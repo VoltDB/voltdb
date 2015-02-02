@@ -162,7 +162,16 @@ public class AsyncCompilerAgent {
                     }
                 }
             }
-            if (!hasDDL) {
+            if (hasDDL == null) {
+                // we saw neither DDL or DQL/DML.  Make sure that we get a
+                // response back to the client
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Failed to plan, no SQL statement provided.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
+            else if (!hasDDL) {
                 final AsyncCompilerResult result = compileAdHocPlan(w);
                 w.completionHandler.onCompletion(result);
             }
