@@ -440,16 +440,20 @@ public class HTTPAdminListener {
             try {
                 DeploymentType newDeployment = m_mapper.readValue(deployment, DeploymentType.class);
                 if (newDeployment == null) {
-                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse deployment information."));
                     return;
                 }
                 //For users that are listed if they exists without password set their password to current else password will get changed for existing user.
                 //New users if valid will get updated.
                 //For Scrambled passowrd this will work also but new passwords will be unscrambled
                 //TODO: add switch to post to scramble??
-                if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled()) {
+                if (newDeployment.getSecurity() != null) {
                     DeploymentType currentDeployment = this.getDeployment();
                     List<User> users = currentDeployment.getUsers().getUser();
+                    if (newDeployment.getSecurity().isEnabled() && (users == null || users.isEmpty())) {
+                        response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Enabling security without any users is not allowed."));
+                        return;
+                    }
                     for (UsersType.User user : newDeployment.getUsers().getUser()) {
                         if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
                             for (User u : users) {
@@ -462,6 +466,10 @@ public class HTTPAdminListener {
                 }
 
                 String dep = CatalogUtil.getDeployment(newDeployment);
+                if (dep == null || dep.trim().length() <= 0) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
                 Object[] params = new Object[2];
                 params[0] = null;
                 params[1] = dep;
