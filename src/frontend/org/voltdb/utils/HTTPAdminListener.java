@@ -447,9 +447,13 @@ public class HTTPAdminListener {
                 //New users if valid will get updated.
                 //For Scrambled passowrd this will work also but new passwords will be unscrambled
                 //TODO: add switch to post to scramble??
-                if (newDeployment.getSecurity() != null) {
+                if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled()) {
                     DeploymentType currentDeployment = this.getDeployment();
-                    List<User> users = currentDeployment.getUsers().getUser();
+                    //Merge passwords for existing users.
+                    List<User> users = null;
+                    if (currentDeployment.getUsers() != null) {
+                        users = currentDeployment.getUsers().getUser();
+                    }
                     if (newDeployment.getSecurity().isEnabled() && (users == null || users.isEmpty())) {
                         response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Enabling security without any users is not allowed."));
                         return;
