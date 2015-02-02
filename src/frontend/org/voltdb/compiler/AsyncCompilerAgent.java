@@ -329,7 +329,9 @@ public class AsyncCompilerAgent {
             }
             if (work.sqlStatements.length > 1 && totalQuestionMarkParameters > 0) {
                 return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("Not support for multiple AdHoc statements with parameters in one procedure call"));
+                        String.format("The @AdHoc stored procedure when called with more than one parameter "
+                                + "must be passed a single parameterized SQL statement as its first parameter. "
+                                + "Pass each parameterized SQL statement to a separate callProcedure invocation."));
             }
 
             if (totalQuestionMarkParameters != work.userParamSet.length) {

@@ -605,7 +605,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
             verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1"});
 
             // test batch question mark parameter guards
-            String errorMsg = "Not support for multiple AdHoc statements with parameters in one procedure call";
+            String errorMsg = "The @AdHoc stored procedure when called with more than one parameter "
+                    + "must be passed a single parameterized SQL statement as its first parameter. "
+                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
             adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = ?;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
