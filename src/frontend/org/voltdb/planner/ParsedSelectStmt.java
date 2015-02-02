@@ -902,7 +902,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
 
         // check if limit can be pushed down
-        m_limitCanPushdown = !m_distinct;
+        m_limitCanPushdown = (hasLimit() && !m_distinct);
         if (m_limitCanPushdown) {
             for (ParsedColInfo col : m_displayColumns) {
                 AbstractExpression rootExpr = col.expression;
@@ -1320,10 +1320,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return Collections.unmodifiableList(m_orderColumns);
     }
 
+    private boolean hasLimit() {
+        return m_limit != -1 || m_limitParameterId != -1;
+    }
+
+    private boolean hasOffset() {
+        return m_offset > 0 || m_offsetParameterId != -1;
+    }
+
     @Override
     public boolean hasLimitOrOffset() {
-        if ((m_limit != -1) || (m_limitParameterId != -1) ||
-            (m_offset > 0) || (m_offsetParameterId != -1)) {
+        if (hasLimit() || hasOffset()) {
             return true;
         }
         return false;

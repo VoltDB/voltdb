@@ -1068,7 +1068,12 @@ public class QuerySpecification extends QueryExpression {
 
         int limitCount = Integer.MAX_VALUE;
 
+        // A VoltDB extension to support OFFSET without LIMIT
+        if (sortAndSlice.limitCondition != null
+                && sortAndSlice.limitCondition.getRightNode() != null) {
+        /* disable 1 line ...
         if (sortAndSlice.limitCondition != null) {
+        ... disabled 1 line */
             Integer limit =
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);

@@ -977,18 +977,21 @@ public abstract class StatementDMQL extends Statement {
                 }
                 result.add(offset);
 
-                // read limit. it may be a parameter token.
-                VoltXMLElement limit = new VoltXMLElement("limit");
-                if (limitCondition.nodes[1].isParam == false) {
-                    Integer limitValue = (Integer)limitCondition.nodes[1].getValue(session);
-                    Expression expr = new ExpressionValue(limitValue,
-                            org.hsqldb_voltpatches.types.Type.SQL_BIGINT);
-                    limit.children.add(expr.voltGetXML(session));
-                    limit.attributes.put("limit", limitValue.toString());
-                } else {
-                    limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
+                // Limit may be null (offset with no limit), or
+                // it may be a parameter
+                if (limitCondition.nodes[1] != null) {
+                    VoltXMLElement limit = new VoltXMLElement("limit");
+                    if (limitCondition.nodes[1].isParam == false) {
+                        Integer limitValue = (Integer)limitCondition.nodes[1].getValue(session);
+                        Expression expr = new ExpressionValue(limitValue,
+                                org.hsqldb_voltpatches.types.Type.SQL_BIGINT);
+                        limit.children.add(expr.voltGetXML(session));
+                        limit.attributes.put("limit", limitValue.toString());
+                    } else {
+                        limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
+                    }
+                    result.add(limit);
                 }
-                result.add(limit);
 
             } catch (HsqlException ex) {
                 // XXX really?

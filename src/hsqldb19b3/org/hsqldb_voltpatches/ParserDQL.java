@@ -1263,11 +1263,14 @@ public class ParserDQL extends ParserBase {
                      && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
-        if (e2.isParam()) {
-            e2.setDataType(session, Type.SQL_INTEGER);
-        } else {
-            valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
-                      && ((Integer) e2.getValue(null)).intValue() >= 0);
+        // Following line is a VoltDB patch to address ENG-7160
+        if (e2 != null) {
+            if (e2.isParam()) {
+                e2.setDataType(session, Type.SQL_INTEGER);
+            } else {
+                valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
+                        && ((Integer) e2.getValue(null)).intValue() >= 0);
+            }
         }
 
         if (valid) {
