@@ -136,7 +136,7 @@ class FastSerializer:
 
     def __init__(self, host = None, port = 21212, username = "",
                  password = "", dump_file_path = None,
-                 connect_timeout = None,
+                 connect_timeout = 8,
                  procedure_timeout = None,
                  default_timeout = None):
         """
@@ -245,17 +245,11 @@ class FastSerializer:
 
         if not username is None and not password is None and not host is None:
             assert not self.socket is None
-            if connect_timeout > 0.0:
-                self.socket.settimeout(connect_timeout)
-            else:
-                self.socket.settimeout(None)
+            self.socket.settimeout(connect_timeout)
             self.authenticate(username, password)
 
         if self.socket:
-            if self.default_timeout > 0:
-                self.socket.settimeout(self.default_timeout)
-            else:
-                self.socket.settimeout(None)
+            self.socket.settimeout(self.default_timeout)
 
     def __compileStructs(self):
         # Compiled structs for each type
