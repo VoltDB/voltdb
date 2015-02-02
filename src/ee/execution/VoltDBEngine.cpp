@@ -1913,8 +1913,10 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
         int64_t partitionSequenceNumber = taskInfo.readLong();
         int64_t mpSequenceNumber = taskInfo.readLong();
-        m_drStream->setLastCommittedSequenceNumber(partitionSequenceNumber);
-        if (m_drReplicatedStream) {
+        if (partitionSequenceNumber >= 0) {
+            m_drStream->setLastCommittedSequenceNumber(partitionSequenceNumber);
+        }
+        if (m_drReplicatedStream && mpSequenceNumber >= 0) {
             m_drReplicatedStream->setLastCommittedSequenceNumber(mpSequenceNumber);
         }
         break;

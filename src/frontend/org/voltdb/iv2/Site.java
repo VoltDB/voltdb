@@ -932,10 +932,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setDRSequenceNumbers(long partitionSequenceNumber, long mpSequenceNumber) {
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber) {
+        if (partitionSequenceNumber == null && mpSequenceNumber == null) return;
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(16);
-        paramBuffer.putLong(partitionSequenceNumber);
-        paramBuffer.putLong(mpSequenceNumber);
+        paramBuffer.putLong(partitionSequenceNumber != null ? partitionSequenceNumber : Long.MIN_VALUE);
+        paramBuffer.putLong(mpSequenceNumber != null ? mpSequenceNumber : Long.MIN_VALUE);
         m_ee.executeTask(TaskType.SET_DR_SEQUENCE_NUMBERS, paramBuffer);
     }
 
@@ -1125,10 +1126,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     catalogTable.getSignature());
         }
 
-        Long partitionDRSequenceNumber;
-        if (drSequenceNumbers != null && (partitionDRSequenceNumber = drSequenceNumbers.get(m_partitionId)) != null) {
+        if (drSequenceNumbers != null) {
+            Long partitionDRSequenceNumber = drSequenceNumbers.get(m_partitionId);
             Long mpDRSequenceNumber = drSequenceNumbers.get(MpInitiator.MP_INIT_PID);
-            assert (mpDRSequenceNumber != null);
             setDRSequenceNumbers(partitionDRSequenceNumber, mpDRSequenceNumber);
         } else if (requireExistingSequenceNumbers) {
             VoltDB.crashLocalVoltDB("Could not find DR sequence number for partition " + m_partitionId);

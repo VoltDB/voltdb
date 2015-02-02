@@ -1305,7 +1305,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void setDRSequenceNumbers(long partitionSequenceNumber, long mpSequenceNumber) {}
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber) {}
 
     @Override
     public void toggleProfiler(int toggle)

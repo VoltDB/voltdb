@@ -171,7 +171,7 @@ public interface SiteProcedureConnection {
 
     public Pair<Long, Long> getDRSequenceNumbers();
 
-    public void setDRSequenceNumbers(long partitionSequenceNumber, long mpSequenceNumber);
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber);
 
     public void toggleProfiler(int toggle);
 
