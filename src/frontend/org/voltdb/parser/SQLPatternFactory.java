@@ -73,6 +73,11 @@ public class SQLPatternFactory
             return retElem;
         }
 
+        public static SQLPatternPart anyClause()
+        {
+            return new SQLPatternPartString(".+");
+        }
+
         public static SQLPatternPart capture(SQLPatternPart part)
         {
             return capture(null, part);
@@ -118,12 +123,22 @@ public class SQLPatternFactory
 
         public static SQLPatternPart symbol()
         {
-            return new SQLPatternPartElement("[a-z][a-z0-9_]+");
+            return new SQLPatternPartElement("[a-z][a-z0-9_]*");
+        }
+
+        public static SQLPatternPart ddlName()
+        {
+            return new SQLPatternPartElement("[\\w$]+");
         }
 
         public static SQLPatternPart anything()
         {
-            return new SQLPatternPartString(".*");
+            return new SQLPatternPartElement(".*");
+        }
+
+        public static SQLPatternPart integer()
+        {
+            return new SQLPatternPartElement("\\d+");
         }
     }
 

@@ -37,7 +37,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  *
  * Keep the regular expressions private and just expose methods needed for parsing.
  */
-public class SQLParser
+public class SQLParser extends SQLPatternFactory
 {
     public static class Exception extends RuntimeException
     {
@@ -64,92 +64,37 @@ public class SQLParser
     //========== Private Parsing Data ==========
 
     /**
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * PARTITION -- token
-     * \\s+ one or more spaces
-     * (PROCEDURE|TABLE) -- either PROCEDURE or TABLE token
-     * \\s+ -- one or more spaces
-     * .+ -- one or more of any characters
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
+     * Pattern: PARTITION PROCEDURE|TABLE ...
+     *
+     * Capture groups:
+     *  (1) target type: "procedure" or "table"
      */
-    private static final Pattern PAT_PARTITION_ANY_PREAMBLE = Pattern.compile(
-            "(?i)\\APARTITION\\s+(PROCEDURE|TABLE)\\s+.+;\\z"
-            );
+    private static final Pattern PAT_PARTITION_ANY_PREAMBLE =
+            SPF.statement(
+                SPF.token("partition"),
+                SPF.capture(SPF.token("procedure", "table")),
+                SPF.anyClause()
+            ).compile();
 
     /**
+     * Pattern: PARTITION TABLE tablename ON COLUMN columnname
+     *
      * NB supports only unquoted table and column names
      *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * PARTITION -- token
-     * \\s+ -- one or more spaces
-     * TABLE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [table name capture group 1]
-     *    [\\w$]+ -- 1 or more identifier character
-     *        (letters, numbers, dollar sign ($) underscore (_))
-     * \\s+ -- one or more spaces
-     * ON -- token
-     * \\s+ -- one or more spaces
-     * COLUMN -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [column name capture group 2]
-     *    [\\w$]+ -- 1 or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s* -- 0 or more spaces
-     * ; a -- semicolon
-     * \\z -- end of string
-     * </pre>
+     * Capture groups:
+     *  (1) table name
+     *  (2) column name
      */
-    private static final Pattern PAT_PARTITION_TABLE = Pattern.compile(
-            "(?i)\\APARTITION\\s+TABLE\\s+([\\w$]+)\\s+ON\\s+COLUMN\\s+([\\w$]+)\\s*;\\z"
-            );
+    private static final Pattern PAT_PARTITION_TABLE =
+        SPF.statement(
+            SPF.token("partition"), SPF.token("table"), SPF.capture(SPF.ddlName()),
+            SPF.token("on"), SPF.token("column"), SPF.capture(SPF.ddlName())
+        ).compile();
 
     /**
-     * PARTITION PROCEDURE statement
-     * NB supports only unquoted table and column names
+     * PARTITION PROCEDURE procname ON TABLE tablename COLUMN columnname [PARAMETER paramnum]
      *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * PARTITION -- token
-     * \\s+ -- one or more spaces
-     * PROCEDURE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [procedure name capture group 1]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s+ -- one or more spaces
-     * ON -- token
-     * \\s+ -- one or more spaces
-     * TABLE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [table name capture group 2]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s+ -- one or more spaces
-     * COLUMN -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [column name capture group 3]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * (?:\\s+PARAMETER\\s+(\\d+))? 0 or 1 parameter clause [non-capturing]
-     *    \\s+ -- one or more spaces
-     *    PARAMETER -- token
-     *    \\s+ -- one or more spaces
-     *    \\d+ -- one ore more number digits [parameter index capture group 4]
-     * \\s* -- 0 or more spaces
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
+     * NB supports only unquoted table and column names
      *
      * Capture groups:
      *  (1) Procedure name
@@ -157,10 +102,15 @@ public class SQLParser
      *  (3) Column name
      *  (4) Parameter number
      */
-    private static final Pattern PAT_PARTITION_PROCEDURE = Pattern.compile(
-                "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
-                "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z");
+    private static final Pattern PAT_PARTITION_PROCEDURE =
+        SPF.statement(
+            SPF.token("partition"), SPF.token("procedure"), SPF.capture(SPF.ddlName()),
+            SPF.token("on"), SPF.token("table"), SPF.capture(SPF.ddlName()),
+            SPF.token("column"), SPF.capture(SPF.ddlName()),
+            SPF.optional(SPF.clause(SPF.token("parameter"), SPF.capture(SPF.integer())))
+        ).compile();
 
+    //TODO: Convert to pattern factory usage below this point.
 
     /**
      * CREATE PROCEDURE from Java class statement regex
