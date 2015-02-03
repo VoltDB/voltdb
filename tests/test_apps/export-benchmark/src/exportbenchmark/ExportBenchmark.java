@@ -34,6 +34,10 @@
 
 package exportbenchmark;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.CLIConfig;
@@ -63,8 +67,13 @@ public class ExportBenchmark {
     final Client client;
     // Validated CLI config
     final ExportBenchConfig config;
-    // Stats collected during run
+    // Statistics manager objects from the client
+    final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
+    // Timer for periodic stats
+    Timer timer;
+    
+    static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
     
     /**
      * Uses included {@link CLIConfig} class to
@@ -116,6 +125,22 @@ public class ExportBenchmark {
         client = ClientFactory.createClient(clientConfig);
         
         fullStatsContext = client.createStatsContext();
+        periodicStatsContext = client.createStatsContext();
+    }
+    
+    /**
+     * Create a Timer task to display performance data on the Vote procedure
+     * It calls printStatistics() every displayInterval seconds
+     */
+    public void schedulePeriodicStats() {
+        timer = new Timer();
+        TimerTask statsPrinting = new TimerTask() {
+            @Override
+            public void run() { printStatistics(); }
+        };
+        timer.scheduleAtFixedRate(statsPrinting,
+                                  config.displayinterval * 1000,
+                                  config.displayinterval * 1000);
     }
     
     /**
@@ -237,6 +262,12 @@ public class ExportBenchmark {
         
         connect(config.servers);
         
+        // reset the stats after warmup
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
+        
+        schedulePeriodicStats();
+        
         // Insert objects
         long startTime = System.nanoTime();
         try {
@@ -264,9 +295,27 @@ public class ExportBenchmark {
         }
         
         // See how much time elapsed
+        timer.cancel();
         long estimatedTime = System.nanoTime() - startTime;
         System.out.println("Export time elapsed (ms) for " + config.count + " objects: " + estimatedTime/1000000);
         printResults();
+    }
+    
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public synchronized void printStatistics() {
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+
+        // Print an ISO8601 timestamp (of the same kind Python logging uses) to help
+        // log merger correlate correctly
+        System.out.print(LOG_DF.format(new Date(stats.getEndTimestamp())));
+        System.out.printf(" Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.99999));
     }
     
     /**
