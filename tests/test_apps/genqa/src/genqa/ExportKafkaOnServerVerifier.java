@@ -322,7 +322,7 @@ public class ExportKafkaOnServerVerifier {
         consumersLatch.await();
         consumersLatch2.await();
         System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows);
-        if (consumedRows.get() != expectedRows) {
+        if (consumedRows.get() < expectedRows) {
             System.out.println("ERROR: Exported row count does not match consumed rows.");
         }
         //For shutdown hook to not stop twice.
