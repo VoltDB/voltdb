@@ -112,6 +112,10 @@ public class VoltZK {
     public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(elasticJoinActiveBlockers, "join_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
+
+    // Synchronized State Machine
+    public static final String syncStateMachine = "/db/synchronized_states";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -126,7 +130,8 @@ public class VoltZK {
             leaders_globalservice,
             lastKnownLiveNodes,
             elasticJoinActiveBlockers,
-            request_truncation_snapshot
+            request_truncation_snapshot,
+            syncStateMachine,
     };
 
     /**
