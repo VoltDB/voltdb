@@ -64,17 +64,20 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             long txnId,
                                             Map<Integer, Long> partitionTransactionIds,
                                             Map<Integer, Long> partitionUniqueIds,
-                                            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+                                            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
                                             JSONObject jsData,
                                             SystemProcedureExecutionContext context,
                                             final VoltTable result,
                                             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                            Map<Integer, Long> drSequenceNumbers,
                                             SiteTracker tracker,
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
     {
-        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastUniqueIds, jsData, context,
-                result, exportSequenceNumbers, tracker, hashinatorData, timestamp, context.getNumberOfPartitions());
+        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
+                partitionUniqueIds, remoteDCLastIds,
+                jsData, context, result, exportSequenceNumbers, drSequenceNumbers,
+                tracker, hashinatorData, timestamp, context.getNumberOfPartitions());
     }
 
     Callable<Boolean> createSetupInternal(String file_path,
@@ -82,11 +85,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                     long txnId,
                                                     Map<Integer, Long> partitionTransactionIds,
                                                     Map<Integer, Long> partitionUniqueIds,
-                                                    Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+                                                    Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
                                                     JSONObject jsData,
                                                     SystemProcedureExecutionContext context,
                                                     final VoltTable result,
                                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                    Map<Integer, Long> drSequenceNumbers,
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
                                                     long timestamp,
@@ -153,8 +157,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds,
-                remoteDCLastUniqueIds, context,
-                exportSequenceNumbers, tracker, hashinatorData, timestamp,
+                remoteDCLastIds, context,
+                exportSequenceNumbers, drSequenceNumbers, tracker, hashinatorData, timestamp,
                 newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks);
     }
@@ -164,9 +168,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
                                                   final Map<Integer, Long> partitionUniqueIds,
-                                                  final Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+                                                  final Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                  final Map<Integer, Long> drSequenceNumbers,
                                                   final SiteTracker tracker,
                                                   final HashinatorSnapshotData hashinatorData,
                                                   final long timestamp,
@@ -185,7 +190,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 final AtomicInteger numTables = new AtomicInteger(tables.length);
 
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                        txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastUniqueIds, context, exportSequenceNumbers,
+                        txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastIds, context, exportSequenceNumbers,
+                        drSequenceNumbers,
                         hashinatorData,
                         timestamp,
                         newPartitionCount);
@@ -274,9 +280,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             Map<Integer, Long> partitionUniqueIds,
-            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
             SystemProcedureExecutionContext context,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             HashinatorSnapshotData hashinatorData,
             long timestamp, int newPartitionCount) throws IOException
     {
@@ -290,9 +297,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 tables,
                 context.getHostId(),
                 exportSequenceNumbers,
+                drSequenceNumbers,
                 partitionTransactionIds,
                 partitionUniqueIds,
-                remoteDCLastUniqueIds,
+                remoteDCLastIds,
                 instId,
                 timestamp,
                 newPartitionCount);

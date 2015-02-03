@@ -45,10 +45,12 @@ TupleStreamBase::TupleStreamBase()
       // calls appendTupple with LONG_MIN transaction ids
       // this allows initial ticks to succeed after rejoins
       m_openSpHandle(0),
-      m_openSpUniqueId(0),
+      m_openSequenceNumber(-1),
+      m_openUniqueId(0),
       m_openTransactionUso(0),
       m_committedSpHandle(0), m_committedUso(0),
-      m_committedSpUniqueId(0)
+      m_committedSequenceNumber(-1),
+      m_committedUniqueId(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -93,7 +95,7 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, int64_t spUniqueId, bool sync, bool flush)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
 {
     if (currentSpHandle < m_openSpHandle)
     {
@@ -133,22 +135,24 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     if (m_openSpHandle < currentSpHandle && currentSpHandle != lastCommittedSpHandle)
     {
         if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
-            endTransaction(m_openSpUniqueId);
+            endTransaction(m_openSequenceNumber, m_openUniqueId);
         }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
         //<< currentSpHandle << ")" << std::endl;
         m_committedUso = m_uso;
-        m_committedSpUniqueId = m_openSpUniqueId;
+        m_committedSequenceNumber = m_openSequenceNumber;
+        m_committedUniqueId = m_openUniqueId;
         // Advance the tip to the new transaction.
         m_committedSpHandle = m_openSpHandle;
         m_openSpHandle = currentSpHandle;
-        m_openSpUniqueId = std::max(spUniqueId, m_openSpUniqueId);
+        m_openSequenceNumber++;
+        m_openUniqueId = uniqueId;
 
         if (flush) {
             extendBufferChain(0);
         }
 
-        beginTransaction(uniqueId, spUniqueId);
+        beginTransaction(m_openSequenceNumber, uniqueId);
     }
 
     // now check to see if the lastCommittedSpHandle tells us that our open
@@ -159,12 +163,12 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
         //lastCommittedSpHandle << ")" << std::endl;
         if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
-            endTransaction(m_openSpUniqueId);
+            endTransaction(m_openSequenceNumber, m_openUniqueId);
         }
-        m_committedSpUniqueId = m_openSpUniqueId;
+        m_committedSequenceNumber = m_openSequenceNumber;
         m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
-        m_openSpUniqueId = std::max(spUniqueId, m_openSpUniqueId);
+        m_committedUniqueId = m_openUniqueId;
 
         if (flush) {
             extendBufferChain(0);
@@ -244,7 +248,8 @@ void TupleStreamBase::rollbackTo(size_t mark)
         if (m_currBlock == NULL) {
             extendBufferChain(m_defaultCapacity);
         }
-        m_currBlock->lastSpUniqueId(m_committedSpUniqueId);
+        m_currBlock->recordCompletedTxnForDR(m_committedSequenceNumber, m_committedUniqueId);
+        m_openSequenceNumber = m_committedSequenceNumber;
     }
 }
 
@@ -303,7 +308,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (openTransaction) {
         size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
         ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
-        m_currBlock->startSpUniqueId(m_openSpUniqueId);
+        m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
         m_currBlock->recordLastBeginTxnOffset();
         m_currBlock->consumed(partialTxnLength);
         ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);
@@ -343,6 +348,6 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          * in calls to this procedure may be called right after
          * these.
          */
-        commit(lastCommittedSpHandle, maxSpHandle, maxSpHandle, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::min(), timeInMillis < 0 ? true : false, true);
+        commit(lastCommittedSpHandle, maxSpHandle, maxSpHandle, std::numeric_limits<int64_t>::min(), timeInMillis < 0 ? true : false, true);
     }
 }

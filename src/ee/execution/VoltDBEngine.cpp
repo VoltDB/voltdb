@@ -1900,6 +1900,27 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
         break;
     }
+    case TASK_TYPE_GET_DR_SEQUENCE_NUMBERS:
+        m_resultOutput.writeInt(static_cast<int32_t>(2 * sizeof(int64_t)));
+        m_resultOutput.writeLong(m_drStream->getLastCommittedSequenceNumber());
+        if (m_drReplicatedStream) {
+            m_resultOutput.writeLong(m_drReplicatedStream->getLastCommittedSequenceNumber());
+        } else {
+            m_resultOutput.writeLong(std::numeric_limits<int64_t>::min());
+        }
+        break;
+    case TASK_TYPE_SET_DR_SEQUENCE_NUMBERS: {
+        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+        int64_t partitionSequenceNumber = taskInfo.readLong();
+        int64_t mpSequenceNumber = taskInfo.readLong();
+        if (partitionSequenceNumber >= 0) {
+            m_drStream->setLastCommittedSequenceNumber(partitionSequenceNumber);
+        }
+        if (m_drReplicatedStream && mpSequenceNumber >= 0) {
+            m_drReplicatedStream->setLastCommittedSequenceNumber(mpSequenceNumber);
+        }
+        break;
+    }
     default:
         throwFatalException("Unknown task type %d", taskType);
     }

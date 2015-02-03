@@ -416,6 +416,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public Pair<Long, Long> getDRSequenceNumbers()
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
     public void toggleProfiler(int toggle)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -459,6 +471,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

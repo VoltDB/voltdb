@@ -453,7 +453,9 @@ enum RecoveryMsgType {
 // ------------------------------------------------------------------
 enum TaskType {
     TASK_TYPE_VALIDATE_PARTITIONING = 0,
-    TASK_TYPE_APPLY_BINARY_LOG = 1
+    TASK_TYPE_APPLY_BINARY_LOG = 1,
+    TASK_TYPE_GET_DR_SEQUENCE_NUMBERS = 2,
+    TASK_TYPE_SET_DR_SEQUENCE_NUMBERS = 3
 };
 
 
