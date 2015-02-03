@@ -27,37 +27,32 @@ import org.hsqldb_voltpatches.HSQLDDLInfo;
  *
  * Keep the regular expressions private and just expose methods needed for parsing.
  */
-public class HSQLLexer
+public class HSQLLexer extends SQLPatternFactory
 {
     //private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
 
-    //========== Private Parsing Data ==========
+    //===== Private parsing data
 
     // Glean some basic info about DDL statements sent to HSQLDB
-    private static final Pattern HSQL_DDL_PREPROCESSOR = Pattern.compile(
-            "^\\s*" +  // start of line, 0 or more whitespace
-            "(create|drop|alter)" + // DDL commands we're looking for
-            "\\s+" + // one or more whitespace
-            "((assume)?unique\\s+)?" + // assume | unique for index parsing
-            "(table|view|index)" +
-            "\\s+" + // one or more whitespace
-            "([a-z][a-z0-9_]*)" + // table/view/index name symbol
-            "(\\s+on\\s+([a-z][a-z0-9_]*))?" + // on table/view second name
-            ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-            );
+    private static final Pattern HSQL_DDL_PREPROCESSOR =
+        SPF.statementLeader(
+            SPF.capture("verb", SPF.token("create", "drop", "alter")),
+            SPF.capture("unique", SPF.optional(SPF.token("unique", "assumeunique"))),
+            SPF.capture("object", SPF.token("table", "view", "index")),
+            SPF.capture("name", SPF.symbol()),  // table/view/index name
+            SPF.optional(SPF.clause(
+                    SPF.token("on"),
+                    SPF.capture("subject", SPF.symbol())))
+        ).compile();
 
-    // does ddl the statement end with cascade or have if exists in the right place
-    private static final Pattern DDL_IFEXISTS_OR_CASCADE_CHECK = Pattern.compile(
-            "^.*?" + // start of line, then anything (greedy)
-            "(?<ie>\\s+if\\s+exists)?" + // may contain if exists preceded by whitespace
-            "(?<c>\\s+cascade)?" + // may contain cascade preceded by whitespace
-            "\\s*;?\\s*" + // then optional whitespace, a single optional semi, then ws
-            "$", // end of line
-            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-            );
+    // Does the ddl statement end with cascade or have if exists in the right place?
+    private static final Pattern DDL_IFEXISTS_OR_CASCADE_CHECK =
+        SPF.statementTrailer(
+            SPF.capture("ie", SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exists")))),
+            SPF.capture("c", SPF.optional(SPF.clause(SPF.token("cascade"))))
+        ).compile();
 
-    //========== Public Interface ==========
+    //===== Public interface
 
     /**
      * Glean some basic info about DDL statements sent to HSQLDB
@@ -67,24 +62,24 @@ public class HSQLLexer
 
         Matcher matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
         if (matcher.find()) {
-            String verbString = matcher.group(1);
+            String verbString = matcher.group("verb");
             HSQLDDLInfo.Verb verb = HSQLDDLInfo.Verb.get(verbString);
             if (verb == null) {
                 return null;
             }
 
-            String nounString = matcher.group(4);
+            String nounString = matcher.group("object");
             HSQLDDLInfo.Noun noun = HSQLDDLInfo.Noun.get(nounString);
             if (noun == null) {
                 return null;
             }
 
-            String name = matcher.group(5);
+            String name = matcher.group("name");
             if (name == null) {
                 return null;
             }
 
-            String secondName = matcher.group(7);
+            String secondName = matcher.group("subject");
             if (secondName != null) {
                 secondName = secondName.toLowerCase();
             }

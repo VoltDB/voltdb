@@ -33,11 +33,66 @@ import org.voltcore.logging.VoltLogger;
  *
  * Avoid external dependencies since this is linked with the client.
  */
-public class SQLLexer
+public class SQLLexer extends SQLPatternFactory
 {
+
+    //===== Fundamental (not derived) parsing data
+
     private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
 
-    //========== Private Parsing Data ==========
+    private static class VerbToken
+    {
+        final String token;
+        final boolean supported;
+
+        VerbToken(String token, boolean supported)
+        {
+            this.token = token;
+            this.supported = supported;
+        }
+    };
+
+    private final static VerbToken[] VERB_TOKENS = {
+        // Supported verbs
+        new VerbToken("alter", true),
+        new VerbToken("create", true),
+        new VerbToken("drop", true),
+        new VerbToken("export", true),
+        new VerbToken("partition", true),
+        // Unsupported verbs
+        new VerbToken("import", false)
+    };
+
+    private static class ObjectToken
+    {
+        final String token;
+        final boolean renameable;
+
+        ObjectToken(String token, boolean renameable)
+        {
+            this.token = token;
+            this.renameable = renameable;
+        }
+    };
+
+    private final static ObjectToken[] OBJECT_TOKENS = {
+        // Rename-able objects
+        new ObjectToken("table", true),
+        new ObjectToken("index", true),
+        // Non-rename-able objects
+        new ObjectToken("view", false),
+        new ObjectToken("procedure", false),
+        new ObjectToken("role", false)
+    };
+
+    private final static String[] MODIFIER_TOKENS = {
+        "assumeunique", "unique"
+    };
+
+    static final char   BLOCK_DELIMITER_CHAR = '#';
+    static final String BLOCK_DELIMITER = "###";
+
+    //===== Special non-DDL/DML/SQL patterns
 
     // Match single-line comments
     private static final Pattern PAT_SINGLE_LINE_COMMENT = Pattern.compile(
@@ -45,61 +100,33 @@ public class SQLLexer
             "--" + // start of comment
             ".*$"); // everything to end of line
 
+    private static final Pattern PAT_STRIP_CSTYLE_COMMENTS = Pattern.compile(
+            "/\\*(.|\\n)*?\\*/"
+            );
+
+    //===== Derived parsing data (populated in init() on first call to method that needs it)
+
+    // Guards one time initialization of derived patterns.
+    private static boolean s_initialized = false;
+
     // Simplest possible SQL DDL token lexer
-    private static final Pattern PAT_ANY_DDL_FIRST_TOKEN = Pattern.compile(
-            "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|export|import|partition)" + // tokens we consider DDL
-            "\\s+", // one or more whitespace
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
-            );
+    private static Pattern PAT_ANY_DDL_FIRST_TOKEN = null;
 
-    // Pattern to crudely recognize all statements we understand.
-    private static final Pattern PAT_ALL_HANDLED_PREAMBLES = Pattern.compile(
-            "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|export|partition)" + // DDL we're ready to handle
-            "\\s+" + // one or more whitespace
-            "(table|assumeunique|unique|index|view|procedure|role)" +
-            "\\s+" + // one or more whitespace
-            ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
-            );
-
-    // Don't accept these DDL tokens yet
-    private static final Pattern PAT_UNSUPPORTED_TOKENS = Pattern.compile(
-            "^\\s*" +  // start of line, 0 or more whitespace
-            "(import)" + // DDL we're not ready to handle
-            "\\s+" + // one or more whitespace
-            ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
-            );
-
-    // Also, don't accept RENAME for the tokens we do take yet
-    private static final Pattern PAT_UNSUPPORTED_RENAME_OPS = Pattern.compile(
-            "^\\s*" +  // start of line, 0 or more whitespace
-            "alter" + // DDL we're ready to handle
-            "\\s+" + // one or more whitespace
-            "(table|index)" + // but it's gotta be on tables or indexes
-            "\\s+" + // one or more whitespace
-            ".*" + // some stuff
-            "\\s+" + // one or more whitespace
-            "rename" + // VERBOTEN
-            "\\s+" + // one or more whitespace
-            "to" + // VERBOTEN, CONT'D
-            "\\s+" + // one or more whitespace
-            ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
-            );
+    // Generate pattern to detect supported renames (after we know what's allowed).
+    private static Pattern generateRenamePattern(String... renameables)
+    {
+        return SPF.statementLeader(
+                    SPF.token("alter"),
+                    SPF.capture(SPF.token(renameables)),
+                    SPF.optional(SPF.anything()), //TODO: Too forgiving?
+                    SPF.token("rename"), SPF.token("to")).compile();
+    }
 
     // All handled patterns.
-    private static final Pattern[] PAT_WHITELISTS = {
-        PAT_ALL_HANDLED_PREAMBLES
-    };
+    private static Pattern[] PAT_WHITELISTS = null;
 
     // All rejected patterns.
-    private static final Pattern[] PAT_BLACKLISTS = {
-        PAT_UNSUPPORTED_TOKENS,
-        PAT_UNSUPPORTED_RENAME_OPS
-    };
+    private static Pattern[] PAT_BLACKLISTS = null;
 
     // Extracts the table name for DDL batch conflicting command checks.
     private static final Pattern PAT_CREATE_OR_DROP_TABLE_PREAMBLE = Pattern.compile(
@@ -113,20 +140,95 @@ public class SQLLexer
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
-    private static final Pattern PAT_STRIP_CSTYLE_COMMENTS = Pattern.compile(
-            "/\\*(.|\\n)*?\\*/"
-            );
-
     // Matches the start of a SELECT statement
     private static final Pattern PAT_SELECT_STATEMENT_PREAMBLE = Pattern.compile(
             "^select\\s.+", Pattern.CASE_INSENSITIVE);
 
-    //========== Public Data ==========
-
-    static final char   BLOCK_DELIMITER_CHAR = '#';
-    static final String BLOCK_DELIMITER = "###";
-
     //========== Public Methods ==========
+
+    /**
+     * Initialize derived data - call before using any pattern.
+     */
+    private static void initializePatternsOnce()
+    {
+        // Only initialize patterns once.
+        if (s_initialized) {
+            return;
+        }
+
+        // Simplest possible SQL DDL token lexer
+        int supportedVerbCount = 0;
+        int unsupportedVerbCount = 0;
+        String[] verbsAll = new String[VERB_TOKENS.length];
+        for (int i = 0; i < VERB_TOKENS.length; ++i) {
+            verbsAll[i] = VERB_TOKENS[i].token;
+            if (VERB_TOKENS[i].supported) {
+                supportedVerbCount++;
+            }
+            else {
+                unsupportedVerbCount++;
+            }
+        }
+        PAT_ANY_DDL_FIRST_TOKEN =
+                SPF.statementLeader(
+                        SPF.capture(SPF.token(verbsAll))
+                ).compile();
+
+        // All handled (white-listed) patterns.
+        int renameableCount = 0;
+        String[] secondTokens = new String[OBJECT_TOKENS.length + MODIFIER_TOKENS.length];
+        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
+            secondTokens[i] = OBJECT_TOKENS[i].token;
+            if (OBJECT_TOKENS[i].renameable) {
+                renameableCount++;
+            }
+        }
+        for (int j = 0; j < MODIFIER_TOKENS.length; ++j) {
+            secondTokens[OBJECT_TOKENS.length + j] = MODIFIER_TOKENS[j];
+        }
+        String[] verbsSupported = new String[supportedVerbCount];
+        supportedVerbCount = 0;     // Reuse to build supported verb array.
+        for (int i = 0; i < VERB_TOKENS.length; ++i) {
+            if (VERB_TOKENS[i].supported) {
+                verbsSupported[supportedVerbCount++] = VERB_TOKENS[i].token;
+            }
+        }
+        Pattern patSupportedPreambles =
+            SPF.statementLeader(
+                SPF.capture(SPF.token(verbsSupported)),
+                SPF.capture(SPF.token(secondTokens))
+            ).compile();
+        PAT_WHITELISTS = new Pattern[] {
+            patSupportedPreambles
+        };
+
+        // All rejected (black-listed) patterns, including unsupported statement preambles
+        // and ALTER...RENAME for tokens we do not accept yet
+        String[] verbsNotSupported = new String[unsupportedVerbCount];
+        unsupportedVerbCount = 0;   // Reuse to build unsupported verb array.
+        for (int i = 0; i < VERB_TOKENS.length; ++i) {
+            if (!VERB_TOKENS[i].supported) {
+                verbsNotSupported[unsupportedVerbCount++] = VERB_TOKENS[i].token;
+            }
+        }
+        String[] renameables = new String[renameableCount];
+        renameableCount = 0;    // Reused as index for assigning tokens
+        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
+            if (OBJECT_TOKENS[i].renameable) {
+                renameables[renameableCount++] = OBJECT_TOKENS[i].token;
+            }
+        }
+        Pattern patUnsupportedPreambles =
+                SPF.statementLeader(
+                    SPF.capture(SPF.token(verbsNotSupported))
+                ).compile();
+        PAT_BLACKLISTS = new Pattern[] {
+            patUnsupportedPreambles,
+            generateRenamePattern(renameables)
+        };
+
+        s_initialized = true;
+    }
 
     /**
      * Check if a SQL string is a comment.
@@ -135,6 +237,8 @@ public class SQLLexer
      */
     public static boolean isComment(String sql)
     {
+        initializePatternsOnce();
+
         Matcher commentMatcher = PAT_SINGLE_LINE_COMMENT.matcher(sql);
         return commentMatcher.matches();
     }
@@ -146,6 +250,8 @@ public class SQLLexer
      */
     public static boolean isBlockDelimiter(char c)
     {
+        initializePatternsOnce();
+
         return c == BLOCK_DELIMITER_CHAR;
     }
 
@@ -155,6 +261,8 @@ public class SQLLexer
      */
     public static String extractDDLToken(String sql)
     {
+        initializePatternsOnce();
+
         String ddlToken = null;
         Matcher ddlMatcher = PAT_ANY_DDL_FIRST_TOKEN.matcher(sql);
         if (ddlMatcher.find()) {
@@ -165,6 +273,8 @@ public class SQLLexer
 
     /** Remove c-style comments globally and -- comments from the end of lines */
     public static String stripComments(String ddl) {
+        initializePatternsOnce();
+
         ddl = removeCStyleComments(ddl);
         StringBuilder sb = new StringBuilder();
         String[] ddlLines = ddl.split("\n");
@@ -176,6 +286,8 @@ public class SQLLexer
 
     /** Strip -- comments from the end of a single line */
     public static String stripCommentFromLine(String ddlLine) {
+        initializePatternsOnce();
+
         boolean inQuote = false;
         char quoteChar = ' '; // will be written before use
         boolean lastCharWasDash = false;
@@ -216,6 +328,8 @@ public class SQLLexer
      */
     public static String extractDDLTableName(String sql)
     {
+        initializePatternsOnce();
+
         Matcher matcher = PAT_CREATE_OR_DROP_TABLE_PREAMBLE.matcher(sql);
         if (matcher.find()) {
             return matcher.group(2).toLowerCase();
@@ -227,6 +341,8 @@ public class SQLLexer
     // Hopefully this gets whittled away and eventually disappears.
     public static boolean isPermitted(String sql)
     {
+        initializePatternsOnce();
+
         boolean hadWLMatch = false;
         for (Pattern wl : PAT_WHITELISTS) {
             Matcher wlMatcher = wl.matcher(sql);
@@ -270,6 +386,8 @@ public class SQLLexer
      * @return list of individual SQL statements
      */
     public static List<String> splitStatements(final String sql) {
+        initializePatternsOnce();
+
         List<String> statements = new ArrayList<String>();
         // Use a character array for efficient character-at-a-time scanning.
         char[] buf = sql.toCharArray();
@@ -400,6 +518,8 @@ public class SQLLexer
      */
     public static boolean isSelect(String statement)
     {
+        initializePatternsOnce();
+
         return PAT_SELECT_STATEMENT_PREAMBLE.matcher(statement).matches();
     }
 
