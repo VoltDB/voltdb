@@ -578,7 +578,7 @@ public class Benchmark {
 
         InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
         idpt.start();
-        CatalogUpdateThread ddlt = new CatalogUpdateThread(client);
+        DdlThread ddlt = new DdlThread(client);
         ddlt.start();
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();

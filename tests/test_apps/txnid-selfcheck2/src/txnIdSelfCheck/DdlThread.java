@@ -30,7 +30,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 
-public class CatalogUpdateThread extends BenchmarkThread {
+public class DdlThread extends BenchmarkThread {
 
     public static AtomicLong progressInd = new AtomicLong(0);
     final Client client;
@@ -39,8 +39,8 @@ public class CatalogUpdateThread extends BenchmarkThread {
     final String[] createOrDrop = { "create table anothertable (a int);",
                                     "drop table anothertable if exists;" };
 
-    public CatalogUpdateThread(Client client) {
-        setName("CatalogUpdateThread");
+    public DdlThread(Client client) {
+        setName("DdlThread");
         this.client = client;
     }
 
@@ -79,7 +79,7 @@ public class CatalogUpdateThread extends BenchmarkThread {
                 }
             }
             catch (Exception e) {
-                log.error("CatalogUpdateThread threw an error:", e);
+                log.error("DdlThread threw an error:", e);
                 throw new RuntimeException(e);
             }
             count = ++count & 1;
