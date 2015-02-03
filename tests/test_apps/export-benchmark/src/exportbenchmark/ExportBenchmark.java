@@ -42,16 +42,12 @@ import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NullCallback;
-import org.voltdb.client.ProcedureCallback;
-
 
 /**
  * Asychronously sends data to an export table to test VoltDB export performance.
@@ -262,7 +258,7 @@ public class ExportBenchmark {
         
         connect(config.servers);
         
-        // reset the stats after warmup
+        // reset the stats after initialization
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
         
@@ -299,6 +295,9 @@ public class ExportBenchmark {
         long estimatedTime = System.nanoTime() - startTime;
         System.out.println("Export time elapsed (ms) for " + config.count + " objects: " + estimatedTime/1000000);
         printResults();
+        
+        // Cleanup
+        client.close();
     }
     
     /**
