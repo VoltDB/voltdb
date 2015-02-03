@@ -31,7 +31,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -40,9 +39,8 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-public class TruncateTableLoader extends Thread {
+public class TruncateTableLoader extends BenchmarkThread {
 
-    static VoltLogger log = new VoltLogger("HOST");
 
     final Client client;
     final long targetCount;
@@ -61,8 +59,6 @@ public class TruncateTableLoader extends Thread {
 
     TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
         setName("TruncateTableLoader");
-        setDaemon(true);
-
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;

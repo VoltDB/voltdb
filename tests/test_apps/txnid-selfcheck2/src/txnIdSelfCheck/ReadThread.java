@@ -27,7 +27,6 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -37,9 +36,7 @@ import org.voltdb.client.ProcedureCallback;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
-public class ReadThread extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class ReadThread extends BenchmarkThread {
 
     Random r = new Random(0);
     long counter = 0;
@@ -57,8 +54,6 @@ public class ReadThread extends Thread {
             boolean allowInProcAdhoc, float mpRatio, Semaphore permits)
     {
         setName("ReadThread");
-        setDaemon(true);
-
         this.client = client;
         this.threadCount = threadCount;
         this.threadOffset = threadOffset;

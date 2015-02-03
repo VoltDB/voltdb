@@ -35,7 +35,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -54,9 +53,8 @@ import org.voltdb.client.ProcedureCallback;
  *
  * Any procedure failure will fail the test and exit.
  */
-public class LoadTableLoader extends Thread {
+public class LoadTableLoader extends BenchmarkThread {
 
-    static VoltLogger log = new VoltLogger("HOST");
 
     final Client client;
     final long targetCount;
@@ -85,8 +83,6 @@ public class LoadTableLoader extends Thread {
     LoadTableLoader(Client client, String tableName, long targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
             throws IOException, ProcCallException {
         setName("LoadTableLoader-" + tableName);
-        setDaemon(true);
-
         this.client = client;
         this.m_tableName = tableName;
         this.targetCount = targetCount;

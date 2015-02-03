@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -58,7 +59,7 @@ import org.voltdb.utils.MiscUtils;
 
 public class Benchmark {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    static VoltLogger log = new VoltLogger("Benchmark");
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -440,10 +441,20 @@ public class Benchmark {
         log.error("Thread '" + th.getName() + "' is not alive");
         return 1;
     }
+
     private byte reportDeadThread(Thread th, String msg) {
         log.error("Thread '" + th.getName() + "' is not alive, " + msg);
         return 1;
     }
+
+    public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
+        public void uncaughtException(Thread th, Throwable ex) {
+        log.error("Uncaught exception: " + ex.getMessage(), ex);
+        printJStack();
+        System.exit(-1);
+        }
+    };
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.

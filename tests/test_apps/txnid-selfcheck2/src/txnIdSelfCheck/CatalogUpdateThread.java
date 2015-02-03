@@ -26,13 +26,11 @@ package txnIdSelfCheck;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 
-public class CatalogUpdateThread extends Thread {
-
-    static VoltLogger log = new VoltLogger("CatalogUpdateThread");
+public class CatalogUpdateThread extends BenchmarkThread {
 
     public static AtomicLong progressInd = new AtomicLong(0);
     final Client client;
@@ -43,7 +41,6 @@ public class CatalogUpdateThread extends Thread {
 
     public CatalogUpdateThread(Client client) {
         setName("CatalogUpdateThread");
-        setDaemon(true);
         this.client = client;
     }
 
@@ -63,8 +60,7 @@ public class CatalogUpdateThread extends Thread {
                 ClientResponse cr = TxnId2Utils.doAdHoc(client, createOrDrop[count]);
                 if (cr.getStatus() != ClientResponse.SUCCESS) {
                     log.error("Catalog update failed: " + cr.getStatusString());
-                    Benchmark.printJStack();
-                    System.exit(-1);
+                    throw new RuntimeException("stop the world");
                 } else {
                     log.info("Catalog update success #" + Long.toString(progressInd.get()) + " : " + createOrDrop[count]);
                     progressInd.getAndIncrement();
@@ -84,8 +80,7 @@ public class CatalogUpdateThread extends Thread {
             }
             catch (Exception e) {
                 log.error("CatalogUpdateThread threw an error:", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                throw new RuntimeException(e);
             }
             count = ++count & 1;
             try { Thread.sleep(10000); }

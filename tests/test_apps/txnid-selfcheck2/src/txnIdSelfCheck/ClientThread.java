@@ -30,7 +30,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -41,9 +40,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
-public class ClientThread extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class ClientThread extends BenchmarkThread {
 
     static enum Type {
         PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID, ADHOC_MP;
@@ -80,9 +77,6 @@ public class ClientThread extends Thread {
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
-        setDaemon(true);
-
-
         m_type = Type.typeFromId(mpRatio, allowInProcAdhoc);
         m_cid = cid;
         m_client = client;

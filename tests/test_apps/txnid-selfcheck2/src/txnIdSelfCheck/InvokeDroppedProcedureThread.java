@@ -28,16 +28,13 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
-public class InvokeDroppedProcedureThread extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
     Random r = new Random(8278923);
     long counter = 0;
@@ -48,8 +45,6 @@ public class InvokeDroppedProcedureThread extends Thread {
 
     public InvokeDroppedProcedureThread(Client client) {
         setName("InvokeDroppedProcedureThread");
-        setDaemon(true);
-
         this.client = client;
     }
 

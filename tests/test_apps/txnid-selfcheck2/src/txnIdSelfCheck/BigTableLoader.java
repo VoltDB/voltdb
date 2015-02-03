@@ -31,7 +31,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -40,9 +39,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-public class BigTableLoader extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class BigTableLoader extends BenchmarkThread {
 
     final Client client;
     final long targetCount;
@@ -59,8 +56,6 @@ public class BigTableLoader extends Thread {
 
     BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
         setName("BigTableLoader-"+tableName);
-        setDaemon(true);
-
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
