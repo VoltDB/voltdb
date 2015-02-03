@@ -43,6 +43,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
 
@@ -98,20 +99,6 @@ public class ExportBenchmark {
             if (count <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (tableName == null || tableName.isEmpty()) exitWithMessageAndUsage("Table name cannot be blank");
         }
-    }
-    
-    /**
-     * Asyncronous callback procedure for inserting values into the export table
-     */
-    static class fastCallBack implements ProcedureCallback {
-
-        @Override
-        public void clientCallback(ClientResponse clientResponse)
-                throws Exception {
-            // We don't need to do anything
-            return;
-        }
-        
     }
     
     /**
@@ -237,7 +224,7 @@ public class ExportBenchmark {
             String sql = "";
             for (int i = 0; i < config.count; i++) {
                 sql = "INSERT INTO " + config.tableName + " VALUES (" + 4 + "," + 8 + ","  + 16 + "," + 32 + "," + 42.15 + "," + 12.52 + ",'string1'," + 4215 + ");";
-                client.callProcedure(new fastCallBack(), "@AdHoc", sql);
+                client.callProcedure(new NullCallback(), "@AdHoc", sql);
             }
             client.drain();
             System.out.println("Object insertion complete");
