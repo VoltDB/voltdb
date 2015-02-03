@@ -34,6 +34,8 @@
 
 package exportbenchmark;
 
+import java.util.concurrent.CountDownLatch;
+
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.CLIConfig.Option;
@@ -200,22 +202,40 @@ public class ExportBenchmark {
     }
 
     /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
+     *
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
+     */
+    void connect(String servers) throws InterruptedException {
+        System.out.println("Connecting to VoltDB...");
+
+        String[] serverArray = servers.split(",");
+        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+
+        // use a new thread to connect to each server
+        for (final String server : serverArray) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    connectToOneServerWithRetry(server);
+                    connections.countDown();
+                }
+            }).start();
+        }
+        // block until all have connected
+        connections.await();
+    }
+
+    /**
      * Runs the export benchmark test
      */
     private void runTest() throws Exception{
         System.out.println("Test initialization");
         
-        // Server connection
-        try {
-            connectToOneServerWithRetry(config.servers);
-        }
-        catch (Exception e) {
-            System.err.printf("Connection to VoltDB failed");
-            e.printStackTrace();
-            System.exit(1);
-        }
-        System.out.println("Initialization complete");
-        
+        connect(config.servers);
         
         // Insert objects
         long startTime = System.nanoTime();
