@@ -52,13 +52,16 @@ public enum TxnId2Utils {;
                 sleep = true;
             } catch (ProcCallException e) {
                 ClientResponse cr = e.getClientResponse();
-                log.debug(cr.getStatusString());
+                String ss = cr.getStatusString();
+                log.debug(ss);
                 if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
-                    (cr.getStatusString().matches("(?s).*AdHoc transaction [0-9]+ wasn.t planned against the current catalog version.*") ||
-                     cr.getStatusString().matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
-                     cr.getStatusString().matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*"))) {
+                    (ss.matches("(?s).*AdHoc transaction [0-9]+ wasn.t planned against the current catalog version.*") ||
+                     ss.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
+                     ss.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
+                     ss.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*"))) {
+                         log.debug("matched");
                     }
-                else if (cr.getStatusString().matches(".*Server is currently unavailable; try again later.*")) {
+                else if (ss.matches(".*Server is currently unavailable; try again later.*")) {
                     sleep = true;
                 }
                 else {
