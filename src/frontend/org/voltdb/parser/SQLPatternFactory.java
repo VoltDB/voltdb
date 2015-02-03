@@ -157,7 +157,7 @@ public class SQLPatternFactory
             }
         }
         else {
-            retElem.m_trailer = "\\s+.*$";
+            retElem.m_trailer = ".*$";
         }
         retElem.m_flags |= SQLPatternFactory.CHILD_SPACE_SEPARATOR;
         return retElem;

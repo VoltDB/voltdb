@@ -35,7 +35,6 @@ import org.voltcore.logging.VoltLogger;
  */
 public class SQLLexer extends SQLPatternFactory
 {
-
     //===== Fundamental (not derived) parsing data
 
     private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
@@ -104,15 +103,15 @@ public class SQLLexer extends SQLPatternFactory
             "/\\*(.|\\n)*?\\*/"
             );
 
-    //===== Derived parsing data (populated in init() on first call to method that needs it)
+    //===== Derived parsing data (populated in initializePatternsOnce() on first demand)
 
     // Guards one time initialization of derived patterns.
     private static boolean s_initialized = false;
 
-    // Simplest possible SQL DDL token lexer
+    // Simplest possible SQL DDL token lexer. (set in initializePatternsOnce())
     private static Pattern PAT_ANY_DDL_FIRST_TOKEN = null;
 
-    // Generate pattern to detect supported renames (after we know what's allowed).
+    // Generate supported renames (after we know what's allowed).
     private static Pattern generateRenamePattern(String... renameables)
     {
         return SPF.statementLeader(
@@ -122,113 +121,27 @@ public class SQLLexer extends SQLPatternFactory
                     SPF.token("rename"), SPF.token("to")).compile();
     }
 
-    // All handled patterns.
+    // All handled patterns. (set in initializePatternsOnce())
     private static Pattern[] PAT_WHITELISTS = null;
 
-    // All rejected patterns.
+    // All rejected patterns. (set in initializePatternsOnce())
     private static Pattern[] PAT_BLACKLISTS = null;
 
     // Extracts the table name for DDL batch conflicting command checks.
-    private static final Pattern PAT_CREATE_OR_DROP_TABLE_PREAMBLE = Pattern.compile(
-            "^\\s*" +  // start of line, 0 or more whitespace
-            "(create|drop)" + // DDL commands we're looking for
-            "\\s+" + // one or more whitespace
-            "table" +
-            "\\s+" + // one or more whitespace
-            "([a-z][a-z0-9_]*)" + // table name symbol
-            ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
-            );
+    private static final Pattern PAT_TABLE_DDL_PREAMBLE =
+        SPF.statementLeader(
+            SPF.token("create", "drop"),    // DDL commands we're looking for
+            SPF.token("table"),             // target is table
+            SPF.capture(SPF.symbol())       // table name (captured)
+        ).compile();
 
     // Matches the start of a SELECT statement
-    private static final Pattern PAT_SELECT_STATEMENT_PREAMBLE = Pattern.compile(
-            "^select\\s.+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PAT_SELECT_STATEMENT_PREAMBLE =
+        SPF.statementLeader(
+            SPF.token("select")
+        ).compile();
 
     //========== Public Methods ==========
-
-    /**
-     * Initialize derived data - call before using any pattern.
-     */
-    private static void initializePatternsOnce()
-    {
-        // Only initialize patterns once.
-        if (s_initialized) {
-            return;
-        }
-
-        // Simplest possible SQL DDL token lexer
-        int supportedVerbCount = 0;
-        int unsupportedVerbCount = 0;
-        String[] verbsAll = new String[VERB_TOKENS.length];
-        for (int i = 0; i < VERB_TOKENS.length; ++i) {
-            verbsAll[i] = VERB_TOKENS[i].token;
-            if (VERB_TOKENS[i].supported) {
-                supportedVerbCount++;
-            }
-            else {
-                unsupportedVerbCount++;
-            }
-        }
-        PAT_ANY_DDL_FIRST_TOKEN =
-                SPF.statementLeader(
-                        SPF.capture(SPF.token(verbsAll))
-                ).compile();
-
-        // All handled (white-listed) patterns.
-        int renameableCount = 0;
-        String[] secondTokens = new String[OBJECT_TOKENS.length + MODIFIER_TOKENS.length];
-        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
-            secondTokens[i] = OBJECT_TOKENS[i].token;
-            if (OBJECT_TOKENS[i].renameable) {
-                renameableCount++;
-            }
-        }
-        for (int j = 0; j < MODIFIER_TOKENS.length; ++j) {
-            secondTokens[OBJECT_TOKENS.length + j] = MODIFIER_TOKENS[j];
-        }
-        String[] verbsSupported = new String[supportedVerbCount];
-        supportedVerbCount = 0;     // Reuse to build supported verb array.
-        for (int i = 0; i < VERB_TOKENS.length; ++i) {
-            if (VERB_TOKENS[i].supported) {
-                verbsSupported[supportedVerbCount++] = VERB_TOKENS[i].token;
-            }
-        }
-        Pattern patSupportedPreambles =
-            SPF.statementLeader(
-                SPF.capture(SPF.token(verbsSupported)),
-                SPF.capture(SPF.token(secondTokens))
-            ).compile();
-        PAT_WHITELISTS = new Pattern[] {
-            patSupportedPreambles
-        };
-
-        // All rejected (black-listed) patterns, including unsupported statement preambles
-        // and ALTER...RENAME for tokens we do not accept yet
-        String[] verbsNotSupported = new String[unsupportedVerbCount];
-        unsupportedVerbCount = 0;   // Reuse to build unsupported verb array.
-        for (int i = 0; i < VERB_TOKENS.length; ++i) {
-            if (!VERB_TOKENS[i].supported) {
-                verbsNotSupported[unsupportedVerbCount++] = VERB_TOKENS[i].token;
-            }
-        }
-        String[] renameables = new String[renameableCount];
-        renameableCount = 0;    // Reused as index for assigning tokens
-        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
-            if (OBJECT_TOKENS[i].renameable) {
-                renameables[renameableCount++] = OBJECT_TOKENS[i].token;
-            }
-        }
-        Pattern patUnsupportedPreambles =
-                SPF.statementLeader(
-                    SPF.capture(SPF.token(verbsNotSupported))
-                ).compile();
-        PAT_BLACKLISTS = new Pattern[] {
-            patUnsupportedPreambles,
-            generateRenamePattern(renameables)
-        };
-
-        s_initialized = true;
-    }
 
     /**
      * Check if a SQL string is a comment.
@@ -330,7 +243,7 @@ public class SQLLexer extends SQLPatternFactory
     {
         initializePatternsOnce();
 
-        Matcher matcher = PAT_CREATE_OR_DROP_TABLE_PREAMBLE.matcher(sql);
+        Matcher matcher = PAT_TABLE_DDL_PREAMBLE.matcher(sql);
         if (matcher.find()) {
             return matcher.group(2).toLowerCase();
         }
@@ -524,6 +437,90 @@ public class SQLLexer extends SQLPatternFactory
     }
 
     //========== Private Methods ==========
+
+    /**
+     * Initialize derived data - call before using any pattern.
+     */
+    private static void initializePatternsOnce()
+    {
+        // Only initialize patterns once.
+        if (s_initialized) {
+            return;
+        }
+
+        // Simplest possible SQL DDL token lexer
+        int supportedVerbCount = 0;
+        int unsupportedVerbCount = 0;
+        String[] verbsAll = new String[VERB_TOKENS.length];
+        for (int i = 0; i < VERB_TOKENS.length; ++i) {
+            verbsAll[i] = VERB_TOKENS[i].token;
+            if (VERB_TOKENS[i].supported) {
+                supportedVerbCount++;
+            }
+            else {
+                unsupportedVerbCount++;
+            }
+        }
+        PAT_ANY_DDL_FIRST_TOKEN =
+                SPF.statementLeader(
+                        SPF.capture(SPF.token(verbsAll))
+                ).compile();
+
+        // All handled (white-listed) patterns.
+        int renameableCount = 0;
+        String[] secondTokens = new String[OBJECT_TOKENS.length + MODIFIER_TOKENS.length];
+        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
+            secondTokens[i] = OBJECT_TOKENS[i].token;
+            if (OBJECT_TOKENS[i].renameable) {
+                renameableCount++;
+            }
+        }
+        for (int j = 0; j < MODIFIER_TOKENS.length; ++j) {
+            secondTokens[OBJECT_TOKENS.length + j] = MODIFIER_TOKENS[j];
+        }
+        String[] verbsSupported = new String[supportedVerbCount];
+        supportedVerbCount = 0;     // Reuse to build supported verb array.
+        for (int i = 0; i < VERB_TOKENS.length; ++i) {
+            if (VERB_TOKENS[i].supported) {
+                verbsSupported[supportedVerbCount++] = VERB_TOKENS[i].token;
+            }
+        }
+        Pattern patSupportedPreambles =
+            SPF.statementLeader(
+                SPF.capture(SPF.token(verbsSupported)),
+                SPF.capture(SPF.token(secondTokens))
+            ).compile();
+        PAT_WHITELISTS = new Pattern[] {
+            patSupportedPreambles
+        };
+
+        // All rejected (black-listed) patterns, including unsupported statement preambles
+        // and ALTER...RENAME for tokens we do not accept yet
+        String[] verbsNotSupported = new String[unsupportedVerbCount];
+        unsupportedVerbCount = 0;   // Reuse to build unsupported verb array.
+        for (int i = 0; i < VERB_TOKENS.length; ++i) {
+            if (!VERB_TOKENS[i].supported) {
+                verbsNotSupported[unsupportedVerbCount++] = VERB_TOKENS[i].token;
+            }
+        }
+        String[] renameables = new String[renameableCount];
+        renameableCount = 0;    // Reused as index for assigning tokens
+        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
+            if (OBJECT_TOKENS[i].renameable) {
+                renameables[renameableCount++] = OBJECT_TOKENS[i].token;
+            }
+        }
+        Pattern patUnsupportedPreambles =
+                SPF.statementLeader(
+                    SPF.capture(SPF.token(verbsNotSupported))
+                ).compile();
+        PAT_BLACKLISTS = new Pattern[] {
+            patUnsupportedPreambles,
+            generateRenamePattern(renameables)
+        };
+
+        s_initialized = true;
+    }
 
     /** Remove c-style comments from a string aggressively */
     private static String removeCStyleComments(String ddl) {
