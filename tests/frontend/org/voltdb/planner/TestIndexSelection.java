@@ -25,12 +25,14 @@ package org.voltdb.planner;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
 
@@ -320,7 +322,7 @@ public class TestIndexSelection extends PlannerTestCase {
             assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
         }
         {
-            // need to update costing to give more wait to partial index
+            // CREATE INDEX partial_idx_null_e ON c (a) where e is null;
             AbstractPlanNode pn = compile("select * from c where a > 0 and e is NULL;");
             pn = pn.getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
@@ -330,6 +332,7 @@ public class TestIndexSelection extends PlannerTestCase {
             assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_NULL_E\""));
         }
         {
+            // CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
             AbstractPlanNode pn = compile("select * from c where a > 0 and e is not NULL;");
             pn = pn.getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
@@ -338,12 +341,63 @@ public class TestIndexSelection extends PlannerTestCase {
             String json = pn.toJSONString();
             assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"A_PARTIAL_IDX_NOT_NULL_E\""));
         }
+        {
+            // CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
+            // range-scan covering from (A > 0) to end Z_FULL_IDX_A has higher cost
+            AbstractPlanNode pn = compile("select * from c where a > 0 and e = 0;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() != null);
+            AbstractExpression p = ipn.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"A_PARTIAL_IDX_NOT_NULL_E\""));
+        }
+        {
+            // CREATE INDEX a_partial_idx_not_null_e ON c (a) where (d + e) is not null;
+            AbstractPlanNode pn = compile("select * from c where a > 0 and 0 = abs(e + d);");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() != null);
+            AbstractExpression p = ipn.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"A_PARTIAL_IDX_NOT_NULL_D_E\""));
+        }
+        {
+            // CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
+            AbstractPlanNode pn = compile("select * from c where a > 0 and 0 = abs(e + b);");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() != null);
+            AbstractExpression p = ipn.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"A_PARTIAL_IDX_NOT_NULL_E\""));
+        }
+        {
+            // CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
+            // uniquely match (A = 0) Z_FULL_IDX_A has the lowest cost
+            AbstractPlanNode pn = compile("select * from c where a = 0 and e = 0;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() != null);
+            AbstractExpression p = ipn.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
+        }
     }
 
     public void testPartialIndexArbitraryPredicate()
     {
         {
-            AbstractPlanNode pn = compile("select * from c where a > 0 and (e > 0 or d < 5);");
+            // CREATE INDEX partial_idx_or_expr ON c (f) where e > 0 or d < 5;
+            AbstractPlanNode pn = compile("select * from c where f > 0 and (e > 0 or d < 5);");
             pn = pn.getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
             IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
@@ -356,6 +410,7 @@ public class TestIndexSelection extends PlannerTestCase {
     public void testPartialIndexComparisonPredicateExactMatch()
     {
         {
+            // CREATE INDEX partial_idx_or_expr ON c (a) where e > 0 or d < 5; -- expression trees differ
             AbstractPlanNode pn = compile("select * from c where a > 0 and e > 0 or d < 5;");
             pn = pn.getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());

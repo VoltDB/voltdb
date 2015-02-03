@@ -19,8 +19,10 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -238,13 +240,13 @@ public abstract class SubPlanAssembler {
      * post-filters as an optimization
      *
      * @param tableScan The source table.
-     * @param exprs The set of query predicate expressions.
+     * @param coveringExprs The set of query predicate expressions.
      * @param accessPath The access path for the table.
      * @param exactMatchCoveringExprs The output subset of the query predicates that exactly match the
      *        index predicate expression(s)
      * @return TRUE if the index predicate is completely covered by the query expressions.
      */
-    private boolean isPartialIndexPredicateIsCovered(StmtTableScan tableScan, List<AbstractExpression> exprs, AccessPath accessPath, List<AbstractExpression> exactMatchCoveringExprs) {
+    private boolean isPartialIndexPredicateIsCovered(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, AccessPath accessPath, List<AbstractExpression> exactMatchCoveringExprs) {
         assert(accessPath.index != null);
         String predicatejson = accessPath.index.getPredicatejson();
         if (predicatejson.isEmpty()) {
@@ -260,8 +262,6 @@ public abstract class SubPlanAssembler {
             return false;
         }
         List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
-        List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
-        coveringExprs.addAll(exprs);
 
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (exprsToCover.isEmpty()) {
@@ -295,6 +295,9 @@ public abstract class SubPlanAssembler {
                 exprsToCover = removeCoveredExpressions(tableScan, reversedCoveringExpr, exprsToCover);
             }
         }
+
+        // Handle remaining NOT NULL index predicate expressions that can be covered by NULL rejecting expressions
+        exprsToCover = removeNotNullCOveredExpressions(tableScan, coveringExprs, exprsToCover);
 
         // All index predicate expressions must be covered for index to be selected
         return exprsToCover.isEmpty();
@@ -1334,6 +1337,42 @@ public abstract class SubPlanAssembler {
         // @TODO: non-exact match support
         // At the moment, only exact match is supported. Simply return an empty list for now.
         return coveredExprs;
+    }
+
+    /**
+     * Remove NOT NULL expressions that are covered by the NULL-rejecting expressions. For example,
+     * 'COL IS NOT NULL' is covered by the 'COL > 0' NULL-rejecting comparison expression.
+     *
+     * @param tableScan
+     * @param coveringExprs
+     * @param exprsToCover
+     * @return List<AbstractExpression>
+     */
+    protected List<AbstractExpression> removeNotNullCOveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
+        // Collect all TVEs from NULL-rejecting covering expressions
+        Set<TupleValueExpression> coveringTves = new HashSet<TupleValueExpression>();
+        for (AbstractExpression coveringExpr : coveringExprs) {
+            if (ExpressionUtil.isNullRejectingExpression(coveringExpr, tableScan.getTableAlias())) {
+                coveringTves.addAll(ExpressionUtil.getTupleValueExpressions(coveringExpr));
+            }
+        }
+        // For each NOT NULL expression to cover extract the TVE expressions. If all them are also part
+        // of the covering NULL-rejecting collection then this NOT NULL expression is covered
+        Iterator<AbstractExpression> iter = exprsToCover.iterator();
+        while (iter.hasNext()) {
+            AbstractExpression filter = iter.next();
+            if (ExpressionType.OPERATOR_NOT == filter.getExpressionType()) {
+                assert(filter.getLeft() != null);
+                if (ExpressionType.OPERATOR_IS_NULL == filter.getLeft().getExpressionType()) {
+                    assert(filter.getLeft().getLeft() != null);
+                    List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(filter.getLeft().getLeft());
+                    if (coveringTves.containsAll(tves)) {
+                        iter.remove();
+                    }
+                }
+            }
+        }
+        return exprsToCover;
     }
 
     private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
