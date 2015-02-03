@@ -9,4 +9,4 @@ CREATE TABLE allValues (
     value8 TIMESTAMP
 );
 
-EXPORT TABLE valuesToExport;
+EXPORT TABLE allValues;
