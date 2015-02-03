@@ -55,6 +55,7 @@ public class CatalogUpdateThread extends Thread {
     @Override
     public void run() {
         int count = 0;
+        int errcnt = 0;
         while (m_shouldContinue.get()) {
             // call a ddl transaction
             log.info (createOrDrop[count]);
@@ -68,6 +69,17 @@ public class CatalogUpdateThread extends Thread {
                     log.info("Catalog update success #" + Long.toString(progressInd.get()) + " : " + createOrDrop[count]);
                     progressInd.getAndIncrement();
                     Benchmark.txnCount.incrementAndGet();
+                    errcnt = 0;
+                }
+            }
+            catch (ProcCallException e) {
+                ClientResponse cr = e.getClientResponse();
+                if (cr.getStatusString().matches("Unexpected exception applying DDL statements to original catalog: DDL Error: \"object name already exists:.*")) {
+                    if (errcnt > 1) {
+                        log.error("too many catalog update errors");
+                        throw new RuntimeException("stop the world");
+                    } else
+                        errcnt++;
                 }
             }
             catch (Exception e) {
