@@ -19,6 +19,7 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -141,6 +142,24 @@ public abstract class SubPlanAssembler {
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
             if (path != null) {
+                assert (path.index != null);
+                if (!path.index.getPredicatejson().isEmpty()) {
+                    // One more check for partial indexes to make sure the index predicate is
+                    // completely covered by the query expressions.
+                    // Process the index WHERE clause into a list of anded sub-expressions and process each expression
+                    // separately searching the query (or matview) for a covering expression for each of these expressions.
+                    // All index WHERE sub-expressions must be covered to enable the index.
+                    // For optimization purposes, keep track of the covering (query) expressions that exactly match the
+                    // covered index sub-expression. They can be eliminated from the post-filter expressions.
+                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                    if (isPartialIndexPredicateIsCovered(tableScan, allExprs, path, exactMatchCoveringExprs)) {
+                        filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
+                    } else {
+                        path = null;
+                    }
+                }
+            }
+            if (path != null) {
                 if (postExprs != null) {
                     path.joinExprs.addAll(postExprs);
                 }
@@ -210,6 +229,76 @@ public abstract class SubPlanAssembler {
             return new IndexableExpression(null, ltFilter, m_bindings);
         }
     };
+
+    /**
+     * Split the index WHERE clause into a list of sub-expressions and process each expression
+     * separately searching the query (or matview) for a covering expression for each of these expressions.
+     * All index WHERE sub-expressions must be covered to enable the index.
+     * Collect the query expressions that exactly match the index expression. They can be eliminated from the
+     * post-filters as an optimization
+     *
+     * @param tableScan The source table.
+     * @param exprs The set of query predicate expressions.
+     * @param accessPath The access path for the table.
+     * @param exactMatchCoveringExprs The output subset of the query predicates that exactly match the
+     *        index predicate expression(s)
+     * @return TRUE if the index predicate is completely covered by the query expressions.
+     */
+    private boolean isPartialIndexPredicateIsCovered(StmtTableScan tableScan, List<AbstractExpression> exprs, AccessPath accessPath, List<AbstractExpression> exactMatchCoveringExprs) {
+        assert(accessPath.index != null);
+        String predicatejson = accessPath.index.getPredicatejson();
+        if (predicatejson.isEmpty()) {
+            // Not a partial index
+            return true;
+        }
+        AbstractExpression indexPredicate = null;
+        try {
+            indexPredicate = AbstractExpression.fromJSONString(predicatejson, tableScan);
+        } catch (JSONException e) {
+            e.printStackTrace();
+            assert(false);
+            return false;
+        }
+        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
+        List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
+        coveringExprs.addAll(exprs);
+
+        for (AbstractExpression coveringExpr : coveringExprs) {
+            if (exprsToCover.isEmpty()) {
+                // We are done there. All the index predicate expressions are covered.
+                break;
+            }
+
+            // Each covering expression and its reversed copy need to be tested for the index expression coverage.
+            AbstractExpression reversedCoveringExpr = null;
+            ExpressionType reverseCoveringType = ComparisonExpression.reverses.get(coveringExpr.getExpressionType());
+            if (reverseCoveringType != null) {
+                // reverse the expression
+                reversedCoveringExpr = new ComparisonExpression(
+                        reverseCoveringType, coveringExpr.getRight(), coveringExpr.getLeft());
+            }
+            // Exact match first.
+            if (removeExactMatchCoveredExpressions(coveringExpr, exprsToCover)) {
+                exactMatchCoveringExprs.add(coveringExpr);
+            }
+            // Try the reversed expression for the exact match
+            if (reversedCoveringExpr != null && removeExactMatchCoveredExpressions(reversedCoveringExpr, exprsToCover)) {
+                // It is the original expression that we need to remember
+                exactMatchCoveringExprs.add(coveringExpr);
+            }
+
+            // Now try to find non-exact match
+            exprsToCover = removeCoveredExpressions(tableScan, coveringExpr, exprsToCover);
+
+            // reverse the covering expression and try again
+            if (reversedCoveringExpr != null) {
+                exprsToCover = removeCoveredExpressions(tableScan, reversedCoveringExpr, exprsToCover);
+            }
+        }
+
+        // All index predicate expressions must be covered for index to be selected
+        return exprsToCover.isEmpty();
+    }
 
     /**
      * Given a table, a set of predicate expressions and a specific index, find the best way to
@@ -1100,6 +1189,153 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
+    /**
+     * Loop over the expressions to cover to find ones that exactly match the covering expression
+     * and remove them from the original list. Returns true if there is at least one match. False otherwise.
+     * @param coveringExpr
+     * @param exprsToCover
+     * @return true is the covering expression exactly matches to one or more expressions to cover
+     */
+    private boolean removeExactMatchCoveredExpressions(
+            AbstractExpression coveringExpr, List<AbstractExpression> exprsToCover) {
+
+        boolean hasMatch = false;
+        Iterator<AbstractExpression> iter = exprsToCover.iterator();
+        while(iter.hasNext()) {
+            AbstractExpression exprToCover = iter.next();
+            if (coveringExpr.bindingToIndexedExpression(exprToCover) != null) {
+                iter.remove();
+                hasMatch = true;
+            }
+        }
+        return hasMatch;
+    }
+
+    /**
+     * Loop over the expressions to cover to find ones that are covered by the covering expression
+     * and remove them from the original list. Returns the same list with the remaining (non-covered) expressions.
+     *
+     * @param tableScan
+     * @param coveringExpr
+     * @param exprsToCover
+     * @return List<AbstractExpression>
+     */
+    private List<AbstractExpression> removeCoveredExpressions(StmtTableScan tableScan,
+            AbstractExpression coveringExpr,
+            List<AbstractExpression> exprsToCover) {
+
+        ExpressionType coveringExprType = coveringExpr.getExpressionType();
+        AbstractExpression leftCoveringExpr = coveringExpr.getLeft();
+        AbstractExpression otherExpr = coveringExpr.getRight();
+
+        // Get the list of the index expression types that the current expression can potentially cover
+        ExpressionType[] comparators = ExpressionType.getCoveringPartialIndexComparators(coveringExprType);
+        if (comparators != null) {
+            // Find the expressions that can potentially be covered by the leftCoveringExpr expression.
+            // The expressions are separated into two lists:
+            // - The first one contains the expressions with their left child covered
+            // - The second one contains the expressions with their right child covered (reversed expressions)
+            List<List<AbstractExpression>> coveredCandidateExprs = getCoveredCandidateExpressionFromFilters(
+                    comparators,
+                    leftCoveringExpr, tableScan,
+                    exprsToCover);
+            assert(coveredCandidateExprs.size() == 2);
+
+            // Filter out the expressions from the previous step that are actually covered
+            List<AbstractExpression> nonExactMatchCoveredExprs = getCoveredExpressionFromFilters(
+                    coveringExprType, otherExpr, coveredCandidateExprs.get(0), coveredCandidateExprs.get(1));
+            // Remove covered expressions from the list
+            exprsToCover.removeAll(nonExactMatchCoveredExprs);
+        }
+        return exprsToCover;
+    }
+
+    /**
+     * Given the list of the expression types, find expressions from the input expression list that
+     * have their left or right child covered by the covering expression. Collect the qualified expressions into
+     * two lists. The first one contains the covered expressions with the left child covered, the second one -
+     * the right child covered
+     *
+     * @param targetComparators
+     * @param coveringExpr
+     * @param tableScan
+     * @param filtersToCover
+     * @return List<List<AbstractExpression>>
+     */
+    private List<List<AbstractExpression>> getCoveredCandidateExpressionFromFilters(
+            ExpressionType[] targetComparators,
+            AbstractExpression coveringExpr, StmtTableScan tableScan,
+            List<AbstractExpression> filtersToCover)
+            {
+        if (targetComparators == null) {
+            return new ArrayList<List<AbstractExpression>>();
+        }
+        List<AbstractExpression> coveredExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> reversedCoveredExprs = new ArrayList<AbstractExpression>();
+        AbstractExpression coveredFilterExpr = null;
+        AbstractExpression otherFilterExpr = null;
+        for (AbstractExpression filter : filtersToCover) {
+            // Filter expression type must correspond to the covering expression type
+            boolean exprTypeMatch = false;
+            for(ExpressionType targetComparator : targetComparators) {
+                exprTypeMatch = (targetComparator == filter.getExpressionType());
+                if (exprTypeMatch) {
+                    break;
+                }
+            }
+            if (exprTypeMatch) {
+                coveredFilterExpr = filter.getLeft();
+                otherFilterExpr = filter.getRight();
+                if (bindingIfValidIndexedFilterOperand(tableScan, coveredFilterExpr, otherFilterExpr,
+                        coveringExpr, -1) != null) {
+                    coveredExprs.add(filter);
+                }
+            }
+            // Reverse the filter
+            boolean reverseExprTypeMatch = false;
+            for(ExpressionType targetComparator : targetComparators) {
+                reverseExprTypeMatch = (targetComparator == ComparisonExpression.reverses.get(filter.getExpressionType()));
+                if (reverseExprTypeMatch) {
+                    break;
+                }
+            }
+            if (reverseExprTypeMatch) {
+                coveredFilterExpr = filter.getRight();
+                otherFilterExpr = filter.getLeft();
+                if (bindingIfValidIndexedFilterOperand(tableScan, coveredFilterExpr, otherFilterExpr,
+                        coveringExpr, -1) != null) {
+                    reversedCoveredExprs.add(filter);
+                }
+            }
+
+        }
+        List<List<AbstractExpression>> retval = new ArrayList<List<AbstractExpression>>();
+        retval.add(coveredExprs);
+        retval.add(reversedCoveredExprs);
+        return retval;
+    }
+
+    /**
+     * Given the covering expression type and its 'other' expression value, filter out index expressions
+     * that are not covered. The 'other' expression is compared against the right child of the coveredCandidateExprs
+     * expressions and against the left child of the reversedCoveredCandidateExprs expressions using the reversed
+     * covering expression type.
+     * @param coveringExprType
+     * @param otherCoveringExpr
+     * @param coveredCandidateExprs
+     * @param reversedCoveredCandidateExprs
+     * @return
+     */
+    protected List<AbstractExpression> getCoveredExpressionFromFilters(
+            ExpressionType coveringExprType, AbstractExpression otherCoveringExpr,
+            List<AbstractExpression> coveredCandidateExprs,
+            List<AbstractExpression> reversedCoveredCandidateExprs) {
+        List<AbstractExpression> coveredExprs = new ArrayList<AbstractExpression>();
+        // @TODO: non-exact match support
+        // At the moment, only exact match is supported. Simply return an empty list for now.
+        return coveredExprs;
+    }
+
     private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
             if (tableScan.getTableAlias().equals(tve.getTableAlias())) {
@@ -1303,5 +1539,16 @@ public abstract class SubPlanAssembler {
                 break;
             }
         }
+    }
+
+    /**
+     * Partial index optimization: Remove query expressions that exactly match the index WHERE expression(s)
+     * from the access path.
+     *
+     * @param path - Partial Index access path
+     * @param exprToRemove - expressions to remove
+     */
+    private void filterPostPredicateForPartialIndex(AccessPath path, List<AbstractExpression> exprToRemove) {
+        path.otherExprs.removeAll(exprToRemove);
     }
 }

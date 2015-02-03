@@ -310,4 +310,166 @@ public class TestIndexSelection extends PlannerTestCase {
         System.out.println(pn.toExplainPlanString());
         assertTrue(pn.toExplainPlanString().contains("using its primary key index (for deterministic order only)"));
     }
+
+    public void testPartialIndexNULLPredicate() {
+        {
+            AbstractPlanNode pn = compile("select * from c where a > 0;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
+        }
+        {
+            // need to update costing to give more wait to partial index
+            AbstractPlanNode pn = compile("select * from c where a > 0 and e is NULL;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_NULL_E\""));
+        }
+        {
+            AbstractPlanNode pn = compile("select * from c where a > 0 and e is not NULL;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"A_PARTIAL_IDX_NOT_NULL_E\""));
+        }
+    }
+
+    public void testPartialIndexArbitraryPredicate()
+    {
+        {
+            AbstractPlanNode pn = compile("select * from c where a > 0 and (e > 0 or d < 5);");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_OR_EXPR\""));
+        }
+    }
+
+    public void testPartialIndexComparisonPredicateExactMatch()
+    {
+        {
+            AbstractPlanNode pn = compile("select * from c where a > 0 and e > 0 or d < 5;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            String json = pn.toJSONString();
+            System.out.println(json);
+            assertTrue(json.contains("\"PURPOSE\":3,\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
+        }
+        {
+            // CREATE INDEX partial_idx_1 ON c (b) where abs(e) > 1;
+            AbstractPlanNode pn = compile("select * from c where b = 0 and abs(e) > 1;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            System.out.println(json);
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_1\""));
+        }
+        {
+            // CREATE INDEX partial_idx_1 ON c (b) where abs(e) > 1;
+            AbstractPlanNode pn = compile("select * from c where b > 0 and 1 < abs(e);");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            System.out.println(json);
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_1\""));
+        }
+        {
+            // CREATE INDEX partial_idx_2 ON c (b) where d > 0 and d < 5;
+            AbstractPlanNode pn = compile("select * from c where b > 0 and d > 0 and d < 5;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            System.out.println(json);
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_2\""));
+        }
+        {
+            // CREATE INDEX partial_idx_2 ON c (b) where d > 0 and d < 5;
+            AbstractPlanNode pn = compile("select * from c where b > 0 and d < 5 and 0 < d;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            System.out.println(json);
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_2\""));
+        }
+        {
+            // CREATE INDEX partial_idx_3 ON c (b) where 0 < f;
+            AbstractPlanNode pn = compile("select * from c where b > 0 and f > 0;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            System.out.println(json);
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\""));
+        }
+        {
+            // CREATE INDEX partial_idx_3 ON c (b) where 0 < f;
+            AbstractPlanNode pn = compile("select * from c where b > 0 and 0 < f;");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertTrue(ipn.getPredicate() == null);
+            String json = pn.toJSONString();
+            System.out.println(json);
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\""));
+        }
+    }
+
+    public void testPartialIndexComparisonPredicateNonExactMatch()
+        {
+            {
+                AbstractPlanNode pn = compile("select * from c where a > 0 and e > 0 or d < 5;");
+                pn = pn.getChild(0);
+                assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+                String json = pn.toJSONString();
+                System.out.println(json);
+                assertTrue(json.contains("\"PURPOSE\":3,\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
+            }
+            {
+                AbstractPlanNode pn = compile("select * from c where b > 0 and e = 0;");
+                pn = pn.getChild(0);
+                String json = pn.toJSONString();
+                System.out.println(json);
+                assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+                // At the moment expression exact match only
+                assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
+                //assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_1\""));
+            }
+            {
+                AbstractPlanNode pn = compile("select * from c where b > 0 and f > 3;");
+                pn = pn.getChild(0);
+                assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+                String json = pn.toJSONString();
+                System.out.println(json);
+                // At the moment expression exact match only
+                assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
+                //assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\""));
+            }
+            {
+                AbstractPlanNode pn = compile("select * from c where b > 0 and 3 < f;");
+                pn = pn.getChild(0);
+                assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+                String json = pn.toJSONString();
+                System.out.println(json);
+                // At the moment expression exact match only
+                assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\""));
+//                assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\""));
+            }
+    }
 }

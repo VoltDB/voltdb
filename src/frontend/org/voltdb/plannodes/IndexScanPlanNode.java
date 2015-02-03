@@ -28,7 +28,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -436,6 +435,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // otherwise, pick the index with the most columns covered otherwise
         // count non-equality scans as -0.5 coverage
         // prefer array to hash to tree, all else being equal
+        // prefer partial index, all else being equal
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
@@ -542,6 +542,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 m_estimatedProcessedTupleCount = limitInt;
             }
         }
+
+        // give a small 10% discount to partial index
+        if (!m_catalogIndex.getPredicatejson().isEmpty()) {
+            discountPartialIndexCostEstimates();
+        }
+    }
+
+    /**
+     * Adjust cost estimates for partial indexes
+     */
+    private void discountPartialIndexCostEstimates() {
+        assert(m_catalogIndex.getPredicatejson().isEmpty() == false);
+        // @TODO-5990: At the moment it is very simple discounting schema - give 1% discount to all partial indexes.
+        // A case can be made that the more filter clauses an index has, the smaller the index,
+        // and the cheaper the index operation, so the discount could be a sliding scale based on number
+        // of filter clauses, or equality filters have greater weight than ranges filters or not null filters
+        m_estimatedProcessedTupleCount *= 0.99;
     }
 
     @Override
