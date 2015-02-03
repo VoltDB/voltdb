@@ -2140,6 +2140,18 @@ function alertNodeClicked(obj) {
         var getSnapshotDetails = function (connection, snapshotList, snapshotDirectory) {
             var colIndex = {};
             var counter = 0;
+
+            if (connection.Metadata['@SnapshotScan_data'][0] == undefined) {
+
+                if (connection.Metadata['@SnapshotScan_status'] == -2) {
+                    snapshotList[0] = {};
+                    snapshotList[0]["RESULT"] = "FAILURE";
+                    snapshotList[0]["ERR_MSG"] = connection.Metadata['@SnapshotScan_statusstring'] != null ? connection.Metadata['@SnapshotScan_statusstring'] : "";
+                }
+
+                return;
+            }
+
             if (connection.Metadata['@SnapshotScan_data'][0].data.length != 0)
                 connection.Metadata['@SnapshotScan_data'] = connection.Metadata['@SnapshotScan_data'][0];
             else
