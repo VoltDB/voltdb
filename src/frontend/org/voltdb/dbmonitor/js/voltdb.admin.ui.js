@@ -468,7 +468,7 @@ function loadAdminPage() {
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
                             msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
-                            msg += "Please try again later.";
+                            msg += result.statusstring != null ? result.statusstring : "Please try again later.";
                         }
 
                         adminEditObjects.updateErrorFieldMsg.text(msg);
