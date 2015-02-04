@@ -137,6 +137,10 @@ public class ReportMaker {
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
             }
+            if (annotation.statementsThatUseThis.size() > 0) {
+                assert(annotation.statementsThatUseThis.size() == 1);
+                sb.append("<p>Used by the LIMIT PARTITION ROWS Statement</p>");
+            }
         }
 
         sb.append("</td></tr>\n");
@@ -294,6 +298,31 @@ public class ReportMaker {
             }
         }
 
+        // LIMIT PARTITION ROW statement may also use the index in this table, prepare the information for report
+        if (! table.getTuplelimitdeletestmt().isEmpty()) {
+            assert(table.getTuplelimitdeletestmt().size() == 1);
+            Statement stmt = table.getTuplelimitdeletestmt().iterator().next();
+
+            for (String tableDotIndexPair : stmt.getIndexesused().split(",")) {
+                if (tableDotIndexPair.length() == 0) continue;
+                String parts[] = tableDotIndexPair.split("\\.", 2);
+                assert(parts.length == 2);
+                if (parts.length != 2) continue;
+                String tableName = parts[0];
+                String indexName = parts[1];
+                if (! table.getTypeName().equals(tableName)) continue;
+
+                Index i = table.getIndexes().get(indexName);
+                assert(i != null);
+                IndexAnnotation ia = (IndexAnnotation) i.getAnnotation();
+                if (ia == null) {
+                    ia = new IndexAnnotation();
+                    i.setAnnotation(ia);
+                }
+                ia.statementsThatUseThis.add(stmt);
+            }
+        }
+
         if (table.getIndexes().size() > 0) {
             sb.append(generateIndexesTable(table));
         }
@@ -431,7 +460,6 @@ public class ReportMaker {
                 i.setAnnotation(ia);
             }
             ia.proceduresThatUseThis.add(procedure);
-            ia.statementsThatUseThis.add(statement);
             procAnnotation.indexesUsed.add(i);
 
             String uindexName = indexName.toUpperCase();
