@@ -596,7 +596,8 @@ function loadAdminPage() {
             
             $("#btnSaveSnapshotConfirmCancel").unbind("click");
             $("#btnSaveSnapshotConfirmCancel").on("click", function () {
-                popup.close();
+                $("#saveSnapshotConfirm").hide();
+                $("#saveSnapshot").show();
             });
             
             $("#btnSaveSnapshotOk").unbind("click");
