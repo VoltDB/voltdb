@@ -1616,7 +1616,6 @@ public abstract class CatalogUtil {
         }
 
         String indexString = StringUtils.join(tableDotIndexNames, ",");
-
         stmt.setIndexesused(indexString);
 
         assert(tablesRead.size() == 0);

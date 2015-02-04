@@ -106,7 +106,7 @@ public class PlannerTool {
     }
 
     /**
-     * Stripped down compile that is used to plan default procs.
+     * Stripped down compile that is ONLY used to plan default procedures.
      */
     public synchronized CompiledPlan planSqlCore(String sql, StatementPartitioning partitioning) {
         TrivialCostModel costModel = new TrivialCostModel();
@@ -118,7 +118,7 @@ public class PlannerTool {
 
         CompiledPlan plan = null;
         try {
-            // If not caching or there was no cache hit, do the expensive full planning.
+            // do the expensive full planning.
             planner.parse();
             plan = planner.plan();
             assert(plan != null);
