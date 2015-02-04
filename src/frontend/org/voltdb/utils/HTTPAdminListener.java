@@ -734,8 +734,8 @@ public class HTTPAdminListener {
             deploymentRequestHandler.setHandler(m_deploymentHandler);
 
             ///permissions
-            ContextHandler permissionRequestHandler = new ContextHandler("/roles");
-            permissionRequestHandler.setHandler(new RolesRequestHandler());
+            ContextHandler rolesRequestHandler = new ContextHandler("/roles");
+            rolesRequestHandler.setHandler(new RolesRequestHandler());
 
             ///profile
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
@@ -747,7 +747,7 @@ public class HTTPAdminListener {
                     catalogRequestHandler,
                     ddlRequestHandler,
                     deploymentRequestHandler,
-                    permissionRequestHandler,
+                    rolesRequestHandler,
                     profileRequestHandler,
                     dbMonitorHandler
             });
