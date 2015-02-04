@@ -8,14 +8,12 @@ volthelp()
 ~/$VOLTDB/examples has various runnable samples in separate subdirectories.
 
 Useful commands in  ~/$VOLTDB/bin (see documentation):
-  Database startup             voltdb ACTION ...
-  Catalog compilation          voltdb compile ...
+  Database startup             voltdb create ...
   Database administration      voltadmin COMMAND ...
   Interactive SQL interpreter  sqlcmd
 
 Command Help:
   General voltdb usage  voltdb -h
-  Catalog compilation   voltdb compile -h
   Administration        voltadmin help [COMMAND]
   SQL interpreter       sqlcmd --help
 
@@ -25,9 +23,10 @@ Documentation:
 
 Quick example:
   $ cd voter
-  $ ./run.sh &       (start the background server)
-  $ ./run.sh client  (run the sample client for 2 minutes)
-  $ kill %1          (kill the background server)
+  $ voltdb create &  # (start VoltDB in the background)
+  $ sqlcmd < ddl.sql # (load the schema and procedures)
+  $ ./run.sh client  # (run the sample client for 2 minutes)
+  $ kill %1          # (kill the background server)
 "
 }
 
