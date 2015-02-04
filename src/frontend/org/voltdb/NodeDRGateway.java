@@ -65,4 +65,6 @@ public interface NodeDRGateway {
     public abstract void shutdown() throws InterruptedException;
 
     public abstract void updateCatalog(CatalogContext catalog);
+
+    public abstract int getDRClusterId();
 }
