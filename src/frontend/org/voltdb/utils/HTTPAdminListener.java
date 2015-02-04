@@ -447,22 +447,31 @@ public class HTTPAdminListener {
                 //New users if valid will get updated.
                 //For Scrambled passowrd this will work also but new passwords will be unscrambled
                 //TODO: add switch to post to scramble??
-                if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled()) {
+                if (newDeployment.getSecurity() != null) {
                     DeploymentType currentDeployment = this.getDeployment();
                     //Merge passwords for existing users.
                     List<User> users = null;
+                    List<User> newusers = null;
                     if (currentDeployment.getUsers() != null) {
                         users = currentDeployment.getUsers().getUser();
                     }
-                    if (newDeployment.getSecurity().isEnabled() && (users == null || users.isEmpty())) {
+                    if (newDeployment.getUsers() != null) {
+                        newusers = newDeployment.getUsers().getUser();
+                    }
+                    //We check current users also because enabling uses existing users that we copy over.
+                    if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled() &&
+                            (newusers == null || newusers.isEmpty() || users == null || users.isEmpty())) {
                         response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Enabling security without any users is not allowed."));
                         return;
                     }
-                    for (UsersType.User user : newDeployment.getUsers().getUser()) {
-                        if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
-                            for (User u : users) {
-                                if (user.getName().equalsIgnoreCase(u.getName())) {
-                                    user.setPassword(u.getPassword());
+                    //For security disabled copy all user's passwords to ensure deployment is good.
+                    if (newusers != null) {
+                        for (UsersType.User user : newusers) {
+                            if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
+                                for (User u : users) {
+                                    if (user.getName().equalsIgnoreCase(u.getName())) {
+                                        user.setPassword(u.getPassword());
+                                    }
                                 }
                             }
                         }

@@ -468,7 +468,7 @@ function loadAdminPage() {
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
                             msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
-                            msg += "Please try again later.";
+                            msg += result.statusstring != null ? result.statusstring : "Please try again later.";
                         }
 
                         adminEditObjects.updateErrorFieldMsg.text(msg);
@@ -554,6 +554,9 @@ function loadAdminPage() {
                     txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
+            
+            $("#saveSnapshotConfirm").hide();
+            $("#saveSnapshot").show();
         },
         afterOpen: function (event) {
             var popup = $(this)[0];
@@ -582,6 +585,23 @@ function loadAdminPage() {
                     return;
                 }
 
+                $("#saveSnapshot").hide();
+                $("#saveSnapshotConfirm").show();
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function () {
+                popup.close();
+            });
+            
+            $("#btnSaveSnapshotConfirmCancel").unbind("click");
+            $("#btnSaveSnapshotConfirmCancel").on("click", function () {
+                $("#saveSnapshotConfirm").hide();
+                $("#saveSnapshot").show();
+            });
+            
+            $("#btnSaveSnapshotOk").unbind("click");
+            $("#btnSaveSnapshotOk").on("click", function (e) {
                 var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
@@ -598,12 +618,6 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
-                popup.close();
-
-            });
-
-            $("#btnSaveSnapshotCancel").unbind("click");
-            $("#btnSaveSnapshotCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -668,8 +682,9 @@ function loadAdminPage() {
     });
 
     var getDateTime = function () {
-        var currentDate = new Date();
-        return (currentDate.getFullYear() + '.' + (currentDate.getMonth() + 1) + '.' + currentDate.getDate() + '.' + currentDate.getHours() + '.' + currentDate.getMinutes() + '.' + currentDate.getSeconds()).toString();
+
+        var currentDate = new Date().toISOString(); // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
+        return currentDate.substr(0, 19).replace('T', '.').replace(/-/g, '.').replace(/:/g, '.');
     };
 
     $('#restoreConfirmation').popup({
@@ -801,7 +816,7 @@ function loadAdminPage() {
             var searchError = false;
             $.each(snapshotList, function (id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
-                    result += '<tr><td style="color:#c70000" colspan="3"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    result += '<tr><td style="color:#c70000" colspan="3"> Error: Failure getting snapshots. ' + snapshot.ERR_MSG + '</td></tr>';
                     searchError = true;
                     return false;
                 } else if (snapshot.NONCE == undefined) {
