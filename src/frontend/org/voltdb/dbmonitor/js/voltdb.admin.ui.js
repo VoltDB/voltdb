@@ -554,6 +554,9 @@ function loadAdminPage() {
                     txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
+            
+            $("#saveSnapshotConfirm").hide();
+            $("#saveSnapshot").show();
         },
         afterOpen: function (event) {
             var popup = $(this)[0];
@@ -582,6 +585,22 @@ function loadAdminPage() {
                     return;
                 }
 
+                $("#saveSnapshot").hide();
+                $("#saveSnapshotConfirm").show();
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function () {
+                popup.close();
+            });
+            
+            $("#btnSaveSnapshotConfirmCancel").unbind("click");
+            $("#btnSaveSnapshotConfirmCancel").on("click", function () {
+                popup.close();
+            });
+            
+            $("#btnSaveSnapshotOk").unbind("click");
+            $("#btnSaveSnapshotOk").on("click", function (e) {
                 var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
@@ -598,12 +617,6 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
-                popup.close();
-
-            });
-
-            $("#btnSaveSnapshotCancel").unbind("click");
-            $("#btnSaveSnapshotCancel").on("click", function () {
                 popup.close();
             });
         }

@@ -1032,7 +1032,7 @@
     <div id="savePop" style="display: none">
         <div class="overlay-title icon-alert">Save</div>
         <div class="clear"></div>
-        <div class="saveInfo">
+        <div id="saveSnapshot" class="saveInfo">
             <div class="overlay-content ">
                 <form id="formSaveSnapshot" method="get" action="">
                     <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
@@ -1049,11 +1049,11 @@
             </div>
             <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
         </div>
-        <div class="saveConfirmation" style="display: none;">
+        <div id="saveSnapshotConfirm" class="saveConfirmation" style="display: none;">
             <div class="overlay-content ">
                 <div class="confirmationInfo">Are you sure you want to save?</div>
             </div>
-            <div class="overlay-btns"><a class="btn closeBtn">Yes</a> <a class="btn btn-gray confirmNoSave">No</a> </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshotOk" class="btn closeBtn">Yes</a> <a id="btnSaveSnapshotConfirmCancel" class="btn btn-gray confirmNoSave">No</a> </div>
         </div>
     </div>
     <!-- POPUP savePop -->
