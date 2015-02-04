@@ -2110,8 +2110,8 @@ function alertNodeClicked(obj) {
         this.saveSnapshot = function (snapshotDir, snapshotFileName, onSaveSnapshot) {
             VoltDBService.SaveSnapShot(snapshotDir, snapshotFileName, function (connection, status) {
                 var snapshotStatus = {};
-                if (status == 1) {
-                    voltDbRenderer.getSaveSnapshotStatus(connection, snapshotStatus);
+                if (status == 1 || status == -2) {
+                    voltDbRenderer.getSaveSnapshotStatus(connection, snapshotStatus, status);
                     onSaveSnapshot(true, snapshotStatus);
                 }
             });
@@ -2176,9 +2176,20 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.getSaveSnapshotStatus = function (connection, snapshotStatus) {
+        this.getSaveSnapshotStatus = function (connection, snapshotStatus, saveStatus) {
             var colIndex = {};
             var counter = 0;
+            
+            //Handle error for community edition of VoltDB.
+            if (saveStatus == -2) {
+                var currentServer = getCurrentServer();
+                snapshotStatus[currentServer] = {};
+
+                snapshotStatus[currentServer]["RESULT"] = "Failure";
+                snapshotStatus[currentServer]["ERR_MSG"] = connection.Metadata['@SnapshotSave_statusstring'] != undefined ? connection.Metadata['@SnapshotSave_statusstring'] : "";
+
+                return;
+            }
 
             connection.Metadata['@SnapshotSave_data'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "RESULT" || columnInfo["name"] == "ERR_MSG")
