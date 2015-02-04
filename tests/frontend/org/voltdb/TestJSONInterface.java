@@ -1569,6 +1569,77 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
+    public void testRoles() throws Exception {
+        try {
+            String simpleSchema
+            = "CREATE TABLE foo (\n"
+            + "    bar BIGINT NOT NULL,\n"
+            + "    PRIMARY KEY (bar)\n"
+            + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment
+            String jdep = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
+            assertEquals(jdep.split("]},").length, 2);
+
+            server.shutdown();
+            simpleSchema
+            = "CREATE ROLE admin WITH sysproc, defaultproc;\n"
+            + "CREATE ROLE developer WITH adhoc, defaultproc;\n"
+            + "CREATE ROLE batch WITH defaultproc;\n"
+            + "CREATE TABLE foo (\n"
+            + "    bar BIGINT NOT NULL,\n"
+            + "    PRIMARY KEY (bar)\n"
+            + ");";
+
+            schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment
+            jdep = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
+            assertEquals(jdep.split("]},").length, 5);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
 
     public void testProfile() throws Exception {
         try {

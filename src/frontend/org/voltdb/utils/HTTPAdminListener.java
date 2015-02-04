@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URL;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Group;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Permission;
@@ -487,6 +490,120 @@ public class HTTPAdminListener {
         }
     }
 
+    private class RoleStruct {
+        private final String name;
+        private final boolean builtIn;
+        private final String permissions[];
+        public RoleStruct(String n, boolean b, String[] p) {
+            name = n;
+            builtIn = b;
+            permissions = p;
+        }
+        public String getName() {
+            return name;
+        }
+        public boolean getBuiltIn() {
+            return builtIn;
+        }
+        public String[] getPermissions() {
+            return permissions;
+        }
+    }
+
+    class RolesRequestHandler extends VoltRequestHandler {
+
+        final ObjectMapper m_mapper;
+        String m_schema = "";
+
+        public RolesRequestHandler() {
+            m_mapper = new ObjectMapper();
+            //Mixin for to not output passwords.
+            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+            try {
+                JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
+                m_schema = schema.toString();
+            } catch (JsonMappingException ex) {
+                m_log.warn("Failed to generate JSON schema: ", ex);
+            }
+        }
+
+        private RoleStruct[] buildRollStruct() {
+            CatalogMap<Group> groups = VoltDB.instance().getCatalogContext().database.getGroups();
+            RoleStruct[] rolls = new RoleStruct[groups.size()];
+            int grpCnt = 0;
+            for (Group grp : groups) {
+                String name = grp.getTypeName();
+                EnumSet<Permission> perms = Permission.getPermissionSetForGroup(grp);
+                String[] permissions = new String[perms.size()];
+                int permCnt = 0;
+                for (Permission perm : perms) {
+                    permissions[permCnt] = perm.toString();
+                    permCnt++;
+                }
+                boolean builtIn = false;
+                if (name.equals("administrator") || name.equals("user")) {
+                    builtIn = true;
+                }
+                rolls[grpCnt] = new RoleStruct(name, builtIn, permissions);
+                grpCnt++;
+            }
+            return rolls;
+        }
+
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+
+            super.handle(target, baseRequest, request, response);
+
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+            AuthenticationResult authResult = null;
+            try {
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+
+                //Requests require authentication.
+                authResult = authenticate(baseRequest);
+                if (!authResult.isAuthenticated()) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
+                    baseRequest.setHandled(true);
+                    return;
+                }
+                //Authenticated but has no permissions.
+                if (!authResult.m_authUser.hasPermission(Permission.ADMIN)) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Permission denied"));
+                    baseRequest.setHandled(true);
+                    return;
+                }
+
+                //Authenticated and has ADMIN permission
+                if (request.getMethod().equalsIgnoreCase("POST")) {
+                    // noop
+                } else {
+                    //non POST
+                    if (jsonp != null) {
+                        response.getWriter().write(jsonp + "(");
+                    }
+                    m_mapper.writeValue(response.getWriter(), buildRollStruct());
+                    if (jsonp != null) {
+                        response.getWriter().write(")");
+                    }
+                }
+                baseRequest.setHandled(true);
+            } catch (Exception ex) {
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
+            }
+        }
+    }
+
     class APIRequestHandler extends VoltRequestHandler {
 
         @Override
@@ -616,6 +733,10 @@ public class HTTPAdminListener {
             m_deploymentHandler = new DeploymentRequestHandler();
             deploymentRequestHandler.setHandler(m_deploymentHandler);
 
+            ///permissions
+            ContextHandler permissionRequestHandler = new ContextHandler("/roles");
+            permissionRequestHandler.setHandler(new RolesRequestHandler());
+
             ///profile
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
             profileRequestHandler.setHandler(new UserProfileHandler());
@@ -626,6 +747,7 @@ public class HTTPAdminListener {
                     catalogRequestHandler,
                     ddlRequestHandler,
                     deploymentRequestHandler,
+                    permissionRequestHandler,
                     profileRequestHandler,
                     dbMonitorHandler
             });
