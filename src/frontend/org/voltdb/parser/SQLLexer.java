@@ -462,9 +462,10 @@ public class SQLLexer extends SQLPatternFactory
             }
         }
         PAT_ANY_DDL_FIRST_TOKEN =
-                SPF.statementLeader(
-                        SPF.capture(SPF.token(verbsAll))
-                ).compile();
+            SPF.statementLeader(
+                SPF.capture(SPF.token(verbsAll)),
+                SPF.anyClause()
+            ).compile();
 
         // All handled (white-listed) patterns.
         int renameableCount = 0;

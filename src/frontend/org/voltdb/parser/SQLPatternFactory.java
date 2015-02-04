@@ -75,7 +75,7 @@ public class SQLPatternFactory
 
         public static SQLPatternPart anyClause()
         {
-            return new SQLPatternPartString(".+");
+            return new SQLPatternPartElement(".+");
         }
 
         public static SQLPatternPart capture(SQLPatternPart part)
