@@ -130,9 +130,9 @@ public class SQLLexer extends SQLPatternFactory
     // Extracts the table name for DDL batch conflicting command checks.
     private static final Pattern PAT_TABLE_DDL_PREAMBLE =
         SPF.statementLeader(
-            SPF.token("create", "drop"),    // DDL commands we're looking for
-            SPF.token("table"),             // target is table
-            SPF.capture(SPF.symbol())       // table name (captured)
+            SPF.capture(SPF.token("create", "drop")),   // DDL commands we're looking for
+            SPF.token("table"),                         // target is table
+            SPF.capture(SPF.symbol())                   // table name (captured)
         ).compile();
 
     // Matches the start of a SELECT statement
