@@ -55,7 +55,8 @@ public class TestAdhocWithOnlyComment extends AdhocDDLTestBase {
                         "-- this used to hang the server");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
+                assertTrue("wrong exception details returned",
+                        pce.getMessage().contains("no SQL statement provided"));
                 threw = true;
             }
             assertTrue("Adhoc with no statements should return an error", threw);
@@ -63,10 +64,41 @@ public class TestAdhocWithOnlyComment extends AdhocDDLTestBase {
             threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
-                        "/* this used to hang the server\n too, probably, test it! */");
+                        "/* this never hung the server, \n but test it! */");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
+                // this takes a different path because it isn't treated as a
+                // comment by the AsyncCompilerAgent and makes it through to
+                // the DDLCompiler which complains because it never finds a
+                // semicolon-terminated statement.  Updating the error message
+                // check here will be left as an unexpected exercise for
+                // whoever gets stuck making the returned message consistent.
+                assertTrue("wrong exception details returned",
+                        pce.getMessage().contains("unexpected end of statement"));
+                threw = true;
+            }
+            assertTrue("Adhoc with no statements should return an error", threw);
+
+            threw = false;
+            try {
+                // ensure that empty string also gets the same error
+                m_client.callProcedure("@AdHoc", "");
+            }
+            catch (ProcCallException pce) {
+                assertTrue("wrong exception details returned",
+                        pce.getMessage().contains("no SQL statement provided"));
+                threw = true;
+            }
+            assertTrue("Adhoc with no statements should return an error", threw);
+
+            threw = false;
+            try {
+                // ensure that just random whitespace also gets the same treatment
+                m_client.callProcedure("@AdHoc", "  \n   \t    ");
+            }
+            catch (ProcCallException pce) {
+                assertTrue("wrong exception details returned",
+                        pce.getMessage().contains("no SQL statement provided"));
                 threw = true;
             }
             assertTrue("Adhoc with no statements should return an error", threw);

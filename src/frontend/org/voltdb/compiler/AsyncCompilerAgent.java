@@ -114,14 +114,12 @@ public class AsyncCompilerAgent {
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
             // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
-            // This is not currently robust to comment, multi-line statments,
-            // multiple statements on a line, etc.
             Boolean hasDDL = null;
             // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
             SortedSet<String> conflictTables = new TreeSet<String>();
             Set<String> createdTables = new HashSet<String>();
             for (String stmt : w.sqlStatements) {
-                if (SQLLexer.isComment(stmt)) {
+                if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
                     continue;
                 }
                 String ddlToken = SQLLexer.extractDDLToken(stmt);
