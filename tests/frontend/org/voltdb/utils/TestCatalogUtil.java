@@ -651,9 +651,10 @@ public class TestCatalogUtil extends TestCase {
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export enabled='true' target='file'>"
                 + "        <configuration>"
-                + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">exportdata</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -663,19 +664,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export enabled='true' target='kafka'>"
                 + "        <configuration>"
-                + "            <property name=\"foo\">false</property>"
-                + "            <property name=\"type\">CSV</property>"
-                + "            <property name=\"with-schema\">false</property>"
-                + "        </configuration>"
-                + "    </export>"
-                + "</deployment>";
-        final String withBuiltinRabbitMQExport =
-                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
-                + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='rabbitmq'>"
-                + "        <configuration>"
-                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"metadata.broker.list\">uno,due,tre</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
@@ -696,13 +685,11 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+        assertTrue("compilation should have failed", msg.contains("Custom Export failed to configure"));
 
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
         assertNotNull(catconn);
-
-        assertFalse(bad_deployment.getExport().isEnabled());
 
         //This is a good deployment with custom class that can be found
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
@@ -756,20 +743,6 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(builtin_kafkadeployment.getExport().getTarget(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
-
-        // Check RabbitMQ option
-        final File tmpRabbitMQBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinRabbitMQExport);
-        DeploymentType builtin_rabbitmqdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpRabbitMQBuiltin));
-        Catalog cat5 = compiler.compileCatalogFromDDL(x);
-        msg = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
-        db = cat5.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get("0");
-        assertNotNull(catconn);
-        assertTrue(builtin_rabbitmqdeployment.getExport().isEnabled());
-        assertEquals(ServerExportEnum.RABBITMQ, builtin_rabbitmqdeployment.getExport().getTarget());
-        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
-        assertEquals("org.voltdb.exportclient.RabbitMQExportClient", prop.getValue());
     }
 
     /**

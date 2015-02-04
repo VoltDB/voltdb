@@ -768,7 +768,7 @@ public class TestJSONInterface extends TestCase {
             // Call @AdHoc with many parameters (more than 2)
             pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            assertTrue(responseJSON.contains("Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
+            assertTrue(responseJSON.contains("Incorrect number of parameters passed: expected 0, passed 2"));
 
         } finally {
             if (server != null) {
@@ -1071,6 +1071,66 @@ public class TestJSONInterface extends TestCase {
             String response = callProcOverJSON("DelayProc", pset, null, null, false);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testLongQuerySTring() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //create a large query string
+            final StringBuilder b = new StringBuilder();
+            b.append("Procedure=@Statistics&Parameters=[TABLE]&jsonpxx=");
+            for (int i = 0; i < 450000; i++) {
+                b.append(i);
+            }
+            //call multiple times.
+            for (int i = 0; i < 500; i++) {
+                String response = callProcOverJSONRaw(b.toString(), 200);
+                System.out.println(response);
+                Response r = responseFromJSON(response);
+                assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+                //make sure good queries can still work.
+                ParameterSet pset = ParameterSet.fromArrayNoCopy("select * from foo");
+                String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+                System.out.println(responseJSON);
+                r = responseFromJSON(responseJSON);
+                System.out.println(r.statusString);
+                assertEquals(ClientResponse.SUCCESS, r.status);
+            }
+            //make sure good queries can still work after.
+            ParameterSet pset = ParameterSet.fromArrayNoCopy("select * from foo");
+            String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            System.out.println(responseJSON);
+            Response response = responseFromJSON(responseJSON);
+            System.out.println(response.statusString);
+            assertEquals(ClientResponse.SUCCESS, response.status);
+
         } finally {
             if (server != null) {
                 server.shutdown();

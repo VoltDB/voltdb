@@ -212,7 +212,8 @@ public abstract class Statement {
     VoltXMLElement voltGetStatementXML(Session session)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        throw new RuntimeException("Unsupported SQL verb in statement: \""+sql+"\"");
+        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                "this type of sql statement is not supported or is not not allowed in this context");
     }
     /**********************************************************************/
 }

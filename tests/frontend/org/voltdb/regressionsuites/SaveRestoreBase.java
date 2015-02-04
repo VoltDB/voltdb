@@ -42,11 +42,16 @@ public class SaveRestoreBase extends RegressionSuite {
     @Override
     public void setUp() throws Exception
     {
+        setUp(TESTNONCE);
+    }
+
+    public void setUp(String nonce) throws Exception
+    {
         File tempDir = new File(TMPDIR);
         if (!tempDir.exists()) {
             assertTrue(tempDir.mkdirs());
         }
-        deleteTestFiles();
+        deleteTestFiles(nonce);
         super.setUp();
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
@@ -56,8 +61,13 @@ public class SaveRestoreBase extends RegressionSuite {
     @Override
     public void tearDown() throws Exception
     {
+        tearDown(TESTNONCE);
+    }
+
+    public void tearDown(String nonce) throws Exception
+    {
         super.tearDown();
-        deleteTestFiles();
+        deleteTestFiles(nonce);
         System.gc();
         System.runFinalization();
     }
@@ -88,14 +98,14 @@ public class SaveRestoreBase extends RegressionSuite {
         }
     }
 
-    protected void deleteTestFiles()
+    protected void deleteTestFiles(final String nonce)
     {
         FilenameFilter cleaner = new FilenameFilter()
         {
             @Override
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(TESTNONCE) ||
+                return file.startsWith(nonce) ||
                 file.endsWith(".vpt") ||
                 file.endsWith(".digest") ||
                 file.endsWith(".tsv") ||

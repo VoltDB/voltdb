@@ -90,9 +90,10 @@ public class VoltDDLElementTracker {
     /**
      * Tracks the given procedure descriptor if it is not already tracked
      * @param descriptor a {@link VoltCompiler.ProcedureDescriptor}
+     * @return name added to procedure map
      * @throws VoltCompilerException if it is already tracked
      */
-    void add(ProcedureDescriptor descriptor) throws VoltCompilerException
+    String add(ProcedureDescriptor descriptor) throws VoltCompilerException
     {
         assert descriptor != null;
 
@@ -107,6 +108,8 @@ public class VoltDDLElementTracker {
         }
 
         m_procedureMap.put(shortName, descriptor);
+
+        return shortName;
     }
 
     /**
@@ -145,7 +148,7 @@ public class VoltDDLElementTracker {
         ProcedureDescriptor descriptor = m_procedureMap.get(procedureName);
         if( descriptor == null) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Partition in referencing an undefined procedure \"%s\"",
+                    "Partition references an undefined procedure \"%s\"",
                     procedureName));
         }
 

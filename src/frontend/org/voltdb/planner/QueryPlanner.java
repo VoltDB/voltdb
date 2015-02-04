@@ -396,6 +396,7 @@ public class QueryPlanner {
             ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }
+
         return bestPlan;
     }
 

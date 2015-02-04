@@ -35,7 +35,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
@@ -86,7 +85,7 @@ public abstract class StatementCompiler {
      * @param  detMode      Pass through parameter to QueryPlanner
      * @param  partitioning Partition info for statement
     */
-    static void compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
+    static boolean compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
@@ -98,20 +97,76 @@ public abstract class StatementCompiler {
         stmt = stmt.trim();
         compiler.addInfo("Compiling Statement: " + stmt);
 
+        // put the data in the catalog that we have
+        if (!stmt.endsWith(";")) {
+            stmt += ";";
+        }
+
+        // if this key + sql is the same, then a cached stmt can be used
+        String keyPrefix = compiler.getKeyPrefix(partitioning, detMode, joinOrder);
+
+        // if the key is cache-able, look for a previous statement
+        if (keyPrefix != null) {
+            Statement previousStatement = compiler.getCachedStatement(keyPrefix, stmt);
+            // check if the stmt exists and if it's the same sql text
+            if (previousStatement != null) {
+                catalogStmt.setAnnotation(previousStatement.getAnnotation());
+                catalogStmt.setAttachment(previousStatement.getAttachment());
+                catalogStmt.setCachekeyprefix(previousStatement.getCachekeyprefix());
+                catalogStmt.setCost(previousStatement.getCost());
+                catalogStmt.setExplainplan(previousStatement.getExplainplan());
+                catalogStmt.setIscontentdeterministic(previousStatement.getIscontentdeterministic());
+                catalogStmt.setIsorderdeterministic(previousStatement.getIsorderdeterministic());
+                catalogStmt.setNondeterminismdetail(previousStatement.getNondeterminismdetail());
+                catalogStmt.setQuerytype(previousStatement.getQuerytype());
+                catalogStmt.setReadonly(previousStatement.getReadonly());
+                catalogStmt.setReplicatedtabledml(previousStatement.getReplicatedtabledml());
+                catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
+                catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
+                catalogStmt.setSqltext(previousStatement.getSqltext());
+                catalogStmt.setTablesread(previousStatement.getTablesread());
+                catalogStmt.setTablesupdated(previousStatement.getTablesupdated());
+                catalogStmt.setIndexesused(previousStatement.getIndexesused());
+
+                for (StmtParameter oldSp : previousStatement.getParameters()) {
+                    StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
+                    newSp.setAnnotation(oldSp.getAnnotation());
+                    newSp.setAttachment(oldSp.getAttachment());
+                    newSp.setIndex(oldSp.getIndex());
+                    newSp.setIsarray(oldSp.getIsarray());
+                    newSp.setJavatype(oldSp.getJavatype());
+                    newSp.setSqltype(oldSp.getSqltype());
+                }
+
+                for (PlanFragment oldFrag : previousStatement.getFragments()) {
+                    PlanFragment newFrag = catalogStmt.getFragments().add(oldFrag.getTypeName());
+                    newFrag.setAnnotation(oldFrag.getAnnotation());
+                    newFrag.setAttachment(oldFrag.getAttachment());
+                    newFrag.setHasdependencies(oldFrag.getHasdependencies());
+                    newFrag.setMultipartition(oldFrag.getMultipartition());
+                    newFrag.setNontransactional(oldFrag.getNontransactional());
+                    newFrag.setPlanhash(oldFrag.getPlanhash());
+                    newFrag.setPlannodetree(oldFrag.getPlannodetree());
+                }
+
+                return true;
+            }
+        }
+
+
+
         // determine the type of the query
         QueryType qtype = QueryType.getFromSQL(stmt);
 
         catalogStmt.setReadonly(qtype.isReadOnly());
         catalogStmt.setQuerytype(qtype.getValue());
 
-        // put the data in the catalog that we have
-        if (!stmt.endsWith(";")) {
-            stmt += ";";
-        }
+        // might be null if not cacheable
+        catalogStmt.setCachekeyprefix(keyPrefix);
+
+
         catalogStmt.setSqltext(stmt);
         catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
-        catalogStmt.setBatched(false);
-        catalogStmt.setParamnum(0);
 
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
         String sql = catalogStmt.getSqltext();
@@ -192,16 +247,10 @@ public abstract class StatementCompiler {
         }
         compiler.captureDiagnosticContext(planString);
 
-        // Stuff the explain plan in an annotation for report generation.
-        // N.B. The explain plan is actually in the catalog as of 5/28/13, but
-        // plans are in place to remove it shortly.
-        StatementAnnotation annotation = new StatementAnnotation();
-        annotation.explainPlan = plan.explainedPlan;
-        catalogStmt.setAnnotation(annotation);
-        // build usage links for report generation
+        // build usage links for report generation and put them in the catalog
         CatalogUtil.updateUsageAnnotations(db, catalogStmt, plan.rootPlanGraph, plan.subPlanGraph);
 
-        // set the explain plan output into the catalog (in hex)
+        // set the explain plan output into the catalog (in hex) for reporting
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
 
         // compute a hash of the plan
@@ -242,14 +291,16 @@ public abstract class StatementCompiler {
         // Planner should have rejected with an exception any statement with an unrecognized type.
         int validType = catalogStmt.getQuerytype();
         assert(validType != QueryType.INVALID.getValue());
+
+        return false;
     }
 
-    static void compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
+    static boolean compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String sqlText, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
-        compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+        return compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
                 null, sqlText, joinOrder, detMode, partitioning);
     }
 
@@ -351,13 +402,11 @@ public abstract class StatementCompiler {
         stmt.setReadonly(catProc.getReadonly());
         stmt.setQuerytype(qtype.getValue());
         stmt.setSinglepartition(catProc.getSinglepartition());
-        stmt.setBatched(false);
         stmt.setIscontentdeterministic(true);
         stmt.setIsorderdeterministic(true);
         stmt.setNondeterminismdetail("NO CONTENT FOR DEFAULT PROCS");
         stmt.setSeqscancount(plan.countSeqScans());
         stmt.setReplicatedtabledml(!catProc.getReadonly() && table.getIsreplicated());
-        stmt.setParamnum(plan.parameters.length);
 
         // Input Parameters
         // We will need to update the system catalogs with this new information

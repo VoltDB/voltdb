@@ -111,8 +111,6 @@ public class PlannerTestAideDeCamp {
         Statement catalogStmt = proc.getStatements().add(stmtLabel);
         catalogStmt.setSqltext(sql);
         catalogStmt.setSinglepartition(forceSingle);
-        catalogStmt.setBatched(false);
-        catalogStmt.setParamnum(paramCount);
 
         // determine the type of the query
         QueryType qtype = QueryType.SELECT;

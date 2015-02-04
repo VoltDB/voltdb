@@ -33,6 +33,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -114,6 +116,13 @@ public class VoltCompiler {
 
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     public final boolean standaloneCompiler;
+
+    // tables that change between the previous compile and this one
+    // used for Live-DDL caching of plans
+    private Set<String> m_dirtyTables = new TreeSet<>();
+    // A collection of statements from the previous catalog
+    // used for Live-DDL caching of plans
+    private Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -448,7 +457,7 @@ public class VoltCompiler {
             compilerLog.error("Unable to open DDL file.", e);
             return false;
         }
-        return compileInternalToFile(projectReader, jarOutputPath, ddlReaderList, null);
+        return compileInternalToFile(projectReader, jarOutputPath, null, null, ddlReaderList, null);
     }
 
     /**
@@ -470,7 +479,7 @@ public class VoltCompiler {
             compilerLog.error("Failed to add DDL file to empty in-memory jar.");
             return false;
         }
-        return compileInternalToFile(null, jarOutputPath, ddlReaderList, jarFile);
+        return compileInternalToFile(null, jarOutputPath, null, null, ddlReaderList, jarFile);
     }
 
     private static void addBuildInfo(final InMemoryJarfile jarOutput) {
@@ -502,7 +511,7 @@ public class VoltCompiler {
         DatabaseType autoGenDatabase = getProjectDatabase(null);
         InMemoryJarfile autoGenJarOutput = new InMemoryJarfile();
         autoGenCompiler.m_currentFilename = AUTOGEN_DDL_FILE_NAME;
-        Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase,
+        Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase, null, null,
                 autogenReaderList, autoGenJarOutput);
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
@@ -527,6 +536,8 @@ public class VoltCompiler {
     private boolean compileInternalToFile(
             final VoltCompilerReader projectReader,
             final String jarOutputPath,
+            final VoltCompilerReader cannonicalDDLIfAny,
+            final Catalog previousCatalogIfAny,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutputRet)
     {
@@ -535,7 +546,7 @@ public class VoltCompiler {
             return false;
         }
 
-        InMemoryJarfile jarOutput = compileInternal(projectReader, ddlReaderList, jarOutputRet);
+        InMemoryJarfile jarOutput = compileInternal(projectReader, cannonicalDDLIfAny, previousCatalogIfAny, ddlReaderList, jarOutputRet);
         if (jarOutput == null) {
             return false;
         }
@@ -564,6 +575,8 @@ public class VoltCompiler {
      */
     private InMemoryJarfile compileInternal(
             final VoltCompilerReader projectReader,
+            final VoltCompilerReader cannonicalDDLIfAny,
+            final Catalog previousCatalogIfAny,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutputRet)
     {
@@ -590,7 +603,7 @@ public class VoltCompiler {
         if (database == null) {
             return null;
         }
-        final Catalog catalog = compileCatalogInternal(database, ddlReaderList, jarOutput);
+        final Catalog catalog = compileCatalogInternal(database, cannonicalDDLIfAny, previousCatalogIfAny, ddlReaderList, jarOutput);
         if (catalog == null) {
             return null;
         }
@@ -722,7 +735,7 @@ public class VoltCompiler {
     {
         DatabaseType database = getProjectDatabase(null);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
-        return compileCatalogInternal(database, DDLPathsToReaderList(ddlFilePaths), jarOutput);
+        return compileCatalogInternal(database, null, null, DDLPathsToReaderList(ddlFilePaths), jarOutput);
     }
 
     /**
@@ -746,7 +759,7 @@ public class VoltCompiler {
         DatabaseType database = getProjectDatabase(projectReader);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
         // Provide an empty DDL reader list.
-        return compileCatalogInternal(database, DDLPathsToReaderList(), jarOutput);
+        return compileCatalogInternal(database, null, null, DDLPathsToReaderList(), jarOutput);
     }
 
     /**
@@ -823,6 +836,8 @@ public class VoltCompiler {
      */
     private Catalog compileCatalogInternal(
             final DatabaseType database,
+            final VoltCompilerReader cannonicalDDLIfAny,
+            final Catalog previousCatalogIfAny,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
     {
@@ -842,7 +857,11 @@ public class VoltCompiler {
             }
             // shutdown and make a new hsqldb
             try {
-                compileDatabaseNode(database, ddlReaderList, jarOutput);
+                Database previousDBIfAny = null;
+                if (previousCatalogIfAny != null) {
+                    previousDBIfAny = previousCatalogIfAny.getClusters().get("cluster").getDatabases().get("database");
+                }
+                compileDatabaseNode(database, cannonicalDDLIfAny, previousDBIfAny, ddlReaderList, jarOutput);
             } catch (final VoltCompilerException e) {
                 return null;
             }
@@ -931,7 +950,7 @@ public class VoltCompiler {
         List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
-        compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, null, null, whichProcs, jarOutput);
+        compileDatabase(db, hsql, voltDdlTracker, null, null, ddlReaderList, null, null, whichProcs, jarOutput);
 
         return m_catalog;
     }
@@ -946,6 +965,8 @@ public class VoltCompiler {
      */
     private void compileDatabaseNode(
             final DatabaseType database,
+            VoltCompilerReader cannonicalDDLIfAny,
+            Database previousDBIfAny,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
                     throws VoltCompilerException
@@ -1034,7 +1055,7 @@ public class VoltCompiler {
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
-        compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, database.getExport(), classDependencies,
+        compileDatabase(db, hsql, voltDdlTracker, cannonicalDDLIfAny, previousDBIfAny, ddlReaderList, database.getExport(), classDependencies,
                         DdlProceduresToLoad.ALL_DDL_PROCEDURES, jarOutput);
     }
 
@@ -1054,6 +1075,8 @@ public class VoltCompiler {
             Database db,
             HSQLInterface hsql,
             VoltDDLElementTracker voltDdlTracker,
+            VoltCompilerReader cannonicalDDLIfAny,
+            Database previousDBIfAny,
             List<VoltCompilerReader> schemaReaders,
             ExportType export,
             Collection<Class<?>> classDependencies,
@@ -1065,6 +1088,15 @@ public class VoltCompiler {
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
         final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
+
+        if (cannonicalDDLIfAny != null) {
+            // add the file object's path to the list of files for the jar
+            m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
+
+            ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
+        }
+
+        m_dirtyTables.clear();
 
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             // add the file object's path to the list of files for the jar
@@ -1155,7 +1187,11 @@ public class VoltCompiler {
 
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
-            compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, jarOutput);
+            CatalogMap<Procedure> previousProcsIfAny = null;
+            if (previousDBIfAny != null) {
+                previousProcsIfAny = previousDBIfAny.getProcedures();
+            }
+            compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, previousProcsIfAny, jarOutput);
         }
 
         // add extra classes from the DDL
@@ -1306,8 +1342,19 @@ public class VoltCompiler {
                                    Collection<ProcedureDescriptor> allProcs,
                                    Collection<Class<?>> classDependencies,
                                    DdlProceduresToLoad whichProcs,
+                                   CatalogMap<Procedure> prevProcsIfAny,
                                    InMemoryJarfile jarOutput) throws VoltCompilerException
     {
+        // build a cache of previous SQL stmts
+        m_previousCatalogStmts.clear();
+        if (prevProcsIfAny != null) {
+            for (Procedure prevProc : prevProcsIfAny) {
+                for (Statement prevStmt : prevProc.getStatements()) {
+                    addStatementToCache(prevStmt);
+                }
+            }
+        }
+
         // Ignore class dependencies if ignoring java stored procs.
         // This extra qualification anticipates some (undesirable) overlap between planner
         // testing and additional library code in the catalog jar file.
@@ -1323,7 +1370,6 @@ public class VoltCompiler {
         }
 
         final List<ProcedureDescriptor> procedures = new ArrayList<>();
-
         procedures.addAll(allProcs);
 
         // Actually parse and handle all the Procedures
@@ -1348,6 +1394,9 @@ public class VoltCompiler {
         }
         // done handling files
         m_currentFilename = null;
+
+        // allow gc to reclaim any cache memory here
+        m_previousCatalogStmts.clear();
     }
 
     private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
@@ -2045,6 +2094,68 @@ public class VoltCompiler {
      * @return the compiled catalog is contained in the provided jarfile.
      *
      */
+    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException
+    {
+        String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
+                Constants.UTF8ENCODING);
+        compilerLog.trace("OLD DDL: " + oldDDL);
+
+        VoltCompilerStringReader canonicalDDLReader = null;
+        VoltCompilerStringReader newDDLReader = null;
+
+        // Use the in-memory jarfile-provided class loader so that procedure
+        // classes can be found and copied to the new file that gets written.
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            canonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
+            newDDLReader = new VoltCompilerStringReader("ADHOCDDL.sql", newDDL);
+
+            List<VoltCompilerReader> ddlList = new ArrayList<>();
+            ddlList.add(newDDLReader);
+
+            m_classLoader = jarfile.getLoader();
+            // Do the compilation work.
+            InMemoryJarfile jarOut = compileInternal(null, canonicalDDLReader, oldCatalog, ddlList, jarfile);
+            // Trim the compiler output to try to provide a concise failure
+            // explanation
+            if (jarOut != null) {
+                compilerLog.debug("Successfully recompiled InMemoryJarfile");
+            }
+            else {
+                String errString = "Adhoc DDL failed";
+                if (m_errors.size() > 0) {
+                    errString = m_errors.get(m_errors.size() - 1).getLogString();
+                }
+                int fronttrim = errString.indexOf("DDL Error");
+                if (fronttrim < 0) { fronttrim = 0; }
+                int endtrim = errString.indexOf(" in statement starting");
+                if (endtrim < 0) { endtrim = errString.length(); }
+                String trimmed = errString.substring(fronttrim, endtrim);
+                throw new IOException(trimmed);
+            }
+        }
+        finally {
+            // Restore the original class loader
+            m_classLoader = originalClassLoader;
+
+            if (canonicalDDLReader != null) {
+                try { canonicalDDLReader.close(); } catch (IOException ioe) {}
+            }
+            if (newDDLReader != null) {
+                try { newDDLReader.close(); } catch (IOException ioe) {}
+            }
+        }
+    }
+
+    /**
+     * Compile the provided jarfile.  Basically, treat the jarfile as a staging area
+     * for the artifacts to be included in the compile, and then compile it in place.
+     *
+     * *NOTE*: Does *NOT* work with project.xml jarfiles.
+     *
+     * @return the compiled catalog is contained in the provided jarfile.
+     *
+     */
     public void compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
     {
         // Gather DDL files for recompilation
@@ -2067,7 +2178,7 @@ public class VoltCompiler {
         try {
             m_classLoader = jarfile.getLoader();
             // Do the compilation work.
-            InMemoryJarfile jarOut = compileInternal(null, ddlReaderList, jarfile);
+            InMemoryJarfile jarOut = compileInternal(null, null, null, ddlReaderList, jarfile);
             // Trim the compiler output to try to provide a concise failure
             // explanation
             if (jarOut != null) {
@@ -2166,7 +2277,7 @@ public class VoltCompiler {
                         versionFromCatalog, versionFromVoltDB));
 
                 // Do the compilation work.
-                boolean success = compileInternalToFile(projectReader, outputJarPath, ddlReaderList, outputJar);
+                boolean success = compileInternalToFile(projectReader, outputJarPath, null, null, ddlReaderList, outputJar);
 
                 // Sanitize the *.sql files in the jarfile so that only the autogenerated
                 // canonical DDL file will be used for future compilations
@@ -2253,5 +2364,84 @@ public class VoltCompiler {
             }
         }
         return upgradedFromVersion;
+    }
+
+    /**
+     * Note that a table changed in order to invalidate potential cached
+     * statements that reference the changed table.
+     */
+    void markTableAsDirty(String tableName) {
+        m_dirtyTables.add(tableName.toLowerCase());
+    }
+
+    /**
+     * Key prefix includes attributes that make a cached statement usable if they match
+     *
+     * For example, if the SQL is the same, but the partitioning isn't, then the statements
+     * aren't actually interchangeable.
+     */
+    String getKeyPrefix(StatementPartitioning partitioning, DeterminismMode detMode, String joinOrder) {
+        // no caching for inferred yet
+        if (partitioning.isInferred()) {
+            return null;
+        }
+
+        String joinOrderPrefix = "#";
+        if (joinOrder != null) {
+            joinOrderPrefix += joinOrder;
+        }
+
+        boolean partitioned = partitioning.wasSpecifiedAsSingle();
+
+        return joinOrderPrefix + String.valueOf(detMode.toChar()) + (partitioned ? "P#" : "R#");
+    }
+
+    void addStatementToCache(Statement stmt) {
+        String key = stmt.getCachekeyprefix() + stmt.getSqltext();
+        m_previousCatalogStmts.put(key, stmt);
+    }
+
+    // track hits and misses for debugging
+    static long m_stmtCacheHits = 0;
+    static long m_stmtCacheMisses = 0;
+
+    /** Look for a match from the previous catalog that matches the key + sql */
+    Statement getCachedStatement(String keyPrefix, String sql) {
+        String key = keyPrefix + sql;
+
+        Statement candidate = m_previousCatalogStmts.get(key);
+        if (candidate == null) {
+            ++m_stmtCacheMisses;
+            return null;
+        }
+
+        // check that no underlying tables have been modified since the proc had been compiled
+        String[] tablesTouched = candidate.getTablesread().split(",");
+        for (String tableName : tablesTouched) {
+            if (m_dirtyTables.contains(tableName.toLowerCase())) {
+                ++m_stmtCacheMisses;
+                return null;
+            }
+        }
+        tablesTouched = candidate.getTablesupdated().split(",");
+        for (String tableName : tablesTouched) {
+            if (m_dirtyTables.contains(tableName.toLowerCase())) {
+                ++m_stmtCacheMisses;
+                return null;
+            }
+        }
+
+        ++m_stmtCacheHits;
+        // easy debugging stmt
+        //printStmtCacheStats();
+        return candidate;
+    }
+
+    @SuppressWarnings("unused")
+    private void printStmtCacheStats() {
+        System.out.printf("Hits: %d, Misses %d, Percent %.2f\n",
+                m_stmtCacheHits, m_stmtCacheMisses,
+                (m_stmtCacheHits * 100.0) / (m_stmtCacheHits + m_stmtCacheMisses));
+        System.out.flush();
     }
 }
