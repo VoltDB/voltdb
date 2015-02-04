@@ -668,8 +668,9 @@ function loadAdminPage() {
     });
 
     var getDateTime = function () {
-        var currentDate = new Date();
-        return (currentDate.getFullYear() + '.' + (currentDate.getMonth() + 1) + '.' + currentDate.getDate() + '.' + currentDate.getHours() + '.' + currentDate.getMinutes() + '.' + currentDate.getSeconds()).toString();
+
+        var currentDate = new Date().toISOString(); // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
+        return currentDate.substr(0, 19).replace('T', '.').replace(/-/g, '.').replace(/:/g, '.');
     };
 
     $('#restoreConfirmation').popup({
