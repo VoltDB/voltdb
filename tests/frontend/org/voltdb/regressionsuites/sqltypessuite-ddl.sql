@@ -23,7 +23,7 @@ CREATE TABLE ALLOW_NULLS (
  PRIMARY KEY (PKEY)
 );
 
--- Attribute for ea. supported type: nulls allowed for export group
+-- Attribute for ea. supported type: nulls allowed for export target
 CREATE TABLE ALLOW_NULLS_GRP (
  PKEY          INTEGER       NOT NULL,
  A_TINYINT     TINYINT,

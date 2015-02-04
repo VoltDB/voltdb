@@ -1177,9 +1177,9 @@ public class VoltCompiler {
         // Process DDL exported tables
         NavigableMap<String, NavigableSet<String>> exportTables = voltDdlTracker.getExportedTables();
         for (Entry<String, NavigableSet<String>> e : exportTables.entrySet()) {
-            String groupName = e.getKey();
+            String targetName = e.getKey();
             for (String tableName : e.getValue()) {
-                addExportTableToConnector(groupName, tableName, db);
+                addExportTableToConnector(targetName, tableName, db);
             }
         }
 
@@ -1574,15 +1574,15 @@ public class VoltCompiler {
         }
     }
 
-    void addExportTableToConnector(final String groupName, final String tableName, final Database catdb)
+    void addExportTableToConnector(final String targetName, final String tableName, final Database catdb)
             throws VoltCompilerException
     {
         assert tableName != null && ! tableName.trim().isEmpty() && catdb != null;
 
         // Catalog Connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase(groupName);
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase(targetName);
         if (catconn == null) {
-            catconn = catdb.getConnectors().add(groupName);
+            catconn = catdb.getConnectors().add(targetName);
         }
         org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tableName);
         if (tableref == null) {

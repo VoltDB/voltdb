@@ -70,5 +70,5 @@ public class Constants
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
     // default export group to use when no group name is provided
-    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "__DEFAULT_EXPORT_GROUP__";
+    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "default";
 }

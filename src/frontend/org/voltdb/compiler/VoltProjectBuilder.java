@@ -550,7 +550,7 @@ public class VoltProjectBuilder {
         addExport(enabled, exportTarget, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
     }
 
-    public void addExport(boolean enabled, String exportTarget, Properties config, String group) {
+    public void addExport(boolean enabled, String exportTarget, Properties config, String target) {
         HashMap<String, Object> exportConnector = new HashMap<String, Object>();
         exportConnector.put("elLoader", "org.voltdb.export.processors.GuestProcessor");
         exportConnector.put("elEnabled", enabled);
@@ -569,7 +569,7 @@ public class VoltProjectBuilder {
         else {
             exportConnector.put("elExportTarget", "file");
         }
-        exportConnector.put("elGroup", group);
+        exportConnector.put("elGroup", target);
         m_elExportConnectors.add(exportConnector);
     }
 
@@ -582,10 +582,10 @@ public class VoltProjectBuilder {
         transformer.append("Export TABLE " + name + ";");
     }
 
-    public void setTableAsExportOnly(String name, String group) {
+    public void setTableAsExportOnly(String name, String target) {
         assert(name != null);
-        assert(group != null);
-        transformer.append("Export TABLE " + name + " GROUP " + group + ";");
+        assert(target != null);
+        transformer.append("Export TABLE " + name + " TARGET " + target + ";");
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -1000,12 +1000,12 @@ public class VoltProjectBuilder {
                     !((String)exportConnector.get("elLoader")).trim().isEmpty());
 
             ServerExportEnum exportTarget = ServerExportEnum.fromValue(((String)exportConnector.get("elExportTarget")).toLowerCase());
-            exportConfig.setTarget(exportTarget);
+            exportConfig.setType(exportTarget);
             if (exportTarget.equals(ServerExportEnum.CUSTOM)) {
                 exportConfig.setExportconnectorclass(System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE));
             }
 
-            exportConfig.setGroup((String)exportConnector.get("elGroup"));
+            exportConfig.setTarget((String)exportConnector.get("elGroup"));
 
             Properties config = (Properties)exportConnector.get("elConfig");
             if((config != null) && (config.size() > 0)) {

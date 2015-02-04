@@ -404,7 +404,7 @@ public abstract class CatalogUtil {
         return false;
     }
 
-    public static String getExportGroupIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
+    public static String getExportTargetIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
                                                                     org.voltdb.catalog.Table table)
     {
         for (Connector connector : database.getConnectors()) {
@@ -664,23 +664,24 @@ public abstract class CatalogUtil {
             DeploymentType deployment = result.getValue();
             // move any deprecated standalone export elements to the group
             ExportType export = deployment.getExport();
-            if (export != null && export.getConfiguration().size() == 1 &&
-                    (export.isEnabled() != null || export.getTarget() != null || export.getExportconnectorclass() != null)) {
+            if (export != null && export.getTarget() != null) {
+                if (export.getConfiguration().size() > 1) {
+                    hostLog.error("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
+                    return null;
+                }
+                //OLD syntax use target as type.
                 ExportConfigurationType exportConfig = export.getConfiguration().get(0);
                 if (export.isEnabled() != null) {
                     exportConfig.setEnabled(export.isEnabled());
                 }
                 if (export.getTarget() != null) {
-                    exportConfig.setTarget(export.getTarget());
+                    exportConfig.setType(export.getTarget());
                 }
                 if (export.getExportconnectorclass() != null) {
                     exportConfig.setExportconnectorclass(export.getExportconnectorclass());
                 }
-            }
-            else if (export != null && export.getConfiguration().size() > 1 &&
-                    (export.isEnabled() != null || export.getTarget() != null || export.getExportconnectorclass() != null)) {
-                hostLog.error("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
-                return null;
+                //Set target to default name.
+                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             }
 
             populateDefaultDeployment(deployment);
@@ -988,7 +989,7 @@ public abstract class CatalogUtil {
         // on-server export always uses the guest processor
         String exportClientClassName = null;
 
-        switch(exportConfiguration.getTarget()) {
+        switch(exportConfiguration.getType()) {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
@@ -1092,7 +1093,7 @@ public abstract class CatalogUtil {
             boolean connectorEnabled = exportConfiguration.isEnabled();
             // Get the group name from the xml attribute "group"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String groupName = exportConfiguration.getGroup();
+            String groupName = exportConfiguration.getTarget();
             boolean defaultConnector = groupName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             if (connectorEnabled) {

@@ -16,7 +16,7 @@ CREATE TABLE NO_NULLS (
  A_DECIMAL     DECIMAL          NOT NULL,  -- DECIMAL(19,12)
  PRIMARY KEY (PKEY)
 );
--- For group based export
+-- For target based export
 CREATE TABLE NO_NULLS_GRP (
  PKEY          INTEGER          NOT NULL,
  A_TINYINT     TINYINT          NOT NULL,

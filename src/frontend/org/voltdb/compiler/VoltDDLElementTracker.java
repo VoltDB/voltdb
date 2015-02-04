@@ -44,7 +44,7 @@ public class VoltDDLElementTracker {
     final Map<String, ProcedureDescriptor> m_procedureMap =
             new HashMap<String, ProcedureDescriptor>();
     // map from export group name to a sorted set of table names in that group
-    final NavigableMap<String, NavigableSet<String>> m_exportsByGroup = new TreeMap<>();
+    final NavigableMap<String, NavigableSet<String>> m_exportsByTargetName = new TreeMap<>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
     final Set<String> m_importLines = new TreeSet<String>();
@@ -192,29 +192,29 @@ public class VoltDDLElementTracker {
     /**
      * Track an exported table
      * @param tableName a table name
-     * @param groupName
+     * @param targetName
      * @throws VoltCompilerException when the given table is already exported
      */
-    void addExportedTable(String tableName, String groupName)
+    void addExportedTable(String tableName, String targetName)
     {
         assert tableName != null && ! tableName.trim().isEmpty();
-        assert groupName != null && ! groupName.trim().isEmpty();
+        assert targetName != null && ! targetName.trim().isEmpty();
 
         // store uppercase in the catalog as typename
-        groupName = groupName.toUpperCase();
+        targetName = targetName.toUpperCase();
 
         // insert the table's name into the export group
-        NavigableSet<String> tableGroup = m_exportsByGroup.get(groupName);
+        NavigableSet<String> tableGroup = m_exportsByTargetName.get(targetName);
         if (tableGroup == null) {
             tableGroup = new TreeSet<String>();
-            m_exportsByGroup.put(groupName, tableGroup);
+            m_exportsByTargetName.put(targetName, tableGroup);
         }
         tableGroup.add(tableName);
     }
 
     void removeExportedTable(String tableName)
     {
-        for (Entry<String, NavigableSet<String>> groupTables : m_exportsByGroup.entrySet()) {
+        for (Entry<String, NavigableSet<String>> groupTables : m_exportsByTargetName.entrySet()) {
             if(groupTables.getValue().remove(tableName)) {
                 break;
             }
@@ -226,7 +226,7 @@ public class VoltDDLElementTracker {
      * @return a collection with tracked table exports
      */
     NavigableMap<String, NavigableSet<String>> getExportedTables() {
-        return m_exportsByGroup;
+        return m_exportsByTargetName;
     }
 
 }
