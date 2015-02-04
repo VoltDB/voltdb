@@ -333,6 +333,7 @@ public class SynchronizedStatesManager {
             ByteBuffer startStates = buildProposal(REQUEST_TYPE.INITIALIZING,
                     m_requestedInitialState, m_requestedInitialState);
             boolean stateMachineNodeCreated = addIfMissing(m_barrierResultsPath, CreateMode.PERSISTENT, startStates.array());
+
             if (m_membershipChangePending) {
                 getLatestMembership();
             }
@@ -340,7 +341,7 @@ public class SynchronizedStatesManager {
                 m_knownMembers = knownMembers;
             }
             // We need to always monitor participants so that if we are initialized we can add ourselves and insert
-            // our results and if we are not initialized, we can always auto-insert a null agreement response.
+            // our results and if we are not initialized, we can always auto-insert a null result.
             if (stateMachineNodeCreated) {
                 assert(ownDistributedLock);
                 m_synchronizedState = m_requestedInitialState;
@@ -1196,6 +1197,15 @@ public class SynchronizedStatesManager {
                 m_log.debug(m_stateMachineId + ": Received ConnectionLossException in addResultEntry");
             } catch (InterruptedException e) {
                 m_log.debug(m_stateMachineId + ": Received InterruptedException in addResultEntry");
+            }
+            catch (KeeperException.NodeExistsException e) {
+                // There is a race during initialization where a null result is assigned once so a current proposal
+                // is not hung. However, if a new proposal is submitted by another instance between that assignment
+                // and the call to checkForBarrierParticipantsChange, a second null result is assigned.
+                if (m_requestedInitialState == null || result != null) {
+                    org.voltdb.VoltDB.crashLocalVoltDB(
+                            "Unexepected failure in StateMachine; Two results created for one proposal.", true, e);
+                }
             } catch (Exception e) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
                         "Unexepected failure in StateMachine.", true, e);
