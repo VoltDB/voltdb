@@ -49,6 +49,37 @@ class TestBase extends GebReportingSpec {
 
     @Shared boolean firstDebugMessage = true
 
+    def setupSpec() { // called once (per test class), before any tests
+        // If the window is not the right size, resize it
+        def winSize = driver.manage().window().size
+        int desiredWidth  = getIntSystemProperty("windowWidth", DEFAULT_WINDOW_WIDTH)
+        int desiredHeight = getIntSystemProperty("windowHeight", DEFAULT_WINDOW_HEIGHT)
+        if (winSize.width != desiredWidth || winSize.height != desiredHeight) {
+            driver.manage().window().setSize(new Dimension(desiredWidth, desiredHeight))
+            debugPrint "Window resized, from (" + winSize.width + ", " + winSize.height +
+                       ") to (" + desiredWidth + ", " + desiredHeight + ")"
+        }
+    }
+
+    def setup() { // called before each test
+        debugPrint "\nTest: " + tName.getMethodName()
+
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            when: 'Open VMC page'
+            ensureOnVoltDBManagementCenterPage()
+            then: 'to be on VMC page'
+            at VoltDBManagementCenterPage
+        }
+
+        page.loginIfNeeded()
+    }
+
+    def ensureOnVoltDBManagementCenterPage() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            to VoltDBManagementCenterPage
+        }
+    }
+
     /**
      * Returns the specified System Property as an int value; or the default
      * value, if the System Property is not set, or cannot be parsed as an int.
@@ -137,37 +168,6 @@ class TestBase extends GebReportingSpec {
             assert expected == actual
         }
         return true
-    }
-
-    def setupSpec() { // called once (per test class), before any tests
-        // If the window is not the right size, resize it
-        def winSize = driver.manage().window().size
-        int desiredWidth  = getIntSystemProperty("windowWidth", DEFAULT_WINDOW_WIDTH)
-        int desiredHeight = getIntSystemProperty("windowHeight", DEFAULT_WINDOW_HEIGHT)
-        if (winSize.width != desiredWidth || winSize.height != desiredHeight) {
-            driver.manage().window().setSize(new Dimension(desiredWidth, desiredHeight))
-            debugPrint "Window resized, from (" + winSize.width + ", " + winSize.height +
-                       ") to (" + desiredWidth + ", " + desiredHeight + ")"
-        }
-    }
-
-    def setup() { // called before each test
-        debugPrint "\nTest: " + tName.getMethodName()
-
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            when: 'Open VMC page'
-            ensureOnVoltDBManagementCenterPage()
-            then: 'to be on VMC page'
-            at VoltDBManagementCenterPage
-        }
-
-        page.loginIfNeeded()
-    }
-    
-    def ensureOnVoltDBManagementCenterPage() {
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            to VoltDBManagementCenterPage
-        }
     }
 
     /**
