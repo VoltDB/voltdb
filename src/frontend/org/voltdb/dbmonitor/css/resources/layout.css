@@ -784,7 +784,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .arrow, 
 .labelCollapsed, 
 .labelExpanded,
-a.restoreConfirmationDisable { background-image:url(images/admin-icons.png);}
+a.restoreConfirmationDisable, .securityDelete { background-image:url(images/admin-icons.png);}
 label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
@@ -795,8 +795,8 @@ label.error { color: #c70000; width: auto; display: block; line-height: 0px; fon
 ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px;}
 ul.adminClusterList li { margin:0; padding:0; float:left; width:50px; height:100%; line-height:75px; text-align:center; margin-right:5px;}
 ul.adminClusterList li a{display:block;}
-ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -106px; width:40px; height:36px;}
-ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -151px; width:40px; height:36px;}
+ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -11px; width:40px; height:36px;}
+ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -56px; width:40px; height:36px;}
 ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
 ul.adminClusterList li a.promote-disabled, ul.adminClusterList li a.promote-disabled:hover{ display:inline-block; background-position:-70px -56px;width:40px; height:36px; color:#bbb;}
 ul.adminClusterList li a.restore, ul.adminClusterList li a.restoreConfirmationDisable { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
@@ -842,8 +842,12 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739
 .headerAdminContent h1 {padding: 18px 0 0 20px; font-size:17px;}
 .adminPorts { margin:0 0 10px 0; background:#FFFFFF;}
 .adminTbl { margin:0; padding:0;}
+.adminTbl2 th { margin:0; padding:15px 25px 15px 20px;border-bottom: 1px solid #CCCCCC; 
+					font-weight:bold; font-size:14px;}
+.adminTbl2 th:nth-child(1) { text-align:left}
 .adminTbl1 tr td { margin:0; padding:2px 2px 2px 2px; border-left:none; border-right:none; line-height:38px; /*height:32px;*/}
 .adminTbl2 tr td { margin:0; padding:15px 25px 15px 20px; border-left:none; border-right:none;}
+.network tr td:nth-child(2) { text-align:center;}
 .adminTbl1 tr td a.save {position:relative;top:4px}
 
 .onIcon			 { background-position: -266px -58px; width: 31px; height: 17px; position:relative; top:4px;}
@@ -863,8 +867,8 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739
 
 .adminTbl1 td .edit, .adminTbl1 td .editDisabled {top:9px;}
 .hasSubLabel{} 
-.labelCollapsed{ background-position:-422px -11px; padding-left:22px;}
-.labelExpanded{ background-position:-422px -55px; padding-left:22px;}
+.labelCollapsed{ background-position:-468px -11px; padding-left:22px;}
+.labelExpanded{ background-position:-468px -55px; padding-left:22px;}
 .adminTbl2 tr td:nth-child(1){font-weight:bold;}
 
 .adminWrapper{position:relative;}
@@ -963,7 +967,17 @@ text-align: center;
 color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
 }
-
+.refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;}
+.schm { margin:9px}
+.securWrapper { margin:10px 40px;}
+.secTbl { border:1px solid #CCCCCC; }
+.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; padding:0 10px}
+.secTbl tr th { font-weight:bold;}
+.userName { float:left;font-weight:bold;font-size:14px;}
+.editBtn { float:right}
+.editBtn ul li { float:left;margin: 0 0 0 5px;}
+.btnEd {cursor: pointer;background: #D0D2D2;padding:5px;font-weight: bold; font-size:12px;}
+.securityDelete {background-position:-1019px -12px; width:25px; height:20px; position:relative; top:10px; cursor:pointer;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
