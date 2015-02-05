@@ -892,26 +892,26 @@ public class TestCatalogUtil extends TestCase {
             assertTrue(msg.contains("Custom Export failed to configure, failed to load export plugin class:"));
         }
 
-        //This is a bad deployment with the same export group defined multiple times
+        //This is a bad deployment with the same export target defined multiple times
         final File tmpBadGrp = VoltProjectBuilder.writeStringToTempFile(withBadRepeatGroup);
         DeploymentType bad_grp_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBadGrp));
 
         Catalog cat2 = compiler.compileCatalogFromDDL(x);
         if ((msg = CatalogUtil.compileDeployment(cat2, bad_grp_deployment, false)) == null) {
-            fail("Should not accept a deployment file containing multiple connectors for the same group.");
+            fail("Should not accept a deployment file containing multiple connectors for the same target.");
         } else {
-            assertTrue(msg.contains("Multiple connectors can not be assigned to single export group:"));
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export target:"));
         }
 
-        //This is a bad deployment with the same export group defined multiple times
+        //This is a bad deployment with the same default export target defined multiple times
         final File tmpBadGrpDef = VoltProjectBuilder.writeStringToTempFile(withBadRepeatGroupDefault);
         DeploymentType bad_grp_deployment_def = CatalogUtil.getDeployment(new FileInputStream(tmpBadGrpDef));
 
         Catalog cat2Def = compiler.compileCatalogFromDDL(x);
         if ((msg = CatalogUtil.compileDeployment(cat2Def, bad_grp_deployment_def, false)) == null) {
-            fail("Should not accept a deployment file containing multiple connectors for the same group.");
+            fail("Should not accept a deployment file containing multiple connectors for the same target.");
         } else {
-            assertTrue(msg.contains("Multiple connectors can not be assigned to single export group:"));
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export target:"));
         }
 
         //This is a bad deployment that uses both the old and new syntax
