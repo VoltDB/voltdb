@@ -20,7 +20,6 @@
 
 namespace voltdb {
 
-static const std::string CRASH_ME = "crash_me";
 /** implement a forced SQL ERROR function (for test and example purposes) for either integer or string types **/
 template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     const char* sqlstatecode;
@@ -37,11 +36,13 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
         const char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
         std::string valueStr(valueChars, valueLength);
 
-        if (valueStr == CRASH_ME) {
+#if defined(DEBUG) || defined(_DEBUG) || defined(_DEBUG_)
+        if (valueStr == "crash_me") {
             // generate a segmentation fault on purpose
             int *ptr = NULL;
             *ptr = 1; // EXC_BAD_ACCESS
         }
+#endif
 
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
