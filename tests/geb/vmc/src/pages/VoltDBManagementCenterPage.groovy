@@ -23,8 +23,13 @@
 
 package vmcTest.pages
 
+import java.util.List;
+import java.util.Map;
+
 import geb.*
 import geb.navigator.Navigator
+import geb.waiting.WaitTimeoutException
+
 import org.openqa.selenium.JavascriptExecutor
 
 /**
@@ -34,6 +39,7 @@ import org.openqa.selenium.JavascriptExecutor
  * (& DB Monitor Catalog Report, etc.).
  */
 class VoltDBManagementCenterPage extends Page {
+    static Boolean securityEnabled = null;
 
     static url = '/'  // relative to the baseUrl
     static content = {
@@ -44,6 +50,10 @@ class VoltDBManagementCenterPage extends Page {
         dbMonitorLink(to: DbMonitorPage) { dbMonitorTab.find('a') }
         schemaLink   (to: SchemaPage)    { schemaTab.find('a') }
         sqlQueryLink (to: SqlQueryPage)  { sqlQueryTab.find('a') }
+        loginDialog  (required: false) { $('#loginBox') }
+        usernameInput   (required: false) { loginDialog.find('input#username') }
+        passwordInput   (required: false) { loginDialog.find('input#password') }
+        loginButton  (required: false) { loginDialog.find('#LoginBtn') }
     }
     static at = {
         title == 'VoltDB Management Center'
@@ -116,6 +126,77 @@ class VoltDBManagementCenterPage extends Page {
     }
 
     /**
+     * Returns the contents of the element specified by the Navigator, which
+     * should refer to a "table" HTML element. If columnWise is true, the table
+     * contents are returned in the form of a Map, with each element a List of
+     * Strings; each Key of the Map is a column header of the table, and its
+     * List contains the displayed text of that column. If columnWise is false,
+     * the table contents are returned in the form of a List of List of String;
+     * each List element represents a row of the table, containing a List of
+     * all the elements in that row.
+     * @param tableElement - a Navigator specifying the "table" element whose
+     * contents are to be returned.
+     * @return a List or Map representing the contents of the specified table
+     * element.
+     */
+    protected def getTableContents(Navigator tableElement,
+                boolean columnHeadersToLowerCase, boolean columnWise) {
+        def result = []
+        def columnHeaders = tableElement.find('thead').first().find('th')*.text()
+        if (columnHeadersToLowerCase) {
+            columnHeaders = columnHeaders.collect { it.toLowerCase() }
+        }
+        def rows = tableElement.find('tbody').find('tr')
+        // remove "empty" (or hidden) rows (those with no visible text)
+        for (int i=rows.size()-1; i>= 0; i--) {
+            String rowText = rows.getAt(i).text()
+            if (rowText == null || rowText.isEmpty()) {
+                rows = rows.remove(i);
+            }
+        }
+        if (columnWise) {
+            result = [:]
+            def makeColumn = { index,rowset -> rowset.collect { row -> row.find('td',index).text() } }
+            def colNum = 0
+            columnHeaders.each { result.put(it, makeColumn(colNum++, rows)) }
+            return result
+        } else {
+            result.add(columnHeaders)
+            rows.each { result.add(it.find('td')*.text()) }
+        }
+        return result
+    }
+
+    /**
+     * Returns the contents of the element specified by the Navigator, which
+     * should refer to a "table" HTML element. The table contents are returned
+     * in the form of a Map, with each element a List of Strings; each Key of
+     * the Map is a column header of the table, and its List contains the
+     * displayed text of that column. 
+     * @param tableElement - a Navigator specifying the "table" element whose
+     * contents are to be returned.
+     * @return a Map representing the contents of the specified table element.
+     */
+    protected Map<String,List<String>> getTableByColumn(Navigator tableElement,
+                                        boolean columnHeadersToLowerCase=true) {
+        return getTableContents(tableElement, columnHeadersToLowerCase, true)
+    }
+
+    /**
+     * Returns the contents of the element specified by the Navigator, which
+     * should refer to a "table" HTML element. The table contents are returned
+     * in the form of a List of List of String; each List element represents a
+     * row of the table, containing a List of all the elements in that row.
+     * @param tableElement - a Navigator specifying the "table" element whose
+     * contents are to be returned.
+     * @return a Map representing the contents of the specified table element.
+     */
+    protected Map<String,List<String>> getTableByRow(Navigator tableElement,
+                                        boolean columnHeadersToLowerCase=false) {
+        return getTableContents(tableElement, columnHeadersToLowerCase, false)
+    }
+
+    /**
      * Returns true if the current page is a DbMonitorPage (i.e., the "DB Monitor"
      * tab of the VoltDB Management Center page is currently open).
      * @return true if a DbMonitorPage is currently open.
@@ -181,6 +262,66 @@ class VoltDBManagementCenterPage extends Page {
     def void openSqlQueryPage() {
         if (!isSqlQueryPageOpen()) {
             sqlQueryLink.click()
+            waitFor() { !$('#tabMain').find('#tabScroller').text().isEmpty() }
         }
     }
+
+    /**
+     * Returns whether or not a Login dialog is currently open.
+     * @return true if a Login dialog is currently open.
+     */
+    def boolean isLoginDialogOpen() {
+        if (securityEnabled == null) {
+            try {
+                waitFor() { loginDialog.displayed }
+                securityEnabled = true
+            } catch (WaitTimeoutException e) {
+                securityEnabled = false
+            }
+        }
+        if (securityEnabled) {
+            try {
+                waitFor() { loginDialog.displayed }
+            } catch (WaitTimeoutException e) {
+                // do nothing
+            }
+        }
+        if (loginDialog.displayed) {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Logs in, via the Login dialog (which is assumed to be open on the
+     * current page), using the specified username and password (or their
+     * default values, if not specified).
+     * @param username - the username to be used for login.
+     * @param password - the password to be used for login.
+     */
+    def void login(username="admin", password="voltdb") {
+        usernameInput = username
+        passwordInput = password
+        loginButton.click()
+        waitFor() { !loginDialog.displayed }
+    }
+
+    /**
+     * Checks whether a Login dialog is open on the current page; and if so,
+     * logs in, using the specified username and password (or their default
+     * values, if not specified).
+     * @param username - the username to be used for login.
+     * @param password - the password to be used for login.
+     */
+    def boolean loginIfNeeded(username="admin", password="voltdb") {
+        if (isLoginDialogOpen()) {
+            println "Login dialog is open; will attempt to login."
+            login(username, password)
+            return true
+        } else {
+            return false
+        }
+    }
+
 }
