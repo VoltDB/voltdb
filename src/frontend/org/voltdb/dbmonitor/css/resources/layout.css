@@ -971,8 +971,9 @@ font: 14px Arial, Helvetica, sans-serif;
 .schm { margin:9px}
 .securWrapper { margin:10px 40px;}
 .secTbl { border:1px solid #CCCCCC; }
-.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; padding:0 10px}
-.secTbl tr th { font-weight:bold;}
+.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; padding:0 10px;}
+
+.secTbl tr th { font-weight:bold; background:#FBFBFB;}
 .userName { float:left;font-weight:bold;font-size:14px;}
 .editBtn { float:right}
 .editBtn ul li { float:left;margin: 0 0 0 5px;}
