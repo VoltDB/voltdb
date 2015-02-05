@@ -23,7 +23,8 @@
 
 package vmcTest.tests
 
-//import geb.*
+import java.util.List;
+import spock.lang.*
 import vmcTest.pages.*
 
 /**
@@ -32,16 +33,45 @@ import vmcTest.pages.*
  */
 class SchemaPageTest extends TestBase {
 
-    def setup() { // called before each test
-        setup: 'Open VMC page'
-        to VoltDBManagementCenterPage
-        expect: 'to be on VMC page'
-        at VoltDBManagementCenterPage
+    static final String DDL_SOURCE_FILE = 'src/resources/expectedDdlSource.txt';
+    static Boolean runningGenqa = null;
+    @Shared def ddlSourceFile = new File(DDL_SOURCE_FILE)
+    @Shared def ddlSourceLines = []
+    //@Shared def fileLinesPairs = [ [ddlSourceFile, ddlSourceLines] ]
+    //@Shared def slurper = new JsonSlurper()
 
+    def setupSpec() { // called once, before any tests
+        // Move contents of the specified file into memory
+        ddlSourceLines = getFileLines(ddlSourceFile)
+        //fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file)) }
+    }
+
+    def setup() { // called before each test
+        // TestBase.setup gets called first (automatically)
         when: 'click the Schema (page) link'
         page.openSchemaPage()
         then: 'should be on Schema page'
         at SchemaPage
+    }
+
+    /**
+     * Returns whether or not we are currently running the 'genqa' test app,
+     * based on whether the expected DDL Source is listed on the page.
+     * @param spdst - the SchemaPageDdlSourceTab from which to get the DDL source.
+     * @return true if we are currently running the 'genqa' test app.
+     */
+    static boolean isRunningGenqa(SchemaPageDdlSourceTab spdst) {
+        if (runningGenqa == null) {
+            def ddlSource = spdst.getDdlSource()
+            runningGenqa = true
+            for (table in ["PARTITIONED_TABLE", "REPLICATED_TABLE", "EXPORT_MIRROR_PARTITIONED_TABLE"]) {
+                if (ddlSource.contains(table)) {
+                    runningGenqa = false
+                    break
+                }
+            }
+        }
+        return runningGenqa
     }
 
     def 'confirm Overview tab open initially'() {
@@ -99,5 +129,42 @@ class SchemaPageTest extends TestBase {
         page.openSchemaPageOverviewTab()
         then: 'should be on Overview tab'
         at SchemaPageOverviewTab
+    }
+
+    /**
+     * Check that the DDL Source displayed on the DDL Source tab matches the
+     * expected list (for the 'genqa' test app).
+     */
+    def checkSchemaTab() {
+        when: 'click the Schema tab link'
+        page.openSchemaPageSchemaTab()
+
+        then: 'should be on Schema tab'
+        at SchemaPageSchemaTab
+
+        // TODO: should make these into tests, not just debug print
+        cleanup: 'for now, just print the table, row-wise'
+        debugPrint "\nSchema (tab) table, row-wise:\n" + page.getSchemaTable(false)
+
+        and: 'for now, just print the table, column-wise'
+        debugPrint "\nSchema (tab) table, column-wise:\n" + page.getSchemaTable(true)
+    }
+
+    /**
+     * Check that the DDL Source displayed on the DDL Source tab matches the
+     * expected list (for the 'genqa' test app).
+     */
+    def checkDdlSourceTab() {
+        when: 'click the DDL Source tab link'
+        page.openSchemaPageDdlSourceTab()
+
+        then: 'should be on DDL Source tab'
+        at SchemaPageDdlSourceTab
+
+        when: 'get the DDL Source (text), from the DDL Source tab'
+        List<String> ddlSourceTextLines = Arrays.asList(page.getDdlSource().split("\n"))
+
+        then: 'DDL Source should match expected text'
+        printAndCompare('DDL Source', DDL_SOURCE_FILE, isRunningGenqa(page), ddlSourceLines, ddlSourceTextLines)
     }
 }
