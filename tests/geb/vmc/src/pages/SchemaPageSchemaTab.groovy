@@ -23,6 +23,9 @@
 
 package vmcTest.pages
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * This class represents the 'Schema' tab of the 'Schema' page (or tab) of
  * the VoltDB Management Center (page), which is the VoltDB web UI (replacing
@@ -30,12 +33,26 @@ package vmcTest.pages
  */
 class SchemaPageSchemaTab extends SchemaPage {
     static content = {
-        // TODO: add content
+        schemaTable { $('#schematable') }
     }
     static at = {
         schemaSubTab.displayed
         schemaSubTab.attr('class') == 'active'
-        // TODO: add a few key elements, that should always appear
+        schemaTable.displayed
+    }
+    
+    /**
+     * Returns the contents of the "Schema" table, on the Schema tab of the
+     * Schema page of the VMC.
+     * @param columnWise - if true, returns a Map<String,List<String>>, with
+     * each key being a column header, and its associated List contains each
+     * of the values in that column; if false, returns a List<List(String)>,
+     * representing the table by row, with the columnn headers in the first
+     * row.
+     * @return the contents of the "Schema" table.
+     */
+    def getSchemaTable(boolean columnWise) {
+        return getTableContents(schemaTable, false, columnWise)
     }
 
 }
