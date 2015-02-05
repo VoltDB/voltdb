@@ -26,17 +26,11 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
@@ -48,7 +42,6 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
-import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -901,7 +894,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_limitNodeTop.setLimitParameterIndex(limitParamIndex);
         m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
 
-        // check if limit can be pushed down
+        // Check if the LimitPlanNode can be pushed down.  The LimitPlanNode may have a LIMIT
+        // clause only, OFFSET clause only, or both.  Offset only cannot be pushed down.
         m_limitCanPushdown = (hasLimit() && !m_distinct);
         if (m_limitCanPushdown) {
             for (ParsedColInfo col : m_displayColumns) {
