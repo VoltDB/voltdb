@@ -1858,6 +1858,18 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 new long[][] {});
     }
 
+    private void insertForInParamsTests(Client client) throws Exception {
+        for (int i = 0; i < 10; ++i) {
+            VoltTable vt = client.callProcedure("P1.insert",
+                    i, Integer.toString(i), i * 10, i * 100.0)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+    }
+
+    // Note: the following tests for IN with parameters should at some point
+    // be moved into their own suite along with existing tests for IN
+    // that now live in TestIndexesSuite.  This is ENG-7607.
     public void testInWithIntParams() throws Exception {
 
         // HSQL does not support WHERE f IN ?
@@ -1865,20 +1877,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
             return;
 
         Client client = getClient();
-
-        for (int i = 0; i < 10; ++i) {
-            VoltTable vt = client.callProcedure("P1.insert",
-                    i, Integer.toString(i), i * 10, i * 100.0)
-                    .getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {1});
-        }
+        insertForInParamsTests(client);
 
         VoltTable vt = client.callProcedure("one_list_param", new int[] {1, 2})
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1, 2});
 
-        // param has to be an int array, not long array
-        // Also, this error message isn't that friendly
+        // The following error message characterizes what happens if the
+        // users passes long array to an IN parameter on an INTEGER column.
+        // VoltDB requires that the data types match exactly here.
+        //
+        // This error message isn't that friendly (ENG-7606).
         verifyProcFails(client,
                 "tryScalarMakeCompatible: "
                 + "Unable to match parameter array:int to provided long",
@@ -1899,45 +1908,25 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     }
 
-    static private final class SimpleCallback implements ProcedureCallback {
-
-        private ClientResponse m_clientResponse = null;
-
-        @Override
-        public void clientCallback(ClientResponse clientResponse) throws Exception {
-            m_clientResponse = clientResponse;
-        }
-
-        public ClientResponse getClientResponse() {
-            return m_clientResponse;
-        }
-    }
-
     public void testInWithStringParams() throws Exception {
         if (isHSQL())
             return;
 
         Client client = getClient();
-
-        for (int i = 0; i < 10; ++i) {
-            VoltTable vt = client.callProcedure("P1.insert",
-                    i, Integer.toString(i), i * 10, i * 100.0)
-                    .getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {1});
-        }
+        insertForInParamsTests(client);
 
         String[] stringArgs = {"7", "8"};
 
         // For vararg methods like callProcedure, when there is an array of objects
-        // (not an array of native types) passed as the last argument, the
-        // compile time type affects how the compiler presents the arguments to the
+        // (not an array of native types) passed as the only vararg argument, the
+        // compile-time type affects how the compiler presents the arguments to the
         // callee:
         //    cast to Object   - callProcedure sees just one param (which is an array)
         //    cast to Object[] - (or a subclass of Object[]) callee sees each array
-        //                       element as its own parameter
+        //                       element as its own parameter value
 
         // where desc in ?
-        // Cast it as an object and it's treated as a single paramter in the callee.
+        // Cast parameter value as an object and it's treated as a single parameter in the callee.
         VoltTable vt = client.callProcedure("one_string_list_param", (Object)stringArgs)
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {7, 8});
@@ -1968,47 +1957,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         vt = client.callProcedure("one_string_scalar_param", "9")
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {9});
-
-        // Try with the async version of callProcedure.
-        boolean b;
-        SimpleCallback callback = new SimpleCallback();
-        b = client.callProcedure(callback,
-                "one_string_scalar_param", (Object)stringArgs);
-        // This is queued, but execution fails as it should.
-        assertTrue(b);
-        client.drain();
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
-        assertTrue(callback.getClientResponse().getStatusString().contains(
-                "Array / Scalar parameter mismatch"));
-
-        b = client.callProcedure(callback,
-                "one_string_scalar_param", (Object[])stringArgs);
-        // This is queued, but execution fails as it should.
-        // (Presumably with wrong number of params, but we have no way of knowing.)
-        assertTrue(b);
-        client.drain();
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
-        assertTrue(callback.getClientResponse().getStatusString().contains(
-                "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
-
-        // This should succeed
-        b = client.callProcedure(callback,
-                "one_string_list_param", (Object)stringArgs);
-        assertTrue(b);
-        client.drain();
-        assertEquals(ClientResponse.SUCCESS, callback.getClientResponse().getStatus());
-        vt = callback.getClientResponse().getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {7, 8});
-
-        // Here's what happens with too many parameters
-        b = client.callProcedure(callback,
-                "one_string_scalar_param", "dog", "cat");
-        // This is queued, but execution fails as it should.
-        assertTrue(b);
-        client.drain();
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
-        assertTrue(callback.getClientResponse().getStatusString().contains(
-                "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
     }
 
     public void testInWithStringParamsAdHoc() throws Exception {
@@ -2016,13 +1964,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             return;
 
         Client client = getClient();
-
-        for (int i = 0; i < 10; ++i) {
-            VoltTable vt = client.callProcedure("P1.insert",
-                    i, Integer.toString(i), i * 10, i * 100.0)
-                    .getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {1});
-        }
+        insertForInParamsTests(client);
 
         String[] stringArgs = {"7", "8"};
 
@@ -2032,10 +1974,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable vt;
 
         // where desc in ?
-        // Cast it as an object and it's treated as a single paramter in the callee.
-        // This fails, but it should not, this issue is ENG-7604
+        //
+        // Cast parameter as an Object (not Object[]),
+        // and it's treated as a single array-typed parameter in the callee.
+        //
+        // VoltDB produces an error in this case, but this seems wrong:
+        //
         verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, stringArgs);
+                "@AdHoc", adHocQueryWithListParam, (Object)stringArgs);
+
+        verifyProcFails(client, "Array / Scalar parameter mismatch",
+                "@AdHoc", adHocQueryWithListParam, (Object[])stringArgs);
 
         // where desc in ?
         // scalar parameter fails
@@ -2052,10 +2001,82 @@ public class TestFixedSQLSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", adHocQueryWithScalarParam, "9")
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {9});
+    }
+
+    static private final class SimpleCallback implements ProcedureCallback {
+
+        private ClientResponse m_clientResponse = null;
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            m_clientResponse = clientResponse;
+        }
+
+        public ClientResponse getClientResponse() {
+            return m_clientResponse;
+        }
+    }
+
+    public void testInWithStringParamsAsync() throws Exception {
+        if (isHSQL())
+            return;
+
+        // There is nothing particularly special about asynchronous procedure calls
+        // with IN and parameters.  I wrote these test cases to try and
+        // reproduce ENG-7354, which was closed as "not a bug."
+        //
+        // There doesn't seem to be a lot of tests for async call error recovery,
+        // so these tests are preserved here (hopefully they can find a better
+        // home someday).
+
+        Client client = getClient();
+        insertForInParamsTests(client);
+        String[] stringArgs = {"7", "8"};
 
         // Try with the async version of callProcedure.
         boolean b;
         SimpleCallback callback = new SimpleCallback();
+        b = client.callProcedure(callback,
+                "one_string_scalar_param", (Object)stringArgs);
+        // This is queued, but execution fails as it should.
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "Array / Scalar parameter mismatch"));
+
+        b = client.callProcedure(callback,
+                "one_string_scalar_param", (Object[])stringArgs);
+        // This is queued, but execution fails as it should.
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
+
+        // This should succeed
+        b = client.callProcedure(callback,
+                "one_string_list_param", (Object)stringArgs);
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.SUCCESS, callback.getClientResponse().getStatus());
+        VoltTable vt = callback.getClientResponse().getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {7, 8});
+
+        // Try some ad hoc queries as well.
+        String adHocQueryWithListParam = "select id from P1 where desc in ?";
+        String adHocQueryWithScalarParam = "select id from P1 where desc in (?)";
+
+        // Here's what happens with too many parameters
+        b = client.callProcedure(callback,
+                "one_string_scalar_param", "dog", "cat");
+        // This is queued, but execution fails as it should.
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
+
         b = client.callProcedure(callback, "@AdHoc",
                 adHocQueryWithScalarParam, stringArgs);
         assertTrue(b);
