@@ -1020,7 +1020,7 @@ public abstract class CatalogUtil {
             String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
             //Override for tests
             if (dexportClientClassName != null && dexportClientClassName.trim().length() > 0 &&
-                    exportConfiguration.getTarget().equals(ServerExportEnum.CUSTOM)) {
+                    exportConfiguration.getType().equals(ServerExportEnum.CUSTOM)) {
                 processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, dexportClientClassName);
             } else {
                 processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
