@@ -49,11 +49,6 @@ class NavigatePagesTest extends TestBase {
     def setup() { // called before each test
         def listener = new EchoingPageChangeListener()
         browser.registerPageChangeListener(listener)
-
-        setup: 'Open VMC page'
-        to VoltDBManagementCenterPage
-        expect: 'to be on VMC page'
-        at VoltDBManagementCenterPage
     }
 
     def 'confirm DB Monitor page open initially'() {
