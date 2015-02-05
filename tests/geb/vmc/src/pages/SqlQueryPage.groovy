@@ -39,9 +39,10 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         tablesTab   { tabControls.find("a[href='#tab1']") }
         viewsTab    { tabControls.find("a[href='#tab2']") }
         storedProcsTab  { tabControls.find("a[href='#tab3']") }
-        tablesNames { tabArea.find('#accordionTable').find('h3') }
-        viewsNames  { tabArea.find('#accordionViews').find('h3') }
-        storedProcs { tabArea.find('#accordionProcedures') }
+        listsArea   { tabArea.find('#tabScroller') }
+        tablesNames { listsArea.find('#accordionTable').find('h3') }
+        viewsNames  { listsArea.find('#accordionViews').find('h3') }
+        storedProcs { listsArea.find('#accordionProcedures') }
         systemStoredProcsHeader  { storedProcs.find('.systemHeader').first() }
         defaultStoredProcsHeader { storedProcs.find('.systemHeader').last() }
         systemStoredProcs   { storedProcs.find('#systemProcedure').find('h3') }
@@ -64,8 +65,10 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     static at = {
         sqlQueryTab.displayed
         sqlQueryTab.attr('class') == 'active'
-        tabArea.displayed
+        tablesTab.displayed
+        viewsTab.displayed
         storedProcsTab.displayed
+        listsArea.displayed
         queryInput.displayed
         queryResHtml.displayed
     }
@@ -417,26 +420,6 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /**
-     * Returns the contents of the element specified by Navigator, which must
-     * be a "table" HTML element, in the form of a Map, with each element a
-     * List of Strings; each Key of the Map is a column header of the table,
-     * and its List contains the displayed text of that column.
-     * @param tableElement - a Navigator specifying the "table" element whose
-     * contents are to be returned.
-     * @return a Map representing the contents of the specified table element.
-     */
-    private def Map<String,List<String>> getTableResult(Navigator tableElement) {
-        def result = [:]
-        def columnHeaders = tableElement.find('thead').find('th')*.text()
-        columnHeaders = columnHeaders.collect {it.toLowerCase()}
-        def rows = tableElement.find('tbody').find('tr')
-        def colNum = 0
-        def makeColumn = { index,rowset -> rowset.collect { row -> row.find('td',index).text() } }
-        columnHeaders.each { result.put(it, makeColumn(colNum++, rows)) }
-        return result
-    }
-
-    /**
      * Returns the contents of every "table" element in the "Query Result" area,
      * in the form of a List (for each table) of Maps, with each Map element a
      * List of Strings; each Key of the Map is a column header of the table,
@@ -445,7 +428,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      */
     def List<Map<String,List<String>>> getQueryResults() {
         def results = []
-        queryTables.each { results.add(getTableResult(it)) }
+        queryTables.each { results.add(getTableByColumn(it)) }
         return results
     }
 
@@ -471,7 +454,18 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return a Map representing the contents of the <i>last</i> table.
      */
     def Map<String,List<String>> getQueryResult() {
-        return getTableResult(queryTables.last())
+        return getTableByColumn(queryTables.last())
+    }
+
+    /**
+     * Returns the text of whatever is shown in the "Query Result" area, in its
+     * entirety; normally, this would include query results and/or errors, but
+     * at times it could also be "Connect to a datasource first.", which would
+     * not show up as either a result nor an error message.
+     * @return the text of whatever is shown in the "Query Result" area.
+     */
+    def String getQueryResultText() {
+        return queryResHtml.text()
     }
 
     /**
