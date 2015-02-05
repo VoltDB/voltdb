@@ -442,6 +442,8 @@ public class TestIndexSelection extends PlannerTestCase {
         }
         {
             // CREATE INDEX partial_idx_2 ON c (b) where d > 0 and d < 5;
+            // CREATE INDEX partial_idx_3 ON c (b) where d > 0; is also a match
+            // but has higher cost because of the extra post filter
             AbstractPlanNode pn = compile("select * from c where b > 0 and d > 0 and d < 5;");
             pn = pn.getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
@@ -471,7 +473,7 @@ public class TestIndexSelection extends PlannerTestCase {
             assertTrue(ipn.getPredicate() == null);
             String json = pn.toJSONString();
             System.out.println(json);
-            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\""));
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_4\""));
         }
         {
             // CREATE INDEX partial_idx_3 ON c (b) where 0 < f;
@@ -482,7 +484,7 @@ public class TestIndexSelection extends PlannerTestCase {
             assertTrue(ipn.getPredicate() == null);
             String json = pn.toJSONString();
             System.out.println(json);
-            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\""));
+            assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_4\""));
         }
     }
 

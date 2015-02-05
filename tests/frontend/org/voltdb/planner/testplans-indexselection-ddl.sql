@@ -57,4 +57,5 @@ CREATE INDEX partial_idx_null_e ON c (a) where e is null;
 CREATE INDEX partial_idx_or_expr ON c (f) where e > 0 or d < 5;
 CREATE INDEX partial_idx_1 ON c (b) where abs(e) > 1;
 CREATE INDEX partial_idx_2 ON c (b) where d > 0 and d < 5;
-CREATE INDEX partial_idx_3 ON c (b) where 0 < f;
+CREATE INDEX partial_idx_3 ON c (b) where d > 0;
+CREATE INDEX partial_idx_4 ON c (b) where 0 < f;

@@ -540,8 +540,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         //
         // Avoid applying the discount to that initial tie-breaker value of  2 or 3
         if (!m_eliminatedPostFilterExpressions.isEmpty() && m_estimatedProcessedTupleCount > 3) {
-            double discount = 1.0 - Math.pow(0.10, m_eliminatedPostFilterExpressions.size());
+            double discount = 1.0;
+            // Each eliminated filter gets a scaled down by an additional factor of 0.1 discount.
+            for (int i = 0; i < m_eliminatedPostFilterExpressions.size(); ++i) {
+                discount -= Math.pow(0.1, i + 1);
+            }
             m_estimatedProcessedTupleCount *= discount;
+            if (m_estimatedProcessedTupleCount < 4) {
+                m_estimatedProcessedTupleCount = 4;
+            }
         }
 
         LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
