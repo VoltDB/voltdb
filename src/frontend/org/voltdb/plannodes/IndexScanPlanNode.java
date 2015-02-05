@@ -100,13 +100,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();;
+    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();
 
     private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
     private static final int FOR_GROUPING = 2;
     private static final int FOR_DETERMINISM = 3;
 
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
+
+    // Post-filters that got eliminated by exactly matched partial index filters
+    private List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
 
     public IndexScanPlanNode() {
         super();
@@ -527,6 +530,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_estimatedOutputTupleCount = 1;
         }
 
+        // Apply discounts similar to the keyWidth one for the additional post-filters that get
+        // eliminated by exactly matched partial index filters. The existing discounts are not
+        // supposed to give a "full refund" of the optimized-out post filters, because there is
+        // an offsetting order log(n) cost to using the index. That offsetting cost will be lower
+        // (order log(smaller n)) for partial indexes, but it's not clear what the typical
+        // relative costs are of a partial index with x key components and y partial index predicates
+        // vs. a full or partial index with x+n key components and y-m partial index predicates.
+        //
+        // Avoid applying the discount to that initial tie-breaker value of  2 or 3
+        if (!m_eliminatedPostFilterExpressions.isEmpty() && m_estimatedProcessedTupleCount > 3) {
+            double discount = 1.0 - Math.pow(0.10, m_eliminatedPostFilterExpressions.size());
+            m_estimatedProcessedTupleCount *= discount;
+        }
+
         LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
         if (limit != null) {
             int limitInt = limit.getLimit();
@@ -543,22 +560,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
-        // give a small 10% discount to partial index
-        if (!m_catalogIndex.getPredicatejson().isEmpty()) {
-            discountPartialIndexCostEstimates();
-        }
-    }
-
-    /**
-     * Adjust cost estimates for partial indexes
-     */
-    private void discountPartialIndexCostEstimates() {
-        assert(m_catalogIndex.getPredicatejson().isEmpty() == false);
-        // @TODO-5990: At the moment it is very simple discounting schema - give 1% discount to all partial indexes.
-        // A case can be made that the more filter clauses an index has, the smaller the index,
-        // and the cheaper the index operation, so the discount could be a sliding scale based on number
-        // of filter clauses, or equality filters have greater weight than ranges filters or not null filters
-        m_estimatedProcessedTupleCount *= 0.99;
     }
 
     @Override
@@ -787,6 +788,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public boolean isForGroupingOnly() {
         return m_purpose == FOR_GROUPING;
+    }
+
+    public void setEliminatedPostFilters(List<AbstractExpression> exprs) {
+        for (AbstractExpression expr : exprs) {
+            m_eliminatedPostFilterExpressions.add((AbstractExpression)expr.clone());
+        }
     }
 
     // Called by ReplaceWithIndexLimit and ReplaceWithIndexCounter

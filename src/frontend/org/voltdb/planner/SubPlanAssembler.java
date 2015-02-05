@@ -297,7 +297,7 @@ public abstract class SubPlanAssembler {
         }
 
         // Handle remaining NOT NULL index predicate expressions that can be covered by NULL rejecting expressions
-        exprsToCover = removeNotNullCOveredExpressions(tableScan, coveringExprs, exprsToCover);
+        exprsToCover = removeNotNullCoveredExpressions(tableScan, coveringExprs, exprsToCover);
 
         // All index predicate expressions must be covered for index to be selected
         return exprsToCover.isEmpty();
@@ -1348,7 +1348,7 @@ public abstract class SubPlanAssembler {
      * @param exprsToCover
      * @return List<AbstractExpression>
      */
-    protected List<AbstractExpression> removeNotNullCOveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
+    protected List<AbstractExpression> removeNotNullCoveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
         // Collect all TVEs from NULL-rejecting covering expressions
         Set<TupleValueExpression> coveringTves = new HashSet<TupleValueExpression>();
         for (AbstractExpression coveringExpr : coveringExprs) {
@@ -1537,6 +1537,7 @@ public abstract class SubPlanAssembler {
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         scanNode.setSkipNullPredicate();
+        scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         return resultNode;
     }
 
@@ -1589,5 +1590,7 @@ public abstract class SubPlanAssembler {
      */
     private void filterPostPredicateForPartialIndex(AccessPath path, List<AbstractExpression> exprToRemove) {
         path.otherExprs.removeAll(exprToRemove);
+        // Keep the eliminated expressions for cost estimating purpose
+        path.eliminatedPostExprs.addAll(exprToRemove);
     }
 }
