@@ -1087,14 +1087,16 @@ public abstract class CatalogUtil {
             return;
         }
         List<String> targetList = new ArrayList<String>();
-
+        boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            // Get the target name from the xml attribute "arget"
+            // Get the target name from the xml attribute "target"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
             String targetName = exportConfiguration.getTarget();
-            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            if (noEmptyTarget && (targetName == null || targetName.trim().isEmpty()) ) {
+                    throw new RuntimeException("target must be specified along with type in export configuration.");
+            }
 
             if (connectorEnabled) {
                 if (targetList.contains(targetName)) {
@@ -1105,6 +1107,7 @@ public abstract class CatalogUtil {
                     targetList.add(targetName);
                 }
             }
+            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
