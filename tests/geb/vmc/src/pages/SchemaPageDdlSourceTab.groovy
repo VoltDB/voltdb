@@ -30,12 +30,23 @@ package vmcTest.pages
  */
 class SchemaPageDdlSourceTab extends SchemaPage {
     static content = {
-        // TODO: add content
+        mainContent { $('#d') }
+        downloadButton  { mainContent.find('.dataBlockHeading').find('a') }
+        sourceText  { mainContent.find('.dataBlockContent') }
     }
     static at = {
         ddlTab.displayed
         ddlTab.attr('class') == 'active'
-        // TODO: add a few key elements, that should always appear
+        //downloadButton.displayed
+        sourceText.displayed
+    }
+
+    /**
+     * Returns the DDL Source, as displayed on the "DDL Source" tab of the
+     * "Schema" page (or tab).
+     */
+    def String getDdlSource() {
+        return sourceText.first().text()
     }
 
 }
