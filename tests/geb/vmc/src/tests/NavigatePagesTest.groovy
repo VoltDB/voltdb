@@ -47,6 +47,7 @@ class EchoingPageChangeListener implements PageChangeListener {
 class NavigatePagesTest extends TestBase {
 
     def setup() { // called before each test
+        // TestBase.setup gets called first (automatically)
         def listener = new EchoingPageChangeListener()
         browser.registerPageChangeListener(listener)
     }
