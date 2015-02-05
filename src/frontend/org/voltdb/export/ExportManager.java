@@ -91,7 +91,7 @@ public class ExportManager
             new CopyOnWriteArrayList<Long>();
 
     //Keep track of initial or last generation that was set in EE but has no Java side as export is disabled and misconfigured.
-    //Typically start with table pointing to bad group. fix group and unfix it again...keep doing this and you will
+    //Typically start with table pointing to bad target. fix target and unfix it again...keep doing this and you will
     //have a generation thats last one which has not java side as export s disabled.
     private static long m_lastNonEnabledGeneration = 0;
     private final HostMessenger m_messenger;
@@ -533,7 +533,7 @@ public class ExportManager
             Properties properties = new Properties();
             Set<String> tables = new HashSet<>();
 
-            String groupName = conn.getTypeName();
+            String targetName = conn.getTypeName();
 
             for (ConnectorTableInfo ti : conn.getTableinfo()) {
                 tables.add(ti.getTable().getTypeName());
@@ -554,7 +554,7 @@ public class ExportManager
             }
 
             Pair<Properties, Set<String>> connConfig = new Pair<>(properties, tables);
-            config.put(groupName, connConfig);
+            config.put(targetName, connConfig);
         }
 
         m_processorConfig = config;

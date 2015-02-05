@@ -662,7 +662,7 @@ public abstract class CatalogUtil {
             JAXBElement<DeploymentType> result =
                 (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
             DeploymentType deployment = result.getValue();
-            // move any deprecated standalone export elements to the group
+            // move any deprecated standalone export elements to the default target
             ExportType export = deployment.getExport();
             if (export != null && export.getTarget() != null) {
                 if (export.getConfiguration().size() > 1) {
@@ -1086,43 +1086,43 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        List<String> groupList = new ArrayList<String>();
+        List<String> targetList = new ArrayList<String>();
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            // Get the group name from the xml attribute "group"
+            // Get the target name from the xml attribute "arget"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String groupName = exportConfiguration.getTarget();
-            boolean defaultConnector = groupName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            String targetName = exportConfiguration.getTarget();
+            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             if (connectorEnabled) {
-                if (groupList.contains(groupName)) {
-                    throw new RuntimeException("Multiple connectors can not be assigned to single export group: " +
-                            groupName + ".");
+                if (targetList.contains(targetName)) {
+                    throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
+                            targetName + ".");
                 }
                 else {
-                    groupList.add(groupName);
+                    targetList.add(targetName);
                 }
             }
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
-            org.voltdb.catalog.Connector catconn = db.getConnectors().get(groupName);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
                     if (defaultConnector) {
                         hostLog.info("Export configuration enabled and provided for the default export " +
-                                     "group in deployment file, however, no export " +
-                                     "tables are assigned to the default group. " +
-                                     "Export group will be disabled.");
+                                     "target in deployment file, however, no export " +
+                                     "tables are assigned to the default target. " +
+                                     "Export target will be disabled.");
                     }
                     else {
-                        hostLog.info("Export configuration enabled and provided for export group " +
-                                     groupName +
+                        hostLog.info("Export configuration enabled and provided for export target " +
+                                     targetName +
                                      " in deployment file however no export " +
-                                     "tables are assigned to the this group. " +
-                                     "Export group " + groupName + " will be disabled.");
+                                     "tables are assigned to the this target. " +
+                                     "Export target " + targetName + " will be disabled.");
                     }
                 }
                 continue;
@@ -1140,26 +1140,26 @@ public abstract class CatalogUtil {
 
             if (!connectorEnabled) {
                 if (defaultConnector) {
-                    hostLog.info("Export configuration for the default export group is present and is " +
-                            "configured to be disabled. The default export group will be disabled.");
+                    hostLog.info("Export configuration for the default export target is present and is " +
+                            "configured to be disabled. The default export target will be disabled.");
                 }
                 else {
-                    hostLog.info("Export configuration for export group " + groupName + " is present and is " +
-                                 "configured to be disabled. Export group " + groupName + " will be disabled.");
+                    hostLog.info("Export configuration for export target " + targetName + " is present and is " +
+                                 "configured to be disabled. Export target " + targetName + " will be disabled.");
                 }
             } else {
                 if (defaultConnector) {
-                    hostLog.info("Default export group is configured and enabled with type=" + exportConfiguration.getTarget());
+                    hostLog.info("Default export target is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 else {
-                    hostLog.info("Export group " + groupName + " is configured and enabled with type=" + exportConfiguration.getTarget());
+                    hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 if (exportConfiguration.getProperty() != null) {
                     if (defaultConnector) {
-                        hostLog.info("Default export group configuration properties are: ");
+                        hostLog.info("Default export target configuration properties are: ");
                     }
                     else {
-                        hostLog.info("Export group " + groupName + " configuration properties are: ");
+                        hostLog.info("Export target " + targetName + " configuration properties are: ");
                     }
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
                         if (!configProp.getName().toLowerCase().contains("password")) {
