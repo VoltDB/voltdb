@@ -1,20 +1,28 @@
 Automated Tests of the VMC (VoltDB Management Center), Using GEB
 ----------------------------------------------------------------
 
-This page describes the GEB automated tests of the VMC (VoltDB Management
+This file describes the GEB automated tests of the VMC (VoltDB Management
 Center), which is the new UI, replacing the old Web Studio. These automated
-tests are believed to provide more than the level of coverage of the now
-deprecated GEB tests of Web Studio, in the ../studioWeb/ directory.
+tests are believed to provide more than the level of coverage of the old
+GEB tests of Web Studio, in the, now deleted, ../studioWeb/ directory.
 
 To run these tests of the VMC:
-1. Download and install OR build from source the VoltDB pro version.
+1. Download and install OR build from source VoltDB, preferably the pro
+   version (since 'genqa' requires pro).
 2. From the voltdb/tests/test_apps/genqa/ directory, launch a backgrounded
-   genqa application server ("./run.sh server &").
+   genqa application server:
+      ./run.sh server &
+   (You can also run against other examples, such as the 'voter' example, but
+   the testing is less complete.)
 3. From the voltdb/tests/geb/vmc/ directory, launch the all-in-one install/run
-   script for the automated test ("./gradlew firefox --rerun-tasks").
+   script for the automated tests:
+      ./gradlew firefox --rerun-tasks
+   (You may use 'firefox' or 'firefoxTest'.)
 4. Scan the console output for highlighted FAILED messages or failed test
    counts and/or browse the test result summary rooted in:
-   voltdb/tests/geb/vmc/build/reports/firefoxTest/tests/index.html
+      voltdb/tests/geb/vmc/build/reports/firefoxTest/tests/index.html
+   or, if you used Chrome:
+      voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html
 5. Stop the backgrounded server ("voltadmin shutdown" or "kill %1" – or 
    "kill <whatever your actual background job number(s) may be>").
 
@@ -22,14 +30,16 @@ To add to or modify the existing tests:
 1. To add additional SQL queries to be run in the VMC, add additional lines to
    the file voltdb/tests/geb/vmc/src/resources/sqlQueries.txt; the format is
    JSON-based, and the specific format should be fairly self-explanatory, by
-   looking at existing tests.
+   looking at existing tests. Make sure the new tests clean up after themselves,
+   and can be run twice in a row; for example, any new tables that are Created
+   should also be Dropped.
 2. More substantial changes to the tests can be made in the
    voltdb/tests/geb/vmc/src/pages/ and voltdb/tests/geb/vmc/src/tests/
    directories, which contain most of the actual Groovy / GEB code.
 3. For more info on GEB, see:
       http://www.gebish.org/
       http://www.gebish.org/manual/current/
-   For more info on Spock (which is also used), see;
+   For more info on Spock (which is also used), see:
       http://docs.spockframework.org/en/latest/
       https://code.google.com/p/spock/wiki/SpockBasics
 
@@ -44,16 +54,23 @@ browsers). To do this:
       def seleniumVersion = "2.44.0"
    to use the latest version (e.g. "2.45.2").
 
-Note 1: if you want to run these tests regularly on your machine, you may want
+Note 1: If you want to run these tests on Chrome, using:
+      ./gradlew chrome --rerun-tasks
+   (you may use 'chrome' or 'chromeTest'), then you will first need to download
+   the Chrome Driver, as described here:
+      https://code.google.com/p/selenium/wiki/ChromeDriver
+   (mainly, make sure it's in a directory included in the system PATH).
+Note 2: If you want to run just one test class or method, you may do so using
+   the --tests argument. For example, to run all of the tests in the
+   NavigatePagesTest class (on Firefox), run:
+       ./gradlew firefox --tests=*NavigatePages* --rerun-tasks
+   Or, to run just the checkTables method (in the SqlQueriesTest class), run:
+       ./gradlew firefox --tests=*checkTables --rerun-tasks
+Note 3: If you want to run these tests regularly on your machine, you may want
    to set your Firefox Preferences (under Advanced, Update) to something other
    than "Automatically install updates" ("Check for updates, but let me choose
    whether to install them" is a good choice), so that your version of Firefox
    does not get ahead of what Selenium can handle.
-Note 2: if you want to run these tests using Chrome
-   ("./gradlew chrome --rerun-tasks"), then you will first need to download the
-   Chrome Driver, as described here:
-      https://code.google.com/p/selenium/wiki/ChromeDriver
-   (mainly, make sure it's in a directory included in the system PATH).
-Note 3: running the tests against Safari does not currently work; no other
+Note 4: Running the tests against Safari does not currently work; no other
    browsers (besides Firefox & Chrome) are currently supported. (The browser
    drivers are specified in voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy.)
