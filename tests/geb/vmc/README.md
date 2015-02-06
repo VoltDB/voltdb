@@ -60,17 +60,48 @@ Note 1: If you want to run these tests on Chrome, using:
    the Chrome Driver, as described here:
       https://code.google.com/p/selenium/wiki/ChromeDriver
    (mainly, make sure it's in a directory included in the system PATH).
+
 Note 2: If you want to run just one test class or method, you may do so using
    the --tests argument. For example, to run all of the tests in the
    NavigatePagesTest class (on Firefox), run:
-       ./gradlew firefox --tests=*NavigatePages* --rerun-tasks
+      ./gradlew firefox --tests=*NavigatePages* --rerun-tasks
    Or, to run just the checkTables method (in the SqlQueriesTest class), run:
-       ./gradlew firefox --tests=*checkTables --rerun-tasks
-Note 3: If you want to run these tests regularly on your machine, you may want
+      ./gradlew firefox --tests=*checkTables --rerun-tasks
+   You can also run all of the tests defined in
+   voltdb/tests/geb/vmc/src/resources/sqlQueries.txt, as follows:
+      ./gradlew firefox --tests=*sqlQueries* --rerun-tasks
+
+Note 3: There are several system properties that can be specified on the
+   command-line using '-P', as follows:
+      ./gradlew -Purl=http://my.server.com:8080/ -PdebugPrint=true -PtimeoutSeconds=10 firefox --rerun-tasks
+   Here is a description of all system properties currently available:
+      NAME            DEFAULT  DESCRIPTION
+      url             http://localhost:8080/  The URL for the VMC to be tested
+      debugPrint      false    Lots of debug output is produced (in the test result HTML pages)
+      timeoutSeconds  5        How long to wait for HTML elements to appear, before giving up
+      windowWidth     1500     The width of the browser window
+      windowHeight    1000     The height of the browser window
+   These are used only in the SqlQueriesTest class, mainly in the
+   insertQueryCountAndDeleteForTablesAndViews test method:
+      numRowsToInsert 3        How many rows to insert, in each Table
+      testTables      PARTITIONED_TABLE,REPLICATED_TABLE  Which Tables to test (or ALL)
+      testViews       null     Which Views (if any) to test (or ALL)
+      insertJson      false    
+      sleepSeconds    0        Can slow down the tests, to watch what they are doing
+   If you are running the 'genqa' test app, then PARTITIONED_TABLE and
+   REPLICATED_TABLE are already defined; but if not, they will be created by
+   the SqlQueriesTest class, and then dropped at the end. The system properties
+   that are available are defined in:
+      voltdb/tests/geb/vmc/build.gradle (all except one)
+      voltdb/tests/geb/vmc/src/resources/GebConfig.groovy (timeoutSeconds only)
+   So for more info, see there, or the code (especially SqlQueriesTest).
+
+Note 4: If you want to run these tests regularly on your machine, you may want
    to set your Firefox Preferences (under Advanced, Update) to something other
    than "Automatically install updates" ("Check for updates, but let me choose
    whether to install them" is a good choice), so that your version of Firefox
    does not get ahead of what Selenium can handle.
-Note 4: Running the tests against Safari does not currently work; no other
+
+Note 5: Running the tests against Safari does not currently work; no other
    browsers (besides Firefox & Chrome) are currently supported. (The browser
    drivers are specified in voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy.)
