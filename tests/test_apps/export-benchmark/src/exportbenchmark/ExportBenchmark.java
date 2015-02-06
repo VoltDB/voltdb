@@ -39,6 +39,7 @@ import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -68,6 +69,10 @@ public class ExportBenchmark {
     final ClientStatsContext fullStatsContext;
     // Timer for periodic stats
     Timer timer;
+    // Flags to tell the worker threads to stop or go
+    AtomicBoolean warmupComplete = new AtomicBoolean(false);
+    AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
+
     
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
     
@@ -85,9 +90,6 @@ public class ExportBenchmark {
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 5;
-
-        @Option(desc = "Number of inserts to make into the export table.")
-        long count = 10000;
         
         @Option(desc = "Export table to use")
         String tableName = "allValues";
@@ -103,7 +105,6 @@ public class ExportBenchmark {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (count <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (tableName == null || tableName.isEmpty()) exitWithMessageAndUsage("Table name cannot be blank");
         }
     }
@@ -249,14 +250,47 @@ public class ExportBenchmark {
         // block until all have connected
         connections.await();
     }
+    
+    /**
+     * While <code>benchmarkComplete</code> is set to false, run as many
+     * synchronous procedure calls as possible and record the results.
+     *
+     */
+    class ExportThread implements Runnable {
+
+        @Override
+        public void run() {
+            while (benchmarkComplete.get() == false) {
+                // Insert objects
+                try {
+                    client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
+                } catch (Exception e) {
+                    System.err.println("Couldn't insert into VoltDB\n");
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+            }
+        }
+    }
+
 
     /**
      * Runs the export benchmark test
      */
     private void runTest() throws Exception{
+        // Connect to servers
         System.out.println("Test initialization");
-        
         connect(config.servers);
+        
+        // Start the work
+        Thread thread = new Thread(new ExportThread());
+        thread.start();
+        
+        // Run the benchmark loop for the requested warmup time
+        System.out.println("Warming up...");
+        Thread.sleep(1000l * config.warmup);
+        
+        warmupComplete.set(true);
         
         // reset the stats after initialization
         fullStatsContext.fetchAndResetBaseline();
@@ -264,22 +298,13 @@ public class ExportBenchmark {
         
         schedulePeriodicStats();
         
-        // Insert objects
-        long startTime = System.nanoTime();
-        try {
-            System.out.println("Inserting objects");
-            String sql = "";
-            for (int i = 0; i < config.count; i++) {
-                sql = "INSERT INTO " + config.tableName + " VALUES (" + 4 + "," + 8 + ","  + 16 + "," + 32 + "," + 42.15 + "," + 12.52 + ",'string1'," + 4215 + ");";
-                client.callProcedure(new NullCallback(), "@AdHoc", sql);
-            }
-            client.drain();
-            System.out.println("Object insertion complete");
-        } catch (Exception e) {
-            System.err.println("Couldn't insert into VoltDB\n");
-            e.printStackTrace();
-            System.exit(1);
-        }
+        // Wait until the insertion is done
+        System.out.println("\nRunning benchmark...");
+        Thread.sleep(1000l * config.duration);
+        System.out.println("Object insertion complete");
+        
+        benchmarkComplete.set(true);
+        client.drain();
         
         // Wait until export is done
         try {
@@ -290,13 +315,10 @@ public class ExportBenchmark {
             System.exit(1);
         }
         
-        // See how much time elapsed
         timer.cancel();
-        long estimatedTime = System.nanoTime() - startTime;
-        System.out.println("Export time elapsed (ms) for " + config.count + " objects: " + estimatedTime/1000000);
-        printResults();
         
-        // Cleanup
+        // Print results & close
+        printResults();
         client.close();
     }
     
