@@ -363,9 +363,11 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
                 (queryResHtml.text() != initQueryResultText || queryDurHtml.text() != initQueryDurationText)
             }
         } catch (WaitTimeoutException e) {
-            println "\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; see standard error for stack trace."
+            String message = '\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; this is probably nothing to worry about'
+            println message + '.'
+            System.err.println message + ':'
             e.printStackTrace()
-            println "This is probably nothing to worry about.\n"
+            println 'See Standard error for stack trace.\n'
         }
         return this
     }
