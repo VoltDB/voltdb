@@ -440,21 +440,38 @@ public class HTTPAdminListener {
             try {
                 DeploymentType newDeployment = m_mapper.readValue(deployment, DeploymentType.class);
                 if (newDeployment == null) {
-                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse deployment information."));
                     return;
                 }
                 //For users that are listed if they exists without password set their password to current else password will get changed for existing user.
                 //New users if valid will get updated.
                 //For Scrambled passowrd this will work also but new passwords will be unscrambled
                 //TODO: add switch to post to scramble??
-                if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled()) {
+                if (newDeployment.getSecurity() != null) {
                     DeploymentType currentDeployment = this.getDeployment();
-                    List<User> users = currentDeployment.getUsers().getUser();
-                    for (UsersType.User user : newDeployment.getUsers().getUser()) {
-                        if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
-                            for (User u : users) {
-                                if (user.getName().equalsIgnoreCase(u.getName())) {
-                                    user.setPassword(u.getPassword());
+                    //Merge passwords for existing users.
+                    List<User> users = null;
+                    List<User> newusers = null;
+                    if (currentDeployment.getUsers() != null) {
+                        users = currentDeployment.getUsers().getUser();
+                    }
+                    if (newDeployment.getUsers() != null) {
+                        newusers = newDeployment.getUsers().getUser();
+                    }
+                    //We check current users also because enabling uses existing users that we copy over.
+                    if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled() &&
+                            (newusers == null || newusers.isEmpty() || users == null || users.isEmpty())) {
+                        response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Enabling security without any users is not allowed."));
+                        return;
+                    }
+                    //For security disabled copy all user's passwords to ensure deployment is good.
+                    if (newusers != null) {
+                        for (UsersType.User user : newusers) {
+                            if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
+                                for (User u : users) {
+                                    if (user.getName().equalsIgnoreCase(u.getName())) {
+                                        user.setPassword(u.getPassword());
+                                    }
                                 }
                             }
                         }
@@ -462,6 +479,10 @@ public class HTTPAdminListener {
                 }
 
                 String dep = CatalogUtil.getDeployment(newDeployment);
+                if (dep == null || dep.trim().length() <= 0) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
                 Object[] params = new Object[2];
                 params[0] = null;
                 params[1] = dep;
@@ -588,7 +609,7 @@ public class HTTPAdminListener {
             ///api/1.0/
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
             // the default is 200k which well short of out 2M row size limit
-            apiRequestHandler.setMaxFormContentSize(2* 1024 * 1024);
+            apiRequestHandler.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             apiRequestHandler.setHandler(new APIRequestHandler());
 
             ///catalog

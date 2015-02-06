@@ -58,6 +58,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
@@ -700,9 +701,15 @@ public class DDLCompiler {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+
+            // group names should be the third group captured
+            String targetName = ((statementMatcher.groupCount() > 1) && (statementMatcher.group(2) != null)) ?
+                    checkIdentifierStart(statementMatcher.group(2), statement) :
+                    Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
+
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
-                tableXML.attributes.put("export", "true");
+                tableXML.attributes.put("export", targetName);
             }
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
@@ -871,7 +878,7 @@ public class DDLCompiler {
                     m_tracker.removePartition(tableName);
                 }
                 if (export != null) {
-                    m_tracker.addExportedTable(tableName);
+                    m_tracker.addExportedTable(tableName, export);
                 }
                 else {
                     m_tracker.removeExportedTable(tableName);
@@ -1292,7 +1299,7 @@ public class DDLCompiler {
             // Get the final DDL for the table rebuilt from the catalog object
             // Don't need a real StringBuilder or export state to get the CREATE for a table
             annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
-                    table, query, false);
+                    table, query, null);
         }
 
         if (maxRowSize > MAX_ROW_SIZE) {

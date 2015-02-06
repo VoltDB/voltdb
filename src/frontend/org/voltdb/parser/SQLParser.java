@@ -290,6 +290,9 @@ public class SQLParser extends SQLPatternFactory
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (1) <table name>
+            "(?:\\s+TARGET\\s+" +                // begin optional TARGET clause
+            "([\\w.$]+)" +                      // (2) <export target>
+            ")?" +                              // end optional TARGET clause
             "\\s*;\\z"                          // (end statement)
             );
     /**

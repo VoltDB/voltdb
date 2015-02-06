@@ -339,9 +339,6 @@ chmod +x %%{__perl_requires}
 echo "To make a copy of the VoltDB sample programs run the command: cp -r %%{prefix}/share/%%{voltdbdir}/examples <your-new-examples-directory>"
 echo "Thanks for installing VoltDB!"
 
-%%preun
-%%include preuncmd
-
 %%postun
 # remove voltdb directory tree
 if [ -n "%%{name}" ]; then

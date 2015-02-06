@@ -86,7 +86,7 @@ voltupdate()
     sudo apt-get -y -qq install openjdk-7-jdk ntp ntpdate sysstat python-setuptools
     sudo apt-get -y -qq remove unity-webapps-common
     sudo apt-get -y -qq update
-    sudo apt-get -y -qq upgrade
+    sudo apt-get -y -q upgrade
     sudo apt-get clean
     sudo apt-get autoclean
 

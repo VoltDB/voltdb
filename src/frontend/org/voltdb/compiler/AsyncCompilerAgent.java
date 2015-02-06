@@ -34,6 +34,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
@@ -114,14 +115,12 @@ public class AsyncCompilerAgent {
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
             // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
-            // This is not currently robust to comment, multi-line statments,
-            // multiple statements on a line, etc.
             Boolean hasDDL = null;
             // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
             SortedSet<String> conflictTables = new TreeSet<String>();
             Set<String> createdTables = new HashSet<String>();
             for (String stmt : w.sqlStatements) {
-                if (SQLLexer.isComment(stmt)) {
+                if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
                     continue;
                 }
                 String ddlToken = SQLLexer.extractDDLToken(stmt);
@@ -162,7 +161,16 @@ public class AsyncCompilerAgent {
                     }
                 }
             }
-            if (!hasDDL) {
+            if (hasDDL == null) {
+                // we saw neither DDL or DQL/DML.  Make sure that we get a
+                // response back to the client
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Failed to plan, no SQL statement provided.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
+            else if (!hasDDL) {
                 final AsyncCompilerResult result = compileAdHocPlan(w);
                 w.completionHandler.onCompletion(result);
             }
@@ -270,7 +278,7 @@ public class AsyncCompilerAgent {
         work.completionHandler.onCompletion(result);
     }
 
-    AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {
+    AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
@@ -319,6 +327,28 @@ public class AsyncCompilerAgent {
         if (!errorMsgs.isEmpty()) {
             errorSummary = StringUtils.join(errorMsgs, "\n");
         }
+
+        // check the parameters count
+        if (work.explainMode == ExplainMode.NONE && work.userParamSet != null) {
+            int totalQuestionMarkParameters = 0;
+            for (AdHocPlannedStatement result: stmts) {
+                totalQuestionMarkParameters += result.getQuestionMarkParameterCount();
+            }
+            if (work.sqlStatements.length > 1 && totalQuestionMarkParameters > 0) {
+                return AsyncCompilerResult.makeErrorResult(work,
+                        String.format("The @AdHoc stored procedure when called with more than one parameter "
+                                + "must be passed a single parameterized SQL statement as its first parameter. "
+                                + "Pass each parameterized SQL statement to a separate callProcedure invocation."));
+            }
+
+            if (totalQuestionMarkParameters != work.userParamSet.length) {
+                return AsyncCompilerResult.makeErrorResult(work,
+                        String.format("Incorrect number of parameters passed: expected %d, passed %d",
+                                totalQuestionMarkParameters, work.userParamSet.length));
+            }
+
+        }
+
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
                                                                            stmts,
                                                                            partitionParamIndex,

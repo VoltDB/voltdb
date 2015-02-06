@@ -55,11 +55,13 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -429,7 +431,7 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
 
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertFalse(connector.getEnabled());
 
         } finally {
@@ -441,6 +443,8 @@ public class TestVoltCompiler extends TestCase {
 
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
@@ -462,7 +466,7 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
             CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
             assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
@@ -3633,7 +3637,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
-        Connector connector =  db.getConnectors().get("0");
+        Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         if( connector == null) return null;
         return connector.getTableinfo().getIgnoreCase(tableName);
     }
