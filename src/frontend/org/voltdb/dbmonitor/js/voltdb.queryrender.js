@@ -34,9 +34,12 @@
             // The intent is to avoid writing another full sql parser, here.
             // Any statement keyword that does not get listed here simply requires an explicit semicolon before
             // it to mark the end of the preceding statement.
+            // Note on            (?!\s+on) :
+            // This subpattern consumes no input itself but ensures that the next
+            // character is not 'on'.
             MatchStatementStarts =
-                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition|exec|execute|explain|explainproc)\s/gim,
-            //     ($1----------------------------------------------------------------------------------------------------------)
+                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition(?!\s+on)|exec|execute|explain|explainproc)\s/gim,
+            //     ($1--------------------------------------------------------------------------------------------------------------------)
             GenerateSplitStatements = ';$1 ',
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
@@ -81,6 +84,25 @@
             MatchNonBreakingCompoundKeywords =
                 /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
             //   ($1------------------------------------------------)   ($2------------------------------------------------------)
+            // Note on           ([\s\S])
+            // It matches the any character including the new line character
+            MatchCreateView = /(\s*(?:create\s+view\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)(select)/gim,
+            //                 ($1-----------------------------------------------------------------------)($2----)
+            MatchCreateSingleQueryProcedure =
+                /(\s*(?:create\s+procedure\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
+            //   ($1----------------------------------------------------------------------------)($2------------------------------------------------------)
+
+            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+            // There are three keywords that may start statements to escape:
+            //
+            //   partition, execute, and delete
+            //
+            // They require escaping when they are immediately preceded by
+            // "limit", "rows <n>", and "execute(", respectively.
+            MatchLimitPartition = /(\s*limit\s+)(partition)/gim,
+            MatchRowcountExecute = /(\s*rows\s+\d+\s+)(execute)/gim,
+            MatchExecuteDelete = /(\s*execute\s*\(\s*)(delete)/gim,
+
             MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
             GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 
@@ -144,6 +166,12 @@
             //* Enable this to debug in the browser */ console.log("pre-processed queries:'" + src + "'");
             src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchCreateView, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchCreateSingleQueryProcedure, GenerateDisguisedCompoundKeywords);
+
+            src = src.replace(MatchLimitPartition, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchRowcountExecute, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchExecuteDelete, GenerateDisguisedCompoundKeywords);
 
             if (!src.match("^explain")) {
                 // Start a new statement before each remaining statement keyword.
@@ -216,10 +244,18 @@
 
     function executeCallback(format, target, id) {
         var Format = format;
-        var Target = target;
+        var targetHtml = target.find('#resultHtml');
+        var targetCsv = target.find('#resultCsv');
+        var targetMonospace = target.find('#resultMonospace');
         var Id = id;
+        $(targetHtml).html('');
+        $(targetCsv).html('');
+        $(targetMonospace).html('');
+
         function callback(response) {
-            processResponse(Format, Target, Id, response);
+            processResponse('HTML', targetHtml, Id + '_html', response);
+            processResponse('CSV', targetCsv, Id + '_csv', response);
+            processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
         }
         this.Callback = callback;
     }
@@ -227,15 +263,7 @@
     function executeMethod() {
         var target = $('.queryResult');
         var format = $('#exportType').val();
-        if (format == 'HTML') {
-            target = target.find('#resultHtml');
-        } else if (format == 'CSV') {
-            target = target.find('#resultCsv');
-        } else if (format == 'Monospace') {
-            target = target.find('#resultMonospace');
-        }
-        $(target).html('');
-
+        
         if (!VoltDBCore.connections.hasOwnProperty(DataSource)) {
             $(target).html('Connect to a datasource first.');
             return;
@@ -250,7 +278,7 @@
 
         $("#runBTn").attr('disabled', 'disabled');
         $("#runBTn").addClass("graphOpacity");
-        
+
         var statements = CommandParser.parseUserInput(source);
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
@@ -297,6 +325,7 @@
             var tables = response.results;
             for (var j = 0; j < tables.length; j++)
                 printResult(format, target, id + '_' + j, tables[j]);
+
         } else {
             target.append('<span class="errorValue">Error: ' + response.statusstring + '\r\n</span>');
         }

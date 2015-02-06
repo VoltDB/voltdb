@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -444,9 +444,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     /**
      * Returns the purge executor vector for this table
      */
-    ExecutorVector* getPurgeExecutorVector() {
+    boost::shared_ptr<ExecutorVector> getPurgeExecutorVector() {
         assert(hasPurgeFragment());
-        return m_purgeExecutorVector.get();
+        return m_purgeExecutorVector;
     }
 
   private:

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,9 +90,10 @@ public class VoltDDLElementTracker {
     /**
      * Tracks the given procedure descriptor if it is not already tracked
      * @param descriptor a {@link VoltCompiler.ProcedureDescriptor}
+     * @return name added to procedure map
      * @throws VoltCompilerException if it is already tracked
      */
-    void add(ProcedureDescriptor descriptor) throws VoltCompilerException
+    String add(ProcedureDescriptor descriptor) throws VoltCompilerException
     {
         assert descriptor != null;
 
@@ -107,6 +108,8 @@ public class VoltDDLElementTracker {
         }
 
         m_procedureMap.put(shortName, descriptor);
+
+        return shortName;
     }
 
     /**
@@ -145,7 +148,7 @@ public class VoltDDLElementTracker {
         ProcedureDescriptor descriptor = m_procedureMap.get(procedureName);
         if( descriptor == null) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Partition in referencing an undefined procedure \"%s\"",
+                    "Partition references an undefined procedure \"%s\"",
                     procedureName));
         }
 

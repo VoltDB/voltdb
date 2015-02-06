@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -230,7 +230,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     // delete/insert
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->tempTableTupleCount();
+    m_engine->addToTuplesModified(m_inputTable->tempTableTupleCount());
 
     return true;
 }

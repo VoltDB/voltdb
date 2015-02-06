@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,6 +62,11 @@ import com.google_voltpatches.common.base.Throwables;
  */
 public class ExportManager
 {
+    /**
+     * the only supported processor class
+     */
+    public static final String PROCESSOR_CLASS =
+            "org.voltdb.export.processors.GuestProcessor";
 
     /**
      * Processors also log using this facility.
@@ -163,28 +168,36 @@ public class ExportManager
     private void rollToNextGeneration(ExportGeneration drainedGeneration) throws Exception {
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;
+        boolean installNewProcessor = false;
         synchronized (ExportManager.this) {
-            boolean installNewProcessor = false;
             if (m_generations.containsValue(drainedGeneration)) {
                 m_generations.remove(drainedGeneration.m_timestamp);
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
+                //If I am draining current generation create new processor. Otherwise its just older on disk generations
+                // that are getting drained.
                 installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
                 exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
             } else {
+                installNewProcessor = false;
                 exportLog.warn("Finished draining a generation that is not known to export generations.");
             }
 
             try {
-                if (m_loaderClass != null && !m_generations.isEmpty() && installNewProcessor) {
-                    exportLog.info("Creating connector " + m_loaderClass);
-                    final Class<?> loaderClass = Class.forName(m_loaderClass);
-                    //Make it so
+                if (m_loaderClass != null && !m_generations.isEmpty()) {
+                    //Pick next generation.
                     ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                    newProcessor = (ExportDataProcessor) loaderClass.newInstance();
-                    newProcessor.addLogger(exportLog);
-                    newProcessor.setExportGeneration(nextGeneration);
-                    newProcessor.setProcessorConfig(m_processorConfig);
-                    newProcessor.readyForData();
+                    if (installNewProcessor) {
+                        exportLog.info("Creating connector " + m_loaderClass);
+                        final Class<?> loaderClass = Class.forName(m_loaderClass);
+                        newProcessor = (ExportDataProcessor) loaderClass.newInstance();
+                        newProcessor.addLogger(exportLog);
+                        newProcessor.setExportGeneration(nextGeneration);
+                        newProcessor.setProcessorConfig(m_processorConfig);
+                        newProcessor.readyForData();
+                    } else {
+                        //Just set the next generation.
+                        m_processor.get().setExportGeneration(nextGeneration);
+                    }
 
                     if (!nextGeneration.isContinueingGeneration()) {
                         /*
@@ -206,7 +219,10 @@ public class ExportManager
                             nextGeneration.acceptMastershipTask(partitionId);
                         }
                     }
-                    oldProcessor = m_processor.getAndSet(newProcessor);
+                    if (installNewProcessor) {
+                        //If we installed new processor get old one to shutdown.
+                        oldProcessor = m_processor.getAndSet(newProcessor);
+                    }
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
@@ -216,7 +232,7 @@ public class ExportManager
         /*
          * The old processor should shutdown if we installed a new processor.
          */
-        if (oldProcessor != null) {
+        if (oldProcessor != null && installNewProcessor) {
             oldProcessor.shutdown();
         }
         try {
@@ -257,9 +273,6 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass == null) {
-            return;
-        }
         Preconditions.checkArgument(
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
@@ -269,6 +282,9 @@ public class ExportManager
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
          */
+        if (m_generations.isEmpty() || m_generations.firstEntry() == null) {
+            return;
+        }
         ExportGeneration gen = m_generations.firstEntry().getValue();
         if (gen != null && gen.isContinueingGeneration()) {
             gen.acceptMastershipTask(partitionId);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -646,9 +646,21 @@ public class MiscUtils {
         // Index to current character.
         // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
         // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
+        boolean statementIsComment = false;
+        boolean inStatement = false;
         int iCur = 0;
         while (iCur < buf.length) {
-            if (sCommentEnd != null) {
+            // Eat up whitespace outside of a statement
+            if (!inStatement) {
+                if (Character.isWhitespace(buf[iCur])) {
+                    iCur++;
+                    iStart = iCur;
+                }
+                else {
+                    inStatement = true;
+                }
+            }
+            else if (sCommentEnd != null) {
                 // Processing the interior of a comment. Check if at the comment or buffer end.
                 if (iCur >= buf.length - sCommentEnd.length()) {
                     // Exit
@@ -657,6 +669,16 @@ public class MiscUtils {
                     // Move past the comment end.
                     iCur += sCommentEnd.length();
                     sCommentEnd = null;
+                    // If the comment is the whole of the statement so far, terminate it
+                    if (statementIsComment) {
+                        String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+                        if (!statement.isEmpty()) {
+                            statements.add(statement);
+                        }
+                        iStart = iCur;
+                        statementIsComment = false;
+                        inStatement = false;
+                    }
                 } else {
                     // Keep going inside the comment.
                     iCur++;
@@ -694,6 +716,7 @@ public class MiscUtils {
                     }
                     iStart = iCur + 1;
                     iCur = iStart;
+                    inStatement = false;
                 } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
                     // Start of quoted string.
                     cQuote = buf[iCur];
@@ -703,10 +726,16 @@ public class MiscUtils {
                     if (buf[iCur] == '-' && buf[iCur+1] == '-') {
                         // One line double-dash comment start.
                         sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
+                        if (iCur == iStart) {
+                            statementIsComment = true;
+                        }
                         iCur += 2;
                     } else if (buf[iCur] == '/' && buf[iCur+1] == '*') {
                         // Multi-line C-style comment start.
                         sCommentEnd = "*/";
+                        if (iCur == iStart) {
+                            statementIsComment = true;
+                        }
                         iCur += 2;
                     } else {
                         // Not a comment start, move past this character.

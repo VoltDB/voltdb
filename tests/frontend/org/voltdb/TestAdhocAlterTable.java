@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -188,7 +188,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             boolean threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
-                        "alter table FOO drop column DROPME;");
+                        "alter table FOO drop column DROPME; --commentfortesting");
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -234,7 +234,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
             try {
                 m_client.callProcedure("@AdHoc",
-                        "alter table FOO drop column VIEWCOL cascade;");
+                        "alter table FOO drop column VIEWCOL cascade; --comment messes up cascade?");
             }
             catch (ProcCallException pce) {
                 fail("Dropping a column should drop a view with cascade");

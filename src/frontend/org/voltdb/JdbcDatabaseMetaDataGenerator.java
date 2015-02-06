@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,8 @@
 
 package org.voltdb;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -184,9 +184,10 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("ACTIVE_PROC", VoltType.TINYINT)
         };
 
-    JdbcDatabaseMetaDataGenerator(Catalog catalog, InMemoryJarfile jarfile)
+    JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
+        m_defaultProcs = defaultProcs;
         m_database = m_catalog.getClusters().get("cluster").getDatabases().get("database");
         m_jarfile = jarfile;
     }
@@ -545,7 +546,19 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedures()
     {
         VoltTable results = new VoltTable(PROCEDURES_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
             String remark = null;
             try {
@@ -646,7 +659,19 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedureColumns()
     {
         VoltTable results = new VoltTable(PROCEDURECOLUMNS_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
             for (ProcParameter param : proc.getParameters())
             {
@@ -739,6 +764,7 @@ public class JdbcDatabaseMetaDataGenerator
     }
 
     private final Catalog m_catalog;
+    private final DefaultProcedureManager m_defaultProcs;
     private final Database m_database;
     private final InMemoryJarfile m_jarfile;
 }

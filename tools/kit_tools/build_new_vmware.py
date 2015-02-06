@@ -168,6 +168,7 @@ def vm_zerofilldisk(vmdk):
         #Clean up and zero out disk
         _print_line()
         print "Cleaning up disk"
+        print "  Ignore the failure 'cat: write error: No space left on device'"
         local('sudo cat /dev/zero > %s/zero.fill;sync;sleep 1;sync;rm -f %s/zero.fill' % (mount,mount))
     finally:
         vmdk_unmountlocal(mount)
@@ -240,6 +241,7 @@ def clean_and_pack_vmimage():
 
     _print_line()
     print "Mounting VM disk locally to zerofill before compressing"
+    print "  Ignore the failure about 'Invalid configuration file parameter'"
     vm_zerofilldisk(vmdk)
 
     #Shrink disk
@@ -260,6 +262,28 @@ def clean_and_pack_vmimage():
               newvmdir + '.zip',
               chdir = os.path.join(newvmdir,".."))
 
+@task
+def start_from_update(version):
+    """
+    Run all the steps to update $VMX.  Usage: restart_from_update:version
+    """
+
+    _print_line()
+    print "Updating new VM with V" + version
+    vm_update(version)
+
+    clean_and_pack_vmimage()
+
+    #Start
+    _print_line()
+    print "Starting cloned VM for your inspection."
+    vm_start()
+
+    #Stop
+    #_print_line()
+    #print "Stopping VM"
+    #vm_stop()
+    #upload
 
 @task(default=True)
 def make_new_vmimage(version,oldvmdir=None):
@@ -316,21 +340,6 @@ def make_new_vmimage(version,oldvmdir=None):
     _get_vmx()
     vm_start()
 
-    _print_line()
-    print "Updating new VM with V" + version
-    vm_update(version)
+    start_from_update(version)
 
-    clean_and_pack_vmimage()
 
-    #Start
-    _print_line()
-    print "Starting cloned VM for your inspection."
-    os.environ['VMX'] = newvmx
-    _get_vmx()
-    vm_start()
-
-    #Stop
-    #_print_line()
-    #print "Stopping VM"
-    #vm_stop()
-    #upload

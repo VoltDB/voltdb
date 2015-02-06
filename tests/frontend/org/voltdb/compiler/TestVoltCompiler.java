@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -60,6 +60,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -441,6 +442,8 @@ public class TestVoltCompiler extends TestCase {
 
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
@@ -1289,6 +1292,108 @@ public class TestVoltCompiler extends TestCase {
 
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
+    }
+
+    public void testCreateProcedureWithPartition() throws IOException {
+        class Tester {
+            final VoltCompiler compiler = new VoltCompiler();
+            final String baseDDL =
+                "create table books (cash integer default 23 not null, "
+                                  + "title varchar(3) default 'foo', "
+                                  + "primary key(cash));\n"
+              + "partition table books on column cash";
+
+            void test(String ddl) {
+                test(ddl, null);
+            }
+
+            void test(String ddl, String expectedError) {
+                final String schema = String.format("%s;\n%s;", baseDDL, ddl);
+                boolean success = compileDDL(schema, compiler);
+                checkCompilerErrorMessages(expectedError, compiler, success);
+            }
+        }
+        Tester tester = new Tester();
+
+        // Class proc
+        tester.test("create procedure "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
+
+        // Class proc with previously-defined partition properties (expect error)
+        tester.test("create procedure "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.AddBook",
+                    "has partition properties defined both in class");
+
+        // Class proc with ALLOW before PARTITION clause
+        tester.test("create role r1;\n"
+                  + "create procedure "
+                  + "allow r1 "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
+
+        // Class proc with ALLOW after PARTITION clause
+        tester.test("create role r1;\n"
+                  + "create procedure "
+                  + "partition on table books column cash "
+                  + "allow r1 "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
+
+        // Statement proc
+        tester.test("create procedure Foo "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "AS select * from books where cash = ?");
+
+        // Statement proc with ALLOW before PARTITION clause
+        tester.test("create role r1;\n"
+                  + "create procedure Foo "
+                  + "allow r1 "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "AS select * from books where cash = ?");
+
+        // Statement proc with ALLOW after PARTITION clause
+        tester.test("create role r1;\n"
+                  + "create procedure Foo "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "allow r1 "
+                  + "AS select * from books where cash = ?");
+
+        // Inspired by a problem with fullDDL.sql
+        tester.test(
+                "create role admin;\n" +
+                "CREATE TABLE T26 (age BIGINT NOT NULL, gender TINYINT);\n" +
+                "PARTITION TABLE T26 ON COLUMN age;\n" +
+                "CREATE TABLE T26a (age BIGINT NOT NULL, gender TINYINT);\n" +
+                "PARTITION TABLE T26a ON COLUMN age;\n" +
+                "CREATE PROCEDURE p4 ALLOW admin PARTITION ON TABLE T26 COLUMN age PARAMETER 0 AS SELECT COUNT(*) FROM T26 WHERE age = ?;\n" +
+                "CREATE PROCEDURE PARTITION ON TABLE T26a COLUMN age ALLOW admin FROM CLASS org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc");
+
+        // Inline code proc
+        tester.test("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                    "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                    "CREATE PROCEDURE Foo PARTITION ON TABLE PKEY_INTEGER COLUMN PKEY AS ###\n" +
+                    "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                    "    transactOn = { int key -> \n" +
+                    "        voltQueueSQL(stmt,key)\n" +
+                    "        voltExecuteSQL(true)\n" +
+                    "    }\n" +
+                    "### LANGUAGE GROOVY");
+
+        // Class proc with two PARTITION clauses (inner regex failure causes specific error)
+        tester.test("create procedure "
+                  + "partition on table books column cash "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook",
+                    "Only one PARTITION clause is allowed for CREATE PROCEDURE");
+
+        // Class proc with two ALLOW clauses (should work)
+        tester.test("create role r1;\n"
+                  + "create role r2;\n"
+                  + "create procedure "
+                  + "allow r1 "
+                  + "allow r2 "
+                  + "from class org.voltdb.compiler.procedures.AddBook");
     }
 
     public void testUseInnerClassAsProc() throws Exception {
@@ -2156,6 +2261,23 @@ public class TestVoltCompiler extends TestCase {
         // Test MatView.
         String ddl;
 
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total) " +
+                "as select num, count(*) from (select num from t) subt group by num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+
+        ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
+                "create table t2(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (id, num, total) " +
+                "as select t1.id, t2.num, count(*) from t1 join t2 on t1.id = t2.id group by t1.id, t2.num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" has 2 sources. Only one source table is allowed.");
+
+        ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
+                "create table t2(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (id, num, total) " +
+                "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
@@ -2553,7 +2675,7 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "PARTITION PROCEDURE NotDefinedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Partition in referencing an undefined procedure \"NotDefinedPartitionParamInteger\"";
+        expectedError = "Partition references an undefined procedure \"NotDefinedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -2838,7 +2960,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
-    public void testInvalidGtroovyProcedureDDL() throws Exception {
+    public void testInvalidGroovyProcedureDDL() throws Exception {
         ArrayList<Feedback> fbs;
         String expectedError;
 
@@ -3469,9 +3591,9 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure p1 allow as select * from books;");
         badDDLAgainstSimpleSchema(".*expected syntax.*",
                 "create procedure p1 allow a b as select * from books;");
-        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+        badDDLAgainstSimpleSchema(".*role rx that does not exist.*",
                 "create procedure p1 allow rx as select * from books;");
-        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+        badDDLAgainstSimpleSchema(".*role rx that does not exist.*",
                 "create role r1;",
                 "create procedure p1 allow r1, rx as select * from books;");
     }
