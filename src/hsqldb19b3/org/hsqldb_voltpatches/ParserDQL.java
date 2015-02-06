@@ -1263,7 +1263,7 @@ public class ParserDQL extends ParserBase {
                      && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
-        // Following line is a VoltDB patch to address ENG-7160
+        // A VoltDB extension to allow OFFSET without LIMIT
         if (e2 != null) {
             if (e2.isParam()) {
                 e2.setDataType(session, Type.SQL_INTEGER);
@@ -1272,6 +1272,16 @@ public class ParserDQL extends ParserBase {
                         && ((Integer) e2.getValue(null)).intValue() >= 0);
             }
         }
+        // End of VoltDB extension
+
+        /* disable 6 lines ...
+        if (e2.isParam()) {
+            e2.setDataType(session, Type.SQL_INTEGER);
+        } else {
+            valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
+                      && ((Integer) e2.getValue(null)).intValue() >= 0);
+        }
+        ... disabled 6 lines */
 
         if (valid) {
             sortAndSlice.addLimitCondition(new ExpressionOp(OpTypes.LIMIT, e1,

@@ -1071,6 +1071,7 @@ public class QuerySpecification extends QueryExpression {
         // A VoltDB extension to support OFFSET without LIMIT
         if (sortAndSlice.limitCondition != null
                 && sortAndSlice.limitCondition.getRightNode() != null) {
+        // End of VoltDB extension
         /* disable 1 line ...
         if (sortAndSlice.limitCondition != null) {
         ... disabled 1 line */
