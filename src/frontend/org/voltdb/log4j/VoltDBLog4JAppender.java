@@ -28,6 +28,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
+/**
+ * A Log4j appender that writes to a VoltDB instance.
+ * The appender works automatically with minimal setup; a blank, running VoltDB instance
+ * is all that is required.
+ */
 public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     String server = "localhost";
     int port = 21212;
@@ -40,6 +45,9 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     Client client = null;
     VoltBulkLoader bulkLoader = null;
 
+    /**
+     * Failure callback for insertions to VoltDB
+     */
     static class VoltDBLog4JAppenderCallback implements BulkLoaderFailureCallBack {
 
         @Override
@@ -51,6 +59,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
 
     }
 
+    // Log4j configuration loaders
     public void setCluster(String cluster) { this.server = cluster; }
     public String getCluster() { return this.server; }
 
@@ -66,7 +75,10 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     public void setTable(String table) { this.table = table; }
     public String getTable() { return this.table; }
 
-
+    /**
+     * Initializes a new Log4j appender.
+     * Connects to VoltDB and verifies a table is ready for insertion.
+     */
     public VoltDBLog4JAppender() {
         try {
             // Create a connection to VoltDB
@@ -90,11 +102,16 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         }
     }
 
+    /**
+     * Checks the running VoltDB instance for a table.
+     * If no table exists, create & partition one.
+     * @param client       The VoltDB client
+     * @throws Exception
+     */
     private void setupTable(Client client) throws Exception {
         // See if we have a table
         VoltTable allTables = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
-        for (int i = 0; i < allTables.getRowCount(); i++) {
-            allTables.advanceRow();
+        while (allTables.advanceRow()) {
             String name = allTables.getString("TABLE_NAME");
             if (name.toLowerCase().equals(table)){
                 // We have the table, don't need to add it
@@ -105,9 +122,16 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         }
        // No table, so we need to add one
        String sqlStmt = "CREATE TABLE " + table + " ( id INT UNIQUE NOT NULL, timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))";
+       String sqlStmt2 = "PARTITION TABLE " + table + " ON COLUMN id;";
        client.callProcedure("@AdHoc", sqlStmt);
+       client.callProcedure("@AdHoc", sqlStmt2);
     }
 
+    /**
+     * When starting the appender on an existing VoltDB table, find the current index
+     * @return The current index
+     * @throws Exception
+     */
     private long findCurrentLogIndex() throws Exception{
         String sqlStmt = "SELECT MAX(id) from " + table + ";";
         VoltTable result = client.callProcedure("@AdHoc", sqlStmt).getResults()[0];
