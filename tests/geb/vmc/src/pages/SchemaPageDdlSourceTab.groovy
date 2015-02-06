@@ -44,9 +44,21 @@ class SchemaPageDdlSourceTab extends SchemaPage {
     /**
      * Returns the DDL Source, as displayed on the "DDL Source" tab of the
      * "Schema" page (or tab).
+     * @return the displayed DDL Source (as a String).
      */
     def String getDdlSource() {
         return sourceText.first().text()
+    }
+
+    /**
+     * Returns the DDL Source, as displayed on the "DDL Source" tab of the
+     * "Schema" page (or tab), returning each line as a separate String.
+     * @return the displayed DDL Source (as a List<String>).
+     */
+    def List<String> getDdlSourceLines() {
+        List<String> lines = []  // supports remove() method (unlike Arrays.asList)
+        Arrays.asList(getDdlSource().split("\n")).each { lines.add(it) }
+        return lines
     }
 
 }
