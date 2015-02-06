@@ -30,15 +30,26 @@ import org.openqa.selenium.firefox.FirefoxDriver
 //import org.openqa.selenium.phantomjs.PhantomJSDriver
 import org.openqa.selenium.safari.SafariDriver
 
+/*
 import org.openqa.selenium.remote.DesiredCapabilities
 import org.openqa.selenium.remote.RemoteWebDriver
 //import com.thoughtworks.selenium.DefaultSelenium
 import org.openqa.selenium.remote.CommandExecutor
 //import org.openqa.selenium.SeleneseCommandExecutor
+*/
+
+// Returns the specified project property value, if it is defined; otherwise,
+// returns the specified default value
+def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultValue) {
+    if (project.hasProperty(projectPropertyName)) {
+        return project.getProperties()[projectPropertyName]
+    } else {
+        return defaultValue
+    }
+}
 
 waiting {
-    timeout = 5
-    //timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 5)
+    timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 5)
 }
 
 environments {
