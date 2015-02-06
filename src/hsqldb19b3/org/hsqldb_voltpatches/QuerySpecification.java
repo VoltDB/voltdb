@@ -246,14 +246,12 @@ public class QuerySpecification extends QueryExpression {
                                                rangeVariables.length, false);
         }
 
-    /************************* Volt DB Extensions *************************/
+        // A VoltDB extension to support ???
         resolveColumnReferencesInGroupBy();
-    /**********************************************************************/
-
+        // End of VoltDB extension
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
-
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to support ???
     void resolveColumnReferencesInGroupBy() {
         if (! isAggregated) {
             return;
@@ -342,7 +340,7 @@ public class QuerySpecification extends QueryExpression {
         }
         unresolvedExpressions = newUnresolvedExpressions;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 
     void resolveColumnRefernecesInOrderBy(SortAndSlice sortAndSlice) {
 
@@ -1940,7 +1938,6 @@ public class QuerySpecification extends QueryExpression {
             set.add(name);
         }
     }
-
     /************************* Volt DB Extensions *************************/
     Expression getHavingCondition() { return havingCondition; }
 
@@ -1956,7 +1953,7 @@ public class QuerySpecification extends QueryExpression {
      * @param header    A string to be prepended to output
      */
     private void dumpExprColumns(String header){
-        System.out.println("\n\n*********************************************");
+        System.out.println("\n\n---------------------------------------------");
         System.out.println(header);
         try {
             System.out.println(getSQL());

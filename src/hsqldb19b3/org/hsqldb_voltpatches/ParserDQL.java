@@ -43,7 +43,6 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.store.BitMap;
 import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.BlobType;
-import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.IntervalType;
@@ -291,7 +290,6 @@ public class ParserDQL extends ParserBase {
                     inBytes = readIfThis(Tokens.BYTES);
                 }
                 // End of VoltDB extension
-
                 readThis(Tokens.CLOSEBRACKET);
             } else if (typeNumber == Types.SQL_BIT) {
                 length = 1;
@@ -339,7 +337,7 @@ public class ParserDQL extends ParserBase {
         if (typeObject.isCharacterType()) {
             // A VoltDB extension to support the character in bytes.
             if (inBytes) {
-                ((CharacterType) typeObject).inBytes = true;
+                ((org.hsqldb_voltpatches.types.CharacterType)typeObject).inBytes = true;
             }
             // End of VoltDB extension
             if (token.tokenType == Tokens.CHARACTER) {
@@ -1384,9 +1382,11 @@ public class ParserDQL extends ParserBase {
             Expression e = XreadTableSubqueryOrJoinedTable();
 
             table = e.subQuery.getTable();
+            // A VoltDB extension to support subquery serialization?
             if (table instanceof TableDerived) {
                 ((TableDerived)table).dataExpression = e;
             }
+            // End of VoltDB extension
         } else {
             table = readTableName();
 
@@ -1603,7 +1603,7 @@ public class ParserDQL extends ParserBase {
                     return null;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case Tokens.QUESTION :
                 e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
 
@@ -2063,7 +2063,7 @@ public class ParserDQL extends ParserBase {
                         break;
                     }
 
-                // $FALL-THROUGH$
+                // fall through
                 default :
                     end = true;
                     break;
@@ -2111,7 +2111,7 @@ public class ParserDQL extends ParserBase {
                         break;
                     }
 
-                // $FALL-THROUGH$
+                // fall through
                 default :
                     end = true;
                     break;
@@ -3874,8 +3874,10 @@ public class ParserDQL extends ParserBase {
                 function = FunctionSQL.newSQLFunction(name, compileContext);
 
                 if (function != null) {
+                    // A VoltDB extension to avoid abusing the exception handling mechanism
                     // It's not really clear why readSQLFunction exceptions just get thrown through here
                     // but get post-processed in the similar call above for FunctionForVoltDB and FunctionCustom
+                    // End of VoltDB extension
                     return readSQLFunction(function);
                 }
             }

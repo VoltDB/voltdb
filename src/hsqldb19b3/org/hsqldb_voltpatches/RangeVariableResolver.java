@@ -442,7 +442,7 @@ public class RangeVariableResolver {
                         continue;
                     }
 
-                // $FALL-THROUGH$
+                // fall through
                 case OpTypes.IS_NULL : {
                     int colIndex = e.getLeftNode().getColumnIndex();
 

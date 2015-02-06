@@ -489,7 +489,7 @@ public abstract class Type implements SchemaObject, Cloneable {
                        0);
     public static final NumberType SQL_DECIMAL =
         new NumberType(Types.SQL_DECIMAL, NumberType.defaultNumericPrecision,
-    // VoltDB BEGIN Cherry-picked code change from hsqldb-2.2.8
+    // CHERRY PICK code change from hsqldb-2.2.8
                        7);
     public static final NumberType SQL_DECIMAL_DEFAULT =
             new NumberType(Types.SQL_DECIMAL, NumberType.defaultNumericPrecision,
@@ -497,7 +497,7 @@ public abstract class Type implements SchemaObject, Cloneable {
     /* disable 1 line ...
                        0);
     ... disabled 1 line */
-    // VoltDB END Cherry-picked code change from hsqldb-2.2.8
+    // End of CHERRY PICK
     public static final NumberType SQL_DECIMAL_BIGINT_SQR =
         // A VoltDB extension to disable use of giant types in sums
         new NumberType(Types.SQL_BIGINT, NumberType.bigintPrecision, 8);
@@ -870,7 +870,7 @@ public abstract class Type implements SchemaObject, Cloneable {
                     throw Error.error(ErrorCode.X_42592, "" + precision);
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_REAL :
             case Types.SQL_DOUBLE :
                 return SQL_DOUBLE;
@@ -1000,6 +1000,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         typeAliases.put("CHARACTER VARYING", Types.SQL_VARCHAR);
         typeAliases.put("CHARACTER LARGE OBJECT", Types.SQL_CLOB);
 */
+        // A VoltDB extension to disable unsupported types
         /* disable 6 lines ...
         typeAliases.put("INT", Types.SQL_INTEGER);
         typeAliases.put("DEC", Types.SQL_DECIMAL);

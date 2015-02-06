@@ -490,7 +490,7 @@ public class Logger {
             case TableBase.TEMP_TABLE :
                 diskBased = false;
 
-            // $FALL-THROUGH$
+            // fall through
             case TableBase.RESULT_TABLE :
             case TableBase.SYSTEM_SUBQUERY :
             case TableBase.VIEW_TABLE :

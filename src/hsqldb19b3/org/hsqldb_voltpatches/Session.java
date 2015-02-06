@@ -1835,14 +1835,15 @@ public class Session implements SessionInterface {
         if (sqlWarnings == null) {
             sqlWarnings = new HsqlArrayList(true);
         }
-// A VoltDB extension to avoid memory waste.
+        // A VoltDB extension to avoid memory waste.
         // Only the last warning is ever asked for, so just keep overwriting any existing one.
         // So, why do we need a List? Good question. Just trying to minimize the code change for now.
         else {
             sqlWarnings.set(0, warning);
             return;
         }
-// End of VoltDB extension
+        // End of VoltDB extension
+
         sqlWarnings.add(warning);
     }
 
@@ -1908,7 +1909,7 @@ public class Session implements SessionInterface {
             simpleDateFormat = new SimpleDateFormat("MMMM", Locale.ENGLISH);
 
             SimpleTimeZone zone = new SimpleTimeZone(timeZoneSeconds,
-                "hsqldb");
+                "hsqldb_voltpatches");
             Calendar cal = new GregorianCalendar(zone);
 
             simpleDateFormat.setCalendar(cal);

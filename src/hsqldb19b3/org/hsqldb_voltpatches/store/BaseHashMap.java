@@ -143,7 +143,7 @@ public class BaseHashMap {
             throw new IllegalArgumentException();
         }
 
-        // CHERRY PICK to prevent a flaky crash?
+        // CHERRY PICK code to prevent a flaky crash?
         if (initialCapacity < 3) {
             initialCapacity = 3;
         }
@@ -284,7 +284,7 @@ public class BaseHashMap {
             if (isObjectKey) {
                 // A VoltDB extension to prevent an intermittent NPE on catalogUpdate?
                 if (objectKey.equals(objectKeyTable[lookup])) {
-                /* disabled 1 line ...
+                /* disable 1 line ...
                 if (objectKeyTable[lookup].equals(objectKey)) {
                 ... disabled 1 line */
                 // End of VoltDB extension
@@ -1172,13 +1172,12 @@ public class BaseHashMap {
             return false;
         }
 
-        // CHERRY PICK to prevent a flaky crash?
+        // CHERRY PICK code to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
 
         // End of CHERRY PICK
-
         int lookup = getLookup(key, key.hashCode());
 
         return lookup == -1 ? false
@@ -1186,7 +1185,7 @@ public class BaseHashMap {
     }
 
     protected boolean containsKey(int key) {
-        // CHERRY PICK to prevent a flaky crash?
+        // CHERRY PICK code to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
@@ -1201,7 +1200,7 @@ public class BaseHashMap {
 
     protected boolean containsKey(long key) {
 
-        // CHERRY PICK to prevent a flaky crash?
+        // CHERRY PICK code to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
@@ -1217,7 +1216,7 @@ public class BaseHashMap {
 
         int lookup = 0;
 
-        // CHERRY PICK to prevent a flaky crash?
+        // CHERRY PICK code to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
@@ -1486,7 +1485,7 @@ public class BaseHashMap {
             }
 
             if (isList) {
-                // CHERRY PICK to prevent a flaky crash?
+                // CHERRY PICK code to prevent a flaky crash?
                 removeRow(lookup);
 
                 // End of CHERRY PICK

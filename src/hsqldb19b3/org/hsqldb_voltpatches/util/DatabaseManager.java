@@ -121,7 +121,7 @@ implements ActionListener, WindowListener, KeyListener {
 //#endif
     private static final String HELP_TEXT =
         "See the forums, mailing lists, and HSQLDB User Guide\n"
-        + "at http://hsqldb.org.\n\n"
+        + "at http://hsqldb_voltpatches.org.\n\n"
         + "Please paste the following version identifier with any\n"
         + "problem reports or help requests:  $Revision: 2928 $"
         + (TT_AVAILABLE ? ""
@@ -132,7 +132,7 @@ implements ActionListener, WindowListener, KeyListener {
         "$Revision: 2928 $ of DatabaseManagerSwing\n\n"
         + "Copyright (c) 1995-2000, The Hypersonic SQL Group.\n"
         + "Copyright (c) 2001-2009, The HSQL Development Group.\n"
-        + "http://hsqldb.org  (User Guide available at this site).\n\n\n"
+        + "http://hsqldb_voltpatches.org  (User Guide available at this site).\n\n\n"
         + "You may use and redistribute according to the HSQLDB\n"
         + "license documented in the source code and at the web\n"
         + "site above."          //
@@ -161,7 +161,7 @@ implements ActionListener, WindowListener, KeyListener {
 
     // (ulrivo): variables set by arguments from the commandline
     static String defDriver   = "org.hsqldb_voltpatches.jdbcDriver";
-    static String defURL      = "jdbc:hsqldb:mem:.";
+    static String defURL      = "jdbc:hsqldb_voltpatches:mem:.";
     static String defUser     = "SA";
     static String defPassword = "";
     static String defScript;

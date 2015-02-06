@@ -94,7 +94,7 @@ import org.hsqldb_voltpatches.scriptio.ScriptWriterBase;
 // because important information about the database is now stored in the
 // *.properties file, all database files should be in the same folder as the
 // *.properties file
-// tony_lai@users 20020820 - export hsqldb.log_size to .properties file
+// tony_lai@users 20020820 - export hsqldb_voltpatches.log_size to .properties file
 // tony_lai@users 20020820 - changes to shutdown compact to save memory
 // fredt@users 20020910 - patch 1.7.1 by Nitin Chauhan - code improvements
 // fredt@users 20021208 - ongoing revamp
@@ -168,7 +168,7 @@ public class Log {
     }
 
     /**
-     * When opening a database, the hsqldb.compatible_version property is
+     * When opening a database, the hsqldb_voltpatches.compatible_version property is
      * used to determine if this version of the engine is equal to or greater
      * than the earliest version of the engine capable of opening that
      * database.<p>
@@ -212,7 +212,7 @@ public class Log {
                 }
 
             // continue as non-modified files
-            // $FALL-THROUGH$
+            // fall through
             case HsqlDatabaseProperties.FILES_NOT_MODIFIED :
 
                 /**

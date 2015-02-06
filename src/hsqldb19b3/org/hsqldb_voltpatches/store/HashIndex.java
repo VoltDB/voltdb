@@ -78,7 +78,7 @@ class HashIndex {
 
     HashIndex(int hashTableSize, int capacity, boolean fixedSize) {
 
-        // CHERRY PICK to prevent a flaky crash case
+        // CHERRY PICK code to prevent a flaky crash case
         if (capacity < hashTableSize) {
             capacity = hashTableSize;
         }

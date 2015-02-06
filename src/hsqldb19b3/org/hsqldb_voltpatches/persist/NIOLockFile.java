@@ -273,7 +273,7 @@ final class NIOLockFile extends LockFile {
      * file lock tagging is performed.
      */
     public static final String POSIX_MANDITORY_FILELOCK_PROPERTY =
-        "hsqldb.lockfile.posix.manditory.filelock";
+        "hsqldb_voltpatches.lockfile.posix.manditory.filelock";
 
     /**
      * Represents an OS-enforced lock region upon this object's lock file.

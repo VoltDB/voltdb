@@ -807,7 +807,6 @@ public class ExpressionColumn extends Expression {
             case OpTypes.ASTERISK :
                 return true;
             // End of VoltDB extension
-
             default :
                 return false;
         }

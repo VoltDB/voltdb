@@ -74,12 +74,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
+/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comments in place.
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
-
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -1440,7 +1439,7 @@ public class Expression {
 
     /************************* Volt DB Extensions *************************/
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     public void collectAllColumnExpressions(HsqlList set) {
 
         Expression.collectAllExpressions(set, this,
@@ -1938,7 +1937,6 @@ public class Expression {
         return cached_id;
     }
 
-    // A VoltDB extension to support indexed expressions
     public VoltXMLElement voltGetExpressionXML(Session session, Table table)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         resolveTableColumns(table);
@@ -1947,7 +1945,6 @@ public class Expression {
         return voltGetXML(session);
     }
 
-    // A VoltDB extension to support indexed expressions
     private void resolveTableColumns(Table table) {
         HsqlList set = new HsqlArrayList();
         collectAllColumnExpressions(set);

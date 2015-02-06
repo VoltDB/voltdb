@@ -185,6 +185,7 @@ public class DatabaseManager {
     }
     ... disabled 9 lines */
     // End of VoltDB extension
+
     /**
      * This has to be improved once a threading model is in place.
      * Current behaviour:
@@ -474,6 +475,7 @@ public class DatabaseManager {
             return path;
         }
     }
+
     /************************* Volt DB Extensions *************************/
     /** Minimal stub to locally resolve Server class references. */
     private static class Server {

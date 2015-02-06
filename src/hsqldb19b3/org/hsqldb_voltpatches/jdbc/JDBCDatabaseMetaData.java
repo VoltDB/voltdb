@@ -209,10 +209,10 @@ import org.hsqldb_voltpatches.FunctionCustom;
  *     Examples: <p>
  *
  *     <pre class="JavaCodeExample">
- *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb:file:test&quot;</span>      => <span class="JavaStringLiteral">&quot;file:test&quot;</span>
- *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb:mem:.&quot;</span>          => <span class="JavaStringLiteral">&quot;mem:.&quot;</span>
- *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb:hsql:/host/<alias>...&quot;</span> => URI of aliased database
- *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb:http:/host/<alias>...&quot;</span> => URI of aliased database
+ *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb_voltpatches:file:test&quot;</span>      => <span class="JavaStringLiteral">&quot;file:test&quot;</span>
+ *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb_voltpatches:mem:.&quot;</span>          => <span class="JavaStringLiteral">&quot;mem:.&quot;</span>
+ *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb_voltpatches:hsql:/host/<alias>...&quot;</span> => URI of aliased database
+ *     <span class="JavaStringLiteral">&quot;jdbc:hsqldb_voltpatches:http:/host/<alias>...&quot;</span> => URI of aliased database
  *     </pre>
  *
  *     <b>Note:</b> No provision is made for qualifying database objects

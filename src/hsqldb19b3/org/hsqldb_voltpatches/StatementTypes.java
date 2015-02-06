@@ -151,13 +151,13 @@ public interface StatementTypes {
     int CREATE_MODULE                    = 51;
     int WHILE                            = 97;
 
-    // hsqldb database
+    // hsqldb_voltpatches database
     int DATABASE_BACKUP     = 1001;
     int DATABASE_CHECKPOINT = 1002;
     int DATABASE_SHUTDOWN   = 1003;
     int DATABASE_SCRIPT     = 1004;
 
-    // hsqldb database settings
+    // hsqldb_voltpatches database settings
     int SET_DATABASE_DEFAULT_INITIAL_SCHEMA    = 1011;
     int SET_DATABASE_DEFAULT_TABLE_TYPE        = 1012;
     int SET_DATABASE_FILES_BACKUP_INCREMENT    = 1013;
@@ -184,18 +184,18 @@ public interface StatementTypes {
     int SET_DATABASE_READ_ONLY_FILES           = 1035;
     int SET_DATABASE_TRANSACTION_CONTROL       = 1036;
 
-    // hsqldb user settings
+    // hsqldb_voltpatches user settings
     int SET_USER_INITIAL_SCHEMA = 1042;
     int SET_USER_PASSWORD       = 1043;
 
-    // hsqldb session
+    // hsqldb_voltpatches session
     int TRANSACTION_LOCK_TABLE         = 1044;
     int SET_SESSION_AUTOCOMMIT         = 1045;
     int SET_SESSION_RESULT_MAX_ROWS    = 1046;
     int SET_SESSION_RESULT_MEMORY_ROWS = 1047;
     int ROLLBACK_SAVEPOINT             = 1048;
 
-    // hsqldb schema
+    // hsqldb_voltpatches schema
     int CREATE_ALIAS       = 1051;
     int CREATE_INDEX       = 1052;
     int CREATE_USER        = 1053;
@@ -211,13 +211,13 @@ public interface StatementTypes {
     int SET_TABLE_SOURCE   = 1069;
     int SET_TABLE_TYPE     = 1070;
 
-    // hsqldb sql implementation
+    // hsqldb_voltpatches sql implementation
     int CONDITION = 1101;                         // element of IF
     int HANDLER   = 1102;
     int DDL       = 1103;
     int CHECK     = 1104;
 
-    // hsqldb groups
+    // hsqldb_voltpatches groups
     int X_SQL_SCHEMA_DEFINITION   = 2001;
     int X_SQL_SCHEMA_MANIPULATION = 2002;
     int X_SQL_DATA                = 2003;

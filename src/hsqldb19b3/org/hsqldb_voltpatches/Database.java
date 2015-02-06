@@ -153,9 +153,9 @@ public class Database {
     /** true means filesReadOnly but CACHED and TEXT tables are disallowed */
     private boolean                filesInJar;
     public boolean                 sqlEnforceStrictSize;
-    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    // CHERRY PICK code change from hsqldb-2.2.8
     public boolean                sqlConvertTruncate     = true;
-    // END Cherry-picked code change from hsqldb-2.2.8
+    // End of CHERRY PICK change from hsqldb-2.2.8
     private boolean                bIgnoreCase;
     private boolean                bReferentialIntegrity;
     private HsqlDatabaseProperties databaseProperties;
@@ -313,9 +313,13 @@ public class Database {
 
             lobManager.createSchema();
 
+        	// A VoltDB extension to avoid disabled features
+        	/* disable 3 lines ...
             if (DatabaseURL.isFileBasedDatabaseType(databaseType)) {
                 logger.openLog(this);
             }
+            ... disabled 3 lines. */
+            // End of VoltDB extension
 
             if (version.substring(0, 3).equals("1.7")
                     || version.substring(0, 5).equals("1.8.0")) {

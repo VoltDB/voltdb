@@ -785,7 +785,7 @@ public class Scanner {
                     }
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 boolean result = scanUndelimitedIdentifier();
 
@@ -1055,7 +1055,7 @@ public class Scanner {
 
                 token.dataType = Type.SQL_NUMERIC;
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_NUMERIC :
                 try {
                     BigDecimal decimal = new BigDecimal(token.tokenString);
@@ -1857,7 +1857,6 @@ public class Scanner {
             return newDate(s);
         }
         // End of VoltDB extension
-
         long    zoneSeconds = 0;
         long    seconds;
         int     fraction = 0;
@@ -2397,7 +2396,7 @@ public class Scanner {
                     throw Error.error(errorCode);
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
         }
 

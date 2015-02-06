@@ -39,7 +39,7 @@ package org.hsqldb_voltpatches.util;
  */
 interface Traceable {
 
-    boolean TRACE = Boolean.getBoolean("hsqldb.util.trace");
+    boolean TRACE = Boolean.getBoolean("hsqldb_voltpatches.util.trace");
 
     void trace(String s);
 }

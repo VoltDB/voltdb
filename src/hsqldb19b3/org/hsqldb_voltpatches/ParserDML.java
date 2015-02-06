@@ -145,7 +145,7 @@ public class ParserDML extends ParserDQL {
                         break;
                     }
 
-                    // $FALL-THROUGH$
+                    // fall through
                 } else {
                     rewind(position);
 
@@ -153,7 +153,7 @@ public class ParserDML extends ParserDQL {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case Tokens.OVERRIDING : {
                 if (token.tokenType == Tokens.OVERRIDING) {
                     read();
@@ -176,7 +176,7 @@ public class ParserDML extends ParserDQL {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case Tokens.VALUES : {
                 read();
 
@@ -440,18 +440,19 @@ public class ParserDML extends ParserDQL {
             rangeVariables = resolver.rangeVariables;
         }
 
-        // VoltDB Extension:
+        // A VoltDB extension to support LIMIT and OFFSET on DELETE statements.
         // This needs to be done before building the compiled statement
         // so that parameters in LIMIT or OFFSET are retrieved from
         // the compileContext
         SortAndSlice sas = voltGetSortAndSliceForDelete(rangeVariables);
 
+        // End of VoltDB extension
         StatementDMQL cs = new StatementDML(session, table, rangeVariables,
                                             compileContext, restartIdentity);
 
-        // VoltDB Extension:
+        // A VoltDB extension to support LIMIT and OFFSET on DELETE statements.
         voltAppendDeleteSortAndSlice((StatementDML)cs, sas);
-
+        // End of VoltDB extension
         return cs;
     }
 
@@ -1062,9 +1063,7 @@ public class ParserDML extends ParserDQL {
 
         return cs;
     }
-
     /************************* Volt DB Extensions *************************/
-
     /**
      * This is a Volt extension to allow
      *   DELETE FROM tab ORDER BY c LIMIT 1
@@ -1098,5 +1097,4 @@ public class ParserDML extends ParserDQL {
         deleteStmt.setSortAndSlice(sas);
     }
     /**********************************************************************/
-
 }

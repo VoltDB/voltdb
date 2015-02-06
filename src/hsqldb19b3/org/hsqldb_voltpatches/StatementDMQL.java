@@ -31,10 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
@@ -259,7 +255,7 @@ public abstract class StatementDMQL extends Statement {
                     return;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case ResultConstants.RETURN_GENERATED_KEYS :
                 generatedIndexes = new int[]{ colIndex };
                 break;
@@ -812,7 +808,6 @@ public abstract class StatementDMQL extends Statement {
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
     }
-
     /************************* Volt DB Extensions *************************/
 
     private static class Pair<T, U> {
@@ -947,9 +942,9 @@ public abstract class StatementDMQL extends Statement {
     }
 
     /** return a list of VoltXMLElements that need to be added to the statement XML for LIMIT and OFFSET */
-    protected static List<VoltXMLElement> voltGetLimitOffsetXMLFromSortAndSlice(Session session, SortAndSlice sortAndSlice)
-            throws HSQLParseException {
-        List<VoltXMLElement> result = new ArrayList<>();
+    protected static java.util.List<VoltXMLElement> voltGetLimitOffsetXMLFromSortAndSlice(Session session, SortAndSlice sortAndSlice)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
+        java.util.List<VoltXMLElement> result = new java.util.ArrayList<>();
 
         if (sortAndSlice == null || sortAndSlice == SortAndSlice.noSort) {
             return result;
@@ -1007,7 +1002,7 @@ public abstract class StatementDMQL extends Statement {
         if (select.isDistinctSelect)
             query.attributes.put("distinct", "true");
 
-        List<VoltXMLElement> limitOffsetXml = voltGetLimitOffsetXMLFromSortAndSlice(session, select.sortAndSlice);
+        java.util.List<VoltXMLElement> limitOffsetXml = voltGetLimitOffsetXMLFromSortAndSlice(session, select.sortAndSlice);
         for (VoltXMLElement elem : limitOffsetXml) {
             query.children.add(elem);
         }
@@ -1016,8 +1011,7 @@ public abstract class StatementDMQL extends Statement {
         // and uniq them later
         org.hsqldb_voltpatches.lib.HsqlList col_list = new org.hsqldb_voltpatches.lib.HsqlArrayList();
         select.collectAllExpressions(col_list, Expression.columnExpressionSet, Expression.emptyExpressionSet);
-        if (select.queryCondition != null)
-        {
+        if (select.queryCondition != null) {
             Expression.collectAllExpressions(col_list, select.queryCondition,
                                              Expression.columnExpressionSet,
                                              Expression.emptyExpressionSet);
@@ -1027,28 +1021,21 @@ public abstract class StatementDMQL extends Statement {
                                              Expression.columnExpressionSet,
                                              Expression.emptyExpressionSet);
         }
-        for (RangeVariable rv : select.rangeVariables)
-        {
-            if (rv.indexCondition != null)
-            {
+        for (RangeVariable rv : select.rangeVariables) {
+            if (rv.indexCondition != null) {
                 Expression.collectAllExpressions(col_list, rv.indexCondition,
                                                  Expression.columnExpressionSet,
                                                  Expression.emptyExpressionSet);
-
             }
-            if (rv.indexEndCondition != null)
-            {
+            if (rv.indexEndCondition != null) {
                 Expression.collectAllExpressions(col_list, rv.indexEndCondition,
                                                  Expression.columnExpressionSet,
                                                  Expression.emptyExpressionSet);
-
             }
-            if (rv.nonIndexJoinCondition != null)
-            {
+            if (rv.nonIndexJoinCondition != null) {
                 Expression.collectAllExpressions(col_list, rv.nonIndexJoinCondition,
                                                  Expression.columnExpressionSet,
                                                  Expression.emptyExpressionSet);
-
             }
         }
 

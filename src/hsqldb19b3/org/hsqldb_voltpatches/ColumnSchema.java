@@ -34,7 +34,6 @@ package org.hsqldb_voltpatches;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
-import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -345,9 +344,9 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         }
 
         if (typestring.compareTo("VARCHAR") == 0) {
-            assert(dataType instanceof CharacterType);
-            CharacterType ct = (CharacterType)dataType;
-            column.attributes.put("bytes", String.valueOf(ct.inBytes));
+            assert(dataType instanceof org.hsqldb_voltpatches.types.CharacterType);
+            boolean inBytes = ((org.hsqldb_voltpatches.types.CharacterType)dataType).inBytes;
+            column.attributes.put("bytes", String.valueOf(inBytes));
         }
 
         // see if there is a default value for the column

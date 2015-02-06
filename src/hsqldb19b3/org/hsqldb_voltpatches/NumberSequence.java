@@ -119,7 +119,7 @@ public final class NumberSequence implements SchemaObject {
                     break;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 throw Error.error(ErrorCode.X_42565);
         }
