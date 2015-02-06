@@ -91,8 +91,8 @@ public class ExportBenchmark {
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 5;
         
-        @Option(desc = "Export table to use")
-        String tableName = "allValues";
+        @Option(desc = "Number of concurrent threads synchronously calling procedures.")
+        int threads = 1;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -105,7 +105,7 @@ public class ExportBenchmark {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (tableName == null || tableName.isEmpty()) exitWithMessageAndUsage("Table name cannot be blank");
+            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
         }
     }
     
@@ -283,8 +283,11 @@ public class ExportBenchmark {
         connect(config.servers);
         
         // Start the work
-        Thread thread = new Thread(new ExportThread());
-        thread.start();
+        Thread threads[] = new Thread[config.threads];
+        for (int i = 0; i < config.threads; ++i) {
+            threads[i] = new Thread(new ExportThread());
+            threads[i].start();
+        }
         
         // Run the benchmark loop for the requested warmup time
         System.out.println("Warming up...");
