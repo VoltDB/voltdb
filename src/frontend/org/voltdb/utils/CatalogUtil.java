@@ -34,7 +34,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -70,7 +70,9 @@ import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
@@ -100,11 +102,11 @@ import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.ReplicationType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
-import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -112,6 +114,10 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import java.util.Properties;
+
+import org.voltdb.export.ExportManager;
 
 /**
  *
@@ -355,6 +361,26 @@ public abstract class CatalogUtil {
         return (columns);
     }
 
+    public static NavigableSet<Table> getExportTables(Database db) {
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : db.getConnectors()) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                exportTables.add(tinfo.getTable());
+            }
+        }
+        return exportTables.build();
+    }
+
+    public static NavigableSet<String> getExportTableNames(Database db) {
+        ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : db.getConnectors()) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                exportTables.add(tinfo.getTable().getTypeName());
+            }
+        }
+        return exportTables.build();
+    }
+
     /**
      * Return true if a table is a streamed / export table
      * This function is duplicated in CatalogUtil.h
@@ -365,24 +391,35 @@ public abstract class CatalogUtil {
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table)
     {
-        // no export, no export only tables
-        if (database.getConnectors().size() == 0) {
-            return false;
-        }
-
-        // there is one well-known-named connector
-        org.voltdb.catalog.Connector connector = database.getConnectors().get("0");
-
-        // iterate the connector tableinfo list looking for tableIndex
-        // tableInfo has a reference to a table - can compare the reference
-        // to the desired table by looking at the relative index. ick.
-        for (org.voltdb.catalog.ConnectorTableInfo tableInfo : connector.getTableinfo()) {
-            if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
-                return tableInfo.getAppendonly();
+        for (Connector connector : database.getConnectors()) {
+            // iterate the connector tableinfo list looking for tableIndex
+            // tableInfo has a reference to a table - can compare the reference
+            // to the desired table by looking at the relative index. ick.
+            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                    return true;
+                }
             }
         }
         return false;
     }
+
+    public static String getExportTargetIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
+                                                                    org.voltdb.catalog.Table table)
+    {
+        for (Connector connector : database.getConnectors()) {
+            // iterate the connector tableinfo list looking for tableIndex
+            // tableInfo has a reference to a table - can compare the reference
+            // to the desired table by looking at the relative index. ick.
+            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                    return connector.getTypeName();
+                }
+            }
+        }
+        return null;
+    }
+
 
     /**
      * Return true if a table is the source table for a materialized view.
@@ -625,6 +662,28 @@ public abstract class CatalogUtil {
             JAXBElement<DeploymentType> result =
                 (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
             DeploymentType deployment = result.getValue();
+            // move any deprecated standalone export elements to the default target
+            ExportType export = deployment.getExport();
+            if (export != null && export.getTarget() != null) {
+                if (export.getConfiguration().size() > 1) {
+                    hostLog.error("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
+                    return null;
+                }
+                //OLD syntax use target as type.
+                ExportConfigurationType exportConfig = export.getConfiguration().get(0);
+                if (export.isEnabled() != null) {
+                    exportConfig.setEnabled(export.isEnabled());
+                }
+                if (export.getTarget() != null) {
+                    exportConfig.setType(export.getTarget());
+                }
+                if (export.getExportconnectorclass() != null) {
+                    exportConfig.setExportconnectorclass(export.getExportconnectorclass());
+                }
+                //Set target to default name.
+                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            }
+
             populateDefaultDeployment(deployment);
             return deployment;
         } catch (JAXBException e) {
@@ -926,11 +985,11 @@ public abstract class CatalogUtil {
         }
     }
 
-    private static Properties checkExportProcessorConfiguration(ExportType exportType) {
+    private static Properties checkExportProcessorConfiguration(ExportConfigurationType exportConfiguration) {
         // on-server export always uses the guest processor
         String exportClientClassName = null;
 
-        switch(exportType.getTarget()) {
+        switch(exportConfiguration.getType()) {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
@@ -938,30 +997,36 @@ public abstract class CatalogUtil {
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
-                exportClientClassName = exportType.getExportconnectorclass();
-                if (exportType.isEnabled()) try {
-                    CatalogUtil.class.getClassLoader().loadClass(exportClientClassName);
+                exportClientClassName = exportConfiguration.getExportconnectorclass();
+                if (exportConfiguration.isEnabled()) {
+                    try {
+                        CatalogUtil.class.getClassLoader().loadClass(exportClientClassName);
+                    }
+                    catch (ClassNotFoundException ex) {
+                        String msg =
+                                "Custom Export failed to configure, failed to load" +
+                                " export plugin class: " + exportConfiguration.getExportconnectorclass() +
+                                " Disabling export.";
+                        hostLog.error(msg);
+                        throw new DeploymentCheckException(msg);
+                    }
                 }
-                catch (ClassNotFoundException ex) {
-                    String msg =
-                            "Custom Export failed to configure, failed to load " +
-                            " export plugin class: " + exportType.getExportconnectorclass() +
-                            " Disabling export.";
-                    hostLog.error(msg);
-                    throw new DeploymentCheckException(msg);
-            }
             break;
         }
 
         Properties processorProperties = new Properties();
 
         if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-            //Override for tests
             String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
-            processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, dexportClientClassName);
+            //Override for tests
+            if (dexportClientClassName != null && dexportClientClassName.trim().length() > 0 &&
+                    exportConfiguration.getType().equals(ServerExportEnum.CUSTOM)) {
+                processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, dexportClientClassName);
+            } else {
+                processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            }
         }
 
-        ExportConfigurationType exportConfiguration = exportType.getConfiguration();
         if (exportConfiguration != null) {
             List<PropertyType> configProperties = exportConfiguration.getProperty();
             if (configProperties != null && ! configProperties.isEmpty()) {
@@ -979,7 +1044,7 @@ public abstract class CatalogUtil {
             }
         }
 
-        if (!exportType.isEnabled()) {
+        if (!exportConfiguration.isEnabled()) {
             return processorProperties;
         }
 
@@ -999,15 +1064,19 @@ public abstract class CatalogUtil {
         }
         try {
             processor.addLogger(hostLog);
-            processor.setProcessorConfig(processorProperties);
+
+            processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
+            processor.checkProcessorConfig(processorProperties);
             processor.shutdown();
         } catch (Exception e) {
             hostLog.error("Export processor failed its configuration check", e);
             throw new DeploymentCheckException("Export processor failed its configuration check: " + e.getMessage(), e);
         }
 
+        processorProperties.remove(ExportManager.CONFIG_CHECK_ONLY);
         return processorProperties;
     }
+
     /**
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
@@ -1017,46 +1086,88 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
+        List<String> targetList = new ArrayList<String>();
+        boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
+        for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
-        boolean isEnabled = exportType.isEnabled();
-
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
-        if (catconn == null) {
-            if (isEnabled) {
-                hostLog.info("Export configuration enabled in deployment file however no export " +
-                        "tables are present in the project file. Export disabled.");
+            boolean connectorEnabled = exportConfiguration.isEnabled();
+            // Get the target name from the xml attribute "target"
+            // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
+            String targetName = exportConfiguration.getTarget();
+            if (noEmptyTarget && (targetName == null || targetName.trim().isEmpty()) ) {
+                    throw new RuntimeException("target must be specified along with type in export configuration.");
             }
-            return;
-        }
 
-        Properties processorProperties = checkExportProcessorConfiguration(exportType);
-        for (String name: processorProperties.stringPropertyNames()) {
-            ConnectorProperty prop = catconn.getConfig().add(name);
-            prop.setName(name);
-            prop.setValue(processorProperties.getProperty(name));
-        }
+            if (connectorEnabled) {
+                if (targetList.contains(targetName)) {
+                    throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
+                            targetName + ".");
+                }
+                else {
+                    targetList.add(targetName);
+                }
+            }
+            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-        // on-server export always uses the guest processor
-        catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
-        catconn.setEnabled(isEnabled);
+            Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
-        //Set class back in deployment for display
-        exportType.setExportconnectorclass(
-                processorProperties.getProperty(ExportDataProcessor.EXPORT_TO_TYPE)
-                );
+            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
+            if (catconn == null) {
+                if (connectorEnabled) {
+                    if (defaultConnector) {
+                        hostLog.info("Export configuration enabled and provided for the default export " +
+                                     "target in deployment file, however, no export " +
+                                     "tables are assigned to the default target. " +
+                                     "Export target will be disabled.");
+                    }
+                    else {
+                        hostLog.info("Export configuration enabled and provided for export target " +
+                                     targetName +
+                                     " in deployment file however no export " +
+                                     "tables are assigned to the this target. " +
+                                     "Export target " + targetName + " will be disabled.");
+                    }
+                }
+                continue;
+            }
+            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
+            for (String name: processorProperties.stringPropertyNames()) {
+                ConnectorProperty prop = catconn.getConfig().add(name);
+                prop.setName(name);
+                prop.setValue(processorProperties.getProperty(name));
+            }
 
-        if (!isEnabled) {
-            hostLog.info("Export configuration is present and is " +
-               "configured to be disabled. Export will be disabled.");
-        } else {
-            hostLog.info("Export is configured and enabled with type=" + exportType.getTarget());
-            ExportConfigurationType exportConfiguration = exportType.getConfiguration();
-            if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
-                hostLog.info("Export configuration properties are: ");
-                for (PropertyType configProp : exportConfiguration.getProperty()) {
-                    if (!configProp.getName().toLowerCase().contains("passw")) {
-                        hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
+            // on-server export always uses the guest processor
+            catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
+            catconn.setEnabled(connectorEnabled);
+
+            if (!connectorEnabled) {
+                if (defaultConnector) {
+                    hostLog.info("Export configuration for the default export target is present and is " +
+                            "configured to be disabled. The default export target will be disabled.");
+                }
+                else {
+                    hostLog.info("Export configuration for export target " + targetName + " is present and is " +
+                                 "configured to be disabled. Export target " + targetName + " will be disabled.");
+                }
+            } else {
+                if (defaultConnector) {
+                    hostLog.info("Default export target is configured and enabled with type=" + exportConfiguration.getType());
+                }
+                else {
+                    hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
+                }
+                if (exportConfiguration.getProperty() != null) {
+                    if (defaultConnector) {
+                        hostLog.info("Default export target configuration properties are: ");
+                    }
+                    else {
+                        hostLog.info("Export target " + targetName + " configuration properties are: ");
+                    }
+                    for (PropertyType configProp : exportConfiguration.getProperty()) {
+                        if (!configProp.getName().toLowerCase().contains("password")) {
+                            hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
+                        }
                     }
                 }
             }

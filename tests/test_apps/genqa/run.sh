@@ -2,6 +2,8 @@
 
 APPNAME="genqa"
 APPNAME2="genqa2"
+APPNAME3="eggenqa"
+APPNAME4="eggenqa2"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -41,7 +43,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar $APPNAME3.jar $APPNAME4.jar voltdbroot voltdbroot
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
@@ -62,8 +64,10 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
-    $VOLTDB compile --classpath obj -o $APPNAME2.jar -p project2.xml
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    $VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql
+    $VOLTDB compile --classpath obj -o $APPNAME3.jar ddl3.sql
+    $VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA

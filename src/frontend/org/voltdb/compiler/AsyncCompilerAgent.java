@@ -115,14 +115,12 @@ public class AsyncCompilerAgent {
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
             // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
-            // This is not currently robust to comment, multi-line statments,
-            // multiple statements on a line, etc.
             Boolean hasDDL = null;
             // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
             SortedSet<String> conflictTables = new TreeSet<String>();
             Set<String> createdTables = new HashSet<String>();
             for (String stmt : w.sqlStatements) {
-                if (SQLLexer.isComment(stmt)) {
+                if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
                     continue;
                 }
                 String ddlToken = SQLLexer.extractDDLToken(stmt);
@@ -163,7 +161,16 @@ public class AsyncCompilerAgent {
                     }
                 }
             }
-            if (!hasDDL) {
+            if (hasDDL == null) {
+                // we saw neither DDL or DQL/DML.  Make sure that we get a
+                // response back to the client
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Failed to plan, no SQL statement provided.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
+            else if (!hasDDL) {
                 final AsyncCompilerResult result = compileAdHocPlan(w);
                 w.completionHandler.onCompletion(result);
             }
