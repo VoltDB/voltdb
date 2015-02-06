@@ -443,10 +443,10 @@ class SqlQueriesTest extends TestBase {
      * Runs insert into, upsert into, query from, count query, and delete from
      * queries, for every Table listed on the SQL Query page of the VMC; and,
      * when appropriate, for every View.
-     * <p>Note: unlike the '#testName' tests, this can run against any VoltDB
-     * database, since it gets the Table and View names from the UI.
+     * <p>Note: this can run against any VoltDB database, since it gets the
+     * Table and View names from system properties, or from the UI.
      */
-    def 'insertQueryCountAndDeleteForTablesAndViews'() {
+    def insertQueryCountAndDeleteForTablesAndViews() {
         setup: 'get the list of Tables to test'
         boolean startedWithEmptyTables = false
         String testTables = System.getProperty('testTables', '')
@@ -601,12 +601,12 @@ class SqlQueriesTest extends TestBase {
      *  queries only work if you are running against the 'genqa' test app;
      *  otherwise, they will fail immediately.
      */
-    @Unroll // performs this method for each 'testName' in the SQL Query text file
-    def '#testName'() {
+    @Unroll // performs this method for each test in the SQL Query text file
+    def '#sqlQueriesTestName'() {
 
         if (!isRunningGenqa(page) && expectedResponse.status == "SUCCESS") {
             println ("\nWARNING: Apparently not running against the 'genqa' test "
-                    + "app, so this test (" + testName + ") may fail.")
+                    + "app, so this test (" + sqlQueriesTestName + ") may fail.")
         }
 
         setup: 'execute the next query (or queries)'
@@ -633,7 +633,8 @@ class SqlQueriesTest extends TestBase {
         debugPrint "actual status : " + status
         debugPrint "query duration: " + duration
         if (duration == null || duration.isEmpty()) {
-            println "WARNING: query duration '" + duration + "', for test '" + testName + "' is null or empty!"
+            println "WARNING: query duration '" + duration + "', for test '" +
+                    sqlQueriesTestName + "' is null or empty!"
         }
 
         then: 'check the error status, and query result'
@@ -646,7 +647,7 @@ class SqlQueriesTest extends TestBase {
         where: 'list of queries to test and expected responses'
         line << sqlQueryLines
         iter = slurper.parseText(line)
-        testName = iter.testName
+        sqlQueriesTestName = iter.testName
         query = iter.sqlCmd
         expectedResponse = iter.response
     }
