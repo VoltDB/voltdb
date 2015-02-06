@@ -97,6 +97,11 @@ public abstract class BuildDirectoryUtils {
     public static String getBuildDirectoryPath() {
         String envPath = System.getenv("TEST_DIR");
         if (envPath != null) {
+            File path = new File(envPath);
+            path.mkdirs();
+            if (!path.exists() || !path.isDirectory() || !path.canRead() || !path.canWrite() || !path.canExecute()) {
+                throw new RuntimeException("Could not create test directory");
+            }
             return envPath;
         } else {
             return ".";

@@ -20,32 +20,29 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package genqa2.procedures;
 
-package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
-
+import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-public class InsertBase extends VoltProcedure {
+@ProcInfo(
+    partitionInfo = "export_done_table.txnid:0",
+    singlePartition = true
+)
+public class JiggleExportGroupDoneTable extends VoltProcedure {
+    public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
+    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
 
-    protected final SQLStmt i_no_nulls = new SQLStmt
-    ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    public long run(long txid)
+    {
+        voltQueueSQL(export, txid);
+        voltQueueSQL(exportFoo, txid);
 
-    protected final SQLStmt i_no_nulls_grp = new SQLStmt
-    ("INSERT INTO NO_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+        // Execute last statement batch
+        voltExecuteSQL(true);
 
-    protected final SQLStmt i_allow_nulls = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-    protected final SQLStmt i_allow_nulls_grp = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-    public final SQLStmt i_with_defaults = new SQLStmt
-    ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");
-
-    public long run() {
-        assert(false);
-        throw new RuntimeException("Don't call this.");
+        // Retun to caller
+        return txid;
     }
-
 }
