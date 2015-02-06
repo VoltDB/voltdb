@@ -1,5 +1,5 @@
 # DDL Source: (for the genqa test app)
-CREATE TABLE EXPORT_DONE_TABLE ( FOO
+CREATE TABLE EXPORT_DONE_TABLE (
    TXNID bigint NOT NULL
 );
 PARTITION TABLE EXPORT_DONE_TABLE ON COLUMN TXNID;
@@ -163,18 +163,16 @@ CREATE VIEW REPLICATED_TABLE_GROUP (
    SELECT ROWID_GROUP,COUNT(*)FROM REPLICATED_TABLE GROUP BY ROWID_GROUP;
 
 
-CREATE PROCEDURE 
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE EXPORT_DONE_TABLE COLUMN TXNID
    FROM CLASS genqa.procedures.JiggleExportDoneTable;
---Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
---PARTITION PROCEDURE JiggleExportDoneTable ON TABLE EXPORT_DONE_TABLE COLUMN TXNID;
 
 CREATE PROCEDURE 
    FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 
-CREATE PROCEDURE 
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE EXPORT_PARTITIONED_TABLE COLUMN ROWID
    FROM CLASS genqa.procedures.JiggleExportSinglePartition;
---Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
---PARTITION PROCEDURE JiggleExportSinglePartition ON TABLE EXPORT_PARTITIONED_TABLE COLUMN ROWID;
 
 CREATE PROCEDURE 
    FROM CLASS genqa.procedures.JiggleMultiPartition;
@@ -182,24 +180,21 @@ CREATE PROCEDURE
 CREATE PROCEDURE 
    FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
 
-CREATE PROCEDURE 
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE PARTITIONED_TABLE COLUMN ROWID
    FROM CLASS genqa.procedures.JiggleSinglePartition;
---Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
---PARTITION PROCEDURE JiggleSinglePartition ON TABLE PARTITIONED_TABLE COLUMN ROWID;
 
-CREATE PROCEDURE 
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE PARTITIONED_TABLE COLUMN ROWID
    FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
---Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
---PARTITION PROCEDURE JiggleSinglePartitionWithDeletionExport ON TABLE PARTITIONED_TABLE COLUMN ROWID;
 
 CREATE PROCEDURE 
+   PARTITION ON TABLE EXPORT_SKINNY_PARTITIONED_TABLE COLUMN ROWID
    FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
-PARTITION PROCEDURE JiggleSkinnyExportSinglePartition ON TABLE EXPORT_SKINNY_PARTITIONED_TABLE COLUMN ROWID;
 
 CREATE PROCEDURE 
    FROM CLASS genqa.procedures.WaitMultiPartition;
 
-CREATE PROCEDURE 
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE PARTITIONED_TABLE COLUMN ROWID
    FROM CLASS genqa.procedures.WaitSinglePartition;
---Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
---PARTITION PROCEDURE WaitSinglePartition ON TABLE PARTITIONED_TABLE COLUMN ROWID;
