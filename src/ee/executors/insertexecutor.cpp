@@ -190,6 +190,11 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
+    VOLT_DEBUG("This is a %s-row insert",
+               m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
+               "single" : "multi");
+    VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
+
     //
     // An insert is quite simple really. We just loop through our m_inputTable
     // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
@@ -318,6 +323,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(modifiedTuples);
-    VOLT_DEBUG("Finished inserting tuple");
+    VOLT_DEBUG("Finished inserting %d tuples", modifiedTuples);
     return true;
 }
