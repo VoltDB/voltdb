@@ -1836,13 +1836,15 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(false, c.hasErrorsOrWarnings());
     }
 
-    public void testDDLCompilerDropOneOfThreeIndexes()
+    public void testDDLCompilerDropTwoOfFiveIndexes()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
                 "create index idx_t_idnum_b on t(id,num);\n" +
-                "create index idx_t_idnum_c on t(id,num);\n";
+                "create index idx_t_idnum_c on t(id,num);\n" +
+                "create index idx_t_idnum_d on t(id,num) where id > 0;\n" +
+                "create index idx_t_idnum_f on t(id,num) where id > 0;\n";
 
         final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertEquals(true, c.hasErrorsOrWarnings());
@@ -1852,7 +1854,7 @@ public class TestVoltCompiler extends TestCase {
                 foundCount++;
             }
         }
-        assertEquals(1, foundCount);
+        assertEquals(2, foundCount);
     }
 
     public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()

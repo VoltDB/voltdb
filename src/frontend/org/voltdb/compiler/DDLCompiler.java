@@ -73,6 +73,7 @@ import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedColInfo;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
@@ -2291,9 +2292,12 @@ public class DDLCompiler {
             Table srcTable, List<AbstractExpression> groupbyExprs)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
-        // Match based on one of two algorithms depending on whether expressions are all simple columns.
-        if (groupbyExprs == null) {
-            for (Index index : allIndexes) {
+        StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
+
+        for (Index index : allIndexes) {
+            boolean matchedAll = true;
+            // Match based on one of two algorithms depending on whether expressions are all simple columns.
+            if (groupbyExprs == null) {
                 String expressionjson = index.getExpressionsjson();
                 if ( ! expressionjson.isEmpty()) {
                     continue;
@@ -2306,7 +2310,6 @@ public class DDLCompiler {
                     continue;
                 }
 
-                boolean matchedAll = true;
                 for (int i = 0; i < indexedColRefs.size(); ++i) {
                     int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
                     int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
@@ -2315,18 +2318,12 @@ public class DDLCompiler {
                         break;
                     }
                 }
-                if (matchedAll) {
-                    return index;
-                }
-            }
-        } else {
-            for (Index index : allIndexes) {
+            } else {
                 String expressionjson = index.getExpressionsjson();
                 if (expressionjson.isEmpty()) {
                     continue;
                 }
                 List<AbstractExpression> indexedExprs = null;
-                StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
@@ -2338,16 +2335,34 @@ public class DDLCompiler {
                     continue;
                 }
 
-                boolean matchedAll = true;
                 for (int i = 0; i < indexedExprs.size(); ++i) {
                     if ( ! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
                         matchedAll = false;
                         break;
                     }
                 }
-                if (matchedAll) {
-                    return index;
+            }
+            if (matchedAll && !index.getPredicatejson().isEmpty()) {
+                // Additional check for partial indexes to make sure matview WHERE clause
+                // covers the partial index predicate
+                List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
+                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                try {
+                    String encodedPredicate = matviewinfo.getPredicate();
+                    if (!encodedPredicate.isEmpty()) {
+                        String predicate = Encoder.hexDecodeToString(encodedPredicate);
+                        AbstractExpression matViewPredicate = AbstractExpression.fromJSONString(predicate, tableScan);
+                        coveringExprs.addAll(ExpressionUtil.uncombineAny(matViewPredicate));
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    assert(false);
+                    return null;
                 }
+                matchedAll = SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs);
+            }
+            if (matchedAll) {
+                return index;
             }
         }
         return null;

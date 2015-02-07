@@ -154,7 +154,7 @@ public abstract class SubPlanAssembler {
                     // For optimization purposes, keep track of the covering (query) expressions that exactly match the
                     // covered index sub-expression. They can be eliminated from the post-filter expressions.
                     List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                    if (isPartialIndexPredicateIsCovered(tableScan, allExprs, path, exactMatchCoveringExprs)) {
+                    if (isPartialIndexPredicateIsCovered(tableScan, allExprs, path.index, exactMatchCoveringExprs)) {
                         filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
                     } else {
                         path = null;
@@ -241,14 +241,14 @@ public abstract class SubPlanAssembler {
      *
      * @param tableScan The source table.
      * @param coveringExprs The set of query predicate expressions.
-     * @param accessPath The access path for the table.
+     * @param index The partial index to cover.
      * @param exactMatchCoveringExprs The output subset of the query predicates that exactly match the
      *        index predicate expression(s)
      * @return TRUE if the index predicate is completely covered by the query expressions.
      */
-    private boolean isPartialIndexPredicateIsCovered(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, AccessPath accessPath, List<AbstractExpression> exactMatchCoveringExprs) {
-        assert(accessPath.index != null);
-        String predicatejson = accessPath.index.getPredicatejson();
+    public static boolean isPartialIndexPredicateIsCovered(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, Index index, List<AbstractExpression> exactMatchCoveringExprs) {
+        assert(index != null);
+        String predicatejson = index.getPredicatejson();
         if (predicatejson.isEmpty()) {
             // Not a partial index
             return true;
@@ -1199,7 +1199,7 @@ public abstract class SubPlanAssembler {
      * @param exprsToCover
      * @return true is the covering expression exactly matches to one or more expressions to cover
      */
-    private boolean removeExactMatchCoveredExpressions(
+    private static boolean removeExactMatchCoveredExpressions(
             AbstractExpression coveringExpr, List<AbstractExpression> exprsToCover) {
 
         boolean hasMatch = false;
@@ -1223,7 +1223,7 @@ public abstract class SubPlanAssembler {
      * @param exprsToCover
      * @return List<AbstractExpression>
      */
-    private List<AbstractExpression> removeCoveredExpressions(StmtTableScan tableScan,
+    private static List<AbstractExpression> removeCoveredExpressions(StmtTableScan tableScan,
             AbstractExpression coveringExpr,
             List<AbstractExpression> exprsToCover) {
 
@@ -1265,7 +1265,7 @@ public abstract class SubPlanAssembler {
      * @param filtersToCover
      * @return List<List<AbstractExpression>>
      */
-    private List<List<AbstractExpression>> getCoveredCandidateExpressionFromFilters(
+    private static List<List<AbstractExpression>> getCoveredCandidateExpressionFromFilters(
             ExpressionType[] targetComparators,
             AbstractExpression coveringExpr, StmtTableScan tableScan,
             List<AbstractExpression> filtersToCover)
@@ -1329,7 +1329,7 @@ public abstract class SubPlanAssembler {
      * @param reversedCoveredCandidateExprs
      * @return
      */
-    protected List<AbstractExpression> getCoveredExpressionFromFilters(
+    private static List<AbstractExpression> getCoveredExpressionFromFilters(
             ExpressionType coveringExprType, AbstractExpression otherCoveringExpr,
             List<AbstractExpression> coveredCandidateExprs,
             List<AbstractExpression> reversedCoveredCandidateExprs) {
@@ -1348,7 +1348,7 @@ public abstract class SubPlanAssembler {
      * @param exprsToCover
      * @return List<AbstractExpression>
      */
-    protected List<AbstractExpression> removeNotNullCoveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
+    private static List<AbstractExpression> removeNotNullCoveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
         // Collect all TVEs from NULL-rejecting covering expressions
         Set<TupleValueExpression> coveringTves = new HashSet<TupleValueExpression>();
         for (AbstractExpression coveringExpr : coveringExprs) {
