@@ -13,16 +13,16 @@ configurations {
 }
 
 task clientDocJar(type:Jar) {
-	classifier = 'javadoc'
-	baseName = project.name + 'client'
-	version = project.version
-	from('doc/javadoc/java-client-api')
-	include('**/*')
+  classifier = 'javadoc'
+  baseName = project.name + 'client'
+  version = project.version
+  from('doc/javadoc/java-client-api')
+  include('**/*')
 }
 
 /*
  * This reflects the sources that are compiled in build-client.xml
- * the client ant file is the authoritative answer of what are the 
+ * the client ant file is the authoritative answer of what are the
  * client sources, and any modifcations to it should be also reflected
  * here
  */
@@ -118,7 +118,7 @@ task debug << {
 uploadClientArchives {
     repositories {
         mavenDeployer {
-            beforeDeployment { MavenDeployment mvnd -> 
+            beforeDeployment { MavenDeployment mvnd ->
               signing.signPom(mvnd)
               configurations.clientArchives.artifacts.each { ca ->
                 def ascfile = file(ca.file.path + '.asc')
@@ -130,7 +130,7 @@ uploadClientArchives {
                 mvnd.addArtifact(ascartf)
               }
             }
- 
+
             repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
               authentication(userName: sonatypeUsername, password: sonatypePassword)
             }
@@ -139,19 +139,19 @@ uploadClientArchives {
               authentication(userName: sonatypeUsername, password: sonatypePassword)
             }
             // repository(url: "file://localhost/Users/stefano/tmp/m2repo/")
- 
+
             pom.project {
                name 'voltdbclient'
                packaging 'jar'
                description 'VoltDB client interface libraries'
                url 'http://www.voltdb.com/'
- 
+
                scm {
                    url 'git@github.com:VoltDB/voltdb.git'
                    connection 'scm:git@github.com:VoltDB/voltdb.git'
                    developerConnection 'scm:git@github.com:VoltDB/voltdb.git'
                }
- 
+
                licenses {
                    license {
                        name 'GNU Affero General Public License Version 3'
@@ -159,7 +159,7 @@ uploadClientArchives {
                        distribution 'repo'
                    }
                }
- 
+
                developers {
                    developer {
                        id 'jhugg'
