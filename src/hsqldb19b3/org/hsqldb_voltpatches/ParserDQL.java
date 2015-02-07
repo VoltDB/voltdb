@@ -1270,7 +1270,6 @@ public class ParserDQL extends ParserBase {
                         && ((Integer) e2.getValue(null)).intValue() >= 0);
             }
         }
-        // End of VoltDB extension
 
         /* disable 6 lines ...
         if (e2.isParam()) {
@@ -1280,6 +1279,7 @@ public class ParserDQL extends ParserBase {
                       && ((Integer) e2.getValue(null)).intValue() >= 0);
         }
         ... disabled 6 lines */
+        // End of VoltDB extension
 
         if (valid) {
             sortAndSlice.addLimitCondition(new ExpressionOp(OpTypes.LIMIT, e1,

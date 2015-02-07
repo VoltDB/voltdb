@@ -1337,7 +1337,7 @@ class DatabaseInformationMain extends DatabaseInformation {
         // Initialization
         ti = new DITableInfo();
         p  = database.getProperties();
-        tables = p.isPropertyTrue("hsqldb.system_table_indexinfo")
+        tables = p.isPropertyTrue("hsqldb_voltpatches.system_table_indexinfo")
                  ? allTables()
                  : database.schemaManager.databaseObjectIterator(
                      SchemaObject.TABLE);
@@ -1484,7 +1484,7 @@ class DatabaseInformationMain extends DatabaseInformation {
 
         // Initialization
         p = database.getProperties();
-        tables = p.isPropertyTrue("hsqldb.system_table_primarykeys")
+        tables = p.isPropertyTrue("hsqldb_voltpatches.system_table_primarykeys")
                  ? allTables()
                  : database.schemaManager.databaseObjectIterator(
                      SchemaObject.TABLE);
@@ -2285,7 +2285,7 @@ class DatabaseInformationMain extends DatabaseInformation {
         final int isref_cname = 8;
         final int iref_gen    = 9;
 
-        // hsqldb ext
+        // hsqldb_voltpatches ext
         final int ihsqldb_type   = 10;
         final int iread_only     = 11;
         final int icommit_action = 12;

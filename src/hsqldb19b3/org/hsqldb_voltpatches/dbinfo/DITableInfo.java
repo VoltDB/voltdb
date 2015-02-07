@@ -578,7 +578,7 @@ final class DITableInfo {
      */
     String getIndexColDirection(int i, int columnPosition) {
 
-        // so far, hsqldb only supports completely ascending indexes
+        // so far, hsqldb_voltpatches only supports completely ascending indexes
         return "A";
     }
 

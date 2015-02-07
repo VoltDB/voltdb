@@ -274,7 +274,7 @@ final class DITypeInfo {
      *
      * <li>CHAR and VARCHAR types: <p>
      *
-     *      The value of the system property hsqldb.max_xxxchar_display_size
+     *      The value of the system property hsqldb_voltpatches.max_xxxchar_display_size
      *      or the magic value 32766 (0x7FFE) (tested usable/accepted by most
      *      tools and compatible with assumptions made by java.io read/write
      *      UTF) when the system property is not defined or is not accessible,
