@@ -204,7 +204,10 @@ JAVA COMPILATION
         <fileset dir="${src.gpl.dir}" includes="org/voltdb/client/**/*.properties"/>
         <fileset dir="${src.gpl.dir}" includes="org/voltdb/*.properties"/>
     </copy>
-
+    <!-- 
+        please reflect any changes to the includes list to our maven central upload
+        script upload.gradle 
+    -->
     <invoke-javac16
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="com/google_voltpatches/**/*.java
