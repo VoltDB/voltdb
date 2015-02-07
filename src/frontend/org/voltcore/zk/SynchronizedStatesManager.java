@@ -331,7 +331,7 @@ public class SynchronizedStatesManager {
             lockLocalState();
             boolean ownDistributedLock = requestDistributedLock();
             ByteBuffer startStates = buildProposal(REQUEST_TYPE.INITIALIZING,
-                    m_requestedInitialState, m_requestedInitialState);
+                    m_requestedInitialState.asReadOnlyBuffer(), m_requestedInitialState.asReadOnlyBuffer());
             boolean stateMachineNodeCreated = addIfMissing(m_barrierResultsPath, CreateMode.PERSISTENT, startStates.array());
 
             if (m_membershipChangePending) {
@@ -420,9 +420,7 @@ public class SynchronizedStatesManager {
             states.putShort((short)requestType.ordinal());
             states.putShort((short)existingState.remaining());
             states.put(existingState);
-            existingState.rewind();
             states.put(proposedState);
-            proposedState.rewind();
             states.flip();
             return states;
         }
@@ -461,16 +459,8 @@ public class SynchronizedStatesManager {
                         StateChangeRequest existingAndProposedStates = getExistingAndProposedBuffersFromResultsNode(statePair);
                         m_currentRequestType = existingAndProposedStates.m_requestType;
                         if (m_requestedInitialState != null) {
-                            // We track the number of people waiting on the results so we know when the result is stale and
-                            // the next lock holder can initiate a new state proposal.
-                            m_zk.create(m_myPartiticpantsPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-
-                            // This member just joined and has not yet been initialized so piggyback the initialization onto
-                            // another member's proposal
-
                             // Since we have not initialized yet, we acknowledge this proposal with an empty result.
                             addResultEntry(null);
-
                             unlockLocalState();
                         }
                         else {
@@ -689,7 +679,7 @@ public class SynchronizedStatesManager {
                             if (m_stateChangeInitiator) {
                                 m_synchronizedState = m_requestedInitialState;
                                 ByteBuffer stableState = buildProposal(REQUEST_TYPE.INITIALIZING,
-                                        m_synchronizedState, m_synchronizedState);
+                                        m_synchronizedState.asReadOnlyBuffer(), m_synchronizedState.asReadOnlyBuffer());
                                 Stat newProposalStat = m_zk.setData(m_barrierResultsPath, stableState.array(), -1);
                                 m_lastProposalVersion = newProposalStat.getVersion();
                             }
@@ -887,20 +877,23 @@ public class SynchronizedStatesManager {
                     if (result == RESULT_CONCENSUS.AGREE) {
                         // Fall through to set up the initial state and provide notification of initialization
                         existingAndProposedStates = new StateChangeRequest(REQUEST_TYPE.INITIALIZING,
-                                existingAndProposedStates.m_proposal, existingAndProposedStates.m_proposal);
+                                existingAndProposedStates.m_proposal.asReadOnlyBuffer(),
+                                existingAndProposedStates.m_proposal.asReadOnlyBuffer());
                     }
                     else
                     if (result == RESULT_CONCENSUS.DISAGREE) {
                         // Fall through to set up the initial state and provide notification of initialization
                         existingAndProposedStates = new StateChangeRequest(REQUEST_TYPE.INITIALIZING,
-                                existingAndProposedStates.m_previousState, existingAndProposedStates.m_previousState);
+                                existingAndProposedStates.m_previousState.asReadOnlyBuffer(),
+                                existingAndProposedStates.m_previousState.asReadOnlyBuffer());
                     }
                     else {
                         // Another members outcome request was completed but a subsequent proposing member died
                         // between the time the results of this last request were removed and the new proposal
                         // was made. Fall through and propose a new LAST_CHANGE_OUTCOME_REQUEST.
                         existingAndProposedStates = new StateChangeRequest(REQUEST_TYPE.STATE_CHANGE_REQUEST,
-                                existingAndProposedStates.m_previousState, existingAndProposedStates.m_proposal);
+                                existingAndProposedStates.m_previousState.asReadOnlyBuffer(),
+                                existingAndProposedStates.m_proposal.asReadOnlyBuffer());
                     }
                 }
 
@@ -927,7 +920,7 @@ public class SynchronizedStatesManager {
                     m_log.debug(m_stateMachineId + ": Initialized (existing) with State " +
                             stateToString(m_synchronizedState.asReadOnlyBuffer()));
                     if (existingAndProposedStates.m_requestType != REQUEST_TYPE.INITIALIZING) {
-                        staleTask = existingAndProposedStates.m_proposal;
+                        staleTask = existingAndProposedStates.m_proposal.asReadOnlyBuffer();
                     }
                     cancelDistributedLock();
                     // Add an acceptable result so the next initializing member recognizes an immediate quorum.
@@ -1010,22 +1003,22 @@ public class SynchronizedStatesManager {
             assert (currRequestor != null); // We should be able to find ourselves
             //Back on currRequestor
             iter.previous();
-            String nextlower = null;
+            String nextLower = null;
             //Until we have previous nodes and we set a watch on previous node.
             while (iter.hasPrevious()) {
                 //Process my lower nodes and put a watch on whats live
                 String previous = ZKUtil.joinZKPath(m_lockPath, iter.previous());
                 if (m_zk.exists(previous, m_lockWatcher) != null) {
-                    m_log.debug(m_stateMachineId + ": Waiting for " + previous);
-                    nextlower = previous;
+                    m_log.debug(m_stateMachineId + ": " + m_ourDistributedLockName + " waiting on " + previous);
+                    nextLower = previous;
                     break;
                 }
             }
             //If we could not watch any lower node we are lowest and must own the lock.
-            if (nextlower == null) {
+            if (nextLower == null) {
                 return m_ourDistributedLockName;
             }
-            return nextlower;
+            return nextLower;
         }
 
         private final Runnable HandlerForDistributedLockEvent = new Runnable() {
@@ -1162,12 +1155,12 @@ public class SynchronizedStatesManager {
             try {
                 assert(m_ourDistributedLockName == null);
                 assert(debugIsLocalStateLocked());
-                m_ourDistributedLockName = m_zk.create(ZKUtil.joinZKPath(m_lockPath,"lock_"), null,
+                m_ourDistributedLockName = m_zk.create(ZKUtil.joinZKPath(m_lockPath, "lock_"), null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
                 m_lockWaitingOn = getNextLockNodeFromList();
                 if (m_lockWaitingOn.equals(m_ourDistributedLockName) && m_currentParticipants == 0) {
                     // Prevents a second notification.
-                    m_log.debug(m_stateMachineId + ": requestLock returned successfully");
+                    m_log.debug(m_stateMachineId + ": requestLock successful for " + m_ourDistributedLockName);
                     m_lockWaitingOn = null;
                     m_holdingDistributedLock = true;
                     if (m_membershipChangePending) {
@@ -1309,7 +1302,7 @@ public class SynchronizedStatesManager {
             m_stateChangeInitiator = true;
             m_currentRequestType = REQUEST_TYPE.STATE_CHANGE_REQUEST;
             ByteBuffer stateChange = buildProposal(REQUEST_TYPE.STATE_CHANGE_REQUEST,
-                    m_synchronizedState, m_pendingProposal);
+                    m_synchronizedState.asReadOnlyBuffer(), m_pendingProposal.asReadOnlyBuffer());
             m_lastProposalVersion = wakeCommunityWithProposal(stateChange.array());
             assignStateChangeAgreement(true);
         }
@@ -1369,7 +1362,8 @@ public class SynchronizedStatesManager {
             m_currentRequestType = correlated ?
                     REQUEST_TYPE.CORRELATED_COORDINATED_TASK :
                     REQUEST_TYPE.UNCORRELATED_COORDINATED_TASK;
-            ByteBuffer taskProposal = buildProposal(m_currentRequestType, m_synchronizedState, proposedTask);
+            ByteBuffer taskProposal = buildProposal(m_currentRequestType,
+                    m_synchronizedState.asReadOnlyBuffer(), proposedTask.asReadOnlyBuffer());
             m_pendingProposal = proposedTask;
             // Since we don't update m_lastProposalVersion, we will wake ourselves up
             wakeCommunityWithProposal(taskProposal.array());
