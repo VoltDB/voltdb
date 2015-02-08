@@ -190,9 +190,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
-    VOLT_DEBUG("This is a %s-row insert",
+    VOLT_DEBUG("This is a %s-row insert on partition with id %d",
                m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
-               "single" : "multi");
+               "single" : "multi", m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
 
     //
