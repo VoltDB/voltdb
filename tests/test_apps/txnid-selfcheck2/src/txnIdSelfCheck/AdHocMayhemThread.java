@@ -134,9 +134,7 @@ public class AdHocMayhemThread extends BenchmarkThread {
         try {
             client.callProcedure("SetupAdHocTables");
         } catch (Exception e) {
-            log.error("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
-            Benchmark.printJStack();
-            System.exit(-1);
+            hardStop("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
         }
 
         while (m_shouldContinue.get()) {
@@ -174,9 +172,7 @@ public class AdHocMayhemThread extends BenchmarkThread {
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
-                log.error("AdHocMayhemThread failed to run an AdHoc statement. Will exit.", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("AdHocMayhemThread failed to run an AdHoc statement. Will exit.", e);
             }
         }
     }

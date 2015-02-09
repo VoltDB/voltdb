@@ -176,12 +176,9 @@ public class ClientThread extends BenchmarkThread {
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
-                log.error(String.format(
+                hardStop(String.format(
                         "Client cid %d procedure %s returned %d results instead of %d",
-                        m_cid, procName, results.length, expectedTables));
-                log.error(((ClientResponseImpl) response).toJSONString());
-                Benchmark.printJStack();
-                System.exit(-1);
+                        m_cid, procName, results.length, expectedTables), response);
             }
             VoltTable data = results[3];
             try {
@@ -215,10 +212,7 @@ public class ClientThread extends BenchmarkThread {
         // this implies bad data and is fatal
         if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                 (cri.getStatus() == ClientResponse.USER_ABORT)) {
-            log.error("ClientThread had a proc-call exception that indicated bad data", e);
-            log.error(cri.toJSONString(), e);
-            Benchmark.printJStack();
-            System.exit(-1);
+            hardStop("ClientThread had a proc-call exception that indicated bad data", cri);
         }
         // other proc call exceptions are logged, but don't stop the thread
         else {
@@ -272,9 +266,7 @@ public class ClientThread extends BenchmarkThread {
                 // just need to fall through and get out
             }
             catch (Exception e) {
-                log.error("ClientThread had a non proc-call exception", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("ClientThread had a non proc-call exception", e);
             }
         }
     }

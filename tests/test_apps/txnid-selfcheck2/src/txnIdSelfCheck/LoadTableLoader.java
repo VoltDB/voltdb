@@ -130,10 +130,7 @@ public class LoadTableLoader extends BenchmarkThread {
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.UNEXPECTED_FAILURE) {
                 // log what happened status will be logged in json error log.
-                log.error("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the world
-                System.exit(-1);
+                hardStop("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             //Connection loss node failure will come down here along with user aborts from procedure.
             if (status != ClientResponse.SUCCESS) {
@@ -162,10 +159,7 @@ public class LoadTableLoader extends BenchmarkThread {
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
-                log.error("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the world
-                System.exit(-1);
+                hardStop("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
@@ -194,10 +188,7 @@ public class LoadTableLoader extends BenchmarkThread {
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
-                log.error("LoadTableLoader gracefully failed to delete from table " + m_tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the world
-                System.exit(-1);
+                hardStop("LoadTableLoader gracefully failed to delete from table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
@@ -312,8 +303,7 @@ public class LoadTableLoader extends BenchmarkThread {
                 long nextRowCount = 0;
                 try { nextRowCount = TxnId2Utils.getRowCount(client, m_tableName);
                 } catch (Exception e) {
-                    log.error("getrowcount exception", e);
-                    System.exit(-1);
+                    hardStop("getrowcount exception", e);
                 }
                 // if no progress, throttle a bit
                 if (nextRowCount == currentRowCount.get()) {

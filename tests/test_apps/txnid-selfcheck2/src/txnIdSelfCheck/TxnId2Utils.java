@@ -45,8 +45,7 @@ public enum TxnId2Utils {;
                     return cr;
                 } else {
                     log.debug(cr.getStatusString());
-                    Benchmark.printJStack();
-                    System.exit(-1);
+                    Benchmark.hardStop("unexpected response", cr);
                 }
             } catch (NoConnectionsException e) {
                 sleep = true;

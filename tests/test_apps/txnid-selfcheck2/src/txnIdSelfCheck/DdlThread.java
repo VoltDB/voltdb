@@ -59,8 +59,7 @@ public class DdlThread extends BenchmarkThread {
             try {
                 ClientResponse cr = TxnId2Utils.doAdHoc(client, createOrDrop[count]);
                 if (cr.getStatus() != ClientResponse.SUCCESS) {
-                    log.error("Catalog update failed: " + cr.getStatusString());
-                    throw new RuntimeException("stop the world");
+                    hardStop("DDL failed: " + cr.getStatusString());
                 } else {
                     log.info("Catalog update success #" + Long.toString(progressInd.get()) + " : " + createOrDrop[count]);
                     progressInd.getAndIncrement();
@@ -72,15 +71,13 @@ public class DdlThread extends BenchmarkThread {
                 ClientResponse cr = e.getClientResponse();
                 if (cr.getStatusString().matches("Unexpected exception applying DDL statements to original catalog: DDL Error: \"object name already exists:.*")) {
                     if (errcnt > 1) {
-                        log.error("too many catalog update errors");
-                        throw new RuntimeException("stop the world");
+                        hardStop("too many ddl errors", e);
                     } else
                         errcnt++;
                 }
             }
             catch (Exception e) {
-                log.error("DdlThread threw an error:", e);
-                throw new RuntimeException(e);
+                hardStop("DdlThread threw an error:", e);
             }
             count = ++count & 1;
             try { Thread.sleep(10000); }

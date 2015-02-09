@@ -84,9 +84,7 @@ public class ReadThread extends BenchmarkThread {
                 UpdateBaseProc.validateCIDData(data, ReadThread.class.getName());
             }
             catch (Exception e) {
-                log.error("ReadThread got a bad response", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("ReadThread got a bad response", e);
             }
         }
     }
@@ -136,9 +134,7 @@ public class ReadThread extends BenchmarkThread {
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
-                log.error("ReadThread failed to run a procedure. Will exit.", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("ReadThread failed to run a procedure. Will exit.", e);
             }
         }
     }

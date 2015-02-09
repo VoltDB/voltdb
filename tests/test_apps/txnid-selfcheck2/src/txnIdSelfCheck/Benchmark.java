@@ -231,10 +231,60 @@ public class Benchmark {
         }
     }
 
-    /**
-     * Remove the client from the list if connection is broken.
-     */
+    static public void hardStop(String msg) {
+        logHardStop(msg);
+        stopTheWorld();
+    }
+
+    static public void hardStop(Exception e) {
+        logHardStop("Unexpected exception", e);
+        stopTheWorld();
+    }
+
+    static public void hardStop(String msg, Exception e) {
+        logHardStop(msg, e);
+        if (e instanceof ProcCallException) {
+            ClientResponse cr = ((ProcCallException) e).getClientResponse();
+            hardStop(msg, cr);
+        }
+    }
+
+    static public void hardStop(String msg, ClientResponse resp) {
+        hardStop(msg, (ClientResponseImpl) resp);
+    }
+
+    static public void hardStop(String msg, ClientResponseImpl resp) {
+        logHardStop(msg);
+        log.error("[HardStop] " + resp.toJSONString());
+        stopTheWorld();
+    }
+
+    static private void logHardStop(String msg, Exception e) {
+        log.error("[HardStop] " + msg, e);
+    }
+
+    static private void logHardStop(String msg) {
+        log.error("[HardStop] " + msg);
+    }
+
+    static private void stopTheWorld() {
+        Benchmark.printJStack();
+        log.error("Terminating abnormally");
+        System.exit(-1);
+    }
+
+
     private class StatusListener extends ClientStatusListenerExt {
+
+        @Override
+        public void uncaughtException(ProcedureCallback callback, ClientResponse resp, Throwable e) {
+            hardStop("Uncaught exception in procedure callback ", new Exception(e));
+
+        }
+
+        /**
+         * Remove the client from the list if connection is broken.
+         */
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             if (shutdown.get()) {

@@ -104,9 +104,7 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
-                log.error("InvokeDroppedProcedureThread failed to run client. Will exit.", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("InvokeDroppedProcedureThread failed to run client. Will exit.", e);
             }
         }
     }

@@ -96,11 +96,7 @@ public class BigTableLoader extends BenchmarkThread {
             if (status == ClientResponse.GRACEFUL_FAILURE ||
                     status == ClientResponse.USER_ABORT) {
                 // log what happened
-                log.error("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                Benchmark.printJStack();
-                // stop the world
-                System.exit(-1);
+                hardStop("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
