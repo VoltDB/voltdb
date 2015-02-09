@@ -253,9 +253,43 @@
         $(targetMonospace).html('');
 
         function callback(response) {
-            processResponse('HTML', targetHtml, Id + '_html', response);
-            processResponse('CSV', targetCsv, Id + '_csv', response);
-            processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+
+            var processResponseForAllViews = function() {
+                processResponse('HTML', targetHtml, Id + '_html', response);
+                processResponse('CSV', targetCsv, Id + '_csv', response);
+                processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+            };
+            
+            var handlePortSwitchingOption = function (isPaused) {
+                
+                if (isPaused && VoltDbAdminConfig.isAdmin) {
+                    //Show error message with an option to allow admin port switching
+                    $("#queryDatabasePausedErrorPopupLink").click();
+                } else {
+                    processResponseForAllViews();
+                }
+            };
+
+            //Handle the case when Database is paused
+            if (response.status == -5 && !$.cookie("sql_port_for_paused_db")) {
+                var isDbPaused = $("#resumeConfirmation").css("display") != "none"; //Check to see if the Database is Paused
+
+                if (!isDbPaused) {
+
+                    //Refresh cluster state to display latest status.
+                    var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
+                        VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
+                        isDbPaused = $("#resumeConfirmation").css("display") != "none";
+                        handlePortSwitchingOption(isDbPaused);
+                    };
+                    voltDbRenderer.GetSystemInformation(function() {}, loadAdminTabPortAndOverviewDetails, function(data) {});
+                } else {
+                    handlePortSwitchingOption(true);
+                }
+                
+            } else {
+                processResponseForAllViews();
+            }
         }
         this.Callback = callback;
     }
@@ -263,7 +297,7 @@
     function executeMethod() {
         var target = $('.queryResult');
         var format = $('#exportType').val();
-        
+
         if (!VoltDBCore.connections.hasOwnProperty(DataSource)) {
             $(target).html('Connect to a datasource first.');
             return;

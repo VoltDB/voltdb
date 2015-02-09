@@ -262,9 +262,7 @@ var loadPage = function (serverName, portid) {
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
 
-    //For SQL Query tab, we need to pass admin as false. This way, if the database is paused, 
-    //users can't accidentally send requests that might change database contents.
-    loadSQLQueryPage(serverName, portid, userName, password, false);
+    loadSQLQueryPage(serverName, portid, userName);
 
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';

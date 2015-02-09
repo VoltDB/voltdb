@@ -423,7 +423,7 @@
                 var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
                 var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
                 var values = ['0', '0', undefined];
-                var isAdmin = false;
+                var isAdmin = true;
                 _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
@@ -447,6 +447,29 @@
                 console.log(e.message);
             }
 
+        };
+        
+        this.SetConnectionForSQLExecution = function (sqlPort) {
+            try {
+                var processName = "SQLQUERY_EXECUTE";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["TABLE"];
+                var values = ['0'];
+                //For SQL Query tab, we need to pass admin as false. This way, if the database is paused, 
+                //users can't accidentally send requests that might change database contents.
+                var isAdmin = false;
+                var newSqlPort = sqlPort != null ? sqlPort : port;
+                _connection = VoltDBCore.HasConnection(server, newSqlPort, isAdmin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.AddConnection(server, newSqlPort, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function(connection, status) {
+                    }, null, false);
+                } else {
+                    VoltDBCore.updateConnection(server, newSqlPort, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function(connection, status) {
+                    }, null, false);
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
         };
 
         this.GetShortApiProfile = function (onConnectionAdded) {

@@ -1,4 +1,9 @@
-﻿$(document).ready(function () {
+﻿var sqlPortForPausedDB = {
+    UseAdminPort: 'UseAdminPort',
+    UseNormalPort: 'UseNormalPort'
+};
+
+$(document).ready(function () {
 
     //Default Action
     $(".tab_content").hide(); //Hide all content
@@ -116,17 +121,60 @@
         height: '225px'
     });
     
+    var sqlChangePortName = "sql_port_for_paused_db";
+    $("#queryDatabasePausedErrorPopupLink").popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+
+            var popup = $(this)[0];
+            
+            $("#btnQueryDatabasePausedErrorOk").unbind("click");
+            $("#btnQueryDatabasePausedErrorOk").on("click", function () {
+                saveSessionCookie(sqlChangePortName, sqlPortForPausedDB.UseAdminPort);
+                VoltDBService.SetConnectionForSQLExecution(VoltDbAdminConfig.adminPort);
+                popup.close();
+                //Rerun the query
+                $("#runBTn").button().click();
+            });
+            
+            $("#btnQueryDatabasePausedErrorCancel").unbind("click");
+            $("#btnQueryDatabasePausedErrorCancel").on("click", function () {
+                popup.close();
+            });
+        },
+        beforeClose: function () {
+            if ($.cookie(sqlChangePortName) != sqlPortForPausedDB.UseAdminPort) {
+                saveSessionCookie(sqlChangePortName, sqlPortForPausedDB.UseNormalPort);
+                //Rerun the query
+                $("#runBTn").button().click();
+            }
+        },
+        closeContent: '',
+        modal: true
+    });
 });
 
-function loadSQLQueryPage(serverName, portid, userName, password, admin) {
-    
+function loadSQLQueryPage(serverName, portid, userName) {
+
+    if ($.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
+
+        //Refresh cluster state to display latest status.
+        var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
+            VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
+            var sqlPort = VoltDbAdminConfig.adminPort != -1 ? VoltDbAdminConfig.adminPort : null;
+            VoltDBService.SetConnectionForSQLExecution(sqlPort);
+        };
+        voltDbRenderer.GetSystemInformation(function () { }, loadAdminTabPortAndOverviewDetails, function (data) { });
+    } else {
+        VoltDBService.SetConnectionForSQLExecution();
+    }
+
     function saveConnectionKey() {
         var server = serverName == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(serverName);
-        var port = portid == null ? '8080' : $.trim(portid);
         var user = userName == '' ? null : userName;
-        var processName = 'TABLE_INFORMATION';
-        var key = (server + '_' + port + '_' + (user == '' ? '' : user) + '_' +
-            (admin == true ? 'Admin' : '') + "_" + processName).replace(/[^_a-zA-Z0-9]/g, "_");
+        var processName = 'SQLQUERY_EXECUTE';
+        var key = (server + '_' + (user == '' ? '' : user) + '_' + processName).replace(/[^_a-zA-Z0-9]/g, "_");
         saveCookie('connectionkey', key);
     }
 

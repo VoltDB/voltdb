@@ -1522,6 +1522,7 @@ function loadAdminPage() {
         this.stoppedServer = "";
         this.runningServerIds = "";
         this.firstResponseReceived = false;
+        this.adminPort = -1;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1721,6 +1722,7 @@ function loadAdminPage() {
         };
 
         var configurePortAndOverviewValues = function (configValues) {
+            VoltDbAdminConfig.adminPort = configValues.adminPort;
             adminDOMObjects.adminPort.text(configValues.adminPort);
             adminDOMObjects.httpPort.text(configValues.httpPort);
             adminDOMObjects.internalPort.text(configValues.internalPort);
