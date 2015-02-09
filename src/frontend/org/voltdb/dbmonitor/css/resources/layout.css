@@ -806,7 +806,7 @@ ul.adminClusterList li a.saveme { display:inline-block;background-position:-120p
 ul.adminClusterList li a.restoreConfirmationDisable {display: inline-block;  width:40px; height:36px; background-position:-310px -12px; color:#bbb;}
 
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739px -56px; width:40px; height:36px;}
+ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-786px -56px; width:40px; height:36px;}
 /*ul.adminClusterList li a:hover{color:#000;}*/
 .adminTxt01 { margin:0 0 0 6px;}
 .adminTxt02 { margin:0 0 0 2px;}
@@ -906,7 +906,7 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 
 .tblshutdown tr td  { border:none;}
 .tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
-.tblshutdown tr td a.disableServer { display:inline-block;background-position:-933px -150px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-925px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
 .shutdownServerPause {position: relative; top: 17px; right:3px; color: #cccccc;}
