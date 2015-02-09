@@ -182,11 +182,11 @@
                                 <div class="chartHeader">
                                     <h1>Partition Idle Time</h1>
                                 </div>
-                                <svg id="" width="100%" height="400"></svg>
+                              <img src="css/resources/images/partition.jpg" />
                             </div>
-                            <div id="" class="chart right">
+                            <div id="" class="chart right" style="display:none;">
                                 <div class="chartHeader">
-                                    <h1>Partition Idle Time</h1>
+                                    <h1>Data replicated over time </h1>
                                 </div>
                                 <svg id="" width="100%" height="400"></svg>
                             </div>
@@ -374,10 +374,8 @@
                                     <div class="securWrapper">
                                     <div class="userName">Users</div>
                                     <div class="editBtn">
-                                    <ul>
-                                    <li><a href="#" class="btnEd">Edit</a></li>
-                                    <li><a href="#" class="btnEd">Add</a></li>
-                                    </ul>
+                                    <a href="#" class="btnEd"><span class="userPlus">+</span> Add User</a>                    
+                                  
                                     </div>
                                     <div class="clear"></div>
                                     <table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
@@ -1327,9 +1325,13 @@
     <!-- Loading -->
 
     <!-- Placed at the end of the document so the pages load faster -->
-    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
+    <script src="js/bootstrap.js"></script>
+    <script src="js/jquery.tablesorter.js"></script>
+    <script src="js/jquery.tablesorter.widgets.js"></script>
     <!-- Placed at the end of the document so the pages load faster -->
+    <!--ToDo-->
+    <!--'tablesorter.widgets.js' has a small but important fix which is not present in the one in assets.voltdb.com in the current version-->
+    <!--Therefore we have used the local copy of .js file that contains the fix for <JIRA Issue> feature implementation. Later the fix needed to ammended in remote copy as well-->
+    <!--Otherwise the fix can also be found in the latest github version of tablesorter plugin online-->
 </body>
 </html>
