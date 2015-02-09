@@ -61,7 +61,7 @@ public class DdlThread extends BenchmarkThread {
                 if (cr.getStatus() != ClientResponse.SUCCESS) {
                     hardStop("DDL failed: " + cr.getStatusString());
                 } else {
-                    log.info("Catalog update success #" + Long.toString(progressInd.get()) + " : " + createOrDrop[count]);
+                    log.info("DDL success #" + Long.toString(progressInd.get()) + " : " + createOrDrop[count]);
                     progressInd.getAndIncrement();
                     Benchmark.txnCount.incrementAndGet();
                     errcnt = 0;
