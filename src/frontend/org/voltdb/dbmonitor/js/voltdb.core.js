@@ -18,7 +18,7 @@
             this.password = (aPassword === '' || aPassword === 'null') ? null : (aIsHashPassword == false ? aPassword : null);
             this.isHashedPassword = (aPassword === '' || aPassword === 'null') ? null : (aIsHashPassword == true ? aPassword : null);
             this.process = aProcess;
-            this.key = (this.server + '_' + this.port + '_' + (this.user == '' ? '' : this.user) + '_' + (this.admin == true ? 'Admin' : '') + "_" + this.process).replace(/[^_a-zA-Z0-9]/g, "_");
+            this.key = (this.server + '_' + (this.user == '' ? '' : this.user) + '_' + this.process).replace(/[^_a-zA-Z0-9]/g, "_");
             this.display = this.server + ':' + this.port + (this.user == '' ? '' : ' (' + this.user + ')') + (this.admin == true ? ' - Admin' : '');
             this.Metadata = {};
             this.ready = false;
@@ -461,12 +461,13 @@
 
         };
 
-        this.AddConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, onConnectionAdded, shortApiCallDetails) {
+        this.AddConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, onConnectionAdded, shortApiCallDetails, isExecutionRequired) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
             compileProcedureCommands(conn, procedureNames, parameters, values);
             this.connections[conn.key] = conn;
-            loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName, shortApiCallDetails);
 
+            if (isExecutionRequired !== false)
+                loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName, shortApiCallDetails);
         };
 
         this.updateConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, connection, onConnectionAdded, shortApiCallDetails) {

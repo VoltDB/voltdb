@@ -1309,7 +1309,28 @@
 
     <!-- POPUP StopServerErrorPopup-->
 
-
+    <!-- Query error because of Paused Database Popup-->
+    <div style="display: none"><a href="#queryDatabasePausedErrorPopup" id="queryDatabasePausedErrorPopupLink">Query Error</a></div>
+    <div id="queryDatabasePausedErrorPopup" style="display: none">
+        <div id="queryDatabasePausedInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Query Execution Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorQueryDbPause">
+                <p>
+                    The query could not be executed because the database is Paused. You can run the query by switching to admin port. 
+                </p>
+                <p>&nbsp;</p>
+                <p>
+                    <span style="font-weight: bold">Do you want to switch to admin port?</span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryDatabasePausedErrorOk">Ok</a> <a id="btnQueryDatabasePausedErrorCancel" class="btn btn-gray closeBtn">Cancel</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- Query error because of Paused Database Popup-->
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">
