@@ -681,7 +681,7 @@ public abstract class CatalogUtil {
                     exportConfig.setExportconnectorclass(export.getExportconnectorclass());
                 }
                 //Set target to default name.
-                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                exportConfig.setStream(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             }
 
             populateDefaultDeployment(deployment);
@@ -1093,25 +1093,25 @@ public abstract class CatalogUtil {
             boolean connectorEnabled = exportConfiguration.isEnabled();
             // Get the target name from the xml attribute "target"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String targetName = exportConfiguration.getTarget();
-            if (noEmptyTarget && (targetName == null || targetName.trim().isEmpty()) ) {
+            String streamName = exportConfiguration.getStream();
+            if (noEmptyTarget && (streamName == null || streamName.trim().isEmpty()) ) {
                     throw new RuntimeException("target must be specified along with type in export configuration.");
             }
 
             if (connectorEnabled) {
-                if (targetList.contains(targetName)) {
+                if (targetList.contains(streamName)) {
                     throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
-                            targetName + ".");
+                            streamName + ".");
                 }
                 else {
-                    targetList.add(targetName);
+                    targetList.add(streamName);
                 }
             }
-            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
-            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
             if (catconn == null) {
                 if (connectorEnabled) {
                     if (defaultConnector) {
@@ -1122,10 +1122,10 @@ public abstract class CatalogUtil {
                     }
                     else {
                         hostLog.info("Export configuration enabled and provided for export target " +
-                                     targetName +
+                                     streamName +
                                      " in deployment file however no export " +
                                      "tables are assigned to the this target. " +
-                                     "Export target " + targetName + " will be disabled.");
+                                     "Export target " + streamName + " will be disabled.");
                     }
                 }
                 continue;
@@ -1147,22 +1147,22 @@ public abstract class CatalogUtil {
                             "configured to be disabled. The default export target will be disabled.");
                 }
                 else {
-                    hostLog.info("Export configuration for export target " + targetName + " is present and is " +
-                                 "configured to be disabled. Export target " + targetName + " will be disabled.");
+                    hostLog.info("Export configuration for export target " + streamName + " is present and is " +
+                                 "configured to be disabled. Export target " + streamName + " will be disabled.");
                 }
             } else {
                 if (defaultConnector) {
                     hostLog.info("Default export target is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 else {
-                    hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
+                    hostLog.info("Export target " + streamName + " is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 if (exportConfiguration.getProperty() != null) {
                     if (defaultConnector) {
                         hostLog.info("Default export target configuration properties are: ");
                     }
                     else {
-                        hostLog.info("Export target " + targetName + " configuration properties are: ");
+                        hostLog.info("Export target " + streamName + " configuration properties are: ");
                     }
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
                         if (!configProp.getName().toLowerCase().contains("password")) {
