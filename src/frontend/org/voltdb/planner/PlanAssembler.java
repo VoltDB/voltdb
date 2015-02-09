@@ -1152,8 +1152,10 @@ public class PlanAssembler {
 
             }
 
+            boolean targetIsExportTable = tableListIncludesExportOnly(m_parsedInsert.m_tableList);
             InsertSubPlanAssembler subPlanAssembler =
-                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning);
+                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning,
+                            targetIsExportTable);
             AbstractPlanNode subplan = subPlanAssembler.nextPlan();
             if (subplan == null) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
