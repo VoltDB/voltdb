@@ -55,6 +55,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
 
 public class Benchmark {
