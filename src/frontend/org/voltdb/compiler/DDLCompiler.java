@@ -483,7 +483,7 @@ public class DDLCompiler {
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (1) <table name>
-            "(?:\\s+TO\\s+TARGET\\s+" +                // begin optional TO STREAM clause
+            "(?:\\s+TO\\s+STREAM\\s+" +                // begin optional TO STREAM clause
             "([\\w.$]+)" +                      // (2) <export target>
             ")?" +                              // end optional STREAM clause
             "\\s*;\\z"                          // (end statement)
