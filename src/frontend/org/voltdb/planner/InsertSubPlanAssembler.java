@@ -38,7 +38,7 @@ import org.voltdb.types.PlanNodeType;
 public class InsertSubPlanAssembler extends SubPlanAssembler {
 
     private boolean m_bestAndOnlyPlanWasGenerated = false;
-    private boolean m_targetIsExportTable = false;
+    final private boolean m_targetIsExportTable;
 
     InsertSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
             StatementPartitioning partitioning, boolean targetIsExportTable) {

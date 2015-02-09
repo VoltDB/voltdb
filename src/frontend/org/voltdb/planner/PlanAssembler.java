@@ -1233,6 +1233,9 @@ public class PlanAssembler {
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
+        if (subquery != null) {
+            insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());
+        }
 
         // The field map tells the insert node
         // where to put values produced by child into the row to be inserted.

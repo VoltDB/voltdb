@@ -64,6 +64,10 @@ void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj)
     if (obj.hasNonNullKey("UPSERT")) {
         m_isUpsert = true;
     }
+    m_sourceIsPartitioned = false;
+    if (obj.hasNonNullKey("SOURCE_IS_PARTITIONED")) {
+        m_sourceIsPartitioned = true;
+    }
 }
 
 void InsertPlanNode::initTupleWithDefaultValues(VoltDBEngine* engine,
