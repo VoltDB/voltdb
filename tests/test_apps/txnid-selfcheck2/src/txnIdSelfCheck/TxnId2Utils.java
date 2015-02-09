@@ -37,6 +37,7 @@ public enum TxnId2Utils {;
 
     static ClientResponse doAdHoc(Client client, String query) throws NoConnectionsException, IOException, ProcCallException {
         Boolean sleep = false;
+        Boolean noConnections = false;
         while (true) {
             try {
                 ClientResponse cr = client.callProcedure("@AdHoc", query);
@@ -48,7 +49,9 @@ public enum TxnId2Utils {;
                     Benchmark.hardStop("unexpected response", cr);
                 }
             } catch (NoConnectionsException e) {
-                sleep = true;
+                noConnections = true;
+            } catch (IOException e) {
+                Benchmark.hardStop(e);
             } catch (ProcCallException e) {
                 ClientResponse cr = e.getClientResponse();
                 String ss = cr.getStatusString();
@@ -58,19 +61,20 @@ public enum TxnId2Utils {;
                      ss.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
                      ss.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                      ss.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*"))) {
-                         log.debug("matched");
                     }
                 else if (ss.matches(".*Server is currently unavailable; try again later.*")) {
                     sleep = true;
                 }
                 else {
-                    log.debug(Thread.currentThread().getName() + " throwing ", e);
                     throw e;
                 }
             }
-            if (sleep) {
+            if (sleep | noConnections) {
                 try { Thread.sleep(3000); } catch (Exception f) { }
                 sleep = false;
+                if (noConnections)
+                    while (client.getConnectedHostList().size() == 0);
+                noConnections = false;
             }
         }
     }
