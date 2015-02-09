@@ -192,7 +192,6 @@ public class Benchmark {
      * Fake an internal jstack to the log
      */
     static public void printJStack() {
-        log.info(new Date().toString() + " Full thread dump");
 
         Map<String, List<String>> deduped = new HashMap<String, List<String>>();
 
@@ -221,14 +220,14 @@ public class Benchmark {
             }
         }
 
+        String logline = "";
         for (Entry<String, List<String>> e : deduped.entrySet()) {
-            String logline = "";
             for (String header : e.getValue()) {
-                logline += header + "\n";
+                logline += "\n" + header + "\n";
             }
             logline += e.getKey();
-            log.info(logline);
         }
+        log.info("Full thread dump:\n" + logline);
     }
 
     static public void hardStop(String msg) {
