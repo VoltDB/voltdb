@@ -26,7 +26,7 @@ package vmcTest.config
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.firefox.FirefoxDriver
 //import org.openqa.selenium.htmlunit.HtmlUnitDriver
-//import org.openqa.selenium.ie.InternetExplorerDriver
+import org.openqa.selenium.ie.InternetExplorerDriver
 //import org.openqa.selenium.phantomjs.PhantomJSDriver
 import org.openqa.selenium.safari.SafariDriver
 
@@ -61,13 +61,13 @@ environments {
     chrome {
         driver = { new ChromeDriver() }
     }
-/*
-    htmlunit {
-        driver = { new HtmlUnitDriver(true) }
-    }
 
     ie {
         driver = { new InternetExplorerDriver() }
+    }
+/*
+    htmlunit {
+        driver = { new HtmlUnitDriver(true) }
     }
 
     phantomjs {

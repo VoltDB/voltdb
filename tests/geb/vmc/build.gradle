@@ -27,7 +27,7 @@
 apply plugin: "groovy"
 
 // The drivers to use
-ext.drivers = ["firefox", "chrome", /*"ie", "htmlunit", "phantomjs",*/ "safari"]
+ext.drivers = ["firefox", "chrome", "ie", /*"htmlunit", "phantomjs",*/ "safari"]
 
 repositories {
     mavenCentral()
