@@ -25,6 +25,11 @@ message Pause {
     optional int32 partitionId = 1;
 }
 
+message Connect {
+    optional int32 clusterId = 1;
+    optional fixed64 persistInstanceId = 2;
+}
+
 message Subscribe {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
@@ -124,4 +129,5 @@ message CtrlEnvelope {
     optional SnapshotReq snapshotReq = 7;
     optional Subscribe subscribe = 8;
     optional EventAck eventAck = 9;
+    optional Connect connect = 10;
 }

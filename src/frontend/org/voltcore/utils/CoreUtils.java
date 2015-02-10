@@ -34,9 +34,11 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -1128,5 +1130,23 @@ public class CoreUtils {
         }
         return true;
     };
+
+    /**
+     * Utility method to sort the keys and values of a map by their value.
+     */
+    public static <K extends Comparable< ? super K>,V extends Comparable< ? super V>> List<Entry<K,V>>
+            sortKeyValuePairByValue(Map<K,V> map) {
+        List<Map.Entry<K,V>> entries = new ArrayList<Map.Entry<K,V>>(map.entrySet());
+        Collections.sort(entries, new Comparator<Map.Entry<K,V>>() {
+            @Override
+            public int compare(Entry<K,V> o1, Entry<K,V> o2) {
+                if (!o1.getValue().equals(o2.getValue())) {
+                    return (o1.getValue()).compareTo(o2.getValue());
+                }
+                return o1.getKey().compareTo(o2.getKey());
+            }
+        } );
+        return entries;
+    }
 
 }

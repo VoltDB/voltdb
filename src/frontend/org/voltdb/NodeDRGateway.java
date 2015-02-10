@@ -21,6 +21,11 @@ import java.io.IOException;
 
 public interface NodeDRGateway {
 
+    /*
+     * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
+     */
+    public abstract void blockOnDRStateConvergence();
+
     /**
      * Start listening on the ports
      */

@@ -653,11 +653,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     } else {
                         drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
                         ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
+                        Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
+                        m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
+                                                                                       m_replicationActive,
+                                                                                       m_configuredNumberOfPartitions,
+                                                                                       m_catalogContext.getDeployment().getCluster().getHostcount());
                     }
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class);
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive,
-                                                                                   m_configuredNumberOfPartitions);
+                                                                                   m_configuredNumberOfPartitions,
+                                                                                   m_catalogContext.getDeployment().getCluster().getHostcount());
+                    m_nodeDRGateway.start();
+                    m_nodeDRGateway.blockOnDRStateConvergence();
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -765,6 +773,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // Configure consumer-side DR if relevant
             if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
+                byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
                 if (drProducerHost == null || drProducerHost.isEmpty()) {
                     VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
                 }
@@ -773,11 +782,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                             String.class,
                             ClientInterface.class,
+                            byte.class,
                             boolean.class,
                             String.class);
                     m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
                             drProducerHost,
                             m_clientInterface,
+                            drConsumerClusterId,
                             usingCommandLog,
                             clSnapshotPath);
                     m_globalServiceElector.registerService(m_consumerDRGateway);
@@ -2601,7 +2612,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private void prepareReplication() {
         try {
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.start();
                 m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled());
             }
             if (m_consumerDRGateway != null) {
