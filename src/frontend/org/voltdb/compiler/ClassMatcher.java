@@ -67,8 +67,10 @@ public class ClassMatcher {
             classNamePattern = classNamePattern.substring(0, indexOfDollarSign);
         }
 
-        String regExPreppedName = preppedName.replace("**", "[\\w.\\$]+");
-        regExPreppedName = regExPreppedName.replace("*",  "[\\w\\$]+");
+        // Substitution order is critical.
+        String regExPreppedName = preppedName.replace(".", "[.]");
+        regExPreppedName = regExPreppedName.replace("**", "[\\w.\\$]+");
+        regExPreppedName = regExPreppedName.replace("*",  "[\\w\\$]*");
 
         String regex = "^" + // (line start)
                        regExPreppedName +
