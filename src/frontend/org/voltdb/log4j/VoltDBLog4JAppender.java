@@ -39,11 +39,12 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     String user = null;
     String password = null;
     String table = "log4j";
+    String insertMethod = "bulkloader";
     long current_index = 0;
 
     ClientConfig config = null;
     Client client = null;
-    VoltBulkLoader bulkLoader = null;
+    AppenderInsert insertDevice = null;
 
     /**
      * Failure callback for insertions to VoltDB
@@ -57,6 +58,59 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             System.err.println(response.getStatusString());
         }
 
+    }
+
+    /**
+     * Interface that defines one method: insert log information into VoltDB
+     */
+    interface AppenderInsert {
+        public void insert(long timestamp, String level, String message) throws Exception;
+        public void close();
+    }
+
+    /**
+     * Insert class that uses a bulkloader
+     */
+    class BulkLoaderAppenderInsert implements AppenderInsert {
+        VoltBulkLoader bulkLoader = null;
+        public BulkLoaderAppenderInsert(Client client) {
+            try{
+                bulkLoader = client.getNewBulkLoader(table, 1, new VoltDBLog4JAppenderCallback());
+            } catch (Exception e) {
+                System.err.println("Coundn't get bulkloader for client");
+                e.printStackTrace();
+            }
+        }
+        @Override
+        public void insert(long timestamp, String level, String message) throws Exception{
+            Object rowHandle = null;
+            bulkLoader.insertRow(rowHandle, current_index, timestamp, level, message);
+        }
+        @Override
+        public void close() {
+            try {
+                bulkLoader.drain();
+                bulkLoader.close();
+            } catch (Exception e) {
+                System.err.println("Couldn't close bulkloader");
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Insert class that uses a stored procedure
+     */
+    class ProcedureAppenderInsert implements AppenderInsert {
+        @Override
+        public void insert(long timestamp, String level, String message) throws Exception {
+            // Not implemented yet
+            return;
+        }
+        @Override
+        public void close() {
+            // Not implemented yet
+        }
     }
 
     // Log4j configuration loaders
@@ -74,6 +128,9 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
 
     public void setTable(String table) { this.table = table; }
     public String getTable() { return this.table; }
+
+    public void setInsert(String insertMethod) { this.insertMethod = insertMethod.toLowerCase(); }
+    public String getInsert() { return this.table; }
 
     /**
      * Initializes a new Log4j appender.
@@ -94,8 +151,13 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             // Make sure we have a table set up.
             setupTable(client);
 
-            // Grab a bulk loader
-            bulkLoader = client.getNewBulkLoader("log4j", 1, new VoltDBLog4JAppenderCallback());
+            // Create the insert device
+            if (insertMethod.equals("bulkloader"))
+                insertDevice = new BulkLoaderAppenderInsert(client);
+            else if (insertMethod.equals("prodecure"))
+                insertDevice = new ProcedureAppenderInsert();
+            else
+                System.err.println("Unrecognized insert method: '" + insertMethod + "'");
         } catch (Exception e) {
             System.err.println("Unable to create VoltDB client");
             e.printStackTrace();
@@ -143,8 +205,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     public void close() {
         // Close the VoltDB connection
         try {
-            bulkLoader.drain();
-            bulkLoader.close();
+            insertDevice.close();
             client.drain();
             client.close();
         } catch (Exception e) {
@@ -167,11 +228,10 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
 
         // Insert the log message into VoltDB
         try{
-            Object rowHandle = null;
-            bulkLoader.insertRow(rowHandle, current_index, timestamp, level, message);
+            insertDevice.insert(timestamp, level, message);
             current_index++;
-        } catch (InterruptedException e) {
-            System.err.println("Failed to insert into VoltDB using bulk loader");
+        } catch (Exception e) {
+            System.err.println("Failed to insert into VoltDB");
             e.printStackTrace();
         }
     }
