@@ -969,7 +969,7 @@ text-align: center;
 color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
 }
-.refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;display:none}
+.refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;display: none;}
 .schm { margin:9px}
 .securWrapper { margin:10px 40px;}
 .secTbl { border:1px solid #CCCCCC; }

@@ -245,11 +245,6 @@ $(document).ready(function () {
         loadPage(serverName, portid);
     });
 
-    $('.refreshBtn.schm').unbind("click");
-    $('.refreshBtn.schm').click(function () {
-        VoltDbUI.refreshSqlAndSchemaTab();
-    });
-
 });
 
 function logout() {
@@ -1590,22 +1585,29 @@ var adjustGraphSpacing = function () {
         };
 
         this.loadSchemaTab = function () {            
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';            
             var templateJavascript = "js/template.js";
 
-            $.post(templateUrl, function (result) {
+            $.post(templateUrl, function (result) {            
                 result = result.replace('<!--##SIZES##>', '');
                 var body = $(result).filter("#wrapper").html();
                 $("#schema").html(body);
-                $(".refreshBtn.schm").css("display", "block");
-
+                
                 $("#schemaLinkSqlQuery").on("click", function (e) {
                     $("#navSqlQuery").trigger("click");
                     e.preventDefault();
                 });
 
-                $.getScript(templateJavascript);                
+                $.getScript(templateJavascript, function () {
+                    $(".refreshBtn.schm").css("display", "block");
+                    $('.refreshBtn.schm').unbind("click");
+                    $('.refreshBtn.schm').click(function () {                       
+                        VoltDbUI.refreshSqlAndSchemaTab();
+                    });
+
+                });                
                 $("#overlay").hide();
+                
             });
         };
 
@@ -1632,7 +1634,6 @@ function RefreshServerUI() {
         $("#popServerList").hide();
 
     }
-
 
 }
 
