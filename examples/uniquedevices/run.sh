@@ -110,7 +110,7 @@ function background_server_andload() {
     sleeptime=0
     until ../../bin/sqlcmd  --query=' exec @SystemInformation, OVERVIEW;' > /dev/null 2>&1
     do
-        sleeptime=$((sleeptime + 1))
+        sleeptime=$((sleeptime + 2))
         sleep 2
         echo " ... Waiting for VoltDB to start"
         if [[ $sleeptime -gt 30 ]]
