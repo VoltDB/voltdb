@@ -71,6 +71,7 @@ Note 2: Similarly, if you want to run these tests on Internet Explorer (IE), on 
       http://docs.seleniumhq.org/download/
    but also be aware of this recent issue:
       https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw
+   and you may want to turn off IE's auto-correct (spell checking).
 
 Note 3: If you want to run just one test class or method, you may do so using
    the --tests argument. For example, to run all of the tests in the
