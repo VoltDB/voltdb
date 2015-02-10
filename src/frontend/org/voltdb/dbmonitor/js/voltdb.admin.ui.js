@@ -1718,6 +1718,7 @@ function loadAdminPage() {
         };
 
         var configurePortAndOverviewValues = function (configValues) {
+            VoltDbAdminConfig.adminPort = configValues.adminPort;
             adminDOMObjects.adminPort.text(configValues.adminPort);
             adminDOMObjects.httpPort.text(configValues.httpPort);
             adminDOMObjects.internalPort.text(configValues.internalPort);
