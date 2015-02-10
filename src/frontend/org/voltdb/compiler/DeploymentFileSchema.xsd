@@ -328,7 +328,6 @@
         <!-- Currently, only one DR data source is allowed -->
         <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
-    <xs:attribute name="name" type="xs:string" default=""/>
     <xs:attribute name="id" type="clusterIdType" use="required"/>
     <xs:attribute name="listen" type="xs:boolean" default="false" />
     <xs:attribute name="port" type="xs:int" default="5555"/>
@@ -344,8 +343,6 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
-    <xs:attribute name="enabled" type="xs:boolean" default="true" />
-    <xs:attribute name="group" type="xs:string" default="" />
   </xs:complexType>
   
   <!-- restriction on id -->

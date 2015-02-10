@@ -1040,7 +1040,6 @@ public class VoltProjectBuilder {
             if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
                 ConnectionType conn = factory.createConnectionType();
                 dr.setConnection(conn);
-                conn.setEnabled(true);
                 conn.setSource(m_drMasterHost);
             }
         }
