@@ -27,7 +27,7 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class TestClassMatcher extends TestCase {
     static String testClasses = "org.voltdb.utils.BinaryDeque\n" +
