@@ -1560,7 +1560,7 @@ var adjustGraphSpacing = function () {
         //load schema tab and table and views tabs inside sql query 
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();
-            //SQLQueryRender.populateTablesAndViews();
+            SQLQueryRender.populateTablesAndViews();
         };
 
         this.refreshConnectionTime = function (seconds) {
@@ -1589,7 +1589,7 @@ var adjustGraphSpacing = function () {
             }
         };
 
-        this.loadSchemaTab = function () {
+        this.loadSchemaTab = function () {            
             var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
             var templateJavascript = "js/template.js";
 
@@ -1597,6 +1597,7 @@ var adjustGraphSpacing = function () {
                 result = result.replace('<!--##SIZES##>', '');
                 var body = $(result).filter("#wrapper").html();
                 $("#schema").html(body);
+                $(".refreshBtn.schm").css("display", "block");
 
                 $("#schemaLinkSqlQuery").on("click", function (e) {
                     $("#navSqlQuery").trigger("click");

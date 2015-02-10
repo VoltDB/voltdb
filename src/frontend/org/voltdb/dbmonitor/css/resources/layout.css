@@ -907,8 +907,8 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 
 
 .tblshutdown tr td  { border:none;}
-.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
-.tblshutdown tr td a.disableServer { display:inline-block;background-position:-925px -150px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.shutdown { display:inline-block;background-position:-785px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-978px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
 .shutdownServerPause {position: relative; top: 17px; right:3px; color: #cccccc;}
@@ -969,7 +969,7 @@ text-align: center;
 color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
 }
-.refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;}
+.refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;display:none}
 .schm { margin:9px}
 .securWrapper { margin:10px 40px;}
 .secTbl { border:1px solid #CCCCCC; }
