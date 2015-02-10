@@ -12,8 +12,8 @@ To run these tests of the VMC:
 2. From the voltdb/tests/test_apps/genqa/ directory, launch a backgrounded
    genqa application server:
       ./run.sh server &
-   (You can also run against other examples, such as the 'voter' example, but
-   the testing is less complete.)
+   (You can also run against other examples, such as the 'voter' example,
+   though the testing is slightly less complete.)
 3. From the voltdb/tests/geb/vmc/ directory, launch the all-in-one install/run
    script for the automated tests:
       ./gradlew firefox --rerun-tasks
@@ -23,7 +23,9 @@ To run these tests of the VMC:
       voltdb/tests/geb/vmc/build/reports/firefoxTest/tests/index.html
    or, if you used Chrome:
       voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html
-5. Stop the backgrounded server ("voltadmin shutdown" or "kill %1" – or 
+   or, if you used Internet Explorer (IE):
+      voltdb/tests/geb/vmc/build/reports/ieTest/tests/index.html
+5. Stop the backgrounded server ("voltadmin shutdown" or "kill %1" - or 
    "kill <whatever your actual background job number(s) may be>").
 
 To add to or modify the existing tests:
@@ -61,7 +63,16 @@ Note 1: If you want to run these tests on Chrome, using:
       https://code.google.com/p/selenium/wiki/ChromeDriver
    (mainly, make sure it's in a directory included in the system PATH).
 
-Note 2: If you want to run just one test class or method, you may do so using
+Note 2: Similarly, if you want to run these tests on Internet Explorer (IE), on a
+   Windows system, using ('gradlew' here refers to gradlew.bat):
+      gradlew ie --rerun-tasks
+   (you may use 'ie' or 'ieTest'), then you will first need to download the IE
+   driver, as described here (under 'The Internet Explorer Driver Server'):
+      http://docs.seleniumhq.org/download/
+   but also be aware of this recent issue:
+      https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw
+
+Note 3: If you want to run just one test class or method, you may do so using
    the --tests argument. For example, to run all of the tests in the
    NavigatePagesTest class (on Firefox), run:
       ./gradlew firefox --tests=*NavigatePages* --rerun-tasks
@@ -71,7 +82,7 @@ Note 2: If you want to run just one test class or method, you may do so using
    voltdb/tests/geb/vmc/src/resources/sqlQueries.txt, as follows:
       ./gradlew firefox --tests=*sqlQueries* --rerun-tasks
 
-Note 3: There are several system properties that can be specified on the
+Note 4: There are several system properties that can be specified on the
    command-line using '-P', as follows:
       ./gradlew -Purl=http://my.server.com:8080/ -PdebugPrint=true -PtimeoutSeconds=10 firefox --rerun-tasks
    Here is a description of all system properties currently available:
@@ -96,12 +107,16 @@ Note 3: There are several system properties that can be specified on the
       voltdb/tests/geb/vmc/src/resources/GebConfig.groovy (timeoutSeconds only)
    So for more info, see there, or the code (especially SqlQueriesTest).
 
-Note 4: If you want to run these tests regularly on your machine, you may want
+Note 5: If you want to run these tests regularly on your machine, you may want
    to set your Firefox Preferences (under Advanced, Update) to something other
    than "Automatically install updates" ("Check for updates, but let me choose
    whether to install them" is a good choice), so that your version of Firefox
    does not get ahead of what Selenium can handle.
 
-Note 5: Running the tests against Safari does not currently work; no other
-   browsers (besides Firefox & Chrome) are currently supported. (The browser
-   drivers are specified in voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy.)
+Note 6: Running the tests against Safari does not currently work; no other
+   browsers (besides Firefox, Chrome and Internet Explorer) are currently
+   supported. (The browser drivers are specified in
+   voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy.)
+
+Note 7: For now, these tests must be run in a graphical environment, where the
+   browser can be launched, though we hope to add a "headless" option eventually.
