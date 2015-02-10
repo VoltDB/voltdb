@@ -109,12 +109,6 @@ function background_server_andload() {
     init
 }
 
-# run the voltdb server locally
-function rejoin() {
-    # run the server
-    voltdb rejoin -H $HOST -d deployment.xml -l $LICENSE
-}
-
 # run the client that drives the example
 function client() {
     async-benchmark
