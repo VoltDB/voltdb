@@ -37,18 +37,22 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 Topend* topend,
                 Pool* tempStringPool,
                 VoltDBEngine* engine,
-                bool exportEnabled,
                 std::string hostname,
                 CatalogId hostId,
                 DRTupleStream *drStream) :
-    m_topEnd(topend), m_tempStringPool(tempStringPool),
+    m_topEnd(topend),
+    m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
-    m_drStream(drStream), m_engine(engine),
-    m_txnId(0), m_spHandle(0),
+    m_drStream(drStream),
+    m_engine(engine),
+    m_txnId(0),
+    m_spHandle(0),
     m_lastCommittedSpHandle(0),
-    m_siteId(siteId), m_partitionId(partitionId),
-    m_hostname(hostname), m_hostId(hostId),
-    m_exportEnabled(exportEnabled), m_epoch(0) // set later
+    m_siteId(siteId),
+    m_partitionId(partitionId),
+    m_hostname(hostname),
+    m_hostId(hostId),
+    m_epoch(0) // set later
 {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);
     bindToThread();

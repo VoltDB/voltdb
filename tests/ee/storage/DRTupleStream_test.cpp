@@ -61,7 +61,7 @@ const int BUFFER_SIZE = 983;
 class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest() : m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, true, "localhost", 2, &m_wrapper)) {
+        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, "localhost", 2, &m_wrapper)) {
         m_wrapper.m_enabled = true;
         srand(0);
         // set up the schema used to fill the new buffer
