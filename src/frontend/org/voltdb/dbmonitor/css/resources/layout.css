@@ -20,7 +20,7 @@ h1 {font:16px Arial, Helvetica, sans-serif;}
 .btn:hover{background-color:#76bd1d; color:#fff;}
 .graphOpacity {opacity: 0.5}
 h1, h2, h3, h4, h5, h6 {margin:0!important;}
-
+.errorValue{ color: #c70000;}
 
 /*****Global Ends******/
 /******sprite*************/
@@ -1043,7 +1043,6 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 .adminContentRight {width:100%;}
 .parameterValue{ }
 .returnValue{ color:#0079bb;}
-.errorValue{color:red}
 
 h3.systemHeader{}
 .editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}
