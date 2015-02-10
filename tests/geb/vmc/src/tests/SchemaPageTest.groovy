@@ -144,10 +144,10 @@ class SchemaPageTest extends TestBase {
 
         // TODO: should make these into tests, not just debug print
         cleanup: 'for now, just print the table, row-wise'
-        debugPrint "\nSchema (tab) table, row-wise:\n" + page.getSchemaTable(false)
+        debugPrint "\nSchema (tab) table, row-wise:\n" + page.getSchemaTableByRow()
 
         and: 'for now, just print the table, column-wise'
-        debugPrint "\nSchema (tab) table, column-wise:\n" + page.getSchemaTable(true)
+        debugPrint "\nSchema (tab) table, column-wise:\n" + page.getSchemaTableByColumn()
     }
 
     /**

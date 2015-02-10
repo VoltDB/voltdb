@@ -40,19 +40,27 @@ class SchemaPageSchemaTab extends SchemaPage {
         schemaSubTab.attr('class') == 'active'
         schemaTable.displayed
     }
+
+    /**
+     * Returns the contents of the "Schema" table, on the Schema tab of the
+     * Schema page of the VMC, by column, as a Map<String,List<String>>.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
+     * @return the contents of the "Schema" table, listed by column.
+     */
+    Map<String,List<String>> getSchemaTableByColumn(ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
+        return getTableByColumn(schemaTable, colHeaderFormat)
+    }
     
     /**
      * Returns the contents of the "Schema" table, on the Schema tab of the
-     * Schema page of the VMC.
-     * @param columnWise - if true, returns a Map<String,List<String>>, with
-     * each key being a column header, and its associated List contains each
-     * of the values in that column; if false, returns a List<List(String)>,
-     * representing the table by row, with the columnn headers in the first
-     * row.
-     * @return the contents of the "Schema" table.
+     * Schema page of the VMC, by row, as a List<List<String>>.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
+     * @return the contents of the "Schema" table, listed by row.
      */
-    def getSchemaTable(boolean columnWise) {
-        return getTableContents(schemaTable, false, columnWise)
+    List<List<String>> getSchemaTableByRow(ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
+        return getTableByRow(schemaTable, colHeaderFormat)
     }
 
 }

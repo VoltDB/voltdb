@@ -392,7 +392,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         qrfddOptions.each { options.add(it.text()) }
         return options
     }
-    
+
     /**
      * Returns a list of the values of the options available on query result
      * format drop-down menu. (Typically, these are the same as the text
@@ -426,11 +426,14 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * in the form of a List (for each table) of Maps, with each Map element a
      * List of Strings; each Key of the Map is a column header of the table,
      * and its List contains the displayed text of that column.
+     * @param colHeaderFormat - the case in which you want each table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
      * @return a List of Maps representing the contents of every table.
      */
-    def List<Map<String,List<String>>> getQueryResults() {
+    def List<Map<String,List<String>>> getQueryResults(
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
         def results = []
-        queryTables.each { results.add(getTableByColumn(it)) }
+        queryTables.each { results.add(getTableByColumn(it, colHeaderFormat)) }
         return results
     }
 
@@ -442,10 +445,13 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * this method with index 0 will return the first table.
      * @param index - the index (0-based) of the "table" element whose contents
      * are to be returned.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
      * @return a Map representing the contents of the specified table.
      */
-    def Map<String,List<String>> getQueryResult(int index) {
-        return getQueryResults().get(index)
+    def Map<String,List<String>> getQueryResult(int index,
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
+        return getQueryResults(colHeaderFormat).get(index)
     }
 
     /**
@@ -453,10 +459,13 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * Result" area, in the form of a Map, with each element a List of Strings;
      * each Key of the Map is a column header of the table, and its List
      * contains the displayed text of that column.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
      * @return a Map representing the contents of the <i>last</i> table.
      */
-    def Map<String,List<String>> getQueryResult() {
-        return getTableByColumn(queryTables.last())
+    def Map<String,List<String>> getQueryResult(
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
+        return getTableByColumn(queryTables.last(), colHeaderFormat)
     }
 
     /**

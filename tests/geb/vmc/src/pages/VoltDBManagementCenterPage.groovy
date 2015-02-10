@@ -126,7 +126,18 @@ class VoltDBManagementCenterPage extends Page {
     }
 
     /**
-     * Returns the contents of the element specified by the Navigator, which
+     * Used to specify whether you want a table's contents returned with the
+     * column headers as displayed, converted to lower case, or converted to
+     * upper case.
+     */
+    enum ColumnHeaderCase {
+        AS_IS,
+        TO_LOWER_CASE,
+        TO_UPPER_CASE
+    }
+
+    /**
+     * Returns the contents of the element specified by a Navigator, which
      * should refer to a "table" HTML element. If columnWise is true, the table
      * contents are returned in the form of a Map, with each element a List of
      * Strings; each Key of the Map is a column header of the table, and its
@@ -136,18 +147,26 @@ class VoltDBManagementCenterPage extends Page {
      * all the elements in that row.
      * @param tableElement - a Navigator specifying the "table" element whose
      * contents are to be returned.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
+     * @param columnWise - if true, the table contents are returned column-wise,
+     * as a Map<String,List<String>>; if false, they're returned row-wise, as a
+     * List<List<String>>.
      * @return a List or Map representing the contents of the specified table
      * element.
      */
-    protected def getTableContents(Navigator tableElement,
-                boolean columnHeadersToLowerCase, boolean columnWise) {
+    private def getTableContents(Navigator tableElement,
+                                 ColumnHeaderCase colHeaderFormat,
+                                 boolean columnWise) {
         def result = []
         def columnHeaders = tableElement.find('thead').first().find('th')*.text()
-        if (columnHeadersToLowerCase) {
+        if (ColumnHeaderCase.TO_LOWER_CASE.equals(colHeaderFormat)) {
             columnHeaders = columnHeaders.collect { it.toLowerCase() }
+        } else if (ColumnHeaderCase.TO_UPPER_CASE.equals(colHeaderFormat)) {
+            columnHeaders = columnHeaders.collect { it.toUpperCase() }
         }
         def rows = tableElement.find('tbody').find('tr')
-        // remove "empty" (or hidden) rows (those with no visible text)
+        // Remove "empty" (or hidden) rows (those with no visible text)
         for (int i=rows.size()-1; i>= 0; i--) {
             String rowText = rows.getAt(i).text()
             if (rowText == null || rowText.isEmpty()) {
@@ -168,32 +187,36 @@ class VoltDBManagementCenterPage extends Page {
     }
 
     /**
-     * Returns the contents of the element specified by the Navigator, which
+     * Returns the contents of the element specified by a Navigator, which
      * should refer to a "table" HTML element. The table contents are returned
      * in the form of a Map, with each element a List of Strings; each Key of
      * the Map is a column header of the table, and its List contains the
      * displayed text of that column. 
      * @param tableElement - a Navigator specifying the "table" element whose
      * contents are to be returned.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
      * @return a Map representing the contents of the specified table element.
      */
     protected Map<String,List<String>> getTableByColumn(Navigator tableElement,
-                                        boolean columnHeadersToLowerCase=true) {
-        return getTableContents(tableElement, columnHeadersToLowerCase, true)
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
+        return getTableContents(tableElement, colHeaderFormat, true)
     }
 
     /**
-     * Returns the contents of the element specified by the Navigator, which
+     * Returns the contents of the element specified by a Navigator, which
      * should refer to a "table" HTML element. The table contents are returned
      * in the form of a List of List of String; each List element represents a
      * row of the table, containing a List of all the elements in that row.
      * @param tableElement - a Navigator specifying the "table" element whose
      * contents are to be returned.
-     * @return a Map representing the contents of the specified table element.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
+     * @return a List representing the contents of the specified table element.
      */
-    protected Map<String,List<String>> getTableByRow(Navigator tableElement,
-                                        boolean columnHeadersToLowerCase=false) {
-        return getTableContents(tableElement, columnHeadersToLowerCase, false)
+    protected List<List<String>> getTableByRow(Navigator tableElement,
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
+        return getTableContents(tableElement, colHeaderFormat, false)
     }
 
     /**
