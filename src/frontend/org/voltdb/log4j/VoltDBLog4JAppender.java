@@ -25,6 +25,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
@@ -64,7 +65,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
      * Interface that defines one method: insert log information into VoltDB
      */
     interface AppenderInsert {
-        public void insert(long timestamp, String level, String message) throws Exception;
+        public void insert(long id, long timestamp, String level, String message) throws Exception;
         public void close();
     }
 
@@ -82,9 +83,9 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             }
         }
         @Override
-        public void insert(long timestamp, String level, String message) throws Exception{
+        public void insert(long id, long timestamp, String level, String message) throws Exception{
             Object rowHandle = null;
-            bulkLoader.insertRow(rowHandle, current_index, timestamp, level, message);
+            bulkLoader.insertRow(rowHandle, id, timestamp, level, message);
         }
         @Override
         public void close() {
@@ -102,14 +103,16 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
      * Insert class that uses a stored procedure
      */
     class ProcedureAppenderInsert implements AppenderInsert {
+        Client client;
+        public ProcedureAppenderInsert(Client client) { this.client = client; }
         @Override
-        public void insert(long timestamp, String level, String message) throws Exception {
-            // Not implemented yet
-            return;
+        public void insert(long id, long timestamp, String level, String message) throws Exception {
+            client.callProcedure(new NullCallback(), "LogInsert", id, timestamp, level, message);
         }
         @Override
         public void close() {
-            // Not implemented yet
+            // Nothing to close
+            return;
         }
     }
 
@@ -154,8 +157,8 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             // Create the insert device
             if (insertMethod.equals("bulkloader"))
                 insertDevice = new BulkLoaderAppenderInsert(client);
-            else if (insertMethod.equals("prodecure"))
-                insertDevice = new ProcedureAppenderInsert();
+            else if (insertMethod.equals("procedure"))
+                insertDevice = new ProcedureAppenderInsert(client);
             else
                 System.err.println("Unrecognized insert method: '" + insertMethod + "'");
         } catch (Exception e) {
@@ -185,8 +188,12 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
        // No table, so we need to add one
        String sqlStmt = "CREATE TABLE " + table + " ( id INT UNIQUE NOT NULL, timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))";
        String sqlStmt2 = "PARTITION TABLE " + table + " ON COLUMN id;";
+       String sqlStmt3 = "CREATE PROCEDURE LogInsert AS "
+                         + "INSERT INTO " + table + " (id, timestamp, level, message) "
+                         + "VALUES (?,?,?,?);";
        client.callProcedure("@AdHoc", sqlStmt);
        client.callProcedure("@AdHoc", sqlStmt2);
+       client.callProcedure("@AdHoc", sqlStmt3);
     }
 
     /**
@@ -194,7 +201,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
      * @return The current index
      * @throws Exception
      */
-    private long findCurrentLogIndex() throws Exception{
+    private long findCurrentLogIndex() throws Exception {
         String sqlStmt = "SELECT MAX(id) from " + table + ";";
         VoltTable result = client.callProcedure("@AdHoc", sqlStmt).getResults()[0];
         result.advanceRow();
@@ -228,7 +235,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
 
         // Insert the log message into VoltDB
         try{
-            insertDevice.insert(timestamp, level, message);
+            insertDevice.insert(current_index, timestamp, level, message);
             current_index++;
         } catch (Exception e) {
             System.err.println("Failed to insert into VoltDB");
