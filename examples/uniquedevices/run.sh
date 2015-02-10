@@ -104,11 +104,22 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-function nohup_server() {
-    jars-ifneeded
+function background_server_andload() {
     # run the server
-    nohup $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
-    sqlcmd < ddl.sql
+    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    sleeptime=0
+    until ../../bin/sqlcmd  --query=' exec @SystemInformation, OVERVIEW;' > /dev/null 2>&1
+    do
+        sleeptime=$((sleeptime + 1))
+        sleep 2
+        echo " ... Waiting for VoltDB to start"
+        if [[ $sleeptime -gt 30 ]]
+        then
+            echo "Exiting.  VoltDB did not startup within 30 seconds" 1>&2; exit 1;
+        fi
+    done
+    # load the schema
+    init
 }
 
 # run the voltdb server locally
