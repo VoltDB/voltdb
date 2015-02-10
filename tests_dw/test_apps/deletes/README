@@ -1,0 +1,40 @@
+This small app attempts to exercise deletes in order to expose any
+memory instability such as unbounded memory growth.  It also provides
+some semi-dubious insert/delete throughput numbers for benchmark
+purposes.
+
+The user provides values for four input arguments:
+- The average row size of an insert batch,
+- The maximum number of batches to retain in the database,
+- The number of batches between which a random purge of roughly half of the
+  tuples in the database occurs (set to -1 if this behavior is not wanted)
+- The number of batches between which the client will attempt to
+  start a new snapshot (and attempt to verify a previous one, if
+  present, -1 if this behavior is not wanted)
+
+The app then inserts batches of uniformly distributed random size
+around the average row size provided until it reaches the maximum
+number of batches to retain, at which point it alternates
+insertion/deletion, deleting the oldest batch each time.
+
+The first two parameters allow the user to control the total
+approximate size of the data stored, as well as the size of each
+deletion.  The third allows the user to introduce some amount of
+memory fragmentation into the database.
+
+Each insertion and deletion is currently a single-partition procedure;
+the deletion of a batch is performed by iterating over all the present
+values of the partition column (currently a 16 byte string) and
+performing a single-partition delete on each one.
+
+Along with a single table with a rather large schema, the app contains
+several indexes on the table and several additional materialized views
+in order to stress various memory-related issues that have been
+observered previously.
+
+The app's output is currently rather noisy, but reports the total
+insert throughput (in transactions per second, since there is only one
+insert per transaction), and the total delete throughput (in rows
+deleted per second, since this makes more sense).  Also, it spits out
+some rough aggregation of the memory statistics gathered from the
+@Statistics management sysproc.

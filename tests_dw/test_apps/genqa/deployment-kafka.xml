@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" elastic="enabled" schema="catalog" />
+    <partition-detection enabled="false">
+        <snapshot prefix="voltdb_partition_detection"/>
+    </partition-detection>
+    <admin-mode port="21211" adminstartup="false"/>
+    <heartbeat timeout="15"/>
+    <httpd port="8080">
+        <jsonapi enabled="true"/>
+    </httpd>
+    <export enabled="true" target="kafka">
+        <configuration>
+            <property name="metadata.broker.list">kafka1:9092</property>
+            <property name="producer.type">async</property>
+            <property name="request.required.acks">1</property>
+            <property name="skipinternals">false</property>
+        </configuration>
+    </export>
+    <commandlog synchronous="false" enabled="false" logsize="1024">
+        <frequency time="200" transactions="2147483647"/>
+    </commandlog>
+    <systemsettings>
+        <temptables maxsize="100"/>
+        <snapshot priority="6"/>
+    </systemsettings>
+</deployment>

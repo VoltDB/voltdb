@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.procedures.CheckUserId'></procedure>
+            <procedure class='com.procedures.RecordHit' />
+            <procedure class='com.procedures.ArchiveVisits' />
+            <procedure class='com.procedures.ArchiveVisitsEL' />
+            <procedure class='com.procedures.DeleteVisits' />
+        </procedures>
+        <partitions>
+            <partition table='visit_archived' column='userId' />
+            <partition table='visit_unarchived' column='userId' />
+            <partition table='visit_el' column='userId' />
+        </partitions>
+        <export>
+            <tables>
+                <table name="visit_el"/>
+            </tables>
+        </export>
+    </database>
+</project>

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<project>
+    <info>
+        <name>Adhoc Smash Replication</name>
+        <version>2.0</version>
+        <description>Try to expose a theoretical defect in replication.</description>
+    </info>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='adhocsmash.procedures.Delete'>
+              <sql>delete from votes where contestant_number=?</sql>
+            </procedure>
+        </procedures>
+        <partitions>
+            <partition table='votes' column='phone_number' />
+        </partitions>
+    </database>
+</project>

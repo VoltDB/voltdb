@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+       <schemas>
+           <schema path='ctindex.sql' />
+       </schemas>
+       <procedures>
+           <procedure class='Insert' />
+           <procedure class='CountStarSmaller' />
+           <procedure class='CountStarRange' />
+       </procedures>
+       <partitions>
+           <partition table='GAME' column='game_id' />
+       </partitions>
+    </database>
+</project>

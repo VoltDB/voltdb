@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+    <!-- file appender captures all loggers messages. -->
+    <!-- console is a special appender for the logger CONSOLE
+      that allows selectively logging INFO level messages to the console.
+      Appender console and appender consolefiltered must have non-intersecting
+      level filters or messages will appear on the console once for each
+      overlapping appender. -->
+    <appender name="console" class="org.apache.log4j.ConsoleAppender">
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
+        </layout>
+    </appender>
+    <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
+        <param name="file" value="obj/release/testoutput/volt-junit-fulllog.txt"/>
+        <param name="DatePattern" value="'.'yyyy-MM-dd" />
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
+        </layout>
+    </appender>
+
+    <!-- logger name="AUTH">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="HOST">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="NETWORK">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="SQL">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="COMPILER">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="ADHOC">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="EXPORT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="REJOIN">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="SNAPSHOT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="IV2TRACE">
+        <level value="TRACE"/>
+    </logger -->
+
+    <!-- logger name="IV2QUEUETRACE">
+        <level value="TRACE"/>
+    </logger -->
+
+    <logger name="TM">
+        <level value="INFO"/>
+    </logger>
+
+    <root>
+        <priority value="info" />
+        <appender-ref ref="file" />
+        <appender-ref ref="console" />
+    </root>
+</log4j:configuration>

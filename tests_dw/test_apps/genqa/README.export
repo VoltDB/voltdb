@@ -1,0 +1,77 @@
+Quick hacky description on running the long-running export test.
+
+- Build everything:
+-- If you are using eclipse build make sure zkclient jars (zkclient-0.3.jar,zookeeper-3.3.4.jar) are in classpath
+-- The jars are not in repo and must be downloaded and added to classpath.
+-- To add zookeeper jars in your classpath set ZKLIB to point to directory where these jars exist.
+-- If running under apprunner export APPRUNNER_CLIENT_CLASSPATH="/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar"
+./run.sh catalog
+
+TO RUN remote Export Client Test:
+- You'll need 4(four) terminals:
+
+    -- In 1, run the server:
+    ./run.sh server-legacy
+    -- In 2, run the export client:
+    ./run.sh export-tofile
+    -- In 3, start the app client:
+    ./run.sh async-export
+    -- In 4, start the verifier:
+    ./run.sh export-verify
+
+TO RUN onserver Export Client Test:
+- You'll need 4(four) terminals:
+
+    -- In 1, run the server:
+    ./run.sh server
+    -- In 2, run the export client:
+    ./run.sh async-export
+    -- In 3, start the app client:
+    ./run.sh export-on-server-verify
+
+TO RUN onserver Export to kafka Client Test:
+- You'll need 3(three) terminals:
+
+    -- In 1, run the server:
+    ./run.sh server-kafka
+    -- In 2, run the export client:
+    ./run.sh async-export
+    -- In 3, start the verifier client:
+    ./run.sh export-kafka-server-verify
+
+TO RUN onserver Export to RabbitMQ Client Test:
+- You'll need 3(three) terminals:
+
+    -- In 1, start the verifier client:
+    ./run.sh export-rabbitmq-verify
+    -- In 2, run the server:
+    ./run.sh server-rabbitmq
+    -- In 3, run the export client:
+    ./run.sh async-export
+
+TO RUN onserver Export Client Test with custom class:
+    -- In 1, run the server:
+    ./run.sh server-custom
+    -- See that server comes up without any classloading issues.
+
+TO RUN onserver Export Client to connect to JDBC (mysql):
+    -- Install Mysql
+    -- Make sure mysql -u root gets you mysql prompt.
+    -- Create export schema by running
+    mysql -u root < mysql_export.sql
+    -- Copy mysql driver jar in $VOLTDB_LIB/extension/ directory
+    -- Start server with mysql connector enabled.
+    ./run.sh server-mysql
+    -- Run the export client:
+    ./run.sh async-export
+    -- Verify in mysql a schema with name vexport has tables. and table has data. (TODO)
+
+TO RUN onserver Export Client to connect to JDBC (postgresql):
+    -- Install postgresql
+    -- Copy postgresql driver jar in $VOLTDB_LIB/extension/ directory
+    -- Start server with postgresql connector enabled.
+    ./run.sh server-pg
+    -- Run the export client:
+    ./run.sh async-export
+    -- Verify in postgresql a schema with name vexport has tables. and table has data. (TODO)
+    -- Verify update catalog keeps export going. (TODO)

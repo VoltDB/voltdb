@@ -1,0 +1,151 @@
+<?xml version="1.0" ?>
+<project default="main" name="build file">
+
+<!--
+***************************************
+PATHS AND PROPERTIES
+***************************************
+-->
+
+<property name='build.dir'             location='obj/' />
+<property name='src.dir'               location='src/' />
+<property name='debugoutput.dir'       location='debugoutput/' />
+
+<path id='project.classpath'>
+    <fileset dir='../../voltdb' >
+        <include name='voltdb*.jar' />
+    </fileset>
+    <pathelement location='${build.dir}' />
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+
+<target name="main" depends="srccompile, catalog" description="Default. Compile Java clients and stored procedures, then run the VoltDB compiler to generate the catalog." />
+
+<target name="server" depends="srccompile, catalog" description="Start VoltDB Server.">
+    <java fork="yes" classname="org.voltdb.VoltDB">
+        <jvmarg value="-Djava.library.path=../../voltdb" />
+        <jvmarg value="-server"/>
+        <jvmarg value="-Xmx2048m"/>
+        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+        <jvmarg value="-XX:HeapDumpPath=/tmp" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <arg value="catalog"/>
+        <arg value="catalog.jar"/>
+        <classpath refid='project.classpath'/>
+        <assertions><disable/></assertions>
+    </java>
+</target>
+
+<target name="load_s" description="load S table">
+  <java fork="yes" classname="com.eng585.LoadS">
+    <jvmarg value="-Xmx1024m" />
+    <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+    <jvmarg value="-XX:HeapDumpPath=/tmp" />
+    <jvmarg value="-XX:-ReduceInitialCardMarks" />
+    <jvmarg value="-Dlog4j.configuration=./log4j.xml" />
+    <arg value="localhost" />
+    <!-- server to connect to -->
+    <arg value="program" />
+    <!-- User Name -->
+    <arg value="password" />
+    <!-- Password -->
+    <arg value="200000" />
+    <classpath refid='project.classpath' />
+    <assertions>
+      <disable />
+    </assertions>
+  </java>
+</target>
+
+<target name="load_t" description="load T table">
+  <java fork="yes" classname="com.eng585.LoadT">
+    <jvmarg value="-Xmx1024m" />
+    <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+    <jvmarg value="-XX:HeapDumpPath=/tmp" />
+    <jvmarg value="-XX:-ReduceInitialCardMarks" />
+    <jvmarg value="-Dlog4j.configuration=./log4j.xml" />
+    <arg value="localhost" />
+    <!-- server to connect to -->
+    <arg value="program" />
+    <!-- User Name -->
+    <arg value="password" />
+    <!-- Password -->
+    <arg value="200000" />
+    <classpath refid='project.classpath' />
+    <assertions>
+      <disable />
+    </assertions>
+  </java>
+</target>
+
+<target name="boom" description="blow it up">
+  <java fork="yes" classname="com.eng585.Boom">
+    <jvmarg value="-Xmx1024m" />
+    <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+    <jvmarg value="-XX:HeapDumpPath=/tmp" />
+    <jvmarg value="-XX:-ReduceInitialCardMarks" />
+    <jvmarg value="-Dlog4j.configuration=./log4j.xml" />
+    <arg value="localhost" />
+    <!-- server to connect to -->
+    <arg value="program" />
+    <!-- User Name -->
+    <arg value="password" />
+    <!-- Password -->
+    <classpath refid='project.classpath' />
+    <assertions>
+      <disable />
+    </assertions>
+  </java>
+</target>
+
+<target name="catalog" depends="srccompile" description="Create the catalog." >
+    <java fork="yes" failonerror="true"
+          classname="org.voltdb.compiler.VoltCompiler" >
+        <jvmarg value="-Djava.library.path=../../voltdb" />
+        <arg value="project.xml"/>                  <!-- project file -->
+        <arg value="1"/>                            <!-- hosts -->
+        <arg value="2"/>                            <!-- sites -->
+        <arg value="localhost"/>                    <!-- host -->
+        <arg value="catalog.jar"/>                  <!-- output -->
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="Remove all compiled files.">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="${debugoutput.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="catalog.jar" />
+        </fileset>
+    </delete>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="srccompile">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.7" source="1.7" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+</project>

@@ -1,0 +1,27 @@
+CREATE TABLE T1 (
+    T1_PK       INTEGER NOT NULL
+   ,INT1        INTEGER
+   ,CONSTRAINT T1_PK_TREE PRIMARY KEY(T1_PK));
+    
+CREATE VIEW V_T1
+(
+    V1
+   ,COUNT_T1_PK
+)
+AS
+SELECT 
+    INT1
+   ,COUNT(*)
+FROM T1
+GROUP BY INT1
+;
+
+CREATE TABLE T2
+(
+  T2_PK     integer     NOT NULL
+, CHAR1     varchar(50) NOT NULL
+, CONSTRAINT PK_T2 PRIMARY KEY
+  (
+    T2_PK
+  )
+);

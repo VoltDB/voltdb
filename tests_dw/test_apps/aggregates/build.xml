@@ -1,0 +1,113 @@
+<?xml version="1.0" ?>
+<project default="main" name="build file">
+
+<!--
+***************************************
+PATHS AND PROPERTIES
+***************************************
+-->
+
+<property environment="env"/>
+
+<property name='build.dir'             location='obj/' />
+<property name='src.dir'               location='src/' />
+<property name='debugoutput.dir'       location='debugoutput/' />
+
+<path id='project.classpath'>
+    <fileset dir='${env.VOLTDB}' >
+        <include name='voltdb*.jar' />
+    </fileset>
+    <pathelement location='${build.dir}' />
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+
+<!-- apprunner looks for a target named build -->
+<target name="build" depends="srccompile, catalog"/>
+
+<target name="main" depends="srccompile, catalog" description="Default. Compile Java clients and stored procedures, then run the VoltDB compiler to generate the catalog." />
+
+<target name="server" depends="srccompile, catalog" description="Start VoltDB Server.">
+    <java fork="yes" classname="org.voltdb.VoltDB">
+        <jvmarg value="-Djava.library.path=${env.VOLTDB}" />
+        <jvmarg value="-server"/>
+        <jvmarg value="-Xmx2048m"/>
+        <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+        <jvmarg value="-XX:HeapDumpPath=/tmp" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <arg value="catalog"/>
+        <arg value="catalog.jar"/>
+        <arg value="deployment"/>
+        <arg value="deployment.xml"/>
+        <arg value="host"/>
+        <arg value="localhost"/>
+        <classpath refid='project.classpath'/>
+        <assertions><disable/></assertions>
+    </java>
+</target>
+
+<target name="loader" description="load tables">
+  <java fork="yes" classname="com.aggregates.Loader">
+    <jvmarg value="-Xmx1024m" />
+    <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError" />
+    <jvmarg value="-XX:HeapDumpPath=/tmp" />
+    <jvmarg value="-XX:-ReduceInitialCardMarks" />
+    <jvmarg value="-Dlog4j.configuration=./log4j.xml" />
+    <arg value="localhost" />     <!-- server to connect to -->
+    <arg value="program" />       <!-- username -->
+    <arg value="password" />      <!-- password -->
+    <arg value="2000000" />       <!-- rows -->
+    <classpath refid='project.classpath' />
+    <assertions>
+      <disable />
+    </assertions>
+  </java>
+</target>
+
+<target name="catalog" depends="srccompile" description="Create the catalog." >
+    <java fork="yes" failonerror="true"
+          classname="org.voltdb.compiler.VoltCompiler" >
+        <jvmarg value="-Djava.library.path=${env.VOLTDB}" />
+        <arg value="project.xml"/>                  <!-- project file -->
+        <arg value="catalog.jar"/>                  <!-- output -->
+        <classpath refid='project.classpath' />
+        <assertions><disable /></assertions>
+    </java>
+</target>
+
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="Remove all compiled files.">
+    <delete includeemptydirs="true" failonerror='false'>
+        <fileset dir="${build.dir}" includes="**/*" />
+        <fileset dir="${debugoutput.dir}" includes="**/*" />
+        <fileset dir="." defaultexcludes="yes" >
+            <include name="catalog.jar" />
+        </fileset>
+    </delete>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="srccompile">
+    <mkdir dir='${build.dir}' />
+    <javac target="1.7" source="1.7" srcdir="${src.dir}" destdir='${build.dir}' debug='true'>
+        <classpath refid="project.classpath" />
+    </javac>
+</target>
+
+</project>

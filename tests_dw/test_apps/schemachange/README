@@ -1,0 +1,15 @@
+# SchemaChange app notes
+
+This app adds a lot of data and then times how long it takes to mutate schemas.
+
+The mutations are accomplished through one of two mechanisms, catalog update
+(legacy) or ad hoc DDL. Each mechanism is implemented as a subclass of
+SchemaChanger.
+
+SchemaChanger subclasses provide methods to implement the various possible
+mutations. The methods either succeed or throw IOException. The semantics of the
+mechanism being used determines which methods need implementation and how
+batching works. E.g. catalog updates don't need to implement drops because the
+entire catalog is replaced.
+
+Much of the intelligence for generating mutations is in the TableHelper class.

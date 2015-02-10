@@ -1,0 +1,83 @@
+DDL:
+../../../tests/frontend/org/voltdb/planner/testjoinorder-ddl.sql
+
+SQL:
+JOIN:T7,T6,T5,T4,T3,T2,T1:select * from T1, T2, T3, T4, T5, T6, T7;
+JOIN:T1,T2,T3,T4,T5,T6,T7:select * from T1, T2, T3, T4, T5, T6, T7;
+JOIN:T1,T3,T5,T7,T6,T4,T2:select * from T1, T2, T3, T4, T5, T6, T7;
+JOIN:T6,T4,T2,T1,T3,T5,T7:select * from T1, T2, T3, T4, T5, T6, T7;
+# Indexes exist but aren't referenced
+JOIN:I7,I6,I5,I4,I3,I2,I1:select * from I1, I2, I3, I4, I5, I6, I7;
+JOIN:I1,I2,I3,I4,I5,I6,I7:select * from I1, I2, I3, I4, I5, I6, I7;
+JOIN:I1,I3,I5,I7,I6,I4,I2:select * from I1, I2, I3, I4, I5, I6, I7;
+JOIN:I6,I4,I2,I1,I3,I5,I7:select * from I1, I2, I3, I4, I5, I6, I7;
+# Use all indexes -- we may get smarter about transitivity over time.
+JOIN:I7,I6,I5,I4,I3,I2,I1:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+JOIN:I1,I2,I3,I4,I5,I6,I7:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+JOIN:I1,I3,I5,I7,I6,I4,I2:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+JOIN:I6,I4,I2,I1,I3,I5,I7:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+# Drop out join criteria for ugly cross joins
+JOIN:I7,I6,I5,I4,I3,I2,I1:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+JOIN:I1,I2,I3,I4,I5,I6,I7:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+JOIN:I1,I3,I5,I7,I6,I4,I2:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+JOIN:I6,I4,I2,I1,I3,I5,I7:select * from I1, I2, I3, I4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+# Drop random indexes 2 and 4 to force the compiler to sacrifice index scans.
+JOIN:I7,I6,I5,T4,I3,T2,I1:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+JOIN:I1,T2,I3,T4,I5,I6,I7:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+JOIN:I1,I3,I5,I7,I6,T4,T2:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+JOIN:I6,T4,T2,I1,I3,I5,I7:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and B=C and C=D and D=E and E=F and F=G;
+# Drop out indexes and join criteria for uglier cross joins
+JOIN:I7,I6,I5,T4,I3,T2,I1:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+JOIN:I1,T2,I3,T4,I5,I6,I7:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+JOIN:I1,I3,I5,I7,I6,T4,T2:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+JOIN:I6,T4,T2,I1,I3,I5,I7:select * from I1, T2, I3, T4, I5, I6, I7 where A=B and         C=D and D=E and         F=G;
+# ENG-2648 validation - 3-way with transitive equality
+JOIN:P1,P2,P3:select * from P1, P2, P3 where A=C and A=B;
+JOIN:P1,P3,P2:select * from P1, P2, P3 where A=C and A=B;
+JOIN:P2,P1,P3:select * from P1, P2, P3 where A=C and A=B;
+JOIN:P2,P3,P1:select * from P1, P2, P3 where A=C and A=B;
+JOIN:P3,P1,P2:select * from P1, P2, P3 where A=C and A=B;
+JOIN:P3,P2,P1:select * from P1, P2, P3 where A=C and A=B;
+# ENG-2648 validation - 2-way with and without indexes
+JOIN:P1,P2:select * from P1, P2 where A=B;
+JOIN:P2,P1:select * from P1, P2 where A=B;
+JOIN:P1,J2:select * from P1, J2 where A=B;
+JOIN:J2,P1:select * from P1, J2 where A=B;
+JOIN:J1,P2:select * from J1, P2 where A=B;
+JOIN:P2,J1:select * from J1, P2 where A=B;
+JOIN:J1,J2:select * from J1, J2 where A=B;
+JOIN:J2,J1:select * from J1, J2 where A=B;
+# ENG-2648 validation - 2-way with aliases
+JOIN:X,Y:select * from P1 X, P2 Y where A=B;
+JOIN:Y,X:select * from P1 X, P2 Y where A=B;
+JOIN:X,Y:select * from P1 X, J2 Y where A=B;
+JOIN:Y,X:select * from P1 X, J2 Y where A=B;
+JOIN:X,Y:select * from J1 X, P2 Y where A=B;
+JOIN:Y,X:select * from J1 X, P2 Y where A=B;
+JOIN:X,Y:select * from J1 X, J2 Y where A=B;
+JOIN:Y,X:select * from J1 X, J2 Y where A=B;
+# ENG-2648 validation - 4-way with transitive equality 2 indexed 2 not
+JOIN:P1,J2,P3,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P1,P3,J2,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J2,P1,P3,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J2,P3,P1,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P3,P1,J2,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P3,J2,P1,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P1,J2,J4,P3:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P1,P3,J4,J2:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J2,P1,J4,P3:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J2,P3,J4,P1:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P3,P1,J4,J2:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P3,J2,J4,P1:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P1,J4,J2,P3:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P1,J4,P3,J2:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J2,J4,P1,P3:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J2,J4,P3,P1:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P3,J4,P1,J2:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:P3,J4,J2,P1:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J4,P1,J2,P3:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J4,P1,P3,J2:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J4,J2,P1,P3:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J4,J2,P3,P1:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J4,P3,P1,J2:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
+JOIN:J4,P3,J2,P1:select * from P1, J2, P3, J4 where A=C and A=B and A=D;

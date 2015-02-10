@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='deletes-ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='com.deletes.Insert' />
+            <procedure class='com.deletes.DeleteOldBatches' />
+            <procedure class='com.deletes.DeleteDeceased' />
+            <procedure class='com.deletes.CountBatchSize' />
+        </procedures>
+        <partitions>
+            <partition table='big_table' column='fullname' />
+        </partitions>
+    </database>
+</project>

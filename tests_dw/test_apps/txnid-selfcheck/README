@@ -1,0 +1,27 @@
+This app is built to check if transactions are dropped or executed out of order
+on individual partitions. It can also be used as a long running test because
+data does not grow indefinitely.
+
+The following is a list of features this app has:
+
+- doTxn procedure is single partition. It inserts the current transaction ID,
+  timestamp, the global row count and an arbitrary payload for a given client ID
+  (cid) into the partitioned table. It checks if the last row for the same cid
+  in that table was before the current transaction. This procedure also returns
+  the value in the replicated table so that if this procedure and the
+  multi-partition procedure are executed out of order, it will detect the error.
+
+- updateReplicated procedure is multi-partition. It checks if other
+  updateReplicated transactions were executed out of order. This procedure has
+  two write batches. Some percent of this procedure calls will abort by design.
+
+- The ratio of multi-partition transactions can be tuned by passing it to the
+  client.
+
+- The app keeps a fixed-size moving window so that data does not grow out of
+  bound. The size of the window can be passed to the client.
+
+- The client also generates payload for each single partition transaction. The
+  payload size can be set when starting the client.
+
+- To maintain ordering, the same client connection is used for a given cid.

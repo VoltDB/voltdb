@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="4" sitesperhost="2" kfactor="1" schema="catalog" />
+    <paths>
+        <voltdbroot path="/tmp/tmc" />
+    </paths>
+    <httpd port="8080" enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <!--
+    <admin-mode port="21211" />
+    -->
+    <export enabled="true"/>
+
+    <snapshot frequency='15s' prefix='dedupesnapshot' retain='2' />
+</deployment>

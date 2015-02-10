@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='eng1969.procedures.CreateKey'/>
+            <procedure class='eng1969.procedures.UpdateKey'/>
+	</procedures>
+        <partitions>
+            <partition table='backed' column='rowid_group'/>
+        </partitions>
+    </database>
+</project>

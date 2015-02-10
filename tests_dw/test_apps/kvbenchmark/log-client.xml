@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+    <appender name="voltfile" class="org.apache.log4j.FileAppender">
+        <param name="File" value="key-value-client.log" />
+        <param name="ImmediateFlush" value="true" />
+        <layout class="org.apache.log4j.PatternLayout">
+          <param name="ConversionPattern"
+                 value="%-5p %d{ISO8601}   [%t] %c: %m%n"/>
+        </layout>
+    </appender>
+    <appender name="Console" class="org.apache.log4j.ConsoleAppender">
+        <param name="Target" value="System.out" />
+        <layout class="org.apache.log4j.PatternLayout">
+          <param name="ConversionPattern"
+                 value="%-5p %d{ISO8601}   [%t] %c: %m%n"/>
+        </layout>
+    </appender>
+    <appender name="Async" class="org.apache.log4j.AsyncAppender">
+        <param name="Blocking" value="true" />
+        <appender-ref ref="Console" />
+        <appender-ref ref="voltfile" />
+    </appender>
+    <root>
+       <priority value="info" />
+       <appender-ref ref="Async" />
+    </root>
+</log4j:configuration>
