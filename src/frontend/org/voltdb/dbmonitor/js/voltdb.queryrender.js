@@ -262,7 +262,7 @@
             
             var handlePortSwitchingOption = function (isPaused) {
                 
-                if (isPaused && VoltDbAdminConfig.isAdmin) {
+                if (isPaused) {
                     //Show error message with an option to allow admin port switching
                     $("#queryDatabasePausedErrorPopupLink").click();
                 } else {
@@ -271,7 +271,7 @@
             };
 
             //Handle the case when Database is paused
-            if (response.status == -5 && !$.cookie("sql_port_for_paused_db")) {
+            if (response.status == -5 && VoltDbAdminConfig.isAdmin && !$.cookie("sql_port_for_paused_db")) {
                 var isDbPaused = $("#resumeConfirmation").css("display") != "none"; //Check to see if the Database is Paused
 
                 if (!isDbPaused) {
