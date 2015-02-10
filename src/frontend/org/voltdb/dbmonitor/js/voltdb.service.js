@@ -451,7 +451,8 @@
         
         this.SetConnectionForSQLExecution = function (sqlPort) {
             try {
-                var processName = "SQLQUERY_EXECUTE";
+                var processNameSuffix = sqlPort != null ? '_ADMINPORT' : '_CLIENTPORT';
+                var processName = "SQLQUERY_EXECUTE" + processNameSuffix;
                 var procedureNames = ['@Statistics'];
                 var parameters = ["TABLE"];
                 var values = ['0'];
@@ -462,9 +463,6 @@
                 _connection = VoltDBCore.HasConnection(server, newSqlPort, isAdmin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.AddConnection(server, newSqlPort, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function(connection, status) {
-                    }, null, false);
-                } else {
-                    VoltDBCore.updateConnection(server, newSqlPort, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function(connection, status) {
                     }, null, false);
                 }
             } catch (e) {

@@ -1,8 +1,7 @@
-﻿function QueryUI(queryString) {
+﻿function QueryUI(queryString, userName) {
     "use strict";
     var CommandParser,
-        queryToRun=queryString,
-        DataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        queryToRun = queryString;
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -297,13 +296,19 @@
     function executeMethod() {
         var target = $('.queryResult');
         var format = $('#exportType').val();
+        
+        //If the database is running, then auto switch to client port.
+        if (VoltDbAdminConfig.isAdmin && $.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
+            SQLQueryRender.saveConnectionKey(VoltDbAdminConfig.isDbPaused);
+        }
 
-        if (!VoltDBCore.connections.hasOwnProperty(DataSource)) {
+        var dataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
             return;
         }
 
-        var connection = VoltDBCore.connections[DataSource];
+        var connection = VoltDBCore.connections[dataSource];
         var source = '';
         source = queryToRun;
         source = source.replace(/^\s+|\s+$/g, '');

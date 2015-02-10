@@ -1523,6 +1523,7 @@ function loadAdminPage() {
         this.runningServerIds = "";
         this.firstResponseReceived = false;
         this.adminPort = -1;
+        this.isDbPaused = false;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1738,9 +1739,11 @@ function loadAdminPage() {
                 if (clusterValues.clusterState.toLowerCase() == "running") {
                     adminClusterObjects.btnClusterPause.show();
                     adminClusterObjects.btnClusterResume.hide();
+                    VoltDbAdminConfig.isDbPaused = false;
                 } else if (clusterValues.clusterState.toLowerCase() == "paused") {
                     adminClusterObjects.btnClusterPause.hide();
                     adminClusterObjects.btnClusterResume.show();
+                    VoltDbAdminConfig.isDbPaused = true;
                 }
             }
         };
