@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -61,12 +61,17 @@ public class CatalogContext {
     public final CatalogMap<Table> tables;
     public final AuthSystem authSystem;
     public final int catalogVersion;
+    private final byte[] catalogHash;
     private final long catalogCRC;
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
+    // Default procs are loaded on the fly
+    // The DPM knows which default procs COULD EXIST
+    //  and also how to get SQL for them.
+    public final DefaultProcedureManager m_defaultProcs;
 
     /*
      * Planner associated with this catalog version.
@@ -75,7 +80,6 @@ public class CatalogContext {
     public final PlannerTool m_ptool;
 
     // PRIVATE
-    //private final String m_path;
     private final InMemoryJarfile m_jarfile;
 
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
@@ -87,34 +91,34 @@ public class CatalogContext {
             Catalog catalog,
             byte[] catalogBytes,
             byte[] deploymentBytes,
-            int version,
-            long prevCRC) {
+            int version)
+    {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
-        if (catalog == null)
+        if (catalog == null) {
             throw new RuntimeException("Can't create CatalogContext with null catalog.");
+        }
 
         assert(deploymentBytes != null);
-        if (deploymentBytes == null)
+        if (deploymentBytes == null) {
             throw new RuntimeException("Can't create CatalogContext with null deployment bytes.");
+        }
 
-        //m_path = pathToCatalogJar;
-        long tempCRC = 0;
+        assert(catalogBytes != null);
         if (catalogBytes != null) {
             try {
                 m_jarfile = new InMemoryJarfile(catalogBytes);
-                tempCRC = m_jarfile.getCRC();
+                catalogCRC = m_jarfile.getCRC();
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            catalogCRC = tempCRC;
+            this.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
         }
         else {
-            m_jarfile = null;
-            catalogCRC = prevCRC;
+            throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
         }
 
         this.catalog = catalog;
@@ -128,8 +132,10 @@ public class CatalogContext {
         this.deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
         m_memoizedDeployment = null;
 
-        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_jarfile);
-        m_ptool = new PlannerTool(cluster, database, version);
+        m_defaultProcs = new DefaultProcedureManager(database);
+
+        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
+        m_ptool = new PlannerTool(cluster, database, catalogHash);
         catalogVersion = version;
 
         if (procedures != null) {
@@ -176,8 +182,7 @@ public class CatalogContext {
                     newCatalog,
                     bytes,
                     depbytes,
-                    catalogVersion + incValue,
-                    catalogCRC);
+                    catalogVersion + incValue);
         return retval;
     }
 
@@ -339,13 +344,6 @@ public class CatalogContext {
 
     public byte[] getCatalogHash()
     {
-        byte[] catalogHash = null;
-        try {
-            // IZZY: memoize the catalog hash in the catalog context sometime, maybe
-            catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(getCatalogJarBytes());
-        } catch (IOException ioe) {
-            // Should never happen
-        }
         return catalogHash;
     }
 }

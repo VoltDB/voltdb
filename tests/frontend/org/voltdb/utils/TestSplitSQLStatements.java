@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,6 +64,9 @@ public class TestSplitSQLStatements {
         checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
+        checkSplitter("--one\n--two\nreal", "--one", "--two", "real");
+        checkSplitter("  --one\n  --two\nreal", "--one", "--two", "real");
+        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "--def", "/*ghi\njkl;*/");
     }
 
 }

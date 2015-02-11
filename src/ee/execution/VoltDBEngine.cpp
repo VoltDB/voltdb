@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -54,10 +54,9 @@
 #include "catalog/database.h"
 #include "catalog/index.h"
 #include "catalog/materializedviewinfo.h"
-#include "catalog/planfragment.h"
-#include "catalog/procedure.h"
-#include "catalog/statement.h"
 #include "catalog/table.h"
+#include "catalog/planfragment.h"
+#include "catalog/statement.h"
 #include "common/ElasticHashinator.h"
 #include "common/executorcontext.hpp"
 #include "common/FailureInjection.h"
@@ -369,13 +368,13 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_staticParams(MAX_PARAM_COUNT),
       m_pfCount(0),
       m_currentInputDepId(-1),
-      m_isELEnabled(false),
       m_stringPool(16777216, 2),
       m_numResultDependencies(0),
       m_logManager(logProxy),
       m_templateSingleLongTable(NULL),
       m_topend(topend),
-      m_executorContext(NULL)
+      m_executorContext(NULL),
+      m_tuplesModifiedStack()
 {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the
@@ -458,7 +457,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             getTopend(),
                                             &m_stringPool,
                                             this,
-                                            m_isELEnabled,
                                             hostname,
                                             hostId,
                                             &m_drStream);
@@ -634,8 +632,13 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         m_dirtyFragmentBatch = false;
     }
 
+    // In version 5.0, fragments may trigger execution of other fragments.
+    // (I.e., DELETE triggered by an insert to enforce ROW LIMIT)
+    // This method only executes top-level fragments.
+    assert(m_tuplesModifiedStack.size() == 0);
+
     // set this to zero for dml operations
-    m_tuplesModified = 0;
+    m_tuplesModifiedStack.push(0);
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -674,15 +677,19 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     m_currExecutorVec = execsForFrag;
 
     int rc = execsForFrag->execute(this);
+
+    int64_t tuplesModified = m_tuplesModifiedStack.top();
+    m_tuplesModifiedStack.pop();
     resetExecutionMetadata();
-    if (rc != 0) {
+
+    if (rc != ENGINE_ERRORCODE_SUCCESS) {
         return rc;
     }
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
         // put the number of tuples modified into our simple table
-        uint64_t changedCount = htonll(m_tuplesModified);
+        uint64_t changedCount = htonll(tuplesModified);
         memcpy(m_templateSingleLongTable + m_templateSingleLongTableSize - 8, &changedCount, sizeof(changedCount));
         m_resultOutput.writeBytes(m_templateSingleLongTable, m_templateSingleLongTableSize);
         m_numResultDependencies++;
@@ -692,7 +699,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     m_resultOutput.writeIntAt(numResultDependenciesCountOffset, m_numResultDependencies);
 
     // if a fragment modifies any tuples, the whole batch is dirty
-    if (m_tuplesModified > 0) {
+    if (tuplesModified > 0) {
         m_dirtyFragmentBatch = true;
     }
 
@@ -779,13 +786,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     int64_t epoch = catalogCluster->localepoch() * (int64_t)1000;
     m_executorContext->setEpoch(epoch);
 
-    // Tables care about EL state.
-    if (m_database->connectors().size() > 0 && m_database->connectors().get("0")->enabled()) {
-        VOLT_DEBUG("EL enabled.");
-        m_executorContext->m_exportEnabled = true;
-        m_isELEnabled = true;
-    }
-
     // load up all the tables, adding all tables
     if (processCatalogAdditions(timestamp) == false) {
         return false;
@@ -863,8 +863,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
             StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string signature = tcd->signature();
-                m_exportingTables.erase(signature);
                 streamedtable->setSignatureAndGeneration(signature, timestamp);
+                m_exportingTables.erase(signature);
             }
         }
         delete delegate;
@@ -979,7 +979,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             //////////////////////////////////////////////
 
             Table *table = tcd->getTable();
-
             PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(table);
             /*
              * Instruct the table that was not added but is being retained to flush
@@ -991,6 +990,14 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
                 assert(streamedtable);
                 streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                if (!tcd->exportEnabled()) {
+                    //Evaluate export enabled or not if enabled hook up streamer
+                    if (tcd->evaluateExport(*m_database, *catalogTable) && streamedtable->enableStream()) {
+                        //Reset generation after stream wrapper is is created.
+                        streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                        m_exportingTables[catalogTable->signature()] = table;
+                    }
+                }
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
                 continue;
@@ -1006,13 +1013,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 // don't continue on to modify/add/remove indexes, because the
                 // call above should rebuild them all anyway
@@ -1866,8 +1873,17 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 }
 
 int VoltDBEngine::executePurgeFragment(PersistentTable* table) {
-    ExecutorVector *pev = table->getPurgeExecutorVector();
-    return pev->execute(this);
+    boost::shared_ptr<ExecutorVector> pev = table->getPurgeExecutorVector();
+
+    // Push a new frame onto the stack for this executor vector
+    // to report its tuples modified.  We don't want to actually
+    // send this count back to the client---too confusing.  Just
+    // throw it away.
+    m_tuplesModifiedStack.push(0);
+    int rc = pev->execute(this);
+    m_tuplesModifiedStack.pop();
+
+    return rc;
 }
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
@@ -1907,6 +1923,11 @@ void VoltDBEngine::reportProgressToTopend() {
 
         throw InterruptException(std::string(buff));
     }
+}
+
+void VoltDBEngine::addToTuplesModified(int64_t amount) {
+    assert(m_tuplesModifiedStack.size() > 0);
+    m_tuplesModifiedStack.top() += amount;
 }
 
 } // namespace voltdb

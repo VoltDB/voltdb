@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -411,7 +411,7 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
         return false; // mixing ints and booleans here :(
     }
 
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    m_exportEnabled = evaluateExport(catalogDatabase, catalogTable);
 
     // configure for stats tables
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -419,6 +419,14 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
 
     m_table->incrementRefcount();
     return 0;
+}
+
+//After catalog is updated call this to ensure your export tables are connected correctly.
+bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
+                           catalog::Table const &catalogTable)
+{
+    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    return m_exportEnabled;
 }
 
 

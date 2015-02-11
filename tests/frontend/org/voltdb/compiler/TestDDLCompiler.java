@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -422,6 +422,48 @@ public class TestDDLCompiler extends TestCase {
             jarOut.delete();
         }
     }
+
+    public void testExportTables() {
+        File jarOut = new File("exportTables.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // export table w/o group
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "EXPORT TABLE T;",
+
+                // export table w/ group
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "EXPORT TABLE T TARGET FOO;",
+
+                // export table w/ and w/o group
+                "CREATE TABLE T (T_D1 INTEGER, T_D2 INTEGER, T_D3 INTEGER, T_VAL1 INTEGER, T_VAL2 INTEGER, T_VAL3 INTEGER);\n" +
+                "CREATE TABLE S (S_D1 INTEGER, S_D2 INTEGER, S_D3 INTEGER, S_VAL1 INTEGER, S_VAL2 INTEGER, S_VAL3 INTEGER);\n" +
+                "EXPORT TABLE T;\n" +
+                "EXPORT TABLE S TARGET FOO;"
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = false;
+            try {
+                success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            }
+            catch (Exception e) {
+                // do nothing
+            }
+            assertTrue(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
+
 
     public void testNullAnnotation() throws IOException {
 

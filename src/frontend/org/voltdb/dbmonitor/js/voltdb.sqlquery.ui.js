@@ -132,7 +132,6 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
 
     saveConnectionKey();
 
-    var queryString = '';
     var tablesArray = [];
 
     // Export Type Change	 
@@ -152,7 +151,6 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
             $('#resultHtml').css('display', 'none');
             $('#resultCsv').css('display', 'none');
         }
-        var query = new QueryUI(queryString).execute();
     });
     // Clears Query
     $('#clearQuery').click(function () {
@@ -365,7 +363,7 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
     populateTablesAndViews();
 
     $('#runBTn').click(function () {
-        queryString = $('#theQueryText').getSelectedText();
+        var queryString = $('#theQueryText').getSelectedText();
         if (queryString != null) {
             queryString = queryString.replace(/^\s+|\s+$/g, '');
             if (queryString == '')

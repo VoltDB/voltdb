@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -222,7 +222,7 @@ public class TestClientInterface {
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeployment(catalog, deploymentPath, false);
 
-        m_context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0, 0);
+        m_context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 
@@ -351,7 +351,8 @@ public class TestClientInterface {
         VoltType[] paramTypes =  new VoltType[]{VoltType.INTEGER};
         AdHocPlannedStmtBatch plannedStmtBatch =
                 AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes,
-                                                         new Object[]{3}, partitionParamIndex);
+                                                         new Object[]{3}, partitionParamIndex,
+                                                         m_context.getCatalogHash());
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Long> destinationCaptor =
@@ -393,7 +394,8 @@ public class TestClientInterface {
         Object[] extractedValues =  new Object[0];
         VoltType[] paramTypes =  new VoltType[0];
         AdHocPlannedStmtBatch plannedStmtBatch =
-            AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes, null, -1);
+            AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes, null, -1,
+                    m_context.getCatalogHash());
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Long> destinationCaptor =
