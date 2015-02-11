@@ -1,4 +1,25 @@
 #!/usr/bin/env python
+# This file is part of VoltDB.
+# Copyright (C) 2008-2015 VoltDB Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
 
 import distutils
 import errno
@@ -59,7 +80,7 @@ def launch_and_wait_on_voltdb(reportout):
     subprocess.Popen(['../../bin/voltdb', 'create'], shell=False)
     # give server a little startup time.
     time.sleep(5)
-    
+
     empty_input = tempfile.TemporaryFile()
     empty_input.write("\n")
     empty_input.flush()
@@ -115,8 +136,8 @@ def do_main():
                 prefix = input[:-3]
                 childin = open(os.path.join(parent, input))
                 # TODO use temp scratch files instead of local files to avoid polluting the git
-                # workspace. Ideally they would be self-cleaning except in cases where their output
-                # may contain useful diagnostic detail.
+                # workspace. Ideally they would be self-cleaning except in failure cases or debug
+                # modes when they may contain useful diagnostic detail.
                 childout = open(os.path.join(parent, prefix + '.out'), 'w+')
                 childerr = open(os.path.join(parent, prefix + '.err'), 'w+')
                 subprocess.call(['../../bin/sqlcmd'],
@@ -128,8 +149,8 @@ def do_main():
                 cleanedout = open(cleanedpath, 'w+')
                 # Currently, the only fuzzing required is to allow different latency numbers to be
                 # reported like "(Returned 3 rows in 9.99s)" vs. "(Returned 3 rows in 10.01s)".
-                # These both get "fuzzed" into the same generic string "(Returned 3 rows in #.##s)"
-                # before comparison to get identical 'baseline` results on platforms and builds that
+                # These both get "fuzzed" into the same generic string "(Returned 3 rows in #.##s)".
+                # This produces identical 'baseline` results on platforms and builds that
                 # may run at different speeds.
                 latency_matcher = re.compile(r"""
                         ([0-9]\srows\sin\s)  # required to matcha latency report line, survives as \g<1>
@@ -182,6 +203,7 @@ def do_main():
     finally:
         kill_voltdb()
         print "Summary report written to ", os.path.abspath(options.reportfile)
+        # Would it be useful to dump the report file content to stdout?
 
 if __name__ == "__main__":
     do_main()

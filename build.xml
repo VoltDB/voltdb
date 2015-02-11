@@ -246,6 +246,7 @@ PRIMARY ENTRY POINTS
     <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit" />
+        <arg value="sqlcmdtest" />
         <arg value="distcheck" />
         <arg value="pythonfser" />
         <arg value="-Dbuild=${build}" />
@@ -2044,7 +2045,7 @@ TEST CASES
     </java>
 </target>
 
-<target name="sqlcmdtest" description="Test sqlcmd via scripts">
+<target name="sqlcmdtest" depends='default' description="Test sqlcmd via scripts">
     <property name="sqlcmdtest.dir" value="tests/sqlcmd"/>
     <echo message="Running from ${sqlcmdtest.dir}"/>
 
@@ -2063,7 +2064,7 @@ TEST CASES
     </exec>
 </target>
 
-<target name="sqlcmdtestrefresh" description="Reset result baselines for sqlcmd test scripts">
+<target name="sqlcmdtestrefresh" depends='default' description="Reset result baselines for sqlcmd test scripts">
     <property name="sqlcmdtest.dir" value="tests/sqlcmd"/>
     <echo message="Running from ${sqlcmdtest.dir}"/>
 
