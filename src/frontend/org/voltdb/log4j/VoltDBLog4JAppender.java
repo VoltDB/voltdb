@@ -208,6 +208,14 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         return result.getLong(0);
     }
 
+    /**
+     * Returns the client that the appender is using.
+     * @return
+     */
+    public Client getClient() {
+        return client;
+    }
+
     @Override
     public void close() {
         // Close the VoltDB connection
