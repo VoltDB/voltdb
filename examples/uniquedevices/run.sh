@@ -104,28 +104,25 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-function background_server_andload() {
-    # run the server
-    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
-    sleeptime=0
-    until ../../bin/sqlcmd  --query=' exec @SystemInformation, OVERVIEW;' > /dev/null 2>&1
+# wait for backgrounded server to start up
+function wait_for_startup() {
+    until sqlcmd  --query=' exec @SystemInformation, OVERVIEW;' > /dev/null 2>&1
     do
-        sleeptime=$((sleeptime + 2))
         sleep 2
         echo " ... Waiting for VoltDB to start"
-        if [[ $sleeptime -gt 30 ]]
+        if [[ $SECONDS -gt 60 ]]
         then
-            echo "Exiting.  VoltDB did not startup within 30 seconds" 1>&2; exit 1;
+            echo "Exiting.  VoltDB did not startup within 60 seconds" 1>&2; exit 1;
         fi
     done
-    # load the schema
-    init
 }
 
-# run the voltdb server locally
-function rejoin() {
-    # run the server
-    voltdb rejoin -H $HOST -d deployment.xml -l $LICENSE
+# startup server in background and load schema
+function background_server_andload() {
+    # run the server in the background
+    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    wait_for_startup
+    init
 }
 
 # run the client that drives the example
@@ -146,8 +143,26 @@ function client-help() {
     java -classpath $CLIENTCLASSPATH uniquedevices.UniqueDevicesClient --help
 }
 
+# The following two demo functions are used by the Docker package. Don't remove.
+# compile the jars for procs and client code
+function demo-compile() {
+    jars
+}
+
+function demo() {
+    echo "starting server in background..."
+    background_server_andload
+    echo "starting client..."
+    client
+
+    echo
+    echo When you are done with the demo database, \
+        remember to use \"voltadmin shutdown\" to stop \
+        the server process.
+}
+
 function help() {
-    echo "Usage: ./run.sh {clean|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|server|init|demo|client|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 
