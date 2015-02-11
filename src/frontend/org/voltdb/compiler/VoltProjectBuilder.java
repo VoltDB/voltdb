@@ -582,10 +582,10 @@ public class VoltProjectBuilder {
         transformer.append("Export TABLE " + name + ";");
     }
 
-    public void setTableAsExportOnly(String name, String target) {
+    public void setTableAsExportOnly(String name, String stream) {
         assert(name != null);
-        assert(target != null);
-        transformer.append("Export TABLE " + name + " TARGET " + target + ";");
+        assert(stream != null);
+        transformer.append("Export TABLE " + name + " TO STREAM " + stream + ";");
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
@@ -1005,7 +1005,7 @@ public class VoltProjectBuilder {
                 exportConfig.setExportconnectorclass(System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE));
             }
 
-            exportConfig.setTarget((String)exportConnector.get("elGroup"));
+            exportConfig.setStream((String)exportConnector.get("elGroup"));
 
             Properties config = (Properties)exportConnector.get("elConfig");
             if((config != null) && (config.size() > 0)) {

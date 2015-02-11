@@ -80,5 +80,5 @@ CREATE PROCEDURE FROM CLASS com.auctionexample.debug.SelectCategory;
 CREATE PROCEDURE FROM CLASS com.auctionexample.debug.SelectItem;
 CREATE PROCEDURE FROM CLASS com.auctionexample.debug.SelectUser;
 
-EXPORT TABLE ITEM_EXPORT target oldfile;
-EXPORT TABLE BID_EXPORT target newfile;
+EXPORT TABLE ITEM_EXPORT TO STREAM oldfile;
+EXPORT TABLE BID_EXPORT TO STREAM newfile;

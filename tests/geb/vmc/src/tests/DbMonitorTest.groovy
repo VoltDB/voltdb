@@ -32,11 +32,7 @@ import vmcTest.pages.*
 class DbMonitorTest extends TestBase {
 
     def setup() { // called before each test
-        setup: 'Open VMC page'
-        to VoltDBManagementCenterPage
-        expect: 'to be on VMC page'
-        at VoltDBManagementCenterPage
-
+        // TestBase.setup gets called first (automatically)
         when: 'click the DB Monitor link (if needed)'
         page.openDbMonitorPage()
         then: 'should be on DB Monitor page'

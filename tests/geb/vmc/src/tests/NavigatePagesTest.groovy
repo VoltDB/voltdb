@@ -34,7 +34,9 @@ import vmcTest.pages.*
  */
 class EchoingPageChangeListener implements PageChangeListener {
     void pageWillChange(Browser browser, Page oldPage, Page newPage) {
-        NavigatePagesTest.debugPrint "Browser ($browser) changing page from '$oldPage' to '$newPage'"
+        if (NavigatePagesTest.getBooleanSystemProperty("debugPrint", NavigatePagesTest.DEFAULT_DEBUG_PRINT)) {
+            println "Browser ($browser) changing page from '$oldPage' to '$newPage'"
+        }
     }
 }
 
@@ -43,18 +45,11 @@ class EchoingPageChangeListener implements PageChangeListener {
  * Management Center (VMC), which is the VoltDB (new) web UI.
  */
 class NavigatePagesTest extends TestBase {
-    @Rule public TestName name = new TestName()
 
     def setup() { // called before each test
-        debugPrint "\nTest: " + name.getMethodName()
-
+        // TestBase.setup gets called first (automatically)
         def listener = new EchoingPageChangeListener()
         browser.registerPageChangeListener(listener)
-
-        setup: 'Open VMC page'
-        to VoltDBManagementCenterPage
-        expect: 'to be on VMC page'
-        at VoltDBManagementCenterPage
     }
 
     def 'confirm DB Monitor page open initially'() {
