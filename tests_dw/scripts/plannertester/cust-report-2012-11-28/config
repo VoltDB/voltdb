@@ -1,9 +1,0 @@
-DDL:
-cust-report-2012-11-28/createTables.sql
-
-SQL:
-select tuid YYYY from tuid where tuid>? and clientid=? order by tuid, clientid limit ?;
-select clientID ZZZZ from tuid where tuid>? order by clientID limit ?
-
-Partition Columns:
-tuid.tuid

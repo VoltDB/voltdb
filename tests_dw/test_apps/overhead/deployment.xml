@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<deployment>
-    <cluster hostcount="1" sitesperhost="3" kfactor="0" schema="catalog" />
-    <httpd enabled="true">
-        <jsonapi enabled="true" />
-    </httpd>
-</deployment>
