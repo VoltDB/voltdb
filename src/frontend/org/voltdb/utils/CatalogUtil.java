@@ -1261,13 +1261,8 @@ public abstract class CatalogUtil {
             cluster.setDrproducerport(dr.getPort());
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
-                if (drConnection.isEnabled()) {
-                    cluster.setDrmasterhost(drSource);
-                    hostLog.info("Configured connection for DR replica role to host " + drSource);
-                } else {
-                    hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
-                            "Starting cluster as replica will be disabled.");
-                }
+                cluster.setDrmasterhost(drSource);
+                hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
         }
     }
