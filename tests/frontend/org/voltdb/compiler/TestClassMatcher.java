@@ -79,5 +79,13 @@ public class TestClassMatcher extends TestCase {
         matchedClasses = cm.getMatchedClassList();
         out = matchedClasses.toArray(new String[matchedClasses.size()]);
         assertEquals(0, out.length);
+
+        // ENG-7233
+        cm = new ClassMatcher();
+        cm.m_classList = testClasses;
+        cm.addPattern("**.*Lib*");
+        matchedClasses = cm.getMatchedClassList();
+        out = matchedClasses.toArray(new String[matchedClasses.size()]);
+        assertEquals(0, out.length);
     }
 }

@@ -72,11 +72,9 @@ public class JDBCParser
             int parameterCount = PAT_CLEAN_CALL_PARAMETERS.matcher(m.group(2)).replaceAll("").length();
             return new ParsedCall(sql, parameterCount);
         }
-        else {
-            m = PAT_CALL_WITHOUT_PARAMETERS.matcher(jdbcCall);
-            if (m.matches()) {
-                return new ParsedCall(m.group(1), 0);
-            }
+        m = PAT_CALL_WITHOUT_PARAMETERS.matcher(jdbcCall);
+        if (m.matches()) {
+            return new ParsedCall(m.group(1), 0);
         }
         return null;
     }

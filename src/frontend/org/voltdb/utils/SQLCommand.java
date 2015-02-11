@@ -290,19 +290,19 @@ public class SQLCommand
     private static boolean executesAsSimpleDirective(String line) throws Exception {
 
         // SHOW or LIST <blah> statement
-        SQLParser.ParseShowResults showResults = SQLParser.parseShowStatement(line);
-        if (showResults != null) {
-            if (showResults.subcommand.equals("proc") || showResults.subcommand.equals("procedure")) {
+        String subcommand = SQLParser.parseShowStatementSubcommand(line);
+        if (subcommand != null) {
+            if (subcommand.equals("proc") || subcommand.equals("procedure")) {
                execListProcedures();
             }
-            else if (showResults.subcommand.equals("tables")) {
+            else if (subcommand.equals("tables")) {
                 execListTables();
             }
-            else if (showResults.subcommand.equals("classes")) {
+            else if (subcommand.equals("classes")) {
                 execListClasses();
             }
             else {
-                System.out.printf("%d> Bad SHOW target: %s\n%d", RecallableSessionLines.size(), showResults.subcommand);
+                System.out.printf("%d> Bad SHOW target: %s\n%d", RecallableSessionLines.size(), subcommand);
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
             return true;

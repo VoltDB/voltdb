@@ -103,36 +103,38 @@ public class SQLLexer extends SQLPatternFactory
             "/\\*(.|\\n)*?\\*/"
             );
 
-    //===== Derived parsing data (populated in initializePatternsOnce() on first demand)
+    //===== Derived parsing data (populated in static block on first demand)
 
-    // Guards one time initialization of derived patterns.
-    private static boolean s_initialized = false;
-
-    // Simplest possible SQL DDL token lexer. (set in initializePatternsOnce())
+    // Simplest possible SQL DDL token lexer. (set in static block)
     private static Pattern PAT_ANY_DDL_FIRST_TOKEN = null;
 
     // Generate supported renames (after we know what's allowed).
     private static Pattern generateRenamePattern(String... renameables)
     {
+        //TODO: The "anything" (.+) pattern is too forgiving, but will not be long-lived.
+        // Detects ALTER <OBJECT>...RENAME TO, which will recognize more than the
+        // anticipated syntax, but there's no harm since it won't recognize anything
+        // that should be valid right now. Anything rename-ish is blacklisted.
+        // Renames will be fully supported operations in the not-too-distant future.
         return SPF.statementLeader(
                     SPF.token("alter"),
-                    SPF.capture(SPF.token(renameables)),
-                    SPF.optional(SPF.anything()), //TODO: Too forgiving?
+                    SPF.capture(SPF.tokenAlternatives(renameables)),
+                    SPF.optional(SPF.anything()),
                     SPF.token("rename"), SPF.token("to")).compile();
     }
 
-    // All handled patterns. (set in initializePatternsOnce())
+    // All handled patterns. (set in static block)
     private static Pattern[] PAT_WHITELISTS = null;
 
-    // All rejected patterns. (set in initializePatternsOnce())
+    // All rejected patterns. (set in static block)
     private static Pattern[] PAT_BLACKLISTS = null;
 
     // Extracts the table name for DDL batch conflicting command checks.
     private static final Pattern PAT_TABLE_DDL_PREAMBLE =
         SPF.statementLeader(
-            SPF.capture(SPF.token("create", "drop")),   // DDL commands we're looking for
-            SPF.token("table"),                         // target is table
-            SPF.capture(SPF.symbol())                   // table name (captured)
+            SPF.capture(SPF.tokenAlternatives("create", "drop")),   // DDL commands we're looking for
+            SPF.token("table"),                                     // target is table
+            SPF.capture(SPF.symbol())                               // table name (captured)
         ).compile();
 
     // Matches the start of a SELECT statement
@@ -150,8 +152,6 @@ public class SQLLexer extends SQLPatternFactory
      */
     public static boolean isComment(String sql)
     {
-        initializePatternsOnce();
-
         Matcher commentMatcher = PAT_SINGLE_LINE_COMMENT.matcher(sql);
         return commentMatcher.matches();
     }
@@ -163,8 +163,6 @@ public class SQLLexer extends SQLPatternFactory
      */
     public static boolean isBlockDelimiter(char c)
     {
-        initializePatternsOnce();
-
         return c == BLOCK_DELIMITER_CHAR;
     }
 
@@ -174,8 +172,6 @@ public class SQLLexer extends SQLPatternFactory
      */
     public static String extractDDLToken(String sql)
     {
-        initializePatternsOnce();
-
         String ddlToken = null;
         Matcher ddlMatcher = PAT_ANY_DDL_FIRST_TOKEN.matcher(sql);
         if (ddlMatcher.find()) {
@@ -186,8 +182,6 @@ public class SQLLexer extends SQLPatternFactory
 
     /** Remove c-style comments globally and -- comments from the end of lines */
     public static String stripComments(String ddl) {
-        initializePatternsOnce();
-
         ddl = removeCStyleComments(ddl);
         StringBuilder sb = new StringBuilder();
         String[] ddlLines = ddl.split("\n");
@@ -199,8 +193,6 @@ public class SQLLexer extends SQLPatternFactory
 
     /** Strip -- comments from the end of a single line */
     public static String stripCommentFromLine(String ddlLine) {
-        initializePatternsOnce();
-
         boolean inQuote = false;
         char quoteChar = ' '; // will be written before use
         boolean lastCharWasDash = false;
@@ -241,8 +233,6 @@ public class SQLLexer extends SQLPatternFactory
      */
     public static String extractDDLTableName(String sql)
     {
-        initializePatternsOnce();
-
         Matcher matcher = PAT_TABLE_DDL_PREAMBLE.matcher(sql);
         if (matcher.find()) {
             return matcher.group(2).toLowerCase();
@@ -254,8 +244,6 @@ public class SQLLexer extends SQLPatternFactory
     // Hopefully this gets whittled away and eventually disappears.
     public static boolean isPermitted(String sql)
     {
-        initializePatternsOnce();
-
         boolean hadWLMatch = false;
         for (Pattern wl : PAT_WHITELISTS) {
             Matcher wlMatcher = wl.matcher(sql);
@@ -299,8 +287,6 @@ public class SQLLexer extends SQLPatternFactory
      * @return list of individual SQL statements
      */
     public static List<String> splitStatements(final String sql) {
-        initializePatternsOnce();
-
         List<String> statements = new ArrayList<String>();
         // Use a character array for efficient character-at-a-time scanning.
         char[] buf = sql.toCharArray();
@@ -431,23 +417,16 @@ public class SQLLexer extends SQLPatternFactory
      */
     public static boolean isSelect(String statement)
     {
-        initializePatternsOnce();
-
         return PAT_SELECT_STATEMENT_PREAMBLE.matcher(statement).matches();
     }
 
-    //========== Private Methods ==========
+    //========== Private ==========
 
     /**
-     * Initialize derived data - call before using any pattern.
+     * Initialize derived data
      */
-    private static void initializePatternsOnce()
+    static
     {
-        // Only initialize patterns once.
-        if (s_initialized) {
-            return;
-        }
-
         // Simplest possible SQL DDL token lexer
         int supportedVerbCount = 0;
         int unsupportedVerbCount = 0;
@@ -463,7 +442,7 @@ public class SQLLexer extends SQLPatternFactory
         }
         PAT_ANY_DDL_FIRST_TOKEN =
             SPF.statementLeader(
-                SPF.capture(SPF.token(verbsAll)),
+                SPF.capture(SPF.tokenAlternatives(verbsAll)),
                 SPF.anyClause()
             ).compile();
 
@@ -476,6 +455,15 @@ public class SQLLexer extends SQLPatternFactory
                 renameableCount++;
             }
         }
+        // Modifier tokens are supported in the place of object tokens following
+        // a verb to allow the "verb modifier object" pattern like "CREATE UNIQUE INDEX".
+        // For simplicity, "CREATE UNIQUE" et. al. are considered sufficient evidence that
+        // the statement is a permitted white-listed DDL statement.
+        // We seem to be more concerned about accidentally permitting
+        // "CREATE <non-permitted-object> ..."
+        // than "CREATE UNIQUE <non-permitted-object> ...".
+        // Otherwise, we'd require the modifiers to be part of a nested
+        // "modifier object" subpattern.
         for (int j = 0; j < MODIFIER_TOKENS.length; ++j) {
             secondTokens[OBJECT_TOKENS.length + j] = MODIFIER_TOKENS[j];
         }
@@ -488,8 +476,7 @@ public class SQLLexer extends SQLPatternFactory
         }
         Pattern patSupportedPreambles =
             SPF.statementLeader(
-                SPF.capture(SPF.token(verbsSupported)),
-                SPF.capture(SPF.token(secondTokens))
+                SPF.clause(SPF.tokenAlternatives(verbsSupported), SPF.tokenAlternatives(secondTokens))
             ).compile();
         PAT_WHITELISTS = new Pattern[] {
             patSupportedPreambles
@@ -513,14 +500,12 @@ public class SQLLexer extends SQLPatternFactory
         }
         Pattern patUnsupportedPreambles =
                 SPF.statementLeader(
-                    SPF.capture(SPF.token(verbsNotSupported))
+                    SPF.capture(SPF.tokenAlternatives(verbsNotSupported))
                 ).compile();
         PAT_BLACKLISTS = new Pattern[] {
             patUnsupportedPreambles,
             generateRenamePattern(renameables)
         };
-
-        s_initialized = true;
     }
 
     /** Remove c-style comments from a string aggressively */

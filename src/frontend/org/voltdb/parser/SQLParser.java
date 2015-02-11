@@ -72,7 +72,7 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_PARTITION_ANY_PREAMBLE =
             SPF.statement(
                 SPF.token("partition"),
-                SPF.capture(SPF.token("procedure", "table")),
+                SPF.capture(SPF.tokenAlternatives("procedure", "table")),
                 SPF.anyClause()
             ).compile();
 
@@ -358,7 +358,7 @@ public class SQLParser extends SQLPatternFactory
 
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ShowToken = Pattern.compile("^\\s*(list|show)\\s+([a-z+])\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ShowToken = Pattern.compile("^\\s*list|show\\s+([a-z+])\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
@@ -891,30 +891,15 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Results from parseShowStatement
-     */
-    public static class ParseShowResults
-    {
-        public String command;
-        public String subcommand;
-
-        ParseShowResults(String command, String subcommand)
-        {
-            this.command = command.toLowerCase();
-            this.subcommand = subcommand.toLowerCase();
-        }
-    }
-
-    /**
      * Parse SHOW or LIST statement for sqlcmd.
      * @param statement  statement to parse
      * @return           results object or NULL if statement wasn't recognized
      */
-    public static ParseShowResults parseShowStatement(String statement)
+    public static String parseShowStatementSubcommand(String statement)
     {
         Matcher matcher = ShowToken.matcher(statement);
         if (matcher.matches()) {
-            return new ParseShowResults(matcher.group(1), matcher.group(2));
+            return matcher.group(1);
         }
         return null;
     }

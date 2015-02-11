@@ -36,9 +36,9 @@ public class HSQLLexer extends SQLPatternFactory
     // Glean some basic info about DDL statements sent to HSQLDB
     private static final Pattern HSQL_DDL_PREPROCESSOR =
         SPF.statementLeader(
-            SPF.capture("verb", SPF.token("create", "drop", "alter")),
-            SPF.capture("unique", SPF.optional(SPF.token("unique", "assumeunique"))),
-            SPF.capture("object", SPF.token("table", "view", "index")),
+            SPF.capture("verb", SPF.tokenAlternatives("create", "drop", "alter")),
+            SPF.capture("unique", SPF.optional(SPF.tokenAlternatives("unique", "assumeunique"))),
+            SPF.capture("object", SPF.tokenAlternatives("table", "view", "index")),
             SPF.capture("name", SPF.symbol()),  // table/view/index name
             SPF.optional(SPF.clause(
                     SPF.token("on"),

@@ -350,9 +350,18 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 1, ID);
     }
 
+    // To test parseQueryProcedureCallParameters()
+    // To test a valid query: 'select * from dummy' as a proc call.
+    @Test
+    public void testParseQueryProcedureCallParameters22() {
+        ID = 22;
+        String query = "select * from dummy";
+        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures) == null);
+    }
+
     @Test
     public void testParseQuery23() {
-        ID = 22;
+        ID = 23;
         String raw = " select -- comment no semicolon\n"
                 + "* -- comment with this ; a semicolon inside\n"
                 + "from -- comment with this ; a semicolon inside\n"
@@ -388,6 +397,18 @@ public class TestSqlCmdInterface
         expected = expected.replaceAll(",", "");
         expected = expected.replaceAll("\\s+", "");
         assertThis2(query, expected, 2, ID);
+    }
+
+    // To test parseQueryProcedureCallParameters()
+    // To test a valid query: 'exec,, @SystemCatalog,,,,tables'
+    // This test case is FAILED, which is also a surprise, because test case 23 is PASSED.
+    // This further demonstrates that syntax is too loose, but NOT flexible.
+    // Bug 3422
+    @Test
+    public void testParseQueryProcedureCallParameters25() {
+        ID = 25;
+        String query = "exec,, @SystemCatalog,,,,tables";
+        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures) == null);
     }
 
     // To assert the help page printed by SQLCommand.printHelp() is identical to the

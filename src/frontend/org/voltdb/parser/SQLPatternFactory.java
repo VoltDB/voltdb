@@ -98,7 +98,9 @@ public class SQLPatternFactory
             return part;
         }
 
-        public static SQLPatternPart or(SQLPatternPart... parts)
+        /// Unused/untested "one of" to support future OR-ing of multiple alternative clauses.
+        /// Please add unit tests, etc. when it is actually in use.
+        public static SQLPatternPart oneOf(SQLPatternPart... parts)
         {
             // Default to outer and inner non-capturing groups.
             SQLPatternPartElement retElem = new SQLPatternPartElement(parts);
@@ -107,7 +109,7 @@ public class SQLPatternFactory
             return retElem;
         }
 
-        public static SQLPatternPart or(String... strs)
+        public static SQLPatternPart oneOf(String... strs)
         {
             // Default to outer and inner non-capturing groups.
             SQLPatternPartElement retElem = new SQLPatternPartElement(strs);
@@ -116,18 +118,27 @@ public class SQLPatternFactory
             return retElem;
         }
 
-        public static SQLPatternPart token(String... strs)
+        public static SQLPatternPart token(String str)
         {
-            return or(strs);
+            return new SQLPatternPartElement(str);
+        }
+
+        public static SQLPatternPart tokenAlternatives(String... strs)
+        {
+            return oneOf(strs);
         }
 
         public static SQLPatternPart symbol()
         {
+            //TODO: symbol and ddlName could be unified or at least used more consistently
+            // by different callers with the same intent.
+            //TODO: neither symbol nor ddlName recognize quoted identifiers.
             return new SQLPatternPartElement("[a-z][a-z0-9_]*");
         }
 
         public static SQLPatternPart ddlName()
         {
+            //TODO: Unify or rationalize difference with symbol(). See comments in symbol().
             return new SQLPatternPartElement("[\\w$]+");
         }
 

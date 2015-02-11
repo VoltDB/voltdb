@@ -1394,6 +1394,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
     ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn, AuthUser user) {
         ParameterSet params = task.getParams();
+        /*
+         * TODO: We don't actually support multiple proc names in an ExplainProc call,
+         * so I THINK that the string is always a single procname symbol and all this
+         * splitting and iterating is a no-op.
+         */
         //String procs = (String) params.toArray()[0];
         List<String> procNames = SQLLexer.splitStatements( (String)params.toArray()[0]);
         int size = procNames.size();
