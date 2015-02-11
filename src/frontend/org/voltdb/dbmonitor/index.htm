@@ -382,28 +382,45 @@
 
                                 <tr class="child-row-6 subLabelRow">
                                     <td colspan="4">
-                                        <div class="securWrapper">
-                                            <div class="userName">Users</div>
-                                            <div class="editBtn">
-                                                <a href="#" class="btnEd"><span class="userPlus">+</span> Add User</a>
-
-                                            </div>
-                                            <div class="clear"></div>
-                                            <table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
-                                                <tr>
-                                                    <th>Username</th>
-                                                    <th>Password</th>
-                                                    <th>Delete</th>
-                                                </tr>
-                                                <tr>
-                                                    <td>test</td>
-                                                    <td>test</td>
-                                                    <td class="securityDelete"></td>
-                                                </tr>
-                                            </table>
-
+                                        <div class="securWrapper" id="UsersList" >
+                                        <table  width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                        <tr>
+                                        <th>Username</th>
+                                        <th>Password</th>
+                                        <th>Role</th>
+                                        </tr>
+                                        <tr>
+                                        <td>Test</td>
+                                        <td>Test</td>
+                                        <td>User</td>                       
+                                        </tr>
+                                        </table>
+                                        </div>             
+                                        <div class="securWrapper" id="UsersListEditable" style="display:none;">
+                                        <div class="userName">Users</div>
+                                        <div class="editBtn"> <a href="javascript:vold(0)" class="btnEd"id="addmorePOIbutton" onclick="insRow()"> <span class="userPlus">+</span> Add User</a> </div>
+                                        <div class="clear secLine"></div>
+                                        
+                                        <table  id="secTbl" width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                        <tr>
+                                        <th>Username</th>
+                                        <th>Password</th>
+                                        <th>Role</th>
+                                        <th>Delete</th>
+                                        </tr>
+                                        <tr>
+                                        <td id="latbox"><input size=15 type="text" value="Test" ></td>
+                                        <td id="latbox"><input size=15 type="text" value="Test" ></td>
+                                        <td id="lngbox"><select>
+                                        <option></option>
+                                        <option selected="selected">User</option>
+                                        <option>Admin</option>
+                                        </select></td>
+                                        <td><div class="securityDelete" id="delPOIbutton" onclick="deleteRow(this)"></div></td>
+                                        </tr>
+                                        </table>
                                         </div>
-                                    </td>
+                                    </td>                                    
                                 </tr>
 
                                 <tr class="hasSubLabel parent" id="row-1">
@@ -611,44 +628,44 @@
                             <div class="headerAdminContent">
                                 <h1>Network Interfaces</h1>
                             </div>
-                            <div style="overflow: auto">
-                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
-                                    <tr>
-                                        <th width="50%">Port Name</th>
-                                        <th width="25%">Server Setting</th>
-                                        <th width="25%">Cluster Setting</th>
-                                    </tr>
-                                    <tr>
-                                        <td>Client Port</td>
-                                        <td id="clientport"></td>
-                                        <td></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Admin Port</td>
-                                        <td id="adminport"></td>
-                                        <td></td>
-                                    </tr>
-                                    <tr>
-                                        <td>HTTP Port</td>
-                                        <td id="httpport"></td>
-                                        <td></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Internal Port</td>
-                                        <td id="internalPort"></td>
-                                        <td></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Zookeeper Port</td>
-                                        <td id="zookeeperPort"></td>
-                                        <td></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Replication Port</td>
-                                        <td id="replicationPort"></td>
-                                        <td></td>
-                                    </tr>
-                                </table>
+							<div style="overflow:auto" >
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
+                                <tr>
+                                  <th width="50%">Port Name</th>
+                                  <th width="25%">Cluster Setting</th>
+                                  <th width="25%">Server Setting</th>
+                                </tr>
+                                <tr>
+                                    <td>Client Port</td>
+                                    <td id="clientport" ></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Admin Port</td>
+                                    <td id="adminport"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>HTTP Port</td>
+                                    <td id="httpport"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Internal Port</td>
+                                    <td id="internalPort"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Zookeeper Port</td>
+                                    <td id="zookeeperPort"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Replication Port</td>
+                                    <td id="replicationPort"></td>
+                                    <td></td>
+                                </tr>
+                            </table>
                             </div>
                         </div>
                         <div class="adminDirectories">
