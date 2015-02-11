@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -330,14 +330,14 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         ClientResponse resp;
         VoltTable vt;
-        resp = m_client.callProcedure("p4", 18);
+        resp = m_client.callProcedure("p4", 1, 18);
         vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.BIGINT), 0l);
 
         m_client.callProcedure("T26.insert", 18, 1);
 
-        resp = m_client.callProcedure("p4", 18);
+        resp = m_client.callProcedure("p4", 1, 18);
         vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.BIGINT), 1l);

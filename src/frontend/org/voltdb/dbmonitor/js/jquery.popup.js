@@ -109,9 +109,11 @@
 					// Animate in
 					$popup
 						.animate({opacity : 1}, plugin.o.speed, function(){
-						    $('body').css("height", $(window).height()); $('body').css("overflow", "hidden");
-						    $('body').css("position", "fixed");
-						    $('body').css("width", "100%");
+						    $('body').css("height", $(window).height());
+							$('body').css("overflow", "hidden");
+							$('body').css("position", "fixed");
+							$('body').css("overflow-y", "scroll");
+							$('body').css("width", "100%");
 							//$('body').bind('touchmove', function(e){e.preventDefault()});//mobile
 							// Call the open callback
 							plugin.o.afterOpen.call(plugin);
@@ -126,7 +128,7 @@
 						.o.afterOpen.call(this);
 
 				},
-				hide : function($popup, $back) {
+				hide: function ($popup, $back) {
 					if( $popup !== undefined ){
 
 						// Fade the popup out
@@ -293,6 +295,14 @@
 		        });
 		    }
 		    
+		    var btnSaveSnapshotStatus = $("a[id='btnSaveSnapshotStatus']");
+		    if (btnSaveSnapshotStatus != undefined) {
+		        btnSaveSnapshotStatus.unbind('click');
+		        btnSaveSnapshotStatus.bind('click', function () {
+		            p.close();
+		        });
+		    }
+
 		    var cancelBtn = $("a[id='btnCancel']");
 		    if (cancelBtn != undefined) {
 		        cancelBtn.unbind('click');
@@ -313,6 +323,45 @@
 		        });
 		    }
 
+		    var serverShutdownBtn = $("a[id=btnServerShutdownOk]");
+		    if (serverShutdownBtn != undefined) {
+		        serverShutdownBtn.unbind('click');
+		        serverShutdownBtn.bind('click', function (e) {
+		            e.preventDefault();
+		            p.o.closeDialog();
+		            VoltDBCore.isServerConnected = true;
+		            p.close();
+		        });
+		    }
+
+			//save cluster
+			$('.saveBtn').click(function(){
+				$('.saveInfo').hide();
+				$('.saveConfirmation').show();
+			});
+			
+			$('.confirmNoSave').click(function(){
+				$('.saveConfirmation').hide();
+				$('.saveInfo').show();
+			});
+			
+				
+			
+			
+			
+			//admin
+			var closeBtn = $(".closeBtn");
+		    if (closeBtn != undefined) {
+		        closeBtn.unbind('click');
+		        closeBtn.bind('click', function () {
+					$('.saveConfirmation').hide();
+					$('.saveInfo').show();
+					$('.restoreConfirmation').hide();
+					$('.restoreInfo').show();
+		            p.close();
+		    });
+		    }
+			
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content

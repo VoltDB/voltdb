@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,6 +46,9 @@ class StreamedTable : public Table {
   public:
     StreamedTable(bool exportEnabled);
     static StreamedTable* createForTest(size_t, ExecutorContext*);
+
+    //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+    bool enableStream();
 
     virtual ~StreamedTable();
 

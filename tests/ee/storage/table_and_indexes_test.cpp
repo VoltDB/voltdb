@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,7 +49,7 @@ using namespace std;
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, false, "", 0, &drStream);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, "", 0, &drStream);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);

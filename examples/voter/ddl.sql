@@ -61,12 +61,11 @@ AS
 ;
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
-exec @UpdateClasses voter-procs.jar '';
+LOAD CLASSES voter-procs.jar;
 
 -- stored procedures
 CREATE PROCEDURE FROM CLASS voter.Initialize;
 CREATE PROCEDURE FROM CLASS voter.Results;
-CREATE PROCEDURE FROM CLASS voter.Vote;
-PARTITION PROCEDURE Vote ON TABLE votes COLUMN phone_number;
+CREATE PROCEDURE PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.Vote;
 CREATE PROCEDURE FROM CLASS voter.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.GetStateHeatmap;

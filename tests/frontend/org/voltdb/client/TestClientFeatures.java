@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -138,22 +138,25 @@ public class TestClientFeatures extends TestCase {
             // (shouldn't have to do this, but for now, the table loader requires
             //  a VoltTable, and can't read schema. Could fix by using this VoltTable
             //  to generate schema or by teaching to loader how to discover tables)
+            TableHelper.Configuration helperConfig = new TableHelper.Configuration();
+            helperConfig.rand = new Random();
+            TableHelper helper = new TableHelper(helperConfig);
             VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
-                                                          "c01:varchar63, " +
-                                                          "c02:varchar63, " +
-                                                          "c03:varchar63, " +
-                                                          "c04:varchar63, " +
-                                                          "c05:varchar63, " +
-                                                          "c06:varchar63, " +
-                                                          "c07:varchar63, " +
-                                                          "c08:varchar63, " +
-                                                          "c09:varchar63, " +
-                                                          "c10:varchar63) " +
-                                                          "PKEY(pkey)");
+                                                 "c01:varchar63, " +
+                                                 "c02:varchar63, " +
+                                                 "c03:varchar63, " +
+                                                 "c04:varchar63, " +
+                                                 "c05:varchar63, " +
+                                                 "c06:varchar63, " +
+                                                 "c07:varchar63, " +
+                                                 "c08:varchar63, " +
+                                                 "c09:varchar63, " +
+                                                 "c10:varchar63) " +
+                                                 "PKEY(pkey)");
             // get a client with a normal timout
             Client client2 = ClientFactory.createClient();
             client2.createConnection("localhost");
-            TableHelper.fillTableWithBigintPkey(t, 400, 0, client2, new Random(), 0, 1);
+            helper.fillTableWithBigintPkey(t, 400, 0, client2, 0, 1);
 
             long start;
             double duration;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -533,6 +533,30 @@ public class StatementPartitioning implements Cloneable{
         }
         // Initial guess -- as if no equality filters.
         m_countOfIndependentlyPartitionedTables = m_countOfPartitionedTables;
+    }
+
+    /**
+     * Sometimes when we fail to plan a statement, we try again with different inputs
+     * using the same StatementPartitioning object.  In this case, it's incumbent on
+     * callers to reset the cached analysis state set by calling this method.
+     *
+     * TODO: one could imagine separating this class into two classes:
+     * - One for partitioning context (such as AdHoc, stored proc, row limit delete
+     *   trigger), which is immutable
+     * - One to capture the results of partitioning analysis, which can be GC'd when no
+     *   longer needed
+     * This might avoid some of the pitfalls of reused stateful objects.
+     *   */
+    public void resetAnalysisState() {
+        m_countOfIndependentlyPartitionedTables = -1;
+        m_countOfPartitionedTables = -1;
+        m_fullColumnName = null;
+        m_inferredExpression.clear();
+        m_inferredParameterIndex = -1;
+        m_inferredValue = null;
+        m_isDML = false;
+        m_joinValid = true;
+        m_partitionColForDML = null;
     }
 
 }
