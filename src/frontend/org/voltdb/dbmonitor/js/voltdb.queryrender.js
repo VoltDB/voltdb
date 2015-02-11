@@ -1,8 +1,7 @@
-﻿function QueryUI(queryString) {
+﻿function QueryUI(queryString, userName) {
     "use strict";
     var CommandParser,
-        queryToRun=queryString,
-        DataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        queryToRun = queryString;
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -272,15 +271,13 @@
 
             //Handle the case when Database is paused
             if (response.status == -5 && VoltDbAdminConfig.isAdmin && !$.cookie("sql_port_for_paused_db")) {
-                var isDbPaused = $("#resumeConfirmation").css("display") != "none"; //Check to see if the Database is Paused
 
-                if (!isDbPaused) {
+                if (!VoltDbAdminConfig.isDbPaused) {
 
                     //Refresh cluster state to display latest status.
                     var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
                         VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
-                        isDbPaused = $("#resumeConfirmation").css("display") != "none";
-                        handlePortSwitchingOption(isDbPaused);
+                        handlePortSwitchingOption(VoltDbAdminConfig.isDbPaused);
                     };
                     voltDbRenderer.GetSystemInformation(function() {}, loadAdminTabPortAndOverviewDetails, function(data) {});
                 } else {
@@ -298,12 +295,13 @@
         var target = $('.queryResult');
         var format = $('#exportType').val();
 
-        if (!VoltDBCore.connections.hasOwnProperty(DataSource)) {
+        var dataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
             return;
         }
 
-        var connection = VoltDBCore.connections[DataSource];
+        var connection = VoltDBCore.connections[dataSource];
         var source = '';
         source = queryToRun;
         source = source.replace(/^\s+|\s+$/g, '');

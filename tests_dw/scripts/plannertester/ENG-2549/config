@@ -1,9 +1,0 @@
-DDL:
-./ENG-2549/ddl.sql
- 
-SQL:
-select * from l where lname=? and b=0 order by id asc limit ?;
-select * from l where lname=? and b=0 order by id, lname, b asc limit ?;
-
-Partition Columns:
-l.id

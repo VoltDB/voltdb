@@ -78,6 +78,11 @@
                 <div class="clear"></div>
             </div>
             <div class="contents">
+                <!-- Loading -->
+                <div id="overlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
                 <div class="container" id="containerMain">
                     <div class="clusterDetailsWrapper" id="clusterDetails">
                         <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
@@ -275,6 +280,12 @@
             <!--Admin-->
 
             <div id="admin" class="container contents">
+                <!-- Loading -->
+                <div id="adminActionOverlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
+
                 <div class="adminWrapper">
                     <div class="adminLeft">
                         <h1 class="headText clusterIcon">Cluster</h1>
@@ -354,7 +365,7 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <!--<tr class="security" id="securityRow">
-							    <td class="configLabel">Security</td>-->
+                                    <td class="configLabel">Security</td>-->
                                 <tr class="hasSubLabel parent security" id="row-6">
                                     <td class="configLabel"><a href="javascript:vold(0)" class="labelCollapsed">Security</a></td>
                                     <td align="right" class="securitytd">
@@ -675,7 +686,11 @@
             </div>
 
             <!--Schema Tab-->
-            <div id="schema" class="contents"></div>
+            <div id="schema" class="contents">
+                <div id="schemaOverlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+            </div>
 
             <!--Sql Query Tab-->
             <div id="sqlQuery" class="containerStudio contents">
@@ -693,13 +708,12 @@
                                 <div class="tab_container">
                                     <div id="tabScroller">
                                         <!-- Loading -->
-                                                <div id="sqlQueryOverlay" style="display: none;">
-                                                    <div class="loading-medium"></div>
-                                                </div>
-                                                <!-- Loading -->
+                                        <div id="sqlQueryOverlay" style="display: none;">
+                                            <div class="loading-medium"></div>
+                                        </div>
+                                        <!-- Loading -->
                                         <div id="tab1" class="tab_content">
                                             <div id="accordionTable">
-                                                
                                             </div>
                                         </div>
                                         <div id="tab2" class="tab_content">
@@ -1338,25 +1352,6 @@
         </div>
     </div>
     <!-- Query error because of Paused Database Popup-->
-
-    <!-- Loading -->
-    <div id="overlay" style="display: none;">
-        <div class="loading"></div>
-    </div>
-    <!-- Loading -->
-
-
-    <!-- Loading -->
-    <div id="adminActionOverlay" style="display: none;">
-        <div class="loading"></div>
-    </div>
-    <!-- Loading -->
-
-    <!-- Loading -->
-    <div id="schemaOverlay" style="display: none;">
-        <div class="loading"></div>
-    </div>
-    <!-- Loading -->
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>

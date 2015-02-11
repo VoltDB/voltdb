@@ -259,7 +259,7 @@ var loadPage = function (serverName, portid) {
 
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
-    
+
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
 
@@ -1585,19 +1585,17 @@ var adjustGraphSpacing = function () {
         };
 
         this.loadSchemaTab = function () {
-            $("#schemaOverlay").show();
-                        
-            //var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';   
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/dbmonitor/renderedTemplatePage.htm';
+            $('#schema').html('<div id="schemaOverlay" style="display: block;"><div class="loading"></div></div>' + $('#schema').html());
+
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
             var templateJavascript = "js/template.js";
 
-            $.get(templateUrl, function (result) {
-           // $.post(templateUrl, function (result) {            
+            $.post(templateUrl, function (result) {
                 result = result.replace('<!--##SIZES##>', '');
                 var body = $(result).filter("#wrapper").html();
                 $("#schema").html(body);
                 $("#schemaOverlay").hide();
-                
+
                 $("#schemaLinkSqlQuery").on("click", function (e) {
                     $("#navSqlQuery").trigger("click");
                     e.preventDefault();
@@ -1605,16 +1603,17 @@ var adjustGraphSpacing = function () {
 
                 $.getScript(templateJavascript, function () {
                     $('.refreshBtn').css("display", "block");
-                    $('.refreshBtn.schm').css("display", "block");                    
+                    $('.refreshBtn.schm').css("display", "block");
+                    $('.refreshBtn').unbind("click");
                     $('.refreshBtn.schm').unbind("click");
-                    $('.refreshBtn.schm').click(function () {
+                    $('.refreshBtn.schm,.refreshBtn').click(function () {
                         $("#overlay").show();
                         VoltDbUI.refreshSqlAndSchemaTab();
-                        
+
                     });
 
                 });
-                
+
 
             });
         };

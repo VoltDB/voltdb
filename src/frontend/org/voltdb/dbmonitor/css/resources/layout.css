@@ -763,9 +763,7 @@ ul.helpSchemaList {}
 ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px  Arial, Helvetica, sans-serif} 
 .VDBQueryHelp {}
 .VDBQueryHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
-.errorQueryDbPause p { line-height: 20px;}
-.errorQueryDbPause { width: 550px;}
-
+.errorQueryDbPause p { line-height: 20px;}.errorQueryDbPause { width: 550px;}
 /**admin**/
 .adminIcons, 
 .pause, 
@@ -910,6 +908,8 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblshutdown tr td  { border:none;}
 .tblshutdown tr td a.shutdown { display:inline-block;background-position:-785px -105px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.disableServer { display:inline-block;background-position:-978px -150px; width:40px; height:36px;line-height:39px; }
+/*.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-925px -150px; width:40px; height:36px;line-height:39px; }*/
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
 .shutdownServerPause {position: relative; top: 17px; right:3px; color: #cccccc;}
@@ -972,16 +972,18 @@ font: 14px Arial, Helvetica, sans-serif;
 }
 .refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;display: none;}
 .schm { margin:9px}
-.securWrapper { margin:10px 40px;}
-.secTbl { border:1px solid #CCCCCC; }
-.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; padding:0 10px;}
+.securWrapper { /*margin:10px 40px;*/ margin:0 0 -3px 0;}
+.secTbl {/* border:1px solid #CCCCCC;*/ }
+.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; /*padding:5px 0 10px 10px;*/ padding:5px 0 0 40px;}
 
 .secTbl tr th { font-weight:bold; background:#FBFBFB;}
-.userName { float:left;font-weight:bold;font-size:14px;}
-.editBtn { float:right}
+.secTbl input[type="text"]{ margin:0 0 10px 0;}
+.userName { float:left;font-weight:bold;font-size:14px; padding:0 0 0 40px;}
+.secLine { border-bottom:1px solid #CCCCCC;}
+.editBtn { float:right; padding:0 35px 0 0}
 .editBtn ul li { float:left;margin: 0 0 0 5px;}
 .btnEd {cursor: pointer;background: #D0D2D2;padding:5px;font-weight: bold; font-size:12px;}
-.securityDelete {background-position:-1019px -12px; width:25px; height:20px; position:relative; top:10px; cursor:pointer;}
+.securityDelete {background-position:-1042px -12px; width:25px; height:20px; position:relative; top:5px; cursor:pointer;}
 .userPlus {font-size:15px;position:relative;top:2px}
 
 /*********************************************media Qu********************/

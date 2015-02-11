@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<project>
-    <database>
-        <schemas>
-            <schema path='ddl.sql' />
-        </schemas>
-    </database>
-</project>
