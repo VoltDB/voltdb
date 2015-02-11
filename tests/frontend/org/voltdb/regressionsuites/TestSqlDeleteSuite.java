@@ -238,22 +238,30 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         Client client = getClient();
         String[] stmtTemplates = { "DELETE FROM %s ORDER BY NUM ASC LIMIT 1",
                 "DELETE FROM %s ORDER BY NUM DESC LIMIT 2",
-                "DELETE FROM %s ORDER BY NUM LIMIT 3" };
+                "DELETE FROM %s ORDER BY NUM LIMIT 3",
+                "DELETE FROM %s ORDER BY NUM OFFSET 2",
+                "DELETE FROM %s ORDER BY NUM OFFSET 0",
+                };
         // Table starts with 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
         long[][] expectedResults = {
-                new long[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 },
-                new long[] { 1, 2, 3, 4, 5, 6, 7 },
-                new long[] { 4, 5, 6, 7 } };
+                { 1, 2, 3, 4, 5, 6, 7, 8, 9 },
+                { 1, 2, 3, 4, 5, 6, 7 },
+                { 4, 5, 6, 7 },
+                { 4, 5 },
+                {}
+                };
 
         insertRows(client, "P3", 10);
         insertRows(client, "R3", 10);
 
         for (int i = 0; i < stmtTemplates.length; ++i) {
 
+            long numRowsBefore = client.callProcedure("@AdHoc", "select count(*) from R3")
+                    .getResults()[0].asScalarLong();
+
             // Should succeed on replicated table
             String replStmt = String.format(stmtTemplates[i], "R3");
-            int len = replStmt.length();
-            long expectedRows = Long.valueOf(replStmt.substring(len - 1, len));
+            long expectedRows = numRowsBefore - expectedResults[i].length;
             validateTableOfScalarLongs(client , replStmt, new long[] { expectedRows });
 
             validateTableOfScalarLongs(client, "SELECT NUM FROM R3 ORDER BY NUM ASC",
@@ -490,6 +498,61 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
         String stmt = "select id from R1 order by id asc";
         validateTableOfScalarLongs(client, stmt, new long[] { 0, 1, 2, 8, 9 });
+    }
+
+    public void testDeleteOffsetParam() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+        String tables[] = {"P3", "R3"};
+
+        for (String table : tables) {
+            // insert rows where ID is 0 and num is 0..9
+            insertMoreRows(client, table, 1, 10);
+
+            // delete the last 2 rows where ID = 0, ordered by NUM
+            VoltTable vt = client.callProcedure("@AdHoc",
+                    "DELETE FROM " + table + " WHERE ID = 0 ORDER BY NUM OFFSET 8")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 2 });
+
+            validateTableOfScalarLongs(client,
+                    "select num from " + table + " order by num asc",
+                    new long[] {0, 1, 2, 3, 4, 5, 6, 7});
+
+            // Offset by 8 rows, but there are only 8 rows, so should delete nothing
+            vt = client.callProcedure("@AdHoc",
+                    "DELETE FROM " + table + " WHERE ID = 0 ORDER BY NUM OFFSET 8")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 0 });
+
+            validateTableOfScalarLongs(client,
+                    "select num from " + table + " order by num asc",
+                    new long[] {0, 1, 2, 3, 4, 5, 6, 7});
+
+            // offset with a where clause, and also some parameters.
+            // This should delete rows where num is 4 and 5.
+            String stmt = "delete from " + table + " where id = 0 and num between ? and ? order by num offset ?";
+            vt = client.callProcedure("@AdHoc", stmt, 2, 5, 2)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {2});
+
+            validateTableOfScalarLongs(client,
+                    "select num from " + table + " order by num asc",
+                    new long[] {0, 1, 2, 3, 6, 7});
+
+            // Offset by 0 rows: should delete all rows.
+            vt = client.callProcedure("@AdHoc",
+                    "DELETE FROM " + table + " WHERE ID = 0 ORDER BY NUM OFFSET 0")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 6 });
+
+            validateTableOfScalarLongs(client,
+                    "select num from " + table + " order by num asc",
+                    new long[] {});
+        }
     }
 
     //

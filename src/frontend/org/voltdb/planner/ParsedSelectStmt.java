@@ -26,17 +26,11 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
@@ -48,7 +42,6 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
-import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -901,8 +894,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_limitNodeTop.setLimitParameterIndex(limitParamIndex);
         m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
 
-        // check if limit can be pushed down
-        m_limitCanPushdown = !m_distinct;
+        // Check if the LimitPlanNode can be pushed down.  The LimitPlanNode may have a LIMIT
+        // clause only, OFFSET clause only, or both.  Offset only cannot be pushed down.
+        m_limitCanPushdown = (hasLimit() && !m_distinct);
         if (m_limitCanPushdown) {
             for (ParsedColInfo col : m_displayColumns) {
                 AbstractExpression rootExpr = col.expression;
@@ -1320,10 +1314,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return Collections.unmodifiableList(m_orderColumns);
     }
 
+    private boolean hasLimit() {
+        return m_limit != -1 || m_limitParameterId != -1;
+    }
+
+    private boolean hasOffset() {
+        return m_offset > 0 || m_offsetParameterId != -1;
+    }
+
     @Override
     public boolean hasLimitOrOffset() {
-        if ((m_limit != -1) || (m_limitParameterId != -1) ||
-            (m_offset > 0) || (m_offsetParameterId != -1)) {
+        if (hasLimit() || hasOffset()) {
             return true;
         }
         return false;
