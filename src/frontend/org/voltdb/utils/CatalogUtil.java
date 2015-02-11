@@ -670,6 +670,10 @@ public abstract class CatalogUtil {
                     return null;
                 }
                 //OLD syntax use target as type.
+                if (export.getConfiguration().isEmpty()) {
+                    // this code is for RestRoundtripTest
+                    export.getConfiguration().add(new ExportConfigurationType());
+                }
                 ExportConfigurationType exportConfig = export.getConfiguration().get(0);
                 if (export.isEnabled() != null) {
                     exportConfig.setEnabled(export.isEnabled());
