@@ -711,6 +711,7 @@ h1.icon-queryResult{background-position:15px -1039px;}
 .queryResult pre{line-height:20px;}
 #overlay, #adminActionOverlay{ position: fixed;height: 100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 9999;}
 .loading{ background: #fff url(images/loader.GIF) no-repeat center center;height: 75px;width: 75px;margin: 20% auto;}
+.loading-medium{ background: #fff url(images/loader-medium.GIF) no-repeat center center;height: 30px;width: 30px;margin: 25% auto;}
 .loading-small{ background: #fff url(images/loader-small.GIF) no-repeat center center;height: 20px;width: 20px;
                 position: absolute;top: 11px;left: 102px;}
 
