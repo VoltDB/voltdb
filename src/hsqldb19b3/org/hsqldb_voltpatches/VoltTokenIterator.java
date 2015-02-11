@@ -23,30 +23,31 @@ import java.util.NoSuchElementException;
 public class VoltTokenIterator implements Iterator<VoltToken> {
 
     private final Scanner m_scanner;
-    private final Token m_token;
 
     VoltTokenIterator(String input) {
         m_scanner = new Scanner(input);
-        m_token = m_scanner.token;
 
-        assert (m_token.tokenType == Tokens.X_STARTPARSE);
+        assert (m_scanner.token.tokenType == Tokens.X_STARTPARSE);
+
         m_scanner.scanNext();
-
     }
 
     @Override
     public boolean hasNext() {
-        return m_token.tokenType != Tokens.X_ENDPARSE;
+        return m_scanner.token.tokenType != Tokens.X_ENDPARSE;
     }
 
     @Override
     public VoltToken next() {
 
         if (hasNext()) {
-            VoltToken nextToken = new VoltToken(m_token.duplicate());
+            VoltToken nextToken = new VoltToken(m_scanner.token.duplicate());
+
             m_scanner.scanNext();
+
             return nextToken;
         }
+
         throw new NoSuchElementException();
     }
 

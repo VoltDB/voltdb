@@ -2095,6 +2095,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 "Array / Scalar parameter mismatch"));
     }
 
+    public void testSlashSlashComments() throws IOException, ProcCallException {
+        Client client = getClient();
+
+        long result = client.callProcedure("@AdHoc", "SELECT COUNT(*) // foo\n FROM P1;")
+                .getResults()[0].asScalarLong();
+        assertEquals(result, 0);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

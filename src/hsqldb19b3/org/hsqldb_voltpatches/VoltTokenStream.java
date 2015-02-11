@@ -17,8 +17,6 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.Iterator;
-
 public class VoltTokenStream implements Iterable<VoltToken> {
 
     private final String m_input;
@@ -28,7 +26,7 @@ public class VoltTokenStream implements Iterable<VoltToken> {
     }
 
     @Override
-    public Iterator<VoltToken> iterator() {
+    public VoltTokenIterator iterator() {
         return new VoltTokenIterator(m_input);
     }
 
