@@ -290,9 +290,9 @@ public class SQLParser extends SQLPatternFactory
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (1) <table name>
-            "(?:\\s+TARGET\\s+" +                // begin optional TARGET clause
+            "(?:\\s+TO\\s+STREAM\\s+" +         // begin optional TO STREAM clause
             "([\\w.$]+)" +                      // (2) <export target>
-            ")?" +                              // end optional TARGET clause
+            ")?" +                              // end optional STREAM clause
             "\\s*;\\z"                          // (end statement)
             );
     /**
@@ -360,8 +360,8 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ShowToken = Pattern.compile("^\\s*list|show\\s+([a-z+])\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s+([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FileToken = Pattern.compile("^\\s*file\\s+['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
