@@ -277,7 +277,7 @@ EXPORT TABLE export_partitioned_table;
 EXPORT TABLE export_replicated_table;
 EXPORT TABLE export_done_table;
 
-EXPORT TABLE export_skinny_partitioned_table_foo TARGET foo;
-EXPORT TABLE export_partitioned_table_foo TARGET foo;
-EXPORT TABLE export_replicated_table_foo TARGET foo;
-EXPORT TABLE export_done_table_foo TARGET foo;
+EXPORT TABLE export_skinny_partitioned_table_foo TO STREAM foo;
+EXPORT TABLE export_partitioned_table_foo TO STREAM foo;
+EXPORT TABLE export_replicated_table_foo TO STREAM foo;
+EXPORT TABLE export_done_table_foo TO STREAM foo;
