@@ -136,7 +136,7 @@ $(document).ready(function () {
             var processNameSuffix = useAdminPort ? "_ADMINPORT" : "_CLIENTPORT";
             var processName = 'SQLQUERY_EXECUTE' + processNameSuffix;
             var key = (server + '_' + (user == '' ? '' : user) + '_' + processName).replace(/[^_a-zA-Z0-9]/g, "_");
-            saveCookie('connectionkey', key);
+            saveSessionCookie('connectionkey', key);
         };
         
         this.populateTablesAndViews = function() {
@@ -348,6 +348,8 @@ function loadSQLQueryPage(serverName, portid, userName) {
     SQLQueryRender.server = serverName;
     SQLQueryRender.userName = userName;
     VoltDBService.SetConnectionForSQLExecution();
+    SQLQueryRender.saveConnectionKey(false);
+    
     if ($.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
 
         //Refresh cluster state to display latest status.
@@ -355,6 +357,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
             VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
             var sqlPort = VoltDbAdminConfig.adminPort != -1 ? VoltDbAdminConfig.adminPort : null;
             VoltDBService.SetConnectionForSQLExecution(sqlPort);
+            SQLQueryRender.saveConnectionKey(true);
         };
         voltDbRenderer.GetSystemInformation(function () { }, loadAdminTabPortAndOverviewDetails, function (data) { });
     }
@@ -392,8 +395,6 @@ function loadSQLQueryPage(serverName, portid, userName) {
         closeContent: '',
         modal: true
     });
-
-        SQLQueryRender.saveConnectionKey(false);
     
     // Export Type Change	 
     $('#exportType').change(function () {

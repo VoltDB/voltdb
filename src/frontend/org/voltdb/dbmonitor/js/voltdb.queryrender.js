@@ -271,15 +271,13 @@
 
             //Handle the case when Database is paused
             if (response.status == -5 && VoltDbAdminConfig.isAdmin && !$.cookie("sql_port_for_paused_db")) {
-                var isDbPaused = $("#resumeConfirmation").css("display") != "none"; //Check to see if the Database is Paused
 
-                if (!isDbPaused) {
+                if (!VoltDbAdminConfig.isDbPaused) {
 
                     //Refresh cluster state to display latest status.
                     var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
                         VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
-                        isDbPaused = $("#resumeConfirmation").css("display") != "none";
-                        handlePortSwitchingOption(isDbPaused);
+                        handlePortSwitchingOption(VoltDbAdminConfig.isDbPaused);
                     };
                     voltDbRenderer.GetSystemInformation(function() {}, loadAdminTabPortAndOverviewDetails, function(data) {});
                 } else {
@@ -296,11 +294,6 @@
     function executeMethod() {
         var target = $('.queryResult');
         var format = $('#exportType').val();
-        
-        //If the database is running, then auto switch to client port.
-        if (VoltDbAdminConfig.isAdmin && $.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
-            SQLQueryRender.saveConnectionKey(VoltDbAdminConfig.isDbPaused);
-        }
 
         var dataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
