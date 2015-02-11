@@ -45,6 +45,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK;
 
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -1515,7 +1516,7 @@ public class SynchronizedStatesManager {
             disableComplete.get();
         }
         catch (ExecutionException e) {
-            throw new InterruptedException(e.getMessage());
+            Throwables.propagate(e.getCause());
         }
 
     }
@@ -1647,7 +1648,7 @@ public class SynchronizedStatesManager {
                 initComplete.get();
             }
             catch (ExecutionException e) {
-                throw new InterruptedException(e.getMessage());
+                Throwables.propagate(e.getCause());
             }
         }
     }
