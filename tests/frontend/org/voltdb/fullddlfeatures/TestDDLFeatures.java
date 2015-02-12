@@ -284,6 +284,9 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     {
         assertTrue(findTableInSystemCatalogResults("T25"));
         assertEquals(getTableType("T25"), "EXPORT");
+        //Export table created with STREAM syntax
+        assertTrue(findTableInSystemCatalogResults("T25S"));
+        assertEquals(getTableType("T25S"), "EXPORT");
     }
 
 //    @Test
