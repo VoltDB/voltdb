@@ -47,9 +47,9 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     String m_insertMethod = "bulkloader";
     long m_current_index = 0;
 
-    ClientConfig config = null;
-    Client client = null;
-    AppenderInsert insertDevice = null;
+    ClientConfig m_config = null;
+    Client m_client = null;
+    AppenderInsert m_insertDevice = null;
 
     /**
      * Failure callback for insertions to VoltDB
@@ -177,27 +177,27 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     public void activateOptions() {
         // Create a connection to VoltDB
         if ((m_user != null && !m_user.trim().isEmpty()) && (m_password != null && !m_password.trim().isEmpty())) {
-            config = new ClientConfig(m_user, m_password);
+            m_config = new ClientConfig(m_user, m_password);
         } else {
-            config = new ClientConfig();
+            m_config = new ClientConfig();
         }
-        config.setReconnectOnConnectionLoss(true);
-        client = ClientFactory.createClient(config);
+        m_config.setReconnectOnConnectionLoss(true);
+        m_client = ClientFactory.createClient(m_config);
 
         // Make sure we have a table set up.
         try {
-            client.createConnection(m_server, m_port);
-            setupTable(client);
+            m_client.createConnection(m_server, m_port);
+            setupTable(m_client);
         } catch (ProcCallException | IOException e1) {
             throw new AppenderException("failed to connect client to "+ m_server,e1);
         }
 
         // Create the insert device
         if ("bulkloader".equals(m_insertMethod)) {
-            insertDevice = new BulkLoaderAppenderInsert(client);
+            m_insertDevice = new BulkLoaderAppenderInsert(m_client);
         }
         else if ("procedure".equals(m_insertMethod)) {
-            insertDevice = new ProcedureAppenderInsert(client);
+            m_insertDevice = new ProcedureAppenderInsert(m_client);
         }
         else {
             throw new AppenderException("Unrecognized insert method: '" + m_insertMethod + "'");
@@ -248,7 +248,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
      */
     private long findCurrentLogIndex() throws ProcCallException,  IOException {
         String sqlStmt = "SELECT MAX(id) from " + m_table + ";";
-        VoltTable result = client.callProcedure("@AdHoc", sqlStmt).getResults()[0];
+        VoltTable result = m_client.callProcedure("@AdHoc", sqlStmt).getResults()[0];
         result.advanceRow();
         return result.getLong(0);
     }
@@ -258,16 +258,16 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
      * @return
      */
     public Client getClient() {
-        return client;
+        return m_client;
     }
 
     @Override
     public void close() {
         // Close the VoltDB connection
         try {
-            insertDevice.close();
-            client.drain();
-            client.close();
+            m_insertDevice.close();
+            m_client.drain();
+            m_client.close();
         } catch (Exception e) {
             System.err.println("Unable to close connection to VoltDB");
             e.printStackTrace();
@@ -288,7 +288,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
 
         // Insert the log message into VoltDB
         try{
-            insertDevice.insert(m_current_index, timestamp, level, message);
+            m_insertDevice.insert(m_current_index, timestamp, level, message);
             m_current_index++;
         } catch (Exception e) {
             System.err.println("Failed to insert into VoltDB");
