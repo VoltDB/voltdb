@@ -2096,6 +2096,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             error.flattenToBuffer(buffer).flip();
             c.writeStream().enqueue(buffer);
         }
+        else
+        if ((error = m_invocationValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
+                SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
         else {
             /*
              * Round trip the invocation to initialize it for command logging
