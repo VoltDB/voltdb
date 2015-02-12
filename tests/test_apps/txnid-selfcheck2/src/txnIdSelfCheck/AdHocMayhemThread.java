@@ -28,16 +28,13 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
-public class AdHocMayhemThread extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class AdHocMayhemThread extends BenchmarkThread {
 
     Random r = new Random(0);
     long counter = 0;
@@ -50,8 +47,6 @@ public class AdHocMayhemThread extends Thread {
 
     public AdHocMayhemThread(Client client, float mpRatio, Semaphore permits) {
         setName("AdHocMayhemThread");
-        setDaemon(true);
-
         this.client = client;
         this.mpRatio = mpRatio;
         this.m_permits = permits;
@@ -129,6 +124,8 @@ public class AdHocMayhemThread extends Thread {
                 log.warn(((ClientResponseImpl)clientResponse).toJSONString());
                 m_needsBlock.set(true);
             }
+            else
+                Benchmark.txnCount.incrementAndGet();
         }
     }
 
@@ -137,9 +134,7 @@ public class AdHocMayhemThread extends Thread {
         try {
             client.callProcedure("SetupAdHocTables");
         } catch (Exception e) {
-            log.error("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
-            Benchmark.printJStack();
-            System.exit(-1);
+            hardStop("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
         }
 
         while (m_shouldContinue.get()) {
@@ -177,9 +172,7 @@ public class AdHocMayhemThread extends Thread {
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
-                log.error("AdHocMayhemThread failed to run an AdHoc statement. Will exit.", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("AdHocMayhemThread failed to run an AdHoc statement. Will exit.", e);
             }
         }
     }
