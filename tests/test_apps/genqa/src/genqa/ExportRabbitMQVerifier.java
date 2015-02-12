@@ -43,8 +43,9 @@ public class ExportRabbitMQVerifier {
 
     private final ConnectionFactory m_connFactory;
     private volatile long m_verifiedRows = 0;
+    private String m_exchangeName;
 
-    public ExportRabbitMQVerifier(String host, String username, String password, String vhost)
+    public ExportRabbitMQVerifier(String host, String username, String password, String vhost, String exchangename)
             throws IOException, InterruptedException
     {
         m_connFactory = new ConnectionFactory();
@@ -52,6 +53,7 @@ public class ExportRabbitMQVerifier {
         m_connFactory.setUsername(username);
         m_connFactory.setPassword(password);
         m_connFactory.setVirtualHost(vhost);
+        m_exchangeName = exchangename;
     }
 
     public void run() throws IOException, InterruptedException
@@ -60,13 +62,17 @@ public class ExportRabbitMQVerifier {
         final Channel channel = connection.createChannel();
 
         try {
-            channel.exchangeDeclare("testExchange", "topic", true);
+            channel.exchangeDeclare(m_exchangeName, "topic", true);
             String dataQueue = channel.queueDeclare().getQueue();
-            channel.queueBind(dataQueue, "testExchange", "EXPORT_PARTITIONED_TABLE.#");
-            channel.queueBind(dataQueue, "testExchange", "EXPORT_PARTITIONED_TABLE2.#");
-            channel.queueBind(dataQueue, "testExchange", "EXPORT_REPLICATED_TABLE.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE_FOO.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_PARTITIONED_TABLE2_FOO.#");
+            channel.queueBind(dataQueue, m_exchangeName, "EXPORT_REPLICATED_TABLE_FOO.#");
             String doneQueue = channel.queueDeclare().getQueue();
-            channel.queueBind(doneQueue, "testExchange", "EXPORT_DONE_TABLE.#");
+            channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE.#");
+            channel.queueBind(doneQueue, m_exchangeName, "EXPORT_DONE_TABLE_FOO.#");
 
             // Setup callback for data stream
             channel.basicConsume(dataQueue, false, createConsumer(channel));
@@ -80,7 +86,7 @@ public class ExportRabbitMQVerifier {
             final long expectedRows = Long.parseLong(ExportOnServerVerifier.RoughCSVTokenizer
                     .tokenize(new String(doneMsg.getBody(), Charsets.UTF_8))[6]);
 
-            while (expectedRows != m_verifiedRows) {
+            while (expectedRows > m_verifiedRows) {
                 Thread.sleep(1000);
                 System.err.println("Expected " + expectedRows + " " + m_verifiedRows);
             }
@@ -138,13 +144,13 @@ public class ExportRabbitMQVerifier {
 
     public static void main(String[] args) throws IOException, InterruptedException
     {
-        if (args.length != 4) {
+        if (args.length != 5) {
             usage();
             System.exit(-1);
         }
 
         final ExportRabbitMQVerifier verifier =
-                new ExportRabbitMQVerifier(args[0], args[1], args[2], args[3]);
+                new ExportRabbitMQVerifier(args[0], args[1], args[2], args[3], args[4]);
         verifier.run();
     }
 }

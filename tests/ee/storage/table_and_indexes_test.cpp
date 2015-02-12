@@ -49,7 +49,7 @@ using namespace std;
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, false, "", 0, &drStream);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, "", 0, &drStream);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);

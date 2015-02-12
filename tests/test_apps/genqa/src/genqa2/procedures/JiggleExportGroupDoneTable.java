@@ -20,30 +20,29 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package genqa2.procedures;
 
-import org.openqa.selenium.chrome.ChromeDriver
-import org.openqa.selenium.firefox.FirefoxDriver
-import org.openqa.selenium.safari.SafariDriver
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
+@ProcInfo(
+    partitionInfo = "export_done_table.txnid:0",
+    singlePartition = true
+)
+public class JiggleExportGroupDoneTable extends VoltProcedure {
+    public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
+    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
 
-waiting {
-    timeout = 2
+    public long run(long txid)
+    {
+        voltQueueSQL(export, txid);
+        voltQueueSQL(exportFoo, txid);
+
+        // Execute last statement batch
+        voltExecuteSQL(true);
+
+        // Retun to caller
+        return txid;
+    }
 }
-
-environments {
-    
-    firefox {
-        driver = { new FirefoxDriver() }
-    }
-
-    chrome {
-        driver = { new ChromeDriver() }
-    }
-
-    safari {
-        driver = { new SafariDriver() }
-    }
-
-}
-
-// To run the tests with all browsers run “./gradlew test”
