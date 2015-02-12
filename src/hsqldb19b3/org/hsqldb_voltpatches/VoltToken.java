@@ -25,6 +25,7 @@ public class VoltToken {
     private final Token m_hsqlToken;
     private final Kind m_kind;
 
+    @Override
     public String toString() {
         return m_kind.name() + "[" + m_hsqlToken.tokenString + "]";
     }
@@ -764,14 +765,14 @@ public class VoltToken {
         X_IDENTIFIER (Tokens.X_IDENTIFIER),
         X_KEYSET (Tokens.X_KEYSET),
         X_LOB_SIZE (Tokens.X_LOB_SIZE),
-        X_MALFORMED_BINARY_STRING (Tokens.X_MALFORMED_BINARY_STRING),
-        X_MALFORMED_BIT_STRING (Tokens.X_MALFORMED_BIT_STRING),
-        X_MALFORMED_COMMENT (Tokens.X_MALFORMED_COMMENT),
-        X_MALFORMED_IDENTIFIER (Tokens.X_MALFORMED_IDENTIFIER),
-        X_MALFORMED_NUMERIC (Tokens.X_MALFORMED_NUMERIC),
-        X_MALFORMED_STRING (Tokens.X_MALFORMED_STRING),
-        X_MALFORMED_UNICODE_ESCAPE (Tokens.X_MALFORMED_UNICODE_ESCAPE),
-        X_MALFORMED_UNICODE_STRING (Tokens.X_MALFORMED_UNICODE_STRING),
+//        X_MALFORMED_BINARY_STRING (Tokens.X_MALFORMED_BINARY_STRING),
+//        X_MALFORMED_BIT_STRING (Tokens.X_MALFORMED_BIT_STRING),
+//        X_MALFORMED_COMMENT (Tokens.X_MALFORMED_COMMENT),
+//        X_MALFORMED_IDENTIFIER (Tokens.X_MALFORMED_IDENTIFIER),
+//        X_MALFORMED_NUMERIC (Tokens.X_MALFORMED_NUMERIC),
+//        X_MALFORMED_STRING (Tokens.X_MALFORMED_STRING),
+//        X_MALFORMED_UNICODE_ESCAPE (Tokens.X_MALFORMED_UNICODE_ESCAPE),
+//        X_MALFORMED_UNICODE_STRING (Tokens.X_MALFORMED_UNICODE_STRING),
         X_NULL (Tokens.X_NULL),
         X_OPTION (Tokens.X_OPTION),
         X_POS_INTEGER (Tokens.X_POS_INTEGER),
@@ -793,9 +794,13 @@ public class VoltToken {
             return m_hsqlTokenType;
         }
 
-        private static Map<Integer, Kind> tokenTypeToKind = new HashMap<Integer, Kind>();
+        private static Map<Integer, Kind> tokenTypeToKind = new HashMap<>();
         static {
+            System.out.println("Creating token map...");
             for (Kind k : Kind.values()) {
+                if (tokenTypeToKind.containsValue(k.m_hsqlTokenType)) {
+                    System.out.println("duplicate found: " + k.name());
+                }
                 tokenTypeToKind.put(k.m_hsqlTokenType, k);
             }
         }

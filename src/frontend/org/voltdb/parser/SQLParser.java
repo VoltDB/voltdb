@@ -689,14 +689,25 @@ public class SQLParser extends SQLPatternFactory
             return null;
         }
 
-        List<String> queries = new ArrayList<String>();
+        List<String> queries = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
         VoltTokenStream tokenStream = new VoltTokenStream(query);
+        boolean firstToken = true;
         for (VoltToken token : tokenStream) {
-            sb.append(token + " ");
-            if (token.toString().equals(";")) {
+
+            if (! firstToken) {
+                sb.append(" ");
+            }
+
+            sb.append(token.toSqlText());
+
+            if (token.kind() == VoltToken.Kind.SEMICOLON) {
                 queries.add(sb.toString());
                 sb.setLength(0);
+                firstToken = true;
+            }
+            else {
+                firstToken = false;
             }
         }
 

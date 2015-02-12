@@ -25,7 +25,7 @@ import static org.hsqldb_voltpatches.VoltToken.Kind.*;
 public class TestVoltTokenStream extends TestCase {
 
     @SafeVarargs
-    final private void assertStreamProducesTokens(String sqlText, Pair<VoltToken.Kind, String>... pairs) {
+    private static void assertStreamProducesTokens(String sqlText, Pair<VoltToken.Kind, String>... pairs) {
         VoltTokenStream stream = new VoltTokenStream(sqlText);
 
         int i = 0;
@@ -38,6 +38,21 @@ public class TestVoltTokenStream extends TestCase {
         }
 
         assertEquals("token stream shorter than expected", pairs.length, i);
+    }
+
+    private static void assertThrowsParseException(String input) {
+        try {
+            VoltTokenStream vts = new VoltTokenStream(input);
+            VoltTokenIterator it = vts.iterator();
+            while (it.hasNext()) {
+                it.next();
+            }
+        }
+        catch (VoltTokenIterator.ParseException pe) {
+            return;
+        }
+
+        fail("Failed to catch expected ParseException for input \"" + input + "\"");
     }
 
     public void testComments() {
@@ -86,10 +101,10 @@ public class TestVoltTokenStream extends TestCase {
         // This doesn't work: Scanner.scanNext doesn't seem to advance
         // token position, so hits an infinite loop.  Seems to be an HSQL bug.
         // What happens in @AdHoc?
-        //        assertStreamProducesTokens("SELECT // foo \n FROM",
-        //                Pair.of(SELECT, "SELECT"),
-        //                Pair.of(X_REMARK, " foo "),
-        //                Pair.of(FROM, "FROM"));
+        //                assertStreamProducesTokens("SELECT // foo \n FROM",
+        //                        Pair.of(SELECT, "SELECT"),
+        //                        Pair.of(X_REMARK, " foo "),
+        //                        Pair.of(FROM, "FROM"));
     }
 
     public void testStrings() {
@@ -114,32 +129,25 @@ public class TestVoltTokenStream extends TestCase {
         assertStreamProducesTokens("'Let''s \nGo!'",
                 Pair.of(X_VALUE, "'Let''s \nGo!'"));
 
-        // Unterminated.  This is interesting.
-        assertStreamProducesTokens("'Foo",
-                Pair.of(X_VALUE, "''"),
-                Pair.of(X_MALFORMED_BINARY_STRING, "FOO"));
+        // unterminated string.
+        assertThrowsParseException("'Foo");
 
         // Missing first single quote.
-        assertStreamProducesTokens("Foo'",
-                Pair.of(X_MALFORMED_BINARY_STRING, "FOO"),
-                Pair.of(X_VALUE, "''"));
+        assertThrowsParseException("Foo'");
 
-        // Just a quote.  This is interesting.
-        assertStreamProducesTokens("'",
-                Pair.of(X_VALUE, "''"));
+        // Just a single quote.
+        assertThrowsParseException("'");
     }
 
     public void testIdentifiers() {
 
         assertStreamProducesTokens("C",
-                Pair.of(X_MALFORMED_BINARY_STRING, "C"));
+                Pair.of(X_IDENTIFIER, "C"));
 
         assertStreamProducesTokens("SELECT myfield FROM mytable",
-                Pair.of(SELECT, "SELECT")
-
-
-                );
-
-
+                Pair.of(SELECT, "SELECT"),
+                Pair.of(X_IDENTIFIER, "MYFIELD"),
+                Pair.of(FROM, "FROM"),
+                Pair.of(X_IDENTIFIER, "MYTABLE"));
     }
 }

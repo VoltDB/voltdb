@@ -24,6 +24,12 @@ public class VoltTokenIterator implements Iterator<VoltToken> {
 
     private final Scanner m_scanner;
 
+    public class ParseException extends RuntimeException {
+        ParseException(String msg) {
+            super (msg);
+        }
+    }
+
     VoltTokenIterator(String input) {
         m_scanner = new Scanner(input);
 
@@ -41,6 +47,12 @@ public class VoltTokenIterator implements Iterator<VoltToken> {
     public VoltToken next() {
 
         if (hasNext()) {
+
+            if (m_scanner.getToken().isMalformed) {
+                throw new ParseException("Malformed token: "
+                        + m_scanner.getToken().tokenString);
+            }
+
             VoltToken nextToken = new VoltToken(m_scanner.token.duplicate());
 
             m_scanner.scanNext();
