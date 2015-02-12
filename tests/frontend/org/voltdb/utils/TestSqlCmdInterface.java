@@ -44,6 +44,8 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.junit.Test;
+import org.voltdb.parser.SQLParser;
+import org.voltdb.parser.SQLParser.ExecuteCallResults;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -274,16 +276,15 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery21() throws FileNotFoundException {
         ID = 21;
-        final String sqlFile = "./tests/frontend/org/voltdb/utils/localQry.txt";
+        final File sqlFile = new File("./tests/frontend/org/voltdb/utils/localQry.txt");
         String raw = SQLCommand.readScriptFile(sqlFile);
 
         int numOfQueries = -1;
         String qryFrmFile = "";
-        File fh = new File(sqlFile);
-        assert(fh.exists());
+        assert(sqlFile.exists());
         String contents = null;
         try {
-            Scanner scanner = new Scanner(fh);
+            Scanner scanner = new Scanner(sqlFile);
             contents = scanner.useDelimiter("\\A").next();
             scanner.close();
         }
@@ -309,7 +310,7 @@ public class TestSqlCmdInterface
             System.exit(1);
         }
         // Prepare a Scanner that will "scan" the document
-        Scanner opnScanner = new Scanner(fh);
+        Scanner opnScanner = new Scanner(sqlFile);
         // Read each line in the file
         while(opnScanner.hasNext()) {
             String line = opnScanner.nextLine();
@@ -349,9 +350,18 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 1, ID);
     }
 
+    // To test parseQueryProcedureCallParameters()
+    // To test a valid query: 'select * from dummy' as a proc call.
+    @Test
+    public void testParseQueryProcedureCallParameters22() {
+        ID = 22;
+        String query = "select * from dummy";
+        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures) == null);
+    }
+
     @Test
     public void testParseQuery23() {
-        ID = 22;
+        ID = 23;
         String raw = " select -- comment no semicolon\n"
                 + "* -- comment with this ; a semicolon inside\n"
                 + "from -- comment with this ; a semicolon inside\n"
@@ -362,16 +372,6 @@ public class TestSqlCmdInterface
                 + "from \n"
                 + "table";
         assertThis(raw, expected, 1, ID);
-    }
-
-    // To test parseQueryProcedureCallParameters()
-    // To test a valid query: 'select * from dummy'
-    @Test
-    public void testParseQueryProcedureCallParameters22() {
-        ID = 22;
-        String query = "select * from dummy";
-        String expected = query.replaceAll("\\s+", "");
-        assertThis2(query, expected, 4, ID);
     }
 
     // To test parseQueryProcedureCallParameters()
@@ -408,11 +408,7 @@ public class TestSqlCmdInterface
     public void testParseQueryProcedureCallParameters25() {
         ID = 25;
         String query = "exec,, @SystemCatalog,,,,tables";
-        String expected = query.replace("exec", "");
-        expected = expected.replaceAll(",", "");
-        expected = expected.replaceAll("\\s+", "");
-        //assertThis2(query, expected, 2, ID);   // Uncomment this line after 3422 is fixed
-        notAssertThis2(query, expected, 2, ID);  // Comment out this line after 3422 is fixed
+        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures) == null);
     }
 
     // To assert the help page printed by SQLCommand.printHelp() is identical to the
@@ -434,18 +430,23 @@ public class TestSqlCmdInterface
         DataInputStream in2 = new DataInputStream(fstream2);
         BufferedReader br2 = new BufferedReader(new InputStreamReader(in2));
 
-        String strLine1 = null, strLine2 = null;
-        int cnt = 0;
-        while ((strLine1 = br1.readLine()) != null && (strLine2 = br2.readLine()) != null) {
-            err1 = "Expected Content: #" + strLine1 + "#\n";
-            err1 = "  Actual Content: #" + strLine2 + "#\n";
-            assertTrue(msg+err1, strLine1.equals(strLine2));
-            cnt++;
+        try {
+            String strLine1 = null, strLine2 = null;
+            int cnt = 0;
+            while ((strLine1 = br1.readLine()) != null && (strLine2 = br2.readLine()) != null) {
+                err1 = "Expected Content: #" + strLine1 + "#\n";
+                err1 = "  Actual Content: #" + strLine2 + "#\n";
+                assertTrue(msg+err1, strLine1.equals(strLine2));
+                cnt++;
+            }
+            err2 = "The value of line count cannot be zero! cnt = " + cnt + "\n";
+            assertNotSame(msg+err2, 0, cnt);
         }
-        err2 = "The value of line count cannot be zero! cnt = " + cnt + "\n";
-        assertNotSame(msg+err2, 0, cnt);
-        br1.close();
-        br2.close();
+        finally {
+            // Silence the resource leak warnings.
+            br1.close();
+            br2.close();
+        }
     }
 
     // 27) Make sure we don't get fooled by store procedures that with names that start
@@ -497,7 +498,7 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis(String qryStr, int numOfQry, int testID) {
-        List<String> parsed = SQLCommand.parseQuery(qryStr);
+        List<String> parsed = SQLParser.parseQuery(qryStr);
         String msg = "Test ID: " + testID + ". ";
         assertNotNull(msg + "SQLCommand.parseQuery returned a NULL obj!!", parsed);
         assertEquals(msg, numOfQry, parsed.size());
@@ -510,7 +511,7 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis(String qryStr, String cleanQryStr, int numOfQry, int testID, int blockCommentCount) {
-        List<String> parsed = SQLCommand.parseQuery(qryStr);
+        List<String> parsed = SQLParser.parseQuery(qryStr);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + numOfQry + "\n";
         err1 += "Actual # of queries: " + parsed.size() + "\n";
@@ -529,30 +530,18 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis2(String query, String cleanQryStr, int num, int testID) {
-        Pattern ExecuteCall = SQLCommand.getExecuteCall();
-        query = ExecuteCall.matcher(query).replaceFirst("");
-        List<String> params = SQLCommand.parseProcedureCallParameters(query);
-        String parsedString = Joiner.on("").join(params);
+        ExecuteCallResults results = SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures);
+        assertNotNull(results);
+        assertNotNull(results.procedure);
+        assertFalse(results.procedure.isEmpty());
+        int numQueries = results.params.size() + 1;
+        String parsedString = results.procedure + Joiner.on("").join(results.params);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + num + "\n";
-        err1 += "Actual # of queries: " + params.size() + "\n";
-        assertEquals(msg+err1, num, params.size());
+        err1 += "Actual # of queries: " + numQueries + "\n";
+        assertEquals(msg+err1, num, numQueries);
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";
         assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
-    }
-
-   private void notAssertThis2(String query, String cleanQryStr, int num, int testID) {
-        Pattern ExecuteCall = SQLCommand.getExecuteCall();
-        query = ExecuteCall.matcher(query).replaceFirst("");
-        List<String> params = SQLCommand.parseProcedureCallParameters(query);
-        String parsedString = Joiner.on("").join(params);
-        String msg = "\nTest ID: " + testID + ". ";
-        String err1 = "\nExpected # of queries: " + num + "\n";
-        err1 += "Actual # of queries: " + params.size() + "\n";
-        assertNotSame(msg+err1, num, params.size());
-        String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
-        err2 += "Actual queries: \n#" + parsedString + "#\n";
-           assertFalse(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
     }
 }

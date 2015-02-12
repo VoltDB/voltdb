@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,17 +21,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package txnIdSelfCheck.procedures;
+package vmcTest.pages
 
-import org.voltdb.VoltTable;
-
-public class ReadMPInProcAdHoc extends ReadMP {
-
-    @SuppressWarnings("deprecation")
-    @Override
-    public VoltTable[] run(byte cid) {
-        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
-        return voltExecuteSQL(true);
+/**
+ * This class represents the 'Size Worksheet' tab of the 'Schema' page (or tab)
+ * of the VoltDB Management Center (page), which is the VoltDB web UI (replacing
+ * the old Catalog Report).
+ */
+class SchemaPageSizeWorksheetTab extends SchemaPage {
+    static content = {
+        // TODO: add content
+    }
+    static at = {
+        sizeTab.displayed
+        sizeTab.attr('class') == 'active'
+        // TODO: add a few key elements, that should always appear
     }
 
 }
