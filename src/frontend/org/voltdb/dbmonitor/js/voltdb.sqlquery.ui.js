@@ -128,6 +128,7 @@ $(document).ready(function () {
     var iSqlQueryRender = (function () {
         this.server = null;
         this.userName = null;
+        this.useAdminPortCancelled = false;
 
         this.saveConnectionKey = function (useAdminPort) {
             var server = SQLQueryRender.server == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(SQLQueryRender.server);
@@ -364,24 +365,13 @@ function loadSQLQueryPage(serverName, portid, userName) {
 
     SQLQueryRender.server = serverName;
     SQLQueryRender.userName = userName;
-    VoltDBService.SetConnectionForSQLExecution();
+    VoltDBService.SetConnectionForSQLExecution(false);
     SQLQueryRender.saveConnectionKey(false);
-    
-    if ($.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
-
-        //Refresh cluster state to display latest status.
-        var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
-            VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
-            var sqlPort = VoltDbAdminConfig.adminPort != -1 ? VoltDbAdminConfig.adminPort : null;
-            VoltDBService.SetConnectionForSQLExecution(sqlPort);
-            SQLQueryRender.saveConnectionKey(true);
-        };
-        voltDbRenderer.GetSystemInformation(function () { }, loadAdminTabPortAndOverviewDetails, function (data) { });
-    }
     
     var sqlChangePortName = "sql_port_for_paused_db";
     $("#queryDatabasePausedErrorPopupLink").popup({
         open: function (event, ui, ele) {
+            SQLQueryRender.useAdminPortCancelled = false;
         },
         afterOpen: function () {
 
@@ -389,7 +379,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
             $("#btnQueryDatabasePausedErrorOk").unbind("click");
             $("#btnQueryDatabasePausedErrorOk").on("click", function () {
                 saveSessionCookie(sqlChangePortName, sqlPortForPausedDB.UseAdminPort);
-                VoltDBService.SetConnectionForSQLExecution(VoltDbAdminConfig.adminPort);
+                VoltDBService.SetConnectionForSQLExecution(true);
                 SQLQueryRender.saveConnectionKey(true);
                 popup.close();
                 //Rerun the query
@@ -398,6 +388,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
 
             $("#btnQueryDatabasePausedErrorCancel").unbind("click");
             $("#btnQueryDatabasePausedErrorCancel").on("click", function () {
+                SQLQueryRender.useAdminPortCancelled = true;
                 popup.close();
             });
         },
