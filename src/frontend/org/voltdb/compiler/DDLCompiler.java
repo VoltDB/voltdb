@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.FunctionSQL;
@@ -70,6 +69,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
+import org.voltdb.parser.HSQLLexer;
+import org.voltdb.parser.SQLLexer;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
@@ -83,7 +85,6 @@ import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.SQLLexer;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -96,431 +97,6 @@ public class DDLCompiler {
     static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
     static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
     static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
-
-    /**
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * PARTITION -- token
-     * \\s+ one or more spaces
-     * (PROCEDURE|TABLE) -- either PROCEDURE or TABLE token
-     * \\s+ -- one or more spaces
-     * .+ -- one or more of any characters
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
-     */
-    static final Pattern prePartitionPattern = Pattern.compile(
-            "(?i)\\APARTITION\\s+(PROCEDURE|TABLE)\\s+.+;\\z"
-            );
-    /**
-     * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * PARTITION -- token
-     * \\s+ -- one or more spaces
-     * TABLE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [table name capture group 1]
-     *    [\\w$]+ -- 1 or more identifier character
-     *        (letters, numbers, dollar sign ($) underscore (_))
-     * \\s+ -- one or more spaces
-     * ON -- token
-     * \\s+ -- one or more spaces
-     * COLUMN -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [column name capture group 2]
-     *    [\\w$]+ -- 1 or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s* -- 0 or more spaces
-     * ; a -- semicolon
-     * \\z -- end of string
-     * </pre>
-     */
-    static final Pattern partitionTablePattern = Pattern.compile(
-            "(?i)\\APARTITION\\s+TABLE\\s+([\\w$]+)\\s+ON\\s+COLUMN\\s+([\\w$]+)\\s*;\\z"
-            );
-
-    /**
-     * PARTITION PROCEDURE statement
-     * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * PARTITION -- token
-     * \\s+ -- one or more spaces
-     * PROCEDURE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [procedure name capture group 1]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s+ -- one or more spaces
-     * ON -- token
-     * \\s+ -- one or more spaces
-     * TABLE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [table name capture group 2]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s+ -- one or more spaces
-     * COLUMN -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$]+) -- [column name capture group 3]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($) or underscore (_))
-     * (?:\\s+PARAMETER\\s+(\\d+))? 0 or 1 parameter clause [non-capturing]
-     *    \\s+ -- one or more spaces
-     *    PARAMETER -- token
-     *    \\s+ -- one or more spaces
-     *    \\d+ -- one ore more number digits [parameter index capture group 4]
-     * \\s* -- 0 or more spaces
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
-     *
-     * Capture groups:
-     *  (1) Procedure name
-     *  (2) Table name
-     *  (3) Column name
-     *  (4) Parameter number
-     */
-    static final Pattern partitionProcedureStatementPattern = Pattern.compile(
-                "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
-                "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z");
-
-    /**
-     * ALLOW clause that can be used to assign roles in CREATE PROCEDURE statements.
-     * @param nonCapturing the regex group doesn't capture
-     * @return pattern string
-     *
-     * Regex Description:
-     * <pre>
-     *  ALLOW\\s+                   -- ALLOW token and trailing whitespace
-     *  ( or (?:                    -- begin group (1 if capturing)
-     *    [\\w.$]+                  -- first role name
-     *    (?:                       -- begin non-capturing group for additional role names
-     *      \\s*,\\s*               -- comma and optional surrounding whitespace
-     *      [\\w.$]+                -- additional role name
-     *    )*                        -- end non-capturing group for additional role names with repetition
-     *  )                           -- end group
-     * </pre>
-     *
-     * Capture groups (if not non-capturing):
-     *  (1) Entire role list with commas and internal whitespace
-     */
-    static String formatProcedureAllowClause(boolean nonCapturing) {
-        final String groupPrefix = nonCapturing ? "(?:" : "(";
-        return String.format("ALLOW\\s+%s[\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)", groupPrefix);
-    }
-
-    /**
-     * Build a PARTITION clause for a CREATE PROCEDURE statement.
-     * NB supports only unquoted table and column names
-     *
-     * @param nonCapturing the regex group doesn't capture
-     * @return pattern string
-     *
-     * Regex Description:
-     * <pre>
-     *  PARTITION\\s+               -- PARTITION token plus whitespace
-     *  ON\\s+TABLE\\s+             -- ON TABLE tokens plus whitespace
-     *  ([\\w$]+) or (?:[\\w$]+)    -- table name group (1 if capturing)
-     *  \\s+COLUMN\\s+              -- COLUMN token and whitespace
-     *  ([\\w$]+) or (?:[\\w$]+)    -- column name group (2 if capturing)
-     *  (?:                         -- begin optional non-capturing parameter group
-     *    \\s+PARAMETER\\s+         -- PARAMETER token and whitespace
-     *    (\\d+)                    -- parameter number group (3 if capturing)
-     *  )?                          -- end optional non-capturing parameter group
-     * </pre>
-     *
-     * Capture groups (if not non-capturing):
-     *  (1) Procedure name
-     *  (2) Table name
-     *  (3) Column name
-     */
-    static final String formatProcedurePartitionClause(boolean nonCapturing)
-    {
-        final String groupPrefix = nonCapturing ? "(?:" : "(";
-        return String.format(
-            "PARTITION\\s+ON\\s+TABLE\\s+%s[\\w$]+)\\s+COLUMN\\s+%s[\\w$]+)(?:\\s+PARAMETER\\s+%s\\d+))?",
-            groupPrefix, groupPrefix, groupPrefix);
-    }
-
-    /**
-     * Optional ALLOW or PARTITION clause that can modify CREATE PROCEDURE statements.
-     * 2 repetitions support one of each possible clause. The code should check that
-     * if there are two clauses it is one of each, not one repeated twice. The code
-     * should also not care about ordering.
-     *
-     * Regex Description:
-     * <pre>
-     *  (?:"                        -- begin OR group with both possible clauses (non-capturing)
-     *    (?:<allow-clause>)        -- ALLOW clause group (non-capturing)
-     *    |                         -- OR operator
-     *    (?:<partition-clause>)    -- PARTITION clause group (non-capturing)
-     *  )                           -- end OR group with both possible clauses
-     * </pre>
-     *
-     * Capture groups (if not non-capturing):
-     *  (1) Entire role list with commas and internal whitespace
-     */
-    static String formatCreateProcedureClause(boolean nonCapturing) {
-        return String.format("(?:(?:%s)|(?:%s))",
-                             formatProcedureAllowClause(nonCapturing),
-                             formatProcedurePartitionClause(nonCapturing));
-    }
-
-    /**
-     * CREATE PROCEDURE from Java class statement regex
-     * NB supports only unquoted table and column names
-     * Capture groups are in parentheses.
-     *
-     * Regex Description:
-     * <pre>
-     *  (?i)\\A                     -- ignore case instruction and beginning of statement
-     *  CREATE\\s+PROCEDURE         -- CREATE PROCEDURE tokens with whitespace separator
-     *  (<clauses>*)                -- (1) optional ALLOW and or PARTITION clause(s)
-     *  \\s+FROM\\s+CLASS\\s+       -- FROM CLASS tokens with interspersed whitespace
-     *  ([\\w$.]+)                  -- (2) class name
-     *  \\s*;\\z                    -- trailing whitespace, semi-colon and end of statement
-     * </pre>
-     *
-     * Capture groups:
-     *  (1) ALLOW/PARTITION clauses - needs further parsing
-     *  (2) Class name
-     */
-    static final Pattern procedureClassPattern = Pattern.compile(String.format(
-            "(?i)\\ACREATE\\s+PROCEDURE((?:\\s+%s)*)\\s+FROM\\s+CLASS\\s+([\\w$.]+)\\s*;\\z",
-            formatCreateProcedureClause(true)));
-
-    /**
-     * CREATE PROCEDURE with single SELECT or DML statement regex
-     * NB supports only unquoted table and column names
-     * Capture groups are in parentheses.
-     *
-     * Regex Description:
-     * <pre>
-     *  (?i)\\A                     -- ignore case instruction and beginning of statement
-     *  CREATE\\s+PROCEDURE\\s+     -- CREATE PROCEDURE tokens with whitespace
-     *  ([\\w$.]+)                  -- (1) procedure name
-     *  (<clauses>*)                -- (2) optional ALLOW and or PARTITION clause(s)
-     *  \\s+AS\\s+                  -- AS token with surrounding whitespace
-     *  (.+)                        -- (3) SELECT or DML statement
-     *  ;\\z                        -- semi-colon and end of statement
-     * </pre>
-     *
-     * Capture groups:
-     *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses - needs further parsing
-     *  (3) SELECT or DML statement
-     */
-    static final Pattern procedureSingleStatementPattern = Pattern.compile(String.format(
-            "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)((?:\\s+%s)*)\\s+AS\\s+(.+);\\z",
-            formatCreateProcedureClause(true)));
-
-    static final char   BLOCK_DELIMITER_CHAR = '#';
-    static final String BLOCK_DELIMITER = "###";
-
-    /**
-     * CREATE PROCEDURE with inline implementation script, e.g. Groovy, statement regex
-     * NB supports only unquoted table and column names
-     * Capture groups are in parentheses.
-     *
-     * Regex Description:
-     * <pre>
-     *  (?i)\\A                     -- ignore case instruction and beginning of statement
-     *  CREATE\\s+PROCEDURE\\s+     -- CREATE PROCEDURE tokens with whitespace
-     *  ([\\w$.]+)                  -- (1) procedure name
-     *  (<clauses>*)                -- (2) optional ALLOW and or PARTITION clause(s)
-     *  \\s+AS\\s+                  -- AS token with leading and trailing whitespace
-     *  BLOCK_DELIMITER             -- leading block delimiter ###
-     *  (.+)                        -- (3) code block content
-     *  BLOCK_DELIMITER             -- trailing block delimiter ###
-     *  \\s+LANGUAGE\\s+            -- LANGUAGE token with surrounding whitespace
-     *  (GROOVY)                    -- (4) language name
-     *  \\s*;\\z                    -- trailing whitespace, semi-colon and end of statement
-     * </pre>
-     *
-     * Capture groups:
-     *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses - needs further parsing
-     *  (3) Code block content
-     *  (4) Language name
-     */
-    static final Pattern procedureWithScriptPattern = Pattern.compile(String.format(
-            "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)((?:\\s+%s)*)\\s+AS\\s+%s(.+)%s\\s+LANGUAGE\\s+(GROOVY)\\S*;\\z",
-            formatCreateProcedureClause(true), BLOCK_DELIMITER, BLOCK_DELIMITER),
-            Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL);
-
-    /**
-     * Pattern for parsing the ALLOW and PARTITION clauses inside CREATE PROCEDURE statements.
-     * Capture groups are enabled.
-     */
-    static final String procedureClausePatternString = formatCreateProcedureClause(false);
-    static final Pattern procedureClausePattern = Pattern.compile(
-            procedureClausePatternString,
-            Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL);
-
-    /**
-     * DROP PROCEDURE  statement regex
-     */
-    static final Pattern procedureDropPattern = Pattern.compile(
-            "(?i)" +                                // ignore case
-            "\\A" +                                 // beginning of statement
-            "DROP" +                                // DROP token
-            "\\s+" +                                // one or more spaces
-            "PROCEDURE" +                           // PROCEDURE token
-            "\\s+" +                                // one or more spaces
-            "([\\w$.]+)" +                          // (1) class name or procedure name
-            "(\\s+IF EXISTS)?" +                    // (2) <optional IF EXISTS>
-            "\\s*" +                                // zero or more spaces
-            ";" +                                   // semi-colon terminator
-            "\\z"                                   // end of statement
-            );
-
-    /**
-     * IMPORT CLASS with pattern for matching classfiles in
-     * the current classpath.
-     */
-    static final Pattern importClassPattern = Pattern.compile(
-            "(?i)" +                                // (ignore case)
-            "\\A" +                                 // (start statement)
-            "IMPORT\\s+CLASS\\s+" +                 // IMPORT CLASS
-            "([^;]+)" +                             // (1) class matching pattern
-            ";\\z"                                  // (end statement)
-            );
-
-    /**
-     * Regex to parse the CREATE ROLE statement with optional WITH clause.
-     * Leave the WITH clause argument as a single group because regexes
-     * aren't capable of producing a variable number of groups.
-     * Capture groups are tagged as (1) and (2) in comments below.
-     */
-    static final Pattern createRolePattern = Pattern.compile(
-            "(?i)" +                            // (ignore case)
-            "\\A" +                             // (start statement)
-            "CREATE\\s+ROLE\\s+" +              // CREATE ROLE
-            "([\\w.$]+)" +                      // (1) <role name>
-            "(?:\\s+WITH\\s+" +                 // (start optional WITH clause block)
-                "(\\w+(?:\\s*,\\s*\\w+)*)" +    //   (2) <comma-separated argument string>
-            ")?" +                              // (end optional WITH clause block)
-            ";\\z"                              // (end statement)
-            );
-
-    /**
-     * Regex to parse the DROP ROLE statement.
-     * Capture group is tagged as (1) in comments below.
-     */
-    static final Pattern dropRolePattern = Pattern.compile(
-            "(?i)" +                            // (ignore case)
-            "\\A" +                             // (start statement)
-            "DROP\\s+ROLE\\s+" +                // DROP ROLE
-            "([\\w.$]+)" +                      // (1) <role name>
-            "(\\s+IF EXISTS)?" +                // (2) <optional IF EXISTS>
-            ";\\z"                              // (end statement)
-            );
-
-    /**
-     * Regex to match CREATE TABLE or CREATE VIEW statements.
-     * Unlike the other matchers, this is just designed to pull out the
-     * name of the table or view, not the whole statement.
-     * It's used to preserve as-entered schema for each table/view
-     * for the catalog report generator for the moment.
-     * Capture group (1) is ignored, but (2) is used.
-     */
-    static final Pattern createTablePattern = Pattern.compile(
-            "(?i)" +                            // (ignore case)
-            "\\A" +                             // (start statement)
-            "CREATE\\s+(TABLE|VIEW)\\s+" +      // (1) CREATE TABLE
-            "([\\w.$]+)"                        // (2) <table name>
-            );
-
-    /**
-     * Regex to match ALTER or DROP TABLE statements. Capture group (1) is operator, (2) is TABLE, but (3) is used.
-     */
-    static final Pattern alterOrDropTablePattern = Pattern.compile(
-            "(?i)" + // (ignore case)
-            "\\A" + // (start statement)
-            "(ALTER|DROP)\\s+(TABLE)\\s+" + // (1) ALTER or DROP TABLE
-            "([\\w.$]+)" // (3) <table name>
-    );
-
-    /**
-     * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * REPLICATE -- token
-     * \\s+ -- one or more spaces
-     * TABLE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$.]+) -- [table name capture group 1]
-     *    [\\w$]+ -- one or more identifier character (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s* -- 0 or more spaces
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
-     */
-    static final Pattern replicatePattern = Pattern.compile(
-            "(?i)\\AREPLICATE\\s+TABLE\\s+([\\w$]+)\\s*;\\z"
-            );
-
-    /**
-     * EXPORT TABLE statement regex
-     * NB supports only unquoted table names
-     * Capture groups are tagged as (1) in comments below.
-     */
-    static final Pattern exportPattern = Pattern.compile(
-            "(?i)" +                            // (ignore case)
-            "\\A"  +                            // start statement
-            "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
-            "([\\w.$]+)" +                      // (1) <table name>
-            "(?:\\s+TO\\s+STREAM\\s+" +                // begin optional TO STREAM clause
-            "([\\w.$]+)" +                      // (2) <export target>
-            ")?" +                              // end optional STREAM clause
-            "\\s*;\\z"                          // (end statement)
-            );
-    /**
-     * Regex Description:
-     *
-     *  if the statement starts with either create procedure, partition,
-     *  replicate, or role the first match group is set to respectively procedure,
-     *  partition, replicate, or role.
-     * <pre>
-     * (?i) -- ignore case
-     * ((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE\\AEXPORT) -- voltdb ddl
-     *    [capture group 1]
-     *      (?<=\\ACREATE\\s{1,1024})(?:PROCEDURE|ROLE) -- create procedure or role ddl
-     *          (?<=\\ACREATE\\s{0,1024}) -- CREATE zero-width positive lookbehind
-     *              \\A -- beginning of statement
-     *              CREATE -- token
-     *              \\s{1,1024} -- one or up to 1024 spaces
-     *              (?:PROCEDURE|ROLE) -- procedure or role token
-     *      | -- or
-     *      \\A -- beginning of statement
-     *      -- PARTITION token
-     *      | -- or
-     *      \\A -- beginning of statement
-     *      REPLICATE -- token
-     *      | -- or
-     *      \\A -- beginning of statement
-     *      EXPORT -- token
-     * \\s -- one space
-     * </pre>
-     */
-    static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})" +
-            "(?:PROCEDURE|ROLE)|" +
-            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
-            );
 
     static final String TABLE = "TABLE";
     static final String PROCEDURE = "PROCEDURE";
@@ -608,7 +184,7 @@ public class DDLCompiler {
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
 
                     // figure out what table this DDL might affect to minimize diff processing
-                    HSQLDDLInfo ddlStmtInfo = SQLLexer.preprocessHSQLDDL(stmt.statement);
+                    HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
 
                     // Get the diff that results from applying this statement and apply it
                     // to our local tree (with Volt-specific additions)
@@ -800,7 +376,7 @@ public class DDLCompiler {
         statement = statement.trim();
 
         // matches if it is the beginning of a voltDB statement
-        Matcher statementMatcher = voltdbStatementPrefixPattern.matcher(statement);
+        Matcher statementMatcher = SQLParser.matchAllVoltDBStatementPreambles(statement);
         if ( ! statementMatcher.find()) {
             return false;
         }
@@ -809,7 +385,7 @@ public class DDLCompiler {
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
-        statementMatcher = procedureClassPattern.matcher(statement);
+        statementMatcher = SQLParser.matchCreateProcedureFromClass(statement);
         if (statementMatcher.matches()) {
             if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
                 return true;
@@ -851,7 +427,7 @@ public class DDLCompiler {
         }
 
         // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
-        statementMatcher = procedureSingleStatementPattern.matcher(statement);
+        statementMatcher = SQLParser.matchCreateProcedureAsSQL(statement);
         if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
             String sqlStatement = statementMatcher.group(3) + ";";
@@ -874,7 +450,7 @@ public class DDLCompiler {
 
         // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
         // ### <code-block> ### LANGUAGE <language-name>
-        statementMatcher = procedureWithScriptPattern.matcher(statement);
+        statementMatcher = SQLParser.matchCreateProcedureAsScript(statement);
         if (statementMatcher.matches()) {
 
             String className = checkIdentifierStart(statementMatcher.group(1), statement);
@@ -916,7 +492,7 @@ public class DDLCompiler {
         }
 
         // Matches if it is DROP PROCEDURE <proc-name or classname>
-        statementMatcher = procedureDropPattern.matcher(statement);
+        statementMatcher = SQLParser.matchDropProcedure(statement);
         if (statementMatcher.matches()) {
             String classOrProcName = checkIdentifierStart(statementMatcher.group(1), statement);
             // Extract the ifExists bool from group 2
@@ -926,7 +502,7 @@ public class DDLCompiler {
         }
 
         // matches if it is the beginning of a partition statement
-        statementMatcher = prePartitionPattern.matcher(statement);
+        statementMatcher = SQLParser.matchPartitionStatementPreamble(statement);
         if (statementMatcher.matches()) {
 
             // either TABLE or PROCEDURE
@@ -934,7 +510,7 @@ public class DDLCompiler {
             if (TABLE.equals(partitionee)) {
 
                 // matches if it is PARTITION TABLE <table> ON COLUMN <column>
-                statementMatcher = partitionTablePattern.matcher(statement);
+                statementMatcher = SQLParser.matchPartitionTable(statement);
 
                 if ( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -966,7 +542,7 @@ public class DDLCompiler {
                 // matches if it is
                 //   PARTITION PROCEDURE <procedure>
                 //      ON  TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]
-                statementMatcher = partitionProcedureStatementPattern.matcher(statement);
+                statementMatcher = SQLParser.matchPartitionProcedure(statement);
 
                 if ( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -1002,7 +578,7 @@ public class DDLCompiler {
         }
 
         // matches if it is REPLICATE TABLE <table-name>
-        statementMatcher = replicatePattern.matcher(statement);
+        statementMatcher = SQLParser.matchReplicateTable(statement);
         if (statementMatcher.matches()) {
             // group(1) -> table
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
@@ -1021,7 +597,7 @@ public class DDLCompiler {
         }
 
         // match IMPORT CLASS statements
-        statementMatcher = importClassPattern.matcher(statement);
+        statementMatcher = SQLParser.matchImportClass(statement);
         if (statementMatcher.matches()) {
             if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
                 // Semi-hacky way of determining if we're doing a cluster-internal compilation.
@@ -1061,7 +637,7 @@ public class DDLCompiler {
         // matches if it is CREATE ROLE [WITH <permission> [, <permission> ...]]
         // group 1 is role name
         // group 2 is comma-separated permission list or null if there is no WITH clause
-        statementMatcher = createRolePattern.matcher(statement);
+        statementMatcher = SQLParser.matchCreateRole(statement);
         if (statementMatcher.matches()) {
             String roleName = statementMatcher.group(1).toLowerCase();
             CatalogMap<Group> groupMap = db.getGroups();
@@ -1089,7 +665,7 @@ public class DDLCompiler {
 
         // matches if it is DROP ROLE
         // group 1 is role name
-        statementMatcher = dropRolePattern.matcher(statement);
+        statementMatcher = SQLParser.matchDropRole(statement);
         if (statementMatcher.matches()) {
             String roleName = statementMatcher.group(1).toUpperCase();
             boolean ifExists = (statementMatcher.group(2) != null);
@@ -1120,7 +696,7 @@ public class DDLCompiler {
             return true;
         }
 
-        statementMatcher = exportPattern.matcher(statement);
+        statementMatcher = SQLParser.matchExportTable(statement);
         if (statementMatcher.matches()) {
 
             // check the table portion
@@ -1212,7 +788,7 @@ public class DDLCompiler {
         assert clauses != null;
         CreateProcedurePartitionData data = null;
 
-        Matcher matcher = procedureClausePattern.matcher(clauses);
+        Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);
         int start = 0;
         while (matcher.find(start)) {
             start = matcher.end();
@@ -1361,7 +937,7 @@ public class DDLCompiler {
             retval.statement += nchar[0];
             return kStateReadingStringLiteral;
         }
-        else if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+        else if (SQLLexer.isBlockDelimiter(nchar[0])) {
             // we may be examining ### code block delimiters
             retval.statement += nchar[0];
             return kStateReadingCodeBlockDelim;
@@ -1376,7 +952,7 @@ public class DDLCompiler {
 
     private int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
-        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+        if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReadingCodeBlockNextDelim;
         } else {
             return readingState(nchar, retval);
@@ -1385,7 +961,7 @@ public class DDLCompiler {
 
     private int readingEndCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
-        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+        if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReadingEndCodeBlockNextDelim;
         } else {
             return kStateReadingCodeBlock;
@@ -1393,7 +969,7 @@ public class DDLCompiler {
     }
 
     private int readingCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
-        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+        if (SQLLexer.isBlockDelimiter(nchar[0])) {
             retval.statement += nchar[0];
             return kStateReadingCodeBlock;
         }
@@ -1402,7 +978,7 @@ public class DDLCompiler {
 
     private int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
-        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+        if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReading;
         }
         return kStateReadingCodeBlock;
@@ -1412,7 +988,7 @@ public class DDLCompiler {
         // all characters in the literal are accumulated. keep track of
         // newlines for error messages.
         retval.statement += nchar[0];
-        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+        if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReadingEndCodeBlockDelim;
         }
 

@@ -30,6 +30,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.junit.Test;
+import org.voltdb.parser.HSQLLexer;
+import org.voltdb.parser.SQLLexer;
 
 public class TestSQLLexer {
 
@@ -130,7 +132,7 @@ public class TestSQLLexer {
                                      boolean ifexists,
                                      boolean cascade)
     {
-        HSQLDDLInfo info = SQLLexer.preprocessHSQLDDL(ddl);
+        HSQLDDLInfo info = HSQLLexer.preprocessHSQLDDL(ddl);
         assertNotNull(info);
         assertEquals(verb, info.verb);
         assertEquals(noun, info.noun);
@@ -141,7 +143,7 @@ public class TestSQLLexer {
     }
 
     void checkInvalidHSQLPreprocessing(String ddl) {
-        HSQLDDLInfo info = SQLLexer.preprocessHSQLDDL(ddl);
+        HSQLDDLInfo info = HSQLLexer.preprocessHSQLDDL(ddl);
         assertEquals(null, info);
     }
 
@@ -160,9 +162,9 @@ public class TestSQLLexer {
         checkInvalidHSQLPreprocessing("craete table PANTS (ID int, RENAME varchar(50));");
         checkInvalidHSQLPreprocessing("create role pants with pockets;");
         checkInvalidHSQLPreprocessing("create role\n pants\n with cuffs;\n");
-        checkValidHSQLPreprocessing("drop table pants;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
+        checkValidHSQLPreprocessing("drop table pants ;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
         checkValidHSQLPreprocessing("drop table pants if exists;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.TABLE, "pants", null, true, false);
-        checkValidHSQLPreprocessing("drop view pants;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.VIEW, "pants", null, false, false);
+        checkValidHSQLPreprocessing("drop view pants ;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.VIEW, "pants", null, false, false);
         checkValidHSQLPreprocessing("drop view pants cascade;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.VIEW, "pants", null, false, true);
         checkValidHSQLPreprocessing("drop index pants   IF    EXISTS   CAsCaDe  ;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.INDEX, "pants", null, true, true);
         checkInvalidHSQLPreprocessing("dorp table pants;");

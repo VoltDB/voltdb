@@ -29,13 +29,14 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.parser.JDBCParser;
+import org.voltdb.parser.SQLLexer;
+import org.voltdb.parser.JDBCParser.ParsedCall;
 
 public class JDBC4Statement implements java.sql.Statement
 {
@@ -182,25 +183,15 @@ public class JDBC4Statement implements java.sql.Statement
         }
 
         // SQL Parsing
-        private static final Pattern ExtractParameterizedCall = Pattern.compile("^\\s*\\{\\s*call\\s+([^\\s()]+)\\s*\\(([?,\\s]+)\\)\\s*\\}\\s*$", Pattern.CASE_INSENSITIVE);
-        private static final Pattern ExtractNoParameterCall = Pattern.compile("^\\s*\\{\\s*call\\s+([^\\s()]+)\\s*\\}\\s*$", Pattern.CASE_INSENSITIVE);
-        private static final Pattern CleanCallParameters = Pattern.compile("[\\s,]+");
-        public static VoltSQL parseCall(String jdbcCall) throws SQLException        {
-            Matcher m = ExtractParameterizedCall.matcher(jdbcCall);
-            if (m.matches()) {
-                return new VoltSQL(new String[]{m.group(1)},
-                        CleanCallParameters.matcher(m.group(2)).replaceAll("").length(), TYPE_EXEC);
-            } else
-            {
-                m = ExtractNoParameterCall.matcher(jdbcCall);
-                if (m.matches()) {
-                    return new VoltSQL(new String[]{m.group(1)}, 0, TYPE_EXEC);
-                }
+        public static VoltSQL parseCall(String jdbcCall) throws SQLException
+        {
+            ParsedCall parsedCall = JDBCParser.parseJDBCCall(jdbcCall);
+            if (parsedCall == null) {
+                throw SQLError.get(SQLError.ILLEGAL_STATEMENT);
             }
-            throw SQLError.get(SQLError.ILLEGAL_STATEMENT);
+            return new VoltSQL(new String[]{parsedCall.sql}, parsedCall.parameterCount, TYPE_EXEC);
         }
 
-        private static final Pattern IsSelect = Pattern.compile("^select\\s.+", Pattern.CASE_INSENSITIVE);
         public static VoltSQL parseSQL(String queryIn) throws SQLException
         {
             if (queryIn == null || queryIn.length() == 0) {
@@ -215,7 +206,7 @@ public class JDBC4Statement implements java.sql.Statement
             // Assume the type is an update.  We'll look for SELECT explicitly.
             // We need to know the type to validate the exec() statements.  Either it is a query or DDL/update.
             byte type = TYPE_UPDATE;
-            if (IsSelect.matcher(query).matches()) {
+            if (SQLLexer.isSelect(query)) {
                 type = TYPE_SELECT;
             }
 
