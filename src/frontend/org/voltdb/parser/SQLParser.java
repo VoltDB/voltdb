@@ -699,20 +699,21 @@ public class SQLParser extends SQLPatternFactory
                 sb.append(" ");
             }
 
-            sb.append(token.toSqlText());
-
             if (token.kind() == VoltToken.Kind.SEMICOLON) {
                 queries.add(sb.toString());
                 sb.setLength(0);
                 firstToken = true;
             }
             else {
+                sb.append(token.toSqlText());
                 firstToken = false;
             }
         }
 
         if (sb.length() > 0)
             queries.add(sb.toString());
+
+        System.out.println(queries);
 
         return queries;
     }
@@ -750,6 +751,9 @@ public class SQLParser extends SQLPatternFactory
                 queries.add(sqlFragments[j]);
             }
         }
+
+        System.out.println("Parameters are: " + queries);
+
         return queries;
     }
 

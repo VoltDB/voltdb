@@ -19,6 +19,8 @@ package org.hsqldb_voltpatches;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class VoltTokenIterator implements Iterator<VoltToken> {
 
@@ -43,19 +45,52 @@ public class VoltTokenIterator implements Iterator<VoltToken> {
         return m_scanner.token.tokenType != Tokens.X_ENDPARSE;
     }
 
+    private void throwParseException() {
+        throw new ParseException("Malformed token: \""
+                + m_scanner.getToken().tokenString
+                + "\" in input \"" + m_scanner.sqlString + "\"");
+    }
+
+    private VoltToken getNextToken() {
+
+        Token hsqlToken = m_scanner.getToken();
+        if (hsqlToken.isMalformed) {
+            // It could be a stored procedure like "@UpdateClasses"
+            String sqlString = m_scanner.sqlString;
+            String remainingInput = sqlString.substring(m_scanner.currentPosition, sqlString.length());
+
+            Pattern procNamePat = Pattern.compile("^@[A-Z][A-Z0-9_]*", Pattern.CASE_INSENSITIVE);
+            Matcher matcher = procNamePat.matcher(remainingInput);
+            String procName = null;
+
+            if (matcher.find()) {
+                procName = matcher.group();
+            }
+            else
+                throwParseException();
+
+            m_scanner.currentPosition += procName.length();
+            m_scanner.resetState();
+
+            hsqlToken = new Token();
+            hsqlToken.reset();
+            hsqlToken.tokenString = procName;
+            hsqlToken.tokenType = Tokens.X_IDENTIFIER;
+        }
+
+        return new VoltToken(hsqlToken.duplicate());
+    }
+
     @Override
     public VoltToken next() {
 
         if (hasNext()) {
 
-            if (m_scanner.getToken().isMalformed) {
-                throw new ParseException("Malformed token: "
-                        + m_scanner.getToken().tokenString);
-            }
-
-            VoltToken nextToken = new VoltToken(m_scanner.token.duplicate());
+            VoltToken nextToken = getNextToken();
 
             m_scanner.scanNext();
+
+            System.out.println(nextToken);
 
             return nextToken;
         }
