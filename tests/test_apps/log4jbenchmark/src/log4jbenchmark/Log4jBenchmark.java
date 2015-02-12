@@ -70,7 +70,7 @@ public class Log4jBenchmark {
             "----------" + "----------" + "----------" + "----------" + "\n";
 
     // validated command line configuration
-    final KVConfig config;
+    final Log4JConfig config;
     // Reference to the database connection we will use
     final Client client;
     // Timer for periodic stats printing
@@ -91,7 +91,7 @@ public class Log4jBenchmark {
     CsvLogger csvlogger = null;
 
     // Appender
-    VoltDBLog4JAppender voltAppender;
+    final VoltDBLog4JAppender voltAppender;
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
@@ -100,7 +100,7 @@ public class Log4jBenchmark {
      * declaratively state command line options with defaults
      * and validation.
      */
-    static class KVConfig extends CLIConfig {
+    static class Log4JConfig extends CLIConfig {
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
 
@@ -136,7 +136,7 @@ public class Log4jBenchmark {
     }
 
     static class GraphiteLogger implements AutoCloseable {
-        final static String METRIC_PREFIX = "volt.kv.";
+        final static String METRIC_PREFIX = "volt.log4j.";
         final Socket m_socket;
         final PrintWriter m_writer;
 
@@ -167,12 +167,12 @@ public class Log4jBenchmark {
 
             double now = stats.getEndTimestamp() / 1000.0;
 
-            m_writer.printf("volt.kv.aborts %d %.3f\n", stats.getInvocationAborts(), now);
-            m_writer.printf("volt.kv.errors %d %.3f\n", stats.getInvocationErrors(), now);
-            m_writer.printf("volt.kv.latency.average %f %.3f\n", stats.getAverageLatency(), now);
-            m_writer.printf("volt.kv.latency.five9s %.2f %.3f\n", stats.kPercentileLatencyAsDouble(0.99999), now);
-            m_writer.printf("volt.kv.completed %d %.3f\n", stats.getInvocationsCompleted(), now);
-            m_writer.printf("volt.kv.throughput %d %.3f\n", stats.getTxnThroughput(), now);
+            m_writer.printf("volt.log4j.aborts %d %.3f\n", stats.getInvocationAborts(), now);
+            m_writer.printf("volt.log4j.errors %d %.3f\n", stats.getInvocationErrors(), now);
+            m_writer.printf("volt.log4j.latency.average %f %.3f\n", stats.getAverageLatency(), now);
+            m_writer.printf("volt.log4j.latency.five9s %.2f %.3f\n", stats.kPercentileLatencyAsDouble(0.99999), now);
+            m_writer.printf("volt.log4j.completed %d %.3f\n", stats.getInvocationsCompleted(), now);
+            m_writer.printf("volt.log4j.throughput %d %.3f\n", stats.getTxnThroughput(), now);
         }
     }
 
@@ -245,7 +245,7 @@ public class Log4jBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public Log4jBenchmark(KVConfig config) {
+    public Log4jBenchmark(Log4JConfig config) {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "");
@@ -503,11 +503,11 @@ public class Log4jBenchmark {
      *
      * @param args Command line arguments.
      * @throws Exception if anything goes wrong.
-     * @see {@link KVConfig}
+     * @see {@link Log4JConfig}
      */
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
-        KVConfig config = new KVConfig();
+        Log4JConfig config = new Log4JConfig();
         config.parse(Log4jBenchmark.class.getName(), args);
 
         Log4jBenchmark benchmark = new Log4jBenchmark(config);
