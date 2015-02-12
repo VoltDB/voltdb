@@ -41,6 +41,7 @@ public class AsyncCompilerWork implements Serializable {
     final public ProcedureInvocationType invocationType;
     public final long originalTxnId;
     public final long originalUniqueId;
+    // We don't use onReplica with DRv2 but we will almost certainly need this in the future
     final boolean onReplica;
     final boolean useAdhocDDL;
     public final AuthSystem.AuthUser user;

@@ -142,22 +142,13 @@ public class AsyncCompilerAgent {
             }
             else {
                 // We have adhoc DDL.  Is it okay to run it?
-                // Is it forbidden by the replication role and configured schema change method?
-                // master and UAC method chosen:
-                if (!w.onReplica && !w.useAdhocDDL) {
+                // Is it configured schema change method?
+                // UAC method chosen:
+                if (!w.useAdhocDDL) {
                     AsyncCompilerResult errResult =
                         AsyncCompilerResult.makeErrorResult(w,
                                 "Cluster is configured to use @UpdateApplicationCatalog " +
                                 "to change application schema.  AdHoc DDL is forbidden.");
-                    w.completionHandler.onCompletion(errResult);
-                    return;
-                }
-                // Any adhoc DDL on the replica is forbidden (master changes appear as UAC
-                else if (w.onReplica) {
-                    AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "AdHoc DDL is forbidden on a DR replica cluster. " +
-                                "Apply schema changes to the master and they will propogate to replicas.");
                     w.completionHandler.onCompletion(errResult);
                     return;
                 }
