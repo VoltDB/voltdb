@@ -96,7 +96,3 @@ SELECT * FROM @fromtables LHS INNER JOIN @fromtables B20RHS ON LHS._variable[@co
 SELECT * FROM @fromtables A WHERE EXISTS ( SELECT * FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
 SELECT * FROM @fromtables A WHERE _variable[@columntype] IN ( SELECT _variable[@columntype] FROM @fromtables B )
 SELECT * FROM @fromtables A WHERE _variable[@comparabletype] _cmp @comparableconstant AND EXISTS ( SELECT * FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
-
--- IN/EXISTS with other combination
-SELECT _variable[#grouped @columntype], COUNT(*) FROM @fromtables A WHERE EXISTS ( SELECT * FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] ) GROUP BY __[#grouped]
-SELECT * FROM @fromtables LHS INNER JOIN @fromtables B25RHS ON LHS.@idcol = B25RHS.@idcol where LHS._variable[@columntype] NOT IN (SELECT _variable[@columntype] FROM @fromtables IN_TABLE)
