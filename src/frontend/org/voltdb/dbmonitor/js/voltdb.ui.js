@@ -1,6 +1,7 @@
 ﻿var ispopupRevoked = false;
 
 $(document).ready(function () {
+    var rv = -1;
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
     } else {
@@ -13,12 +14,30 @@ $(document).ready(function () {
 
     //Prevent scrolling of page.
     $('#navSchema').on("click", function (e) {
-
+        //Browser validation for IE version less than IE 11
         if (navigator.userAgent.indexOf('MSIE') >= 0) {
             window.location.hash = "#o"; //This is required for IE.
             setTimeout(function () {
                 window.scrollTo(0, 0);
             }, 10);
+        }
+
+        //IE 11 is just a preview release. 
+        //Hence validation expressions may differs after the full version is released 
+        //In such case, below validation has to be updated
+        else if (navigator.appName == 'Netscape') {
+            var ua = navigator.userAgent;
+            var re = new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})");
+
+            if (re.exec(ua) != null) {
+                rv = parseFloat(RegExp.$1);
+                if (rv == 11) {
+                    window.location.hash = "#o"; //This is required for IE.
+                    setTimeout(function () {
+                        window.scrollTo(0, 0);
+                    }, 10);
+                }
+            }            
         }
         e.preventDefault();
     });
@@ -1511,7 +1530,7 @@ var adjustGraphSpacing = function () {
 };
 
 (function (window) {
-    var iVoltDbUi = (function () {        
+    var iVoltDbUi = (function () {
         this.isSchemaTabLoading = false;
         this.ACTION_STATES = {
             NONE: -1,
@@ -1599,7 +1618,7 @@ var adjustGraphSpacing = function () {
             schemaHtml = schemaHtml + $('#schema').html();
             $('#schema').html(schemaHtml);
 
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';            
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';              
             var templateJavascript = "js/template.js";
 
             $.post(templateUrl, function (result) {
