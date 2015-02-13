@@ -162,7 +162,7 @@ public class AsyncCompilerAgent {
             // If we weren't provided operationBytes, it's a deployment-only change and okay to take
             // master and adhoc DDL method chosen
             if (w.invocationName.equals("@UpdateApplicationCatalog") &&
-                w.operationBytes != null && !w.onReplica && w.useAdhocDDL)
+                w.operationBytes != null && w.useAdhocDDL)
             {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
@@ -171,7 +171,7 @@ public class AsyncCompilerAgent {
                 w.completionHandler.onCompletion(errResult);
                 return;
             }
-            else if (w.invocationName.equals("@UpdateClasses") && !w.onReplica && !w.useAdhocDDL) {
+            else if (w.invocationName.equals("@UpdateClasses") && !w.useAdhocDDL) {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
                             "Cluster is configured to use @UpdateApplicationCatalog " +
