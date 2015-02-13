@@ -27,6 +27,8 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
+
 public class TestClassMatcher extends TestCase {
     static String testClasses = "org.voltdb.utils.BinaryDeque\n" +
                                 "org.voltdb.utils.BinaryDeque$BinaryDequeTruncator\n" +
@@ -76,6 +78,31 @@ public class TestClassMatcher extends TestCase {
         cm = new ClassMatcher();
         cm.m_classList = testClasses;
         cm.addPattern("*.voltdb.*CLibrary");
+        matchedClasses = cm.getMatchedClassList();
+        out = matchedClasses.toArray(new String[matchedClasses.size()]);
+        assertEquals(0, out.length);
+    }
+
+    public void testEng7223() {
+        String[] classes = {
+            "voter.ContestantWinningStates",
+            "voter.ContestantWinningStates$OrderByVotesDesc",
+            "voter.ContestantWinningStates$Result"
+        };
+
+        // Should match the outer class, not the nested ones.
+        ClassMatcher cm = new ClassMatcher();
+        cm.m_classList = StringUtils.join(classes, '\n');
+        cm.addPattern("**.*Cont*");
+        Set<String> matchedClasses = cm.getMatchedClassList();
+        String[] out = matchedClasses.toArray(new String[matchedClasses.size()]);
+        assertEquals(1, out.length);
+        assertTrue(strContains(out, "voter.ContestantWinningStates"));
+
+        // Make sure '.' is literal, and not treated as a regex "match any character".
+        cm = new ClassMatcher();
+        cm.m_classList = StringUtils.join(classes, '\n');
+        cm.addPattern("**.*Cont.*");
         matchedClasses = cm.getMatchedClassList();
         out = matchedClasses.toArray(new String[matchedClasses.size()]);
         assertEquals(0, out.length);

@@ -271,6 +271,12 @@ var loadPage = function (serverName, portid) {
     var showAdminPage = function () {
         if (!VoltDbAdminConfig.isAdmin) {
             VoltDbAdminConfig.isAdmin = true;
+
+            if ($.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
+                VoltDBService.SetConnectionForSQLExecution(true);
+                SQLQueryRender.saveConnectionKey(true);
+            }
+
             $("#navAdmin").show();
             loadAdminPage();
         }
@@ -1657,5 +1663,3 @@ function getParameterByName(name) {
     else
         return decodeURIComponent(results[1].replace(/\+/g, " "));
 }
-
-

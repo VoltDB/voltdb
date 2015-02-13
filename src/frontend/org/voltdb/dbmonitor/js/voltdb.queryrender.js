@@ -268,9 +268,9 @@
                     processResponseForAllViews();
                 }
             };
-
+            
             //Handle the case when Database is paused
-            if (response.status == -5 && VoltDbAdminConfig.isAdmin && !$.cookie("sql_port_for_paused_db")) {
+            if (response.status == -5 && VoltDbAdminConfig.isAdmin && !SQLQueryRender.useAdminPortCancelled) {
 
                 if (!VoltDbAdminConfig.isDbPaused) {
 
@@ -287,6 +287,7 @@
             } else {
                 processResponseForAllViews();
             }
+            SQLQueryRender.useAdminPortCancelled = false;
         }
         this.Callback = callback;
     }
