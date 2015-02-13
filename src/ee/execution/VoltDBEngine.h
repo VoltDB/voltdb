@@ -372,6 +372,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return (m_tempTableMemoryLimit * 3) / 4;
         }
 
+        int32_t getPartitionId() const {
+            return m_partitionId;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask
