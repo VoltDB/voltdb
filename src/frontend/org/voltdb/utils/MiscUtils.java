@@ -842,4 +842,55 @@ public class MiscUtils {
         return String.format("%d days %02d:%02d:%02d.%03d",
                 days, hours, minutes, seconds, remainingMs);
     }
+
+    /**
+     * Delays retrieval until first use, but holds onto a boolean value to
+     * minimize overhead. The delayed retrieval allows tests to set properties
+     * dynamically and have them obeyed.
+     */
+    public static class BooleanSystemProperty
+    {
+        private final String key;
+        private Boolean value = null;
+        private final boolean defaultValue;
+
+        /**
+         * Construct system property retriever with default value of false
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key)
+        {
+            this(key, false);
+        }
+
+        /**
+         * Construct system property retriever with default value provided by caller
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key, boolean defaultValue)
+        {
+            this.key = key;
+            this.defaultValue = defaultValue;
+        }
+
+        /**
+         * Retrieves once and caches boolean value. Uses default if not available.
+         * @return true if value or default is true ("true" or "yes" string)
+         */
+        public boolean isTrue()
+        {
+            if (this.value == null) {
+                // First time - retrieve and convert the value or use the default value.
+                String stringValue = System.getProperty(this.key);
+                if (stringValue != null) {
+                    this.value = (stringValue.equalsIgnoreCase("true") || stringValue.equalsIgnoreCase("yes"));
+                }
+                else {
+                    this.value = this.defaultValue;
+                }
+            }
+            assert this.value != null;
+            return this.value;
+        }
+    }
 }
