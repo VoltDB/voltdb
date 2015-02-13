@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="vmcTest.tests.DbMonitorTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2015-02-11T09:06:18" hostname="DWNPCPU0720" time="0.0">
+  <properties/>
+  <testcase name="classMethod" classname="vmcTest.tests.DbMonitorTest" time="0.0">
+    <failure message="org.openqa.selenium.NoSuchWindowException: Window not found. The browser window may have been closed.&#10;Command duration or timeout: 283 milliseconds&#10;Build info: version: '2.44.0', revision: '76d78cf323ce037c5f92db6c1bba601c2ac43ad8', time: '2014-10-23 13:11:40'&#10;System info: host: 'DWNPCPU0720', ip: '192.168.0.107', os.name: 'Windows 7', os.arch: 'amd64', os.version: '6.1', java.version: '1.8.0_25'&#10;Driver info: org.openqa.selenium.firefox.FirefoxDriver&#10;Capabilities [{applicationCacheEnabled=true, rotatable=false, handlesAlerts=true, databaseEnabled=true, version=35.0, platform=WINDOWS, nativeEvents=false, acceptSslCerts=true, webStorageEnabled=true, locationContextEnabled=true, browserName=firefox, takesScreenshot=true, javascriptEnabled=true, cssSelectorsEnabled=true}]&#10;Session ID: bb22c60e-c6bd-4c8c-a44a-f43fce039ba0" type="org.openqa.selenium.NoSuchWindowException">org.openqa.selenium.NoSuchWindowException: Window not found. The browser window may have been closed.
+Command duration or timeout: 283 milliseconds
+Build info: version: '2.44.0', revision: '76d78cf323ce037c5f92db6c1bba601c2ac43ad8', time: '2014-10-23 13:11:40'
+System info: host: 'DWNPCPU0720', ip: '192.168.0.107', os.name: 'Windows 7', os.arch: 'amd64', os.version: '6.1', java.version: '1.8.0_25'
+Driver info: org.openqa.selenium.firefox.FirefoxDriver
+Capabilities [{applicationCacheEnabled=true, rotatable=false, handlesAlerts=true, databaseEnabled=true, version=35.0, platform=WINDOWS, nativeEvents=false, acceptSslCerts=true, webStorageEnabled=true, locationContextEnabled=true, browserName=firefox, takesScreenshot=true, javascriptEnabled=true, cssSelectorsEnabled=true}]
+Session ID: bb22c60e-c6bd-4c8c-a44a-f43fce039ba0
+	at org.openqa.selenium.remote.ErrorHandler.createThrowable(ErrorHandler.java:204)
+	at org.openqa.selenium.remote.ErrorHandler.throwIfResponseFailed(ErrorHandler.java:156)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:599)
+	at org.openqa.selenium.remote.RemoteWebDriver$RemoteWebDriverOptions$RemoteWindow.setSize(RemoteWebDriver.java:793)
+	at vmcTest.tests.TestBase.setupSpec(TestBase.groovy:58)
+Caused by: org.openqa.selenium.NoSuchWindowException: Window not found. The browser window may have been closed.
+Build info: version: '2.44.0', revision: '76d78cf323ce037c5f92db6c1bba601c2ac43ad8', time: '2014-10-23 13:11:40'
+System info: host: 'DWNPCPU0720', ip: '192.168.0.107', os.name: 'Windows 7', os.arch: 'amd64', os.version: '6.1', java.version: '1.8.0_25'
+Driver info: driver.version: unknown
+	at &lt;anonymous class&gt;.nsCommandProcessor.prototype.execute(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/command-processor.js:11706:23)
+	at &lt;anonymous class&gt;.Dispatcher.executeAs/&lt;(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:8437:5)
+	at &lt;anonymous class&gt;.Resource.prototype.handle(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:8584:219)
+	at &lt;anonymous class&gt;.Dispatcher.prototype.dispatch(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:8531:36)
+	at &lt;anonymous class&gt;.WebDriverServer/&lt;.handle(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:11489:5)
+	at &lt;anonymous class&gt;.createHandlerFunc/&lt;(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1935:41)
+	at &lt;anonymous class&gt;.ServerHandler.prototype.handleResponse(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:2261:15)
+	at &lt;anonymous class&gt;.Connection.prototype.process(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1168:5)
+	at &lt;anonymous class&gt;.RequestReader.prototype._handleResponse(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1616:5)
+	at &lt;anonymous class&gt;.RequestReader.prototype._processBody(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1464:9)
+	at &lt;anonymous class&gt;.RequestReader.prototype.onInputStreamReady(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1333:9)
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

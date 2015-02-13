@@ -1,0 +1,20 @@
+if (System.getenv('DRONE')) {
+    repositories {
+        maven {
+            url "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+    }
+
+    configurations.all {
+        resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+    }
+
+    gebVersion = "(,1.0["
+    chromeDriverVersion = "2.8"
+
+    tasks.withType(Test) {
+        testLogging {
+            exceptionFormat = 'full'
+        }
+    }
+}
