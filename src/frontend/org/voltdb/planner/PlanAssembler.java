@@ -1036,8 +1036,10 @@ public class PlanAssembler {
 
             }
 
+            boolean targetIsExportTable = tableListIncludesExportOnly(m_parsedInsert.m_tableList);
             InsertSubPlanAssembler subPlanAssembler =
-                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning);
+                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning,
+                            targetIsExportTable);
             AbstractPlanNode subplan = subPlanAssembler.nextPlan();
             if (subplan == null) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
@@ -1115,6 +1117,9 @@ public class PlanAssembler {
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
+        if (subquery != null) {
+            insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());
+        }
 
         // The field map tells the insert node
         // where to put values produced by child into the row to be inserted.

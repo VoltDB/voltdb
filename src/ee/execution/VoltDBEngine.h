@@ -355,6 +355,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        int32_t getPartitionId() const {
+            return m_partitionId;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask

@@ -60,12 +60,21 @@ class Pool;
  */
 class InsertPlanNode : public AbstractOperationPlanNode {
 public:
-    InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() { }
+    InsertPlanNode()
+        : AbstractOperationPlanNode()
+        , m_multiPartition(false)
+        , m_fieldMap()
+        , m_isUpsert(false)
+        , m_sourceIsPartitioned(false) {
+    }
+
     PlanNodeType getPlanNodeType() const;
 
     bool isMultiPartition() { return m_multiPartition; }
 
     bool isUpsert() { return m_isUpsert; }
+
+    bool sourceIsPartitioned() const { return m_sourceIsPartitioned; }
 
     void initTupleWithDefaultValues(VoltDBEngine* engine,
                                     Pool* pool,
@@ -82,6 +91,7 @@ private:
     bool m_multiPartition;
     std::vector<int> m_fieldMap;
     bool m_isUpsert;
+    bool m_sourceIsPartitioned;
 };
 
 } // namespace voltdb

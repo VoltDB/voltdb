@@ -72,6 +72,7 @@ public:
         m_multiPartition(false),
         m_isStreamed(false),
         m_isUpsert(false),
+        m_sourceIsPartitioned(false),
         m_engine(engine),
         m_templateTuple(),
         m_memoryPool(),
@@ -92,6 +93,7 @@ public:
         bool m_multiPartition;
         bool m_isStreamed;
         bool m_isUpsert;
+        bool m_sourceIsPartitioned;
 
         /** reference to the engine/context to store the number of modified tuples */
         VoltDBEngine* m_engine;
