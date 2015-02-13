@@ -3,7 +3,7 @@
 
     var iVoltDBConfig = (function () {
 
-        this.GetDefaultServerIP = function() {
+        this.GetDefaultServerIP = function () {
             return window.location.hostname;
         };
 

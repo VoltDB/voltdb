@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -84,40 +84,71 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(4, i);
     }
 
+    /** Check the result of a query that has only an OFFSET and no LIMIT clause.
+     * This is done by executing the query with and without the offset clause,
+     * and then skipping past the offset rows in the expected table here
+     * on the client side. */
+    private static void doOffsetAndCheck(Client client, String stmt)
+    throws IOException, InterruptedException, ProcCallException
+    {
+        String stmtNoOffset = stmt.substring(0, stmt.indexOf("OFFSET"));
+        VoltTable expectedTable = client.callProcedure("@AdHoc", stmtNoOffset).getResults()[0];
+        int rowCountBeforeOffset = expectedTable.getRowCount();
+
+        int[] offsets = {0, 1, 5, 10, 11, 15};
+        for (int offset : offsets) {
+            VoltTable actualTable = client.callProcedure("@AdHoc", stmt, offset).getResults()[0];
+            int expectedRowCount = Math.max(rowCountBeforeOffset - offset, 0);
+            assertEquals("Actual table has wrong number of rows: ",
+                    expectedRowCount, actualTable.getRowCount());
+            if (actualTable.getRowCount() == 0)
+                continue;
+
+            // non-empty result.
+            // Advance expected table past offset
+            // then compare what's left.
+            actualTable.resetRowPosition();
+            for (int i = 0; i < offset; ++i)
+                expectedTable.advanceRow();
+
+            while (actualTable.advanceRow() && expectedTable.advanceRow()) {
+                assertEquals(expectedTable.getLong(0), actualTable.getLong(0));
+                assertEquals(expectedTable.getLong(1), actualTable.getLong(1));
+            }
+        }
+    }
+
     public void testBasicLimitOffsets() throws IOException, ProcCallException, InterruptedException
     {
         Client client = this.getClient();
         load(client);
-        doTestMultiPartInlineLimit(client);
-        doTestMultiPartLimit(client);
-        doTestReplicatedInlineLimit(client);
-        doTestReplicatedLimit(client);
+
+        String[] procedureNames = {
+                "LimitAPKEY",
+                "LimitAI",
+                "LimitBPKEY",
+                "LimitBI"
+        };
+        for (String procedureName : procedureNames) {
+            doLimitOffsetAndCheck(client, procedureName);
+        }
+
+        String[] offsetOnlyStmts = {
+                "SELECT * FROM A ORDER BY PKEY OFFSET ?;",
+                "SELECT * FROM B ORDER BY PKEY OFFSET ?;",
+                "SELECT * FROM A ORDER BY I OFFSET ?;",
+                "SELECT * FROM B ORDER BY I OFFSET ?;"
+        };
+        for (String stmt : offsetOnlyStmts) {
+            doOffsetAndCheck(client, stmt);
+        }
+
         doTestJoinAndLimitOffset(client);
-    }
-
-    private static void doTestMultiPartInlineLimit(Client client) throws IOException, InterruptedException, ProcCallException
-    {
-        doLimitOffsetAndCheck(client, "LimitAPKEY");
-    }
-
-    private static void doTestMultiPartLimit(Client client) throws IOException, InterruptedException, ProcCallException
-    {
-        doLimitOffsetAndCheck(client, "LimitAI");
-    }
-
-    private static void doTestReplicatedInlineLimit(Client client) throws IOException, InterruptedException, ProcCallException
-    {
-        doLimitOffsetAndCheck(client, "LimitBPKEY");
-    }
-
-    private static void doTestReplicatedLimit(Client client) throws IOException, InterruptedException, ProcCallException
-    {
-        doLimitOffsetAndCheck(client, "LimitBI");
     }
 
     public static void doTestJoinAndLimitOffset(Client client) throws IOException, ProcCallException, InterruptedException
     {
-        int limits[] = new int[] { 1, 2, 5, 10, 12, 25 };
+        int limits[] = new int[] { 1, 2, 5, 10, 12, 25, Integer.MAX_VALUE };
         int offsets[] = new int[] { 0, 1, 2, 5, 10, 12, 25 };
         String selecteds[] = new String[] { "*", "A.PKEY" };
         String joinops[] = new String[] { ",", "LEFT JOIN", "RIGHT JOIN" };
@@ -143,11 +174,13 @@ public class TestLimitOffsetSuite extends RegressionSuite {
                                     " FROM A " + joinop + " B " +
                                     onwhere + condition +
                                     " ORDER BY A.PKEY, B.PKEY " +
-                                    "LIMIT " + limit +
+                                    ((limit == Integer.MAX_VALUE) ? "" : "LIMIT " + limit) +
                                     ((offset == 0) ? "" : " OFFSET " + offset) +
                                     ";";
                             result = client.callProcedure("@AdHoc", query).getResults()[0];
-                            assertEquals(Math.max(0, Math.min(limit, found-offset)), result.getRowCount());
+                            long expectedRowCount = Math.max(0, Math.min(limit, found-offset));
+                            assertEquals("Statement \"" + query + "\" produced wrong number of rows: ",
+                                    expectedRowCount, result.getRowCount());
                         }
                     }
                 }

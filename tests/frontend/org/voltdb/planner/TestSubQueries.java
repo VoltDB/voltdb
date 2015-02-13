@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -275,7 +275,9 @@ public class TestSubQueries extends PlannerTestCase {
         planNodes = compileToFragments(sql);
         // send node
         pn = planNodes.get(1).getChild(0);
-        checkPrimaryKeyIndexScan(pn, "P1");
+        // P1 has PRIMARY KEY INDEX on column A: GROUP BY C should not use its INDEX to speed up.
+        checkSeqScan(pn, "P1", "C", "A");
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
     }
 
@@ -1112,7 +1114,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "T1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         pn = pn.getChild(0);
-        // ProjectionNode for the top Aggregate, this may not be needed if without complex aggregates
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");

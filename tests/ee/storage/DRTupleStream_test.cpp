@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -67,7 +67,7 @@ static int64_t addPartitionId(int64_t value) {
 class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest() : m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, true, "localhost", 2, &m_wrapper, NULL)) {
+        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, "localhost", 2, &m_wrapper, NULL)) {
         m_wrapper.m_enabled = true;
         srand(0);
         // set up the schema used to fill the new buffer

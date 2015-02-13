@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
 
 public interface SystemProcedureExecutionContext {
@@ -70,6 +71,8 @@ public interface SystemProcedureExecutionContext {
             CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
 
     public TheHashinator getCurrentHashinator();
+
+    public Procedure ensureDefaultProcLoaded(String procName);
 
     /**
      * Update the EE hashinator with the given configuration.

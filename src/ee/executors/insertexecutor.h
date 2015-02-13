@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -97,8 +97,14 @@ public:
         /** If the table is at or over its tuple limit, this method
          * executes the purge fragment for the table.  Returns true if
          * nothing went wrong (regardless of whether the purge
-         * fragment was executed) and false otherwise. */
-        bool executePurgeFragmentIfNeeded(PersistentTable* table);
+         * fragment was executed) and false otherwise.
+         *
+         * The purge fragment might perform a truncate table,
+         * in which case the persistent table object we're inserting
+         * into might change.  Passing a pointer-to-pointer allows
+         * the callee to update the persistent table pointer.
+         */
+        bool executePurgeFragmentIfNeeded(PersistentTable** table);
 
         /** A tuple with the target table's schema that is populated
          * with default values for each field. */

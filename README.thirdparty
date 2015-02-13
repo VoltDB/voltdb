@@ -1140,6 +1140,25 @@ emma_ant
  */
 
 ================================================================================
+Gradle 1.6 (Used in the GEB automated tests of the VMC, VoltDB Management Center)
+
+/*
+ * Copyright 2007-2011 the original author or authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+================================================================================
 gradle-wrapper.jar
 
 The License is accompanied by a NOTICE
@@ -1755,7 +1774,8 @@ Avro 1.7.7 uses the following license:
 Licenses referred to by some above package license texts
 ================================================================================
 
-Apache License Version 2.0, January 2004http://www.apache.org/licenses/
+Apache License Version 2.0, January 2004
+http://www.apache.org/licenses/
 
 TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 1. Definitions.
@@ -2433,7 +2453,17 @@ jQuery Crypt
 Site url: http://www.itsyndicate.ca/jquery/ 
 http://www.jquery-plugins.info/jquery-crypt-00013584.htm
 License Url: http://www.opensource.org/licenses/mit-license.php
-===============================================================================
+================================================================================
+jQuery Validation Plugin
+Site url: http://jqueryvalidation.org/ 
+License Name: MIT License
+License url: http://en.wikipedia.org/wiki/MIT_License
+================================================================================
+iCheck Plugin
+Site url: http://fronteed.com/iCheck/ 
+License Name: MIT License
+License url: http://en.wikipedia.org/wiki/MIT_License
+================================================================================
 Eric Meyer's Reset CSS v2.0
 Site: http://meyerweb.com/eric/tools/css/reset/
 License: None http://www.cssreset.com/terms/

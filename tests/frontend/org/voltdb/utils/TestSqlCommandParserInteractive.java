@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -201,8 +201,29 @@ public class TestSqlCommandParserInteractive extends TestCase {
         cmd.submitText("; --select * from goats;\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
-        assertEquals(2, result.get().size());
+        // Note: sqlcmd split the queries by semicolon
+        // for each fragment, it removes comments at the beginning of a line,
+        // trim whitespace, etc.
+        assertEquals(1, result.get().size());
         assertEquals("insert into goats values (0, 1)", result.get().get(0));
+
+        // test more comments
+        result = cmd.openQuery();
+        cmd.submitText("CREATE TABLE T (\n"
+                + " column1 integer, -- comment\n"
+                + " column2 integer,\n"
+                + " -- column3 integer,\n"
+                + "column4 integer);\n"
+                + "\n"
+                );
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+
+        cmd.submitText("select * from T; -- select * from T;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
 
         cmd.close();
     }

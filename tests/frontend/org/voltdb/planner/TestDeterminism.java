@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -306,7 +306,7 @@ public class TestDeterminism extends PlannerTestCase {
     }
 
     public void testDeterminismOfWrites() {
-        // "LIMIT" not currently supported for DML.
+        // "LIMIT" not currently supported for some DML.
         assertDMLPlanDeterminism("insert into ttree values (1,2,3,4)");
         assertDMLPlanDeterminism("insert into tunique values (1,2,3,4)");
         assertDMLPlanDeterminism("insert into tpk values (1,2,3,4)");
@@ -409,9 +409,6 @@ public class TestDeterminism extends PlannerTestCase {
         assertMPPlanDeterminismNeedsOrdering(
                 "select    max(a)    from ptree group by z, b order by z   ",
                 ", b", "order by 1");
-
-
-
 
         // Odd edge cases of needlessly long ORDER BY clause
         assertMPPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ptree group by z",

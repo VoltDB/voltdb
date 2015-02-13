@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -59,6 +59,11 @@ import org.voltdb.VoltTable;
         singlePartition = false
     )
 public class FragmentUpdateTestProcedure extends VoltProcedure {
+
+    // Note: all of these SQL statements are accessed via reflection in the test:
+    //   TestFragmentProgressUpdate
+    // So please don't remove them or change their names.
+
     public final SQLStmt warehouse_select = new SQLStmt("SELECT * FROM WAREHOUSE;");
     public final SQLStmt warehouse_del_half = new SQLStmt("DELETE FROM WAREHOUSE WHERE W_ID > 5000;");
     public final SQLStmt warehouse_join = new SQLStmt("SELECT W1.W_TAX + W1.W_YTD FROM WAREHOUSE W1, WAREHOUSE W2"
@@ -70,6 +75,9 @@ public class FragmentUpdateTestProcedure extends VoltProcedure {
 
     // Not meaningful, but should take long.
     public final SQLStmt item_big_del = new SQLStmt("DELETE FROM ITEM WHERE I_NAME <> 'NULL_NULL';");
+
+    // Just a quick query
+    public final SQLStmt quick_query = new SQLStmt("SELECT W_ID FROM WAREHOUSE LIMIT 1");
 
     public VoltTable[] run() {
         voltQueueSQL(warehouse_select);

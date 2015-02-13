@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -89,10 +89,8 @@ public abstract class AdHocBase extends VoltSystemProcedure {
             return new VoltTable[]{};
         }
 
-        int currentCatalogVersion = ctx.getCatalogVersion();
-
         for (AdHocPlannedStatement statement : statements) {
-            if (currentCatalogVersion != statement.core.catalogVersion) {
+            if (!statement.core.wasPlannedAgainstHash(ctx.getCatalogHash())) {
                 String msg = String.format("AdHoc transaction %d wasn't planned " +
                         "against the current catalog version. Statement: %s",
                         getVoltPrivateRealTransactionIdDontUseMe(),

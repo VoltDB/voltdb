@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,6 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
-import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.SchemaType;
@@ -319,19 +318,19 @@ public class DeploymentBuilder {
         voltdbroot.setPath(m_voltRootPath);
 
         if (m_snapshotPath != null) {
-            PathEntry snapshotPathElement = factory.createPathEntry();
+            PathsType.Snapshots snapshotPathElement = factory.createPathsTypeSnapshots();
             snapshotPathElement.setPath(m_snapshotPath);
             paths.setSnapshots(snapshotPathElement);
         }
 
         if (m_commandLogPath != null) {
-            PathEntry commandLogPathElement = factory.createPathEntry();
+            PathsType.Commandlog commandLogPathElement = factory.createPathsTypeCommandlog();
             commandLogPathElement.setPath(m_commandLogPath);
             paths.setCommandlog(commandLogPathElement);
         }
 
         if (m_internalSnapshotPath != null) {
-            PathEntry commandLogSnapshotPathElement = factory.createPathEntry();
+            PathsType.Commandlogsnapshot commandLogSnapshotPathElement = factory.createPathsTypeCommandlogsnapshot();
             commandLogSnapshotPathElement.setPath(m_internalSnapshotPath);
             paths.setCommandlogsnapshot(commandLogSnapshotPathElement);
         }

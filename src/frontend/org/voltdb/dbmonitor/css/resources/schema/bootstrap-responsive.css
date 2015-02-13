@@ -1087,8 +1087,7 @@
     float: none;
     margin-left: 0;
   }
-  .nav-collapse,
-  .nav-collapse.collapse {
+  .nav-collapse {
     height: 0;
     overflow: hidden;
   }

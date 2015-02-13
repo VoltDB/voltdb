@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -183,8 +183,14 @@ class CSVFileReader implements Runnable {
                 } else {
                     lineValues[i] = lineValues[i].trim();
                 }
+
+                if(!m_config.customNullString.isEmpty()){
+                    if(lineValues[i].equals(m_config.customNullString)){
+                        lineValues[i] = null;
+                    }
+                }
                 // treat NULL, \N and "\N" as actual null value
-                if (lineValues[i].equals("NULL")
+                else if (lineValues[i].equals("NULL")
                         || lineValues[i].equals(Constants.CSV_NULL)
                         || lineValues[i].equals(Constants.QUOTED_CSV_NULL)) {
                     lineValues[i] = null;

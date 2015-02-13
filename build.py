@@ -158,9 +158,7 @@ CTX.INPUT[''] = """
 """
 
 CTX.INPUT['catalog'] = """
- authprogram.cpp
  catalog.cpp
- cataloginteger.cpp
  catalogtype.cpp
  cluster.cpp
  column.cpp
@@ -171,23 +169,11 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
- deployment.cpp
- group.cpp
- groupref.cpp
  index.cpp
  materializedviewinfo.cpp
  planfragment.cpp
- procedure.cpp
- procparameter.cpp
- program.cpp
  statement.cpp
- stmtparameter.cpp
- systemsettings.cpp
  table.cpp
- user.cpp
- userref.cpp
- snapshotschedule.cpp
- commandlog.cpp
 """
 
 CTX.INPUT['structures'] = """

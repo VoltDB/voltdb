@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -161,12 +161,13 @@ public class UpdateBaseProc extends VoltProcedure {
         }
 
         voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
+        voltQueueSQLExperimental("INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
         voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
-        // not seen by the server, hopefully this will bisect where they're occuring.
-        data = retval[2];
+        // not seen by the server, hopefully this will bisect where they're occurring.
+        data = retval[3];
         validateCIDData(data, getClass().getName());
 
         if (shouldRollback != 0) {

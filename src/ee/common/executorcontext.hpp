@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,7 +47,6 @@ class ExecutorContext {
                     Topend* topend,
                     Pool* tempStringPool,
                     VoltDBEngine* engine,
-                    bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId,
                     DRTupleStream *drTupleStream,
@@ -190,7 +189,6 @@ class ExecutorContext {
     CatalogId m_partitionId;
     std::string m_hostname;
     CatalogId m_hostId;
-    bool m_exportEnabled;
 
     /** local epoch for voltdb, somtime around 2008, pulled from catalog */
     int64_t m_epoch;

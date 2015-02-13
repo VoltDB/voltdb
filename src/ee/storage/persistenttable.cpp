@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -306,6 +306,14 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         assert(targetEmptyTable);
         new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
+
+    // If there is a purge fragment on the old table, pass it on to the new one
+    if (hasPurgeFragment()) {
+        assert(! emptyTable->hasPurgeFragment());
+        boost::shared_ptr<ExecutorVector> evPtr = getPurgeExecutorVector();
+        emptyTable->swapPurgeExecutorVector(evPtr);
+    }
+
     engine->rebuildTableCollections();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();

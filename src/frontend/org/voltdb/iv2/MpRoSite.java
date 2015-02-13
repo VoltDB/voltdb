@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -154,7 +155,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public byte[] getCatalogHash() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            // AdHoc invocations need to be able to check the hash of the current catalog
+            // against the hash of the catalog they were planned against.
+            return m_context.getCatalogHash();
         }
 
         @Override
@@ -238,6 +241,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
+        @Override
+        public Procedure ensureDefaultProcLoaded(String procName) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
     };
 
     /** Create a new RO MP execution site */

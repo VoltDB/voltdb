@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -83,7 +83,7 @@ void AbstractJoinPlanNode::getOutputColumnExpressions(
 std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "JoinType[" << m_joinType << "]\n";
+    buffer << spacer << "JoinType[" << joinToString(m_joinType) << "]\n";
     if (m_preJoinPredicate != NULL)
     {
         buffer << spacer << "Pre-Join Predicate\n";

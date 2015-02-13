@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,10 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -30,36 +32,38 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.server.AsyncContinuation;
-import org.eclipse.jetty.server.Handler;
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.ContextHandler;
-import org.eclipse.jetty.server.handler.ContextHandlerCollection;
-import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.HTTPClientInterface;
-import org.voltdb.VoltDB;
-import org.voltdb.compilereport.ReportMaker;
-
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.io.Resources;
-import java.net.InetAddress;
+import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
+import org.eclipse.jetty.server.AsyncContinuation;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.bio.SocketConnector;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
-import org.eclipse.jetty.server.bio.SocketConnector;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.HTTPClientInterface;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.compilereport.ReportMaker;
+
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.io.Resources;
 
 public class HTTPAdminListener {
 
@@ -274,7 +278,13 @@ public class HTTPAdminListener {
 
     // /profile handler
     class UserProfileHandler extends VoltRequestHandler {
-        private final ObjectMapper m_mapper = new ObjectMapper();
+        private final ObjectMapper m_mapper;
+
+        public UserProfileHandler() {
+            m_mapper = new ObjectMapper();
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+        }
 
         // GET on /profile resources.
         @Override
@@ -285,11 +295,11 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
-
+            AuthenticationResult authResult = null;
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-                AuthenticationResult authResult = authenticate(baseRequest);
+                authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                 } else {
@@ -304,6 +314,8 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
             }
         }
     }
@@ -320,8 +332,10 @@ public class HTTPAdminListener {
 
         public DeploymentRequestHandler() {
             m_mapper = new ObjectMapper();
+            //Mixin for to not output passwords.
             m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            m_mapper.getDeserializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             try {
                 JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
                 m_schema = schema.toString();
@@ -366,23 +380,13 @@ public class HTTPAdminListener {
 
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
-
+            AuthenticationResult authResult = null;
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-                //schema request does not require authentication.
-                if (baseRequest.getRequestURI().contains("/schema")) {
-                    String msg = m_schema;
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, m_schema);
-                    }
-                    response.getWriter().print(msg);
-                    baseRequest.setHandled(true);
-                    return;
-                }
 
                 //Requests require authentication.
-                AuthenticationResult authResult = authenticate(baseRequest);
+                authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                     baseRequest.setHandled(true);
@@ -401,17 +405,93 @@ public class HTTPAdminListener {
                     response.setContentType("text/xml;charset=utf-8");
                     response.getWriter().write(new String(getDeploymentBytes()));
                 } else {
-                    if (jsonp != null) {
-                        response.getWriter().write(jsonp + "(");
-                    }
-                    m_mapper.writeValue(response.getWriter(), getDeployment());
-                    if (jsonp != null) {
-                        response.getWriter().write(")");
+                    if (request.getMethod().equalsIgnoreCase("POST")) {
+                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    } else {
+                        //non POST
+                        if (jsonp != null) {
+                            response.getWriter().write(jsonp + "(");
+                        }
+                        m_mapper.writeValue(response.getWriter(), getDeployment());
+                        if (jsonp != null) {
+                            response.getWriter().write(")");
+                        }
                     }
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
+            }
+        }
+
+        //Update the deployment
+        public void handleUpdateDeployment(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            String deployment = request.getParameter("deployment");
+            if (deployment == null || deployment.length() == 0) {
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get deployment information."));
+                return;
+            }
+            try {
+                DeploymentType newDeployment = m_mapper.readValue(deployment, DeploymentType.class);
+                if (newDeployment == null) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse deployment information."));
+                    return;
+                }
+                //For users that are listed if they exists without password set their password to current else password will get changed for existing user.
+                //New users if valid will get updated.
+                //For Scrambled passowrd this will work also but new passwords will be unscrambled
+                //TODO: add switch to post to scramble??
+                if (newDeployment.getSecurity() != null) {
+                    DeploymentType currentDeployment = this.getDeployment();
+                    //Merge passwords for existing users.
+                    List<User> users = null;
+                    List<User> newusers = null;
+                    if (currentDeployment.getUsers() != null) {
+                        users = currentDeployment.getUsers().getUser();
+                    }
+                    if (newDeployment.getUsers() != null) {
+                        newusers = newDeployment.getUsers().getUser();
+                    }
+                    //We check current users also because enabling uses existing users that we copy over.
+                    if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled() &&
+                            (newusers == null || newusers.isEmpty() || users == null || users.isEmpty())) {
+                        response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Enabling security without any users is not allowed."));
+                        return;
+                    }
+                    //For security disabled copy all user's passwords to ensure deployment is good.
+                    if (newusers != null) {
+                        for (UsersType.User user : newusers) {
+                            if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
+                                for (User u : users) {
+                                    if (user.getName().equalsIgnoreCase(u.getName())) {
+                                        user.setPassword(u.getPassword());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                String dep = CatalogUtil.getDeployment(newDeployment);
+                if (dep == null || dep.trim().length() <= 0) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
+                Object[] params = new Object[2];
+                params[0] = null;
+                params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
+                client.callProcedure("@UpdateApplicationCatalog", params);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+            } catch (Exception ex) {
+                logger.error("Failed to update deployment from API", ex);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
             }
         }
     }
@@ -528,6 +608,8 @@ public class HTTPAdminListener {
 
             ///api/1.0/
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
+            // the default is 200k which well short of out 2M row size limit
+            apiRequestHandler.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             apiRequestHandler.setHandler(new APIRequestHandler());
 
             ///catalog
@@ -559,14 +641,16 @@ public class HTTPAdminListener {
 
             m_server.setHandler(handlers);
 
+            int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
+            int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
             /*
              * Don't force us to look at a huge pile of threads
              */
-            final QueuedThreadPool qtp = new QueuedThreadPool();
-            qtp.setMaxIdleTimeMs(15000);
+            final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
+            qtp.setMaxIdleTimeMs(timeout * 1000);
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
-
+            httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten

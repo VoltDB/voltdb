@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,8 +29,7 @@ StreamedTable::StreamedTable(bool exportEnabled)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
-        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
+        enableStream();
     }
 }
 
@@ -41,6 +40,15 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
     return st;
 }
 
+//This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+bool StreamedTable::enableStream() {
+    if (!m_wrapper) {
+        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                           m_executorContext->m_siteId);
+        return true;
+    }
+    return false;
+}
 
 StreamedTable::~StreamedTable()
 {
