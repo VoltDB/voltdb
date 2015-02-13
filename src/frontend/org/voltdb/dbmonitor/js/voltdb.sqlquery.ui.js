@@ -137,10 +137,10 @@ $(document).ready(function () {
             var key = (server + '_' + (user == '' ? '' : user) + '_' + processName).replace(/[^_a-zA-Z0-9]/g, "_");
             saveSessionCookie('connectionkey', key);
         };
-        
-        this.populateTablesAndViews = function() {
+
+        this.populateTablesAndViews = function () {
             toggleSpinner(true);
-            voltDbRenderer.GetTableInformation(function(tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData) {
+            voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData) {
                 var tables = tablesData['tables'];
                 populateTableData(tables);
                 var views = viewsData['views'];
@@ -151,9 +151,8 @@ $(document).ready(function () {
                 populateStoredProcedure(procedures, procedureColumns, sysProcedure);
 
                 toggleSpinner(false);
-                
+
             });
-                        
         };
 
         var populateTableData = function (tables) {
@@ -347,13 +346,15 @@ $(document).ready(function () {
             if (!show) {
                 $("#sqlQueryOverlay").hide();
                 $("#tabScroller").css("height", 225);
+                $(".slimScrollBar").css('z-index', '99');
             }
             else if (show) {
                 $("#tabScroller").css("height", "");
+                $(".slimScrollBar").css('z-index', '-9999');
                 $("#sqlQueryOverlay").show();
-                
+
             }
-            
+
         };
 
     });
@@ -366,7 +367,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
     SQLQueryRender.userName = userName;
     VoltDBService.SetConnectionForSQLExecution();
     SQLQueryRender.saveConnectionKey(false);
-    
+
     if ($.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
 
         //Refresh cluster state to display latest status.
@@ -378,7 +379,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         };
         voltDbRenderer.GetSystemInformation(function () { }, loadAdminTabPortAndOverviewDetails, function (data) { });
     }
-    
+
     var sqlChangePortName = "sql_port_for_paused_db";
     $("#queryDatabasePausedErrorPopupLink").popup({
         open: function (event, ui, ele) {
@@ -411,7 +412,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         closeContent: '',
         modal: true
     });
-    
+
     // Export Type Change	 
     $('#exportType').change(function () {
         if ($('#exportType').val() == 'HTML') {
@@ -437,7 +438,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
 
     // Tooltip
     $('.tooltip').tooltipster();
-   
+
     $('#runBTn').click(function () {
         var queryString = $('#theQueryText').getSelectedText();
         if (queryString != null) {

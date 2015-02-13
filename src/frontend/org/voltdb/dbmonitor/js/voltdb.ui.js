@@ -1,4 +1,5 @@
 ﻿var ispopupRevoked = false;
+
 $(document).ready(function () {
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
@@ -245,6 +246,7 @@ $(document).ready(function () {
         loadPage(serverName, portid);
     });
 
+    window.onscroll = function () { if (VoltDbUI.isSchemaTabLoading) window.scrollTo(0, 0); };
 });
 
 function logout() {
@@ -1503,8 +1505,8 @@ var adjustGraphSpacing = function () {
 };
 
 (function (window) {
-    var iVoltDbUi = (function () {
-        this.templateScriptLoaded = false;
+    var iVoltDbUi = (function () {        
+        this.isSchemaTabLoading = false;
         this.ACTION_STATES = {
             NONE: -1,
             NEXT: 0,
@@ -1585,37 +1587,38 @@ var adjustGraphSpacing = function () {
         };
 
         this.loadSchemaTab = function () {
-            $('#schema').html('<div id="schemaOverlay" style="display: block;"><div class="loading"></div></div>' + $('#schema').html());
+            this.isSchemaTabLoading = true;
 
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
+            var schemaHtml = '<div id="schemaOverlay" style="display: block;"><div class="loading"></div></div>';
+            schemaHtml = schemaHtml + $('#schema').html();
+            $('#schema').html(schemaHtml);
+
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';            
             var templateJavascript = "js/template.js";
 
             $.post(templateUrl, function (result) {
                 result = result.replace('<!--##SIZES##>', '');
                 var body = $(result).filter("#wrapper").html();
                 $("#schema").html(body);
-                $("#schemaOverlay").hide();
-
+                $("#overlay").hide();
                 $("#schemaLinkSqlQuery").on("click", function (e) {
                     $("#navSqlQuery").trigger("click");
                     e.preventDefault();
                 });
 
                 $.getScript(templateJavascript, function () {
-                    $('.refreshBtn').css("display", "block");
-                    $('.refreshBtn.schm').css("display", "block");
+                    $('.schm').css("display", "block");
                     $('.refreshBtn').unbind("click");
                     $('.refreshBtn.schm').unbind("click");
                     $('.refreshBtn.schm,.refreshBtn').click(function () {
-                        $("#overlay").show();
                         VoltDbUI.refreshSqlAndSchemaTab();
 
                     });
-
+                    VoltDbUI.isSchemaTabLoading = false;
                 });
 
-
             });
+
         };
 
     });
