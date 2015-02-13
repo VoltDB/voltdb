@@ -1771,8 +1771,7 @@ public class DDLCompiler {
                 }
             } else if (subNode.name.equals("predicate")) {
                 assert(subNode.children.size() == 1);
-                predicate = dummy.parseExpressionTree(subNode.children.get(0));
-                checkPartialIndexPredicateMeetsSpec(name, predicate, table);
+                predicate = buildPartialIndexPredicate(dummy, name, subNode.children.get(0), table);
             }
         }
 
@@ -2369,28 +2368,41 @@ public class DDLCompiler {
     }
 
     /**
-     * Verify the partial view expression satisfies the rules.
-     * Throw hopefully helpful error messages otherwise.
+     * Build the abstract expression representing the partial index predicate.
+     * Verify it satisfies the rules. Throw error messages otherwise.
      *
+     * @param dummy AbstractParsedStmt
      * @param indexName The name of the index being checked.
-     * @param predicate The index predicate.
+     * @param predicateXML The XML representing the predicate.
      * @param table Table
      * @throws VoltCompilerException
+     * @return AbstractExpression
      */
-    private void checkPartialIndexPredicateMeetsSpec(String indexName, AbstractExpression predicate, Table table) throws VoltCompilerException {
-        if (predicate == null) {
-            return;
+    private AbstractExpression buildPartialIndexPredicate(
+            AbstractParsedStmt dummy, String indexName, VoltXMLElement predicateXML, Table table) throws VoltCompilerException {
+
+        if (predicateXML == null) {
+            return null;
         }
+
+        // Make sure all column expressions refer to the same index table before we can parse the XML
+        // to avoid the AbstractParsedStmt exception/assertion
         String tableName = table.getTypeName();
+        assert(tableName != null);
         String msg = "Partial index \"" + indexName + "\" ";
 
-        assert(tableName != null);
-        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(predicate)) {
-            if (!tableName.equals(tve.getTableName())) {
+        // Make sure all column expressions refer the index table
+        List<VoltXMLElement> columnRefs= predicateXML.findChildren("columnref");
+        for (VoltXMLElement columnRef : columnRefs) {
+            String columnRefTableName = columnRef.attributes.get("table");
+            if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {
                 msg += "with expression(s) involving other tables is not supported.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
+        // Now it safe to parse the expression tree
+        AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
+
         if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
             msg += "with aggregate expression(s) is not supported.";
             throw m_compiler.new VoltCompilerException(msg);
@@ -2400,7 +2412,7 @@ public class DDLCompiler {
 //            msg += "with subquery expression(s) is not supported.";
 //            throw m_compiler.new VoltCompilerException(msg);
 //        }
-
+        return predicate;
     }
 
     /**
