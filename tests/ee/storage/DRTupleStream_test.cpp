@@ -113,8 +113,7 @@ public:
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
-                               currentSpHandle, currentSpHandle, currentSpHandle, *m_tuple,
-                               DR_RECORD_INSERT);
+                               currentSpHandle, currentSpHandle, *m_tuple, DR_RECORD_INSERT);
     }
 
     virtual ~DRTupleStreamTest() {
