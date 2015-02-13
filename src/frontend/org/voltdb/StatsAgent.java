@@ -411,14 +411,14 @@ public class StatsAgent extends OpsAgent
         case KSAFETY:
             stats = collectKSafetyStats(interval);
             break;
-        case DRREPLICA:
-            stats = collectDRReplicaStats();
+        case DRCONSUMER:
+            stats = collectDRConsumerStats();
             break;
-        case DRREPLICASTATUS:
-            stats = collectDRReplicaStatusStats();
+        case DRCONSUMERNODE:
+            stats = collectDRConsumerNodeStats();
             break;
-        case DRREPLICAPERFORMANCE:
-            stats = collectDRReplicaPerformanceStats();
+        case DRCONSUMERPARTITION:
+            stats = collectDRConsumerPartitionStats();
             break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
@@ -471,11 +471,11 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
-    private VoltTable[] collectDRReplicaStats() {
+    private VoltTable[] collectDRConsumerStats() {
         VoltTable[] stats = null;
 
-        VoltTable[] statusStats = collectDRReplicaStatusStats();
-        VoltTable[] perfStats = collectDRReplicaPerformanceStats();
+        VoltTable[] statusStats = collectDRConsumerNodeStats();
+        VoltTable[] perfStats = collectDRConsumerPartitionStats();
         if (statusStats != null && perfStats != null) {
             stats = new VoltTable[2];
             stats[0] = statusStats[0];
@@ -484,11 +484,11 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
-    private VoltTable[] collectDRReplicaStatusStats() {
+    private VoltTable[] collectDRConsumerNodeStats() {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRREPLICASTATUS, false, now);
+        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRCONSUMERNODE, false, now);
         if (replicaStats != null) {
             stats = new VoltTable[1];
             stats[0] = replicaStats;
@@ -497,11 +497,11 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
-    private VoltTable[] collectDRReplicaPerformanceStats() {
+    private VoltTable[] collectDRConsumerPartitionStats() {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRREPLICAPERFORMANCE, false, now);
+        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRCONSUMERPARTITION, false, now);
         if (replicaStats != null) {
             stats = new VoltTable[1];
             stats[0] = replicaStats;
