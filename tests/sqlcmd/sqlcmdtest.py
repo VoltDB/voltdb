@@ -21,7 +21,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import distutils
 import errno
 import os
 import re
@@ -32,9 +31,9 @@ import time
 
 from optparse import OptionParser
 
-import os, errno
 
 # recursive directory creator like linux "mkdirs -p"
+# Credit: cribbed from stackoverflow.com/questions/600268
 def mkdir_p(path):
     try:
         os.makedirs(path)
@@ -47,13 +46,21 @@ def mkdir_p(path):
 # kill the VoltDB server process, if any, running on the local machine.
 # The process is identified by its command line text via the ps command.
 def kill_voltdb():
+    # ps - find all running java commands.
+    # fgrep - filter out any headers or command lines that do not reference org.voltdb.VoltDB
+    # tr - compress multi-space delimiters to a single space.
+    # cut - extract the second space-delimited field, which is the PID.
+    # xargs - execute a kill command on each PID (hoping there's only the 1 launched from this script).
     killed = subprocess.call(
             "ps -fwwC java | grep org.voltdb.VoltDB | tr -s ' ' | cut -d ' ' -f 2 | xargs /bin/kill -KILL", shell=True)
     if killed != 0:
         print >> sys.stderr, \
                 "Failed to kill the VoltDB server process"
 
-
+# given a script_subdir somewhere within a script_dir,
+# return the path of the corresponding dir within baseline_dir.
+# For example, for ('my/scripts/a/b/c', 'my/scripts', 'your/baselines'),
+# return 'your/baselines/a/b/c'.
 def replace_parent_dir_prefix(script_subdir, script_dir, baseline_dir):
     if script_subdir[0: len(script_dir)] == script_dir:
         return baseline_dir + script_subdir[len(script_dir):]
@@ -63,8 +70,8 @@ def replace_parent_dir_prefix(script_subdir, script_dir, baseline_dir):
     # into the above conditional by first canonicalizing script_subdir and
     # script_dir. Failing that, there may be ways to improve this "guessing"
     # algorithm.
-    # If script_subdir starts with an alphanumeric, assume that it is relative
-    # to script_dir.
+    # If script_subdir starts with an alphanumeric,
+    # assume that it is relative to script_dir.
     if re.match('\w', script_subdir):
         return os.path.join(baseline_dir, script_subdir)
     # Otherwise, assume that its path up to the first separator is equivalent
@@ -104,7 +111,7 @@ def launch_and_wait_on_voltdb(reportout):
 def do_main():
     parser = OptionParser()
     parser.add_option("-s", "--scripts", dest="script_dir", default="./scripts",
-                      help="top level test case script_dir")
+                      help="top level test case script directory")
     parser.add_option("-b", "--baselines", dest="baseline_dir", default="./baselines",
                       help="top level test output baseline directory")
     parser.add_option("-o", "--reportfile", dest="reportfile",
@@ -153,7 +160,7 @@ def do_main():
                 # This produces identical 'baseline` results on platforms and builds that
                 # may run at different speeds.
                 latency_matcher = re.compile(r"""
-                        ([0-9]\srows\sin\s)  # required to matcha latency report line, survives as \g<1>
+                        ([0-9]\srows\sin\s)  # required to match a latency report line, survives as \g<1>
                         [0-9]+\.[0-9]+s      # also required, replaced with #.##s
                         """, re.VERBOSE)
                 for line in outbackin:
