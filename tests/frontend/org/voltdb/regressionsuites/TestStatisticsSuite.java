@@ -855,9 +855,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema1[5] = new ColumnInfo("TOTALBYTES", VoltType.BIGINT);
         expectedSchema1[6] = new ColumnInfo("TOTALBYTESINMEMORY", VoltType.BIGINT);
         expectedSchema1[7] = new ColumnInfo("TOTALBUFFERS", VoltType.BIGINT);
-        expectedSchema1[8] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.BIGINT);
-        expectedSchema1[9] = new ColumnInfo("ISSYNCED", VoltType.STRING);
-        expectedSchema1[10] = new ColumnInfo("MODE", VoltType.STRING);
+        expectedSchema1[8] = new ColumnInfo("LASTQUEUEDDRID", VoltType.BIGINT);
+        expectedSchema1[9] = new ColumnInfo("LASTACKDRID", VoltType.BIGINT);
+        expectedSchema1[10] = new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[11] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[12] = new ColumnInfo("ISSYNCED", VoltType.STRING);
+        expectedSchema1[13] = new ColumnInfo("MODE", VoltType.STRING);
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
         VoltTable[] results = null;
@@ -894,9 +897,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema1[5] = new ColumnInfo("TOTALBYTES", VoltType.BIGINT);
         expectedSchema1[6] = new ColumnInfo("TOTALBYTESINMEMORY", VoltType.BIGINT);
         expectedSchema1[7] = new ColumnInfo("TOTALBUFFERS", VoltType.BIGINT);
-        expectedSchema1[8] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.BIGINT);
-        expectedSchema1[9] = new ColumnInfo("ISSYNCED", VoltType.STRING);
-        expectedSchema1[10] = new ColumnInfo("MODE", VoltType.STRING);
+        expectedSchema1[8] = new ColumnInfo("LASTQUEUEDDRID", VoltType.BIGINT);
+        expectedSchema1[9] = new ColumnInfo("LASTACKDRID", VoltType.BIGINT);
+        expectedSchema1[10] = new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[11] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[12] = new ColumnInfo("ISSYNCED", VoltType.STRING);
+        expectedSchema1[13] = new ColumnInfo("MODE", VoltType.STRING);
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
         ColumnInfo[] expectedSchema2 = new ColumnInfo[7];
