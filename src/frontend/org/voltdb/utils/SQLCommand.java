@@ -562,21 +562,15 @@ public class SQLCommand
             String explainQuery = SQLParser.parseExplainCall(statement);
             if (explainQuery != null) {
                 // We've got a query that starts with "explain", send the query to
-                // @Explain (after stripping "explain").
-                // This all could probably be done more elegantly via a group extracted
-                // from a more comprehensive regexp.
-                explainQuery = explainQuery.substring("explain ".length());
+                // @Explain (after parseExplainCall() strips "explain").
                 printResponse(VoltDB.callProcedure("@Explain", explainQuery));
                 return;
             }
 
             String explainProcQuery = SQLParser.parseExplainProcCall(statement);
             if (explainProcQuery != null) {
-                // We've got a query that starts with "explainproc", send the proc name
-                // to @ExplainPlan (after stripping "explainproc").
-                // This all could probably be done more elegantly via a group extracted
-                // from a more comprehensive regexp.
-                explainProcQuery = explainProcQuery.substring("explainProc ".length());
+                // We've got a query that starts with "explainproc", send the query to
+                // @Explain (after parseExplainCall() strips "explainproc").
                 // Clean up any extra spaces from between explainproc and the proc name.
                 explainProcQuery = explainProcQuery.trim();
                 printResponse(VoltDB.callProcedure("@ExplainProc", explainProcQuery));
