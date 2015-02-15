@@ -51,6 +51,9 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
+    static {
+        System.getProperties().put("USE_DR_V2", "TRUE");
+    }
 
     private final static int SITES = 2;
     private final static int HOSTS = 3;
@@ -163,11 +166,11 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             boolean enforceUnique)
     {
         result.resetRowPosition();
-        Set<Long> partsSeen = new HashSet<Long>();
+        Set<Integer> partsSeen = new HashSet<>();
         while (result.advanceRow()) {
             String colValFromRow = result.getString(columnName);
             if (targetValue.equalsIgnoreCase(colValFromRow)) {
-                long thisPartId = result.getLong("PARTITION_ID");
+                int thisPartId = (int) result.getLong("PARTITION_ID");
                 if (enforceUnique) {
                     assertFalse("PARTITION_ID: " + thisPartId + " seen twice in table looking for " + targetValue +
                             " in column " + columnName, partsSeen.contains(thisPartId));
@@ -175,6 +178,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 partsSeen.add(thisPartId);
             }
         }
+        // Remove the MPI in case it's in there
+        partsSeen.remove(MpInitiator.MP_INIT_PID);
         assertEquals(PARTITIONS, partsSeen.size());
     }
 
@@ -846,7 +851,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING DRPARTITION STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema1 = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema1 = new ColumnInfo[14];
         expectedSchema1[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema1[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema1[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -872,8 +877,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(1, results.length);
         System.out.println("Test DR table: " + results[0].toString());
         validateSchema(results[0], expectedTable1);
-        // One row per site, don't have HSID for ease of check, just check a bunch of stuff
-        assertEquals(HOSTS * SITES, results[0].getRowCount());
+        // One row per site (including the MPI on each host),
+        // don't have HSID for ease of check, just check a bunch of stuff
+        assertEquals(HOSTS * SITES + HOSTS, results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         results[0].advanceRow();
@@ -888,7 +894,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING DR STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema1 = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema1 = new ColumnInfo[14];
         expectedSchema1[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema1[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema1[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -926,8 +932,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("Test DR table: " + results[1].toString());
         validateSchema(results[0], expectedTable1);
         validateSchema(results[1], expectedTable2);
-        // One row per site, don't have HSID for ease of check, just check a bunch of stuff
-        assertEquals(HOSTS * SITES, results[0].getRowCount());
+        // One row per site (including the MPI on each host),
+        // don't have HSID for ease of check, just check a bunch of stuff
+        assertEquals(HOSTS * SITES + HOSTS, results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         results[0].advanceRow();
