@@ -46,16 +46,16 @@ public class TestDDLCompiler extends TestCase {
 
     public void testSimpleDDLCompiler() throws HSQLParseException {
         String ddl1 =
-            "CREATE TABLE \"warehouse\" ( " +
-            "\"w_id\" integer default '0' NOT NULL, " +
-            "\"w_name\" varchar(16) default NULL, " +
-            "\"w_street_1\" varchar(32) default NULL, " +
-            "\"w_street_2\" varchar(32) default NULL, " +
-            "\"w_city\" varchar(32) default NULL, " +
-            "\"w_state\" varchar(2) default NULL, " +
-            "\"w_zip\" varchar(9) default NULL, " +
-            "\"w_tax\" float default NULL, " +
-            "PRIMARY KEY  (\"w_id\") " +
+            "CREATE TABLE warehouse ( " +
+            "w_id integer default '0' NOT NULL, " +
+            "w_name varchar(16) default NULL, " +
+            "w_street_1 varchar(32) default NULL, " +
+            "w_street_2 varchar(32) default NULL, " +
+            "w_city varchar(32) default NULL, " +
+            "w_state varchar(2) default NULL, " +
+            "w_zip varchar(9) default NULL, " +
+            "w_tax float default NULL, " +
+            "PRIMARY KEY  (w_id) " +
             ");";
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -70,8 +70,8 @@ public class TestDDLCompiler extends TestCase {
 
     public void testCharIsNotAllowed() {
         String ddl1 =
-            "CREATE TABLE \"warehouse\" ( " +
-            "\"w_street_1\" char(32) default NULL, " +
+            "CREATE TABLE warehouse ( " +
+            "w_street_1 char(32) default NULL, " +
             ");";
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -431,5 +431,34 @@ public class TestDDLCompiler extends TestCase {
         for(Table t : catalog_db.getTables()) {
             assertNotNull(((TableAnnotation)t.getAnnotation()).ddl);
         }
+    }
+
+    public void testQuotedNameIsNotAllowed() {
+        class Tester {
+            HSQLInterface hsql = HSQLInterface.loadHsqldb();
+            void testSuccess(String ddl) {
+                try {
+                    hsql.runDDLCommand(ddl);
+                }
+                catch (HSQLParseException e) {
+                    fail(String.format("Expected DDL to succeed: %s", ddl));
+                }
+            }
+            void testFailure(String ddl) {
+                try {
+                    hsql.runDDLCommand(ddl);
+                }
+                catch (HSQLParseException e) {
+                    return;
+                }
+                fail(String.format("Expected DDL to fail: %s", ddl));
+            }
+        }
+        Tester tester = new Tester();
+        tester.testFailure("create table \"a_quoted_table_without_spaces\" (an_unquoted_column integer)");
+        tester.testFailure("create table \"a quoted table with spaces\" (an_unquoted_column integer)");
+        tester.testFailure("create table an_unquoted_table (\"a_quoted_column_without_spaces\" integer)");
+        tester.testFailure("create table an_unquoted_table (\"a quoted column with spaces\" integer)");
+        tester.testSuccess("create table an_unquoted_table (an_unquoted_column integer)");
     }
 }
