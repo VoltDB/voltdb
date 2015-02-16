@@ -165,19 +165,13 @@ public class ExportGeneration {
     public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_timestamp = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
-        if (!isRejoin) {
+        if (!m_directory.canWrite()) {
             if (!m_directory.mkdirs()) {
-                throw new IOException("Could not create " + m_directory);
-            }
-        } else {
-            if (!m_directory.canWrite()) {
-                if (!m_directory.mkdirs()) {
-                    throw new IOException("Could not create " + m_directory);
-                }
+                throw new IOException("Could not create " + m_directory + " Rejoin: " + isRejoin);
             }
         }
         m_isContinueingGeneration = true;
-        exportLog.info("Creating new export generation " + m_timestamp);
+        exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
     }
 
     /**
