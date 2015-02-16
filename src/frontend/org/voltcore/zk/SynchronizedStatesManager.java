@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -395,7 +396,17 @@ public class SynchronizedStatesManager {
                     // accept the next proposal and use the outcome to set our initial state.
                     addResultEntry(null);
                     Stat nodeStat = new Stat();
-                    m_zk.getData(m_barrierResultsPath, false, nodeStat);
+                    boolean resultNodeFound = false;
+                    {
+                        try {
+                            m_zk.getData(m_barrierResultsPath, false, nodeStat);
+                            resultNodeFound = true;
+                        }
+                        catch (NoNodeException noNode) {
+                            // This is a race between another node who got the Distributed lock but
+                            // Has not set up the result path yet. Keep Retrying.
+                        }
+                    } while (!resultNodeFound);
                     m_lastProposalVersion = nodeStat.getVersion();
                     checkForBarrierParticipantsChange();
                 }
