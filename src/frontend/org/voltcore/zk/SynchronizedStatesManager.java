@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -350,7 +351,12 @@ public class SynchronizedStatesManager {
             boolean ownDistributedLock = requestDistributedLock();
             ByteBuffer startStates = buildProposal(REQUEST_TYPE.INITIALIZING,
                     m_requestedInitialState.asReadOnlyBuffer(), m_requestedInitialState.asReadOnlyBuffer());
-            boolean stateMachineNodeCreated = addIfMissing(m_barrierResultsPath, CreateMode.PERSISTENT, startStates.array());
+            boolean stateMachineNodeCreated = false;
+            if (ownDistributedLock) {
+                // Only the very first initializer of the state machine with both get the lock and successfully
+                // allocate m_barrierResultsPath
+                stateMachineNodeCreated = addIfMissing(m_barrierResultsPath, CreateMode.PERSISTENT, startStates.array());
+            }
 
             if (m_membershipChangePending) {
                 getLatestMembership();
@@ -371,7 +377,7 @@ public class SynchronizedStatesManager {
                 result[0] = (byte)(1);
                 addResultEntry(result);
                 m_lockWaitingOn = "bogus"; // Avoids call to notifyDistributedLockWaiter
-                m_log.debug(m_stateMachineId + ": Initialized (first member) with State " +
+                m_log.info(m_stateMachineId + ": Initialized (first member) with State " +
                         stateToString(m_synchronizedState.asReadOnlyBuffer()));
                 cancelDistributedLock();
                 checkForBarrierParticipantsChange();
@@ -390,7 +396,17 @@ public class SynchronizedStatesManager {
                     // accept the next proposal and use the outcome to set our initial state.
                     addResultEntry(null);
                     Stat nodeStat = new Stat();
-                    m_zk.getData(m_barrierResultsPath, false, nodeStat);
+                    boolean resultNodeFound = false;
+                    {
+                        try {
+                            m_zk.getData(m_barrierResultsPath, false, nodeStat);
+                            resultNodeFound = true;
+                        }
+                        catch (NoNodeException noNode) {
+                            // This is a race between another node who got the Distributed lock but
+                            // Has not set up the result path yet. Keep Retrying.
+                        }
+                    } while (!resultNodeFound);
                     m_lastProposalVersion = nodeStat.getVersion();
                     checkForBarrierParticipantsChange();
                 }
@@ -750,7 +766,7 @@ public class SynchronizedStatesManager {
                     // We were not yet participating in the state machine so but now we can
                     m_requestedInitialState = null;
                     m_pendingProposal = null;
-                    m_log.debug(m_stateMachineId + ": Initialized (concensus) with State " +
+                    m_log.info(m_stateMachineId + ": Initialized (concensus) with State " +
                             stateToString(m_synchronizedState.asReadOnlyBuffer()));
                     unlockLocalState();
                     setInitialState(readOnlyResult);
@@ -803,7 +819,7 @@ public class SynchronizedStatesManager {
                                 "Unexepected failure in StateMachine.", true, e);
                         success = false;
                     }
-                    m_log.debug(m_stateMachineId + ": Proposed state " + (success?"succeeded ":"failed ") +
+                    m_log.info(m_stateMachineId + ": Proposed state " + (success?"succeeded ":"failed ") +
                             stateToString(attemptedChange.asReadOnlyBuffer()));
                     unlockLocalState();
                     // Notify the derived state machine engine of the current state
@@ -814,7 +830,7 @@ public class SynchronizedStatesManager {
                     // Process the results of a TASK request
                     ByteBuffer taskRequest = m_pendingProposal.asReadOnlyBuffer();
                     m_pendingProposal = null;
-                    m_log.debug(m_stateMachineId + ": Task results for task " + taskToString(taskRequest.asReadOnlyBuffer()));
+                    m_log.info(m_stateMachineId + ": All members completed task " + taskToString(taskRequest.asReadOnlyBuffer()));
                     if (m_currentRequestType == REQUEST_TYPE.CORRELATED_COORDINATED_TASK) {
                         Map<String, ByteBuffer> results = getCorrelatedResults(taskRequest, memberList);
                         if (m_stateChangeInitiator) {
@@ -935,7 +951,7 @@ public class SynchronizedStatesManager {
                     readOnlyResult = m_synchronizedState.asReadOnlyBuffer();
                     m_lastProposalVersion = lastProposal.getVersion();
                     m_pendingProposal = null;
-                    m_log.debug(m_stateMachineId + ": Initialized (existing) with State " +
+                    m_log.info(m_stateMachineId + ": Initialized (existing) with State " +
                             stateToString(m_synchronizedState.asReadOnlyBuffer()));
                     if (existingAndProposedStates.m_requestType != REQUEST_TYPE.INITIALIZING) {
                         staleTask = existingAndProposedStates.m_proposal.asReadOnlyBuffer();
