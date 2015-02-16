@@ -55,6 +55,9 @@ public class InsertMulti extends VoltProcedure {
     public final SQLStmt i_expressions_no_nulls = new SQLStmt
       ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
+    public final SQLStmt i_no_nulls_repl = new SQLStmt
+      ("INSERT INTO NO_NULLS_REPL VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
     public VoltTable[] run(
             String tablename,
             int pkey,
@@ -96,6 +99,11 @@ public class InsertMulti extends VoltProcedure {
         }
         else if (tablename.equals("EXPRESSIONS_NO_NULLS")) {
             voltQueueSQL(i_expressions_no_nulls, pkey, a_tinyint, a_smallint, a_integer,
+                         a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
+        }
+        else if (tablename.equals("NO_NULLS_REPL")) {
+            voltQueueSQL(i_no_nulls_repl, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
