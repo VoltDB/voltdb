@@ -257,7 +257,7 @@ public class TestRepairLog
         }
     }
 
-    private long setBinaryLogUniqueId(TransactionInfoBaseMessage msg, UniqueIdGenerator uig) {
+    public static long setBinaryLogUniqueId(TransactionInfoBaseMessage msg, UniqueIdGenerator uig) {
         Iv2InitiateTaskMessage taskMsg = null;
         if (msg instanceof Iv2InitiateTaskMessage) {
             taskMsg = (Iv2InitiateTaskMessage) msg;
@@ -268,7 +268,7 @@ public class TestRepairLog
         if (taskMsg != null && taskMsg.getStoredProcedureName().startsWith("@ApplyBinaryLog")) {
             ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
             long uid = uig.getNextUniqueId();
-            when(params.getParam(3)).thenReturn(uid);
+            when(params.toArray()).thenReturn(new Object[] {null, null, 0l, 0l, uid});
             return uid;
         }
 
@@ -367,12 +367,12 @@ public class TestRepairLog
     @Test
     public void testTrackBinaryLogUniqueId() {
         // The end unique id for an @ApplyBinaryLogSP invocation is recorded
-        // as its forth parameter. Create a realistic invocation, deliver it
+        // as its fifth parameter. Create a realistic invocation, deliver it
         // to the repair log, and see what we get
         final long endUniqueId = 42;
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@ApplyBinaryLogSP");
-        spi.setParams(0, new byte[]{0}, endUniqueId - 10, endUniqueId);
+        spi.setParams(0, new byte[]{0}, endUniqueId - 10, endUniqueId, endUniqueId);
         spi.setOriginalUniqueId(endUniqueId - 10);
         spi.setOriginalTxnId(endUniqueId -15);
 

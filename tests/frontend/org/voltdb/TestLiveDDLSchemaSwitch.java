@@ -353,7 +353,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             catch (ProcCallException pce) {
                 threw = true;
                 System.out.println(pce.getMessage());
-                assertTrue(pce.getMessage().contains("Write procedure @AdHoc is not allowed"));
+                assertTrue(pce.getMessage().contains("AdHoc DDL is forbidden"));
             }
             assertTrue("Adhoc DDL should have failed", threw);
             assertFalse(findTableInSystemCatalogResults("BAR"));
@@ -429,12 +429,9 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                         "create table BAR (ID integer, VAL varchar(50));");
             }
             catch (ProcCallException pce) {
-                threw = true;
-                System.out.println(pce.getMessage());
-                assertTrue(pce.getMessage().contains("Write procedure @AdHoc is not allowed"));
+                fail("DDL should be allowed in replica cluster: " + pce);
             }
-            assertTrue("Adhoc DDL should have failed", threw);
-            assertFalse(findTableInSystemCatalogResults("BAR"));
+            assertTrue(findTableInSystemCatalogResults("BAR"));
 
             // @UpdateClasses should be rejected
             assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));

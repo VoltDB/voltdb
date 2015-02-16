@@ -63,6 +63,7 @@ public class RandomMsgGenerator
     {
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         ParameterSet ps = mock(ParameterSet.class);
+        when(ps.toArray()).thenReturn(new Object[] {null, null, 0l, 0l, Long.MIN_VALUE});
         when(spi.getParams()).thenReturn(ps);
         Iv2InitiateTaskMessage msg =
             new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, !isMp, spi,
@@ -73,8 +74,6 @@ public class RandomMsgGenerator
             } else {
                 when(spi.getProcName()).thenReturn("@ApplyBinaryLogMP");
             }
-            // dummy end unique id
-            when(ps.getParam(3)).thenReturn(Long.MIN_VALUE);
         } else {
             when(spi.getProcName()).thenReturn("dummy");
         }

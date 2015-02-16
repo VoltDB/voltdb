@@ -321,7 +321,7 @@ public class TestSpPromoteAlgo
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             msg.setSpHandleAndSpUniqueId(sphandle.getTxnId(), uig.getNextUniqueId());
-            maxBinaryLogUniqueId = Math.max(maxBinaryLogUniqueId, setBinaryLogUniqueId(msg, buig));
+            maxBinaryLogUniqueId = Math.max(maxBinaryLogUniqueId, TestRepairLog.setBinaryLogUniqueId(msg, buig));
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 if (!stops[0]) {
@@ -407,19 +407,6 @@ public class TestSpPromoteAlgo
                 }
             }
         }
-    }
-
-    private long setBinaryLogUniqueId(TransactionInfoBaseMessage msg, UniqueIdGenerator uig) {
-        if (msg instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage taskMsg = (Iv2InitiateTaskMessage) msg;
-            if ("@ApplyBinaryLogSP".equals(taskMsg.getStoredProcedureName())) {
-                ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
-                long uid = uig.getNextUniqueId();
-                when(params.getParam(3)).thenReturn(uid);
-                return uid;
-            }
-        }
-        return Long.MIN_VALUE;
     }
 }
 
