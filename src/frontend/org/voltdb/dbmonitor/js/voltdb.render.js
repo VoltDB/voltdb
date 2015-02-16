@@ -409,6 +409,15 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.GetPartitionIdleTimeInformation = function (onInformationLoaded) {
+            var partitionDetails = {};
+            VoltDBService.GetPartitionIdleTimeInformation(function (connection) {
+                getPartitionIdleTimeDetails(connection, partitionDetails);
+                onInformationLoaded(partitionDetails);
+            });
+
+        };
+
         this.getCpuGraphInformation = function (onInformationLoaded) {
             var cpuDetails = {};
 
@@ -1833,6 +1842,109 @@ function alertNodeClicked(obj) {
                 sysMemory[hostName]["PERCENT_USED"] = info[colIndex["PERCENT_USED"]];
             });
         };
+
+        var getPartitionIdleTimeDetails = function (connection, partitionDetail) {
+            var colIndex = {};
+            var counter = 0;
+            var keys = [];
+            var starvStats = {};
+            var starvMpiData = {};
+            var starvMaxData = {};
+            var starvMinData = {};
+            var currentServer = getCurrentServer();
+            var hostName;
+            var timeStamp;
+            var siteId = 0;
+            var mpiIndex = [];
+            var minPer = 100;
+            var maxPer = 0;
+            var previousHost = "";
+            var previousHostKey = "";
+            var previousSiteId = "";
+            if (connection.Metadata['@Statistics_STARVATION'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_STARVATION'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "SITE_ID" || columnInfo["name"] == "PERCENT" || columnInfo["name"] == "TIMESTAMP")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            //to get MPI site id
+            connection.Metadata['@Statistics_STARVATION'].data.forEach(function(info) {
+                if (currentServer == info[colIndex["HOSTNAME"]]) {
+                    if (parseInt(info[colIndex["SITE_ID"]]) > siteId) {
+                        siteId = parseInt(info[colIndex["SITE_ID"]]);
+                    }
+                } else {
+                    if (!mpiIndex.hasOwnProperty(info[colIndex["HOSTNAME"]])) {
+                        mpiIndex[info[colIndex["HOSTNAME"]]] = 0;
+                    }
+                    if (parseInt(info[colIndex["SITE_ID"]]) > mpiIndex[info[colIndex["HOSTNAME"]]]) {
+                        mpiIndex[info[colIndex["HOSTNAME"]]] = parseInt(info[colIndex["SITE_ID"]]);
+                    }
+                }
+            });
+            //
+            
+            connection.Metadata['@Statistics_STARVATION'].data.forEach(function (info) {
+                if (currentServer == info[colIndex["HOSTNAME"]]) {
+                    if (siteId == parseInt(info[colIndex["SITE_ID"]])) {
+                        var keyMpi = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                        starvMpiData[keyMpi] = info[colIndex["PERCENT"]];
+                    } else {
+                        var key = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                        keys.push(key);
+                        starvStats[key] = info[colIndex["PERCENT"]];
+                    }
+                } else {
+                    if (parseInt(info[colIndex["SITE_ID"]]) != mpiIndex[info[colIndex["HOSTNAME"]]]) {
+                        if (info[colIndex["HOSTNAME"]] != hostName) {
+                            hostName = info[colIndex["HOSTNAME"]];
+                            if (previousHostKey != "") {
+                                starvMinData[previousHostKey + '(Min)'] = minPer;
+                                starvMaxData[previousHostKey + '(Max)'] = maxPer;
+                                minPer = 100;
+                                maxPer = 0;
+                            }
+                            if (parseFloat(info[colIndex["PERCENT"]]) < minPer) {
+                                minPer = parseFloat(info[colIndex["PERCENT"]]);
+                            }
+                            if (parseFloat(info[colIndex["PERCENT"]]) > maxPer) {
+                                maxPer = parseFloat(info[colIndex["PERCENT"]]);
+                            }
+                        } else {
+                            if (parseFloat(info[colIndex["PERCENT"]]) < minPer) {
+                                minPer = parseFloat(info[colIndex["PERCENT"]]);
+                            }
+                            if (parseFloat(info[colIndex["PERCENT"]]) > maxPer) {
+                                maxPer = parseFloat(info[colIndex["PERCENT"]]);
+                            }
+                            previousHost = info[colIndex["HOSTNAME"]];
+                            previousHostKey = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                            previousSiteId = info[colIndex["SITE_ID"]];
+                        }
+                    }
+                }
+                timeStamp = info[colIndex["TIMESTAMP"]];
+            });
+            if (previousSiteId != mpiIndex[previousHost]) {
+                starvMinData[previousHostKey + '(Min)'] = minPer;
+                starvMaxData[previousHostKey + '(Max)'] = maxPer;
+            }
+            keys.sort();
+
+            if (!partitionDetail.hasOwnProperty("partitionDetail")) {
+                partitionDetail["partitionDetail"] = {};
+            }
+            partitionDetail["partitionDetail"]["data"] = starvStats;
+            partitionDetail["partitionDetail"]["dataMPI"] = starvMpiData;
+            partitionDetail["partitionDetail"]["dataMax"] = starvMaxData;
+            partitionDetail["partitionDetail"]["dataMin"] = starvMinData;
+            partitionDetail["partitionDetail"]["timeStamp"] = timeStamp;
+        };
+
 
         var getClusterDetails = function (connection, clusterDetails, processName) {
             var suffix = "";
