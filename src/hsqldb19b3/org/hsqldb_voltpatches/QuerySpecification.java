@@ -246,12 +246,12 @@ public class QuerySpecification extends QueryExpression {
                                                rangeVariables.length, false);
         }
 
-        // A VoltDB extension to support ???
+        // A VoltDB extension to support mysql-compatible GROUP BY <column-alias>
         resolveColumnReferencesInGroupBy();
         // End of VoltDB extension
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
-    // A VoltDB extension to support ???
+    // A VoltDB extension to support mysql-compatible GROUP BY <column-alias>
     void resolveColumnReferencesInGroupBy() {
         if (! isAggregated) {
             return;

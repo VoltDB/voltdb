@@ -33,6 +33,10 @@ package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
 
+// A VoltDB extension to support indexed expressions and the assume unique attribute
+import java.util.ArrayList;
+import java.util.List;
+// End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
@@ -2812,7 +2816,7 @@ public class ParserDDL extends ParserRoutine {
                 read();
 
                 // A VoltDB extension to "readColumnNames(false)" to support indexed expressions.
-                java.util.List<Expression> indexExprs = XreadExpressions(null);
+                List<Expression> indexExprs = XreadExpressions(null);
                 OrderedHashSet set = getSimpleColumnNames(indexExprs);
                 /* disable 1 line ...
                 OrderedHashSet set = readColumnNames(false);
@@ -3141,13 +3145,13 @@ public class ParserDDL extends ParserRoutine {
         indexHsqlName.schema = table.getSchemaName();
 
         // A VoltDB extension to support indexed expressions and the assume unique attribute
-        java.util.List<Boolean> ascDesc = new java.util.ArrayList<Boolean>();
-        // A VoltDB extension to "readColumnList(table, true)" to support indexed expressions.
-        java.util.List<Expression> indexExprs = XreadExpressions(ascDesc);
+        List<Boolean> ascDesc = new ArrayList<>();
+        // VoltDB support for indexed expressions.
+        List<Expression> indexExprs = XreadExpressions(ascDesc);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] indexColumns = null;
         if (set == null) {
-            // A VoltDB extension to support indexed expressions.
+            // VoltDB support for indexed expressions.
             // Not just indexing columns.
             // The meaning of set and indexColumns shifts here to be
             // the set of unique base columns for the indexed expressions.
@@ -3523,7 +3527,7 @@ public class ParserDDL extends ParserRoutine {
         }
 
         // A VoltDB extension to "readColumnList(table, false)" to support indexed expressions.
-        java.util.List<Expression> indexExprs = XreadExpressions(null);
+        List<Expression> indexExprs = XreadExpressions(null);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] cols = getColumnList(set, table);
         /* disable 1 line ...
@@ -3537,7 +3541,7 @@ public class ParserDDL extends ParserRoutine {
 
         // A VoltDB extension to support indexed expressions and the assume unique attribute
         if ((indexExprs != null) && (cols == null)) {
-            // A VoltDB extension to support indexed expressions.
+            // VoltDB extension to support indexed expressions.
             // Not just indexing columns.
             // The meaning of cols shifts here to be
             // the set of unique base columns for the indexed expressions.
@@ -3569,7 +3573,7 @@ public class ParserDDL extends ParserRoutine {
         }
 
         // A VoltDB extension to support indexed expressions.
-        java.util.List<Expression> indexExprs = XreadExpressions(null);
+        List<Expression> indexExprs = XreadExpressions(null);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] cols = getColumnList(set, table);
         if ((indexExprs != null) && (cols == null)) {
@@ -5107,10 +5111,10 @@ public class ParserDDL extends ParserRoutine {
 
     /// VoltDB added parsing behavior of the "readColumnList/readColumnNames" functions,
     /// adding support for indexed expressions.
-    private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
+    private List<Expression> XreadExpressions(List<Boolean> ascDesc) {
         readThis(Tokens.OPENBRACKET);
 
-        java.util.List<Expression> indexExprs = new java.util.ArrayList<Expression>();
+        List<Expression> indexExprs = new ArrayList<>();
 
         while (true) {
             Expression expression = XreadValueExpression();
@@ -5143,7 +5147,7 @@ public class ParserDDL extends ParserRoutine {
 
     /// Collect the names of the columns being indexed, or null if indexing anything more general than columns.
     /// This adapts XreadExpressions output to the format originally produced by readColumnNames
-    private OrderedHashSet getSimpleColumnNames(java.util.List<Expression> indexExprs) {
+    private OrderedHashSet getSimpleColumnNames(List<Expression> indexExprs) {
         OrderedHashSet set = new OrderedHashSet();
 
         for (Expression expression : indexExprs) {
@@ -5161,7 +5165,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     /// Collect the names of the unique columns underlying a list of indexed expressions.
-    private OrderedHashSet getBaseColumnNames(java.util.List<Expression> indexExprs) {
+    private OrderedHashSet getBaseColumnNames(List<Expression> indexExprs) {
         OrderedHashSet set = new OrderedHashSet();
 
         HsqlList col_list = new HsqlArrayList();
