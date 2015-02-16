@@ -268,7 +268,7 @@ $(document).ready(function () {
         loadPage(serverName, portid);
     });
 
-    window.onscroll = function () { if (VoltDbUI.isSchemaTabLoading) window.scrollTo(0, 0); };
+    //window.onscroll = function () { if (VoltDbUI.isSchemaTabLoading) window.scrollTo(0, 0); };
 });
 
 function logout() {
