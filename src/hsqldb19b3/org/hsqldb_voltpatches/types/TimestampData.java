@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,17 +40,22 @@ package org.hsqldb_voltpatches.types;
  */
 public class TimestampData {
 
-    long seconds;
-    int  nanos;
-    int  zone;
+    final long seconds;
+    int        nanos;
+    final int  zone;
 
     public TimestampData(long seconds) {
+
         this.seconds = seconds;
+        this.nanos   = 0;
+        this.zone    = 0;
     }
 
     public TimestampData(long seconds, int nanos) {
+
         this.seconds = seconds;
         this.nanos   = nanos;
+        this.zone    = 0;
     }
 
     public TimestampData(long seconds, int nanos, int zoneSeconds) {
@@ -70,6 +75,10 @@ public class TimestampData {
 
     public int getZone() {
         return zone;
+    }
+
+    public void clearNanos() {
+        nanos = 0;
     }
 
     public boolean equals(Object other) {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,26 +31,37 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.result.ResultConstants;
-import org.hsqldb_voltpatches.persist.PersistentStore;
-import org.hsqldb_voltpatches.lib.HashMappedList;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
-import org.hsqldb_voltpatches.navigator.RowSetNavigator;
-import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
-import org.hsqldb_voltpatches.navigator.RowSetNavigatorLinkedList;
+import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
+import org.hsqldb_voltpatches.navigator.RowSetNavigatorDataChange;
+import org.hsqldb_voltpatches.persist.PersistentStore;
+import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.result.ResultConstants;
+import org.hsqldb_voltpatches.types.Type;
 
+/**
+ * Implementation of Statement for updating result rows.<p>
+ *
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ * @version 2.3.2
+ * @since 1.9.0
+ */
 public class StatementResultUpdate extends StatementDML {
 
     int    actionType;
     Type[] types;
+    Result result;
 
     StatementResultUpdate() {
 
         super();
 
-        isTransactionStatement = true;
+        writeTableNames = new HsqlName[1];
+
+        setCompileTimestamp(Long.MAX_VALUE);
     }
 
     public String describe(Session session) {
@@ -59,140 +70,140 @@ public class StatementResultUpdate extends StatementDML {
 
     public Result execute(Session session) {
 
+        Result result;
+
         try {
-            return getResult(session);
-        } catch (HsqlException e) {
-            return Result.newErrorResult(e);
+            result = getResult(session);
+
+            clearStructures(session);
+        } catch (Throwable t) {
+            clearStructures(session);
+
+            result = Result.newErrorResult(t, null);
         }
+
+        return result;
     }
 
     Result getResult(Session session) {
 
         checkAccessRights(session);
 
-        Object[] args = session.sessionContext.dynamicArguments;
+        Object[]        args = session.sessionContext.dynamicArguments;
+        Row             row;
+        PersistentStore store = baseTable.getRowStore(session);
 
         switch (actionType) {
 
             case ResultConstants.UPDATE_CURSOR : {
-                Long id = (Long) args[args.length - 1];
-                PersistentStore store =
-                    session.sessionData.getRowStore(baseTable);
-                Row row = (Row) store.get((int) id.longValue(), false);
-                HashMappedList list = new HashMappedList();
+                row = getRow(session, args);
+
+                /**
+                 * @todo - in 2PL mode isDeleted() always returns false.
+                 * While write lock prevents delete by other transactions,
+                 * same-transaction deletes are not caught
+                 */
+                if (row == null || row.isDeleted(session, store)) {
+                    throw Error.error(ErrorCode.X_24521);
+                }
+
+                RowSetNavigatorDataChange list =
+                    session.sessionContext.getRowSetDataChange();
                 Object[] data =
                     (Object[]) ArrayUtil.duplicateArray(row.getData());
+                boolean[] columnCheck = baseTable.getNewColumnCheckList();
 
                 for (int i = 0; i < baseColumnMap.length; i++) {
                     if (types[i] == Type.SQL_ALL_TYPES) {
                         continue;
                     }
 
-                    data[baseColumnMap[i]] = args[i];
+                    data[baseColumnMap[i]]        = args[i];
+                    columnCheck[baseColumnMap[i]] = true;
                 }
 
-                list.add(row, data);
-                update(session, baseTable, list);
+                int[] colMap = ArrayUtil.booleanArrayToIntIndexes(columnCheck);
+
+                list.addRow(session, row, data, baseTable.getColumnTypes(),
+                            colMap);
+                list.endMainDataSet();
+                update(session, baseTable, list, null);
 
                 break;
             }
             case ResultConstants.DELETE_CURSOR : {
-                Long id = (Long) args[args.length - 1];
-                PersistentStore store =
-                    session.sessionData.getRowStore(baseTable);
-                Row row = (Row) store.get((int) id.longValue(), false);
-                RowSetNavigator navigator = new RowSetNavigatorLinkedList();
+                row = getRow(session, args);
 
-                navigator.add(row);
-                delete(session, baseTable, navigator);
+                if (row == null || row.isDeleted(session, store)) {
+                    throw Error.error(ErrorCode.X_24521);
+                }
+
+                RowSetNavigatorDataChange list =
+                    session.sessionContext.getRowSetDataChange();
+
+                list.addRow(row);
+                list.endMainDataSet();
+                delete(session, baseTable, list);
 
                 break;
             }
             case ResultConstants.INSERT_CURSOR : {
                 Object[] data = baseTable.getNewRowData(session);
 
-                for (int i = 0; i < data.length; i++) {
+                for (int i = 0; i < baseColumnMap.length; i++) {
                     data[baseColumnMap[i]] = args[i];
                 }
 
-                PersistentStore store =
-                    session.sessionData.getRowStore(baseTable);
-
-                baseTable.insertRow(session, store, data);
+                return insertSingleRow(session, store, data);
             }
         }
 
         return Result.updateOneResult;
     }
 
-    void setRowActionProperties(int action, Table table, Type[] types,
-                                int[] columnMap) {
+    Row getRow(Session session, Object[] args) {
 
-        this.actionType    = action;
-        this.baseTable     = table;
-        this.types         = types;
-        this.baseColumnMap = columnMap;
-    }
+        int             rowIdIndex = result.metaData.getColumnCount();
+        Long            rowId      = (Long) args[rowIdIndex];
+        PersistentStore store      = baseTable.getRowStore(session);
+        Row             row        = null;
 
-/*
-    Result result = getAccessRightsResult(session);
+        if (rowIdIndex + 2 == result.metaData.getExtendedColumnCount()) {
+            Object[] data =
+                ((RowSetNavigatorData) result.getNavigator()).getData(
+                    rowId.longValue());
 
-    if (result != null) {
-        return result;
-    }
+            if (data != null) {
+                row = (Row) data[rowIdIndex + 1];
+            }
+        } else {
+            int id = (int) rowId.longValue();
 
-    if (this.isExplain) {
-        return Result.newSingleColumnStringResult("OPERATION",
-                describe(session));
-    }
-
-    try {
-        materializeSubQueries(session, args);
-
-        result = getResult(session);
-    } catch (Throwable t) {
-        String commandString = sql;
-
-        if (session.database.getProperties().getErrorLevel()
-                == HsqlDatabaseProperties.NO_MESSAGE) {
-            commandString = null;
+            row = (Row) store.get(id, false);
         }
 
-        result = Result.newErrorResult(t, commandString);
+        this.result = null;
 
-        if (result.isError()) {
-            result.getException().setStatementType(group, type);
-        }
+        return row;
     }
 
-    session.sessionContext.clearStructures(this);
+    void setRowActionProperties(Result result, int action,
+                                StatementQuery statement, Type[] types) {
 
-    return result;
-*/
-/*
-    long     id         = cmd.getResultId();
-    int      actionType = cmd.getActionType();
-    Result   result     = sessionData.getDataResult(id);
-    Object[] pvals      = cmd.getParameterData();
-    Type[]   types      = cmd.metaData.columnTypes;
+        QueryExpression qe = statement.queryExpression;
 
-    StatementQuery statement = (StatementQuery) result.getValueObject() ;
-    QueryExpression qe = statement.queryExpression;
+        this.result             = result;
+        this.actionType         = action;
+        this.baseTable          = qe.getBaseTable();
+        this.types              = types;
+        this.baseColumnMap      = qe.getBaseTableColumnMap();
+        this.writeTableNames[0] = baseTable.getName();
 
-    Table baseTable = qe.getBaseTable();
-
-    int[] columnMap = qe.getBaseTableColumnMap();
-
-
-    switch (actionType) {
-
-        case ResultConstants.UPDATE_CURSOR :
-        case ResultConstants.DELETE_CURSOR :
-        case ResultConstants.INSERT_CURSOR :
+        // used for statement logging - needs improvements to list only the updated values
+        this.sql                = statement.getSQL();
+        this.parameterMetaData  = qe.getMetaData();
     }
 
-    return Result.updateZeroResult;
-*/
     void checkAccessRights(Session session) {
 
         switch (type) {

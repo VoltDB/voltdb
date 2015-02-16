@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.IntKeyHashMap;
-import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.LongKeyHashMap;
 import org.hsqldb_voltpatches.lib.LongKeyIntValueHashMap;
 import org.hsqldb_voltpatches.lib.LongValueHashMap;
@@ -41,7 +40,7 @@ import org.hsqldb_voltpatches.result.Result;
 
 /**
  * This class manages the reuse of Statement objects for prepared
- * statements for a Database instance.<p>
+ * statements for a Session instance.<p>
  *
  * A compiled statement is registered by a session to be managed. Once
  * registered, it is linked with one or more sessions.<p>
@@ -54,26 +53,24 @@ import org.hsqldb_voltpatches.result.Result;
  * statement id for the sql statement to access the statement.<p>
  *
  * Changes to database structure via DDL statements, will result in all
- * registered CompiledStatement objects to become invalidated. This is done by
- * setting to null all the managed CompiledStatement instances, while keeping
- * their id and sql string. When a session subsequently attempts to use an
- * invalidated (null) CompiledStatement via its id, it will reinstantiate the
- * Statement using its sql statement still held by this class.<p>
+ * registered Statement objects to become invalidated. This is done by
+ * comparing the schema change and compile timestamps. When a session
+ * subsequently attempts to use an invalidated Statement via its id, it will
+ * reinstantiate the Statement using its sql statement still held by this class.<p>
  *
- * This class keeps count of the number of different sessions that are linked
- * to each registered compiled statement, and the number of times each session
- * is linked.  It unregisters a compiled statement when no session remains
- * linked to it.<p>
+ * This class keeps count of the number of time each registered compiled
+ * statement is linked to a session. It unregisters a compiled statement when
+ * no session remains linked to it.<p>
  *
  * Modified by fredt@users from the original by boucherb@users to simplify,
  * support multiple identical prepared statements per session, and avoid
- * keeping references to Statement objects after DDL changes which
- * could result in memory leaks. Modified further to support schemas.<p>
+ * memory leaks. Modified further to support schemas. Changed implementation
+ * in 1.9 as a session object<p>
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
  *
- * @version 1.9.0
+ * @version 2.2.6
  * @since 1.7.2
  */
 public final class StatementManager {
@@ -87,16 +84,10 @@ public final class StatementManager {
     /** Map: Schema id (int) => {Map: SQL String => Compiled Statement id (long)} */
     private IntKeyHashMap schemaMap;
 
-    /** Map: Compiled Statement id (int) => SQL String */
-    private LongKeyHashMap sqlLookup;
-
     /** Map: Compiled statment id (int) => CompiledStatement object. */
     private LongKeyHashMap csidMap;
 
-    /** Map: Session id (long) => {Map: compiled statement id (long) => use count in session} */
-    private LongKeyHashMap sessionUseMap;
-
-    /** Map: Compiled statment id (int) => number of sessions that use the statement */
+    /** Map: Compiled statment id (int) => number of uses of the statement */
     private LongKeyIntValueHashMap useMap;
 
     /**
@@ -115,9 +106,7 @@ public final class StatementManager {
 
         this.database = database;
         schemaMap     = new IntKeyHashMap();
-        sqlLookup     = new LongKeyHashMap();
         csidMap       = new LongKeyHashMap();
-        sessionUseMap = new LongKeyHashMap();
         useMap        = new LongKeyIntValueHashMap();
         next_cs_id    = 0;
     }
@@ -128,28 +117,10 @@ public final class StatementManager {
     synchronized void reset() {
 
         schemaMap.clear();
-        sqlLookup.clear();
         csidMap.clear();
-        sessionUseMap.clear();
         useMap.clear();
 
         next_cs_id = 0;
-    }
-
-    /**
-     * Used after a DDL change that could impact the compiled statements.
-     * Clears references to CompiledStatement objects while keeping the counts
-     * and references to the sql strings.
-     */
-    synchronized void resetStatements() {
-
-        Iterator it = csidMap.values().iterator();
-
-        while (it.hasNext()) {
-            Statement cs = (Statement) it.next();
-
-            cs.clearVariables();
-        }
     }
 
     /**
@@ -203,20 +174,41 @@ public final class StatementManager {
             return null;
         }
 
-        if (!cs.isValid()) {
-            String sql = (String) sqlLookup.get(csid);
+        if (cs.getCompileTimestamp()
+                < database.schemaManager.getSchemaChangeTimestamp()) {
+            cs = recompileStatement(session, cs);
 
-            // revalidate with the original schema
-            try {
-                Session sys = database.sessionManager.getSysSession(
-                    session.currentSchema.name, session.getUser());
+            if (cs == null) {
+                freeStatement(csid);
 
-                cs = sys.compileStatement(sql);
+                return null;
+            }
 
-                cs.setID(csid);
-                csidMap.put(csid, cs);
-            } catch (Throwable t) {
-                freeStatement(csid, session.getId(), true);
+            csidMap.put(csid, cs);
+        }
+
+        return cs;
+    }
+
+    /**
+     * Recompiles a statement
+     */
+    public synchronized Statement getStatement(Session session,
+            Statement statement) {
+
+        long      csid = statement.getID();
+        Statement cs   = (Statement) csidMap.get(csid);
+
+        if (cs != null) {
+            return getStatement(session, csid);
+        }
+
+        if (statement.getCompileTimestamp()
+                < database.schemaManager.getSchemaChangeTimestamp()) {
+            cs = recompileStatement(session, statement);
+
+            if (cs == null) {
+                freeStatement(csid);
 
                 return null;
             }
@@ -225,33 +217,54 @@ public final class StatementManager {
         return cs;
     }
 
-    /**
-     * Links a session with a registered compiled statement. If this session has
-     * not already been linked with the given statement, then the statement use
-     * count is incremented.
-     *
-     * @param csid the compiled statement identifier
-     * @param sessionID the session identifier
-     */
-    private void linkSession(long csid, long sessionID) {
+    private Statement recompileStatement(Session session, Statement cs) {
 
-        LongKeyIntValueHashMap scsMap;
+        HsqlName  oldSchema = session.getCurrentSchemaHsqlName();
+        Statement newStatement;
 
-        scsMap = (LongKeyIntValueHashMap) sessionUseMap.get(sessionID);
+        // revalidate with the original schema
+        try {
+            HsqlName schema = cs.getSchemaName();
+            int      props  = cs.getCursorPropertiesRequest();
 
-        if (scsMap == null) {
-            scsMap = new LongKeyIntValueHashMap();
+            if (schema != null) {
 
-            sessionUseMap.put(sessionID, scsMap);
+                // checks the old schema exists
+                session.setSchema(schema.name);
+            }
+
+            boolean setGenerated = cs.generatedResultMetaData() != null;
+
+            newStatement = session.compileStatement(cs.getSQL(), props);
+
+            newStatement.setCursorPropertiesRequest(props);
+
+            if (!cs.getResultMetaData().areTypesCompatible(
+                    newStatement.getResultMetaData())) {
+                return null;
+            }
+
+            if (!cs.getParametersMetaData().areTypesCompatible(
+                    newStatement.getParametersMetaData())) {
+                return null;
+            }
+
+            newStatement.setCompileTimestamp(
+                database.txManager.getGlobalChangeTimestamp());
+
+            if (setGenerated) {
+                StatementDML si = (StatementDML) cs;
+
+                newStatement.setGeneratedColumnInfo(si.generatedType,
+                                                    si.generatedInputMetaData);
+            }
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            session.setCurrentSchemaHsqlName(oldSchema);
         }
 
-        int count = scsMap.get(csid, 0);
-
-        scsMap.put(csid, count + 1);
-
-        if (count == 0) {
-            useMap.put(csid, useMap.get(csid, 0) + 1);
-        }
+        return newStatement;
     }
 
     /**
@@ -271,7 +284,7 @@ public final class StatementManager {
         if (csid < 0) {
             csid = nextID();
 
-            int schemaid = cs.getSchemalName().hashCode();
+            int schemaid = cs.getSchemaName().hashCode();
             LongValueHashMap sqlMap =
                 (LongValueHashMap) schemaMap.get(schemaid);
 
@@ -282,10 +295,10 @@ public final class StatementManager {
             }
 
             sqlMap.put(cs.getSQL(), csid);
-            sqlLookup.put(csid, cs.getSQL());
         }
 
         cs.setID(csid);
+        cs.setCompileTimestamp(database.txManager.getGlobalChangeTimestamp());
         csidMap.put(csid, cs);
 
         return csid;
@@ -297,11 +310,8 @@ public final class StatementManager {
      * removed from management.
      *
      * @param csid the compiled statment identifier
-     * @param sessionID the session identifier
-     * @param freeAll if true, remove all links to the session
      */
-    synchronized void freeStatement(long csid, long sessionID,
-                                    boolean freeAll) {
+    synchronized void freeStatement(long csid) {
 
         if (csid == -1) {
 
@@ -309,92 +319,26 @@ public final class StatementManager {
             return;
         }
 
-        LongKeyIntValueHashMap scsMap =
-            (LongKeyIntValueHashMap) sessionUseMap.get(sessionID);
+        int useCount = useMap.get(csid, 1);
 
-        if (scsMap == null) {
+        if (useCount > 1) {
+            useMap.put(csid, useCount - 1);
 
-            // statement already removed due to invalidation
             return;
         }
 
-        int sessionUseCount = scsMap.get(csid, 0);
+        Statement cs = (Statement) csidMap.remove(csid);
 
-        if (sessionUseCount == 0) {
+        if (cs != null) {
+            int schemaid = cs.getSchemaName().hashCode();
+            LongValueHashMap sqlMap =
+                (LongValueHashMap) schemaMap.get(schemaid);
+            String sql = (String) cs.getSQL();
 
-            // statement already removed due to invalidation
-        } else if (sessionUseCount == 1 || freeAll) {
-            scsMap.remove(csid);
-
-            int usecount = useMap.get(csid, 0);
-
-            if (usecount == 0) {
-
-                // statement already removed due to invalidation
-            } else if (usecount == 1) {
-                Statement cs = (Statement) csidMap.remove(csid);
-
-                if (cs != null) {
-                    int schemaid = cs.getSchemalName().hashCode();
-                    LongValueHashMap sqlMap =
-                        (LongValueHashMap) schemaMap.get(schemaid);
-                    String sql = (String) sqlLookup.remove(csid);
-
-                    sqlMap.remove(sql);
-                }
-
-                useMap.remove(csid);
-            } else {
-                useMap.put(csid, usecount - 1);
-            }
-        } else {
-            scsMap.put(csid, sessionUseCount - 1);
-        }
-    }
-
-    /**
-     * Releases the link betwen the session and all compiled statement objects
-     * it is linked to. If any such statement is not linked with any other
-     * session, it is removed from management.
-     *
-     * @param sessionID the session identifier
-     */
-    synchronized void removeSession(long sessionID) {
-
-        LongKeyIntValueHashMap scsMap;
-        long                   csid;
-        Iterator               i;
-
-        scsMap = (LongKeyIntValueHashMap) sessionUseMap.remove(sessionID);
-
-        if (scsMap == null) {
-            return;
+            sqlMap.remove(sql);
         }
 
-        i = scsMap.keySet().iterator();
-
-        while (i.hasNext()) {
-            csid = i.nextLong();
-
-            int usecount = useMap.get(csid, 1) - 1;
-
-            if (usecount == 0) {
-                Statement cs = (Statement) csidMap.remove(csid);
-
-                if (cs != null) {
-                    int schemaid = cs.getSchemalName().hashCode();
-                    LongValueHashMap sqlMap =
-                        (LongValueHashMap) schemaMap.get(schemaid);
-                    String sql = (String) sqlLookup.remove(csid);
-
-                    sqlMap.remove(sql);
-                }
-
-                useMap.remove(csid);
-            } else {
-                useMap.put(csid, usecount);
-            }
-        }
+        useMap.remove(csid);
     }
 
     /**
@@ -407,19 +351,39 @@ public final class StatementManager {
     synchronized Statement compile(Session session,
                                    Result cmd) throws Throwable {
 
-        String    sql  = cmd.getMainString();
-        long      csid = getStatementID(session.currentSchema, sql);
-        Statement cs   = (Statement) csidMap.get(csid);
+        int       props = cmd.getExecuteProperties();
+        Statement cs    = null;
+        String    sql   = cmd.getMainString();
+        long      csid  = getStatementID(session.currentSchema, sql);
 
-        if (cs == null || !cs.isValid() || !session.isAdmin()) {
-            Session sys = database.sessionManager.getSysSession(
-                session.currentSchema.name, session.getUser());
+        if (csid >= 0) {
+            cs = (Statement) csidMap.get(csid);
 
-            cs   = sys.compileStatement(sql);
+            if (cs != null) {
+                if (cs.getCursorPropertiesRequest() != props) {
+                    cs   = null;
+                    csid = -1;
+                }
+
+                // generated result props still overwrite earlier version
+            }
+        }
+
+        if (cs == null || !cs.isValid()
+                || cs.getCompileTimestamp()
+                   < database.schemaManager.getSchemaChangeTimestamp()) {
+            cs = session.compileStatement(sql, props);
+
+            cs.setCursorPropertiesRequest(props);
+
             csid = registerStatement(csid, cs);
         }
 
-        linkSession(csid, session.getId());
+        int useCount = useMap.get(csid, 0) + 1;
+
+        useMap.put(csid, useCount);
+        cs.setGeneratedColumnInfo(cmd.getGeneratedResultType(),
+                                  cmd.getGeneratedResultMetaData());
 
         return cs;
     }

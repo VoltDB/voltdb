@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,82 +32,93 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BinaryType;
 import org.hsqldb_voltpatches.types.BlobData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.DTIType;
 import org.hsqldb_voltpatches.types.DateTimeType;
+import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Implementation of SQL standard function calls
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.1.1
  * @since 1.9.0
  */
 public class FunctionSQL extends Expression {
 
-    private final static int   FUNC_POSITION_CHAR                    = 1;     // numeric
-    private final static int   FUNC_POSITION_BINARY                  = 2;
-    private final static int   FUNC_OCCURENCES_REGEX                 = 3;
-    private final static int   FUNC_POSITION_REGEX                   = 4;
-    protected final static int FUNC_EXTRACT                          = 5;
-    protected final static int FUNC_BIT_LENGTH                       = 6;
-    protected final static int FUNC_CHAR_LENGTH                      = 7;
-    protected final static int FUNC_OCTET_LENGTH                     = 8;
-    private final static int   FUNC_CARDINALITY                      = 9;
-    private final static int   FUNC_ABS                              = 10;
-    private final static int   FUNC_MOD                              = 11;
-    protected final static int FUNC_LN                               = 12;
-    private final static int   FUNC_EXP                              = 13;
-    private final static int   FUNC_POWER                            = 14;
-    private final static int   FUNC_SQRT                             = 15;
-    private final static int   FUNC_FLOOR                            = 16;
-    private final static int   FUNC_CEILING                          = 17;
-    private final static int   FUNC_WIDTH_BUCKET                     = 20;
-    protected final static int FUNC_SUBSTRING_CHAR                   = 21;    // string
-    private final static int   FUNC_SUBSTRING_REG_EXPR               = 22;
-    private final static int   FUNC_SUBSTRING_REGEX                  = 23;
-    protected final static int FUNC_FOLD_LOWER                       = 24;
-    protected final static int FUNC_FOLD_UPPER                       = 25;
-    private final static int   FUNC_TRANSCODING                      = 26;
-    private final static int   FUNC_TRANSLITERATION                  = 27;
-    private final static int   FUNC_REGEX_TRANSLITERATION            = 28;
-    protected final static int FUNC_TRIM_CHAR                        = 29;
-    final static int           FUNC_OVERLAY_CHAR                     = 30;
-    private final static int   FUNC_CHAR_NORMALIZE                   = 31;
-    private final static int   FUNC_SUBSTRING_BINARY                 = 32;
-    private final static int   FUNC_TRIM_BINARY                      = 33;
-    private final static int   FUNC_OVERLAY_BINARY                   = 40;
-    protected final static int FUNC_CURRENT_DATE                     = 41;    // datetime
-    protected final static int FUNC_CURRENT_TIME                     = 42;
-    protected final static int FUNC_CURRENT_TIMESTAMP                = 43;
-    protected final static int FUNC_LOCALTIME                        = 44;
-    private final static int   FUNC_LOCALTIMESTAMP                   = 50;
-    private final static int   FUNC_CURRENT_CATALOG                  = 51;    // general
-    private final static int   FUNC_CURRENT_DEFAULT_TRANSFORM_GROUP  = 52;
-    private final static int   FUNC_CURRENT_PATH                     = 53;
-    private final static int   FUNC_CURRENT_ROLE                     = 54;
-    private final static int   FUNC_CURRENT_SCHEMA                   = 55;
-    private final static int   FUNC_CURRENT_TRANSFORM_GROUP_FOR_TYPE = 56;
-    private final static int   FUNC_CURRENT_USER                     = 57;
-    private final static int   FUNC_SESSION_USER                     = 58;
-    private final static int   FUNC_SYSTEM_USER                      = 59;
-    protected final static int FUNC_USER                             = 60;
-    private final static int   FUNC_VALUE                            = 61;
+    protected static final int FUNC_POSITION_CHAR                    = 1;     // numeric
+    private static final int   FUNC_POSITION_BINARY                  = 2;
+    private static final int   FUNC_OCCURENCES_REGEX                 = 3;
+    private static final int   FUNC_POSITION_REGEX                   = 4;
+    protected static final int FUNC_EXTRACT                          = 5;
+    protected static final int FUNC_BIT_LENGTH                       = 6;
+    protected static final int FUNC_CHAR_LENGTH                      = 7;
+    protected static final int FUNC_OCTET_LENGTH                     = 8;
+    private static final int   FUNC_CARDINALITY                      = 9;
+    private static final int   FUNC_MAX_CARDINALITY                  = 10;
+    private static final int   FUNC_TRIM_ARRAY                       = 11;
+    private static final int   FUNC_ABS                              = 12;
+    private static final int   FUNC_MOD                              = 13;
+    protected static final int FUNC_LN                               = 14;
+    private static final int   FUNC_EXP                              = 15;
+    private static final int   FUNC_POWER                            = 16;
+    private static final int   FUNC_SQRT                             = 17;
+    private static final int   FUNC_FLOOR                            = 20;
+    private static final int   FUNC_CEILING                          = 21;
+    private static final int   FUNC_WIDTH_BUCKET                     = 22;
+    protected static final int FUNC_SUBSTRING_CHAR                   = 23;    // string
+    private static final int   FUNC_SUBSTRING_REG_EXPR               = 24;
+    private static final int   FUNC_SUBSTRING_REGEX                  = 25;
+    protected static final int FUNC_FOLD_LOWER                       = 26;
+    protected static final int FUNC_FOLD_UPPER                       = 27;
+    private static final int   FUNC_TRANSCODING                      = 28;
+    private static final int   FUNC_TRANSLITERATION                  = 29;
+    private static final int   FUNC_REGEX_TRANSLITERATION            = 30;
+    protected static final int FUNC_TRIM_CHAR                        = 31;
+    static final int           FUNC_OVERLAY_CHAR                     = 32;
+    private static final int   FUNC_CHAR_NORMALIZE                   = 33;
+    private static final int   FUNC_SUBSTRING_BINARY                 = 40;
+    private static final int   FUNC_TRIM_BINARY                      = 41;
+    private static final int   FUNC_OVERLAY_BINARY                   = 42;
+    protected static final int FUNC_CURRENT_DATE                     = 43;    // datetime
+    protected static final int FUNC_CURRENT_TIME                     = 44;
+    protected static final int FUNC_CURRENT_TIMESTAMP                = 50;
+    protected static final int FUNC_LOCALTIME                        = 51;
+    protected static final int FUNC_LOCALTIMESTAMP                   = 52;
+    private static final int   FUNC_CURRENT_CATALOG                  = 53;    // general
+    private static final int   FUNC_CURRENT_DEFAULT_TRANSFORM_GROUP  = 54;
+    private static final int   FUNC_CURRENT_PATH                     = 55;
+    private static final int   FUNC_CURRENT_ROLE                     = 56;
+    private static final int   FUNC_CURRENT_SCHEMA                   = 57;
+    private static final int   FUNC_CURRENT_TRANSFORM_GROUP_FOR_TYPE = 58;
+    private static final int   FUNC_CURRENT_USER                     = 59;
+    private static final int   FUNC_SESSION_USER                     = 60;
+    private static final int   FUNC_SYSTEM_USER                      = 61;
+    protected static final int FUNC_USER                             = 62;
+    private static final int   FUNC_VALUE                            = 63;
 
     //
-    static final short[] noParamList              = new short[]{};
-    static final short[] emptyParamList           = new short[] {
+    static final short[] noParamList             = new short[]{};
+    static final short[] emptyParamList          = new short[] {
         Tokens.OPENBRACKET, Tokens.CLOSEBRACKET
     };
-    static final short[] optionalNoParamList      = new short[] {
+    static final short[] optionalNoParamList     = new short[] {
         Tokens.X_OPTION, 2, Tokens.OPENBRACKET, Tokens.CLOSEBRACKET
+    };
+    static final short[] optionalSingleParamList = new short[] {
+        Tokens.OPENBRACKET, Tokens.X_OPTION, 1, Tokens.QUESTION,
+        Tokens.CLOSEBRACKET
     };
     static final short[] singleParamList          = new short[] {
         Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET
@@ -115,6 +126,10 @@ public class FunctionSQL extends Expression {
     static final short[] optionalIntegerParamList = new short[] {
         Tokens.X_OPTION, 3, Tokens.OPENBRACKET, Tokens.X_POS_INTEGER,
         Tokens.CLOSEBRACKET
+    };
+    static final short[] optionalDoubleParamList = new short[] {
+        Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA,
+        Tokens.QUESTION, Tokens.CLOSEBRACKET
     };
     static final short[] doubleParamList = new short[] {
         Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
@@ -131,8 +146,9 @@ public class FunctionSQL extends Expression {
     };
 
     //
-    static IntValueHashMap valueFuncMap   = new IntValueHashMap();
-    static IntValueHashMap regularFuncMap = new IntValueHashMap();
+    static IntValueHashMap   valueFuncMap            = new IntValueHashMap();
+    static IntValueHashMap   regularFuncMap          = new IntValueHashMap();
+    static OrderedIntHashSet nonDeterministicFuncSet = new OrderedIntHashSet();
 
     static {
         regularFuncMap.put(Tokens.T_POSITION, FUNC_POSITION_CHAR);
@@ -145,9 +161,9 @@ public class FunctionSQL extends Expression {
         regularFuncMap.put(Tokens.T_CHAR_LENGTH, FUNC_CHAR_LENGTH);
         regularFuncMap.put(Tokens.T_CHARACTER_LENGTH, FUNC_CHAR_LENGTH);
         regularFuncMap.put(Tokens.T_OCTET_LENGTH, FUNC_OCTET_LENGTH);
-        /*
-        regularFuncMap.put(Token.T_CARDINALITY, FUNC_CARDINALITY);
-        */
+        regularFuncMap.put(Tokens.T_CARDINALITY, FUNC_CARDINALITY);
+        regularFuncMap.put(Tokens.T_MAX_CARDINALITY, FUNC_MAX_CARDINALITY);
+        regularFuncMap.put(Tokens.T_TRIM_ARRAY, FUNC_TRIM_ARRAY);
         regularFuncMap.put(Tokens.T_ABS, FUNC_ABS);
         regularFuncMap.put(Tokens.T_MOD, FUNC_MOD);
         regularFuncMap.put(Tokens.T_LN, FUNC_LN);
@@ -203,14 +219,18 @@ public class FunctionSQL extends Expression {
         valueFuncMap.put(Tokens.T_SYSTEM_USER, FUNC_SYSTEM_USER);
         valueFuncMap.put(Tokens.T_USER, FUNC_USER);
         valueFuncMap.put(Tokens.T_VALUE, FUNC_VALUE);
+
+        //
+        nonDeterministicFuncSet.addAll(valueFuncMap.values());
     }
 
     //
     int     funcType;
+    boolean isDeterministic;
     String  name;
     short[] parseList;
     short[] parseListAlt;
-    boolean isValueFunction;
+    boolean isSQLValueFunction;
     // A VoltDB extension to control SQL functions,
     // their types and whether they are implemented in VoltDB.
     protected int parameterArg = -1;
@@ -221,10 +241,12 @@ public class FunctionSQL extends Expression {
     public static FunctionSQL newSQLFunction(String token,
             CompileContext context) {
 
-        int id = regularFuncMap.get(token, -1);
+        int     id              = regularFuncMap.get(token, -1);
+        boolean isValueFunction = false;
 
         if (id == -1) {
-            id = valueFuncMap.get(token, -1);
+            id              = valueFuncMap.get(token, -1);
+            isValueFunction = true;
         }
 
         if (id == -1) {
@@ -239,35 +261,26 @@ public class FunctionSQL extends Expression {
             }
 
             function.dataType = context.currentDomain;
+        } else {
+            function.isSQLValueFunction = isValueFunction;
         }
 
         return function;
-    }
-
-    public static boolean isFunction(String token) {
-        return isRegularFunction(token) || isValueFunction(token);
-    }
-
-    public static boolean isRegularFunction(String token) {
-        return regularFuncMap.containsKey(token);
-    }
-
-    public static boolean isValueFunction(String token) {
-        return valueFuncMap.containsKey(token);
     }
 
     protected FunctionSQL() {
 
         super(OpTypes.SQL_FUNCTION);
 
-        nodes = Expression.emptyExpressionArray;
+        nodes = Expression.emptyArray;
     }
 
     protected FunctionSQL(int id) {
 
         this();
 
-        this.funcType = id;
+        this.funcType   = id;
+        isDeterministic = !nonDeterministicFuncSet.contains(id);
 
         switch (id) {
 
@@ -293,15 +306,15 @@ public class FunctionSQL extends Expression {
                 name      = Tokens.T_EXTRACT;
                 parseList = new short[] {
                     // A VoltDB extension to support more selectors
-                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 18, Tokens.YEAR,
+                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 19, Tokens.YEAR,
                     /* disable 1 line ...
-                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 16, Tokens.YEAR,
+                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 17, Tokens.YEAR,
                     ... disabled 1 line */
                     // End of VoltDB extension
                     Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
                     Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
                     Tokens.QUARTER, Tokens.DAY_OF_YEAR, Tokens.DAY_OF_MONTH,
-                    Tokens.DAY_NAME, Tokens.MONTH_NAME,
+                    Tokens.WEEK_OF_YEAR, Tokens.DAY_NAME, Tokens.MONTH_NAME,
                     Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR,
                     // A VoltDB extension to support WEEK, WEEKDAY
                     Tokens.WEEKDAY, Tokens.WEEK,
@@ -334,10 +347,21 @@ public class FunctionSQL extends Expression {
                 break;
 
             case FUNC_CARDINALITY :
+                name      = Tokens.T_CARDINALITY;
+                parseList = singleParamList;
+                break;
+
+            case FUNC_MAX_CARDINALITY :
+                name      = Tokens.T_MAX_CARDINALITY;
                 parseList = singleParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
+                break;
+
+            case FUNC_TRIM_ARRAY :
+                name      = Tokens.T_TRIM_ARRAY;
+                parseList = doubleParamList;
                 break;
 
             case FUNC_ABS :
@@ -347,7 +371,7 @@ public class FunctionSQL extends Expression {
 
             case FUNC_MOD :
                 name      = Tokens.T_MOD;
-                parseList = singleParamList;
+                parseList = doubleParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
@@ -414,13 +438,8 @@ public class FunctionSQL extends Expression {
                 };
                 parseListAlt = new short[] {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-                    // A VoltDB extension to make the third parameter optional
-                    /* disable 1 line ...
-                    Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
-                    ... disabled 1 line */
-                    Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION,
-                    // End of VoltDB extension
-                    Tokens.CLOSEBRACKET
+                    Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
                 break;
 
@@ -486,9 +505,8 @@ public class FunctionSQL extends Expression {
                 break;
 
             case FUNC_CURRENT_CATALOG :
-                name            = Tokens.T_CURRENT_CATALOG;
-                parseList       = noParamList;
-                isValueFunction = true;
+                name      = Tokens.T_CURRENT_CATALOG;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
@@ -501,18 +519,16 @@ public class FunctionSQL extends Expression {
                 break;
             */
             case FUNC_CURRENT_ROLE :
-                name            = Tokens.T_CURRENT_ROLE;
-                parseList       = noParamList;
-                isValueFunction = true;
+                name      = Tokens.T_CURRENT_ROLE;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_CURRENT_SCHEMA :
-                name            = Tokens.T_CURRENT_SCHEMA;
-                parseList       = noParamList;
-                isValueFunction = true;
+                name      = Tokens.T_CURRENT_SCHEMA;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
@@ -523,87 +539,77 @@ public class FunctionSQL extends Expression {
                 break;
             */
             case FUNC_CURRENT_USER :
-                name            = Tokens.T_CURRENT_USER;
-                parseList       = noParamList;
-                isValueFunction = true;
+                name      = Tokens.T_CURRENT_USER;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_SESSION_USER :
-                name            = Tokens.T_SESSION_USER;
-                parseList       = noParamList;
-                isValueFunction = true;
+                name      = Tokens.T_SESSION_USER;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_SYSTEM_USER :
-                name            = Tokens.T_SYSTEM_USER;
-                parseList       = noParamList;
-                isValueFunction = true;
+                name      = Tokens.T_SYSTEM_USER;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_USER :
-                name            = Tokens.T_USER;
-                parseList       = optionalNoParamList;
-                isValueFunction = true;
+                name      = Tokens.T_USER;
+                parseList = optionalNoParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_VALUE :
-                name            = Tokens.T_VALUE;
-                parseList       = noParamList;
-                isValueFunction = false;
+                name      = Tokens.T_VALUE;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_CURRENT_DATE :
-                name            = Tokens.T_CURRENT_DATE;
-                parseList       = noParamList;
-                isValueFunction = true;
+                name      = Tokens.T_CURRENT_DATE;
+                parseList = noParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_CURRENT_TIME :
-                name            = Tokens.T_CURRENT_TIME;
-                parseList       = optionalIntegerParamList;
-                isValueFunction = true;
+                name      = Tokens.T_CURRENT_TIME;
+                parseList = optionalIntegerParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_CURRENT_TIMESTAMP :
-                name            = Tokens.T_CURRENT_TIMESTAMP;
-                parseList       = optionalIntegerParamList;
-                isValueFunction = true;
+                name      = Tokens.T_CURRENT_TIMESTAMP;
+                parseList = optionalIntegerParamList;
                 break;
 
             case FUNC_LOCALTIME :
-                name            = Tokens.T_LOCALTIME;
-                parseList       = optionalIntegerParamList;
-                isValueFunction = true;
+                name      = Tokens.T_LOCALTIME;
+                parseList = optionalIntegerParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
             case FUNC_LOCALTIMESTAMP :
-                name            = Tokens.T_LOCALTIMESTAMP;
-                parseList       = optionalIntegerParamList;
-                isValueFunction = true;
+                name      = Tokens.T_LOCALTIMESTAMP;
+                parseList = optionalIntegerParamList;
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
@@ -649,9 +655,22 @@ public class FunctionSQL extends Expression {
                     return null;
                 }
 
+                long offset = 0;
+
+                if (nodes.length > 3 && nodes[3] != null) {
+                    Object value = nodes[3].getValue(session);
+
+                    offset = ((Number) value).longValue() - 1;
+
+                    if (offset < 0) {
+                        offset = 0;
+                    }
+                }
+
                 long result =
                     ((CharacterType) nodes[1].dataType).position(
-                        session, data[1], data[0], nodes[0].dataType, 0) + 1;
+                        session, data[1], data[0], nodes[0].dataType,
+                        offset) + 1;
 
                 if (nodes[2] != null
                         && ((Number) nodes[2].valueData).intValue()
@@ -756,9 +775,46 @@ public class FunctionSQL extends Expression {
 
                 return ValuePool.getLong(result);
             }
-            /*
-            case FUNC_CARDINALITY :
-            */
+            case FUNC_CARDINALITY : {
+                if (data[0] == null) {
+                    return null;
+                }
+
+                int result = nodes[0].dataType.cardinality(session, data[0]);
+
+                return ValuePool.getInt(result);
+            }
+            case FUNC_MAX_CARDINALITY : {
+                if (data[0] == null) {
+                    return null;
+                }
+
+                int result = nodes[0].dataType.arrayLimitCardinality();
+
+                return ValuePool.getInt(result);
+            }
+            case FUNC_TRIM_ARRAY : {
+                if (data[0] == null) {
+                    return null;
+                }
+
+                if (data[1] == null) {
+                    return null;
+                }
+
+                Object[] array  = (Object[]) data[0];
+                int      length = ((Number) data[1]).intValue();
+
+                if (length < 0 || length > array.length) {
+                    throw Error.error(ErrorCode.X_2202E);
+                }
+
+                Object[] newArray = new Object[array.length - length];
+
+                System.arraycopy(array, 0, newArray, 0, newArray.length);
+
+                return newArray;
+            }
             case FUNC_ABS : {
                 if (data[0] == null) {
                     return null;
@@ -771,19 +827,12 @@ public class FunctionSQL extends Expression {
                     return null;
                 }
 
-                // non-integral arguments are accepted with conversion
+                // result type is the same as nodes[1]
+                Object value = ((NumberType) nodes[0].dataType).modulo(session,
+                    data[0], data[1], nodes[0].dataType);
 
-                /** @todo - check if widening has an effect */
-                Object value =
-                    ((NumberType) nodes[0].dataType).divide(nodes[0],
-                        nodes[1]);
-
-                value = ((NumberType) nodes[0].dataType).subtract(nodes[0],
-                        value, nodes[1].dataType);
-
-                // result type is the same as argList[1]
-                return ((NumberType) dataType).convertToTypeLimits(session,
-                        value);
+                return dataType.convertToType(session, value,
+                                              nodes[0].dataType);
             }
             case FUNC_LN : {
                 if (data[0] == null) {
@@ -822,15 +871,6 @@ public class FunctionSQL extends Expression {
                 double base     = ((Number) data[0]).doubleValue();
                 double exponent = ((Number) data[1]).doubleValue();
                 double val;
-
-                // A VoltDB extension to tweak compliance with standard sql error handling
-                //VOLTDB's HSQL_BACKEND doesn't object to negative exponents -- why should it?
-                /* disable 3 lines ...
-                if (exponent < 0) {
-                    throw Error.error(ErrorCode.X_2201F);
-                }
-                ... disabled 2 lines */
-                // End of VoltDB extension
 
                 if (base == 0) {
                     if (exponent < 0) {
@@ -880,7 +920,93 @@ public class FunctionSQL extends Expression {
                 return ((NumberType) dataType).ceiling(data[0]);
             }
             case FUNC_WIDTH_BUCKET : {
-                return null;
+                for (int i = 0; i < data.length; i++) {
+                    if (data[i] == null) {
+                        return null;
+                    }
+                }
+
+                if (((NumberType) nodes[3].dataType).isNegative(data[3])) {
+                    throw Error.error(ErrorCode.X_2201G);
+                }
+
+                int compare = nodes[1].dataType.compare(session, data[1],
+                    data[2]);
+                Type   subType;
+                Object temp;
+                Object temp2;
+
+                if (nodes[0].dataType.isNumberType()) {
+                    subType = nodes[0].dataType;
+                } else {
+                    subType = nodes[0].dataType.getCombinedType(session,
+                            nodes[0].dataType, OpTypes.SUBTRACT);
+                }
+
+                switch (compare) {
+
+                    case 0 :
+                        throw Error.error(ErrorCode.X_2201G);
+                    case -1 : {
+                        if (nodes[0].dataType.compare(
+                                session, data[0], data[1]) < 0) {
+                            return ValuePool.INTEGER_0;
+                        }
+
+                        if (nodes[0].dataType.compare(
+                                session, data[0], data[2]) >= 0) {
+                            return dataType.add(session, data[3],
+                                                ValuePool.INTEGER_1,
+                                                Type.SQL_INTEGER);
+                        }
+
+                        temp = subType.subtract(session, data[0], data[1],
+                                                nodes[0].dataType);
+                        temp2 = subType.subtract(session, data[2], data[1],
+                                                 nodes[0].dataType);
+
+                        break;
+                    }
+                    case 1 : {
+                        if (nodes[0].dataType.compare(
+                                session, data[0], data[1]) > 0) {
+                            return ValuePool.INTEGER_0;
+                        }
+
+                        if (nodes[0].dataType.compare(
+                                session, data[0], data[2]) <= 0) {
+                            return dataType.add(session, data[3],
+                                                ValuePool.INTEGER_1,
+                                                Type.SQL_INTEGER);
+                        }
+
+                        temp = subType.subtract(session, data[1], data[0],
+                                                nodes[0].dataType);
+                        temp2 = subType.subtract(session, data[1], data[2],
+                                                 nodes[0].dataType);
+
+                        break;
+                    }
+                    default :
+                        throw Error.runtimeError(ErrorCode.U_S0500, "");
+                }
+
+                Type opType;
+
+                if (subType.typeCode == Types.SQL_DOUBLE) {
+                    opType = subType;
+                } else {
+                    opType = IntervalType.factorType;
+                    temp   = opType.convertToType(session, temp, subType);
+                    temp2  = opType.convertToType(session, temp2, subType);
+                }
+
+                temp = opType.multiply(temp, data[3]);
+                temp = opType.divide(session, temp, temp2);
+                temp = dataType.convertToDefaultType(session, temp);
+
+                return dataType.add(session, temp, ValuePool.INTEGER_1,
+                                    Type.SQL_INTEGER);
             }
             case FUNC_SUBSTRING_CHAR : {
                 if (data[0] == null || data[1] == null) {
@@ -912,7 +1038,7 @@ public class FunctionSQL extends Expression {
 
                 // A VoltDB extension to make the fourth parameter optional and ignored vs. broken and disabled
                 /* disable 9 lines ...
-                if (nodes[3] != null
+                if (nodes.length > 3 && nodes[3] != null
                         && ((Number) nodes[2].valueData).intValue()
                            == Tokens.OCTETS) {
 
@@ -988,7 +1114,7 @@ public class FunctionSQL extends Expression {
                     throw Error.error(ErrorCode.X_22027);
                 }
 
-                int character = string.charAt(0);
+                char character = string.charAt(0);
 
                 return ((CharacterType) dataType).trim(session, data[2],
                                                        character, leading,
@@ -1087,7 +1213,7 @@ public class FunctionSQL extends Expression {
                 byte[] bytes = string.getBytes();
 
                 return ((BinaryType) dataType).trim(session,
-                                                    (BlobData) data[3],
+                                                    (BlobData) data[2],
                                                     bytes[0], leading,
                                                     trailing);
             }
@@ -1128,30 +1254,37 @@ public class FunctionSQL extends Expression {
             case FUNC_CURRENT_PATH :
             */
             case FUNC_CURRENT_ROLE :
-                return null;
+                return session.getRole() == null ? null
+                                                 : session.getRole().getName()
+                                                     .getNameString();
 
             case FUNC_CURRENT_SCHEMA :
-                return session.currentSchema.name;
+                return session.getCurrentSchemaHsqlName().name;
 
             /*
             case FUNC_CURRENT_TRANSFORM_GROUP_FOR_TYPE :
             */
             case FUNC_CURRENT_USER :
-                return session.getGrantee().getNameString();
+                return session.getUser().getName().getNameString();
 
             case FUNC_SESSION_USER :
-                return session.getGrantee().getNameString();
+                return session.getUser().getName().getNameString();
 
             case FUNC_SYSTEM_USER :
-                return session.getGrantee().getNameString();
+                return session.getUser().getName().getNameString();
 
             case FUNC_USER :
-                return session.getGrantee().getNameString();
+                return session.getUser().getName().getNameString();
 
             case FUNC_VALUE :
                 return session.sessionData.currentValue;
 
             case FUNC_CURRENT_DATE :
+                if (session.database.sqlSyntaxOra) {
+                    return dataType.convertToTypeLimits(
+                        session, session.getCurrentTimestamp(false));
+                }
+
                 return session.getCurrentDate();
 
             case FUNC_CURRENT_TIME :
@@ -1196,7 +1329,7 @@ public class FunctionSQL extends Expression {
                             || nodes[1].dataType.isBinaryType()) {
                         nodes[0].dataType = nodes[1].dataType;
                     } else {
-                        nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
+                        nodes[0].dataType = Type.SQL_VARCHAR;
                     }
                 }
 
@@ -1205,7 +1338,7 @@ public class FunctionSQL extends Expression {
                             || nodes[0].dataType.isBinaryType()) {
                         nodes[1].dataType = nodes[0].dataType;
                     } else {
-                        nodes[1].dataType = Type.SQL_VARCHAR_DEFAULT;
+                        nodes[1].dataType = Type.SQL_VARCHAR;
                     }
                 }
 
@@ -1216,12 +1349,22 @@ public class FunctionSQL extends Expression {
                            && nodes[1].dataType.isBinaryType()) {
                     if (nodes[0].dataType.isBitType()
                             || nodes[1].dataType.isBitType()) {
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42563);
                     }
 
                     funcType = FUNC_POSITION_BINARY;
                 } else {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                if (nodes.length > 3 && nodes[3] != null) {
+                    if (nodes[3].isDynamicParam()) {
+                        nodes[3].dataType = Type.SQL_BIGINT;
+                    }
+
+                    if (!nodes[3].dataType.isNumberType()) {
+                        throw Error.error(ErrorCode.X_42563);
+                    }
                 }
 
                 dataType = Type.SQL_BIGINT;
@@ -1239,7 +1382,7 @@ public class FunctionSQL extends Expression {
 
                 if (!nodes[1].dataType.isDateTimeType()
                         && !nodes[1].dataType.isIntervalType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 int     part = ((Number) nodes[0].valueData).intValue();
@@ -1257,7 +1400,7 @@ public class FunctionSQL extends Expression {
 
                 if (!nodes[0].dataType.isCharacterType()
                         && !nodes[0].dataType.isBinaryType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 dataType = Type.SQL_BIGINT;
@@ -1265,19 +1408,23 @@ public class FunctionSQL extends Expression {
                 break;
             }
             case FUNC_CHAR_LENGTH :
+                if (nodes[0].dataType == null) {
+                    nodes[0].dataType = Type.SQL_VARCHAR;
+                }
+
                 if (!nodes[0].dataType.isCharacterType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
             // fall through
             case FUNC_OCTET_LENGTH : {
                 if (nodes[0].dataType == null) {
-                    nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
+                    nodes[0].dataType = Type.SQL_VARCHAR;
                 }
 
                 if (!nodes[0].dataType.isCharacterType()
                         && !nodes[0].dataType.isBinaryType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 dataType = Type.SQL_BIGINT;
@@ -1285,17 +1432,59 @@ public class FunctionSQL extends Expression {
                 break;
             }
             case FUNC_CARDINALITY : {
-                dataType = Type.SQL_BIGINT;
+                if (nodes[0].dataType == null) {
+                    throw Error.error(ErrorCode.X_42567);
+                }
+
+                if (!nodes[0].dataType.isArrayType()) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                dataType = Type.SQL_INTEGER;
+
+                break;
+            }
+            case FUNC_MAX_CARDINALITY : {
+                if (nodes[0].dataType == null) {
+                    throw Error.error(ErrorCode.X_42567);
+                }
+
+                if (!nodes[0].dataType.isArrayType()) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                dataType = Type.SQL_INTEGER;
+
+                break;
+            }
+            case FUNC_TRIM_ARRAY : {
+                if (nodes[0].dataType == null) {
+                    throw Error.error(ErrorCode.X_42567);
+                }
+
+                if (!nodes[0].dataType.isArrayType()) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                if (nodes[1].dataType == null) {
+                    nodes[1].dataType = Type.SQL_INTEGER;
+                }
+
+                if (!nodes[1].dataType.isIntegralType()) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                dataType = nodes[0].dataType;
 
                 break;
             }
             case FUNC_MOD : {
                 if (nodes[0].dataType == null) {
-                    nodes[1].dataType = nodes[0].dataType;
+                    nodes[0].dataType = nodes[1].dataType;
                 }
 
                 if (nodes[1].dataType == null) {
-                    nodes[0].dataType = nodes[1].dataType;
+                    nodes[1].dataType = nodes[0].dataType;
                 }
 
                 if (nodes[0].dataType == null) {
@@ -1304,7 +1493,7 @@ public class FunctionSQL extends Expression {
 
                 if (!nodes[0].dataType.isNumberType()
                         || !nodes[1].dataType.isNumberType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 nodes[0].dataType =
@@ -1320,22 +1509,22 @@ public class FunctionSQL extends Expression {
             }
             case FUNC_POWER : {
                 if (nodes[0].dataType == null) {
-                    // A VoltDB extension to swap out this odd propagation of nulls.
+                    // A VoltDB extension to swap out this odd propagation of unrelated types.
                     // VoltDB simply gives missing types the benefit of the doubt.
                     nodes[0].dataType = Type.SQL_DOUBLE;
                     // For VoltDB, the retest for null below is now redundant.
                     /* disable 1 line ...
-                    nodes[1].dataType = nodes[0].dataType;
+                    nodes[0].dataType = nodes[1].dataType;
                     ... disabled 1 line */
                     // End of VoltDB extension
                 }
 
                 if (nodes[1].dataType == null) {
-                    // A VoltDB extension swapped out this odd propagation of nulls.
+                    // A VoltDB extension swapped out this odd propagation of unrelated types.
                     // VoltDB simply gives missing types the benefit of the doubt.
                     nodes[1].dataType = Type.SQL_DOUBLE;
                     /* disable 1 line ...
-                    nodes[0].dataType = nodes[1].dataType;
+                    nodes[1].dataType = nodes[0].dataType;
                     ... disabled 1 line */
                     // End of VoltDB extension
                 }
@@ -1346,7 +1535,7 @@ public class FunctionSQL extends Expression {
 
                 if (!nodes[0].dataType.isNumberType()
                         || !nodes[1].dataType.isNumberType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 nodes[0].dataType = Type.SQL_DOUBLE;
@@ -1363,7 +1552,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 if (!nodes[0].dataType.isNumberType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 nodes[0].dataType = Type.SQL_DOUBLE;
@@ -1390,7 +1579,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 if (!nodes[0].dataType.isNumberType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 dataType = nodes[0].dataType;
@@ -1398,20 +1587,41 @@ public class FunctionSQL extends Expression {
                 parameterArg = 0;
                 // End of VoltDB extension
 
+                if (dataType.typeCode == Types.SQL_DECIMAL
+                        || dataType.typeCode == Types.SQL_NUMERIC) {
+                    if (dataType.scale > 0) {
+                        dataType = NumberType.getNumberType(dataType.typeCode,
+                                                            dataType.precision
+                                                            + 1, 0);
+                    }
+                }
+
                 break;
             }
             case FUNC_WIDTH_BUCKET : {
-                if (nodes[0].dataType == null || nodes[1].dataType == null
-                        || nodes[2].dataType == null
-                        || nodes[3].dataType == null) {
+                nodes[0].dataType = Type.getAggregateType(nodes[0].dataType,
+                        nodes[1].dataType);
+                nodes[0].dataType = Type.getAggregateType(nodes[0].dataType,
+                        nodes[2].dataType);
+
+                if (nodes[0].dataType == null) {
                     throw Error.error(ErrorCode.X_42567);
                 }
 
                 if (!nodes[0].dataType.isNumberType()
-                        || !nodes[1].dataType.isNumberType()
-                        || !nodes[2].dataType.isNumberType()
-                        || !nodes[3].dataType.isIntegralType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                        && !nodes[0].dataType.isDateTimeType()) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                nodes[1].dataType = nodes[0].dataType;
+                nodes[2].dataType = nodes[0].dataType;
+
+                if (nodes[3].dataType == null) {
+                    nodes[3].dataType = Type.SQL_INTEGER;
+                }
+
+                if (!nodes[3].dataType.isIntegralType()) {
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 dataType = nodes[3].dataType;
@@ -1426,15 +1636,16 @@ public class FunctionSQL extends Expression {
                 if (nodes[0].dataType == null) {
 
                     // in 20.6 parameter not allowed as type cannot be determined as binary or char
-                    throw Error.error(ErrorCode.X_42567);
+                    // throw Error.error(ErrorCode.X_42567);
+                    nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
                 }
 
                 if (nodes[1].dataType == null) {
-                    nodes[1].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                    nodes[1].dataType = Type.SQL_NUMERIC;
                 }
 
                 if (!nodes[1].dataType.isNumberType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 // A VoltDB extension to make the third parameter optional
@@ -1444,11 +1655,11 @@ public class FunctionSQL extends Expression {
                 if (nodes.length > 2 && nodes[2] != null) {
                 // End of VoltDB extension
                     if (nodes[2].dataType == null) {
-                        nodes[2].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                        nodes[2].dataType = Type.SQL_NUMERIC;
                     }
 
                     if (!nodes[2].dataType.isNumberType()) {
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42563);
                     }
 
                     nodes[2].dataType =
@@ -1464,14 +1675,14 @@ public class FunctionSQL extends Expression {
                     funcType = FUNC_SUBSTRING_CHAR;
 
                     if (dataType.typeCode == Types.SQL_CHAR) {
-                        dataType =
-                            CharacterType.getCharacterType(Types.SQL_VARCHAR,
-                                                           dataType.precision);
+                        dataType = CharacterType.getCharacterType(
+                            Types.SQL_VARCHAR, dataType.precision,
+                            dataType.getCollation());
                     }
                 } else if (dataType.isBinaryType()) {
                     funcType = FUNC_SUBSTRING_BINARY;
                 } else {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 if (nodes.length > 3 && nodes[3] != null) {
@@ -1490,7 +1701,7 @@ public class FunctionSQL extends Expression {
             case FUNC_FOLD_LOWER :
             case FUNC_FOLD_UPPER :
                 if (nodes[0].dataType == null) {
-                    throw Error.error(ErrorCode.X_42567);
+                    nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
                 }
 
                 dataType = nodes[0].dataType;
@@ -1499,7 +1710,7 @@ public class FunctionSQL extends Expression {
                 // End of VoltDB extension
 
                 if (!dataType.isCharacterType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
                 break;
 
@@ -1520,7 +1731,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 if (nodes[2].dataType == null) {
-                    throw Error.error(ErrorCode.X_42567);
+                    nodes[2].dataType = Type.SQL_VARCHAR_DEFAULT;
                 }
 
                 dataType = nodes[2].dataType;
@@ -1532,9 +1743,9 @@ public class FunctionSQL extends Expression {
                     funcType = FUNC_TRIM_CHAR;
 
                     if (dataType.typeCode == Types.SQL_CHAR) {
-                        dataType =
-                            CharacterType.getCharacterType(Types.SQL_VARCHAR,
-                                                           dataType.precision);
+                        dataType = CharacterType.getCharacterType(
+                            Types.SQL_VARCHAR, dataType.precision,
+                            dataType.getCollation());
                     }
 
                     if (nodes[1] == null) {
@@ -1554,7 +1765,7 @@ public class FunctionSQL extends Expression {
                             Type.SQL_BINARY);
                     }
                 } else {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
                 break;
 
@@ -1562,7 +1773,10 @@ public class FunctionSQL extends Expression {
             case FUNC_OVERLAY_BINARY : {
                 if (nodes[0].dataType == null) {
                     if (nodes[1].dataType == null) {
-                        throw Error.error(ErrorCode.X_42567);
+                        nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
+                        nodes[1].dataType = Type.SQL_VARCHAR_DEFAULT;
+
+                        // throw Error.error(ErrorCode.X_42567);
                     }
 
                     if (nodes[1].dataType.typeCode == Types.SQL_CLOB
@@ -1588,15 +1802,23 @@ public class FunctionSQL extends Expression {
 
                     if (nodes[0].dataType.typeCode == Types.SQL_CLOB
                             || nodes[1].dataType.typeCode == Types.SQL_CLOB) {
-                        dataType = CharacterType.getCharacterType(
-                            Types.SQL_CLOB,
-                            nodes[0].dataType.precision
-                            + nodes[1].dataType.precision);
+                        dataType =
+                            CharacterType
+                                .getCharacterType(Types.SQL_CLOB,
+                                                  nodes[0].dataType.precision
+                                                  + nodes[1].dataType
+                                                      .precision, nodes[0]
+                                                      .dataType
+                                                      .getCollation());
                     } else {
-                        dataType = CharacterType.getCharacterType(
-                            Types.SQL_VARCHAR,
-                            nodes[0].dataType.precision
-                            + nodes[1].dataType.precision);
+                        dataType =
+                            CharacterType
+                                .getCharacterType(Types.SQL_VARCHAR,
+                                                  nodes[0].dataType.precision
+                                                  + nodes[1].dataType
+                                                      .precision, nodes[0]
+                                                      .dataType
+                                                      .getCollation());
                     }
                 } else if (nodes[0].dataType.isBinaryType()
                            && nodes[1].dataType.isBinaryType()) {
@@ -1615,18 +1837,18 @@ public class FunctionSQL extends Expression {
                             + nodes[1].dataType.precision);
                     }
                 } else {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
                 // A VoltDB extension to customize the SQL function set support
                 parameterArg = 0;
                 // End of VoltDB extension
 
                 if (nodes[2].dataType == null) {
-                    nodes[2].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                    nodes[2].dataType = Type.SQL_NUMERIC;
                 }
 
                 if (!nodes[2].dataType.isNumberType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 nodes[2].dataType =
@@ -1634,11 +1856,11 @@ public class FunctionSQL extends Expression {
 
                 if (nodes[3] != null) {
                     if (nodes[3].dataType == null) {
-                        nodes[3].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                        nodes[3].dataType = Type.SQL_NUMERIC;
                     }
 
                     if (!nodes[3].dataType.isNumberType()) {
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42563);
                     }
 
                     nodes[3].dataType =
@@ -1661,20 +1883,26 @@ public class FunctionSQL extends Expression {
             case FUNC_SESSION_USER :
             case FUNC_SYSTEM_USER :
             case FUNC_USER :
-                dataType = SqlInvariants.SQL_IDENTIFIER;
+                dataType = TypeInvariants.SQL_IDENTIFIER;
                 break;
 
             case FUNC_VALUE :
                 break;
 
             case FUNC_CURRENT_DATE :
-                dataType = CharacterType.SQL_DATE;
+                if (session.database.sqlSyntaxOra) {
+                    dataType = Type.SQL_TIMESTAMP_NO_FRACTION;
+
+                    break;
+                }
+
+                dataType = Type.SQL_DATE;
                 break;
 
             case FUNC_CURRENT_TIME : {
                 int precision = DateTimeType.defaultTimeFractionPrecision;
 
-                if (nodes[0] != null) {
+                if (nodes.length > 0 && nodes[0] != null) {
                     precision = ((Integer) nodes[0].valueData).intValue();
                 }
 
@@ -1690,7 +1918,7 @@ public class FunctionSQL extends Expression {
                 /* disable 8 lines ...
                 int precision = DateTimeType.defaultTimestampFractionPrecision;
 
-                if (nodes[0] != null) {
+                if (nodes.length > 0 && nodes[0] != null) {
                     precision = ((Integer) nodes[0].valueData).intValue();
                 }
 
@@ -1716,7 +1944,7 @@ public class FunctionSQL extends Expression {
             case FUNC_LOCALTIMESTAMP : {
                 int precision = DateTimeType.defaultTimestampFractionPrecision;
 
-                if (nodes[0] != null) {
+                if (nodes.length > 0 && nodes[0] != null) {
                     precision = ((Integer) nodes[0].valueData).intValue();
                 }
 
@@ -1790,14 +2018,25 @@ public class FunctionSQL extends Expression {
 
                 break;
             }
-            /*
-            case FUNC_CARDINALITY :{
-                buf.append(Token.T_CARDINALITY).append('(').append(
-                    argList[0].getSQL()).append(')');
+            case FUNC_CARDINALITY : {
+                sb.append(Tokens.T_CARDINALITY).append('(')              //
+                    .append(nodes[0].getSQL()).append(')');
 
                 break;
             }
-            */
+            case FUNC_MAX_CARDINALITY : {
+                sb.append(Tokens.T_MAX_CARDINALITY).append('(')          //
+                    .append(nodes[0].getSQL()).append(')');
+
+                break;
+            }
+            case FUNC_TRIM_ARRAY : {
+                sb.append(Tokens.T_TRIM_ARRAY).append('(')               //
+                    .append(nodes[0].getSQL()).append(',')               //
+                    .append(nodes[1].getSQL()).append(')');              //
+
+                break;
+            }
             case FUNC_ABS : {
                 sb.append(Tokens.T_ABS).append('(')                      //
                     .append(nodes[0].getSQL()).append(')');
@@ -1843,8 +2082,8 @@ public class FunctionSQL extends Expression {
                 break;
             }
             case FUNC_CEILING : {
-                sb.append(Tokens.T_CEILING).append('(').                 //
-                    append(nodes[0].getSQL()).append(')');
+                sb.append(Tokens.T_CEILING).append('(')                  //
+                    .append(nodes[0].getSQL()).append(')');
 
                 break;
             }
@@ -1973,7 +2212,7 @@ public class FunctionSQL extends Expression {
             case FUNC_CURRENT_TIME : {
                 int precision = DateTimeType.defaultTimeFractionPrecision;
 
-                if (nodes[0] != null) {
+                if (nodes.length > 0 && nodes[0] != null) {
                     precision = ((Number) nodes[0].valueData).intValue();
                 }
 
@@ -1990,7 +2229,7 @@ public class FunctionSQL extends Expression {
             case FUNC_CURRENT_TIMESTAMP : {
                 int precision = DateTimeType.defaultTimestampFractionPrecision;
 
-                if (nodes[0] != null) {
+                if (nodes.length > 0 && nodes[0] != null) {
                     precision = ((Number) nodes[0].valueData).intValue();
                 }
 
@@ -2011,11 +2250,12 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
-    public boolean equals(Object other) {
+    public boolean equals(Expression other) {
 
-        if (other instanceof FunctionSQL
-                && funcType == ((FunctionSQL) other).funcType) {
-            return super.equals(other);
+        if (other instanceof FunctionSQL) {
+            if (funcType == ((FunctionSQL) other).funcType) {
+                return super.equals(other);
+            }
         }
 
         return false;
@@ -2042,7 +2282,12 @@ public class FunctionSQL extends Expression {
         sb.append(name).append("(");
 
         for (int i = 0; i < nodes.length; i++) {
-            sb.append("[").append(nodes[i].describe(session)).append("]");
+            if (nodes[i] == null) {
+                continue;
+            }
+
+            sb.append("[").append(nodes[i].describe(session,
+                    blanks)).append("]");
         }
 
         sb.append(") returns ").append(dataType.getNameString());
@@ -2051,8 +2296,12 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
+    public boolean isDeterministic() {
+        return isDeterministic;
+    }
+
     public boolean isValueFunction() {
-        return isValueFunction;
+        return isSQLValueFunction;
     }
 
     /************************* Volt DB Extensions *************************/

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,14 +31,27 @@
 
 package org.hsqldb_voltpatches.persist;
 
+import org.hsqldb_voltpatches.Database;
+import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
+import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.LongKeyHashMap;
 
+/**
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ * @version 2.3.0
+ * @since 1.9.0
+ */
 public class PersistentStoreCollectionDatabase
 implements PersistentStoreCollection {
 
+    private Database             database;
     private long                 persistentStoreIdSequence;
     private final LongKeyHashMap rowStoreMap = new LongKeyHashMap();
+
+    public PersistentStoreCollectionDatabase(Database db) {
+        this.database = db;
+    }
 
     public void setStore(Object key, PersistentStore store) {
 
@@ -51,21 +64,44 @@ implements PersistentStoreCollection {
         }
     }
 
-    public PersistentStore getStore(Object key) {
+    synchronized public PersistentStore getStore(Object key) {
 
         long persistenceId = ((TableBase) key).getPersistenceId();
         PersistentStore store =
             (PersistentStore) rowStoreMap.get(persistenceId);
 
+        if (store == null) {
+            store = database.logger.newStore(null, this, (TableBase) key);
+            ((TableBase) key).store = store;
+        }
+
         return store;
     }
 
-    public void releaseStore(TableBase table) {
+    public void release() {
+
+        if (rowStoreMap.isEmpty()) {
+            return;
+        }
+
+        Iterator it = rowStoreMap.values().iterator();
+
+        while (it.hasNext()) {
+            PersistentStore store = (PersistentStore) it.next();
+
+            store.release();
+        }
+
+        rowStoreMap.clear();
+    }
+
+    public void removeStore(Table table) {
 
         PersistentStore store =
             (PersistentStore) rowStoreMap.get(table.getPersistenceId());
 
         if (store != null) {
+            store.removeAll();
             store.release();
             rowStoreMap.remove(table.getPersistenceId());
         }
@@ -73,5 +109,33 @@ implements PersistentStoreCollection {
 
     public long getNextId() {
         return persistentStoreIdSequence++;
+    }
+
+    public void setNewTableSpaces() {
+
+        DataFileCache dataCache = database.logger.getCache();
+
+        if (dataCache == null) {
+            return;
+        }
+
+        Iterator it = rowStoreMap.values().iterator();
+
+        while (it.hasNext()) {
+            PersistentStore store = (PersistentStore) it.next();
+
+            if (store == null) {
+                continue;
+            }
+
+            TableBase table = store.getTable();
+
+            if (table.getTableType() == TableBase.CACHED_TABLE) {
+                TableSpaceManager tableSpace =
+                    dataCache.spaceManager.getTableSpace(table.getSpaceID());
+
+                store.setSpaceManager(tableSpace);
+            }
+        }
     }
 }

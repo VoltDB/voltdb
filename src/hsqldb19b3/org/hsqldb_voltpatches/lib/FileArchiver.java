@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,15 +31,18 @@
 
 package org.hsqldb_voltpatches.lib;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
-import java.util.zip.Inflater;
-import java.util.zip.InflaterInputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
+
+import org.hsqldb_voltpatches.lib.java.JavaSystem;
 
 /**
  * Creates a direct, compressed or decompressed copy of a file.
@@ -67,24 +70,25 @@ public class FileArchiver {
                 infilename, outfilename, storage, COMPRESSION_ZIP);
     }
 
-    public static void copyFile(String infilename, String outfilename,
-                                    FileAccess storage) throws IOException {
-        FileArchiver.archive(
-                infilename, outfilename, storage, COMPRESSION_NONE);
-    }
-
     public static void restoreFile(String infilename, String outfilename,
                                       FileAccess storage) throws IOException {
         FileArchiver.unarchive(
                 infilename, outfilename, storage, COMPRESSION_NONE);
     }
     */
+    public static void copyFile(String infilename, String outfilename,
+                                FileAccess storage) throws IOException {
+        FileArchiver.archive(infilename, outfilename, storage,
+                             COMPRESSION_NONE);
+    }
+
     public static void archive(String infilename, String outfilename,
                                FileAccess storage,
                                int compressionType) throws IOException {
 
         InputStream          in        = null;
         OutputStream         f         = null;
+        OutputStream         fOut      = null;
         DeflaterOutputStream deflater  = null;
         boolean              completed = false;
 
@@ -96,8 +100,9 @@ public class FileArchiver {
         try {
             byte[] b = new byte[COPY_BLOCK_SIZE];
 
-            in = storage.openInputStreamElement(infilename);
-            f  = storage.openOutputStreamElement(outfilename);
+            in   = storage.openInputStreamElement(infilename);
+            f    = storage.openOutputStreamElement(outfilename);
+            fOut = f;
 
             switch (compressionType) {
 
@@ -130,7 +135,7 @@ public class FileArchiver {
 
             completed = true;
         } catch (Throwable e) {
-            throw FileUtil.toIOException(e);
+            throw JavaSystem.toIOException(e);
         } finally {
             try {
                 if (in != null) {
@@ -142,6 +147,10 @@ public class FileArchiver {
                         deflater.finish();
                     }
 
+                    if (fOut instanceof FileOutputStream) {
+                        storage.getFileSync(fOut).sync();
+                    }
+
                     f.close();
                 }
 
@@ -149,7 +158,7 @@ public class FileArchiver {
                     storage.removeElement(outfilename);
                 }
             } catch (Throwable e) {
-                throw FileUtil.toIOException(e);
+                throw JavaSystem.toIOException(e);
             }
         }
     }
@@ -205,7 +214,7 @@ public class FileArchiver {
 
             completed = true;
         } catch (Throwable e) {
-            throw FileUtil.toIOException(e);
+            throw JavaSystem.toIOException(e);
         } finally {
             try {
                 if (f != null) {
@@ -214,6 +223,11 @@ public class FileArchiver {
 
                 if (outstream != null) {
                     outstream.flush();
+
+                    if (outstream instanceof FileOutputStream) {
+                        storage.getFileSync(outstream).sync();
+                    }
+
                     outstream.close();
                 }
 
@@ -221,7 +235,7 @@ public class FileArchiver {
                     storage.removeElement(outfilename);
                 }
             } catch (Throwable e) {
-                throw FileUtil.toIOException(e);
+                throw JavaSystem.toIOException(e);
             }
         }
     }

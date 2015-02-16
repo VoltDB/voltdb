@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  * Stores multiple values per key
@@ -85,6 +85,13 @@ public class MultiValueHashMap extends BaseHashMap {
 
     public boolean containsValue(Object value) {
         return super.containsValue(value);
+    }
+
+    public int valueCount(Object key) {
+
+        int hash = key.hashCode();
+
+        return super.valueCount(key, hash);
     }
 
     public void putAll(HashMap t) {

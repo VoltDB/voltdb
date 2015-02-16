@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.StringConverter;
 import org.hsqldb_voltpatches.rights.Grantee;
 
@@ -57,14 +59,12 @@ import org.hsqldb_voltpatches.rights.Grantee;
  * than all the existing names.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.7.2
  */
 public final class HsqlNameManager {
 
-    public static final String DEFAULT_CATALOG_NAME = "PUBLIC";
-    private static final HsqlNameManager staticManager =
-        new HsqlNameManager(null);
+    private static final HsqlNameManager staticManager = new HsqlNameManager();
 
     static {
         staticManager.serialNumber = Integer.MIN_VALUE;
@@ -84,14 +84,29 @@ public final class HsqlNameManager {
     private int      serialNumber = 1;        // 0 is reserved in lookups
     private int      sysNumber    = 10000;    // avoid name clash in older scripts
     private HsqlName catalogName;
+    private boolean  sqlRegularNames;
+    HsqlName         subqueryTableName;
+
+    public HsqlNameManager() {
+        sqlRegularNames = true;
+    }
 
     public HsqlNameManager(Database database) {
-        catalogName = new HsqlName(this, DEFAULT_CATALOG_NAME,
+
+        catalogName = new HsqlName(this, SqlInvariants.DEFAULT_CATALOG_NAME,
                                    SchemaObject.CATALOG, false);
+        sqlRegularNames = database.sqlRegularNames;
+        subqueryTableName = new HsqlName(this, SqlInvariants.SYSTEM_SUBQUERY,
+                                         false, SchemaObject.TABLE);
+        subqueryTableName.schema = SqlInvariants.SYSTEM_SCHEMA_HSQLNAME;
     }
 
     public HsqlName getCatalogName() {
         return catalogName;
+    }
+
+    public void setSqlRegularNames(boolean value) {
+        sqlRegularNames = value;
     }
 
     public static HsqlName newSystemObjectName(String name, int type) {
@@ -185,13 +200,7 @@ public final class HsqlNameManager {
      * Same name string but different objects and serial number
      */
     public HsqlName getSubqueryTableName() {
-
-        HsqlName hsqlName = new HsqlName(this, SqlInvariants.SYSTEM_SUBQUERY,
-                                         false, SchemaObject.TABLE);
-
-        hsqlName.schema = SqlInvariants.SYSTEM_SCHEMA_HSQLNAME;
-
-        return hsqlName;
+        return subqueryTableName;
     }
 
     /**
@@ -206,22 +215,44 @@ public final class HsqlNameManager {
         return name;
     }
 
-    /**
-     * Column index i is 0 based, returns 1 based numbered column.
-     */
-    static public HsqlName getAutoColumnName(int i) {
+    public HsqlName newSpecificRoutineName(HsqlName name) {
 
-        if (i < autoColumnNames.length) {
-            return autoColumnNames[i];
-        }
+        StringBuffer sb = new StringBuffer();
 
-        return new HsqlName(staticManager, "C_" + (i + 1), 0, false);
+        sb.append(name.name).append('_').append(++sysNumber);
+
+        HsqlName hsqlName = new HsqlName(this, sb.toString(),
+                                         SchemaObject.SPECIFIC_ROUTINE,
+                                         name.isNameQuoted);
+
+        hsqlName.parent = name;
+        hsqlName.schema = name.schema;
+
+        return hsqlName;
+    }
+
+    public static HsqlName getColumnName(SimpleName name) {
+        return new HsqlName(staticManager, name.name, name.isNameQuoted,
+                            SchemaObject.COLUMN);
     }
 
     /**
      * Column index i is 0 based, returns 1 based numbered column.
      */
-    static public String getAutoColumnNameString(int i) {
+    public static HsqlName getAutoColumnName(int i) {
+
+        if (i < autoColumnNames.length) {
+            return autoColumnNames[i];
+        }
+
+        return new HsqlName(staticManager, "C_" + (i + 1),
+                            SchemaObject.COLUMN, false);
+    }
+
+    /**
+     * Column index i is 0 based, returns 1 based numbered column.
+     */
+    public static String getAutoColumnNameString(int i) {
 
         if (i < autoColumnNames.length) {
             return autoColumnNames[i].name;
@@ -230,7 +261,7 @@ public final class HsqlNameManager {
         return "C" + (i + 1);
     }
 
-    static public String getAutoNoNameColumnString(int i) {
+    public static String getAutoNoNameColumnString(int i) {
 
         if (i < autoColumnNames.length) {
             return autoNoNameColumnNames[i];
@@ -239,7 +270,7 @@ public final class HsqlNameManager {
         return String.valueOf(i);
     }
 
-    static public String getAutoSavepointNameString(long i, int j) {
+    public static String getAutoSavepointNameString(long i, int j) {
 
         StringBuffer sb = new StringBuffer("S");
 
@@ -251,8 +282,8 @@ public final class HsqlNameManager {
     /**
      * Auto names are used for autogenerated indexes or anonymous constraints.
      */
-    HsqlName newAutoName(String prefix, String namepart, HsqlName schema,
-                         HsqlName parent, int type) {
+    public HsqlName newAutoName(String prefix, String namepart,
+                                HsqlName schema, HsqlName parent, int type) {
 
         StringBuffer sb = new StringBuffer();
 
@@ -281,11 +312,6 @@ public final class HsqlNameManager {
         return name;
     }
 
-    void resetNumbering() {
-        sysNumber    = 0;
-        serialNumber = 0;
-    }
-
     public static SimpleName getSimpleName(String name, boolean isNameQuoted) {
         return new SimpleName(name, isNameQuoted);
     }
@@ -298,7 +324,7 @@ public final class HsqlNameManager {
         private SimpleName() {}
 
         private SimpleName(String name, boolean isNameQuoted) {
-            this.name         = name;
+            this.name         = new String(name);
             this.isNameQuoted = isNameQuoted;
         }
 
@@ -322,6 +348,10 @@ public final class HsqlNameManager {
                    ? StringConverter.toQuotedString(name, '"', true)
                    : name;
         }
+
+        public String getNameString() {
+            return name;
+        }
     }
 
     public static final class HsqlName extends SimpleName {
@@ -331,6 +361,7 @@ public final class HsqlNameManager {
         //
         HsqlNameManager   manager;
         public String     statementName;
+        public String     comment;
         public HsqlName   schema;
         public HsqlName   parent;
         public Grantee    owner;
@@ -358,8 +389,9 @@ public final class HsqlNameManager {
 
             this(man, type);
 
-            this.name         = this.statementName = name;
-            this.isNameQuoted = isQuoted;
+            this.name          = name;
+            this.statementName = name;
+            this.isNameQuoted  = isQuoted;
 
             if (isNameQuoted) {
                 statementName = StringConverter.toQuotedString(name, '"',
@@ -373,37 +405,43 @@ public final class HsqlNameManager {
 
         public String getSchemaQualifiedStatementName() {
 
-            if (type == SchemaObject.COLUMN) {
-                if (parent == null
-                        || SqlInvariants.SYSTEM_SUBQUERY.equals(parent.name)) {
+            switch (type) {
+
+                case SchemaObject.PARAMETER :
+                case SchemaObject.VARIABLE : {
                     return statementName;
                 }
+                case SchemaObject.COLUMN : {
+                    if (parent == null
+                            || SqlInvariants.SYSTEM_SUBQUERY.equals(
+                                parent.name)) {
+                        return statementName;
+                    }
 
-                StringBuffer sb = new StringBuffer();
+                    StringBuffer sb = new StringBuffer();
 
-                if (schema != null) {
-                    sb.append(schema.getStatementName());
+                    if (schema != null) {
+                        sb.append(schema.getStatementName());
+                        sb.append('.');
+                    }
+
+                    sb.append(parent.getStatementName());
                     sb.append('.');
+                    sb.append(statementName);
+
+                    return sb.toString();
                 }
-
-                sb.append(parent.getStatementName());
-                sb.append('.');
-                sb.append(statementName);
-
-                return sb.toString();
             }
 
-            if (schema == null) {
+            if (schema == null
+                    || SqlInvariants.SYSTEM_SCHEMA.equals(schema.name)) {
                 return statementName;
             }
 
             StringBuffer sb = new StringBuffer();
 
-            if (schema != null) {
-                sb.append(schema.getStatementName());
-                sb.append('.');
-            }
-
+            sb.append(schema.getStatementName());
+            sb.append('.');
             sb.append(statementName);
 
             return sb.toString();
@@ -415,11 +453,14 @@ public final class HsqlNameManager {
 
         public void rename(String name, boolean isquoted) {
 
-            this.name          = name;
-            this.statementName = name;
-            this.isNameQuoted  = isquoted;
+            if (manager.sqlRegularNames && name.length() > 128) {
+                throw Error.error(ErrorCode.X_42501, name);
+            }
 
-            if (name.length() > 128) {}
+            // get rid of the excess
+            this.name          = new String(name);
+            this.statementName = this.name;
+            this.isNameQuoted  = isquoted;
 
             if (isNameQuoted) {
                 statementName = StringConverter.toQuotedString(name, '"',
@@ -427,17 +468,15 @@ public final class HsqlNameManager {
             }
 
             if (name.startsWith("SYS_")) {
-                int length = sysPrefixLength(name);
+                int length = name.lastIndexOf('_') + 1;
 
-                if (length > 0) {
-                    try {
-                        int temp = Integer.parseInt(name.substring(length));
+                try {
+                    int temp = Integer.parseInt(name.substring(length));
 
-                        if (temp > manager.sysNumber) {
-                            manager.sysNumber = temp;
-                        }
-                    } catch (NumberFormatException e) {}
-                }
+                    if (temp > manager.sysNumber) {
+                        manager.sysNumber = temp;
+                    }
+                } catch (NumberFormatException e) {}
             }
         }
 

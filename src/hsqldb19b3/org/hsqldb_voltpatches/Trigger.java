@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,19 +36,10 @@ package org.hsqldb_voltpatches;
 
 Contents of row1[] and row2[] in each type of trigger.
 
-BEFORE INSERT
- - row1[] contains single String object = "Statement-level".
-
 AFTER INSERT
  - row1[] contains single String object = "Statement-level".
 
-BEFORE UPDATE
- - row1[] contains single String object = "Statement-level".
-
 AFTER UPDATE
- - row1[] contains single String object = "Statement-level".
-
-BEFORE DELETE
  - row1[] contains single String object = "Statement-level".
 
 AFTER DELETE
@@ -85,8 +76,8 @@ List compiled by Andrew Knight (quozzbat@users)
  * The interface an HSQLDB TRIGGER must implement. The user-supplied class that
  * implements this must have a default constructor.
  *
- * @author Peter Hudson
- * @version 1.7.2
+ * @author Peter Hudson (peterhudson@users dot sourceforge.net)
+ * @version 1.9.0
  * @since 1.7.0
  */
 public interface Trigger {
@@ -95,38 +86,43 @@ public interface Trigger {
     int INSERT_AFTER      = 0;
     int DELETE_AFTER      = 1;
     int UPDATE_AFTER      = 2;
-    int INSERT_BEFORE     = 3;
-    int DELETE_BEFORE     = 4;
-    int UPDATE_BEFORE     = 5;
-    int INSERT_AFTER_ROW  = 6;
-    int DELETE_AFTER_ROW  = 7;
-    int UPDATE_AFTER_ROW  = 8;
-    int INSERT_BEFORE_ROW = 9;
-    int DELETE_BEFORE_ROW = 10;
-    int UPDATE_BEFORE_ROW = 11;
+    int INSERT_AFTER_ROW  = 3;
+    int DELETE_AFTER_ROW  = 4;
+    int UPDATE_AFTER_ROW  = 5;
+    int INSERT_BEFORE_ROW = 6;
+    int DELETE_BEFORE_ROW = 7;
+    int UPDATE_BEFORE_ROW = 8;
 
     /**
-     * The method invoked upon each triggered action. <p>
+     * The method invoked upon each triggered action.
      *
-     * When UPDATE triggers are fired, oldRow contains the
-     * existing values of the table row and newRow contains the
-     * new values.<p>
+     * <p> type contains the integer index id for trigger type, e.g.
+     * TriggerDef.INSERT_AFTER
      *
-     * For INSERT triggers, oldRow is null and newRow contains the
-     * table row to be inserted.
+     * <p> For all triggers defined as default FOR EACH STATEMENT both
+     *  oldRow and newRow are null.
      *
-     * For DELETE triggers, newRow is null and oldRow contains the
-     * table row to be deleted.
+     * <p> For triggers defined as FOR EACH ROW, the following will apply:
      *
-     * type contains the integer index id for trigger type, e.g.
-     * TriggerDef.INSERT_AFTER (fredt@users)
+     * <p> When UPDATE triggers are fired, oldRow contains the existing values
+     * of the table row and newRow contains the new values.
      *
+     * <p> For INSERT triggers, oldRow is null and newRow contains the table row
+     * to be inserted. For DELETE triggers, newRow is null and oldRow contains
+     * the table row to be deleted.
+     *
+     * <p> For error conditions, users can construct an HsqlException using one
+     * of the static methods of org.hsqldb_voltpatches.error.Error with a predefined
+     * SQL State from org.hsqldb_voltpatches.error.ErrorCode.
+     *
+     * @param type the type as one of the int values defined in the interface
      * @param trigName the name of the trigger
-     * @param tabName the name of the table upon which the
-     *      triggered action is occuring
+     * @param tabName the name of the table upon which the triggered action is
+     *   occuring
      * @param oldRow the old row
      * @param newRow the new row
+     * @throws HsqlException
      */
     void fire(int type, String trigName, String tabName, Object[] oldRow,
-              Object[] newRow);
+              Object[] newRow) throws HsqlException;
 }

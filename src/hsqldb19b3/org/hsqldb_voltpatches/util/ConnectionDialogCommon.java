@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,6 @@ import java.io.ObjectOutputStream;
 import java.lang.reflect.Constructor;
 import java.util.Enumeration;
 import java.util.Hashtable;
-
-import org.hsqldb_voltpatches.lib.java.JavaSystem;
 
 // sqlbob@users 20020407 - patch 1.7.0 - reengineering
 // fredt@users - 20040508 - modified patch by lonbinder@users for saving settings
@@ -162,7 +160,8 @@ class ConnectionDialogCommon {
     private static final String fileName       = "hsqlprefs.dat";
     private static File         recentSettings = null;
 
-    static Hashtable loadRecentConnectionSettings() throws IOException {
+    static synchronized Hashtable loadRecentConnectionSettings()
+    throws IOException {
 
         Hashtable list = new Hashtable();
 
@@ -177,10 +176,8 @@ class ConnectionDialogCommon {
                 recentSettings = new File(homedir, fileName);
 
                 if (!recentSettings.exists()) {
-                    JavaSystem.createNewFile(recentSettings);
+                    recentSettings.createNewFile();
 
-                    // Changed back to what I recived from you
-//                  recentSettings.createNewFile();
                     return list;
                 }
             }
@@ -314,7 +311,6 @@ class ConnectionDialogCommon {
 
     public static void setHomeDir() {
 
-//#ifdef JAVA2FULL
         if (homedir == null) {
             try {
                 Class c =
@@ -332,7 +328,5 @@ class ConnectionDialogCommon {
                     "No access to home directory.  Continuing without...");
             }
         }
-
-//#endif
     }
 }

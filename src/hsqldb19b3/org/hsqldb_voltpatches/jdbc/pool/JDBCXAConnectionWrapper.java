@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,33 +36,26 @@ import org.hsqldb_voltpatches.jdbc.JDBCConnection;
 import java.sql.SQLException;
 import java.sql.Savepoint;
 
-// @(#)$Id: JDBCXAConnectionWrapper.java 771 2009-01-12 15:21:22Z fredt $
+// @(#)$Id: JDBCXAConnectionWrapper.java 5026 2012-07-14 20:02:27Z fredt $
 
 /**
- * This is a wrapper class for JDBCConnection objects (not XAConnection
- * object).
+ * This is a wrapper class for JDBCConnection objects (not java.sql.XAConnection
+ * objects).
  * Purpose of this class is to intercept and handle XA-related operations
  * according to chapter 12 of the JDBC 3.0 specification, by returning this
  * wrapped JDBCConnection to end-users.
  * Global transaction services and XAResources will not use this wrapper.
- * It also supports pooling, by virtue of the parent class,
- * LifeTimeConnectionWrapper.
  * <P>
- * This class name would be very precise (the class being a wrapper for
- * XA-capable JDBC Connections), except that a "XAConnection" is an entirely
- * different thing from a JDBC java.sql.Connection.
- * I can think of no way to eliminate the ambiguity without using an
- * 80-character class name.
- * Best I think I can do is to clearly state here that
- * <b>This is a wrapper for XA-capable java.sql.Connections, not for
- *    javax.sql.XAConnection.</b>
+ * The new implementation extends JDBCConnection. A new object is created
+ * based on the session / session proxy of the JDBCXAConnection object in the
+ * constructor. (fredt)<p>
  *
- * @since HSQLDB v. 1.9.0
+ * @version 2.2.9
+ * @since 2.0.0
  * @author Blaine Simpson (blaine dot simpson at admc dot com)
  * @see org.hsqldb_voltpatches.jdbc.JDBCConnection
- * @see org.hsqldb_voltpatches.jdbc.pool.LifeTimeConnectionWrapper
  */
-public class JDBCXAConnectionWrapper extends LifeTimeConnectionWrapper {
+public class JDBCXAConnectionWrapper extends JDBCConnection {
 
     /*
      * A critical question:  One responsibility of this
@@ -73,33 +66,9 @@ public class JDBCXAConnectionWrapper extends LifeTimeConnectionWrapper {
      * "COMMIT" and bypass interception?
      * Similarly, what about DDL commands that cause an explicit commit?
      *                                                - blaine
+     * If we want, we can stop various statement categories from running
+     * during an XA transaction. May do so in the future - fredt
      */
-    private JDBCXAResource xaResource;
-
-    public JDBCXAConnectionWrapper(
-            JDBCConnection connection, JDBCXAResource xaResource,
-            ConnectionDefaults connectionDefaults) throws SQLException {
-
-        /* Could pass in the creating XAConnection, which has methods to
-         * get the connection and the xaResource, but this way cuts down
-         * on the inter-dependencies a bit. */
-        super(connection, connectionDefaults);
-
-        this.xaResource = xaResource;
-    }
-
-    /**
-     * Throws a SQLException if within a Global transaction.
-     *
-     * @throws SQLException if within a Global transaction.
-     */
-    private void validateNotWithinTransaction() throws SQLException {
-
-        if (xaResource.withinGlobalTransaction()) {
-            throw new SQLException(
-                "Method prohibited within a global transaction");
-        }
-    }
 
     /**
      * Interceptor method, because this method is prohibited within
@@ -168,15 +137,53 @@ public class JDBCXAConnectionWrapper extends LifeTimeConnectionWrapper {
     /**
      * Interceptor method, because there may be XA implications to
      * calling the method within a global transaction.
-     * See section 1.2.4 of the JDBC 3.0 spec.
+     * See section 1.2.4 of the JDBC 3.0 spec.<p>
+     *
+     * HSQLDB does not allow changing the isolation level inside a transaction
+     * of any kind.<p>
      */
     public void setTransactionIsolation(int level) throws SQLException {
-
-        /* Goal at this time is to get a working XA DataSource.
-         * After we have multiple transaction levels working, we can
-         * consider how we want to handle attempts to change the level
-         * within a global transaction. */
         validateNotWithinTransaction();
         super.setTransactionIsolation(level);
+    }
+
+    //---------------------- NON-INTERFACE METHODS -----------------------------
+    private JDBCXAResource xaResource;
+
+    public JDBCXAConnectionWrapper(JDBCXAResource xaResource,
+                                   JDBCXAConnection xaConnection,
+                                   JDBCConnection databaseConnection)
+                                   throws SQLException {
+        // todo: Review JDBCXADataSource and this class.
+        //       Under current implementation, because we do not pass a
+        //       JDBCXAConnection instance to the constructor to pick
+        //       up the connectionClosed event listener callback, calling
+        //       close() on this wrapper connection does not reset the
+        //       physical connection or set the inUse flag to false until
+        //       the vending JDBCXAConnection itself is closed, which marks
+        //       the end of its useful life.
+        //
+        //       In other words, due to this current implementation detail,
+        //       JDBCXADataSource cannot cooperate with a pooling implementation
+        //       to reuse physical connections.
+        //       fixed - the event listener works
+        super(databaseConnection, xaConnection);
+
+        xaResource.setConnection(this);
+
+        this.xaResource = xaResource;
+    }
+
+    /**
+     * Throws a SQLException if within a Global transaction.
+     *
+     * @throws SQLException if within a Global transaction.
+     */
+    private void validateNotWithinTransaction() throws SQLException {
+
+        if (xaResource.withinGlobalTransaction()) {
+            throw new SQLException(
+                "Method prohibited within a global transaction");
+        }
     }
 }

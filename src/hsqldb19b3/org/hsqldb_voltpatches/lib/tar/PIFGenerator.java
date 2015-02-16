@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.util.Date;
 
 /**
  * Encapsulates Pax Interchange Format key/value pairs.
@@ -45,8 +46,8 @@ public class PIFGenerator extends ByteArrayOutputStream {
     OutputStreamWriter writer;
     String             name;
     int                fakePid;    // Only used by contructors
-    char               typeFlag;
 
+    //char               typeFlag;  Serves no purpose.  What was orig. purpose?
     public String getName() {
         return name;
     }
@@ -60,7 +61,7 @@ public class PIFGenerator extends ByteArrayOutputStream {
                 "Serious problem.  JVM can't encode UTF-8", uee);
         }
 
-        fakePid = (int) (new java.util.Date().getTime() % 100000L);
+        fakePid = (int) (new Date().getTime() % 100000L);
 
         // Java doesn't have access to PIDs, as PIF wants in the "name" field,
         // so we emulate one in a way that is easy for us.
@@ -81,7 +82,7 @@ public class PIFGenerator extends ByteArrayOutputStream {
             throw new IllegalArgumentException("Sequence numbers start at 1");
         }
 
-        typeFlag = 'g';
+        //typeFlag = 'g';
         name = System.getProperty("java.io.tmpdir") + "/GlobalHead." + fakePid
                + '.' + sequenceNum;
     }
@@ -95,8 +96,7 @@ public class PIFGenerator extends ByteArrayOutputStream {
 
         this();
 
-        typeFlag = 'x';
-
+        //typeFlag = 'x';
         String parentPath = (file.getParentFile() == null) ? "."
                                                            : file.getParentFile()
                                                                .getPath();
@@ -147,8 +147,7 @@ public class PIFGenerator extends ByteArrayOutputStream {
 
         if (key == null || value == null || key.length() < 1
                 || value.length() < 1) {
-            throw new TarMalformatException(
-                RB.singleton.getString(RB.ZERO_WRITE));
+            throw new TarMalformatException(RB.zero_write.getString());
         }
 
         int lenWithoutIlen = key.length() + value.length() + 3;
@@ -167,8 +166,7 @@ public class PIFGenerator extends ByteArrayOutputStream {
         } else if (lenWithoutIlen < 99994) {
             lenW = lenWithoutIlen + 5;
         } else {
-            throw new TarMalformatException(
-                RB.singleton.getString(RB.PIF_TOOBIG, 99991));
+            throw new TarMalformatException(RB.pif_toobig.getString(99991));
         }
 
         writer.write(Integer.toString(lenW));

@@ -1,4 +1,40 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+/*
+ * For work developed by the HSQL Development Group:
+ *
+ * Copyright (c) 2001-2011, The HSQL Development Group
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the HSQL Development Group nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ *
+ * For work originally developed by the Hypersonic SQL Group:
+ *
+ * Copyright (c) 1995-2000, The Hypersonic SQL Group.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,49 +65,19 @@
  *
  * This software consists of voluntary contributions made by many individuals
  * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the HSQL Development Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
 package org.hsqldb_voltpatches.index;
 
-import org.hsqldb_voltpatches.RowAVLDisk;
 import org.hsqldb_voltpatches.Row;
+import org.hsqldb_voltpatches.RowAVL;
+import org.hsqldb_voltpatches.RowAVLDisk;
+import org.hsqldb_voltpatches.lib.LongLookup;
 import org.hsqldb_voltpatches.persist.CachedObject;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
-import org.hsqldb_voltpatches.lib.IntLookup;
+import org.hsqldb_voltpatches.rowio.RowInputInterface;
 
 // fredt@users 20020221 - patch 513005 by sqlbob@users (RMP)
 // fredt@users 20020920 - path 1.7.1 - refactoring to cut mamory footprint
@@ -93,62 +99,156 @@ import org.hsqldb_voltpatches.lib.IntLookup;
  * @version 1.9.0
  * @since Hypersonic SQL
  */
-public abstract class NodeAVL implements CachedObject {
+public class NodeAVL implements CachedObject {
 
     static final int NO_POS = RowAVLDisk.NO_POS;
-    public int       iBalance;    // currently, -2 means 'deleted'
-    public NodeAVL   nNext;       // node of next index (nNext==null || nNext.iId=iId+1)
+    public int       iBalance;
+    public NodeAVL   nNext;    // node of next index (nNext==null || nNext.iId=iId+1)
 
-    /**
-     *  This method unlinks the Node from the other Nodes in the same Index
-     *  and from the Row.
-     *
-     *  It must keep the links between the Nodes in different Indexes.
-     */
-    abstract public void delete();
+    //
+    protected NodeAVL   nLeft;
+    protected NodeAVL   nRight;
+    protected NodeAVL   nParent;
+    protected final Row row;
 
-    public boolean isMemory() {
-        return true;
+    NodeAVL() {
+        row = null;
     }
 
-    /**
-     *  File offset of Node. Used with CachedRow objects only
-     */
-    abstract public int getPos();
+    public NodeAVL(Row r) {
+        row = r;
+    }
 
-    /**
-     *  Return the Row Object that is linked to this Node.
-     */
-    abstract Row getRow(PersistentStore store);
+    public void delete() {
+        iBalance = 0;
+        nLeft    = nRight = nParent = null;
+    }
 
-    /**
-     *  Getters and setters for AVL index operations.
-     */
-    abstract boolean isLeft(NodeAVL node);
+    NodeAVL getLeft(PersistentStore store) {
+        return nLeft;
+    }
 
-    abstract boolean isRight(NodeAVL node);
+    NodeAVL setLeft(PersistentStore persistentStore, NodeAVL n) {
 
-    abstract NodeAVL getLeft(PersistentStore store);
+        nLeft = n;
 
-    abstract NodeAVL setLeft(PersistentStore store, NodeAVL n);
+        return this;
+    }
 
-    abstract NodeAVL getRight(PersistentStore store);
+    public int getBalance(PersistentStore store) {
+        return iBalance;
+    }
 
-    abstract NodeAVL setRight(PersistentStore store, NodeAVL n);
+    boolean isLeft(NodeAVL node) {
+        return nLeft == node;
+    }
 
-    abstract NodeAVL getParent(PersistentStore store);
+    boolean isRight(NodeAVL node) {
+        return nRight == node;
+    }
 
-    abstract NodeAVL setParent(PersistentStore store, NodeAVL n);
+    NodeAVL getRight(PersistentStore persistentStore) {
+        return nRight;
+    }
 
-    abstract int getBalance();
+    NodeAVL setRight(PersistentStore persistentStore, NodeAVL n) {
 
-    abstract public NodeAVL setBalance(PersistentStore store, int b);
+        nRight = n;
 
-    abstract boolean isRoot();
+        return this;
+    }
 
-    abstract boolean isFromLeft(PersistentStore store);
+    NodeAVL getParent(PersistentStore store) {
+        return nParent;
+    }
 
-    abstract boolean equals(NodeAVL n);
+    boolean isRoot(PersistentStore store) {
+        return nParent == null;
+    }
+
+    NodeAVL setParent(PersistentStore persistentStore, NodeAVL n) {
+
+        nParent = n;
+
+        return this;
+    }
+
+    public NodeAVL setBalance(PersistentStore store, int b) {
+
+        iBalance = b;
+
+        return this;
+    }
+
+    boolean isFromLeft(PersistentStore store) {
+
+        if (nParent == null) {
+            return true;
+        }
+
+        return this == nParent.nLeft;
+    }
+
+    public NodeAVL child(PersistentStore store, boolean isleft) {
+        return isleft ? getLeft(store)
+                      : getRight(store);
+    }
+
+    public NodeAVL set(PersistentStore store, boolean isLeft, NodeAVL n) {
+
+        if (isLeft) {
+            nLeft = n;
+        } else {
+            nRight = n;
+        }
+
+        if (n != null) {
+            n.nParent = this;
+        }
+
+        return this;
+    }
+
+    public void replace(PersistentStore store, Index index, NodeAVL n) {
+
+        if (nParent == null) {
+            if (n != null) {
+                n = n.setParent(store, null);
+            }
+
+            store.setAccessor(index, n);
+        } else {
+            nParent.set(store, isFromLeft(store), n);
+        }
+    }
+
+    boolean equals(NodeAVL n) {
+        return n == this;
+    }
+
+    public void setInMemory(boolean in) {}
+
+    public int getDefaultCapacity() {
+        return 0;
+    }
+
+    public void read(RowInputInterface in) {}
+
+    public void write(RowOutputInterface out) {}
+
+    public void write(RowOutputInterface out, LongLookup lookup) {}
+
+    public long getPos() {
+        return 0;
+    }
+
+    public RowAVL getRow(PersistentStore store) {
+        return (RowAVL) row;
+    }
+
+    protected Object[] getData(PersistentStore store) {
+        return row.getData();
+    }
 
     public void updateAccessCount(int count) {}
 
@@ -162,7 +262,15 @@ public abstract class NodeAVL implements CachedObject {
         return 0;
     }
 
-    public void setPos(int pos) {}
+    final public boolean isBlock() {
+        return false;
+    }
+
+    public void setPos(long pos) {}
+
+    public boolean isNew() {
+        return false;
+    }
 
     public boolean hasChanged() {
         return false;
@@ -181,8 +289,6 @@ public abstract class NodeAVL implements CachedObject {
         return false;
     }
 
-    abstract public void setInMemory(boolean in);
-
     public void restore() {}
 
     public void destroy() {}
@@ -191,7 +297,7 @@ public abstract class NodeAVL implements CachedObject {
         return 0;
     }
 
-    abstract public void write(RowOutputInterface out);
-
-    public void write(RowOutputInterface out, IntLookup lookup) {}
+    public boolean isMemory() {
+        return true;
+    }
 }

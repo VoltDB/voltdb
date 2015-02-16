@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,22 +31,28 @@
 
 package org.hsqldb_voltpatches.rights;
 
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 import org.hsqldb_voltpatches.Database;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.Routine;
+import org.hsqldb_voltpatches.RoutineSchema;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.SqlInvariants;
 import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.Collection;
 import org.hsqldb_voltpatches.lib.HashMappedList;
-import org.hsqldb_voltpatches.lib.HashSet;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.Set;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
+import org.hsqldb_voltpatches.lib.StringConverter;
 
 /**
  * Contains a set of Grantee objects, and supports operations for creating,
@@ -54,11 +60,11 @@ import org.hsqldb_voltpatches.lib.HsqlArrayList;
  * Administrative privileges.
  *
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
  * @author Blaine Simpson (blaine dot simpson at admc dot com)
  *
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.8.0
  * @see Grantee
  */
@@ -82,6 +88,8 @@ public class GranteeManager {
 
         SqlInvariants.INFORMATION_SCHEMA_HSQLNAME.owner = systemAuthorisation;
         SqlInvariants.SYSTEM_SCHEMA_HSQLNAME.owner      = systemAuthorisation;
+        SqlInvariants.LOBS_SCHEMA_HSQLNAME.owner        = systemAuthorisation;
+        SqlInvariants.SQLJ_SCHEMA_HSQLNAME.owner        = systemAuthorisation;
     }
 
     /**
@@ -101,6 +109,16 @@ public class GranteeManager {
      * schema authorizations.
      */
     Database database;
+
+    /**
+     * MessageDigest instance for database
+     */
+    private MessageDigest digester;
+
+    /**
+     * MessageDigest algorithm
+     */
+    private String digestAlgo;
 
     /**
      * The PUBLIC role.
@@ -206,8 +224,24 @@ public class GranteeManager {
     public void grant(OrderedHashSet granteeList, SchemaObject dbObject,
                       Right right, Grantee grantor, boolean withGrantOption) {
 
+        if (dbObject instanceof RoutineSchema) {
+            SchemaObject[] routines =
+                ((RoutineSchema) dbObject).getSpecificRoutines();
+
+            grant(granteeList, routines, right, grantor, withGrantOption);
+
+            return;
+        }
+
+        HsqlName name = dbObject.getName();
+
+        if (dbObject instanceof Routine) {
+            name = ((Routine) dbObject).getSpecificName();
+        }
+
         if (!grantor.isGrantable(dbObject, right)) {
-            throw Error.error(ErrorCode.X_0L000, grantor.getNameString());
+            throw Error.error(ErrorCode.X_0L000,
+                              grantor.getName().getNameString());
         }
 
         if (grantor.isAdmin()) {
@@ -217,14 +251,34 @@ public class GranteeManager {
         checkGranteeList(granteeList);
 
         for (int i = 0; i < granteeList.size(); i++) {
-            String  name    = (String) granteeList.get(i);
-            Grantee grantee = get(name);
+            Grantee grantee = get((String) granteeList.get(i));
 
-            grantee.grant(dbObject, right, grantor, withGrantOption);
+            grantee.grant(name, right, grantor, withGrantOption);
 
             if (grantee.isRole) {
                 updateAllRights(grantee);
             }
+        }
+    }
+
+    public void grant(OrderedHashSet granteeList, SchemaObject[] routines,
+                      Right right, Grantee grantor, boolean withGrantOption) {
+
+        boolean granted = false;
+
+        for (int i = 0; i < routines.length; i++) {
+            if (!grantor.isGrantable(routines[i], right)) {
+                continue;
+            }
+
+            grant(granteeList, routines[i], right, grantor, withGrantOption);
+
+            granted = true;
+        }
+
+        if (!granted) {
+            throw Error.error(ErrorCode.X_0L000,
+                              grantor.getName().getNameString());
         }
     }
 
@@ -240,6 +294,10 @@ public class GranteeManager {
 
             if (isImmutable(name)) {
                 throw Error.error(ErrorCode.X_28502, name);
+            }
+
+            if (grantee instanceof User && ((User) grantee).isExternalOnly) {
+                throw Error.error(ErrorCode.X_28000, name);
             }
         }
     }
@@ -281,7 +339,8 @@ public class GranteeManager {
         }
 
         if (!grantor.isGrantable(role)) {
-            throw Error.error(ErrorCode.X_0L000, grantor.getNameString());
+            throw Error.error(ErrorCode.X_0L000,
+                              grantor.getName().getNameString());
         }
 
         grantee.grant(role);
@@ -325,13 +384,14 @@ public class GranteeManager {
             }
 
             if (!grantor.isAdmin()) {
-                throw Error.error(ErrorCode.X_0L000, grantor.getNameString());
+                throw Error.error(ErrorCode.X_0L000,
+                                  grantor.getName().getNameString());
             }
         }
     }
 
     public void grantSystemToPublic(SchemaObject object, Right right) {
-        publicRole.grant(object, right, systemAuthorisation, true);
+        publicRole.grant(object.getName(), right, systemAuthorisation, true);
     }
 
     /**
@@ -370,7 +430,23 @@ public class GranteeManager {
                        Right rights, Grantee grantor, boolean grantOption,
                        boolean cascade) {
 
-        if (!grantor.isFullyAccessibleByRole(dbObject)) {
+        if (dbObject instanceof RoutineSchema) {
+            SchemaObject[] routines =
+                ((RoutineSchema) dbObject).getSpecificRoutines();
+
+            revoke(granteeList, routines, rights, grantor, grantOption,
+                   cascade);
+
+            return;
+        }
+
+        HsqlName name = dbObject.getName();
+
+        if (dbObject instanceof Routine) {
+            name = ((Routine) dbObject).getSpecificName();
+        }
+
+        if (!grantor.isFullyAccessibleByRole(name)) {
             throw Error.error(ErrorCode.X_42501, dbObject.getName().name);
         }
 
@@ -379,21 +455,21 @@ public class GranteeManager {
         }
 
         for (int i = 0; i < granteeList.size(); i++) {
-            String  name = (String) granteeList.get(i);
-            Grantee g    = get(name);
+            String  granteeName = (String) granteeList.get(i);
+            Grantee g           = get(granteeName);
 
             if (g == null) {
-                throw Error.error(ErrorCode.X_28501, name);
+                throw Error.error(ErrorCode.X_28501, granteeName);
             }
 
-            if (isImmutable(name)) {
-                throw Error.error(ErrorCode.X_28502, name);
+            if (isImmutable(granteeName)) {
+                throw Error.error(ErrorCode.X_28502, granteeName);
             }
         }
 
         for (int i = 0; i < granteeList.size(); i++) {
-            String  name = (String) granteeList.get(i);
-            Grantee g    = get(name);
+            String  granteeName = (String) granteeList.get(i);
+            Grantee g           = get(granteeName);
 
             g.revoke(dbObject, rights, grantor, grantOption);
             g.updateAllRights();
@@ -401,6 +477,16 @@ public class GranteeManager {
             if (g.isRole) {
                 updateAllRights(g);
             }
+        }
+    }
+
+    public void revoke(OrderedHashSet granteeList, SchemaObject[] routines,
+                       Right rights, Grantee grantor, boolean grantOption,
+                       boolean cascade) {
+
+        for (int i = 0; i < routines.length; i++) {
+            revoke(granteeList, routines[i], rights, grantor, grantOption,
+                   cascade);
         }
     }
 
@@ -516,6 +602,11 @@ public class GranteeManager {
             throw Error.error(ErrorCode.X_28503, name.name);
         }
 
+        if (SqlInvariants.isLobsSchemaName(name.name)
+                || SqlInvariants.isSystemSchemaName(name.name)) {
+            throw Error.error(ErrorCode.X_28502, name.name);
+        }
+
         Grantee g = new Grantee(name, this);
 
         g.isRole = true;
@@ -532,11 +623,23 @@ public class GranteeManager {
             throw Error.error(ErrorCode.X_28503, name.name);
         }
 
+        if (SqlInvariants.isLobsSchemaName(name.name)
+                || SqlInvariants.isSystemSchemaName(name.name)) {
+            throw Error.error(ErrorCode.X_28502, name.name);
+        }
+
         User g = new User(name, this);
 
         map.put(name.name, g);
 
         return g;
+    }
+
+    /**
+     * Only used for a recently added user with no dependencies
+     */
+    public void removeNewUser(HsqlName name) {
+        map.remove(name.name);
     }
 
     /**
@@ -658,7 +761,8 @@ public class GranteeManager {
             Grantee grantee = (Grantee) it.next();
 
             // ADMIN_ROLE_NAME is not persisted
-            if (!GranteeManager.isReserved(grantee.getNameString())) {
+            if (!GranteeManager.isReserved(
+                    grantee.getName().getNameString())) {
                 list.add(grantee.getSQL());
             }
         }
@@ -670,7 +774,15 @@ public class GranteeManager {
             Grantee grantee = (Grantee) it.next();
 
             if (grantee instanceof User) {
+                if (((User) grantee).isExternalOnly) {
+                    continue;
+                }
+
                 list.add(grantee.getSQL());
+
+                if (((User) grantee).isLocalOnly) {
+                    list.add(((User) grantee).getLocalUserSQL());
+                }
             }
         }
 
@@ -688,10 +800,14 @@ public class GranteeManager {
 
         while (grantees.hasNext()) {
             Grantee grantee = (Grantee) grantees.next();
-            String  name    = grantee.getNameString();
+            String  name    = grantee.getName().getNameString();
 
             // _SYSTEM user, DBA Role grants not persisted
             if (GranteeManager.isImmutable(name)) {
+                continue;
+            }
+
+            if (grantee instanceof User && ((User) grantee).isExternalOnly) {
                 continue;
             }
 
@@ -705,5 +821,41 @@ public class GranteeManager {
         list.toArray(array);
 
         return array;
+    }
+
+    public void setDigestAlgo(String algo) {
+        digestAlgo = algo;
+    }
+
+    public String getDigestAlgo() {
+        return digestAlgo;
+    }
+
+    synchronized MessageDigest getDigester() {
+
+        if (digester == null) {
+            try {
+                digester = MessageDigest.getInstance(digestAlgo);
+            } catch (NoSuchAlgorithmException e) {
+                throw Error.error(ErrorCode.GENERAL_ERROR, e);
+            }
+        }
+
+        return digester;
+    }
+
+    String digest(String string) throws RuntimeException {
+
+        byte[] data;
+
+        try {
+            data = string.getBytes("ISO-8859-1");
+        } catch (UnsupportedEncodingException e) {
+            throw Error.error(ErrorCode.GENERAL_ERROR, e);
+        }
+
+        data = getDigester().digest(data);
+
+        return StringConverter.byteArrayToHexString(data);
     }
 }

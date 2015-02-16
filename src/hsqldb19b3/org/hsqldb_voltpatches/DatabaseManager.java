@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,20 +33,17 @@ package org.hsqldb_voltpatches;
 
 import java.util.Vector;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.FileUtil;
 import org.hsqldb_voltpatches.lib.HashMap;
 import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlTimer;
 import org.hsqldb_voltpatches.lib.IntKeyHashMap;
 import org.hsqldb_voltpatches.lib.Iterator;
+import org.hsqldb_voltpatches.lib.Notified;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
-// A VoltDB extension to disable a package dependency
-/* disable 2 lines ...
-import org.hsqldb_voltpatches.server.Server;
-import org.hsqldb_voltpatches.server.ServerConstants;
-... disabled 2 lines */
-// End of VoltDB extension
-import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
  * Handles initial attempts to connect to HSQLDB databases within the JVM
@@ -60,7 +57,7 @@ import org.hsqldb_voltpatches.store.ValuePool;
  * Maintains a reference to the timer used for file locks and logging.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.8.0
+ * @version 2.3.2
  * @since 1.7.2
  */
 public class DatabaseManager {
@@ -87,13 +84,16 @@ public class DatabaseManager {
      */
     public static Vector getDatabaseURIs() {
 
-        Vector   v  = new Vector();
-        Iterator it = databaseIDMap.values().iterator();
+        Vector v = new Vector();
 
-        while (it.hasNext()) {
-            Database db = (Database) it.next();
+        synchronized (databaseIDMap) {
+            Iterator it = databaseIDMap.values().iterator();
 
-            v.addElement(db.getURI());
+            while (it.hasNext()) {
+                Database db = (Database) it.next();
+
+                v.addElement(db.getURI());
+            }
         }
 
         return v;
@@ -102,21 +102,23 @@ public class DatabaseManager {
     /**
      * Closes all the databases using the given mode.<p>
      *
-     * CLOSEMODE_IMMEDIATELY = -1;
-     * CLOSEMODE_NORMAL      = 0;
-     * CLOSEMODE_COMPACT     = 1;
-     * CLOSEMODE_SCRIPT      = 2;
+     * CLOSEMODE_IMMEDIATELY = 1;
+     * CLOSEMODE_NORMAL      = 2;
+     * CLOSEMODE_COMPACT     = 3;
+     * CLOSEMODE_SCRIPT      = 4;
      */
     public static void closeDatabases(int mode) {
 
-        Iterator it = databaseIDMap.values().iterator();
+        synchronized (databaseIDMap) {
+            Iterator it = databaseIDMap.values().iterator();
 
-        while (it.hasNext()) {
-            Database db = (Database) it.next();
+            while (it.hasNext()) {
+                Database db = (Database) it.next();
 
-            try {
-                db.close(mode);
-            } catch (HsqlException e) {}
+                try {
+                    db.close(mode);
+                } catch (HsqlException e) {}
+            }
         }
     }
 
@@ -124,15 +126,20 @@ public class DatabaseManager {
      * Used by server to open a new session
      */
     public static Session newSession(int dbID, String user, String password,
-                                     int timeZoneSeconds) {
+                                     String zoneString, int timeZoneSeconds) {
 
-        Database db = (Database) databaseIDMap.get(dbID);
+        Database db = null;
+
+        synchronized (databaseIDMap) {
+            db = (Database) databaseIDMap.get(dbID);
+        }
 
         if (db == null) {
             return null;
         }
 
-        Session session = db.connect(user, password, timeZoneSeconds);
+        Session session = db.connect(user, password, zoneString,
+                                     timeZoneSeconds);
 
         session.isNetwork = true;
 
@@ -144,15 +151,11 @@ public class DatabaseManager {
      */
     public static Session newSession(String type, String path, String user,
                                      String password, HsqlProperties props,
-                                     int timeZoneSeconds) {
+                                     String zoneString, int timeZoneSeconds) {
 
         Database db = getDatabase(type, path, props);
 
-        if (db == null) {
-            return null;
-        }
-
-        return db.connect(user, password, timeZoneSeconds);
+        return db.connect(user, password, zoneString, timeZoneSeconds);
     }
 
     /**
@@ -161,7 +164,11 @@ public class DatabaseManager {
      */
     public static Session getSession(int dbId, long sessionId) {
 
-        Database db = (Database) databaseIDMap.get(dbId);
+        Database db = null;
+
+        synchronized (databaseIDMap) {
+            db = (Database) databaseIDMap.get(dbId);
+        }
 
         return db == null ? null
                           : db.sessionManager.getSession(sessionId);
@@ -170,11 +177,7 @@ public class DatabaseManager {
     /**
      * Used by server to open or create a database
      */
-
-// loosecannon1@users 1.7.2 patch properties on the JDBC URL
-    // A VoltDB extension to disable a package dependency
-    /* disable 9 lines ...
-    public static int getDatabase(String type, String path, Server server,
+    public static int getDatabase(String type, String path, Notified server,
                                   HsqlProperties props) {
 
         Database db = getDatabase(type, path, props);
@@ -183,8 +186,31 @@ public class DatabaseManager {
 
         return db.databaseID;
     }
-    ... disabled 9 lines */
-    // End of VoltDB extension
+
+    public static Database getDatabase(int id) {
+        return (Database) databaseIDMap.get(id);
+    }
+
+    public static void shutdownDatabases(Notified server, int shutdownMode) {
+
+        Database[] dbArray;
+
+        synchronized (serverMap) {
+            HashSet databases = (HashSet) serverMap.get(server);
+
+            if (databases == null) {
+                dbArray = new Database[0];
+            } else {
+                dbArray = new Database[databases.size()];
+
+                databases.toArray(dbArray);
+            }
+        }
+
+        for (int i = 0; i < dbArray.length; i++) {
+            dbArray[i].close(shutdownMode);
+        }
+    }
 
     /**
      * This has to be improved once a threading model is in place.
@@ -200,8 +226,6 @@ public class DatabaseManager {
      * the db can be reopened for the new connection).
      *
      */
-
-// loosecannon1@users 1.7.2 patch properties on the JDBC URL
     public static Database getDatabase(String type, String path,
                                        HsqlProperties props) {
 
@@ -251,7 +275,6 @@ public class DatabaseManager {
         return db;
     }
 
-// loosecannon1@users 1.7.2 patch properties on the JDBC URL
     private static synchronized Database getDatabaseObject(String type,
             String path, HsqlProperties props) {
 
@@ -262,24 +285,42 @@ public class DatabaseManager {
         if (type == DatabaseURL.S_FILE) {
             databaseMap = fileDatabaseMap;
             key         = filePathToKey(path);
+            db          = (Database) databaseMap.get(key);
+
+            if (db == null) {
+                if (databaseMap.size() > 0) {
+                    Iterator it = databaseMap.keySet().iterator();
+
+                    while (it.hasNext()) {
+                        String current = (String) it.next();
+
+                        if (key.equalsIgnoreCase(current)) {
+                            key = current;
+
+                            break;
+                        }
+                    }
+                }
+            }
         } else if (type == DatabaseURL.S_RES) {
             databaseMap = resDatabaseMap;
         } else if (type == DatabaseURL.S_MEM) {
             databaseMap = memDatabaseMap;
         } else {
-            throw Error.runtimeError(ErrorCode.U_S0500,
-                                     "DatabaseManager.getDatabaseObject");
+            throw Error.runtimeError(ErrorCode.U_S0500, "DatabaseManager");
         }
 
         db = (Database) databaseMap.get(key);
 
         if (db == null) {
-            db            = new Database(type, path, type + key, props);
+            db            = new Database(type, path, key, props);
             db.databaseID = dbIDCounter;
 
-            databaseIDMap.put(dbIDCounter, db);
+            synchronized (databaseIDMap) {
+                databaseIDMap.put(dbIDCounter, db);
 
-            dbIDCounter++;
+                dbIDCounter++;
+            }
 
             databaseMap.put(key, db);
         }
@@ -305,16 +346,14 @@ public class DatabaseManager {
         } else if (type == DatabaseURL.S_MEM) {
             databaseMap = memDatabaseMap;
         } else {
-            throw (Error.runtimeError(
-                ErrorCode.U_S0500, "DatabaseManager.lookupDatabaseObject()"));
+            throw (Error.runtimeError(ErrorCode.U_S0500, "DatabaseManager"));
         }
 
         return (Database) databaseMap.get(key);
     }
 
     /**
-     * Adds a database to the registry. Returns
-     * null if there is none.
+     * Adds a database to the registry.
      */
     private static synchronized void addDatabaseObject(String type,
             String path, Database db) {
@@ -330,11 +369,13 @@ public class DatabaseManager {
         } else if (type == DatabaseURL.S_MEM) {
             databaseMap = memDatabaseMap;
         } else {
-            throw Error.runtimeError(ErrorCode.U_S0500,
-                                     "DatabaseManager.addDatabaseObject()");
+            throw Error.runtimeError(ErrorCode.U_S0500, "DatabaseManager");
         }
 
-        databaseIDMap.put(db.databaseID, db);
+        synchronized (databaseIDMap) {
+            databaseIDMap.put(db.databaseID, db);
+        }
+
         databaseMap.put(key, db);
     }
 
@@ -359,14 +400,22 @@ public class DatabaseManager {
         } else if (type == DatabaseURL.S_MEM) {
             databaseMap = memDatabaseMap;
         } else {
-            throw (Error.runtimeError(
-                ErrorCode.U_S0500, "DatabaseManager.lookupDatabaseObject()"));
+            throw (Error.runtimeError(ErrorCode.U_S0500, "DatabaseManager"));
         }
 
-        databaseIDMap.remove(dbID);
-        databaseMap.remove(key);
+        boolean isEmpty = false;
 
-        if (databaseIDMap.isEmpty()) {
+        synchronized (databaseIDMap) {
+            databaseIDMap.remove(dbID);
+
+            isEmpty = databaseIDMap.isEmpty();
+        }
+
+        synchronized (databaseMap) {
+            databaseMap.remove(key);
+        }
+
+        if (isEmpty) {
             ValuePool.resetPool();
         }
     }
@@ -383,40 +432,27 @@ public class DatabaseManager {
     /**
      * Deregisters a server completely.
      */
-    public static void deRegisterServer(Server server) {
-        serverMap.remove(server);
-    }
+    public static void deRegisterServer(Notified server) {
 
-    /**
-     * Deregisters a server as serving a given database. Not yet used.
-     */
-    private static void deRegisterServer(Server server, Database db) {
-
-        Iterator it = serverMap.values().iterator();
-
-        for (; it.hasNext(); ) {
-            HashSet databases = (HashSet) it.next();
-
-            databases.remove(db);
-
-            if (databases.isEmpty()) {
-                it.remove();
-            }
+        synchronized (serverMap) {
+            serverMap.remove(server);
         }
     }
 
     /**
      * Registers a server as serving a given database.
      */
-    private static void registerServer(Server server, Database db) {
+    private static void registerServer(Notified server, Database db) {
 
-        if (!serverMap.containsKey(server)) {
-            serverMap.put(server, new HashSet());
+        synchronized (serverMap) {
+            if (!serverMap.containsKey(server)) {
+                serverMap.put(server, new HashSet());
+            }
+
+            HashSet databases = (HashSet) serverMap.get(server);
+
+            databases.add(db);
         }
-
-        HashSet databases = (HashSet) serverMap.get(server);
-
-        databases.add(db);
     }
 
     /**
@@ -425,19 +461,31 @@ public class DatabaseManager {
      */
     private static void notifyServers(Database db) {
 
-        Iterator it = serverMap.keySet().iterator();
+        Notified[] servers;
 
-        for (; it.hasNext(); ) {
-            Server  server    = (Server) it.next();
-            HashSet databases = (HashSet) serverMap.get(server);
+        synchronized (serverMap) {
+            servers = new Notified[serverMap.size()];
 
-            if (databases.contains(db)) {
-// A VoltDB extension to disable a package dependency
-/* disable 2 lines ...
-                server.notify(ServerConstants.SC_DATABASE_SHUTDOWN,
-                              db.databaseID);
-... disabled 2 lines */
-// End of VoltDB extension
+            serverMap.keysToArray(servers);
+        }
+
+        for (int i = 0; i < servers.length; i++) {
+            Notified server = servers[i];
+            HashSet  databases;
+            boolean  removed = false;
+
+            synchronized (serverMap) {
+                databases = (HashSet) serverMap.get(server);
+            }
+
+            if (databases != null) {
+                synchronized (databases) {
+                    removed = databases.remove(db);
+                }
+            }
+
+            if (removed) {
+                server.notify(db.databaseID);
             }
         }
     }
@@ -447,8 +495,8 @@ public class DatabaseManager {
         Iterator it = serverMap.keySet().iterator();
 
         for (; it.hasNext(); ) {
-            Server  server    = (Server) it.next();
-            HashSet databases = (HashSet) serverMap.get(server);
+            Notified server    = (Notified) it.next();
+            HashSet  databases = (HashSet) serverMap.get(server);
 
             if (databases.contains(db)) {
                 return true;
@@ -470,15 +518,9 @@ public class DatabaseManager {
     private static String filePathToKey(String path) {
 
         try {
-            return FileUtil.getDefaultInstance().canonicalPath(path);
+            return FileUtil.getFileUtil().canonicalPath(path);
         } catch (Exception e) {
             return path;
         }
     }
-
-    /************************* Volt DB Extensions *************************/
-    /** Minimal stub to locally resolve Server class references. */
-    private static class Server {
-    }
-    /**********************************************************************/
 }

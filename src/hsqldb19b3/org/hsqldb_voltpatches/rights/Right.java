@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,12 +31,13 @@
 
 package org.hsqldb_voltpatches.rights;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
@@ -45,7 +46,7 @@ import org.hsqldb_voltpatches.lib.OrderedHashSet;
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
  *
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public final class Right {
@@ -227,8 +228,9 @@ public final class Right {
             isFullDelete = false;
         }
 
-        if (!isFullSelect && selectColumnSet == null) {}
-        else if (right.isFullSelect) {
+        if (!isFullSelect && selectColumnSet == null) {
+            //
+        } else if (right.isFullSelect) {
             isFullSelect    = false;
             selectColumnSet = null;
         } else if (right.selectColumnSet != null) {
@@ -244,8 +246,9 @@ public final class Right {
             }
         }
 
-        if (!isFullInsert && insertColumnSet == null) {}
-        else if (right.isFullInsert) {
+        if (!isFullInsert && insertColumnSet == null) {
+            //
+        } else if (right.isFullInsert) {
             isFullInsert    = false;
             insertColumnSet = null;
         } else if (right.insertColumnSet != null) {
@@ -261,8 +264,9 @@ public final class Right {
             }
         }
 
-        if (!isFullUpdate && updateColumnSet == null) {}
-        else if (right.isFullUpdate) {
+        if (!isFullUpdate && updateColumnSet == null) {
+            //
+        } else if (right.isFullUpdate) {
             isFullUpdate    = false;
             updateColumnSet = null;
         } else if (right.updateColumnSet != null) {
@@ -278,8 +282,9 @@ public final class Right {
             }
         }
 
-        if (!isFullReferences && referencesColumnSet == null) {}
-        else if (right.isFullReferences) {
+        if (!isFullReferences && referencesColumnSet == null) {
+            //
+        } else if (right.isFullReferences) {
             isFullReferences    = false;
             referencesColumnSet = null;
         } else if (right.referencesColumnSet != null) {
@@ -295,8 +300,9 @@ public final class Right {
             }
         }
 
-        if (!isFullTrigger && triggerColumnSet == null) {}
-        else if (right.isFullTrigger) {
+        if (!isFullTrigger && triggerColumnSet == null) {
+            //
+        } else if (right.isFullTrigger) {
             isFullTrigger    = false;
             triggerColumnSet = null;
         } else if (right.triggerColumnSet != null) {
@@ -588,7 +594,7 @@ public final class Right {
         return isFull || isFullDelete;
     }
 
-    public boolean canAccess(int privilegeType) {
+    public boolean canAccessFully(int privilegeType) {
 
         if (isFull) {
             return true;
@@ -614,15 +620,40 @@ public final class Right {
             case GrantConstants.TRIGGER :
                 return isFullTrigger;
 
+            case GrantConstants.EXECUTE :
+                return isFull;
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Right");
         }
     }
 
+    public boolean canAcesssNonSelect() {
+
+        if (isFull) {
+            return true;
+        }
+
+        if (isFullInsert || isFullUpdate || isFullDelete || isFullReferences
+                || isFullTrigger) {
+            return true;
+        }
+
+        boolean result = false;
+
+        result |= (insertColumnSet != null && !insertColumnSet.isEmpty());
+        result |= (updateColumnSet != null && !updateColumnSet.isEmpty());
+        result |= referencesColumnSet != null
+                  && !referencesColumnSet.isEmpty();
+        result |= triggerColumnSet != null && !triggerColumnSet.isEmpty();
+
+        return result;
+    }
+
     /**
      * Supports column level rights
      */
-    public boolean canAccess(SchemaObject object, int privilegeType) {
+    public boolean canAccess(int privilegeType) {
 
         if (isFull) {
             return true;
@@ -669,9 +700,53 @@ public final class Right {
 
                 return triggerColumnSet != null && !triggerColumnSet.isEmpty();
 
+            case GrantConstants.EXECUTE :
+                return isFull;
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Right");
         }
+    }
+
+    public boolean canAccess(Table table, int[] columnMap) {
+
+        if (isFull) {
+            return true;
+        }
+
+        if (isFullSelect || isFullInsert || isFullUpdate || isFullDelete
+                || isFullReferences || isFullTrigger) {
+            return true;
+        }
+
+        boolean result = false;
+
+        result |= (selectColumnSet != null && insertColumnSet.isEmpty());
+        result |= (insertColumnSet != null && insertColumnSet.isEmpty());
+        result |= (updateColumnSet != null && !updateColumnSet.isEmpty());
+        result |= referencesColumnSet != null
+                  && !referencesColumnSet.isEmpty();
+        result |= triggerColumnSet != null && !triggerColumnSet.isEmpty();
+
+        if (!result) {
+            return false;
+        }
+
+        HashSet set = new HashSet();
+
+        set.addAll(selectColumnSet);
+        set.addAll(insertColumnSet);
+        set.addAll(updateColumnSet);
+        set.addAll(referencesColumnSet);
+        set.addAll(triggerColumnSet);
+
+        for (int i = 0; i < columnMap.length; i++) {
+            if (!set.contains(table.getColumn(i).getName())) {
+                return false;
+            }
+        }
+
+        return result;
     }
 
     /**

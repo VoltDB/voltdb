@@ -1,4 +1,40 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+/*
+ * For work developed by the HSQL Development Group:
+ *
+ * Copyright (c) 2001-2014, The HSQL Development Group
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the HSQL Development Group nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ *
+ * For work originally developed by the Hypersonic SQL Group:
+ *
+ * Copyright (c) 1995-2000, The Hypersonic SQL Group.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,51 +65,16 @@
  *
  * This software consists of voluntary contributions made by many individuals
  * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the HSQL Development Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
 package org.hsqldb_voltpatches.index;
 
-import java.util.NoSuchElementException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlNameManager;
+import org.hsqldb_voltpatches.Constraint;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.OpTypes;
 import org.hsqldb_voltpatches.Row;
@@ -83,20 +84,22 @@ import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.TransactionManager;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.lib.ReadWriteLockDummy;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.types.Type;
 
 // fredt@users 20020221 - patch 513005 by sqlbob@users - corrections
-// fredt@users 20020225 - patch 1.7.0 - changes to support cascading deletes
-// tony_lai@users 20020820 - patch 595052 - better error message
-// fredt@users 20021205 - patch 1.7.2 - changes to method signature
 // fredt@users - patch 1.8.0 - reworked the interface and comparison methods
 // fredt@users - patch 1.8.0 - improved reliability for cached indexes
 // fredt@users - patch 1.9.0 - iterators and concurrency
+// fredt@users - patch 2.0.0 - enhanced selection and iterators
 
 /**
  * Implementation of an AVL tree with parent pointers in nodes. Subclasses
@@ -106,124 +109,46 @@ import org.hsqldb_voltpatches.types.Type;
  * An Index object also holds information on table columns (in the form of int
  * indexes) that are covered by it.<p>
  *
- *  New class derived from Hypersonic SQL code and enhanced in HSQLDB. <p>
+ * New class derived from Hypersonic SQL code and enhanced in HSQLDB. <p>
  *
  * @author Thomas Mueller (Hypersonic SQL Group)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since Hypersonic SQL
  */
 public class IndexAVL implements Index {
 
-    // fields
-    private final long      persistenceId;
-    private final HsqlName  name;
-    private final boolean[] colCheck;
-    private final int[]     colIndex;
-    private final int[]     defaultColMap;
-    private final Type[]    colTypes;
-    private final boolean[] colDesc;
-    private final boolean[] nullsLast;
-    private final int[]     pkCols;
-    private final Type[]    pkTypes;
-    private final boolean   isUnique;    // DDL uniqueness
-    private final boolean   useRowId;
-    private final boolean   isConstraint;
-    private final boolean   isForward;
-    private int             depth;
     private static final IndexRowIterator emptyIterator =
-        new IndexRowIterator(null, (PersistentStore) null, null, null);
-    private final TableBase table;
-    private int             position;
+        new IndexRowIterator(null, (PersistentStore) null, null, null, 0,
+                             false, false);
+
+    // fields
+    private final long       persistenceId;
+    protected final HsqlName name;
+    private final boolean[]  colCheck;
+    final int[]              colIndex;
+    private final int[]      defaultColMap;
+    final Type[]             colTypes;
+    private final boolean[]  colDesc;
+    private final boolean[]  nullsLast;
+    final boolean            isSimpleOrder;
+    final boolean            isSimple;
+    protected final boolean  isPK;        // PK with or without columns
+    protected final boolean  isUnique;    // DDL uniqueness
+    protected final boolean  isConstraint;
+    private final boolean    isForward;
+    private boolean          isClustered;
+    protected TableBase      table;
+    int                      position;
+    private IndexUse[]       asArray;
 
     //
-    ReadWriteLock lock      = new ReentrantReadWriteLock();
-    Lock          readLock  = lock.readLock();
-    Lock          writeLock = lock.writeLock();
+    Object[] nullData;
 
     //
-    public static final Index[] emptyArray = new Index[]{};
-
-    /**
-     * Set a node as child of another
-     *
-     * @param x parent node
-     * @param isleft boolean
-     * @param n child node
-     *
-     */
-    private static NodeAVL set(PersistentStore store, NodeAVL x,
-                               boolean isleft, NodeAVL n) {
-
-        if (isleft) {
-            x = x.setLeft(store, n);
-        } else {
-            x = x.setRight(store, n);
-        }
-
-        if (n != null) {
-            n.setParent(store, x);
-        }
-
-        return x;
-    }
-
-    /**
-     * Returns either child node
-     *
-     * @param x node
-     * @param isleft boolean
-     *
-     * @return child node
-     *
-     */
-    private static NodeAVL child(PersistentStore store, NodeAVL x,
-                                 boolean isleft) {
-        return isleft ? x.getLeft(store)
-                      : x.getRight(store);
-    }
-
-    private static void getColumnList(Table t, int[] col, int len,
-                                      StringBuffer a) {
-
-        a.append('(');
-
-        for (int i = 0; i < len; i++) {
-            a.append(t.getColumn(col[i]).getName().statementName);
-
-            if (i < len - 1) {
-                a.append(',');
-            }
-        }
-
-        a.append(')');
-    }
-
-    /**
-     * compares two full table rows based on a set of columns
-     *
-     * @param a a full row
-     * @param b a full row
-     * @param cols array of column indexes to compare
-     * @param coltypes array of column types for the full row
-     *
-     * @return comparison result, -1,0,+1
-     */
-    public static int compareRows(Object[] a, Object[] b, int[] cols,
-                                  Type[] coltypes) {
-
-        int fieldcount = cols.length;
-
-        for (int j = 0; j < fieldcount; j++) {
-            int i = coltypes[cols[j]].compare(a[cols[j]], b[cols[j]]);
-
-            if (i != 0) {
-                return i;
-            }
-        }
-
-        return 0;
-    }
+    ReadWriteLock lock;
+    Lock          readLock;
+    Lock          writeLock;
 
     /**
      * Constructor declaration
@@ -235,6 +160,7 @@ public class IndexAVL implements Index {
      * @param descending boolean[]
      * @param nullsLast boolean[]
      * @param colTypes array of column types
+     * @param pk if index is for a primary key
      * @param unique is this a unique index
      * @param constraint does this index belonging to a constraint
      * @param forward is this an auto-index for an FK that refers to a table
@@ -245,28 +171,56 @@ public class IndexAVL implements Index {
                     Type[] colTypes, boolean pk, boolean unique,
                     boolean constraint, boolean forward) {
 
-        persistenceId  = id;
-        this.name      = name;
-        this.colIndex  = columns;
-        this.colTypes  = colTypes;
-        this.colDesc   = descending == null ? new boolean[columns.length]
-                                            : descending;
-        this.nullsLast = nullsLast == null ? new boolean[columns.length]
-                                           : nullsLast;
-        isUnique       = unique;
-        isConstraint   = constraint;
-        isForward      = forward;
-        this.table     = table;
-        this.pkCols    = table.getPrimaryKey();
-        this.pkTypes   = table.getPrimaryKeyTypes();
-        useRowId = (!isUnique && pkCols.length == 0) || (colIndex.length == 0);
-        colCheck       = table.getNewColumnCheckList();
+        this.persistenceId = id;
+        this.name          = name;
+        this.colIndex      = columns;
+        this.colTypes      = colTypes;
+        this.colDesc       = descending == null ? new boolean[columns.length]
+                                                : descending;
+        this.nullsLast     = nullsLast == null ? new boolean[columns.length]
+                                               : nullsLast;
+        this.isPK          = pk;
+        this.isUnique      = unique;
+        this.isConstraint  = constraint;
+        this.isForward     = forward;
+        this.table         = table;
+        this.colCheck      = table.getNewColumnCheckList();
+        this.asArray = new IndexUse[]{ new IndexUse(this, colIndex.length) };
 
         ArrayUtil.intIndexesToBooleanArray(colIndex, colCheck);
 
-        defaultColMap = new int[columns.length];
+        this.defaultColMap = new int[columns.length];
 
         ArrayUtil.fillSequence(defaultColMap);
+
+        boolean simpleOrder = colIndex.length > 0;
+
+        for (int i = 0; i < colDesc.length; i++) {
+            if (this.colDesc[i] || this.nullsLast[i]) {
+                simpleOrder = false;
+            }
+        }
+
+        isSimpleOrder = simpleOrder;
+        isSimple      = isSimpleOrder && colIndex.length == 1;
+        nullData      = new Object[colIndex.length];
+
+        //
+        switch (table.getTableType()) {
+
+            case TableBase.MEMORY_TABLE :
+            case TableBase.CACHED_TABLE :
+            case TableBase.TEXT_TABLE :
+                lock = new ReentrantReadWriteLock();
+                break;
+
+            default :
+                lock = new ReadWriteLockDummy();
+                break;
+        }
+
+        readLock  = lock.readLock();
+        writeLock = lock.writeLock();
     }
 
     // SchemaObject implementation
@@ -298,7 +252,7 @@ public class IndexAVL implements Index {
         return null;
     }
 
-    public void compile(Session session) {}
+    public void compile(Session session, SchemaObject parentObject) {}
 
     public String getSQL() {
 
@@ -316,16 +270,20 @@ public class IndexAVL implements Index {
         sb.append(getName().statementName);
         sb.append(' ').append(Tokens.T_ON).append(' ');
         sb.append(((Table) table).getName().getSchemaQualifiedStatementName());
-
-        int[] col = getColumns();
-        int   len = getVisibleColumns();
-
-        getColumnList(((Table) table), col, len, sb);
+        sb.append(((Table) table).getColumnListSQL(colIndex, colIndex.length));
 
         return sb.toString();
     }
 
+    public long getChangeTimestamp() {
+        return 0;
+    }
+
     // IndexInterface
+    public IndexUse[] asArray() {
+        return asArray;
+    }
+
     public RowIterator emptyIterator() {
         return emptyIterator;
     }
@@ -340,13 +298,6 @@ public class IndexAVL implements Index {
 
     public long getPersistenceId() {
         return persistenceId;
-    }
-
-    /**
-     * Returns the count of visible columns used
-     */
-    public int getVisibleColumns() {
-        return colIndex.length;
     }
 
     /**
@@ -388,6 +339,10 @@ public class IndexAVL implements Index {
         return colDesc;
     }
 
+    public int[] getDefaultColumnMap() {
+        return this.defaultColMap;
+    }
+
     /**
      * Returns a value indicating the order of different types of index in
      * the list of indexes for a table. The position of the groups of Indexes
@@ -408,6 +363,10 @@ public class IndexAVL implements Index {
      */
     public int getIndexOrderValue() {
 
+        if (isPK) {
+            return 0;
+        }
+
         if (isConstraint) {
             return isForward ? 4
                              : isUnique ? 0
@@ -421,17 +380,170 @@ public class IndexAVL implements Index {
         return isForward;
     }
 
+    public void setTable(TableBase table) {
+        this.table = table;
+    }
+
+    public void setClustered(boolean clustered) {
+        isClustered = clustered;
+    }
+
+    public boolean isClustered() {
+        return isClustered;
+    }
+
     /**
      * Returns the node count.
      */
-    public int size(PersistentStore store) {
-
-        int count = 0;
+    public long size(Session session, PersistentStore store) {
 
         readLock.lock();
 
         try {
-            RowIterator it = firstRow(null, store);
+            return store.elementCount(session);
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    public long sizeUnique(PersistentStore store) {
+
+        readLock.lock();
+
+        try {
+            return store.elementCountUnique(this);
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    public double[] searchCost(Session session, PersistentStore store) {
+
+        boolean  probeDeeper = false;
+        int      counter     = 1;
+        double[] changes     = new double[colIndex.length];
+        int      depth       = 0;
+        int[]    depths      = new int[1];
+
+        readLock.lock();
+
+        try {
+            NodeAVL node = getAccessor(store);
+            NodeAVL temp = node;
+
+            if (node == null) {
+                return changes;
+            }
+
+            while (true) {
+                node = temp;
+                temp = node.getLeft(store);
+
+                if (temp == null) {
+                    break;
+                }
+
+                if (depth == Index.probeDepth) {
+                    probeDeeper = true;
+
+                    break;
+                }
+
+                depth++;
+            }
+
+            while (true) {
+                temp  = next(store, node, depth, probeDepth, depths);
+                depth = depths[0];
+
+                if (temp == null) {
+                    break;
+                }
+
+                compareRowForChange(session, node.getData(store),
+                                    temp.getData(store), changes);
+
+                node = temp;
+
+                counter++;
+            }
+
+            if (probeDeeper) {
+                double[] factors = new double[colIndex.length];
+                int extras = probeFactor(session, store, factors, true)
+                             + probeFactor(session, store, factors, false);
+
+                for (int i = 0; i < colIndex.length; i++) {
+                    factors[i] /= 2.0;
+
+                    for (int j = 0; j < factors[i]; j++) {
+                        changes[i] *= 2;
+                    }
+                }
+            }
+
+            long rowCount = store.elementCount();
+
+            for (int i = 0; i < colIndex.length; i++) {
+                if (changes[i] == 0) {
+                    changes[i] = 1;
+                }
+
+                changes[i] = rowCount / changes[i];
+
+                if (changes[i] < 2) {
+                    changes[i] = 2;
+                }
+            }
+
+/*
+            StringBuffer s = new StringBuffer();
+
+            s.append("count " + rowCount + " columns " + colIndex.length
+                     + " selectivity " + changes[0]);
+            System.out.println(s);
+*/
+            return changes;
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    int probeFactor(Session session, PersistentStore store, double[] changes,
+                    boolean left) {
+
+        int     depth = 0;
+        NodeAVL x     = getAccessor(store);
+        NodeAVL n     = x;
+
+        if (x == null) {
+            return 0;
+        }
+
+        while (n != null) {
+            x = n;
+            n = left ? x.getLeft(store)
+                     : x.getRight(store);
+
+            depth++;
+
+            if (depth > probeDepth && n != null) {
+                compareRowForChange(session, x.getData(store),
+                                    n.getData(store), changes);
+            }
+        }
+
+        return depth - probeDepth;
+    }
+
+    public long getNodeCount(Session session, PersistentStore store) {
+
+        long count = 0;
+
+        readLock.lock();
+
+        try {
+            RowIterator it = firstRow(session, store, 0);
 
             while (it.hasNext()) {
                 it.getNextRow();
@@ -445,10 +557,6 @@ public class IndexAVL implements Index {
         }
     }
 
-    public int sizeEstimate(PersistentStore store) {
-        return (int) (1L << depth);
-    }
-
     public boolean isEmpty(PersistentStore store) {
 
         readLock.lock();
@@ -458,6 +566,72 @@ public class IndexAVL implements Index {
         } finally {
             readLock.unlock();
         }
+    }
+
+    /**
+     * Removes all links between memory nodes
+     */
+    public void unlinkNodes(NodeAVL primaryRoot) {
+
+        writeLock.lock();
+
+        try {
+            NodeAVL x = primaryRoot;
+            NodeAVL l = x;
+
+            while (l != null) {
+                x = l;
+                l = x.getLeft(null);
+            }
+
+            while (x != null) {
+                NodeAVL n = nextUnlink(x);
+
+                x = n;
+            }
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    private NodeAVL nextUnlink(NodeAVL x) {
+
+        NodeAVL temp = x.getRight(null);
+
+        if (temp != null) {
+            x    = temp;
+            temp = x.getLeft(null);
+
+            while (temp != null) {
+                x    = temp;
+                temp = x.getLeft(null);
+            }
+
+            return x;
+        }
+
+        temp = x;
+        x    = x.getParent(null);
+
+        while (x != null && x.isRight(temp)) {
+            x.nRight = null;
+
+            temp.getRow(null).destroy();
+            temp.delete();
+
+            //
+            temp = x;
+            x    = x.getParent(null);
+        }
+
+        if (x != null) {
+            x.nLeft = null;
+        }
+
+        temp.getRow(null).destroy();
+        temp.delete();
+
+        return x;
     }
 
     public void checkIndex(PersistentStore store) {
@@ -488,16 +662,16 @@ public class IndexAVL implements Index {
         }
     }
 
-    private void checkNodes(PersistentStore store, NodeAVL p) {
+    void checkNodes(PersistentStore store, NodeAVL p) {
 
         NodeAVL l = p.getLeft(store);
         NodeAVL r = p.getRight(store);
 
-        if (l != null && l.getBalance() == -2) {
+        if (l != null && l.getBalance(store) == -2) {
             System.out.print("broken index - deleted");
         }
 
-        if (r != null && r.getBalance() == -2) {
+        if (r != null && r.getBalance(store) == -2) {
             System.out.print("broken index -deleted");
         }
 
@@ -511,16 +685,206 @@ public class IndexAVL implements Index {
     }
 
     /**
+     * Compares two table rows based on the columns of this index. The rowColMap
+     * parameter specifies which columns of the other table are to be compared
+     * with the colIndex columns of this index. The rowColMap can cover all or
+     * only some columns of this index.
+     *
+     * @param session Session
+     * @param a row from another table
+     * @param rowColMap column indexes in the other table
+     * @param b a full row in this table
+     * @return comparison result, -1,0,+1
+     */
+    public int compareRowNonUnique(Session session, Object[] a, Object[] b,
+                                   int[] rowColMap) {
+
+        int fieldcount = rowColMap.length;
+
+        for (int j = 0; j < fieldcount; j++) {
+            int i = colTypes[j].compare(session, a[colIndex[j]],
+                                        b[rowColMap[j]]);
+
+            if (i != 0) {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    public int compareRowNonUnique(Session session, Object[] a, Object[] b,
+                                   int[] rowColMap, int fieldCount) {
+
+        for (int j = 0; j < fieldCount; j++) {
+            int i = colTypes[j].compare(session, a[colIndex[j]],
+                                        b[rowColMap[j]]);
+
+            if (i != 0) {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * As above but use the index column data
+     */
+    public int compareRowNonUnique(Session session, Object[] a, Object[] b,
+                                   int fieldCount) {
+
+        for (int j = 0; j < fieldCount; j++) {
+            int i = colTypes[j].compare(session, a[colIndex[j]],
+                                        b[colIndex[j]]);
+
+            if (i != 0) {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    public void compareRowForChange(Session session, Object[] a, Object[] b,
+                                    double[] changes) {
+
+        for (int j = 0; j < colIndex.length; j++) {
+            int i = colTypes[j].compare(session, a[colIndex[j]],
+                                        b[colIndex[j]]);
+
+            if (i != 0) {
+                for (; j < colIndex.length; j++) {
+                    changes[j]++;
+                }
+            }
+        }
+    }
+
+    public int compareRow(Session session, Object[] a, Object[] b) {
+
+        for (int j = 0; j < colIndex.length; j++) {
+            int i = colTypes[j].compare(session, a[colIndex[j]],
+                                        b[colIndex[j]]);
+
+            if (i != 0) {
+                if (isSimpleOrder) {
+                    return i;
+                }
+
+                boolean nulls = a[colIndex[j]] == null
+                                || b[colIndex[j]] == null;
+
+                if (colDesc[j] && !nulls) {
+                    i = -i;
+                }
+
+                if (nullsLast[j] && nulls) {
+                    i = -i;
+                }
+
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Compare two rows of the table for inserting rows into unique indexes
+     * Supports descending columns.
+     *
+     * @param session Session
+     * @param newRow data
+     * @param existingRow data
+     * @param useRowId boolean
+     * @param start int
+     * @return comparison result, -1,0,+1
+     */
+    int compareRowForInsertOrDelete(Session session, Row newRow,
+                                    Row existingRow, boolean useRowId,
+                                    int start) {
+
+        Object[] a = newRow.getData();
+        Object[] b = existingRow.getData();
+
+        for (int j = start; j < colIndex.length; j++) {
+            int i = colTypes[j].compare(session, a[colIndex[j]],
+                                        b[colIndex[j]]);
+
+            if (i != 0) {
+                if (isSimpleOrder) {
+                    return i;
+                }
+
+                boolean nulls = a[colIndex[j]] == null
+                                || b[colIndex[j]] == null;
+
+                if (colDesc[j] && !nulls) {
+                    i = -i;
+                }
+
+                if (nullsLast[j] && nulls) {
+                    i = -i;
+                }
+
+                return i;
+            }
+        }
+
+        if (useRowId) {
+            long diff = newRow.getPos() - existingRow.getPos();
+
+            return diff == 0L ? 0
+                              : diff > 0L ? 1
+                                          : -1;
+        }
+
+        return 0;
+    }
+
+    int compareObject(Session session, Object[] a, Object[] b,
+                      int[] rowColMap, int position, int opType) {
+        return colTypes[position].compare(session, a[colIndex[position]],
+                                          b[rowColMap[position]], opType);
+    }
+
+    boolean hasNulls(Session session, Object[] rowData) {
+
+        boolean uniqueNulls = session == null
+                              || session.database.sqlUniqueNulls;
+        boolean compareId = false;
+
+        for (int j = 0; j < colIndex.length; j++) {
+            if (rowData[colIndex[j]] == null) {
+                compareId = true;
+
+                if (uniqueNulls) {
+                    break;
+                }
+            } else {
+                compareId = false;
+
+                break;
+            }
+        }
+
+        return compareId;
+    }
+
+    /**
      * Insert a node into the index
      */
     public void insert(Session session, PersistentStore store, Row row) {
 
         NodeAVL n;
         NodeAVL x;
-        boolean isleft  = true;
-        int     compare = -1;
+        boolean isleft       = true;
+        int     compare      = -1;
+        boolean compareRowId = !isUnique || hasNulls(session, row.getData());
 
         writeLock.lock();
+        store.writeLock();
 
         try {
             n = getAccessor(store);
@@ -536,30 +900,57 @@ public class IndexAVL implements Index {
                 Row currentRow = n.getRow(store);
 
                 compare = compareRowForInsertOrDelete(session, row,
-                                                      currentRow);
+                                                      currentRow,
+                                                      compareRowId, 0);
+
+                // after the first match and check, all compares are with row id
+                if (compare == 0 && session != null && !compareRowId
+                        && session.database.txManager.isMVRows()) {
+                    if (!isEqualReadable(session, store, n)) {
+                        compareRowId = true;
+                        compare = compareRowForInsertOrDelete(session, row,
+                                                              currentRow,
+                                                              compareRowId,
+                                                              colIndex.length);
+                    }
+                }
 
                 if (compare == 0) {
-                    throw Error.error(ErrorCode.X_23505);
+                    Constraint c = null;
+
+                    if (isConstraint) {
+                        c = ((Table) table).getUniqueConstraintForIndex(this);
+                    }
+
+                    if (c == null) {
+                        throw Error.error(ErrorCode.X_23505,
+                                          name.statementName);
+                    } else {
+                        throw c.getException(row.getData());
+                    }
                 }
 
                 isleft = compare < 0;
                 x      = n;
-                n      = child(store, x, isleft);
+                n      = x.child(store, isleft);
 
                 if (n == null) {
                     break;
                 }
             }
 
-            x = set(store, x, isleft, ((RowAVL) row).getNode(position));
+            x = x.set(store, isleft, ((RowAVL) row).getNode(position));
 
             balance(store, x, isleft);
+        } catch (RuntimeException e) {
+            throw e;
         } finally {
+            store.writeUnlock();
             writeLock.unlock();
         }
     }
 
-    public void delete(PersistentStore store, Row row) {
+    public void delete(Session session, PersistentStore store, Row row) {
 
         if (!row.isInMemory()) {
             row = (Row) store.get(row, false);
@@ -567,10 +958,12 @@ public class IndexAVL implements Index {
 
         NodeAVL node = ((RowAVL) row).getNode(position);
 
-        delete(store, node);
+        if (node != null) {
+            delete(store, node);
+        }
     }
 
-    public void delete(PersistentStore store, NodeAVL x) {
+    void delete(PersistentStore store, NodeAVL x) {
 
         if (x == null) {
             return;
@@ -579,6 +972,7 @@ public class IndexAVL implements Index {
         NodeAVL n;
 
         writeLock.lock();
+        store.writeLock();
 
         try {
             if (x.getLeft(store) == null) {
@@ -604,16 +998,16 @@ public class IndexAVL implements Index {
                 n = x.getLeft(store);
 
                 // swap d and x
-                int b = x.getBalance();
+                int b = x.getBalance(store);
 
-                x = x.setBalance(store, d.getBalance());
+                x = x.setBalance(store, d.getBalance(store));
                 d = d.setBalance(store, b);
 
                 // set x.parent
                 NodeAVL xp = x.getParent(store);
                 NodeAVL dp = d.getParent(store);
 
-                if (d.isRoot()) {
+                if (d.isRoot(store)) {
                     store.setAccessor(this, x);
                 }
 
@@ -655,7 +1049,6 @@ public class IndexAVL implements Index {
                     x = x.setRight(store, dr);
                 }
 
-                // apprently no-ops
                 x.getRight(store).setParent(store, x);
                 x.getLeft(store).setParent(store, x);
 
@@ -672,7 +1065,7 @@ public class IndexAVL implements Index {
 
             boolean isleft = x.isFromLeft(store);
 
-            replace(store, x, n);
+            x.replace(store, this, n);
 
             n = x.getParent(store);
 
@@ -684,7 +1077,7 @@ public class IndexAVL implements Index {
                 int sign = isleft ? 1
                                   : -1;
 
-                switch (x.getBalance() * sign) {
+                switch (x.getBalance(store) * sign) {
 
                     case -1 :
                         x = x.setBalance(store, 0);
@@ -696,15 +1089,16 @@ public class IndexAVL implements Index {
                         return;
 
                     case 1 :
-                        NodeAVL r = child(store, x, !isleft);
-                        int     b = r.getBalance();
+                        NodeAVL r = x.child(store, !isleft);
+                        int     b = r.getBalance(store);
 
                         if (b * sign >= 0) {
-                            replace(store, x, r);
+                            x.replace(store, this, r);
 
-                            x = set(store, x, !isleft,
-                                    child(store, r, isleft));
-                            r = set(store, r, isleft, x);
+                            NodeAVL child = r.child(store, isleft);
+
+                            x = x.set(store, !isleft, child);
+                            r = r.set(store, isleft, x);
 
                             if (b == 0) {
                                 x = x.setBalance(store, sign);
@@ -717,17 +1111,15 @@ public class IndexAVL implements Index {
                             r = r.setBalance(store, 0);
                             x = r;
                         } else {
-                            NodeAVL l = child(store, r, isleft);
+                            NodeAVL l = r.child(store, isleft);
 
-                            replace(store, x, l);
+                            x.replace(store, this, l);
 
-                            b = l.getBalance();
-                            r = set(store, r, isleft,
-                                    child(store, l, !isleft));
-                            l = set(store, l, !isleft, r);
-                            x = set(store, x, !isleft,
-                                    child(store, l, isleft));
-                            l = set(store, l, isleft, x);
+                            b = l.getBalance(store);
+                            r = r.set(store, isleft, l.child(store, !isleft));
+                            l = l.set(store, !isleft, r);
+                            x = x.set(store, !isleft, l.child(store, isleft));
+                            l = l.set(store, isleft, x);
                             x = x.setBalance(store, (b == sign) ? -sign
                                                                 : 0);
                             r = r.setBalance(store, (b == -sign) ? sign
@@ -740,33 +1132,52 @@ public class IndexAVL implements Index {
                 isleft = x.isFromLeft(store);
                 n      = x.getParent(store);
             }
+        } catch (RuntimeException e) {
+            throw e;
         } finally {
+            store.writeUnlock();
             writeLock.unlock();
         }
     }
 
-    public boolean exists(Session session, PersistentStore store,
-                          Object[] rowdata, int[] rowColMap) {
-        return findNode(session, store, rowdata, rowColMap, rowColMap.length)
-               != null;
+    public boolean existsParent(Session session, PersistentStore store,
+                                Object[] rowdata, int[] rowColMap) {
+
+        NodeAVL node = findNode(session, store, rowdata, rowColMap,
+                                rowColMap.length, OpTypes.EQUAL,
+                                TransactionManager.ACTION_REF, false);
+
+        return node != null;
     }
 
     /**
-     * Return the first node equal to the indexdata object. The rowdata has
-     * the same column mapping as this index.
+     * Return the first node equal to the indexdata object. The rowdata has the
+     * same column mapping as this index.
      *
      * @param session session object
      * @param store store object
      * @param rowdata array containing index column data
-     * @param match count of columns to match
+     * @param matchCount count of columns to match
+     * @param compareType int
+     * @param reversed boolean
+     * @param map boolean[]
      * @return iterator
      */
     public RowIterator findFirstRow(Session session, PersistentStore store,
-                                    Object[] rowdata, int match) {
+                                    Object[] rowdata, int matchCount,
+                                    int distinctCount, int compareType,
+                                    boolean reversed, boolean[] map) {
 
-        NodeAVL node = findNode(session, store, rowdata, defaultColMap, match);
+        NodeAVL node = findNode(session, store, rowdata, defaultColMap,
+                                matchCount, compareType,
+                                TransactionManager.ACTION_READ, reversed);
 
-        return getIterator(session, store, node);
+        if (node == null) {
+            return emptyIterator;
+        }
+
+        return new IndexRowIterator(session, store, this, node, distinctCount,
+                                    false, reversed);
     }
 
     /**
@@ -782,151 +1193,40 @@ public class IndexAVL implements Index {
                                     Object[] rowdata) {
 
         NodeAVL node = findNode(session, store, rowdata, colIndex,
-                                colIndex.length);
+                                colIndex.length, OpTypes.EQUAL,
+                                TransactionManager.ACTION_READ, false);
 
-        return getIterator(session, store, node);
+        if (node == null) {
+            return emptyIterator;
+        }
+
+        return new IndexRowIterator(session, store, this, node, 0, false,
+                                    false);
     }
 
     /**
-     * Return the first node equal to the rowdata object.
-     * The rowdata has the column mapping privided in rowColMap.
+     * Return the first node equal to the rowdata object. The rowdata has the
+     * column mapping provided in rowColMap.
      *
      * @param session session object
      * @param store store object
      * @param rowdata array containing table row data
+     * @param rowColMap int[]
      * @return iterator
      */
     public RowIterator findFirstRow(Session session, PersistentStore store,
                                     Object[] rowdata, int[] rowColMap) {
 
         NodeAVL node = findNode(session, store, rowdata, rowColMap,
-                                rowColMap.length);
+                                rowColMap.length, OpTypes.EQUAL,
+                                TransactionManager.ACTION_READ, false);
 
-        return getIterator(session, store, node);
-    }
-
-    /**
-     * Finds the first node that is larger or equal to the given one based
-     * on the first column of the index only.
-     *
-     * @param session session object
-     * @param store store object
-     * @param value value to match
-     * @param compare comparison Expression type
-     *
-     * @return iterator
-     */
-    public RowIterator findFirstRow(Session session, PersistentStore store,
-                                    Object value, int compare) {
-
-        readLock.lock();
-
-        try {
-            if (compare == OpTypes.SMALLER
-                    || compare == OpTypes.SMALLER_EQUAL) {
-                return findFirstRowNotNull(session, store);
-            }
-
-            boolean isEqual = compare == OpTypes.EQUAL
-                              || compare == OpTypes.IS_NULL;
-            NodeAVL x     = getAccessor(store);
-            int     iTest = 1;
-
-            if (compare == OpTypes.GREATER) {
-                iTest = 0;
-            }
-
-            if (value == null && !isEqual) {
-                return emptyIterator;
-            }
-
-            // this method returns the correct node only with the following conditions
-            boolean check = compare == OpTypes.GREATER
-                            || compare == OpTypes.EQUAL
-                            || compare == OpTypes.GREATER_EQUAL;
-
-            if (!check) {
-                Error.runtimeError(ErrorCode.U_S0500, "Index.findFirst");
-            }
-
-            while (x != null) {
-                boolean t = colTypes[0].compare(
-                    value, x.getRow(store).getData()[colIndex[0]]) >= iTest;
-
-                if (t) {
-                    NodeAVL r = x.getRight(store);
-
-                    if (r == null) {
-                        break;
-                    }
-
-                    x = r;
-                } else {
-                    NodeAVL l = x.getLeft(store);
-
-                    if (l == null) {
-                        break;
-                    }
-
-                    x = l;
-                }
-            }
-
-/*
-        while (x != null
-                && Column.compare(value, x.getData()[colIndex_0], colType_0)
-                   >= iTest) {
-            x = next(x);
+        if (node == null) {
+            return emptyIterator;
         }
-*/
-            while (x != null) {
-                Object colvalue = x.getRow(store).getData()[colIndex[0]];
-                int    result   = colTypes[0].compare(value, colvalue);
 
-                if (result >= iTest) {
-                    x = next(store, x);
-                } else {
-                    if (isEqual) {
-                        if (result != 0) {
-                            x = null;
-                        }
-                    } else if (colvalue == null) {
-                        x = next(store, x);
-
-                        continue;
-                    }
-
-                    break;
-                }
-            }
-
-// MVCC
-            if (session == null || x == null) {
-                return getIterator(session, store, x);
-            }
-
-            while (x != null) {
-                Row row = x.getRow(store);
-
-                if (compare == OpTypes.EQUAL
-                        && colTypes[0].compare(
-                            value, row.getData()[colIndex[0]]) != 0) {
-                    x = null;
-
-                    break;
-                }
-
-                if (session.database.txManager.canRead(session, row)) {
-                    break;
-                }
-
-                x = next(store, x);
-            }
-
-            return getIterator(session, store, x);
-        } finally {
-            readLock.unlock();
-        }
+        return new IndexRowIterator(session, store, this, node, 0, false,
+                                    false);
     }
 
     /**
@@ -937,59 +1237,16 @@ public class IndexAVL implements Index {
     public RowIterator findFirstRowNotNull(Session session,
                                            PersistentStore store) {
 
-        readLock.lock();
+        NodeAVL node = findNode(session, store, nullData, this.defaultColMap,
+                                1, OpTypes.NOT,
+                                TransactionManager.ACTION_READ, false);
 
-        try {
-            NodeAVL x = getAccessor(store);
-
-            while (x != null) {
-                boolean t = colTypes[0].compare(
-                    null, x.getRow(store).getData()[colIndex[0]]) >= 0;
-
-                if (t) {
-                    NodeAVL r = x.getRight(store);
-
-                    if (r == null) {
-                        break;
-                    }
-
-                    x = r;
-                } else {
-                    NodeAVL l = x.getLeft(store);
-
-                    if (l == null) {
-                        break;
-                    }
-
-                    x = l;
-                }
-            }
-
-            while (x != null) {
-                Object colvalue = x.getRow(store).getData()[colIndex[0]];
-
-                if (colvalue == null) {
-                    x = next(store, x);
-                } else {
-                    break;
-                }
-            }
-
-// MVCC
-            while (session != null && x != null) {
-                Row row = x.getRow(store);
-
-                if (session.database.txManager.canRead(session, row)) {
-                    break;
-                }
-
-                x = next(store, x);
-            }
-
-            return getIterator(session, store, x);
-        } finally {
-            readLock.unlock();
+        if (node == null) {
+            return emptyIterator;
         }
+
+        return new IndexRowIterator(session, store, this, node, 0, false,
+                                    false);
     }
 
     /**
@@ -997,9 +1254,8 @@ public class IndexAVL implements Index {
      *
      * @return Iterator for first row
      */
-    public RowIterator firstRow(Session session, PersistentStore store) {
-
-        int tempDepth = 0;
+    public RowIterator firstRow(Session session, PersistentStore store,
+                                int distinctCount) {
 
         readLock.lock();
 
@@ -1010,31 +1266,32 @@ public class IndexAVL implements Index {
             while (l != null) {
                 x = l;
                 l = x.getLeft(store);
-
-                tempDepth++;
             }
 
             while (session != null && x != null) {
                 Row row = x.getRow(store);
 
-                if (session.database.txManager.canRead(session, row)) {
+                if (session.database.txManager.canRead(
+                        session, store, row, TransactionManager.ACTION_READ,
+                        null)) {
                     break;
                 }
 
                 x = next(store, x);
             }
 
-            return getIterator(session, store, x);
-        } finally {
-            depth = tempDepth;
+            if (x == null) {
+                return emptyIterator;
+            }
 
+            return new IndexRowIterator(session, store, this, x,
+                                        distinctCount, false, false);
+        } finally {
             readLock.unlock();
         }
     }
 
     public RowIterator firstRow(PersistentStore store) {
-
-        int tempDepth = 0;
 
         readLock.lock();
 
@@ -1045,14 +1302,14 @@ public class IndexAVL implements Index {
             while (l != null) {
                 x = l;
                 l = x.getLeft(store);
-
-                tempDepth++;
             }
 
-            return getIterator(null, store, x);
-        } finally {
-            depth = tempDepth;
+            if (x == null) {
+                return emptyIterator;
+            }
 
+            return new IndexRowIterator(null, store, this, x, 0, false, false);
+        } finally {
             readLock.unlock();
         }
     }
@@ -1062,7 +1319,8 @@ public class IndexAVL implements Index {
      *
      * @return last row
      */
-    public Row lastRow(Session session, PersistentStore store) {
+    public RowIterator lastRow(Session session, PersistentStore store,
+                               int distinctCount) {
 
         readLock.lock();
 
@@ -1078,15 +1336,21 @@ public class IndexAVL implements Index {
             while (session != null && x != null) {
                 Row row = x.getRow(store);
 
-                if (session.database.txManager.canRead(session, row)) {
+                if (session.database.txManager.canRead(
+                        session, store, row, TransactionManager.ACTION_READ,
+                        null)) {
                     break;
                 }
 
                 x = last(store, x);
             }
 
-            return x == null ? null
-                             : x.getRow(store);
+            if (x == null) {
+                return emptyIterator;
+            }
+
+            return new IndexRowIterator(session, store, this, x,
+                                        distinctCount, false, true);
         } finally {
             readLock.unlock();
         }
@@ -1094,307 +1358,389 @@ public class IndexAVL implements Index {
 
     /**
      * Returns the node after the given one
-     *
-     * @param x node
-     *
-     * @return next node
      */
-    private NodeAVL next(Session session, PersistentStore store, NodeAVL x) {
+    NodeAVL next(Session session, PersistentStore store, NodeAVL x,
+                 int distinctCount) {
 
         if (x == null) {
             return null;
         }
 
-        readLock.lock();
+        if (distinctCount != 0) {
+            return findDistinctNode(session, store, x, distinctCount, false);
+        }
 
-        try {
-            while (true) {
-                x = next(store, x);
+        while (true) {
+            x = next(store, x);
 
-                if (x == null) {
-                    return x;
-                }
-
-                if (session == null) {
-                    return x;
-                }
-
-                Row row = x.getRow(store);
-
-                if (session.database.txManager.canRead(session, row)) {
-                    return x;
-                }
+            if (x == null) {
+                return x;
             }
-        } finally {
-            readLock.unlock();
+
+            if (session == null) {
+                return x;
+            }
+
+            Row row = x.getRow(store);
+
+            if (session.database.txManager.canRead(
+                    session, store, row, TransactionManager.ACTION_READ,
+                    null)) {
+                return x;
+            }
         }
     }
 
-    private NodeAVL next(PersistentStore store, NodeAVL x) {
+    NodeAVL last(Session session, PersistentStore store, NodeAVL x,
+                 int distinctCount) {
 
-        NodeAVL r = x.getRight(store);
+        if (x == null) {
+            return null;
+        }
 
-        if (r != null) {
-            x = r;
+        if (distinctCount != 0) {
+            return findDistinctNode(session, store, x, distinctCount, true);
+        }
 
-            NodeAVL l = x.getLeft(store);
+        while (true) {
+            x = last(store, x);
 
-            while (l != null) {
-                x = l;
-                l = x.getLeft(store);
+            if (x == null) {
+                return x;
+            }
+
+            if (session == null) {
+                return x;
+            }
+
+            Row row = x.getRow(store);
+
+            if (session.database.txManager.canRead(
+                    session, store, row, TransactionManager.ACTION_READ,
+                    null)) {
+                return x;
+            }
+        }
+    }
+
+    NodeAVL next(PersistentStore store, NodeAVL x) {
+
+        if (x == null) {
+            return null;
+        }
+
+        RowAVL row = x.getRow(store);
+
+        x = row.getNode(position);
+
+        NodeAVL temp = x.getRight(store);
+
+        if (temp != null) {
+            x    = temp;
+            temp = x.getLeft(store);
+
+            while (temp != null) {
+                x    = temp;
+                temp = x.getLeft(store);
             }
 
             return x;
         }
 
-        NodeAVL ch = x;
+        temp = x;
+        x    = x.getParent(store);
 
-        x = x.getParent(store);
-
-        while (x != null && ch.equals(x.getRight(store))) {
-            ch = x;
-            x  = x.getParent(store);
+        while (x != null && x.isRight(temp)) {
+            temp = x;
+            x    = x.getParent(store);
         }
 
         return x;
     }
 
-    private NodeAVL last(PersistentStore store, NodeAVL x) {
+    NodeAVL next(PersistentStore store, NodeAVL x, int depth, int maxDepth,
+                 int[] depths) {
+
+        NodeAVL temp = depth == maxDepth ? null
+                                         : x.getRight(store);
+
+        if (temp != null) {
+            depth++;
+
+            x    = temp;
+            temp = depth == maxDepth ? null
+                                     : x.getLeft(store);
+
+            while (temp != null) {
+                depth++;
+
+                x = temp;
+
+                if (depth == maxDepth) {
+                    temp = null;
+                } else {
+                    temp = x.getLeft(store);
+                }
+            }
+
+            depths[0] = depth;
+
+            return x;
+        }
+
+        temp = x;
+        x    = x.getParent(store);
+
+        depth--;
+
+        while (x != null && x.isRight(temp)) {
+            temp = x;
+            x    = x.getParent(store);
+
+            depth--;
+        }
+
+        depths[0] = depth;
+
+        return x;
+    }
+
+    NodeAVL last(PersistentStore store, NodeAVL x) {
 
         if (x == null) {
             return null;
         }
 
-        readLock.lock();
+        RowAVL row = x.getRow(store);
 
-        try {
-            NodeAVL left = x.getLeft(store);
+        x = row.getNode(position);
 
-            if (left != null) {
-                x = left;
+        NodeAVL temp = x.getLeft(store);
 
-                NodeAVL right = x.getRight(store);
+        if (temp != null) {
+            x    = temp;
+            temp = x.getRight(store);
 
-                while (right != null) {
-                    x     = right;
-                    right = x.getRight(store);
-                }
-
-                return x;
-            }
-
-            NodeAVL ch = x;
-
-            x = x.getParent(store);
-
-            while (x != null && ch.equals(x.getLeft(store))) {
-                ch = x;
-                x  = x.getParent(store);
+            while (temp != null) {
+                x    = temp;
+                temp = x.getRight(store);
             }
 
             return x;
-        } finally {
-            readLock.unlock();
         }
+
+        temp = x;
+        x    = x.getParent(store);
+
+        while (x != null && x.isLeft(temp)) {
+            temp = x;
+            x    = x.getParent(store);
+        }
+
+        return x;
     }
 
-    /**
-     * Replace x with n
-     *
-     * @param x node
-     * @param n node
-     */
-    private void replace(PersistentStore store, NodeAVL x, NodeAVL n) {
+    boolean isEqualReadable(Session session, PersistentStore store,
+                            NodeAVL node) {
 
-        if (x.isRoot()) {
-            if (n != null) {
-                n = n.setParent(store, null);
+        NodeAVL  c = node;
+        Object[] data;
+        Object[] nodeData;
+        Row      row;
+
+        row = node.getRow(store);
+
+        session.database.txManager.setTransactionInfo(store, row);
+
+        if (session.database.txManager.canRead(session, store, row,
+                                               TransactionManager.ACTION_DUP,
+                                               null)) {
+            return true;
+        }
+
+        data = node.getData(store);
+
+        while (true) {
+            c = last(store, c);
+
+            if (c == null) {
+                break;
             }
 
-            store.setAccessor(this, n);
-        } else {
-            set(store, x.getParent(store), x.isFromLeft(store), n);
-        }
-    }
+            nodeData = c.getData(store);
 
-    /**
-     * Compares two table rows based on the columns of this index. The rowColMap
-     * parameter specifies which columns of the other table are to be compared
-     * with the colIndex columns of this index. The rowColMap can cover all
-     * or only some columns of this index.
-     *
-     * @param a row from another table
-     * @param rowColMap column indexes in the other table
-     * @param b a full row in this table
-     *
-     * @return comparison result, -1,0,+1
-     */
-    public int compareRowNonUnique(Object[] a, int[] rowColMap, Object[] b) {
+            if (compareRow(session, data, nodeData) == 0) {
+                row = c.getRow(store);
 
-        int fieldcount = rowColMap.length;
+                session.database.txManager.setTransactionInfo(store, row);
 
-        for (int j = 0; j < fieldcount; j++) {
-            int i = colTypes[j].compare(a[rowColMap[j]], b[colIndex[j]]);
-
-            if (i != 0) {
-                return i;
-            }
-        }
-
-        return 0;
-    }
-
-    public int compareRowNonUnique(Object[] a, int[] rowColMap, Object[] b,
-                                   int fieldCount) {
-
-        for (int j = 0; j < fieldCount; j++) {
-            int i = colTypes[j].compare(a[rowColMap[j]], b[colIndex[j]]);
-
-            if (i != 0) {
-                return i;
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     * As above but use the index column data
-     */
-    public int compareRowNonUnique(Object[] a, Object[] b, int fieldcount) {
-
-        for (int j = 0; j < fieldcount; j++) {
-            int i = colTypes[j].compare(a[j], b[colIndex[j]]);
-
-            if (i != 0) {
-                return i;
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     * Compare two rows of the table for inserting rows into unique indexes
-     * Supports descending columns.
-     *
-     * @param newRow data
-     * @param existingRow data
-     * @return comparison result, -1,0,+1
-     */
-    private int compareRowForInsertOrDelete(Session session, Row newRow,
-            Row existingRow) {
-
-        Object[] a       = newRow.getData();
-        Object[] b       = existingRow.getData();
-        int      j       = 0;
-        boolean  hasNull = false;
-
-        for (; j < colIndex.length; j++) {
-            Object  currentvalue = a[colIndex[j]];
-            Object  othervalue   = b[colIndex[j]];
-            int     i = colTypes[j].compare(currentvalue, othervalue);
-            boolean nulls        = currentvalue == null || othervalue == null;
-
-            if (i != 0) {
-                if (colDesc[j] && !nulls) {
-                    i = -i;
+                if (session.database.txManager.canRead(
+                        session, store, row, TransactionManager.ACTION_DUP,
+                        null)) {
+                    return true;
                 }
 
-                if (nullsLast[j] && nulls) {
-                    i = -i;
+                continue;
+            }
+
+            break;
+        }
+
+        while (true) {
+            c = next(session, store, node, 0);
+
+            if (c == null) {
+                break;
+            }
+
+            nodeData = c.getData(store);
+
+            if (compareRow(session, data, nodeData) == 0) {
+                row = c.getRow(store);
+
+                session.database.txManager.setTransactionInfo(store, row);
+
+                if (session.database.txManager.canRead(
+                        session, store, row, TransactionManager.ACTION_DUP,
+                        null)) {
+                    return true;
                 }
 
-                return i;
+                continue;
             }
 
-            if (currentvalue == null) {
-                hasNull = true;
-            }
+            break;
         }
 
-        if (isUnique && !useRowId && !hasNull) {
-            if (session == null
-                    || session.database.txManager.canRead(session,
-                        existingRow)) {
-
-                //* debug 190
-//                session.database.txManager.canRead(session, existingRow);
-                return 0;
-            } else {
-                int difference = newRow.getPos() - existingRow.getPos();
-
-                return difference;
-            }
-        }
-
-        for (j = 0; j < pkCols.length; j++) {
-            Object currentvalue = a[pkCols[j]];
-            int    i = pkTypes[j].compare(currentvalue, b[pkCols[j]]);
-
-            if (i != 0) {
-                return i;
-            }
-        }
-
-        if (useRowId) {
-            int difference = newRow.getPos() - existingRow.getPos();
-
-            if (difference < 0) {
-                difference = -1;
-            } else if (difference > 0) {
-                difference = 1;
-            }
-
-            return difference;
-        }
-
-        if (session == null
-                || session.database.txManager.canRead(session, existingRow)) {
-            return 0;
-        } else {
-            int difference = newRow.getPos() - existingRow.getPos();
-
-            if (difference < 0) {
-                difference = -1;
-            } else if (difference > 0) {
-                difference = 1;
-            }
-
-            return difference;
-        }
+        return false;
     }
 
     /**
      * Finds a match with a row from a different table
      *
+     * @param session Session
+     * @param store PersistentStore
      * @param rowdata array containing data for the index columns
      * @param rowColMap map of the data to columns
-     * @param first true if the first matching node is required, false if any node
+     * @param fieldCount int
+     * @param compareType int
+     * @param readMode int
+     * @param reversed
      * @return matching node or null
      */
-    private NodeAVL findNode(Session session, PersistentStore store,
-                             Object[] rowdata, int[] rowColMap,
-                             int fieldCount) {
+    NodeAVL findNode(Session session, PersistentStore store, Object[] rowdata,
+                     int[] rowColMap, int fieldCount, int compareType,
+                     int readMode, boolean reversed) {
 
         readLock.lock();
 
         try {
-            NodeAVL x = getAccessor(store);
-            NodeAVL n;
-            NodeAVL result = null;
+            NodeAVL x          = getAccessor(store);
+            NodeAVL n          = null;
+            NodeAVL result     = null;
+            Row     currentRow = null;
+
+            if (compareType != OpTypes.EQUAL
+                    && compareType != OpTypes.IS_NULL) {
+                fieldCount--;
+
+                if (compareType == OpTypes.SMALLER
+                        || compareType == OpTypes.SMALLER_EQUAL
+                        || compareType == OpTypes.MAX) {
+                    reversed = true;
+                }
+            }
 
             while (x != null) {
-                int i = this.compareRowNonUnique(rowdata, rowColMap,
-                                                 x.getRow(store).getData(),
-                                                 fieldCount);
+                currentRow = x.getRow(store);
+
+                int i = 0;
+
+                if (fieldCount > 0) {
+                    i = compareRowNonUnique(session, currentRow.getData(),
+                                            rowdata, rowColMap, fieldCount);
+                }
 
                 if (i == 0) {
-                    result = x;
-                    n      = x.getLeft(store);
-                } else if (i > 0) {
+                    switch (compareType) {
+
+                        case OpTypes.MAX :
+                        case OpTypes.IS_NULL :
+                        case OpTypes.EQUAL : {
+                            result = x;
+
+                            if (reversed) {
+                                n = x.getRight(store);
+                            } else {
+                                n = x.getLeft(store);
+                            }
+
+                            break;
+                        }
+                        case OpTypes.NOT :
+                        case OpTypes.GREATER : {
+                            i = compareObject(session, currentRow.getData(),
+                                              rowdata, rowColMap, fieldCount,
+                                              compareType);
+
+                            if (i <= 0) {
+                                n = x.getRight(store);
+                            } else {
+                                result = x;
+                                n      = x.getLeft(store);
+                            }
+
+                            break;
+                        }
+                        case OpTypes.GREATER_EQUAL_PRE :
+                        case OpTypes.GREATER_EQUAL : {
+                            i = compareObject(session, currentRow.getData(),
+                                              rowdata, rowColMap, fieldCount,
+                                              compareType);
+
+                            if (i < 0) {
+                                n = x.getRight(store);
+                            } else {
+                                result = x;
+                                n      = x.getLeft(store);
+                            }
+
+                            break;
+                        }
+                        case OpTypes.SMALLER : {
+                            i = compareObject(session, currentRow.getData(),
+                                              rowdata, rowColMap, fieldCount,
+                                              compareType);
+
+                            if (i < 0) {
+                                result = x;
+                                n      = x.getRight(store);
+                            } else {
+                                n = x.getLeft(store);
+                            }
+
+                            break;
+                        }
+                        case OpTypes.SMALLER_EQUAL : {
+                            i = compareObject(session, currentRow.getData(),
+                                              rowdata, rowColMap, fieldCount,
+                                              compareType);
+
+                            if (i <= 0) {
+                                result = x;
+                                n      = x.getRight(store);
+                            } else {
+                                n = x.getLeft(store);
+                            }
+
+                            break;
+                        }
+                        default :
+                            Error.runtimeError(ErrorCode.U_S0500, "Index");
+                    }
+                } else if (i < 0) {
                     n = x.getRight(store);
-                } else {
+                } else if (i > 0) {
                     n = x.getLeft(store);
                 }
 
@@ -1411,20 +1757,98 @@ public class IndexAVL implements Index {
             }
 
             while (result != null) {
-                Row row = result.getRow(store);
+                currentRow = result.getRow(store);
 
-                if (compareRowNonUnique(
-                        rowdata, rowColMap, row.getData(), fieldCount) != 0) {
+                if (session.database.txManager.canRead(session, store,
+                                                       currentRow, readMode,
+                                                       colIndex)) {
+                    break;
+                }
+
+                result = reversed ? last(store, result)
+                                  : next(store, result);
+
+                if (result == null) {
+                    break;
+                }
+
+                currentRow = result.getRow(store);
+
+                if (fieldCount > 0
+                        && compareRowNonUnique(
+                            session, currentRow.getData(), rowdata, rowColMap,
+                            fieldCount) != 0) {
                     result = null;
 
                     break;
                 }
+            }
 
-                if (session.database.txManager.canRead(session, row)) {
+            return result;
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    NodeAVL findDistinctNode(Session session, PersistentStore store,
+                             NodeAVL node, int fieldCount, boolean reversed) {
+
+        readLock.lock();
+
+        try {
+            NodeAVL  x          = getAccessor(store);
+            NodeAVL  n          = null;
+            NodeAVL  result     = null;
+            Row      currentRow = null;
+            Object[] rowData    = node.getData(store);
+
+            while (x != null) {
+                currentRow = x.getRow(store);
+
+                int i = 0;
+
+                i = compareRowNonUnique(session, currentRow.getData(),
+                                        rowData, colIndex, fieldCount);
+
+                if (reversed) {
+                    if (i < 0) {
+                        result = x;
+                        n      = x.getRight(store);
+                    } else {
+                        n = x.getLeft(store);
+                    }
+                } else {
+                    if (i <= 0) {
+                        n = x.getRight(store);
+                    } else {
+                        result = x;
+                        n      = x.getLeft(store);
+                    }
+                }
+
+                if (n == null) {
                     break;
                 }
 
-                result = next(store, result);
+                x = n;
+            }
+
+            // MVCC 190
+            if (session == null) {
+                return result;
+            }
+
+            while (result != null) {
+                currentRow = result.getRow(store);
+
+                if (session.database.txManager.canRead(
+                        session, store, currentRow,
+                        TransactionManager.ACTION_READ, colIndex)) {
+                    break;
+                }
+
+                result = reversed ? last(store, result)
+                                  : next(store, result);
             }
 
             return result;
@@ -1436,13 +1860,13 @@ public class IndexAVL implements Index {
     /**
      * Balances part of the tree after an alteration to the index.
      */
-    private void balance(PersistentStore store, NodeAVL x, boolean isleft) {
+    void balance(PersistentStore store, NodeAVL x, boolean isleft) {
 
         while (true) {
             int sign = isleft ? 1
                               : -1;
 
-            switch (x.getBalance() * sign) {
+            switch (x.getBalance(store) * sign) {
 
                 case 1 :
                     x = x.setBalance(store, 0);
@@ -1454,26 +1878,26 @@ public class IndexAVL implements Index {
                     break;
 
                 case -1 :
-                    NodeAVL l = child(store, x, isleft);
+                    NodeAVL l = x.child(store, isleft);
 
-                    if (l.getBalance() == -sign) {
-                        replace(store, x, l);
+                    if (l.getBalance(store) == -sign) {
+                        x.replace(store, this, l);
 
-                        x = set(store, x, isleft, child(store, l, !isleft));
-                        l = set(store, l, !isleft, x);
+                        x = x.set(store, isleft, l.child(store, !isleft));
+                        l = l.set(store, !isleft, x);
                         x = x.setBalance(store, 0);
                         l = l.setBalance(store, 0);
                     } else {
-                        NodeAVL r = child(store, l, !isleft);
+                        NodeAVL r = l.child(store, !isleft);
 
-                        replace(store, x, r);
+                        x.replace(store, this, r);
 
-                        l = set(store, l, !isleft, child(store, r, isleft));
-                        r = set(store, r, isleft, l);
-                        x = set(store, x, isleft, child(store, r, !isleft));
-                        r = set(store, r, !isleft, x);
+                        l = l.set(store, !isleft, r.child(store, isleft));
+                        r = r.set(store, isleft, l);
+                        x = x.set(store, isleft, r.child(store, !isleft));
+                        r = r.set(store, !isleft, x);
 
-                        int rb = r.getBalance();
+                        int rb = r.getBalance(store);
 
                         x = x.setBalance(store, (rb == -sign) ? sign
                                                               : 0);
@@ -1485,7 +1909,7 @@ public class IndexAVL implements Index {
                     return;
             }
 
-            if (x.isRoot()) {
+            if (x.isRoot(store)) {
                 return;
             }
 
@@ -1494,21 +1918,21 @@ public class IndexAVL implements Index {
         }
     }
 
-    private NodeAVL getAccessor(PersistentStore store) {
+    NodeAVL getAccessor(PersistentStore store) {
 
         NodeAVL node = (NodeAVL) store.getAccessor(this);
 
         return node;
     }
 
-    private IndexRowIterator getIterator(Session session,
-                                         PersistentStore store, NodeAVL x) {
+    IndexRowIterator getIterator(Session session, PersistentStore store,
+                                 NodeAVL x, boolean single, boolean reversed) {
 
         if (x == null) {
             return emptyIterator;
         } else {
             IndexRowIterator it = new IndexRowIterator(session, store, this,
-                x);
+                x, 0, single, reversed);
 
             return it;
         }
@@ -1521,20 +1945,24 @@ public class IndexAVL implements Index {
         final IndexAVL        index;
         NodeAVL               nextnode;
         Row                   lastrow;
-        IndexRowIterator      last;
-        IndexRowIterator      next;
-        IndexRowIterator      lastInSession;
-        IndexRowIterator      nextInSession;
+        int                   distinctCount;
+        boolean               single;
+        boolean               reversed;
 
         /**
          * When session == null, rows from all sessions are returned
          */
         public IndexRowIterator(Session session, PersistentStore store,
-                                IndexAVL index, NodeAVL node) {
+                                IndexAVL index, NodeAVL node,
+                                int distinctCount, boolean single,
+                                boolean reversed) {
 
-            this.session = session;
-            this.store   = store;
-            this.index   = index;
+            this.session       = session;
+            this.store         = store;
+            this.index         = index;
+            this.distinctCount = distinctCount;
+            this.single        = single;
+            this.reversed      = reversed;
 
             if (index == null) {
                 return;
@@ -1555,18 +1983,44 @@ public class IndexAVL implements Index {
                 return null;
             }
 
-            lastrow  = nextnode.getRow(store);
-            nextnode = index.next(session, store, nextnode);
+            NodeAVL lastnode = nextnode;
 
-            if (nextnode == null) {
-                release();
+            if (single) {
+                nextnode = null;
+            } else {
+                index.readLock.lock();
+                store.writeLock();
+
+                try {
+                    if (reversed) {
+                        nextnode = index.last(session, store, nextnode,
+                                              distinctCount);
+                    } else {
+                        nextnode = index.next(session, store, nextnode,
+                                              distinctCount);
+                    }
+                } finally {
+                    store.writeUnlock();
+                    index.readLock.unlock();
+                }
             }
+
+            lastrow = lastnode.getRow(store);
 
             return lastrow;
         }
 
-        public void remove() {
-            store.delete(lastrow);
+        public Object[] getNext() {
+
+            Row row = getNextRow();
+
+            return row == null ? null
+                               : row.getData();
+        }
+
+        public void removeCurrent() {
+            store.delete(session, lastrow);
+            store.remove(lastrow);
         }
 
         public void release() {}
@@ -1575,7 +2029,7 @@ public class IndexAVL implements Index {
             return false;
         }
 
-        public long getPos() {
+        public long getRowId() {
             return nextnode.getPos();
         }
     }

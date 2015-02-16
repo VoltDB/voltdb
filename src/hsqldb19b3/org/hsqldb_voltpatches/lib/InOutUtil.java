@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,16 +36,20 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.Serializable;
+import java.io.Writer;
 
 /**
  * Input / Output utility
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.8.0
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
+ * @version 2.1
+ * @revised 1.8.0
  * @since 1.7.2
  */
-public class InOutUtil {
+public final class InOutUtil {
 
     /**
      * Implementation only supports unix line-end format and is suitable for
@@ -107,5 +111,149 @@ public class InOutUtil {
         ObjectInputStream        is = new ObjectInputStream(bi);
 
         return (Serializable) is.readObject();
+    }
+
+
+    public static final int DEFAULT_COPY_BUFFER_SIZE = 8192;
+    public static final long DEFAULT_COPY_AMOUNT = Long.MAX_VALUE;
+
+    /**
+     * @see #copy(java.io.InputStream, java.io.OutputStream, long, int)
+     */
+    public static long copy(
+            final InputStream inputStream,
+            final OutputStream outputStream) throws IOException {
+        return copy(inputStream, outputStream,
+                DEFAULT_COPY_AMOUNT,
+                DEFAULT_COPY_BUFFER_SIZE);
+    }
+
+    /**
+     * @see #copy(java.io.InputStream, java.io.OutputStream, long, int)
+     */
+    public static long copy(
+            final InputStream inputStream,
+            final OutputStream outputStream,
+            final long amount) throws IOException {
+        return copy(inputStream, outputStream, amount,
+                DEFAULT_COPY_BUFFER_SIZE);
+    }
+    
+    /**
+     * the specified <tt>amount</tt> from the given input stream to the
+     * given output stream, using a buffer of the given size.
+     *
+     * @param inputStream from which to source bytes
+     * @param outputStream to which to sink bytes
+     * @param amount max # of bytes to transfer.
+     * @param bufferSize to use internally
+     * @return the number of bytes <i>actually</i> transfered.
+     * @throws IOException if any, thrown by either of the given stream objects
+     */
+    public static long copy(
+            final InputStream inputStream,
+            final OutputStream outputStream,
+            final long amount,
+            final int bufferSize) throws IOException {
+        //
+        int maxBytesToRead = (int) Math.min((long) bufferSize, amount);
+        //
+        final byte[] buffer = new byte[maxBytesToRead];
+        //
+        long bytesCopied = 0;
+        int bytesRead;        
+
+        while ((bytesCopied < amount) && -1 != (bytesRead =
+                inputStream.read(buffer, 0, maxBytesToRead))) {
+            //
+            outputStream.write(buffer, 0, bytesRead);
+
+            if (bytesRead > Long.MAX_VALUE - bytesCopied) {
+                // edge case...
+                // extremely unlikely but included for 'correctness'
+                bytesCopied = Long.MAX_VALUE;
+            } else {
+                bytesCopied += bytesRead;
+            }
+
+            if (bytesCopied >= amount) {
+                return bytesCopied;
+            }
+
+            maxBytesToRead = (int) Math.min((long) bufferSize,
+                    amount - bytesCopied);
+        }
+
+        return bytesCopied;
+    }
+
+    /**
+     * @see #copy(java.io.Reader, java.io.Writer, long, int)
+     */
+    public static long copy(
+            final Reader reader,
+            final Writer writer) throws IOException {
+        return copy(reader, writer,
+                DEFAULT_COPY_AMOUNT,
+                DEFAULT_COPY_BUFFER_SIZE);
+    }
+
+    /**
+     * @see #copy(java.io.Reader, java.io.Writer, long, int)
+     */
+    public static long copy(
+            final Reader reader,
+            final Writer writer,
+            final long amount) throws IOException {
+        return copy(reader, writer, amount,
+                DEFAULT_COPY_BUFFER_SIZE);
+    }
+
+    /**
+     * the specified <tt>amount</tt> from the given input stream to the
+     * given output stream, using a buffer of the given size.
+     *
+     * @param reader from which to source characters
+     * @param writer to which to sink characters
+     * @param amount max # of characters to transfer.
+     * @param bufferSize to use internally
+     * @return the number of characters <i>actually</i> transfered.
+     * @throws IOException if any, thrown by either of the given stream objects
+     */
+    public static long copy(
+            final Reader reader,
+            final Writer writer,
+            final long amount,
+            final int bufferSize) throws IOException {
+        //
+        int maxCharsToRead = (int) Math.min((long) bufferSize, amount);
+        //
+        final char[] buffer = new char[maxCharsToRead];
+        //
+        long charsCopied = 0;
+        int charsRead;        
+
+        while ((charsCopied < amount) && -1 != (charsRead =
+                reader.read(buffer, 0, maxCharsToRead))) {
+            //
+            writer.write(buffer, 0, charsRead);
+
+            if (charsRead > Long.MAX_VALUE - charsCopied) {
+                // edge case...
+                // extremely unlikely but included for 'correctness'
+                charsCopied = Long.MAX_VALUE;
+            } else {
+                charsCopied += charsRead;
+            }
+
+            if (charsCopied >= amount) {
+                return charsCopied;
+            }
+
+            maxCharsToRead = (int) Math.min((long) bufferSize,
+                    amount - charsCopied);
+        }
+
+        return charsCopied;
     }
 }

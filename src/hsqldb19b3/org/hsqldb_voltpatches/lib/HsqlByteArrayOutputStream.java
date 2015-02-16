@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.UTFDataFormatException;
 import java.io.UnsupportedEncodingException;
 
@@ -44,7 +45,7 @@ import java.io.UnsupportedEncodingException;
  * (without synchronization) and java.io.DataOutputStream
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.0
  */
 public class HsqlByteArrayOutputStream extends java.io.OutputStream
@@ -80,21 +81,29 @@ implements DataOutput {
 
         buffer = new byte[length];
 
-        for (int left = length; left > 0; ) {
-            int read = input.read(buffer, count, left);
+        int used = write(input, length);
+
+        if (used != length) {
+            throw new EOFException();
+        }
+    }
+
+    public HsqlByteArrayOutputStream(InputStream input) throws IOException {
+
+        buffer = new byte[128];
+
+        for (;;) {
+            int read = input.read(buffer, count, buffer.length - count);
 
             if (read == -1) {
-                if (left > 0) {
-                    input.close();
-
-                    throw new EOFException();
-                }
-
                 break;
             }
 
-            left  -= read;
             count += read;
+
+            if (count == buffer.length) {
+                ensureRoom(128);
+            }
         }
     }
 
@@ -222,10 +231,6 @@ implements DataOutput {
         buffer[count++] = (byte) b;
     }
 
-    public void writeNoCheck(int b) {
-        buffer[count++] = (byte) b;
-    }
-
     public void write(byte[] b) {
         write(b, 0, b.length);
     }
@@ -236,6 +241,72 @@ implements DataOutput {
         System.arraycopy(b, off, buffer, count, len);
 
         count += len;
+    }
+
+    public String toString() {
+        return new String(buffer, 0, count);
+    }
+
+    public void close() throws IOException {}
+
+    // additional public methods not in similar java.util classes
+    public void writeNoCheck(int b) {
+        buffer[count++] = (byte) b;
+    }
+
+    public void writeChars(char[] charArray) {
+
+        int len = charArray.length;
+
+        ensureRoom(len * 2);
+
+        for (int i = 0; i < len; i++) {
+            int v = charArray[i];
+
+            buffer[count++] = (byte) (v >>> 8);
+            buffer[count++] = (byte) v;
+        }
+    }
+
+    public int write(InputStream input, int countLimit) throws IOException {
+
+        int left = countLimit;
+
+        ensureRoom(countLimit);
+
+        while (left > 0) {
+            int read = input.read(buffer, count, left);
+
+            if (read == -1) {
+                break;
+            }
+
+            left  -= read;
+            count += read;
+        }
+
+        return countLimit - left;
+    }
+
+    public int write(Reader input, int countLimit) throws IOException {
+
+        int left = countLimit;
+
+        ensureRoom(countLimit * 2);
+
+        while (left > 0) {
+            int c = input.read();
+
+            if (c == -1) {
+                break;
+            }
+
+            writeChar(c);
+
+            left--;
+        }
+
+        return countLimit - left;
     }
 
     public void writeTo(OutputStream out) throws IOException {
@@ -268,17 +339,10 @@ implements DataOutput {
         count = newPos;
     }
 
-    public String toString() {
-        return new String(buffer, 0, count);
-    }
-
     public String toString(String enc) throws UnsupportedEncodingException {
         return new String(buffer, 0, count, enc);
     }
 
-    public void close() throws IOException {}
-
-    // additional public methods not in similar java.util classes
     public void write(char[] c, int off, int len) {
 
         ensureRoom(len * 2);
@@ -302,11 +366,6 @@ implements DataOutput {
 
     public byte[] getBuffer() {
         return this.buffer;
-    }
-
-    public void setBuffer(byte[] buffer) {
-        count       = 0;
-        this.buffer = buffer;
     }
 
     public void ensureRoom(int extra) {
@@ -339,5 +398,14 @@ implements DataOutput {
     public void reset(byte[] buffer) {
         count       = 0;
         this.buffer = buffer;
+    }
+
+    public void setSize(int size) {
+
+        if (size > buffer.length) {
+            reset(size);
+        }
+
+        count = size;
     }
 }

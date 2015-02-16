@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,50 +31,73 @@
 
 package org.hsqldb_voltpatches.jdbc.pool;
 
-import javax.sql.ConnectionEventListener;
-import javax.sql.PooledConnection;
-
 import java.sql.Connection;
 import java.sql.SQLException;
+
+import javax.sql.ConnectionEvent;
+import javax.sql.ConnectionEventListener;
+import javax.sql.PooledConnection;
 
 //#ifdef JAVA6
 import javax.sql.StatementEventListener;
 
 //#endif JAVA6
-// boucherb@users 20051207 - patch 1.8.0.x initial JDBC 4.0 support work
+import org.hsqldb_voltpatches.jdbc.JDBCConnection;
+import org.hsqldb_voltpatches.jdbc.JDBCConnectionEventListener;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 /**
- * @author Jakob Jenkov
+ * An implementations of {@link javax.sql.PooledConnection PooledConnection}
+ * for use by connection pooling software.<p>
+ * The class maintains a lifetime connection to the database. The
+ * getConnection() method establishes a lease on the lifetime connection
+ * and returns a special JDBCConnection (userConnection) that is
+ * valid until it is closed.<p>
+ *
+ * This class uses a dedicated HyperSQL method to guarantee each lease on the
+ * connection starts with the original state of the connection.<p>
+ *
+ * The ConnectionEventLister objects that have been registered with this
+ * PooledConnection are notified when each lease expires, or an unrecoverable
+ * error occurs on the connection to the database.<p>
+ *
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ * @version 2.0.1
+ * @since JDK 1.2, HSQLDB 2.0
  */
-public class JDBCPooledConnection implements PooledConnection {
+public class JDBCPooledConnection
+implements PooledConnection, JDBCConnectionEventListener {
 
-    private LifeTimeConnectionWrapper connectionWrapper = null;
+    synchronized public Connection getConnection() throws SQLException {
 
-    public JDBCPooledConnection(LifeTimeConnectionWrapper connectionWrapper) {
-        this.connectionWrapper = connectionWrapper;
+        if (isInUse) {
+            throw new SQLException("Connection in use");
+        }
+
+        isInUse = true;
+
+        userConnection = new JDBCConnection(connection, this);
+
+        return userConnection;
     }
 
     public void close() throws SQLException {
 
-        connectionWrapper.closePhysically();
+        if (connection != null) {
+            connection.closeFully();
 
-        this.connectionWrapper = null;
-    }
-
-    public Connection getConnection() throws SQLException {
-        return this.connectionWrapper;
+            this.connection = null;
+        }
     }
 
     public void addConnectionEventListener(ConnectionEventListener listener) {
-        this.connectionWrapper.addConnectionEventListener(listener);
+        listeners.add(listener);
     }
 
     public void removeConnectionEventListener(
             ConnectionEventListener listener) {
-        this.connectionWrapper.removeConnectionEventListener(listener);
+        listeners.remove(listener);
     }
-
-/** @todo - implement methods */
 
 //#ifdef JAVA6
     public void addStatementEventListener(StatementEventListener listener) {}
@@ -83,4 +106,103 @@ public class JDBCPooledConnection implements PooledConnection {
             StatementEventListener listener) {}
 
 //#endif JAVA6
+    // ------------------------ internal implementation ------------------------
+    synchronized public void connectionClosed() {
+
+        ConnectionEvent event = new ConnectionEvent(this);
+
+        userConnection = null;
+
+        reset();
+
+        for (int i = 0; i < listeners.size(); i++) {
+            ConnectionEventListener connectionEventListener =
+                (ConnectionEventListener) listeners.get(i);
+
+            connectionEventListener.connectionClosed(event);
+        }
+    }
+
+    synchronized public void connectionErrorOccured(SQLException e) {
+
+        ConnectionEvent event = new ConnectionEvent(this, e);
+
+        reset();
+
+        for (int i = 0; i < listeners.size(); i++) {
+            ConnectionEventListener connectionEventListener =
+                (ConnectionEventListener) listeners.get(i);
+
+            connectionEventListener.connectionErrorOccurred(event);
+        }
+    }
+
+    /**
+     * Returns true if getConnection() has been called and a leas has been
+     * given.
+     */
+    synchronized public boolean isInUse() {
+        return isInUse;
+    }
+
+    /**
+     * Force close the userConnection, no close event is fired.
+     */
+    synchronized public void reset() {
+
+        if (userConnection != null) {
+
+            // userConnection is already closed in normal use
+            try {
+                userConnection.close();
+            } catch (SQLException e) {
+
+                // check connection problems
+            }
+        }
+
+        try {
+            connection.reset();
+        } catch (SQLException e) {
+
+            // check connection problems
+        }
+
+        isInUse = false;
+    }
+
+    /**
+     * Force close the userConnection, and connection, no close event is fired.
+     */
+    synchronized public void release() {
+
+        if (userConnection != null) {
+
+            // userConnection is already closed in normal use
+            try {
+                userConnection.close();
+            } catch (SQLException e) {
+
+                // check connection problems
+            }
+        }
+
+        try {
+            connection.close();
+        } catch (SQLException e) {
+
+            // check connection problems
+        }
+
+        isInUse = false;
+    }
+
+    protected OrderedHashSet listeners = new OrderedHashSet();
+    protected JDBCConnection connection;
+    protected JDBCConnection userConnection;
+    protected boolean        isInUse;
+
+    public JDBCPooledConnection(JDBCConnection connection) {
+        this.connection = connection;
+    }
 }

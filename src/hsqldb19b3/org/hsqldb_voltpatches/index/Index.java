@@ -1,39 +1,4 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the Hypersonic SQL Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE HYPERSONIC SQL GROUP,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * This software consists of voluntary contributions made by many individuals
- * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -69,53 +34,76 @@ package org.hsqldb_voltpatches.index;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
+import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.types.Type;
 
+/**
+ *
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ * @version 2.2.9
+ * @since 1.9.0
+ */
 public interface Index extends SchemaObject {
 
-    Index[] emptyArray = new Index[]{};
+    int INDEX_NONE       = 0;
+    int INDEX_NON_UNIQUE = 1;
+    int INDEX_UNIQUE     = 2;
+
+    //
+    double minimumSelectivity = 16;
+    double cachedFactor       = 8;
+    int    probeDepth         = 4;
+
+    //
+    Index[]    emptyArray    = new Index[]{};
+    IndexUse[] emptyUseArray = new IndexUse[]{};
+
+    IndexUse[] asArray();
 
     RowIterator emptyIterator();
 
-    public int getPosition();
+    int getPosition();
 
-    public void setPosition(int position);
+    void setPosition(int position);
 
-    public long getPersistenceId();
+    long getPersistenceId();
 
     /**
      * Returns the count of visible columns used
      */
-    public int getVisibleColumns();
-
-    public int getColumnCount();
+    int getColumnCount();
 
     /**
      * Is this a UNIQUE index?
      */
-    public boolean isUnique();
+    boolean isUnique();
 
     /**
      * Does this index belong to a constraint?
      */
-    public boolean isConstraint();
+    boolean isConstraint();
 
     /**
      * Returns the array containing column indexes for index
      */
-    public int[] getColumns();
+    int[] getColumns();
 
     /**
      * Returns the array containing column indexes for index
      */
-    public Type[] getColumnTypes();
+    Type[] getColumnTypes();
 
     /**
      * Returns the count of visible columns used
      */
-    public boolean[] getColumnDesc();
+    boolean[] getColumnDesc();
+
+    /**
+     * Returns the array containing 0, 1, .. column indexes
+     */
+    int[] getDefaultColumnMap();
 
     /**
      * Returns a value indicating the order of different types of index in
@@ -135,32 +123,40 @@ public interface Index extends SchemaObject {
      *
      * @return ordinal value
      */
-    public int getIndexOrderValue();
+    int getIndexOrderValue();
 
-    public boolean isForward();
+    boolean isForward();
+
+    void setTable(TableBase table);
+
+    void setClustered(boolean clustered);
+
+    boolean isClustered();
 
     /**
      * Returns the node count.
      */
-    public int size(PersistentStore store);
+    long size(Session session, PersistentStore store);
 
-    public int sizeEstimate(PersistentStore store);
+    long sizeUnique(PersistentStore store);
 
-    public boolean isEmpty(PersistentStore store);
+    double[] searchCost(Session session, PersistentStore store);
 
-    public void checkIndex(PersistentStore store);
+    long getNodeCount(Session session, PersistentStore store);
+
+    boolean isEmpty(PersistentStore store);
+
+    void checkIndex(PersistentStore store);
 
     /**
      * Insert a node into the index
      */
-    public void insert(Session session, PersistentStore store,
-                       Row row);
+    void insert(Session session, PersistentStore store, Row row);
 
-    public void delete(PersistentStore store, Row row);
+    void delete(Session session, PersistentStore store, Row row);
 
-    public boolean exists(Session session, PersistentStore store,
-                          Object[] rowdata,
-                          int[] rowColMap);
+    boolean existsParent(Session session, PersistentStore store,
+                         Object[] rowdata, int[] rowColMap);
 
     /**
      * Return the first node equal to the indexdata object. The rowdata has
@@ -168,13 +164,13 @@ public interface Index extends SchemaObject {
      *
      * @param session session object
      * @param store store object
-     * @param coldata array containing index column data
-     * @param match count of columns to match
+     * @param matchCount count of columns to match
      * @return iterator
      */
-    public RowIterator findFirstRow(Session session, PersistentStore store,
-                                    Object[] rowdata,
-                                    int match);
+    RowIterator findFirstRow(Session session, PersistentStore store,
+                             Object[] rowdata, int matchCount,
+                             int distinctCount, int compareType,
+                             boolean reversed, boolean[] map);
 
     /**
      * Return the first node equal to the rowdata object.
@@ -185,8 +181,8 @@ public interface Index extends SchemaObject {
      * @param rowdata array containing table row data
      * @return iterator
      */
-    public RowIterator findFirstRow(Session session, PersistentStore store,
-                                    Object[] rowdata);
+    RowIterator findFirstRow(Session session, PersistentStore store,
+                             Object[] rowdata);
 
     /**
      * Return the first node equal to the rowdata object.
@@ -197,51 +193,33 @@ public interface Index extends SchemaObject {
      * @param rowdata array containing table row data
      * @return iterator
      */
-    public RowIterator findFirstRow(Session session, PersistentStore store,
-                                    Object[] rowdata,
-                                    int[] rowColMap);
-
-    /**
-     * Finds the first node that is larger or equal to the given one based
-     * on the first column of the index only.
-     *
-     * @param session session object
-     * @param store store object
-     * @param value value to match
-     * @param compare comparison Expression type
-     *
-     * @return iterator
-     */
-    public RowIterator findFirstRow(Session session, PersistentStore store,
-                                    Object value,
-                                    int compare);
+    RowIterator findFirstRow(Session session, PersistentStore store,
+                             Object[] rowdata, int[] rowColMap);
 
     /**
      * Finds the first node where the data is not null.
      *
      * @return iterator
      */
-    public RowIterator findFirstRowNotNull(Session session,
-                                           PersistentStore store)
-                                          ;
+    RowIterator findFirstRowNotNull(Session session, PersistentStore store);
 
-    public RowIterator firstRow(PersistentStore store);
+    RowIterator firstRow(PersistentStore store);
 
     /**
      * Returns the row for the first node of the index
      *
      * @return Iterator for first row
      */
-    public RowIterator firstRow(Session session,
-                                PersistentStore store);
+    RowIterator firstRow(Session session, PersistentStore store,
+                         int distinctCount);
 
     /**
      * Returns the row for the last node of the index
      *
      * @return last row
      */
-    public Row lastRow(Session session,
-                       PersistentStore store);
+    RowIterator lastRow(Session session, PersistentStore store,
+                        int distinctCount);
 
     /**
      * Compares two table rows based on the columns of this index. The rowColMap
@@ -255,18 +233,30 @@ public interface Index extends SchemaObject {
      *
      * @return comparison result, -1,0,+1
      */
-    public int compareRowNonUnique(Object[] a, int[] rowColMap,
-                                   Object[] b);
+    int compareRowNonUnique(Session session, Object[] a, Object[] b,
+                            int[] rowColMap);
 
-    public int compareRowNonUnique(Object[] a, int[] rowColMap, Object[] b,
-                                   int fieldCount);
+    int compareRowNonUnique(Session session, Object[] a, Object[] b,
+                            int[] rowColMap, int fieldCount);
 
     /**
      * As above but use the index column data
      */
-    public int compareRowNonUnique(Object[] a, Object[] b,
-                                   int fieldcount);
+    int compareRowNonUnique(Session session, Object[] a, Object[] b,
+                            int fieldcount);
 
+    int compareRow(Session session, Object[] a, Object[] b);
+
+    class IndexUse {
+
+        public Index index;
+        public int   columnCount;
+
+        public IndexUse(Index index, int columnCount) {
+            this.index       = index;
+            this.columnCount = columnCount;
+        }
+    }
     /************************* Volt DB Extensions *************************/
 
     /**

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  * @author Fred Toussi (fredt@users dot sourceforge.net)
@@ -94,7 +94,11 @@ public class OrderedIntHashSet extends BaseHashMap {
         return intKeyTable[index];
     }
 
-    public int getOrderedMatchCount(int[] array) {
+    public int getIndex(int value) {
+        return getLookup(value);
+    }
+
+    public int getStartMatchCount(int[] array) {
 
         int i = 0;
 
@@ -105,6 +109,31 @@ public class OrderedIntHashSet extends BaseHashMap {
         }
 
         return i;
+    }
+
+    public int getOrderedStartMatchCount(int[] array) {
+
+        int i = 0;
+
+        for (; i < array.length; i++) {
+            if (i >= size() || get(i) != array[i]) {
+                break;
+            }
+        }
+
+        return i;
+    }
+
+    public boolean addAll(Collection col) {
+
+        int      oldSize = size();
+        Iterator it      = col.iterator();
+
+        while (it.hasNext()) {
+            add(it.nextInt());
+        }
+
+        return oldSize != size();
     }
 
     public int[] toArray() {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,29 +31,26 @@
 
 package org.hsqldb_voltpatches.types;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlException;
+import org.hsqldb_voltpatches.OpTypes;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.lib.StringConverter;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.jdbc.JDBCClobClient;
 
 /**
- * Type subclass CLOB data.<p>
+ * Type object for CLOB.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public final class ClobType extends CharacterType {
 
-    static final long maxClobPrecision = 1024L * 1024 * 1024 * 1024;
-    static final int  defaultClobSize  = 1024 * 1024 * 16;
-
-    public ClobType() {
-        super(Types.SQL_CLOB, defaultClobSize);
-    }
+    public static final long maxClobPrecision     = 1024L * 1024 * 1024 * 1024;
+    public static final int  defaultClobSize      = 1024 * 1024 * 1024;
+    public static final int  defaultShortClobSize = 16 * 1024 * 1024;
 
     public ClobType(long precision) {
         super(Types.SQL_CLOB, precision);
@@ -66,6 +63,10 @@ public final class ClobType extends CharacterType {
 
     public int getJDBCTypeCode() {
         return Types.CLOB;
+    }
+
+    public Class getJDBCClass() {
+        return java.sql.Clob.class;
     }
 
     public String getJDBCClassName() {
@@ -109,12 +110,20 @@ public final class ClobType extends CharacterType {
         return sb.toString();
     }
 
+    public long getMaxPrecision() {
+        return maxClobPrecision;
+    }
+
     public boolean isLobType() {
         return true;
     }
 
-    /** @todo implement comparison */
-    public int compare(Object a, Object b) {
+    /** @todo - collation comparison */
+    public int compare(Session session, Object a, Object b) {
+        return compare(session, a, b, OpTypes.EQUAL);
+    }
+
+    public int compare(Session session, Object a, Object b, int opType) {
 
         if (a == b) {
             return 0;
@@ -128,12 +137,13 @@ public final class ClobType extends CharacterType {
             return 1;
         }
 
-        long aId = ((ClobData) a).getId();
-        long bId = ((ClobData) b).getId();
+        if (b instanceof String) {
+            return session.database.lobManager.compare(collation,
+                    (ClobData) a, (String) b);
+        }
 
-        return (aId > bId) ? 1
-                           : (bId > aId ? -1
-                                        : 0);
+        return session.database.lobManager.compare(collation, (ClobData) a,
+                (ClobData) b);
     }
 
     public Object convertToDefaultType(SessionInterface session, Object a) {
@@ -163,18 +173,44 @@ public final class ClobType extends CharacterType {
             return null;
         }
 
-        return ((ClobData) a).toString();
+        return Long.toString(((ClobData) a).getId());
     }
 
     public String convertToSQLString(Object a) {
 
         if (a == null) {
-            return "NULL";
+            return Tokens.T_NULL;
         }
 
-        String s = convertToString(a);
+        return convertToString(a);
+    }
 
-        return StringConverter.toQuotedString(s, '\'', true);
+    public Object convertJavaToSQL(SessionInterface session, Object a) {
+
+        if (a == null) {
+            return null;
+        }
+
+        if (a instanceof JDBCClobClient) {
+            return ((JDBCClobClient) a).getClob();
+        }
+
+        throw Error.error(ErrorCode.X_42561);
+    }
+
+    public Object convertSQLToJava(SessionInterface session, Object a) {
+
+        if (a == null) {
+            return null;
+        }
+
+        if (a instanceof ClobDataID) {
+            ClobDataID clob = (ClobDataID) a;
+
+            return new JDBCClobClient(session, clob);
+        }
+
+        throw Error.error(ErrorCode.X_42561);
     }
 
     public long position(SessionInterface session, Object data,

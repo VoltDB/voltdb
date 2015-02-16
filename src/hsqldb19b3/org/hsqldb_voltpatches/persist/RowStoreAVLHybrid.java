@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +33,6 @@ package org.hsqldb_voltpatches.persist;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.RowAVL;
@@ -42,111 +40,100 @@ import org.hsqldb_voltpatches.RowAVLDisk;
 import org.hsqldb_voltpatches.RowAction;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.TableBase;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.index.Index;
+import org.hsqldb_voltpatches.index.IndexAVL;
+import org.hsqldb_voltpatches.index.NodeAVL;
+import org.hsqldb_voltpatches.index.NodeAVLDisk;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
-import org.hsqldb_voltpatches.lib.IntKeyHashMapConcurrent;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
-import org.hsqldb_voltpatches.Table;
 
 /*
- * Implementation of PersistentStore for result set and temporary tables.
+ * Implementation of PersistentStore for result sets.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class RowStoreAVLHybrid extends RowStoreAVL implements PersistentStore {
 
-    TableBase                       table;
-    final Session                   session;
-    DataFileCacheSession            cache;
-    private int                     maxMemoryRowCount;
-    private int                     memoryRowCount;
-    private boolean                 useCache;
-    private boolean                 isCached;
-    private final boolean           isTempTable;
-    private IntKeyHashMapConcurrent rowIdMap;
-    int                             rowIdSequence = 0;
+    DataFileCache   cache;
+    private int     maxMemoryRowCount;
+    private boolean useDisk;
+    boolean         isCached;
+    int             rowIdSequence = 0;
 
     public RowStoreAVLHybrid(Session session,
                              PersistentStoreCollection manager,
-                             TableBase table, boolean useCache) {
+                             TableBase table, boolean diskBased) {
 
-        this.session           = session;
         this.manager           = manager;
         this.table             = table;
         this.maxMemoryRowCount = session.getResultMemoryRowCount();
-        this.rowIdMap          = new IntKeyHashMapConcurrent();
-        this.useCache          = useCache;
-        this.isTempTable       = table.getTableType() == TableBase.TEMP_TABLE;
+        this.useDisk           = diskBased;
 
-        if (table.getTableType() == TableBase.RESULT_TABLE) {
-            timestamp = session.getActionTimestamp();
+        if (maxMemoryRowCount == 0) {
+            this.useDisk = false;
         }
 
-// temp code to force use of cache
+        if (table.getTableType() == TableBase.RESULT_TABLE) {
+            setTimestamp(session.getActionTimestamp());
+        }
+
+// test code to force use of cache
 /*
-        if (useCache) {
-            cache = session.sessionData.getResultCache();
-
-            if (cache != null) {
-                isCached = useCache;
-
-                cache.storeCount++;
-            }
+        if (diskBased) {
+            this.maxMemoryRowCount = 0;
+            this.useDisk           = true;
         }
 */
 
 //
-        resetAccessorKeys(table.getIndexList());
+        resetAccessorKeys(session, table.getIndexList());
         manager.setStore(table, this);
+
+        nullsList = new boolean[table.getColumnCount()];
     }
 
     public boolean isMemory() {
         return !isCached;
     }
 
-    public int getAccessCount() {
+    public void setMemory(boolean mode) {
+        useDisk = !mode;
+    }
+
+    public synchronized int getAccessCount() {
         return isCached ? cache.getAccessCount()
                         : 0;
     }
 
     public void set(CachedObject object) {}
 
-    public CachedObject get(int i) {
+    public CachedObject get(long i) {
 
         try {
             if (isCached) {
                 return cache.get(i, this, false);
             } else {
-                return (CachedObject) rowIdMap.get(i);
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "RowStoreAVLHybrid");
             }
         } catch (HsqlException e) {
             return null;
         }
     }
 
-    public CachedObject getKeep(int i) {
-
-        try {
-            if (isCached) {
-                return cache.get(i, this, true);
-            } else {
-                return (CachedObject) rowIdMap.get(i);
-            }
-        } catch (HsqlException e) {
-            return null;
-        }
-    }
-
-    public CachedObject get(int i, boolean keep) {
+    public CachedObject get(long i, boolean keep) {
 
         try {
             if (isCached) {
                 return cache.get(i, this, keep);
             } else {
-                return (CachedObject) rowIdMap.get(i);
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "RowStoreAVLHybrid");
             }
         } catch (HsqlException e) {
             return null;
@@ -166,28 +153,28 @@ public class RowStoreAVLHybrid extends RowStoreAVL implements PersistentStore {
         }
     }
 
-    public int getStorageSize(int i) {
-
-        try {
-            if (isCached) {
-                return cache.get(i, this, false).getStorageSize();
-            } else {
-                return 0;
-            }
-        } catch (HsqlException e) {
-            return 0;
-        }
-    }
-
-    public void add(CachedObject object) {
+    public void add(Session session, CachedObject object, boolean tx) {
 
         if (isCached) {
             int size = object.getRealSize(cache.rowOut);
 
+            size += indexList.length * NodeAVLDisk.SIZE_IN_BYTE;
             size = cache.rowOut.getStorageSize(size);
 
             object.setStorageSize(size);
+
+            long pos = tableSpace.getFilePosition(size, false);
+
+            object.setPos(pos);
             cache.add(object);
+        }
+
+        Object[] data = ((Row) object).getData();
+
+        for (int i = 0; i < nullsList.length; i++) {
+            if (data[i] == null) {
+                nullsList[i] = true;
+            }
         }
     }
 
@@ -206,149 +193,214 @@ public class RowStoreAVLHybrid extends RowStoreAVL implements PersistentStore {
         return null;
     }
 
-    public CachedObject getNewCachedObject(Session session, Object object) {
+    public CachedObject getNewCachedObject(Session session, Object object,
+                                           boolean tx) {
+
+        if (!isCached) {
+            if (useDisk && elementCount.get() >= maxMemoryRowCount) {
+                changeToDiskTable(session);
+            }
+        }
+
+        Row row;
 
         if (isCached) {
-            Row row = new RowAVLDisk(table, (Object[]) object);
-
-            add(row);
-
-            if (isTempTable) {
-                RowAction.addAction(session, RowAction.ACTION_INSERT,
-                                    (Table) table, row);
-            }
-
-            return row;
+            row = new RowAVLDisk(table, (Object[]) object, this);
         } else {
-            memoryRowCount++;
+            int id = rowIdSequence++;
 
-            if (useCache && memoryRowCount > maxMemoryRowCount) {
-                changeToDiskTable();
+            row = new RowAVL(table, (Object[]) object, id, this);
+        }
 
-                return getNewCachedObject(session, object);
-            }
+        add(session, row, tx);
 
-            Row row = new RowAVL(table, (Object[]) object);
-            int id  = rowIdSequence++;
+        return row;
+    }
 
-            row.setPos(id);
-            rowIdMap.put(id, row);
+    public void indexRow(Session session, Row row) {
 
-            if (isTempTable) {
-                RowAction.addAction(session, RowAction.ACTION_INSERT,
-                                    (Table) table, row);
-            }
+        try {
+            row = (Row) get(row, true);
 
-            return row;
+            super.indexRow(session, row);
+            row.keepInMemory(false);
+        } catch (HsqlException e) {
+            throw e;
         }
     }
 
     public void removeAll() {
 
         if (!isCached) {
-            rowIdMap.clear();
+            destroy();
         }
 
+        elementCount.set(0);
         ArrayUtil.fillArray(accessorList, null);
-    }
 
-    public void remove(int i) {
-
-        if (isCached) {
-            cache.remove(i, this);
-        } else {
-            rowIdMap.remove(i);
+        for (int i = 0; i < nullsList.length; i++) {
+            nullsList[i] = false;
         }
     }
 
-    public void removePersistence(int i) {}
-
-    public void release(int i) {
+    public void remove(CachedObject object) {
 
         if (isCached) {
-            cache.release(i);
+            cache.remove(object);
         }
     }
 
     public void commitPersistence(CachedObject row) {}
 
+    public void commitRow(Session session, Row row, int changeAction,
+                          int txModel) {
+
+        switch (changeAction) {
+
+            case RowAction.ACTION_DELETE :
+                remove(row);
+                break;
+
+            case RowAction.ACTION_INSERT :
+                break;
+
+            case RowAction.ACTION_INSERT_DELETE :
+
+                // INSERT + DELEETE
+                remove(row);
+                break;
+
+            case RowAction.ACTION_DELETE_FINAL :
+                delete(session, row);
+                remove(row);
+                break;
+        }
+    }
+
+    public void rollbackRow(Session session, Row row, int changeAction,
+                            int txModel) {
+
+        switch (changeAction) {
+
+            case RowAction.ACTION_DELETE :
+                row = (Row) get(row, true);
+
+                ((RowAVL) row).setNewNodes(this);
+                row.keepInMemory(false);
+                indexRow(session, row);
+                break;
+
+            case RowAction.ACTION_INSERT :
+                delete(session, row);
+                remove(row);
+                break;
+
+            case RowAction.ACTION_INSERT_DELETE :
+
+                // INSERT + DELEETE
+                remove(row);
+                break;
+        }
+    }
+
+    //
     public DataFileCache getCache() {
         return cache;
     }
 
     public void setCache(DataFileCache cache) {
-        throw Error.runtimeError(ErrorCode.U_S0500, "");
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowStoreAVLHybrid");
     }
 
     public void release() {
 
-        ArrayUtil.fillArray(accessorList, null);
+        if (!isCached) {
+            destroy();
+        }
 
         if (isCached) {
-            cache.storeCount--;
-
-            if (cache.storeCount == 0) {
-                cache.clear();
-            }
+            cache.adjustStoreCount(-1);
 
             cache    = null;
             isCached = false;
-        } else {
-            rowIdMap.clear();
         }
 
         manager.setStore(table, null);
+        elementCount.set(0);
+        ArrayUtil.fillArray(accessorList, null);
     }
 
-    public void setAccessor(Index key, CachedObject accessor) {
-
-        Index index = (Index) key;
-
-        accessorList[index.getPosition()] = accessor;
+    public void delete(Session session, Row row) {
+        super.delete(session, row);
     }
 
-    public void setAccessor(Index key, int accessor) {}
+    public CachedObject getAccessor(Index key) {
 
-    public void resetAccessorKeys(Index[] keys) {
+        NodeAVL node = (NodeAVL) accessorList[key.getPosition()];
 
-        if (indexList.length == 0 || indexList[0] == null
-                || accessorList[0] == null) {
+        if (node == null) {
+            return null;
+        }
+
+        RowAVL row = (RowAVL) get(node.getRow(this), false);
+
+        node                            = row.getNode(key.getPosition());
+        accessorList[key.getPosition()] = node;
+
+        return node;
+    }
+
+    public synchronized void resetAccessorKeys(Session session, Index[] keys) {
+
+        if (indexList.length == 0 || accessorList[0] == null) {
             indexList    = keys;
             accessorList = new CachedObject[indexList.length];
 
             return;
         }
 
-        throw Error.runtimeError(ErrorCode.U_S0500, "RowStoreCached");
+        if (isCached) {
+            throw Error.runtimeError(ErrorCode.U_S0500, "RowStoreAVLHybrid");
+        }
+
+        super.resetAccessorKeys(session, keys);
     }
 
-    public void changeToDiskTable() {
+    public boolean hasNull(int pos) {
+        return nullsList[pos];
+    }
 
-        cache = session.sessionData.getResultCache();
+    public final void changeToDiskTable(Session session) {
+
+        cache =
+            ((PersistentStoreCollectionSession) manager).getSessionDataCache();
 
         if (cache != null) {
+            tableSpace = cache.spaceManager.getTableSpace(
+                DataSpaceManager.tableIdDefault);
+
+            IndexAVL    idx      = (IndexAVL) indexList[0];
+            NodeAVL     root     = (NodeAVL) accessorList[0];
             RowIterator iterator = table.rowIterator(this);
 
             ArrayUtil.fillArray(accessorList, null);
+            elementCount.set(0);
 
             isCached = true;
 
-            cache.storeCount++;
+            cache.adjustStoreCount(1);
 
             while (iterator.hasNext()) {
-                Row row    = iterator.getNextRow();
-                Row newRow = (Row) getNewCachedObject(session, row.getData());
+                Row row = iterator.getNextRow();
+                Row newRow = (Row) getNewCachedObject(session, row.getData(),
+                                                      false);
 
-                indexRow(null, newRow);
+                indexRow(session, newRow);
             }
 
-            rowIdMap.clear();
+            idx.unlinkNodes(root);
         }
 
         maxMemoryRowCount = Integer.MAX_VALUE;
-    }
-
-    public CachedObject getNewInstance(int size) {
-        return null;
     }
 }

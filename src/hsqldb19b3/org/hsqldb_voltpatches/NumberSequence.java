@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,10 +34,13 @@ package org.hsqldb_voltpatches;
 import java.math.BigDecimal;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.rights.Grantee;
-import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.map.ValuePool;
+import org.hsqldb_voltpatches.rights.Grantee;
+import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Maintains a sequence of numbers.
@@ -48,10 +51,10 @@ import org.hsqldb_voltpatches.lib.OrderedHashSet;
  */
 public final class NumberSequence implements SchemaObject {
 
-    public final static NumberSequence[] emptyArray = new NumberSequence[]{};
+    public static final NumberSequence[] emptyArray = new NumberSequence[]{};
 
     //
-    HsqlName name;
+    private HsqlName name;
 
     // present value
     private long currValue;
@@ -85,15 +88,19 @@ public final class NumberSequence implements SchemaObject {
 
     public void setDefaults(HsqlName name, Type type) {
 
-        this.name = name;
-        dataType  = type;
-        this.name = name;
-        dataType  = type;
+        this.name     = name;
+        this.dataType = type;
+        this.name     = name;
 
         long min;
         long max;
 
         switch (dataType.typeCode) {
+
+            case Types.TINYINT :
+                max = Byte.MAX_VALUE;
+                min = Byte.MIN_VALUE;
+                break;
 
             case Types.SQL_SMALLINT :
                 max = Short.MAX_VALUE;
@@ -121,7 +128,7 @@ public final class NumberSequence implements SchemaObject {
 
             // fall through
             default :
-                throw Error.error(ErrorCode.X_42565);
+                throw Error.error(ErrorCode.X_42563);
         }
 
         minValue  = min;
@@ -169,30 +176,17 @@ public final class NumberSequence implements SchemaObject {
         return null;
     }
 
-    public void compile(Session session) {}
+    public void compile(Session session, SchemaObject parentObject) {}
 
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(128);
 
-        if (name == null) {
-            sb.append(Tokens.T_GENERATED).append(' ');
-
-            if (isAlways()) {
-                sb.append(Tokens.T_ALWAYS);
-            } else {
-                sb.append(Tokens.T_BY).append(' ').append(Tokens.T_DEFAULT);
-            }
-
-            sb.append(' ').append(Tokens.T_AS).append(' ').append(
-                Tokens.T_IDENTITY).append(Tokens.T_OPENBRACKET);
-        } else {
-            sb.append(Tokens.T_CREATE).append(' ');
-            sb.append(Tokens.T_SEQUENCE).append(' ');
-            sb.append(getName().getSchemaQualifiedStatementName()).append(' ');
-            sb.append(Tokens.T_AS).append(' ');
-            sb.append(getDataType().getNameString()).append(' ');
-        }
+        sb.append(Tokens.T_CREATE).append(' ');
+        sb.append(Tokens.T_SEQUENCE).append(' ');
+        sb.append(getName().getSchemaQualifiedStatementName()).append(' ');
+        sb.append(Tokens.T_AS).append(' ');
+        sb.append(getDataType().getNameString()).append(' ');
 
         //
         sb.append(Tokens.T_START).append(' ');
@@ -221,6 +215,61 @@ public final class NumberSequence implements SchemaObject {
         }
 
         return sb.toString();
+    }
+
+    public String getSQLColumnDefinition() {
+
+        StringBuffer sb = new StringBuffer(128);
+
+        sb.append(Tokens.T_GENERATED).append(' ');
+
+        if (name == null) {
+            if (isAlways()) {
+                sb.append(Tokens.T_ALWAYS);
+            } else {
+                sb.append(Tokens.T_BY).append(' ').append(Tokens.T_DEFAULT);
+            }
+
+            sb.append(' ').append(Tokens.T_AS).append(' ').append(
+                Tokens.T_IDENTITY).append(Tokens.T_OPENBRACKET);
+
+            //
+            sb.append(Tokens.T_START).append(' ');
+            sb.append(Tokens.T_WITH).append(' ');
+            sb.append(startValue);
+
+            if (getIncrement() != 1) {
+                sb.append(' ').append(Tokens.T_INCREMENT).append(' ');
+                sb.append(Tokens.T_BY).append(' ');
+                sb.append(getIncrement());
+            }
+
+            if (!hasDefaultMinMax()) {
+                sb.append(' ').append(Tokens.T_MINVALUE).append(' ');
+                sb.append(getMinValue());
+                sb.append(' ').append(Tokens.T_MAXVALUE).append(' ');
+                sb.append(getMaxValue());
+            }
+
+            if (isCycle()) {
+                sb.append(' ').append(Tokens.T_CYCLE);
+            }
+
+            if (name == null) {
+                sb.append(Tokens.T_CLOSEBRACKET);
+            }
+        } else {
+            sb.append(Tokens.T_BY).append(' ').append(Tokens.T_DEFAULT);
+            sb.append(' ').append(Tokens.T_AS).append(' ');
+            sb.append(Tokens.T_SEQUENCE).append(' ');
+            sb.append(getName().getSchemaQualifiedStatementName());
+        }
+
+        return sb.toString();
+    }
+
+    public long getChangeTimestamp() {
+        return 0;
     }
 
     public String getRestartSQL() {
@@ -287,6 +336,11 @@ public final class NumberSequence implements SchemaObject {
         long max;
 
         switch (dataType.typeCode) {
+
+            case Types.TINYINT :
+                max = Byte.MAX_VALUE;
+                min = Byte.MIN_VALUE;
+                break;
 
             case Types.SQL_SMALLINT :
                 max = Short.MAX_VALUE;
@@ -413,6 +467,11 @@ public final class NumberSequence implements SchemaObject {
 
         switch (dataType.typeCode) {
 
+            case Types.TINYINT :
+                max = Byte.MAX_VALUE;
+                min = Byte.MIN_VALUE;
+                break;
+
             case Types.SQL_SMALLINT :
                 max = Short.MAX_VALUE;
                 min = Short.MIN_VALUE;
@@ -448,6 +507,11 @@ public final class NumberSequence implements SchemaObject {
         long max;
 
         switch (dataType.typeCode) {
+
+            case Types.TINYINT :
+                max = Byte.MAX_VALUE;
+                min = Byte.MIN_VALUE;
+                break;
 
             case Types.SQL_SMALLINT :
                 max = Short.MAX_VALUE;

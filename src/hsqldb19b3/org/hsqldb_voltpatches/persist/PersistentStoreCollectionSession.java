@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,13 +31,15 @@
 
 package org.hsqldb_voltpatches.persist;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.Session;
+import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.HsqlDeque;
 import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.LongKeyHashMap;
-import org.hsqldb_voltpatches.HsqlException;
 
 /**
  * Collection of PersistenceStore itmes currently used by a session.
@@ -45,7 +47,7 @@ import org.hsqldb_voltpatches.HsqlException;
  * TableBase.getPersistenceId().
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class PersistentStoreCollectionSession
@@ -55,16 +57,26 @@ implements PersistentStoreCollection {
     private final LongKeyHashMap rowStoreMapSession     = new LongKeyHashMap();
     private LongKeyHashMap       rowStoreMapTransaction = new LongKeyHashMap();
     private LongKeyHashMap       rowStoreMapStatement   = new LongKeyHashMap();
+    private LongKeyHashMap       rowStoreMapRoutine     = new LongKeyHashMap();
+    private HsqlDeque            rowStoreListStack;
 
     public PersistentStoreCollectionSession(Session session) {
         this.session = session;
     }
 
-    public void setStore(Object key, PersistentStore store) {
+    synchronized public void setStore(Object key, PersistentStore store) {
 
         TableBase table = (TableBase) key;
 
         switch (table.persistenceScope) {
+
+            case TableBase.SCOPE_ROUTINE :
+                if (store == null) {
+                    rowStoreMapRoutine.remove(table.getPersistenceId());
+                } else {
+                    rowStoreMapRoutine.put(table.getPersistenceId(), store);
+                }
+                break;
 
             case TableBase.SCOPE_STATEMENT :
                 if (store == null) {
@@ -74,6 +86,8 @@ implements PersistentStoreCollection {
                 }
                 break;
 
+            // TEMP TABLE default, SYSTEM_TABLE + INFO_SCHEMA_TABLE
+            case TableBase.SCOPE_FULL :
             case TableBase.SCOPE_TRANSACTION :
                 if (store == null) {
                     rowStoreMapTransaction.remove(table.getPersistenceId());
@@ -93,64 +107,88 @@ implements PersistentStoreCollection {
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "PersistentStoreCollection");
+                                         "PersistentStoreCollectionSession");
         }
     }
 
-    public PersistentStore getStore(Object key) {
-
-        try {
-            TableBase       table = (TableBase) key;
-            PersistentStore store;
-
-            switch (table.persistenceScope) {
-
-                case TableBase.SCOPE_STATEMENT :
-                    store = (PersistentStore) rowStoreMapStatement.get(
-                        table.getPersistenceId());
-
-                    if (store == null) {
-                        store = session.database.logger.newStore(session,
-                                this, table, true);
-                    }
-
-                    return store;
-
-                case TableBase.SCOPE_TRANSACTION :
-                    store = (PersistentStore) rowStoreMapTransaction.get(
-                        table.getPersistenceId());
-
-                    if (store == null) {
-                        store = session.database.logger.newStore(session,
-                                this, table, true);
-                    }
-
-                    return store;
-
-                case TableBase.SCOPE_SESSION :
-                    store = (PersistentStore) rowStoreMapSession.get(
-                        table.getPersistenceId());
-
-                    if (store == null) {
-                        store = session.database.logger.newStore(session,
-                                this, table, true);
-                    }
-
-                    return store;
-            }
-        } catch (HsqlException e) {}
-
-        throw Error.runtimeError(ErrorCode.U_S0500, "PSCS");
+    synchronized public PersistentStore getViewStore(long persistenceId) {
+        return (PersistentStore) rowStoreMapStatement.get(persistenceId);
     }
 
-    public void clearAllTables() {
+    synchronized public PersistentStore getStore(Object key) {
+
+        TableBase       table = (TableBase) key;
+        PersistentStore store;
+
+        switch (table.persistenceScope) {
+
+            case TableBase.SCOPE_ROUTINE :
+                store = (PersistentStore) rowStoreMapRoutine.get(
+                    table.getPersistenceId());
+
+                if (store == null) {
+                    store = session.database.logger.newStore(session, this,
+                            table);
+                }
+
+                return store;
+
+            case TableBase.SCOPE_STATEMENT :
+                store = (PersistentStore) rowStoreMapStatement.get(
+                    table.getPersistenceId());
+
+                if (store == null) {
+                    store = session.database.logger.newStore(session, this,
+                            table);
+                }
+
+                return store;
+
+            // TEMP TABLE default, SYSTEM_TABLE + INFO_SCHEMA_TABLE
+            case TableBase.SCOPE_FULL :
+            case TableBase.SCOPE_TRANSACTION :
+                store = (PersistentStore) rowStoreMapTransaction.get(
+                    table.getPersistenceId());
+
+                if (store == null) {
+                    store = session.database.logger.newStore(session, this,
+                            table);
+                }
+
+                if (table.getTableType() == TableBase.INFO_SCHEMA_TABLE) {
+                    session.database.dbInfo.setStore(session, (Table) table,
+                                                     store);
+                }
+
+                return store;
+
+            case TableBase.SCOPE_SESSION :
+                store = (PersistentStore) rowStoreMapSession.get(
+                    table.getPersistenceId());
+
+                if (store == null) {
+                    store = session.database.logger.newStore(session, this,
+                            table);
+                }
+
+                return store;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "PersistentStoreCollectionSession");
+        }
+    }
+
+    synchronized public void clearAllTables() {
 
         clearSessionTables();
         clearTransactionTables();
         clearStatementTables();
+        clearRoutineTables();
+        closeSessionDataCache();
     }
 
-    public void clearResultTables(long actionTimestamp) {
+    synchronized public void clearResultTables(long actionTimestamp) {
 
         if (rowStoreMapSession.isEmpty()) {
             return;
@@ -159,16 +197,16 @@ implements PersistentStoreCollection {
         Iterator it = rowStoreMapSession.values().iterator();
 
         while (it.hasNext()) {
-            RowStoreAVL store = (RowStoreAVL) it.next();
+            PersistentStore store = (PersistentStore) it.next();
 
-            if (store.timestamp == actionTimestamp) {
-
+            if (store.getTimestamp() == actionTimestamp) {
                 store.release();
+                it.remove();
             }
         }
     }
 
-    public void clearSessionTables() {
+    synchronized public void clearSessionTables() {
 
         if (rowStoreMapSession.isEmpty()) {
             return;
@@ -181,9 +219,11 @@ implements PersistentStoreCollection {
 
             store.release();
         }
+
+        rowStoreMapSession.clear();
     }
 
-    public void clearTransactionTables() {
+    synchronized public void clearTransactionTables() {
 
         if (rowStoreMapTransaction.isEmpty()) {
             return;
@@ -196,9 +236,11 @@ implements PersistentStoreCollection {
 
             store.release();
         }
+
+        rowStoreMapTransaction.clear();
     }
 
-    public void clearStatementTables() {
+    synchronized public void clearStatementTables() {
 
         if (rowStoreMapStatement.isEmpty()) {
             return;
@@ -211,5 +253,180 @@ implements PersistentStoreCollection {
 
             store.release();
         }
+
+        rowStoreMapStatement.clear();
+    }
+
+    synchronized public void clearRoutineTables() {
+
+        if (rowStoreMapRoutine.isEmpty()) {
+            return;
+        }
+
+        Iterator it = rowStoreMapRoutine.values().iterator();
+
+        while (it.hasNext()) {
+            PersistentStore store = (PersistentStore) it.next();
+
+            store.release();
+        }
+
+        rowStoreMapRoutine.clear();
+    }
+
+    synchronized public void registerIndex(Session session, TableBase table) {
+
+        PersistentStore store = findStore(table);
+
+        if (store == null) {
+            return;
+        }
+
+        store.resetAccessorKeys(session, table.getIndexList());
+    }
+
+    synchronized public PersistentStore findStore(TableBase table) {
+
+        PersistentStore store = null;
+
+        switch (table.persistenceScope) {
+
+            case TableBase.SCOPE_ROUTINE :
+                store = (PersistentStore) rowStoreMapRoutine.get(
+                    table.getPersistenceId());
+                break;
+
+            case TableBase.SCOPE_STATEMENT :
+                store = (PersistentStore) rowStoreMapStatement.get(
+                    table.getPersistenceId());
+                break;
+
+            // TEMP TABLE default, SYSTEM_TABLE + INFO_SCHEMA_TABLE
+            case TableBase.SCOPE_FULL :
+            case TableBase.SCOPE_TRANSACTION :
+                store = (PersistentStore) rowStoreMapTransaction.get(
+                    table.getPersistenceId());
+                break;
+
+            case TableBase.SCOPE_SESSION :
+                store = (PersistentStore) rowStoreMapSession.get(
+                    table.getPersistenceId());
+                break;
+        }
+
+        return store;
+    }
+
+    synchronized public void moveData(Table oldTable, Table newTable,
+                                      int colIndex, int adjust) {
+
+        PersistentStore oldStore = findStore(oldTable);
+
+        if (oldStore == null) {
+            return;
+        }
+
+        PersistentStore newStore = getStore(newTable);
+
+        try {
+            newStore.moveData(session, oldStore, colIndex, adjust);
+        } catch (HsqlException e) {
+            newStore.release();
+            setStore(newTable, null);
+
+            throw e;
+        }
+
+        setStore(oldTable, null);
+    }
+
+    synchronized public void push(boolean isRoutine) {
+
+        if (rowStoreListStack == null) {
+            rowStoreListStack = new HsqlDeque();
+        }
+
+        Object[] array = rowStoreMapStatement.toArray();
+
+        rowStoreListStack.add(array);
+        rowStoreMapStatement.clear();
+
+        if (isRoutine) {
+            array = rowStoreMapRoutine.toArray();
+
+            rowStoreListStack.add(array);
+            rowStoreMapRoutine.clear();
+        }
+    }
+
+    synchronized public void pop(boolean isRoutine) {
+
+        Object[] array;
+
+        if (isRoutine) {
+            array = (Object[]) rowStoreListStack.removeLast();
+
+            clearRoutineTables();
+
+            for (int i = 0; i < array.length; i++) {
+                PersistentStore store = (PersistentStore) array[i];
+
+                rowStoreMapRoutine.put(store.getTable().getPersistenceId(),
+                                       store);
+            }
+        }
+
+        array = (Object[]) rowStoreListStack.removeLast();
+
+        clearStatementTables();
+
+        for (int i = 0; i < array.length; i++) {
+            PersistentStore store = (PersistentStore) array[i];
+
+            rowStoreMapStatement.put(store.getTable().getPersistenceId(),
+                                     store);
+        }
+    }
+
+    DataFileCacheSession resultCache;
+
+    synchronized public DataFileCacheSession getSessionDataCache() {
+
+        if (resultCache == null) {
+            String path = session.database.logger.getTempDirectoryPath();
+
+            if (path == null) {
+                return null;
+            }
+
+            try {
+                resultCache =
+                    new DataFileCacheSession(session.database,
+                                             path + "/session_"
+                                             + Long.toString(session.getId()));
+
+                resultCache.open(false);
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        return resultCache;
+    }
+
+    private void closeSessionDataCache() {
+
+        if (resultCache != null) {
+            try {
+                resultCache.release();
+                resultCache.deleteFile();
+            } catch (HsqlException e) {}
+
+            resultCache = null;
+        }
+    }
+
+    synchronized public void release() {
+        clearAllTables();
     }
 }

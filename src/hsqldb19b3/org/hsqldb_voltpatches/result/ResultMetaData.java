@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,18 +34,20 @@ package org.hsqldb_voltpatches.result;
 import java.io.IOException;
 
 import org.hsqldb_voltpatches.ColumnBase;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.rowio.RowInputBinary;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
+import org.hsqldb_voltpatches.types.ArrayType;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
- * Meta data for a result set.
+ * Metadata for a result set.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.1.1
  * @since 1.8.0
  */
 public final class ResultMetaData {
@@ -114,6 +116,18 @@ public final class ResultMetaData {
         Type[] types = new Type[colCount];
 
         return newResultMetaData(types, null, colCount, colCount);
+    }
+
+    public static ResultMetaData newSingleColumnMetaData(String colName) {
+
+        ResultMetaData md = ResultMetaData.newResultMetaData(1);
+
+        md.columns[0] = new ColumnBase(null, null, null, colName);
+
+        md.columns[0].setType(Type.SQL_VARCHAR_DEFAULT);
+        md.prepareData();
+
+        return md;
     }
 
     public static ResultMetaData newResultMetaData(Type[] types,
@@ -219,8 +233,11 @@ public final class ResultMetaData {
     }
 
     private static void decodeTableColumnAttrs(int in, ColumnBase column) {
-        column.setNullability((byte) (in & 0x0000000f));
-        column.setIdentity((in & 0x00000010) != 0);
+
+        column.setNullability((byte) (in & 0x00000003));
+        column.setIdentity((in & 0x00000004) != 0);
+        column.setWriteable((in & 0x00000008) != 0);
+        column.setSearchable((in & 0x00000010) != 0);
     }
 
     private static int encodeTableColumnAttrs(ColumnBase column) {
@@ -228,6 +245,14 @@ public final class ResultMetaData {
         int out = column.getNullability();    // always between 0x00 and 0x02
 
         if (column.isIdentity()) {
+            out |= 0x00000004;
+        }
+
+        if (column.isWriteable()) {
+            out |= 0x00000008;
+        }
+
+        if (column.isSearchable()) {
             out |= 0x00000010;
         }
 
@@ -235,7 +260,7 @@ public final class ResultMetaData {
     }
 
     private void decodeParamColumnAttrs(int in, int columnIndex) {
-        paramNullable[columnIndex] = (byte) (in & 0x0000000f);
+        paramNullable[columnIndex] = (byte) (in & 0x00000003);
         paramModes[columnIndex]    = (byte) ((in >> 4) & 0x0000000f);
     }
 
@@ -260,9 +285,7 @@ public final class ResultMetaData {
                 columnTypes = new Type[columnCount];
 
                 for (int i = 0; i < columnCount; i++) {
-                    int type = in.readType();
-
-                    columnTypes[i] = Type.getDefaultType(type);
+                    columnTypes[i] = readDataTypeSimple(in);
                 }
 
                 return;
@@ -341,25 +364,65 @@ public final class ResultMetaData {
                 return;
             }
             default : {
-                throw Error.runtimeError(ErrorCode.U_S0500, "");
+                throw Error.runtimeError(ErrorCode.U_S0500, "ResultMetaData");
             }
         }
     }
 
+    Type readDataTypeSimple(RowInputBinary in) throws IOException {
+
+        int     typeCode = in.readType();
+        boolean isArray  = typeCode == Types.SQL_ARRAY;
+
+        if (isArray) {
+            typeCode = in.readType();
+
+            return Type.getDefaultArrayType(typeCode);
+        }
+
+        return Type.getDefaultType(typeCode);
+    }
+
     Type readDataType(RowInputBinary in) throws IOException {
 
-        int  typeCode = in.readType();
-        long size     = in.readLong();
-        int  scale    = in.readInt();
+        int     typeCode = in.readType();
+        boolean isArray  = typeCode == Types.SQL_ARRAY;
 
-        return Type.getType(typeCode, 0, size, scale);
+        if (isArray) {
+            typeCode = in.readType();
+        }
+
+        long size  = in.readLong();
+        int  scale = in.readInt();
+        Type type = Type.getType(typeCode, Type.SQL_VARCHAR.getCharacterSet(),
+                                 Type.SQL_VARCHAR.getCollation(), size, scale);
+
+        if (isArray) {
+            type = new ArrayType(type, ArrayType.defaultArrayCardinality);
+        }
+
+        return type;
     }
 
     void writeDataType(RowOutputInterface out, Type type) {
 
         out.writeType(type.typeCode);
+
+        if (type.isArrayType()) {
+            out.writeType(type.collectionBaseType().typeCode);
+        }
+
         out.writeLong(type.precision);
         out.writeInt(type.scale);
+    }
+
+    void writeDataTypeCodes(RowOutputInterface out, Type type) {
+
+        out.writeType(type.typeCode);
+
+        if (type.isArrayType()) {
+            out.writeType(type.collectionBaseType().typeCode);
+        }
     }
 
     void write(RowOutputInterface out) throws IOException {
@@ -372,7 +435,7 @@ public final class ResultMetaData {
             case UPDATE_RESULT_METADATA :
             case SIMPLE_RESULT_METADATA : {
                 for (int i = 0; i < columnCount; i++) {
-                    out.writeType(columnTypes[i].typeCode);
+                    writeDataTypeCodes(out, columnTypes[i]);
                 }
 
                 return;
@@ -433,7 +496,7 @@ public final class ResultMetaData {
                 return;
             }
             default : {
-                throw Error.runtimeError(ErrorCode.U_S0500, "");
+                throw Error.runtimeError(ErrorCode.U_S0500, "ResultMetaData");
             }
         }
     }
@@ -447,5 +510,20 @@ public final class ResultMetaData {
         ArrayUtil.projectRow(columns, columnMap, newMeta.columns);
 
         return newMeta;
+    }
+
+    public boolean areTypesCompatible(ResultMetaData newMeta) {
+
+        if (columnCount != newMeta.columnCount) {
+            return false;
+        }
+
+        for (int i = 0; i < columnCount; i++) {
+            if (!columnTypes[i].canConvertFrom(newMeta.columnTypes[i])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

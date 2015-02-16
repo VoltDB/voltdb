@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,6 +33,8 @@ package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
@@ -41,16 +43,19 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
+import org.hsqldb_voltpatches.navigator.RowSetNavigatorDataTable;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Implementation of an SQL query expression
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.9.0
  */
 
@@ -60,7 +65,7 @@ import org.hsqldb_voltpatches.types.Type;
  * - Result metadata for the final result of QueryExpression
  *
  */
-public class QueryExpression {
+public class QueryExpression implements RangeGroup {
 
     public static final int NOUNION       = 0,
                             UNION         = 1,
@@ -87,13 +92,13 @@ public class QueryExpression {
     HsqlList unresolvedExpressions;
 
     //
+    boolean isReferencesResolved;
+    boolean isPartOneResolved;
+    boolean isPartTwoResolved;
     boolean isResolved;
 
     //
     int persistenceScope = TableBase.SCOPE_STATEMENT;
-
-    //
-    int columnMode = TableBase.COLUMNS_REFERENCED;
 
     //
     ResultMetaData resultMetaData;
@@ -101,20 +106,33 @@ public class QueryExpression {
 
     //
     View    view;
+    boolean isBaseMergeable;
+    boolean isMergeable;
     boolean isUpdatable;
     boolean isInsertable;
     boolean isCheckable;
     boolean isTopLevel;
+    boolean isRecursive;
+    boolean isSingleRow;
+    boolean acceptsSequences;
+    boolean isCorrelated;
+    boolean isTable;
+    boolean isValueList;
+
+    //
+    TableDerived recursiveTable;
 
     //
     public TableBase resultTable;
     public Index     mainIndex;
     public Index     fullIndex;
     public Index     orderIndex;
+    public Index     idIndex;
 
     //
     CompileContext compileContext;
 
+    //
     QueryExpression(CompileContext compileContext) {
         this.compileContext = compileContext;
         sortAndSlice        = SortAndSlice.noSort;
@@ -127,6 +145,26 @@ public class QueryExpression {
 
         sortAndSlice             = SortAndSlice.noSort;
         this.leftQueryExpression = leftQueryExpression;
+    }
+
+    public RangeVariable[] getRangeVariables() {
+        return RangeVariable.emptyArray;
+    }
+
+    public void setCorrelated() {
+        isCorrelated = true;
+    }
+
+    public boolean isVariable() {
+        return false;
+    }
+
+    public void setSingleRow() {
+        isSingleRow = true;
+    }
+
+    public boolean isRecursive() {
+        return isRecursive;
     }
 
     void addUnion(QueryExpression queryExpression, int unionType) {
@@ -155,43 +193,68 @@ public class QueryExpression {
 
         isFullOrder = true;
 
-        if (leftQueryExpression == null) {
-            return;
+        if (leftQueryExpression != null) {
+            leftQueryExpression.setFullOrder();
         }
 
-        leftQueryExpression.setFullOrder();
-        rightQueryExpression.setFullOrder();
+        if (rightQueryExpression != null) {
+            rightQueryExpression.setFullOrder();
+        }
     }
 
     public void resolve(Session session) {
 
-        resolveReferences(session);
+        resolveReferences(session, RangeGroup.emptyArray);
         ExpressionColumn.checkColumnsResolved(unresolvedExpressions);
         resolveTypes(session);
     }
 
-    public void resolve(Session session, RangeVariable[] outerRanges) {
+    public void resolve(Session session, RangeGroup[] rangeGroups,
+                        Type[] targetTypes) {
 
-        resolveReferences(session);
+        resolveReferences(session, rangeGroups);
 
         if (unresolvedExpressions != null) {
             for (int i = 0; i < unresolvedExpressions.size(); i++) {
-                Expression e    = (Expression) unresolvedExpressions.get(i);
-                HsqlList   list = e.resolveColumnReferences(outerRanges, null);
+                Expression e = (Expression) unresolvedExpressions.get(i);
+                HsqlList list = e.resolveColumnReferences(session,
+                    RangeGroup.emptyGroup, rangeGroups, null);
 
                 ExpressionColumn.checkColumnsResolved(list);
             }
         }
 
-        resolveTypes(session);
+        resolveTypesPartOne(session);
+
+        if (targetTypes != null) {
+            for (int i = 0;
+                    i < unionColumnTypes.length && i < targetTypes.length;
+                    i++) {
+                if (unionColumnTypes[i] == null) {
+                    unionColumnTypes[i] = targetTypes[i];
+                }
+            }
+        }
+
+        resolveTypesPartTwo(session);
+        resolveTypesPartThree(session);
     }
 
-    public void resolveReferences(Session session) {
+    public void resolveReferences(Session session, RangeGroup[] rangeGroups) {
 
-        leftQueryExpression.resolveReferences(session);
-        rightQueryExpression.resolveReferences(session);
+        if (isReferencesResolved) {
+            return;
+        }
+
+        leftQueryExpression.resolveReferences(session, rangeGroups);
+        rightQueryExpression.resolveReferences(session, rangeGroups);
         addUnresolvedExpressions(leftQueryExpression.unresolvedExpressions);
         addUnresolvedExpressions(rightQueryExpression.unresolvedExpressions);
+
+        if (leftQueryExpression.isCorrelated
+                || rightQueryExpression.isCorrelated) {
+            setCorrelated();
+        }
 
         if (!unionCorresponding) {
             columnCount = leftQueryExpression.getColumnCount();
@@ -208,6 +271,9 @@ public class QueryExpression {
 
             ArrayUtil.fillSequence(leftQueryExpression.unionColumnMap);
             resolveColumnRefernecesInUnionOrderBy();
+
+            accessibleColumns    = leftQueryExpression.accessibleColumns;
+            isReferencesResolved = true;
 
             return;
         }
@@ -226,6 +292,14 @@ public class QueryExpression {
                 int    index = ArrayUtil.find(rightNames, name);
 
                 if (name.length() > 0 && index != -1) {
+                    if (!leftQueryExpression.accessibleColumns[i]) {
+                        throw Error.error(ErrorCode.X_42578);
+                    }
+
+                    if (!rightQueryExpression.accessibleColumns[index]) {
+                        throw Error.error(ErrorCode.X_42578);
+                    }
+
                     leftColumns.add(i);
                     rightColumns.add(index);
                     unionCorrespondingColumns.add(name);
@@ -233,7 +307,7 @@ public class QueryExpression {
             }
 
             if (unionCorrespondingColumns.isEmpty()) {
-                throw Error.error(ErrorCode.X_42579);
+                throw Error.error(ErrorCode.X_42578);
             }
 
             leftQueryExpression.unionColumnMap  = leftColumns.toArray();
@@ -249,14 +323,22 @@ public class QueryExpression {
                 int    index = ArrayUtil.find(leftNames, name);
 
                 if (index == -1) {
-                    throw Error.error(ErrorCode.X_42579);
+                    throw Error.error(ErrorCode.X_42501);
+                }
+
+                if (!leftQueryExpression.accessibleColumns[index]) {
+                    throw Error.error(ErrorCode.X_42578);
                 }
 
                 leftQueryExpression.unionColumnMap[i] = index;
                 index = ArrayUtil.find(rightNames, name);
 
                 if (index == -1) {
-                    throw Error.error(ErrorCode.X_42579);
+                    throw Error.error(ErrorCode.X_42501);
+                }
+
+                if (!rightQueryExpression.accessibleColumns[index]) {
+                    throw Error.error(ErrorCode.X_42578);
                 }
 
                 rightQueryExpression.unionColumnMap[i] = index;
@@ -267,6 +349,12 @@ public class QueryExpression {
         unionColumnTypes = new Type[columnCount];
 
         resolveColumnRefernecesInUnionOrderBy();
+
+        accessibleColumns = new boolean[columnCount];
+
+        ArrayUtil.fillArray(accessibleColumns, true);
+
+        isReferencesResolved = true;
     }
 
     /**
@@ -334,11 +422,14 @@ public class QueryExpression {
 
         resolveTypesPartOne(session);
         resolveTypesPartTwo(session);
-
-        isResolved = true;
+        resolveTypesPartThree(session);
     }
 
     void resolveTypesPartOne(Session session) {
+
+        if (isPartOneResolved) {
+            return;
+        }
 
         ArrayUtil.projectRowReverse(leftQueryExpression.unionColumnTypes,
                                     leftQueryExpression.unionColumnMap,
@@ -354,21 +445,87 @@ public class QueryExpression {
         ArrayUtil.projectRow(rightQueryExpression.unionColumnTypes,
                              rightQueryExpression.unionColumnMap,
                              unionColumnTypes);
+
+        isPartOneResolved = true;
+    }
+
+    void resolveTypesPartTwoRecursive(Session session) {
+        resolveTypesPartTwo(session);
     }
 
     void resolveTypesPartTwo(Session session) {
 
+        if (isPartTwoResolved) {
+            return;
+        }
+
         ArrayUtil.projectRowReverse(leftQueryExpression.unionColumnTypes,
                                     leftQueryExpression.unionColumnMap,
                                     unionColumnTypes);
-        leftQueryExpression.resolveTypesPartTwo(session);
+
+        if (isRecursive) {
+            leftQueryExpression.resolveTypesPartTwoRecursive(session);
+
+            recursiveTable.colTypes = leftQueryExpression.getColumnTypes();
+
+            for (int i = 0; i < recursiveTable.colTypes.length; i++) {
+                recursiveTable.getColumn(i).setType(
+                    recursiveTable.colTypes[i]);
+            }
+
+            recursiveTable.getFullIndex(session);
+        } else {
+            leftQueryExpression.resolveTypesPartTwo(session);
+        }
+
+        leftQueryExpression.resolveTypesPartThree(session);
         ArrayUtil.projectRowReverse(rightQueryExpression.unionColumnTypes,
                                     rightQueryExpression.unionColumnMap,
                                     unionColumnTypes);
         rightQueryExpression.resolveTypesPartTwo(session);
+        rightQueryExpression.resolveTypesPartThree(session);
 
         //
-        if (unionCorresponding) {
+        ResultMetaData leftMeta  = leftQueryExpression.getMetaData();
+        ResultMetaData rightMeta = rightQueryExpression.getMetaData();
+
+        for (int i = 0; i < leftQueryExpression.unionColumnMap.length; i++) {
+            int        leftIndex  = leftQueryExpression.unionColumnMap[i];
+            int        rightIndex = rightQueryExpression.unionColumnMap[i];
+            ColumnBase column     = leftMeta.columns[leftIndex];
+            byte leftNullability =
+                leftMeta.columns[leftIndex].getNullability();
+            byte rightNullability =
+                rightMeta.columns[rightIndex].getNullability();
+
+            // redundant after 2.2.9 changes
+            if (column instanceof ColumnSchema
+                    && rightMeta.columns[rightIndex] instanceof ColumnBase) {
+                column = new ColumnBase();
+
+                column.setType(leftQueryExpression.unionColumnTypes[i]);
+                column.setNullability(leftNullability);
+
+                leftMeta.columns[leftIndex] = column;
+            }
+
+            if (rightNullability == SchemaObject.Nullability
+                    .NULLABLE || (rightNullability == SchemaObject.Nullability
+                        .NULLABLE_UNKNOWN && leftNullability == SchemaObject
+                        .Nullability.NO_NULLS)) {
+                if (column instanceof ColumnSchema) {
+                    column = new ColumnBase();
+
+                    column.setType(leftQueryExpression.unionColumnTypes[i]);
+
+                    leftMeta.columns[leftIndex] = column;
+                }
+
+                column.setNullability(rightNullability);
+            }
+        }
+
+        if (unionCorresponding || isRecursive) {
             resultMetaData = leftQueryExpression.getMetaData().getNewMetaData(
                 leftQueryExpression.unionColumnMap);
 
@@ -381,7 +538,8 @@ public class QueryExpression {
             while (true) {
                 if (queryExpression.leftQueryExpression == null
                         || queryExpression.unionCorresponding) {
-                    sortAndSlice.setIndex(queryExpression.resultTable);
+                    sortAndSlice.setIndex(session,
+                                          queryExpression.resultTable);
 
                     break;
                 }
@@ -389,6 +547,13 @@ public class QueryExpression {
                 queryExpression = queryExpression.leftQueryExpression;
             }
         }
+
+        isPartTwoResolved = true;
+    }
+
+    void resolveTypesPartThree(Session session) {
+        compileContext = null;
+        isResolved     = true;
     }
 
     public Object[] getValues(Session session) {
@@ -404,6 +569,8 @@ public class QueryExpression {
             throw Error.error(ErrorCode.X_21000);
         }
     }
+
+    public void addExtraConditions(Expression e) {}
 
     public Object[] getSingleRowValues(Session session) {
 
@@ -428,8 +595,12 @@ public class QueryExpression {
 
     Result getResult(Session session, int maxRows) {
 
+        if (isRecursive) {
+            return getResultRecursive(session);
+        }
+
         int    currentMaxRows = unionType == UNION_ALL ? maxRows
-                                                       : Integer.MAX_VALUE;
+                                                       : 0;
         Result first = leftQueryExpression.getResult(session, currentMaxRows);
         RowSetNavigatorData navigator =
             (RowSetNavigatorData) first.getNavigator();
@@ -439,52 +610,63 @@ public class QueryExpression {
             (RowSetNavigatorData) second.getNavigator();
 
         if (unionCorresponding) {
-            RowSetNavigatorData rowSet = new RowSetNavigatorData(session,
-                this);
+            RowSetNavigatorData rowSet;
+            boolean memory =
+                session.resultMaxMemoryRows == 0
+                || (navigator.getSize() < session.resultMaxMemoryRows
+                    && rightNavigator.getSize() < session.resultMaxMemoryRows);
+
+            if (memory) {
+                rowSet = new RowSetNavigatorData(session, this);
+            } else {
+                rowSet = new RowSetNavigatorDataTable(session, this);
+            }
 
             rowSet.copy(navigator, leftQueryExpression.unionColumnMap);
+            navigator.release();
 
             navigator = rowSet;
 
             first.setNavigator(navigator);
 
             first.metaData = this.getMetaData();
-            rowSet         = new RowSetNavigatorData(session, this);
 
-            if (unionType != UNION && unionType != UNION_ALL) {
-                rowSet.copy(rightNavigator,
-                            rightQueryExpression.unionColumnMap);
-
-                rightNavigator = rowSet;
+            if (memory) {
+                rowSet = new RowSetNavigatorData(session, this);
+            } else {
+                rowSet = new RowSetNavigatorDataTable(session, this);
             }
+
+            rowSet.copy(rightNavigator, rightQueryExpression.unionColumnMap);
+            rightNavigator.release();
+
+            rightNavigator = rowSet;
         }
 
         switch (unionType) {
 
             case UNION :
-                navigator.union(rightNavigator,
-                                rightQueryExpression.unionColumnMap);
+                navigator.union(session, rightNavigator);
                 break;
 
             case UNION_ALL :
-                navigator.unionAll(rightNavigator,
-                                   rightQueryExpression.unionColumnMap);
+                navigator.unionAll(session, rightNavigator);
                 break;
 
             case INTERSECT :
-                navigator.intersect(rightNavigator);
+                navigator.intersect(session, rightNavigator);
                 break;
 
             case INTERSECT_ALL :
-                navigator.intersectAll(rightNavigator);
+                navigator.intersectAll(session, rightNavigator);
                 break;
 
             case EXCEPT :
-                navigator.except(rightNavigator);
+                navigator.except(session, rightNavigator);
                 break;
 
             case EXCEPT_ALL :
-                navigator.exceptAll(rightNavigator);
+                navigator.exceptAll(session, rightNavigator);
                 break;
 
             default :
@@ -492,17 +674,79 @@ public class QueryExpression {
         }
 
         if (sortAndSlice.hasOrder()) {
-            RowSetNavigatorData nav =
-                (RowSetNavigatorData) first.getNavigator();
+            navigator.sortOrderUnion(session, sortAndSlice);
+        }
 
-            nav.sortUnion(sortAndSlice);
-            nav.trim(sortAndSlice.getLimitStart(session),
-                     sortAndSlice.getLimitCount(session, maxRows));
+        if (sortAndSlice.hasLimit()) {
+            int[] limits = sortAndSlice.getLimits(session, this, maxRows);
+
+            navigator.trim(limits[0], limits[1]);
         }
 
         navigator.reset();
 
         return first;
+    }
+
+    Result getResultRecursive(Session session) {
+
+        Result tempResult;
+
+        recursiveTable.materialise(session);
+
+        RowSetNavigatorData recNav = recursiveTable.getNavigator(session);
+        Result              result = Result.newResult(recNav);
+
+        result.metaData = resultMetaData;
+
+        for (int round = 0; ; round++) {
+            tempResult = rightQueryExpression.getResult(session, 0);
+
+            RowSetNavigatorData tempNavigator =
+                (RowSetNavigatorData) tempResult.getNavigator();
+
+            if (tempNavigator.isEmpty()) {
+                break;
+            }
+
+            int startSize = recNav.getSize();
+
+            switch (unionType) {
+
+                case UNION :
+                    recNav.union(session, tempNavigator);
+                    break;
+
+                case UNION_ALL :
+                    recNav.unionAll(session, tempNavigator);
+                    break;
+
+                default :
+                    throw Error.runtimeError(ErrorCode.U_S0500,
+                                             "QueryExpression");
+            }
+
+            if (startSize == recNav.getSize()) {
+                break;
+            }
+
+            if (round > 256) {
+                throw Error.error(ErrorCode.GENERAL_ERROR);
+            }
+        }
+
+        return result;
+    }
+
+    public OrderedHashSet getSubqueries() {
+
+        OrderedHashSet subqueries = leftQueryExpression.getSubqueries();
+
+        subqueries =
+            OrderedHashSet.addAll(subqueries,
+                                  rightQueryExpression.getSubqueries());
+
+        return subqueries;
     }
 
     public boolean isSingleColumn() {
@@ -528,8 +772,58 @@ public class QueryExpression {
     }
 
     /** @todo 1.9.0 review */
-    public String describe(Session session) {
-        return leftQueryExpression.describe(session);
+    public String describe(Session session, int blanks) {
+
+        StringBuffer sb;
+        String       temp;
+        StringBuffer b = new StringBuffer(blanks);
+
+        for (int i = 0; i < blanks; i++) {
+            b.append(' ');
+        }
+
+        sb = new StringBuffer();
+
+        switch (unionType) {
+
+            case UNION :
+                temp = Tokens.T_UNION;
+                break;
+
+            case UNION_ALL :
+                temp = Tokens.T_UNION + ' ' + Tokens.T_ALL;
+                break;
+
+            case INTERSECT :
+                temp = Tokens.T_INTERSECT;
+                break;
+
+            case INTERSECT_ALL :
+                temp = Tokens.T_INTERSECT + ' ' + Tokens.T_ALL;
+                break;
+
+            case EXCEPT :
+                temp = Tokens.T_EXCEPT;
+                break;
+
+            case EXCEPT_ALL :
+                temp = Tokens.T_EXCEPT + ' ' + Tokens.T_ALL;
+                break;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "QueryExpression");
+        }
+
+        sb.append(b).append(temp).append("\n");
+        sb.append(b).append("Left Query=[\n");
+        sb.append(b).append(leftQueryExpression.describe(session, blanks + 2));
+        sb.append(b).append("]\n");
+        sb.append(b).append("Right Query=[\n");
+        sb.append(b).append(rightQueryExpression.describe(session,
+                blanks + 2));
+        sb.append(b).append("]\n");
+
+        return sb.toString();
     }
 
     public HsqlList getUnresolvedExpressions() {
@@ -537,8 +831,24 @@ public class QueryExpression {
     }
 
     public boolean areColumnsResolved() {
-        return unresolvedExpressions == null
-               || unresolvedExpressions.isEmpty();
+
+        if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
+            return true;
+        }
+
+        for (int i = 0; i < unresolvedExpressions.size(); i++) {
+            Expression e = (Expression) unresolvedExpressions.get(i);
+
+            if (e.getRangeVariable() == null) {
+                return false;
+            }
+
+            if (e.getRangeVariable().rangeType == RangeVariable.TABLE_RANGE) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     String[] getColumnNames() {
@@ -574,15 +884,41 @@ public class QueryExpression {
         return unionCorrespondingColumns.size();
     }
 
-    public void collectAllExpressions(HsqlList set, OrderedIntHashSet typeSet,
-                                      OrderedIntHashSet stopAtTypeSet) {
+    public OrderedHashSet collectAllExpressions(OrderedHashSet set,
+            OrderedIntHashSet typeSet, OrderedIntHashSet stopAtTypeSet) {
 
-        leftQueryExpression.collectAllExpressions(set, typeSet, stopAtTypeSet);
+        set = leftQueryExpression.collectAllExpressions(set, typeSet,
+                stopAtTypeSet);
 
         if (rightQueryExpression != null) {
-            rightQueryExpression.collectAllExpressions(set, typeSet,
+            set = rightQueryExpression.collectAllExpressions(set, typeSet,
                     stopAtTypeSet);
         }
+
+        return set;
+    }
+
+    OrderedHashSet collectRangeVariables(RangeVariable[] rangeVars,
+                                         OrderedHashSet set) {
+
+        set = leftQueryExpression.collectRangeVariables(rangeVars, set);
+
+        if (rightQueryExpression != null) {
+            set = rightQueryExpression.collectRangeVariables(rangeVars, set);
+        }
+
+        return set;
+    }
+
+    OrderedHashSet collectRangeVariables(OrderedHashSet set) {
+
+        set = leftQueryExpression.collectRangeVariables(set);
+
+        if (rightQueryExpression != null) {
+            set = rightQueryExpression.collectRangeVariables(set);
+        }
+
+        return set;
     }
 
     public void collectObjectNames(Set set) {
@@ -605,7 +941,11 @@ public class QueryExpression {
      * Used prior to type resolution
      */
     public void setView(View view) {
-        this.view = view;
+
+        this.view             = view;
+        this.isUpdatable      = true;
+        this.acceptsSequences = true;
+        this.isTopLevel       = true;
     }
 
     /**
@@ -629,17 +969,15 @@ public class QueryExpression {
         mainIndex = resultTable.getPrimaryIndex();
 
         if (sortAndSlice.hasOrder()) {
-            orderIndex = resultTable.createAndAddIndexStructure(null,
-                    sortAndSlice.sortOrder, sortAndSlice.sortDescending,
-                    sortAndSlice.sortNullsLast, false, false, false);
+            orderIndex = sortAndSlice.getNewIndex(session, resultTable);
         }
 
         int[] fullCols = new int[columnCount];
 
         ArrayUtil.fillSequence(fullCols);
 
-        fullIndex = resultTable.createAndAddIndexStructure(null, fullCols,
-                null, null, false, false, false);
+        fullIndex = resultTable.createAndAddIndexStructure(session, null,
+                fullCols, null, null, false, false, false);
         resultTable.fullIndex = fullIndex;
     }
 
@@ -658,13 +996,12 @@ public class QueryExpression {
         try {
             resultTable = new TableDerived(session.database, tableName,
                                            tableType, unionColumnTypes,
-                                           columnList, null);
+                                           columnList,
+                                           ValuePool.emptyIntArray);
         } catch (Exception e) {}
     }
 
     public void setColumnsDefined() {
-
-        columnMode = TableBase.COLUMNS_REFERENCED;
 
         if (leftQueryExpression != null) {
             leftQueryExpression.setColumnsDefined();
@@ -674,7 +1011,7 @@ public class QueryExpression {
     /**
      * Not for views. Only used on root node.
      */
-    public void setAsTopLevel() {
+    public void setReturningResult() {
 
         if (compileContext.getSequences().length > 0) {
             throw Error.error(ErrorCode.X_42598);
@@ -693,7 +1030,6 @@ public class QueryExpression {
 
         if (unionCorresponding) {
             persistenceScope = TableBase.SCOPE_SESSION;
-            columnMode       = TableBase.COLUMNS_UNREFERENCED;
 
             return;
         }
@@ -708,7 +1044,8 @@ public class QueryExpression {
             HashMappedList list    = new HashMappedList();
 
             for (int i = 0; i < unionColumnMap.length; i++) {
-                ColumnSchema column = (ColumnSchema) columns.get(i);
+                ColumnSchema column =
+                    (ColumnSchema) columns.get(unionColumnMap[i]);
 
                 list.add(column.getName().name, column);
             }
@@ -787,6 +1124,27 @@ public class QueryExpression {
         rightQueryExpression.getBaseTableNames(set);
     }
 
+    boolean isEquivalent(QueryExpression other) {
+
+        return leftQueryExpression.isEquivalent(other.leftQueryExpression)
+               && unionType == other.unionType
+               && (rightQueryExpression == null
+                   ? other.rightQueryExpression == null
+                   : rightQueryExpression.isEquivalent(
+                       other.rightQueryExpression));
+    }
+
+    public void replaceColumnReferences(RangeVariable range,
+                                        Expression[] list) {
+        leftQueryExpression.replaceColumnReferences(range, list);
+        rightQueryExpression.replaceColumnReferences(range, list);
+    }
+
+    public void replaceRangeVariables(RangeVariable[] ranges,
+                                      RangeVariable[] newRanges) {
+        leftQueryExpression.replaceRangeVariables(ranges, newRanges);
+        rightQueryExpression.replaceRangeVariables(ranges, newRanges);
+    }
     /************************* Volt DB Extensions *************************/
 
     private static final String[] m_setOperatorNames = new String[] {

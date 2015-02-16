@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,8 +42,10 @@ import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.StatementTypes;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.result.ResultConstants;
+import org.hsqldb_voltpatches.result.ResultProperties;
 
-/* $Id: JDBCStatement.java 2968 2009-04-10 23:44:16Z fredt $ */
+/* $Id: JDBCStatement.java 5283 2013-09-29 17:52:44Z unsaved $ */
 
 // fredt@users   20020320 - patch 1.7.0 - JDBC 2 support and error trapping
 //
@@ -82,9 +84,10 @@ import org.hsqldb_voltpatches.result.Result;
  * <!-- start release-specific documentation -->
  * <div class="ReleaseSpecificDocumentation">
  * <h3>HSQLDB-Specific Information:</h3><p>
- * From version 1.9.0, the implementation meets the JDBC specification
+ * From version 2.0, the implementation meets the JDBC specification
  * requirment that any existing ResultSet is closed when execute() or
- * executeQuery() methods are called.
+ * executeQuery() methods are called. The connection property close_result=true
+ * is required for this behaviour.
  * <p>
  *
  * <b>JRE 1.1.x Notes:</b> <p>
@@ -129,10 +132,10 @@ import org.hsqldb_voltpatches.result.Result;
  * </div>
  * <!-- end release-specific documentation -->
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
- * @revised JDK 1.6, HSQLDB 1.9.0
+ * @version 2.3.0
+ * @revised JDK 1.6, HSQLDB 2.0
  * @see JDBCConnection#createStatement
  * @see JDBCResultSet
  */
@@ -159,7 +162,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      *
      * This method should not be used for statements other than SELECT queries.<p>
      *
-     * From 1.9.0, HSQLDB throws an exception when the statement
+     * From 2.0, HSQLDB throws an exception when the statement
      * is a DDL statement or an UPDATE or DELETE statement.
      * </div>
      * <!-- end release-specific documentation -->
@@ -324,7 +327,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         checkClosed();
 
         if (max < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
     }
 
@@ -371,7 +374,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         checkClosed();
 
         if (max < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
         maxRows = max;
     }
@@ -426,7 +429,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
 
         checkClosed();
 
-        return 0;
+        return queryTimeout;
     }
 
     /**
@@ -445,9 +448,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, calls to this method are ignored; HSQLDB waits an
-     * unlimited amount of time for statement execution
-     * requests to return.
+     * The maximum number of seconds to wait is 32767.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -463,8 +464,13 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         checkClosed();
 
         if (seconds < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
+
+        if (seconds > Short.MAX_VALUE) {
+            seconds = Short.MAX_VALUE;
+        }
+        queryTimeout = seconds;
     }
 
     /**
@@ -479,7 +485,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB does <i>not</i> support aborting an SQL
+     * Including 2.0, HSQLDB does <i>not</i> support aborting an SQL
      * statement; calls to this method are ignored.
      * </div>
      * <!-- end release-specific documentation -->
@@ -514,7 +520,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB never produces Statement warnings;
+     * In 2.0, HSQLDB may produces Statement warnings;
      * this method always returns null.
      * </div>
      * <!-- end release-specific documentation -->
@@ -528,7 +534,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
 
         checkClosed();
 
-        return null;
+        return rootWarning;
     }
 
     /**
@@ -544,9 +550,8 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including HSQLDB 1.9.0, <code>SQLWarning</code> objects are
-     * never produced for Statement Objects; calls to this method are
-     * ignored.
+     * In HSQLDB 2.0, <code>SQLWarning</code> objects may
+     * be produced for Statement Objects; calls to this method clear the warnings.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -554,7 +559,10 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * this method is called on a closed <code>Statement</code>
      */
     public synchronized void clearWarnings() throws SQLException {
+
         checkClosed();
+
+        rootWarning = null;
     }
 
     /** @todo 1.9.0 - implement */
@@ -582,7 +590,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Including 1.9.0, HSQLDB does not support named cursors;
+     * Including 2.0, HSQLDB does not support named cursors;
      * calls to this method are ignored.
      * </div>
      * <!-- end release-specific documentation -->
@@ -630,7 +638,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         fetchResult(sql, StatementTypes.RETURN_ANY,
                     JDBCStatementBase.NO_GENERATED_KEYS, null, null);
 
-        return resultIn.isData();
+        return currentResultSet != null;
     }
 
     /**
@@ -745,7 +753,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
 
                 break;
             default :
-                throw Util.invalidArgument();
+                throw JDBCUtil.invalidArgument();
         }
     }
 
@@ -815,7 +823,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         checkClosed();
 
         if (rows < 0) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
         fetchSize = rows;
     }
@@ -879,7 +887,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
 
         checkClosed();
 
-        return rsConcurrency;
+        return ResultProperties.getJDBCConcurrency(rsProperties);
     }
 
     /**
@@ -909,7 +917,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
 
         checkClosed();
 
-        return rsScrollability;
+        return ResultProperties.getJDBCScrollability(rsProperties);
     }
 
     /**
@@ -1041,11 +1049,6 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * results in an exception. The size of the returned array equals the
      * number of commands that were executed successfully.<p>
      *
-     * When the product is built under the JAVA1 target, an exception
-     * is never thrown and it is the responsibility of the client software to
-     * check the size of the  returned update count array to determine if any
-     * batch items failed.  To build and run under the JAVA2 target, JDK/JRE
-     * 1.3 or higher must be used.
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -1067,7 +1070,6 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
     public synchronized int[] executeBatch() throws SQLException {
 
         checkClosed();
-        connection.clearWarningsNoCheck();
 
         generatedResult = null;
 
@@ -1084,12 +1086,12 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         } catch (HsqlException e) {
             batchResultOut.getNavigator().clear();
 
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
         batchResultOut.getNavigator().clear();
 
         if (resultIn.isError()) {
-            throw Util.sqlException(resultIn);
+            throw JDBCUtil.sqlException(resultIn);
         }
 
         RowSetNavigator navigator    = resultIn.getNavigator();
@@ -1201,10 +1203,25 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Supported in 1.9.0.x <p>
+     * Starting with version 2.0, HSQLDB supports this feature with single-row
+     * and multi-row insert, update and merge statements. <p>
+     *
+     * This method returns a result set only if
+     * the executeUpdate methods that was used is one of the three methods that
+     * have the extra parameter indicating return of generated keys<p>
+     *
+     * If the executeUpaged method did not specify the columns which represent
+     * the auto-generated keys the IDENTITY column or GENERATED column(s) of the
+     * table are returned.<p>
+     *
+     * The executeUpdate methods with column indexes or column names return the
+     * post-insert or post-update values of the specified columns, whether the
+     * columns are generated or not. This allows values that have been modified
+     * by execution of triggers to be returned.<p>
      *
      * If column names or indexes provided by the user in the executeUpdate()
-     * method calls are not correct, an empty result is returned.
+     * method calls do not correspond to table columns (incorrect names or
+     * indexes larger than the coloum count), an empty result is returned.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1238,7 +1255,10 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.9.0, HSQLDB supports this feature.
+     * Starting with version 2.0, HSQLDB supports returning generated columns
+     * with single-row and multi-row INSERT, UPDATE and MERGE statements. <p>
+     * If the table has an IDENTITY or GENERATED column(s) the values for these
+     * columns are returned in the next call to getGeneratedKeys().
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1270,13 +1290,13 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
 
         if (autoGeneratedKeys != Statement.RETURN_GENERATED_KEYS
                 && autoGeneratedKeys != Statement.NO_GENERATED_KEYS) {
-            throw Util.invalidArgument("autoGeneratedKeys");
+            throw JDBCUtil.invalidArgument("autoGeneratedKeys");
         }
         fetchResult(sql, StatementTypes.RETURN_COUNT, autoGeneratedKeys, null,
                     null);
 
         if (resultIn.isError()) {
-            throw Util.sqlException(resultIn);
+            throw JDBCUtil.sqlException(resultIn);
         }
 
         return resultIn.getUpdateCount();
@@ -1298,9 +1318,9 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.9.0, HSQLDB supports this feature with single-row and
-     * multi-row inserts. <p>
-     * CHECKME: possibly change method depending to final GENERATED column support.
+     * Starting with version 2.0, HSQLDB supports returning generated columns
+     * with single-row and multi-row INSERT, UPDATE and MERGE statements. <p>
+     * The columnIndexes may specify any set of columns of the table.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1329,10 +1349,11 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
             int[] columnIndexes) throws SQLException {
 
         if (columnIndexes == null || columnIndexes.length == 0) {
-            throw Util.invalidArgument("columnIndexes");
+            throw JDBCUtil.invalidArgument("columnIndexes");
         }
         fetchResult(sql, StatementTypes.RETURN_COUNT,
-                    Statement.RETURN_GENERATED_KEYS, columnIndexes, null);
+                    ResultConstants.RETURN_GENERATED_KEYS_COL_INDEXES,
+                    columnIndexes, null);
 
         return resultIn.getUpdateCount();
     }
@@ -1353,7 +1374,9 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.9.0, HSQLDB supports this feature.
+     * Starting with version 2.0, HSQLDB supports returning generated columns
+     * with single-row and multi-row INSERT, UPDATE and MERGE statements. <p>
+     * The columnNames may specify any set of columns of the table.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1381,10 +1404,11 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
             String[] columnNames) throws SQLException {
 
         if (columnNames == null || columnNames.length == 0) {
-            throw Util.invalidArgument("columnIndexes");
+            throw JDBCUtil.invalidArgument("columnIndexes");
         }
         fetchResult(sql, StatementTypes.RETURN_COUNT,
-                    Statement.RETURN_GENERATED_KEYS, null, columnNames);
+                    ResultConstants.RETURN_GENERATED_KEYS_COL_NAMES, null,
+                    columnNames);
 
         return resultIn.getUpdateCount();
     }
@@ -1418,7 +1442,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.9.0, HSQLDB supports this feature.
+     * Starting with 2.0, HSQLDB supports this feature.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1451,7 +1475,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
 
         if (autoGeneratedKeys != Statement.RETURN_GENERATED_KEYS
                 && autoGeneratedKeys != Statement.NO_GENERATED_KEYS) {
-            throw Util.invalidArgument("autoGeneratedKeys");
+            throw JDBCUtil.invalidArgument("autoGeneratedKeys");
         }
         fetchResult(sql, StatementTypes.RETURN_ANY, autoGeneratedKeys, null,
                     null);
@@ -1490,7 +1514,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.9.0, HSQLDB supports this feature.
+     * Starting with 2.0, HSQLDB supports this feature.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1517,10 +1541,11 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
             String sql, int[] columnIndexes) throws SQLException {
 
         if (columnIndexes == null || columnIndexes.length == 0) {
-            throw Util.invalidArgument("columnIndexes");
+            throw JDBCUtil.invalidArgument("columnIndexes");
         }
         fetchResult(sql, StatementTypes.RETURN_ANY,
-                    Statement.RETURN_GENERATED_KEYS, columnIndexes, null);
+                    ResultConstants.RETURN_GENERATED_KEYS_COL_INDEXES,
+                    columnIndexes, null);
 
         return resultIn.isData();
     }
@@ -1555,7 +1580,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.9.0, HSQLDB supports this feature.
+     * Starting with 2.0, HSQLDB supports this feature.
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -1583,10 +1608,11 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
             String sql, String[] columnNames) throws SQLException {
 
         if (columnNames == null || columnNames.length == 0) {
-            throw Util.invalidArgument("columnIndexes");
+            throw JDBCUtil.invalidArgument("columnIndexes");
         }
         fetchResult(sql, StatementTypes.RETURN_ANY,
-                    Statement.RETURN_GENERATED_KEYS, null, columnNames);
+                    ResultConstants.RETURN_GENERATED_KEYS_COL_NAMES, null,
+                    columnNames);
 
         return resultIn.isData();
     }
@@ -1599,14 +1625,6 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * generated by this <code>Statement</code> object.
      * <!-- end generic documentation -->
      *
-     * <!-- start release-specific documentation -->
-     * <div class="ReleaseSpecificDocumentation">
-     * <h3>HSQLDB-Specific Information:</h3> <p>
-     *
-     * Starting with 1.7.2, this method returns HOLD_CURSORS_OVER_COMMIT
-     * </div>
-     * <!-- end release-specific documentation -->
-     *
      * @return either <code>ResultSet.HOLD_CURSORS_OVER_COMMIT</code> or
      *         <code>ResultSet.CLOSE_CURSORS_AT_COMMIT</code>
      * @exception SQLException if a database access error occurs or
@@ -1615,7 +1633,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      */
 //#ifdef JAVA4
     public synchronized int getResultSetHoldability() throws SQLException {
-        return rsHoldability;
+        return ResultProperties.getJDBCHoldability(rsProperties);
     }
 
 //#endif JAVA4
@@ -1626,7 +1644,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * method close has been called on it, or if it is automatically closed.
      * @return true if this <code>Statement</code> object is closed; false if it is still open
      * @throws SQLException if a database access error occurs
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized boolean isClosed() throws SQLException {
         return isClosed;
@@ -1655,7 +1673,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * @throws SQLException if this method is called on a closed
      * <code>Statement</code>
      * <p>
-     * @since JDK 1.6 Build 81, HSQLDB 1.9.0
+     * @since JDK 1.6 Build 81, HSQLDB 2.0
      */
 
 //#ifdef JAVA6
@@ -1678,7 +1696,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * @throws SQLException if this method is called on a closed
      * <code>Statement</code>
      * <p>
-     * @since JDK 1.6 Build 81, HSQLDB 1.9.0
+     * @since JDK 1.6 Build 81, HSQLDB 2.0
      * <p>
      * @see #setPoolable(boolean) setPoolable(boolean)
      */
@@ -1708,7 +1726,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * @param iface A Class defining an interface that the result must implement.
      * @return an object that implements the interface. May be a proxy for the actual implementing object.
      * @throws java.sql.SQLException If no object found that implements the interface
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     @SuppressWarnings("unchecked")
@@ -1718,7 +1736,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
             return (T) this;
         }
 
-        throw Util.invalidArgument("iface: " + iface);
+        throw JDBCUtil.invalidArgument("iface: " + iface);
     }
 
 //#endif JAVA6
@@ -1736,7 +1754,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * @return true if this implements the interface or directly or indirectly wraps an object that does.
      * @throws java.sql.SQLException  if an error occurs while determining whether this is a wrapper
      * for an object with the given interface.
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public boolean isWrapperFor(
@@ -1752,17 +1770,13 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
      * type.
      *
      * @param c the connection on which this statement will execute
-     * @param resultSetConcurrency int
-     * @param resultSetHoldability int
      */
-    JDBCStatement(JDBCConnection c, int resultSetScrollability,
-                  int resultSetConcurrency, int resultSetHoldability) {
+    JDBCStatement(JDBCConnection c, int props) {
 
-        resultOut       = Result.newExecuteDirectRequest();
-        connection      = c;
-        rsScrollability = resultSetScrollability;
-        rsConcurrency   = resultSetConcurrency;
-        rsHoldability   = resultSetHoldability;
+        resultOut             = Result.newExecuteDirectRequest();
+        connection            = c;
+        connectionIncarnation = connection.incarnation;
+        rsProperties          = props;
     }
 
     /**
@@ -1782,27 +1796,33 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
                              String[] generatedNames) throws SQLException {
 
         checkClosed();
-        connection.clearWarningsNoCheck();
         closeResultData();
 
         if (isEscapeProcessing) {
             sql = connection.nativeSQL(sql);
         }
         resultOut.setPrepareOrExecuteProperties(sql, maxRows, fetchSize,
-                statementRetType, rsScrollability, rsConcurrency,
-                rsHoldability, generatedKeys, generatedIndexes,
-                generatedNames);
+                statementRetType, queryTimeout, rsProperties, generatedKeys,
+                generatedIndexes, generatedNames);
 
         try {
             resultIn = connection.sessionProxy.execute(resultOut);
 
             performPostExecute();
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
 
         if (resultIn.isError()) {
-            throw Util.sqlException(resultIn);
+            throw JDBCUtil.sqlException(resultIn);
+        }
+
+        if (resultIn.isData()) {
+            currentResultSet = new JDBCResultSet(connection, this, resultIn,
+                    resultIn.metaData);
+        } else if (resultIn.getStatementType()
+                   == StatementTypes.RETURN_RESULT) {
+            getMoreResults();
         }
     }
 

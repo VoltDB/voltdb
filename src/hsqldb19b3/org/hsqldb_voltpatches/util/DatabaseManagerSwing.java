@@ -1,39 +1,4 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the Hypersonic SQL Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE HYPERSONIC SQL GROUP,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * This software consists of voluntary contributions made by many individuals
- * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -83,6 +48,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -104,6 +70,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import javax.swing.ButtonGroup;
@@ -120,6 +88,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -134,16 +103,17 @@ import javax.swing.table.TableModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.MutableTreeNode;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 
-import org.hsqldb_voltpatches.lib.java.JavaSystem;
 import org.hsqldb_voltpatches.lib.RCData;
+import org.hsqldb_voltpatches.lib.java.JavaSystem;
 
 //dmarshall@users - 20020101 - original swing port of DatabaseManager
 //sqlbob@users 20020401 - patch 537501 by ulrivo - commandline arguments
 //sqlbob@users 20020407 - patch 1.7.0 - reengineering and enhancements
 //nickferguson@users 20021005 - patch 1.7.1 - enhancements
-//deccles@users 20040412 - patch 933671 - various bug fixes
-//deccles@users 2004xxxx - enhancements
+//deccles@users 2004 - 2008 - bug fixes and enhancements
 //weconsultants@users 20041109 - version 1.8.0 - reengineering and enhancements:
 //              Added: Goodies 'Look and Feel'.
 //              Added: a Font Changer(Font Type\Style).
@@ -178,15 +148,13 @@ import org.hsqldb_voltpatches.lib.RCData;
  * Note that the sys-table switch will not work for Oracle, because Oracle
  * does not categorize their system tables correctly in the JDBC Metadata.
  *
- * New class based on Hypersonic SQL original
- *
  * @author dmarshall@users
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
- * @version 1.8.0
+ * @version 2.3.0
  * @since 1.7.0
  */
 public class DatabaseManagerSwing extends JApplet
-implements ActionListener, WindowListener, KeyListener {
+implements ActionListener, WindowListener, KeyListener, MouseListener {
 
     /*
      * This is down here because it is an  implementation note, not a
@@ -264,20 +232,19 @@ implements ActionListener, WindowListener, KeyListener {
     }
 
     private static final String HELP_TEXT =
-        "See the forums, mailing lists, and HSQLDB User Guide\n"
+        "See the HSQLDB Utilities Guide, forums and mailing lists \n"
         + "at http://hsqldb_voltpatches.org.\n\n"
         + "Please paste the following version identifier with any\n"
-        + "problem reports or help requests:  $Revision: 2944 $"
+        + "problem reports or help requests:  $Revision: 5221 $"
         + (TT_AVAILABLE ? ""
                         : ("\n\nTransferTool classes are not in CLASSPATH.\n"
                            + "To enable the Tools menu, add 'transfer.jar' "
                            + "to your class path."));
     ;
     private static final String ABOUT_TEXT =
-        "$Revision: 2944 $ of DatabaseManagerSwing\n\n"
-        + "Copyright (c) 1995-2000, The Hypersonic SQL Group.\n"
-        + "Copyright (c) 2001-2009, The HSQL Development Group.\n"
-        + "http://hsqldb_voltpatches.org  (User Guide available at this site).\n\n\n"
+        "$Revision: 5221 $ of DatabaseManagerSwing\n\n"
+        + "Copyright (c) 2001-2010, The HSQL Development Group.\n"
+        + "http://hsqldb_voltpatches.org  (Utilities Guide available at this site).\n\n\n"
         + "You may use and redistribute according to the HSQLDB\n"
         + "license documented in the source code and at the web\n"
         + "site above."
@@ -499,6 +466,7 @@ implements ActionListener, WindowListener, KeyListener {
         System.getProperties().put("sun.java2d.noddraw", "true");
 
         // (ulrivo): read all arguments from the command line
+        String  currentArg;
         String  lowerArg;
         String  urlid        = null;
         String  rcFile       = null;
@@ -508,10 +476,19 @@ implements ActionListener, WindowListener, KeyListener {
         bMustExit = true;
 
         for (int i = 0; i < arg.length; i++) {
+            currentArg = arg[i];
             lowerArg = arg[i].toLowerCase();
 
             if (lowerArg.startsWith("--")) {
                 lowerArg = lowerArg.substring(1);
+            }
+
+            if (lowerArg.equals("-noexit") || lowerArg.equals("-help")) {
+
+                //
+            } else if (i == arg.length - 1) {
+                throw new IllegalArgumentException("No value for argument "
+                                                   + currentArg);
             }
 
             i++;
@@ -544,6 +521,7 @@ implements ActionListener, WindowListener, KeyListener {
                 i--;
             } else if (lowerArg.equals("-help")) {
                 showUsage();
+
                 return;
             } else {
                 /* Syntax ERRORS should either throw or exit with non-0 status.
@@ -551,10 +529,10 @@ implements ActionListener, WindowListener, KeyListener {
                  * (I.e. should provide easy way for caller to programmatically
                  * determine that there was an invocation problem).
                  */
-
                 throw new IllegalArgumentException(
-                        "Try:  java... " + DatabaseManagerSwing.class.getName()
-                        + " --help");
+                    "invalid argrument " + currentArg + " try:  java... "
+                    + DatabaseManagerSwing.class.getName() + " --help");
+
                 // No reason to localize, since the main syntax message is
                 // not localized.
             }
@@ -594,8 +572,7 @@ implements ActionListener, WindowListener, KeyListener {
                 RCData rcdata     = new RCData(new File(rcfilepath), urlid);
 
                 c = rcdata.getConnection(
-                    null, System.getProperty("sqlfile.charset"),
-                    System.getProperty("javax.net.ssl.trustStore"));
+                    null, System.getProperty("javax.net.ssl.trustStore"));
             } else {
                 c = ConnectionDialogSwing.createConnection(m.jframe,
                         "Connect");
@@ -740,8 +717,10 @@ implements ActionListener, WindowListener, KeyListener {
         try {
             prefs = new DBMPrefs(fMain instanceof JApplet);
         } catch (Exception e) {
+/*
             System.err.println(
                 "Failed to load preferences.  Proceeding with defaults:\n");
+*/
         }
 
         if (prefs == null) {
@@ -833,7 +812,7 @@ implements ActionListener, WindowListener, KeyListener {
                    "Refresh tree (and schema list) automatically"
                    + "when YOU modify database objects");
         tipMap.put(boxShowSchemas,
-                   "Display object names in tree like schemaname.basename");
+                   "Display object names in tree-like schemaname.basename");
         tipMap.put(rbNativeLF,
                    "Set Look and Feel to Native for your platform");
         tipMap.put(rbJavaLF, "Set Look and Feel to Java");
@@ -1488,8 +1467,7 @@ implements ActionListener, WindowListener, KeyListener {
             txtResult.setCursor(txtResultCursor);
 
             /** @todo: Enable actionButtons */
-
-            } else {
+        } else {
 
             // save the old cursors
             if (fMainCursor == null) {
@@ -1573,6 +1551,12 @@ implements ActionListener, WindowListener, KeyListener {
 
         System.err.println("Stopping");
 
+        Thread t = buttonUpdaterThread;
+
+        if (t != null) {
+            t.setContextClassLoader(null);
+        }
+
         buttonUpdaterThread = null;
     }
 
@@ -1622,7 +1606,8 @@ implements ActionListener, WindowListener, KeyListener {
                 updateResult();
                 displayResults();
                 updateAutoCommitBox();
-                System.gc();
+
+                // System.gc();
             } catch (RuntimeException re) {
                 CommonSwing.errorMessage(re);
 
@@ -1649,7 +1634,21 @@ implements ActionListener, WindowListener, KeyListener {
             int r = sStatement.getUpdateCount();
 
             if (r == -1) {
-                formatResultSet(sStatement.getResultSet());
+                ResultSet rs = sStatement.getResultSet();
+
+                try {
+                    formatResultSet(rs);
+                } catch (Throwable t) {
+                    g[0] = "Error displaying the ResultSet";
+
+                    gResult.setHead(g);
+
+                    String s = t.getMessage();
+
+                    g[0] = s;
+
+                    gResult.addRow(g);
+                }
             } else {
                 g[0] = "update count";
 
@@ -1975,6 +1974,328 @@ implements ActionListener, WindowListener, KeyListener {
         iRecent = (iRecent + 1) % iMaxRecent;
     }
 
+    // empty implementations for mouse listener.  We're only using
+    // mouseReleased
+    public final void mouseClicked(final MouseEvent mouseEvent) {}
+
+    public final void mouseEntered(final MouseEvent mouseEvent) {}
+
+    public final void mouseExited(final MouseEvent mouseEvent) {}
+
+    // Check for handlePopup in both mousePressed and mouseReleased.  According to
+    // MouseEvent javadocs it's necessary for cross platform compatibility.
+    // We keep a record of the last alreadyHandled mouseEvent so we don't do it twice.
+    private MouseEvent alreadyHandled = null;
+
+    // mousePressed calls handlePopup, which creates the context-sensitive
+    // helper menu.
+    public final void mousePressed(final MouseEvent e) {
+
+        if (alreadyHandled == e) {
+            return;
+        }
+
+        handlePopup(e);
+
+        alreadyHandled = e;
+    }
+
+    // mouseReleased calls handlePopup, which creates the context-sensitive
+    // helper menu.
+    public final void mouseReleased(final MouseEvent e) {
+
+        if (alreadyHandled == e) {
+            return;
+        }
+
+        handlePopup(e);
+
+        alreadyHandled = e;
+    }
+
+    // based on the table or column right-clicked on, create some helper
+    // actions for common sql statements
+    public final void handlePopup(MouseEvent e) {
+
+        //System.out.println("Handle popup");
+        // if this is not a mouse action for popups then do nothing and return
+        if (!e.isPopupTrigger()) {
+            return;
+        }
+
+        // make sure the source of this mouse event was from the tree
+        Object source = e.getSource();
+
+        if (!(source instanceof JTree)) {
+            return;
+        }
+
+        JTree    tree     = (JTree) source;
+        TreePath treePath = tree.getPathForLocation(e.getX(), e.getY());
+
+        // if we couldn't find a tree path that corresponds to the
+        // right-click, then return
+        if (treePath == null) {
+            return;
+        }
+
+        // create the popup and menus
+        JPopupMenu popup = new JPopupMenu();
+        JMenuItem  menuItem;
+        String     menus[] = new String[] {
+            "Select", "Delete", "Update", "Insert"
+        };
+
+        // loop throught the menus we want to create, making a PopupListener
+        // for each one
+        for (int i = 0; i < menus.length; i++) {
+            PopupListener popupListener = new PopupListener(menus[i],
+                treePath);
+            String title = popupListener.toString();
+
+            if (title == null) {
+                return;
+            }
+
+            // Some of the menu names can be quite long (especially insert).
+            // If it's too long, abbreviate it
+            if (title.length() > 40) {
+                title = title.substring(0, 40) + "...";
+            }
+
+            menuItem = new JMenuItem(title);
+
+            menuItem.addActionListener(popupListener);
+            popup.add(menuItem);
+        }
+
+        popup.show(e.getComponent(), e.getX(), e.getY());
+    }
+
+    // handles the creation of the command when a popup is triggered
+    private class PopupListener implements ActionListener {
+
+        // used to identify depth while right clicking in tree.
+        public static final int DEPTH_URL    = 1;
+        public static final int DEPTH_TABLE  = 2;
+        public static final int DEPTH_COLUMN = 3;
+        String                  command;
+        TreePath                treePath;
+        TreePath                tablePath;
+        TreePath                columnPath;
+        String                  table  = null;
+        String                  column = null;
+
+        PopupListener(String command, TreePath treePath) {
+
+            super();
+
+            this.command  = command;
+            this.treePath = treePath;
+        }
+
+        // when the popup is triggered, create a command string and set it in
+        // the txtCommand buffer
+        public void actionPerformed(ActionEvent ae) {
+            txtCommand.setText(getCommandString());
+        }
+
+        // text to display when added to a menu
+        public String toString() {
+            return getCommandString();
+        }
+
+        //
+        public String getCommandString() {
+
+            int treeDepth = treePath.getPathCount();
+
+            // if we are at TABLE depth, set tablePath and table for use later
+            if (treeDepth == DEPTH_URL) {
+                return "";
+            }
+
+            if (treeDepth == DEPTH_TABLE) {
+                tablePath = treePath;
+                table = treePath.getPathComponent(DEPTH_TABLE - 1).toString();
+            }
+
+            // if we are at TABLE depth, set columnPath, column, tablePath and
+            // table for use later
+            if (treeDepth == DEPTH_COLUMN) {
+                tablePath  = treePath.getParentPath();
+                table = treePath.getPathComponent(DEPTH_TABLE - 1).toString();
+                columnPath = treePath;
+                column = treePath.getPathComponent(DEPTH_COLUMN
+                                                   - 1).toString();
+            }
+
+            // handle command "SELECT".  Use table and column if set.
+            if (command.toUpperCase().equals("SELECT")) {
+                String result = "SELECT * FROM " + quoteTableName(table);
+
+                if (column != null) {
+                    DefaultMutableTreeNode childNode =
+                        (DefaultMutableTreeNode) treePath
+                            .getLastPathComponent();
+                    String  childName = null;
+                    boolean isChar;
+
+                    if (childNode.getChildCount() > 0) {
+                        childName = childNode.getFirstChild().toString();
+                        isChar    = childName.indexOf("CHAR") >= 0;
+                        result    += " WHERE " + quoteObjectName(column);
+
+                        if (isChar) {
+                            result += " LIKE \'%%\'";
+                        } else {
+                            result += " = ";
+                        }
+                    }
+                }
+
+                return result;
+            }
+
+            // handle command "UPDATE".  Use table and column if set.
+            else if (command.toUpperCase().equals("UPDATE")) {
+                String result = "UPDATE " + quoteTableName(table) + " SET ";
+
+                if (column != null) {
+                    result += quoteObjectName(column) + " = ";
+                }
+
+                return result;
+            }
+
+            // handle command "DELETE".  Use table and column if set.
+            else if (command.toUpperCase().equals("DELETE")) {
+                String result = "DELETE FROM " + quoteTableName(table);
+
+                if (column != null) {
+                    DefaultMutableTreeNode childNode =
+                        (DefaultMutableTreeNode) treePath
+                            .getLastPathComponent();
+                    String  childName = null;
+                    boolean isChar;
+
+                    if (childNode.getChildCount() > 0) {
+                        childName = childNode.getFirstChild().toString();
+                        isChar    = childName.indexOf("CHAR") >= 0;
+                        result    += " WHERE " + quoteObjectName(column);
+
+                        if (isChar) {
+                            result += " LIKE \'%%\'";
+                        } else {
+                            result += " = ";
+                        }
+                    }
+                }
+
+                return result;
+            }
+
+            // handle command "INSERT".  Use table and column if set.
+            else if (command.toUpperCase().equals("INSERT")) {
+                TreeNode    tableNode;
+                Enumeration enumer;
+                String      columns = "";
+                String      values  = " ";
+                String      comma   = "";
+                String      quote   = "";
+
+                // build a string that includes all the columns that need to
+                // be added, with a parenthesied list of commas, suitable for
+                // inserting values into.
+                if (tablePath == null) {
+                    return null;
+                }
+
+                tableNode = (TreeNode) tablePath.getLastPathComponent();
+                enumer    = tableNode.children();
+
+                while (enumer.hasMoreElements()) {
+                    Object o = enumer.nextElement();
+
+                    if (o.toString().equals("Indices")) {
+                        continue;
+                    }
+
+                    DefaultMutableTreeNode childNode =
+                        (DefaultMutableTreeNode) o;
+                    String childName = null;
+
+                    if (childNode.getChildCount() == 0) {
+                        continue;
+                    } else {
+                        childName = childNode.getFirstChild().toString();
+                    }
+
+                    // If our first child (type) is some sort of char, use ''
+                    // in the string.  Makes is more obvious to the user when
+                    // they need to use a string
+                    if (childName.indexOf("CHAR") >= 0) {
+                        quote = "\'\'";
+                    } else {
+                        quote = "";
+                    }
+
+                    columns += comma + quoteObjectName(o.toString());
+                    values  += comma + quote;
+                    comma   = ", ";
+                }
+
+                return "INSERT INTO " + quoteTableName(table) + "\n( "
+                       + columns + " )\nVALUES (" + values + ")";
+            } else {
+                return "Got here in error " + command
+                       + ".  Should never happen";
+            }
+        }
+    }
+
+    /**
+     * Perform a limited check (inconclusive) and quote object name if required.
+     * Gives wrong result if a quoted name contains a dot.
+     */
+    private String quoteTableName(String name) {
+
+        int dot = name.indexOf(".");
+
+        if (dot < 0) {
+            int bracket = name.indexOf(" (");
+
+            if (bracket >= 0) {
+                name = name.substring(0, bracket);
+            }
+
+            return quoteObjectName(name);
+        }
+
+        String partOne = name.substring(0, dot);
+        String partTwo = name.substring(dot + 1);
+        int    bracket = partTwo.indexOf(" (");
+
+        if (bracket >= 0) {
+            partTwo = partTwo.substring(0, bracket);
+        }
+
+        return quoteObjectName(partOne) + '.' + quoteObjectName(partTwo);
+    }
+
+    /**
+     * perform a limited check (inconclusive) and quote object name if required
+     */
+    private String quoteObjectName(String name) {
+
+/*
+        if (name.toUpperCase().equals(name) && name.indexOf(' ') < 0) {
+            return name;
+        }
+*/
+        return "\"" + name + "\"";
+    }
+
     private void initGUI() {
 
         JPanel pCommand = new JPanel();
@@ -1990,13 +2311,13 @@ implements ActionListener, WindowListener, KeyListener {
 
         Font fFont = new Font("Dialog", Font.PLAIN, 12);
 
-        txtCommand = new JTextArea(5, 40);
+        txtCommand = new JTextArea(7, 40);
 
         txtCommand.setMargin(new Insets(5, 5, 5, 5));
         txtCommand.addKeyListener(this);
 
         txtCommandScroll = new JScrollPane(txtCommand);
-        txtResult        = new JTextArea(20, 40);
+        txtResult        = new JTextArea(25, 40);
 
         txtResult.setMargin(new Insets(5, 5, 5, 5));
 
@@ -2029,9 +2350,11 @@ implements ActionListener, WindowListener, KeyListener {
         tTree       = new JTree(treeModel);
         tScrollPane = new JScrollPane(tTree);
 
-        tScrollPane.setPreferredSize(new Dimension(120, 400));
+        // System.out.println("Adding mouse listener");
+        tTree.addMouseListener(this);
+        tScrollPane.setPreferredSize(new Dimension(200, 400));
         tScrollPane.setMinimumSize(new Dimension(70, 100));
-        txtCommandScroll.setPreferredSize(new Dimension(360, 100));
+        txtCommandScroll.setPreferredSize(new Dimension(560, 100));
         txtCommandScroll.setMinimumSize(new Dimension(180, 100));
         gScrollPane.setPreferredSize(new Dimension(460, 300));
 
@@ -2217,7 +2540,7 @@ implements ActionListener, WindowListener, KeyListener {
                     }
 
                     String rowcount = displayRowCounts
-                                      ? (" " + DECFMT.format(rowCounts[i]))
+                                      ? (DECFMT.format(rowCounts[i]))
                                       : "";
                     String displayedName = schemaname + name + rowcount;
 
@@ -2386,8 +2709,9 @@ implements ActionListener, WindowListener, KeyListener {
                     String schemaPart = (String) inSchema.elementAt(i);
 
                     schemaPart = schemaPart == null ? ""
-                                                    : (schemaPart + '.');
-                    name       = schemaPart + (String) inTable.elementAt(i);
+                                                    : ("\"" + schemaPart
+                                                       + "\".\"");
+                    name = schemaPart + (String) inTable.elementAt(i) + "\"";
 
                     ResultSet resultSet = select.executeQuery(rowCountSelect
                         + name);

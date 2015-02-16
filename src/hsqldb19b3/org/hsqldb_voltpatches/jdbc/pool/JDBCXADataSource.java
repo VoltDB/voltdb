@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,46 +31,135 @@
 
 package org.hsqldb_voltpatches.jdbc.pool;
 
-import javax.sql.XADataSource;
-
+import java.io.Serializable;
 import java.sql.SQLException;
 
+import javax.naming.NamingException;
+import javax.naming.Reference;
+import javax.naming.Referenceable;
+import javax.naming.StringRefAddr;
+
+//#ifdef JAVA6
+import javax.sql.CommonDataSource;
+
+//#endif JAVA6
+import javax.sql.XAConnection;
+import javax.sql.XADataSource;
+import javax.transaction.xa.Xid;
+
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.jdbc.JDBCCommonDataSource;
+import org.hsqldb_voltpatches.jdbc.JDBCConnection;
+import org.hsqldb_voltpatches.jdbc.JDBCDriver;
+import org.hsqldb_voltpatches.jdbc.JDBCUtil;
 import org.hsqldb_voltpatches.lib.HashMap;
 import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.Iterator;
+import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 
-import javax.transaction.xa.Xid;
-import javax.sql.PooledConnection;
-
-import org.hsqldb_voltpatches.jdbc.JDBCConnection;
-
-import java.sql.DriverManager;
-
-import javax.sql.XAConnection;
-
-// @(#)$Id: JDBCXADataSource.java 2944 2009-03-21 22:53:43Z fredt $
+// @(#)$Id: JDBCXADataSource.java 5283 2013-09-29 17:52:44Z unsaved $
 
 /**
  * Connection factory for JDBCXAConnections.
- * For use by XA data source factories, not by end users.
+ * For use by XA data source factories, not by end users.<p>
  *
- * @since HSQLDB v. 1.9.0
+ * The {@link org.hsqldb_voltpatches.jdbc.JDBCDataSourceFactory} can be used to get
+ * instances of this class.<p>
+ *
+ * The methods of the superclass, {@link org.hsqldb_voltpatches.jdbc.JDBCCommonDataSource},
+ * are used for settings the HyperSQL server and user.<p>
+ *
+ * @version 2.2.9
+ * @since 2.0.0
  * @author Blaine Simpson (blaine dot simpson at admc dot com)
  * @see javax.sql.XADataSource
  * @see org.hsqldb_voltpatches.jdbc.pool.JDBCXAConnection
  */
-public class JDBCXADataSource extends JDBCConnectionPoolDataSource implements XADataSource {
+public class JDBCXADataSource extends JDBCCommonDataSource
+implements XADataSource, Serializable, Referenceable
 
-    /** @todo:  Break off code used here and in JDBCConnectionPoolDataSource
-     *        into an abstract class, and have these classes extend the
-     *        abstract class.  This class should NOT extend
-     *        JDBCConnectionPoolDataSource (notice the masked
-     *        pool-specific methods below).
+//#ifdef JAVA6
+, CommonDataSource
+
+//#endif JAVA6
+{
+
+    /**
+     * Get new XAConnection connection, to be managed by a connection manager.
      */
+    public XAConnection getXAConnection() throws SQLException {
+
+        // Comment out before public release:
+/*
+        System.err.print("Executing " + getClass().getName()
+                         + ".getXAConnection()...");
+*/
+
+        // Use JDBCDriver directly so there is no need to regiser with DriverManager
+        JDBCConnection connection =
+            (JDBCConnection) JDBCDriver.getConnection(url, connectionProps);
+        JDBCXAConnection xaConnection = new JDBCXAConnection(this, connection);
+
+        return xaConnection;
+    }
+
+    /**
+     * Gets a new XAConnection after validating the given username
+     * and password.
+     *
+     * @param user String which must match the 'user' configured for this
+     *             JDBCXADataSource.
+     * @param password  String which must match the 'password' configured
+     *                  for this JDBCXADataSource.
+     *
+     * @see #getXAConnection()
+     */
+    public XAConnection getXAConnection(String user,
+                                        String password) throws SQLException {
+
+        if (user == null || password == null) {
+            throw JDBCUtil.nullArgument();
+        }
+
+        if (user.equals(this.user) && password.equals(this.password)) {
+            return getXAConnection();
+        }
+
+        throw JDBCUtil.sqlException(Error.error(ErrorCode.X_28000));
+    }
+
+    /**
+     * Retrieves the Reference of this object.
+     *
+     * @return The non-null javax.naming.Reference of this object.
+     * @exception NamingException If a naming exception was encountered
+     *          while retrieving the reference.
+     */
+    public Reference getReference() throws NamingException {
+
+        String    cname = "org.hsqldb_voltpatches.jdbc.JDBCDataSourceFactory";
+        Reference ref   = new Reference(getClass().getName(), cname, null);
+
+        ref.add(new StringRefAddr("database", getDatabase()));
+        ref.add(new StringRefAddr("user", getUser()));
+        ref.add(new StringRefAddr("password", password));
+        ref.add(new StringRefAddr("loginTimeout",
+                                  Integer.toString(loginTimeout)));
+
+        return ref;
+    }
+
+    // ------------------------ internal implementation ------------------------
     private HashMap resources = new HashMap();
 
     public void addResource(Xid xid, JDBCXAResource xaResource) {
         resources.put(xid, xaResource);
+    }
+
+    public JDBCXADataSource() throws SQLException {
+
+        //
     }
 
     public JDBCXAResource removeResource(Xid xid) {
@@ -100,7 +189,11 @@ public class JDBCXADataSource extends JDBCConnectionPoolDataSource implements XA
             }
         }
 
-        return (Xid[]) preparedSet.toArray(new Xid[0]);
+        Xid[] array = new Xid[preparedSet.size()];
+
+        preparedSet.toArray(array);
+
+        return array;
     }
 
     /**
@@ -114,79 +207,5 @@ public class JDBCXADataSource extends JDBCConnectionPoolDataSource implements XA
      */
     JDBCXAResource getResource(Xid xid) {
         return (JDBCXAResource) resources.get(xid);
-    }
-
-    /**
-     * Get new PHYSICAL connection, to be managed by a connection manager.
-     */
-    public XAConnection getXAConnection() throws SQLException {
-
-        // Comment out before public release:
-        System.err.print("Executing " + getClass().getName()
-                         + ".getXAConnection()...");
-
-        try {
-            Class.forName(driver).newInstance();
-        } catch (ClassNotFoundException e) {
-            throw new SQLException("Error opening connection: "
-                                   + e.getMessage());
-        } catch (IllegalAccessException e) {
-            throw new SQLException("Error opening connection: "
-                                   + e.getMessage());
-        } catch (InstantiationException e) {
-            throw new SQLException("Error opening connection: "
-                                   + e.getMessage());
-        }
-
-        JDBCConnection connection =
-            (JDBCConnection) DriverManager.getConnection(url, connProperties);
-
-        // Comment out before public release:
-        System.err.print("New phys:  " + connection);
-
-        JDBCXAResource xaResource = new JDBCXAResource(connection, this);
-        JDBCXAConnectionWrapper xaWrapper =
-            new JDBCXAConnectionWrapper(connection, xaResource,
-                                        connectionDefaults);
-        JDBCXAConnection xaConnection = new JDBCXAConnection(xaWrapper,
-            xaResource);
-
-        xaWrapper.setPooledConnection(xaConnection);
-
-        return xaConnection;
-    }
-
-    /**
-     * Gets a new physical connection after validating the given username
-     * and password.
-     *
-     * @param user String which must match the 'user' configured for this
-     *             JDBCXADataSource.
-     * @param password  String which must match the 'password' configured
-     *                  for this JDBCXADataSource.
-     *
-     * @see #getXAConnection()
-     */
-    public XAConnection getXAConnection(String user,
-                                        String password) throws SQLException {
-
-        validateSpecifiedUserAndPassword(user, password);
-
-        return getXAConnection();
-    }
-
-    public PooledConnection getPooledConnection() throws SQLException {
-
-        throw new SQLException(
-            "Use the getXAConnections to get XA Connections.\n"
-            + "Use the class JDBCConnectionPoolDataSource for non-XA data sources.");
-    }
-
-    public PooledConnection getPooledConnection(String user,
-            String password) throws SQLException {
-
-        throw new SQLException(
-            "Use the getXAConnections to get XA Connections.\n"
-            + "Use the class JDBCConnectionPoolDataSource for non-XA data sources.");
     }
 }

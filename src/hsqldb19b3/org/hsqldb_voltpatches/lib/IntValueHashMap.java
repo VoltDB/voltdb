@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@ package org.hsqldb_voltpatches.lib;
 
 import java.util.NoSuchElementException;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  * This class does not store null keys.
@@ -44,7 +44,8 @@ import org.hsqldb_voltpatches.store.BaseHashMap;
  */
 public class IntValueHashMap extends BaseHashMap {
 
-    Set keySet;
+    Set                keySet;
+    private Collection values;
 
     public IntValueHashMap() {
         this(8);
@@ -160,6 +161,15 @@ public class IntValueHashMap extends BaseHashMap {
         return keySet;
     }
 
+    public Collection values() {
+
+        if (values == null) {
+            values = new Values();
+        }
+
+        return values;
+    }
+
     class KeySet implements Set {
 
         public Iterator iterator() {
@@ -200,6 +210,41 @@ public class IntValueHashMap extends BaseHashMap {
             IntValueHashMap.this.remove(o);
 
             return size() != oldSize;
+        }
+
+        public boolean isEmpty() {
+            return size() == 0;
+        }
+
+        public void clear() {
+            IntValueHashMap.this.clear();
+        }
+    }
+
+    class Values implements Collection {
+
+        public Iterator iterator() {
+            return IntValueHashMap.this.new BaseHashIterator(false);
+        }
+
+        public int size() {
+            return IntValueHashMap.this.size();
+        }
+
+        public boolean contains(Object o) {
+            throw new RuntimeException();
+        }
+
+        public boolean add(Object value) {
+            throw new RuntimeException();
+        }
+
+        public boolean addAll(Collection c) {
+            throw new RuntimeException();
+        }
+
+        public boolean remove(Object o) {
+            throw new RuntimeException();
         }
 
         public boolean isEmpty() {

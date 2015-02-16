@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,26 +33,28 @@ package org.hsqldb_voltpatches.types;
 
 import java.math.BigDecimal;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlDateTime;
 import org.hsqldb_voltpatches.OpTypes;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.lib.StringConverter;
-import org.hsqldb_voltpatches.Session;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.ArrayUtil;
 
 /**
  * Type subclass for various typs of INTERVAL.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.1
  * @since 1.9.0
  */
 public final class IntervalType extends DTIType {
 
     public final boolean defaultPrecision;
     public final boolean isYearMonth;
+    public final static NumberType factorType =
+        NumberType.getNumberType(Types.SQL_DECIMAL, 40, maxFractionPrecision);
 
     private IntervalType(int typeGroup, int type, long precision, int scale,
                          int startIntervalType, int endIntervalType,
@@ -60,6 +62,10 @@ public final class IntervalType extends DTIType {
 
         super(typeGroup, type, precision, scale, startIntervalType,
               endIntervalType);
+
+        if (endIntervalType != Types.SQL_INTERVAL_SECOND && scale != 0) {
+            throw Error.error(ErrorCode.X_22006);
+        }
 
         switch (startIntervalType) {
 
@@ -134,6 +140,32 @@ public final class IntervalType extends DTIType {
         return typeCode;
     }
 
+    public Class getJDBCClass() {
+
+        switch (typeCode) {
+
+            case Types.SQL_INTERVAL_YEAR :
+            case Types.SQL_INTERVAL_YEAR_TO_MONTH :
+            case Types.SQL_INTERVAL_MONTH :
+                return IntervalMonthData.class;
+
+            case Types.SQL_INTERVAL_DAY :
+            case Types.SQL_INTERVAL_DAY_TO_HOUR :
+            case Types.SQL_INTERVAL_DAY_TO_MINUTE :
+            case Types.SQL_INTERVAL_DAY_TO_SECOND :
+            case Types.SQL_INTERVAL_HOUR :
+            case Types.SQL_INTERVAL_HOUR_TO_MINUTE :
+            case Types.SQL_INTERVAL_HOUR_TO_SECOND :
+            case Types.SQL_INTERVAL_MINUTE :
+            case Types.SQL_INTERVAL_MINUTE_TO_SECOND :
+            case Types.SQL_INTERVAL_SECOND :
+                return org.hsqldb_voltpatches.types.IntervalSecondData.class;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "IntervalType");
+        }
+    }
+
     public String getJDBCClassName() {
 
         switch (typeCode) {
@@ -160,7 +192,7 @@ public final class IntervalType extends DTIType {
         }
     }
 
-    public Integer getJDBCPrecision() {
+    public int getJDBCPrecision() {
         return this.displaySize();
     }
 
@@ -177,16 +209,16 @@ public final class IntervalType extends DTIType {
         switch (type) {
 
             case Types.SQL_INTERVAL_YEAR :
-                return "YEAR";
+                return Tokens.T_YEAR;
 
             case Types.SQL_INTERVAL_YEAR_TO_MONTH :
                 return "YEAR TO MONTH";
 
             case Types.SQL_INTERVAL_MONTH :
-                return "MONTH";
+                return Tokens.T_MONTH;
 
             case Types.SQL_INTERVAL_DAY :
-                return "DAY";
+                return Tokens.T_DAY;
 
             case Types.SQL_INTERVAL_DAY_TO_HOUR :
                 return "DAY TO HOUR";
@@ -198,7 +230,7 @@ public final class IntervalType extends DTIType {
                 return "DAY TO SECOND";
 
             case Types.SQL_INTERVAL_HOUR :
-                return "HOUR";
+                return Tokens.T_HOUR;
 
             case Types.SQL_INTERVAL_HOUR_TO_MINUTE :
                 return "HOUR TO MINUTE";
@@ -207,13 +239,13 @@ public final class IntervalType extends DTIType {
                 return "HOUR TO SECOND";
 
             case Types.SQL_INTERVAL_MINUTE :
-                return "MINUTE";
+                return Tokens.T_MINUTE;
 
             case Types.SQL_INTERVAL_MINUTE_TO_SECOND :
                 return "MINUTE TO SECOND";
 
             case Types.SQL_INTERVAL_SECOND :
-                return "SECOND";
+                return Tokens.T_SECOND;
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "IntervalType");
@@ -319,16 +351,20 @@ public final class IntervalType extends DTIType {
 
     public Type getAggregateType(Type other) {
 
+        if (other == null) {
+            return this;
+        }
+
+        if (other == SQL_ALL_TYPES) {
+            return this;
+        }
+
         if (typeCode == other.typeCode) {
             if (precision >= other.precision && scale >= other.scale) {
                 return this;
             } else if (precision <= other.precision && scale <= other.scale) {
                 return other;
             }
-        }
-
-        if (other == SQL_ALL_TYPES) {
-            return this;
         }
 
         if (other.isCharacterType()) {
@@ -360,7 +396,7 @@ public final class IntervalType extends DTIType {
         }
     }
 
-    public Type getCombinedType(Type other, int operation) {
+    public Type getCombinedType(Session session, Type other, int operation) {
 
         switch (operation) {
 
@@ -373,12 +409,19 @@ public final class IntervalType extends DTIType {
             case OpTypes.DIVIDE :
                 if (other.isNumberType()) {
                     return this;
+                } else if (other.isIntervalType()) {
+                    IntervalType otherType = (IntervalType) other;
+
+                    if (isYearMonth == otherType.isYearMonth) {
+                        return isYearMonth ? Type.SQL_BIGINT
+                                           : factorType;
+                    }
                 }
                 break;
 
             case OpTypes.ADD :
                 if (other.isDateTimeType()) {
-                    return other.getCombinedType(this, operation);
+                    return other.getCombinedType(session, this, operation);
                 } else if (other.isIntervalType()) {
                     IntervalType newType =
                         (IntervalType) getAggregateType(other);
@@ -395,7 +438,7 @@ public final class IntervalType extends DTIType {
         throw Error.error(ErrorCode.X_42562);
     }
 
-    public int compare(Object a, Object b) {
+    public int compare(Session session, Object a, Object b) {
 
         if (a == b) {
             return 0;
@@ -475,10 +518,9 @@ public final class IntervalType extends DTIType {
 
             // fall through
             case Types.SQL_CHAR :
-            case Types.SQL_VARCHAR :
-            case Types.VARCHAR_IGNORECASE : {
-                return session.getScanner().convertToDatetimeInterval(
-                    (String) a, this);
+            case Types.SQL_VARCHAR : {
+                return session.getScanner().convertToDatetimeInterval(session,
+                        (String) a, this);
             }
             case Types.TINYINT :
             case Types.SQL_SMALLINT :
@@ -588,10 +630,20 @@ public final class IntervalType extends DTIType {
         }
 
         if (a instanceof String) {
-            return convertToType(null, a, Type.SQL_VARCHAR);
+            return convertToType(session, a, Type.SQL_VARCHAR);
+        } else if (a instanceof Integer) {
+            return convertToType(session, a, Type.SQL_INTEGER);
+        } else if (a instanceof Long) {
+            return convertToType(session, a, Type.SQL_BIGINT);
+        } else if (a instanceof BigDecimal) {
+            return convertToType(session, a, Type.SQL_DECIMAL);
         } else {
             throw Error.error(ErrorCode.X_42561);
         }
+    }
+
+    public Object convertJavaToSQL(SessionInterface session, Object a) {
+        return convertToDefaultType(session, a);
     }
 
     public String convertToString(Object a) {
@@ -627,19 +679,21 @@ public final class IntervalType extends DTIType {
     public String convertToSQLString(Object a) {
 
         if (a == null) {
-            return "NULL";
+            return Tokens.T_NULL;
         }
 
         StringBuffer sb = new StringBuffer(32);
 
-        sb.append(Tokens.T_INTERVAL);
-        sb.append(StringConverter.toQuotedString(convertToString(a), '\'',
-                false));
+        sb.append(Tokens.T_INTERVAL).append(' ');
+        sb.append('\'').append(convertToString(a)).append('\'').append(' ');
         sb.append(Tokens.SQL_INTERVAL_FIELD_NAMES[startPartIndex]);
-        sb.append(' ');
-        sb.append(Tokens.T_TO);
-        sb.append(' ');
-        sb.append(Tokens.SQL_INTERVAL_FIELD_NAMES[endPartIndex]);
+
+        if (startPartIndex != endPartIndex) {
+            sb.append(' ');
+            sb.append(Tokens.T_TO);
+            sb.append(' ');
+            sb.append(Tokens.SQL_INTERVAL_FIELD_NAMES[endPartIndex]);
+        }
 
         return sb.toString();
     }
@@ -664,6 +718,67 @@ public final class IntervalType extends DTIType {
 
         return !(isYearMonthIntervalType()
                  ^ ((IntervalType) otherType).isYearMonthIntervalType());
+    }
+
+    public int canMoveFrom(Type otherType) {
+
+        if (otherType == this) {
+            return 0;
+        }
+
+        if (typeCode == otherType.typeCode) {
+            return scale >= otherType.scale ? 0
+                                            : -1;
+        }
+
+        if (!otherType.isIntervalType()) {
+            return -1;
+        }
+
+        if (isYearMonth == ((IntervalType) otherType).isYearMonth) {
+            if (scale < otherType.scale) {
+                return -1;
+            }
+
+            if (endPartIndex >= ((IntervalType) otherType).endPartIndex) {
+                if (precision >= otherType.precision) {
+                    if (startPartIndex
+                            <= ((IntervalType) otherType).startPartIndex) {
+                        return 0;
+                    }
+                }
+
+                return 1;
+            }
+        }
+
+        return -1;
+    }
+
+    public int compareToTypeRange(Object o) {
+
+        long max = precisionLimits[(int) precision];
+        long units;
+
+        if (o instanceof IntervalMonthData) {
+            units = ((IntervalMonthData) o).units;
+        } else if (o instanceof IntervalSecondData) {
+            units = ((IntervalSecondData) o).units;
+        } else {
+            return 0;
+        }
+
+        if (units >= max) {
+            return 1;
+        }
+
+        if (units < 0) {
+            if (-units >= max) {
+                return -1;
+            }
+        }
+
+        return 0;
     }
 
     public Object absolute(Object a) {
@@ -704,7 +819,7 @@ public final class IntervalType extends DTIType {
         }
     }
 
-    public Object add(Object a, Object b, Type otherType) {
+    public Object add(Session session, Object a, Object b, Type otherType) {
 
         if (a == null || b == null) {
             return null;
@@ -742,7 +857,8 @@ public final class IntervalType extends DTIType {
         }
     }
 
-    public Object subtract(Object a, Object b, Type otherType) {
+    public Object subtract(Session session, Object a, Object b,
+                           Type otherType) {
 
         if (a == null || b == null) {
             return null;
@@ -789,20 +905,20 @@ public final class IntervalType extends DTIType {
 
                     return new IntervalSecondData(seconds, nanos, this, true);
                 } else if (a instanceof TimeData && b instanceof TimeData) {
-                    long seconds = ((TimeData) a).getSeconds()
-                                   - ((TimeData) b).getSeconds();
+                    long aSeconds = ((TimeData) a).getSeconds();
+                    long bSeconds = ((TimeData) b).getSeconds();
                     long nanos = ((TimeData) a).getNanos()
                                  - ((TimeData) b).getNanos();
 
-                    return new IntervalSecondData(seconds, nanos, this, true);
+                    return subtract(aSeconds, bSeconds, nanos);
                 } else if (a instanceof TimestampData
                            && b instanceof TimestampData) {
-                    long seconds = (((TimestampData) a).getSeconds()
-                                    - ((TimestampData) b).getSeconds());
+                    long aSeconds = ((TimestampData) a).getSeconds();
+                    long bSeconds = ((TimestampData) b).getSeconds();
                     long nanos = ((TimestampData) a).getNanos()
                                  - ((TimestampData) b).getNanos();
 
-                    return new IntervalSecondData(seconds, nanos, this, true);
+                    return subtract(aSeconds, bSeconds, nanos);
                 }
 
             // fall through
@@ -811,11 +927,27 @@ public final class IntervalType extends DTIType {
         }
     }
 
+    private IntervalSecondData subtract(long aSeconds, long bSeconds,
+                                        long nanos) {
+
+        if (endIntervalType != Types.SQL_INTERVAL_SECOND) {
+            aSeconds =
+                HsqlDateTime.getTruncatedPart(aSeconds * 1000, endIntervalType)
+                / 1000;
+            bSeconds =
+                HsqlDateTime.getTruncatedPart(bSeconds * 1000, endIntervalType)
+                / 1000;
+            nanos = 0;
+        }
+
+        return new IntervalSecondData(aSeconds - bSeconds, nanos, this, true);
+    }
+
     public Object multiply(Object a, Object b) {
         return multiplyOrDivide(a, b, false);
     }
 
-    public Object divide(Object a, Object b) {
+    public Object divide(Session session, Object a, Object b) {
         return multiplyOrDivide(a, b, true);
     }
 
@@ -832,12 +964,26 @@ public final class IntervalType extends DTIType {
             b = temp;
         }
 
-        if (divide && NumberType.isZero(b)) {
-            throw Error.error(ErrorCode.X_22012);
+        boolean isNumberDiv = b instanceof Number;
+
+        if (divide) {
+            if (isNumberDiv) {
+                if (NumberType.isZero(b)) {
+                    throw Error.error(ErrorCode.X_22012);
+                }
+            } else {
+                if (isYearMonth) {
+                    if (((IntervalMonthData) b).units == 0) {
+                        throw Error.error(ErrorCode.X_22012);
+                    }
+                } else {
+                    if (((IntervalSecondData) b).units == 0) {
+                        throw Error.error(ErrorCode.X_22012);
+                    }
+                }
+            }
         }
 
-        NumberType factorType = NumberType.getNumberType(Types.SQL_DECIMAL,
-            40, maxFractionPrecision);
         BigDecimal factor = (BigDecimal) factorType.convertToDefaultType(null,
             b);
         BigDecimal units;
@@ -853,21 +999,31 @@ public final class IntervalType extends DTIType {
         }
 
         BigDecimal result = divide
-                            ? (BigDecimal) factorType.divide(units, factor)
+                            ? (BigDecimal) factorType.divide(null, units,
+                                factor)
                             : (BigDecimal) factorType.multiply(units, factor);
 
         if (!NumberType.isInLongLimits(result)) {
             throw Error.error(ErrorCode.X_22015);
         }
 
-        if (isYearMonth) {
-            return new IntervalMonthData(result.longValue(), this);
+        if (isNumberDiv) {
+            if (isYearMonth) {
+                return new IntervalMonthData(result.longValue(), this);
+            }
+
+            int nanos = (int) NumberType.scaledDecimal(result,
+                DTIType.maxFractionPrecision);
+
+            return new IntervalSecondData(result.longValue(), nanos, this,
+                                          true);
+        } else {
+            if (isYearMonth) {
+                return result.longValue();
+            } else {
+                return result;
+            }
         }
-
-        int nanos = (int) NumberType.scaledDecimal(result,
-            DTIType.maxFractionPrecision);
-
-        return new IntervalSecondData(result.longValue(), nanos, this, true);
     }
 
     String intervalMonthToString(Object a) {
@@ -990,8 +1146,16 @@ public final class IntervalType extends DTIType {
         int endType   = DTIType.intervalParts[endIndex];
         int type      = DTIType.intervalTypes[startIndex][endIndex];
 
-        if (precision == 0 || precision > DTIType.maxIntervalPrecision
+        if (precision == 0
                 || fractionPrecision > DTIType.maxFractionPrecision) {
+            throw Error.error(ErrorCode.X_42592);
+        }
+
+        if (startIndex == DTIType.INTERVAL_SECOND_INDEX) {
+            if (precision > DTIType.maxIntervalSecondPrecision) {
+                throw Error.error(ErrorCode.X_42592);
+            }
+        } else if (precision > DTIType.maxIntervalPrecision) {
             throw Error.error(ErrorCode.X_42592);
         }
 
@@ -1297,6 +1461,17 @@ public final class IntervalType extends DTIType {
         throw Error.runtimeError(ErrorCode.U_S0500, "IntervalType");
     }
 
+    public static int getIntervalType(String part) {
+
+        int index = ArrayUtil.find(Tokens.SQL_INTERVAL_FIELD_NAMES, part);
+
+        if (index < 0) {
+            throw Error.error(ErrorCode.X_42562);
+        }
+
+        return intervalParts[index];
+    }
+
     long getIntervalValueLimit() {
 
         long limit;
@@ -1426,7 +1601,7 @@ public final class IntervalType extends DTIType {
         return getSecondPart(seconds, nanos);
     }
 
-    public long convertToLong(Object interval) {
+    public long convertToLongEndUnits(Object interval) {
 
         switch (endIntervalType) {
 
@@ -1447,5 +1622,38 @@ public final class IntervalType extends DTIType {
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "IntervalType");
         }
+    }
+
+    public double convertToDoubleStartUnits(Object interval) {
+
+        switch (startIntervalType) {
+
+            case Types.SQL_INTERVAL_YEAR :
+            case Types.SQL_INTERVAL_MONTH :
+                double months = ((IntervalMonthData) interval).units;
+
+                return (months / DTIType.yearToSecondFactors[startPartIndex]);
+
+            case Types.SQL_INTERVAL_DAY :
+            case Types.SQL_INTERVAL_HOUR :
+            case Types.SQL_INTERVAL_MINUTE :
+            case Types.SQL_INTERVAL_SECOND : {
+                double seconds = ((IntervalSecondData) interval).units;
+
+                return (seconds / DTIType.yearToSecondFactors[startPartIndex]);
+            }
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "IntervalType");
+        }
+    }
+
+    public CharacterType getCharacterType() {
+
+        CharacterType type = CharacterType.getCharacterType(Types.SQL_VARCHAR,
+            displaySize());
+
+        type.nameString = getNameString();
+
+        return type;
     }
 }

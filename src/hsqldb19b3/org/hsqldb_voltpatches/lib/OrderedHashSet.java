@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,10 +39,10 @@ package org.hsqldb_voltpatches.lib;
  * This class does not store null elements.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.9.0
  */
-public class OrderedHashSet extends HashSet implements HsqlList {
+public class OrderedHashSet extends HashSet implements HsqlList, Set {
 
     public OrderedHashSet() {
 
@@ -52,23 +52,14 @@ public class OrderedHashSet extends HashSet implements HsqlList {
     }
 
     public boolean remove(Object key) {
-
-        int oldSize = size();
-
-        super.removeObject(key, true);
-
-        return oldSize != size();
+        return super.removeObject(key, true) != null;
     }
 
     public Object remove(int index) throws IndexOutOfBoundsException {
 
         checkRange(index);
 
-        Object result = objectKeyTable[index];
-
-        remove(result);
-
-        return result;
+        return super.removeObject(objectKeyTable[index], true);
     }
 
     public boolean insert(int index,
@@ -86,18 +77,19 @@ public class OrderedHashSet extends HashSet implements HsqlList {
             return add(key);
         }
 
-        Object[] set = toArray(new Object[size()]);
+        Object[] array = new Object[size()];
 
+        toArray(array);
         super.clear();
 
         for (int i = 0; i < index; i++) {
-            add(set[i]);
+            add(array[i]);
         }
 
         add(key);
 
-        for (int i = index; i < set.length; i++) {
-            add(set[i]);
+        for (int i = index; i < array.length; i++) {
+            add(array[i]);
         }
 
         return true;
@@ -118,6 +110,10 @@ public class OrderedHashSet extends HashSet implements HsqlList {
         return objectKeyTable[index];
     }
 
+    public void toArray(Object[] array) {
+        System.arraycopy(super.objectKeyTable, 0, array, 0, array.length);
+    }
+
     public int getIndex(Object key) {
         return getLookup(key, key.hashCode());
     }
@@ -135,6 +131,67 @@ public class OrderedHashSet extends HashSet implements HsqlList {
         }
 
         return max;
+    }
+
+    public int getSmallestIndex(OrderedHashSet other) {
+
+        int min = -1;
+
+        for (int i = 0, size = other.size(); i < size; i++) {
+            int index = getIndex(other.get(i));
+
+            if (index != -1) {
+                if (min == -1 || index < min) {
+                    min = index;
+                }
+            }
+        }
+
+        return min;
+    }
+
+    public int getCommonElementCount(Set other) {
+
+        int count = 0;
+
+        for (int i = 0, size = size(); i < size; i++) {
+            if (other.contains(objectKeyTable[i])) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    public static OrderedHashSet addAll(OrderedHashSet first,
+                                        OrderedHashSet second) {
+
+        if (second == null) {
+            return first;
+        }
+
+        if (first == null) {
+            first = new OrderedHashSet();
+        }
+
+        first.addAll(second);
+
+        return first;
+    }
+
+    public static OrderedHashSet add(OrderedHashSet first, Object value) {
+
+        if (value == null) {
+            return first;
+        }
+
+        if (first == null) {
+            first = new OrderedHashSet();
+        }
+
+        first.add(value);
+
+        return first;
     }
 
     private void checkRange(int i) {

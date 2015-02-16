@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,8 +32,12 @@
 package org.hsqldb_voltpatches;
 
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 
+import org.hsqldb_voltpatches.jdbc.JDBCConnection;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
+import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultLob;
 import org.hsqldb_voltpatches.types.BlobDataID;
@@ -46,7 +50,7 @@ import org.hsqldb_voltpatches.types.TimestampData;
  * the session level.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.2
  */
 public interface SessionInterface {
@@ -68,6 +72,9 @@ public interface SessionInterface {
     int TX_READ_COMMITTED   = 2;
     int TX_REPEATABLE_READ  = 4;
     int TX_SERIALIZABLE     = 8;
+
+    //
+    int lobStreamBlockSize = 512 * 1024;
 
     Result execute(Result r);
 
@@ -117,17 +124,31 @@ public interface SessionInterface {
 
     String getInternalConnectionURL();
 
-    public BlobDataID createBlob(long length);
+    BlobDataID createBlob(long length);
 
-    public ClobDataID createClob(long length);
+    ClobDataID createClob(long length);
 
     void allocateResultLob(ResultLob result, InputStream dataInput);
 
     Scanner getScanner();
+
+    Calendar getCalendar();
+
+    Calendar getCalendarGMT();
+
+    SimpleDateFormat getSimpleDateFormatGMT();
 
     TimestampData getCurrentDate();
 
     int getZoneSeconds();
 
     int getStreamBlockSize();
+
+    HsqlProperties getClientProperties();
+
+    JDBCConnection getJDBCConnection();
+
+    void setJDBCConnection(JDBCConnection connection);
+
+    String getDatabaseUniqueName();
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +33,8 @@ package org.hsqldb_voltpatches.rowio;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 
 /**
  * Fields in the source file need not be quoted. Methods in this class unquote
@@ -42,7 +42,7 @@ import org.hsqldb_voltpatches.ErrorCode;
  * case.
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.0
  */
 public class RowInputTextQuoted extends RowInputText {
@@ -57,7 +57,7 @@ public class RowInputTextQuoted extends RowInputText {
         super(fieldSep, varSep, longvarSep, allQuoted);
     }
 
-    public void setSource(String text, int pos, int byteSize) {
+    public void setSource(String text, long pos, int byteSize) {
 
         super.setSource(text, pos, byteSize);
 
@@ -138,11 +138,13 @@ public class RowInputTextQuoted extends RowInputText {
 
             s = sb.toString();
         } catch (Exception e) {
+            Object[] messages = new Object[] {
+                new Integer(field), e.toString()
+            };
+
             throw new IOException(
                 Error.getMessage(
-                    ErrorCode.M_TEXT_SOURCE_FIELD_ERROR, 0, new Object[] {
-                new Integer(field), e.toString()
-            }));
+                    ErrorCode.M_TEXT_SOURCE_FIELD_ERROR, 0, messages));
         }
 
         return s;

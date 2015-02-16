@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,18 +40,22 @@ import org.hsqldb_voltpatches.types.Type;
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.0
  */
 public interface RowInputInterface {
 
-    int getPos();
+    long getPos();
 
     int getSize();
 
     int readType() throws IOException;
 
     String readString() throws IOException;
+
+    byte readByte() throws IOException;
+
+    char readChar() throws IOException;
 
     short readShort() throws IOException;
 
@@ -61,7 +65,9 @@ public interface RowInputInterface {
 
     Object[] readData(Type[] colTypes) throws IOException;
 
-    void resetRow(int filePos, int size) throws IOException;
+    void resetRow(long filePos, int size);
+
+    void resetBlock(long filePos, int size);
 
     byte[] getBuffer();
 }

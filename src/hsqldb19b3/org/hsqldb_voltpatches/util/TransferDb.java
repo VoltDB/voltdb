@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -81,7 +81,7 @@ class TransferDb extends DataAccessPoint {
 
                 helper.set(this, t, meta.getIdentifierQuoteString());
             } catch (SQLException e) {
-                throw new DataAccessPointException(e.getMessage());
+                throw new DataAccessPointException(e.toString());
             }
         }
     }
@@ -97,7 +97,7 @@ class TransferDb extends DataAccessPoint {
         try {
             result = conn.getAutoCommit();
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
         return result;
@@ -116,7 +116,7 @@ class TransferDb extends DataAccessPoint {
         try {
             conn.commit();
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
     }
 
@@ -133,7 +133,7 @@ class TransferDb extends DataAccessPoint {
         try {
             conn.rollback();
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
     }
 
@@ -142,7 +142,7 @@ class TransferDb extends DataAccessPoint {
         try {
             conn.setAutoCommit(flag);
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
     }
 
@@ -155,7 +155,7 @@ class TransferDb extends DataAccessPoint {
             stmt   = conn.createStatement();
             result = stmt.execute(statement);
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         } finally {
             if (stmt != null) {
                 try {
@@ -187,7 +187,7 @@ class TransferDb extends DataAccessPoint {
             srcStatement = null;
             rsData       = null;
 
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
         return new TransferResultSet(rsData);
@@ -232,7 +232,7 @@ class TransferDb extends DataAccessPoint {
                 }
             }
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         } finally {
             if (destPrep != null) {
                 try {
@@ -308,7 +308,7 @@ class TransferDb extends DataAccessPoint {
                 result.close();
             }
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
         return (ret);
@@ -340,7 +340,7 @@ class TransferDb extends DataAccessPoint {
                 result.close();
             }
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
         return (ret);
@@ -352,7 +352,7 @@ class TransferDb extends DataAccessPoint {
             try {
                 conn.setCatalog(sCatalog);
             } catch (SQLException e) {
-                throw new DataAccessPointException(e.getMessage());
+                throw new DataAccessPointException(e.toString());
             }
         }
     }
@@ -414,7 +414,7 @@ class TransferDb extends DataAccessPoint {
                 }
             }
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         } finally {
             if (result != null) {
                 try {
@@ -441,6 +441,8 @@ class TransferDb extends DataAccessPoint {
         String    RefTableName   = new String("");
         String    foreignKeyName = new String("");
         String    columnName     = new String("");
+
+        Dest.helper.setSchema(TTable.Stmts.sSchema);
 
         TTable.Stmts.sDestDrop =
             "DROP " + TTable.Stmts.sType + " "
@@ -588,15 +590,12 @@ class TransferDb extends DataAccessPoint {
                 TTable.Stmts.sDestDrop = alterDrop + TTable.Stmts.sDestDrop;
             }
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
-        boolean primarykeys           = false;
-        String  PrimaryKeysConstraint = new String();
-
-        PrimaryKeysConstraint = "";
-
-        ResultSet PrimaryKeys = null;
+        boolean   primarykeys           = false;
+        String    PrimaryKeysConstraint = "";
+        ResultSet PrimaryKeys           = null;
 
         try {
             PrimaryKeys = meta.getPrimaryKeys(TTable.Stmts.sDatabaseToConvert,
@@ -634,7 +633,7 @@ class TransferDb extends DataAccessPoint {
                 }
             }
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
         boolean   indices     = false;
@@ -726,7 +725,7 @@ class TransferDb extends DataAccessPoint {
                 }
             }
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
         Vector v = new Vector();
@@ -741,8 +740,9 @@ class TransferDb extends DataAccessPoint {
         ResultSetMetaData select_rsmdata = null;
 
         try {
-            stmt           = conn.createStatement();
-            select_rs      = stmt.executeQuery(TTable.Stmts.sSourceSelect);
+            stmt = conn.createStatement();
+            select_rs = stmt.executeQuery(TTable.Stmts.sSourceSelect
+                                          + " WHERE 1 = 2");
             select_rsmdata = select_rs.getMetaData();
             col = meta.getColumns(TTable.Stmts.sDatabaseToConvert,
                                   TTable.Stmts.sSchema,
@@ -755,7 +755,9 @@ class TransferDb extends DataAccessPoint {
                     col = meta.getColumns(TTable.Stmts.sDatabaseToConvert,
                                           null, TTable.Stmts.sSourceTable,
                                           null);
-                } catch (SQLException eSchema1) {}
+                } catch (SQLException eSchema1) {
+                    eSchema1.printStackTrace();
+                }
             }
         }
 
@@ -794,7 +796,7 @@ class TransferDb extends DataAccessPoint {
                                  + type + " source: " + source);
                 }
 
-                if (type == Types.NUMERIC) {
+                if (type == Types.NUMERIC || type == Types.DECIMAL) {
                     datatype += "(" + Integer.toString(rsmdata_precision);
 
                     if (rsmdata_scale > 0) {
@@ -802,7 +804,9 @@ class TransferDb extends DataAccessPoint {
                     }
 
                     datatype += ")";
-                } else if (type == Types.CHAR) {
+                } else if (type == Types.CHAR || type == Types.VARCHAR
+                           || type == Types.BINARY
+                           || type == Types.VARBINARY) {
                     datatype += "(" + Integer.toString(column_size) + ")";
                 } else if (rsmdata_isAutoIncrement) {
                     datatype = "SERIAL";
@@ -813,7 +817,10 @@ class TransferDb extends DataAccessPoint {
                             || type == Types.LONGVARCHAR
                             || type == Types.BINARY || type == Types.DATE
                             || type == Types.TIME || type == Types.TIMESTAMP) {
-                        DefaultVal = "\'" + DefaultVal + "\'";
+                        if (!DefaultVal.startsWith("'")) {
+
+//                            DefaultVal = "\'" + DefaultVal + "\'";
+                        }
                     }
 
                     datatype += " DEFAULT " + DefaultVal;
@@ -839,7 +846,7 @@ class TransferDb extends DataAccessPoint {
             stmt.close();
             col.close();
         } catch (SQLException e) {
-            throw new DataAccessPointException(e.getMessage());
+            throw new DataAccessPointException(e.toString());
         }
 
         if (primarykeys) {

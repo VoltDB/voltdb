@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,20 +31,28 @@
 
 package org.hsqldb_voltpatches.types;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 
 /**
  * Implementation of data item for INTERVAL MONTH.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class IntervalMonthData {
 
-    public final long units;
+    public final int units;
+
+    public static IntervalMonthData newInterval(double value, int typeCode) {
+
+        int index = DTIType.intervalIndexMap.get(typeCode);
+
+        value *= DTIType.yearToSecondFactors[index];
+
+        return new IntervalMonthData((long) value);
+    }
 
     public static IntervalMonthData newIntervalYear(long years,
             IntervalType type) {
@@ -66,11 +74,11 @@ public class IntervalMonthData {
             months -= (months % 12);
         }
 
-        this.units = months;
+        this.units = (int) months;
     }
 
     public IntervalMonthData(long months) {
-        this.units = months;
+        this.units = (int) months;
     }
 
     public boolean equals(Object other) {
@@ -88,17 +96,20 @@ public class IntervalMonthData {
 
     public int compareTo(IntervalMonthData b) {
 
-        long diff = units - b.units;
-
-        if (diff == 0) {
-            return 0;
+        if (units > b.units) {
+            return 1;
+        } else if (units < b.units) {
+            return -1;
         } else {
-            return diff > 0 ? 1
-                            : -1;
+            return 0;
         }
     }
 
+    public long getMonths() {
+        return units;
+    }
+
     public String toString() {
-        throw Error.runtimeError(ErrorCode.U_S0500, "IntervalMonthData");
+        return Type.SQL_INTERVAL_MONTH_MAX_PRECISION.convertToString(this);
     }
 }

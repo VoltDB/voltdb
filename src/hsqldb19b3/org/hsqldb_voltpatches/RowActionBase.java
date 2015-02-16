@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,28 +43,33 @@ package org.hsqldb_voltpatches;
  * timestamps are not in any order
  *
  * @author Fred Toussi (fredt@users dot sourceforge dot net)
- * @version 2.0.0
+ * @version 2.3.2
+
  * @since 2.0.0
  */
-class RowActionBase {
+public class RowActionBase {
 
-    public static final byte ACTION_NONE             = 0;
-    public static final byte ACTION_INSERT           = 1;
-    public static final byte ACTION_DELETE           = 2;
-    public static final byte ACTION_DELETE_FINAL     = 3;
-    public static final byte ACTION_DELETE_COMMITTED = 4;
-    public static final byte ACTION_DEBUG            = 5;
+    public static final byte ACTION_NONE          = 0;
+    public static final byte ACTION_INSERT        = 1;
+    public static final byte ACTION_DELETE        = 2;
+    public static final byte ACTION_DELETE_FINAL  = 3;
+    public static final byte ACTION_INSERT_DELETE = 4;
+    public static final byte ACTION_REF           = 5;
+    public static final byte ACTION_CHECK         = 6;
+    public static final byte ACTION_DEBUG         = 7;
+
+    //
     RowActionBase            next;
     Session                  session;
-    long                     changeTimestamp;
     long                     actionTimestamp;
     long                     commitTimestamp;
     byte                     type;
+    boolean                  deleteComplete;
     boolean                  rolledback;
     boolean                  prepared;
+    int[]                    changeColumnMap;
 
-    //
-    long tempMergeTimestamp;
+    RowActionBase() {}
 
     /**
      * constructor, used for delete actions only
@@ -73,18 +78,19 @@ class RowActionBase {
 
         this.session    = session;
         this.type       = type;
-        changeTimestamp = session.actionTimestamp;
+        actionTimestamp = session.actionTimestamp;
     }
 
     void setAsAction(RowActionBase action) {
 
         next            = action.next;
         session         = action.session;
-        changeTimestamp = action.changeTimestamp;
         actionTimestamp = action.actionTimestamp;
         commitTimestamp = action.commitTimestamp;
         type            = action.type;
+        deleteComplete  = action.deleteComplete;
         rolledback      = action.rolledback;
         prepared        = action.prepared;
+        changeColumnMap = action.changeColumnMap;
     }
 }

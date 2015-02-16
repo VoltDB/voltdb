@@ -1,4 +1,40 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+/*
+ * For work developed by the HSQL Development Group:
+ *
+ * Copyright (c) 2001-2011, The HSQL Development Group
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the HSQL Development Group nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ *
+ * For work originally developed by the Hypersonic SQL Group:
+ *
+ * Copyright (c) 1995-2000, The Hypersonic SQL Group.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,48 +65,21 @@
  *
  * This software consists of voluntary contributions made by many individuals
  * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the HSQL Development Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.lib.StringUtil;
-import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.types.CharacterType;
-import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
+import org.hsqldb_voltpatches.lib.StringUtil;
+import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.types.BlobData;
+import org.hsqldb_voltpatches.types.CharacterType;
+import org.hsqldb_voltpatches.types.ClobData;
+import org.hsqldb_voltpatches.types.LobData;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Reusable object for processing LIKE queries.
@@ -78,16 +87,17 @@ import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
  * Enhanced in successive versions of HSQLDB.
  *
  * @author Thomas Mueller (Hypersonic SQL Group)
- * @version 1.9.0
+ * @version 2.3.1
  * @since Hypersonic SQL
  */
 
 // boucherb@users 20030930 - patch 1.7.2 - optimize into joins if possible
 // fredt@users 20031006 - patch 1.7.2 - reuse Like objects for all rows
 // fredt@users 1.9.0 - LIKE for binary strings
-class Like {
+// fredt@users 1.9.0 - CompareAt() changes for performance suggested by Gary Frost
+class Like implements Cloneable {
 
-    private final static BinaryData maxByteValue =
+    private static final BinaryData maxByteValue =
         new BinaryData(new byte[]{ -128 }, false);
     private char[]   cLike;
     private int[]    wildCardType;
@@ -116,7 +126,7 @@ class Like {
     private Object getStartsWith() {
 
         if (iLen == 0) {
-            return isBinary ? BinaryData.zeroLengthBinary
+            return isBinary ? (Object) BinaryData.zeroLengthBinary
                             : "";
         }
 
@@ -143,7 +153,7 @@ class Like {
             return null;
         }
 
-        return isBinary ? new BinaryData(os.toByteArray(), false)
+        return isBinary ? (Object) new BinaryData(os.toByteArray(), false)
                         : sb.toString();
     }
 
@@ -161,29 +171,43 @@ class Like {
             o = ((CharacterType) dataType).upper(session, o);
         }
 
-        return compareAt(o, 0, 0, getLength(session, o, "")) ? Boolean.TRUE
-                                                             : Boolean.FALSE;
+        int length = getLength(session, o);
+
+        if (o instanceof ClobData) {
+            o = ((ClobData) o).getChars(session, 0,
+                                        (int) ((ClobData) o).length(session));
+        }
+
+        return compareAt(session, o, 0, 0, iLen, length, cLike, wildCardType)
+               ? Boolean.TRUE
+               : Boolean.FALSE;
     }
 
-    char getChar(Object o, int i) {
+    char getChar(Session session, Object o, int i) {
 
         char c;
 
         if (isBinary) {
-            c = (char) ((BinaryData) o).getBytes()[i];
+            c = (char) ((BlobData) o).getBytes()[i];
         } else {
-            c = ((String) o).charAt(i);
+            if (o instanceof char[]) {
+                c = ((char[]) o)[i];
+            } else if (o instanceof ClobData) {
+                c = ((ClobData)o).getChars(session,i,1)[0];
+            } else {
+                c = ((String) o).charAt(i);
+            }
         }
 
         return c;
     }
 
-    int getLength(SessionInterface session, Object o, String s) {
+    int getLength(SessionInterface session, Object o) {
 
         int l;
 
-        if (isBinary) {
-            l = (int) ((BinaryData) o).length(session);
+        if (o instanceof LobData) {
+            l = (int) ((LobData) o).length(session);
         } else {
             l = ((String) o).length();
         }
@@ -191,13 +215,16 @@ class Like {
         return l;
     }
 
-    private boolean compareAt(Object o, int i, int j, int jLen) {
+    private boolean compareAt(Session session, Object o, int i, int j,
+                              int iLen, int jLen, char cLike[],
+                              int[] wildCardType) {
 
         for (; i < iLen; i++) {
             switch (wildCardType[i]) {
 
                 case 0 :                  // general character
-                    if ((j >= jLen) || (cLike[i] != getChar(o, j++))) {
+                    if ((j >= jLen)
+                            || (cLike[i] != getChar(session, o, j++))) {
                         return false;
                     }
                     break;
@@ -214,8 +241,9 @@ class Like {
                     }
 
                     while (j < jLen) {
-                        if ((cLike[i] == getChar(o, j))
-                                && compareAt(o, i, j, jLen)) {
+                        if ((cLike[i] == getChar(session, o, j))
+                                && compareAt(session, o, i, j, iLen, jLen,
+                                             cLike, wildCardType)) {
                             return true;
                         }
 
@@ -246,7 +274,7 @@ class Like {
 
                 return;
             } else {
-                int length = getLength(session, escape, "");
+                int length = getLength(session, escape);
 
                 if (length != 1) {
                     if (isBinary) {
@@ -256,7 +284,7 @@ class Like {
                     }
                 }
 
-                escapeChar = getChar(escape, 0);
+                escapeChar = getChar(session, escape, 0);
             }
         }
 
@@ -271,7 +299,7 @@ class Like {
         iLen           = 0;
         iFirstWildCard = -1;
 
-        int l = getLength(session, pattern, "");
+        int l = getLength(session, pattern);
 
         cLike        = new char[l];
         wildCardType = new int[l];
@@ -280,7 +308,7 @@ class Like {
                 bPercent  = false;
 
         for (int i = 0; i < l; i++) {
-            char c = getChar(pattern, i);
+            char c = getChar(session, pattern, i);
 
             if (!bEscaping) {
                 if (escapeChar == c) {
@@ -332,12 +360,8 @@ class Like {
         }
     }
 
-    boolean hasWildcards() {
-        return iFirstWildCard != -1;
-    }
-
     boolean isEquivalentToUnknownPredicate() {
-        return isNull;
+        return !isVariable && isNull;
     }
 
     boolean isEquivalentToEqualsPredicate() {
@@ -346,7 +370,7 @@ class Like {
 
     boolean isEquivalentToNotNullPredicate() {
 
-        if (isVariable || isNull || !hasWildcards()) {
+        if (isVariable || isNull || iFirstWildCard == -1) {
             return false;
         }
 
@@ -359,16 +383,8 @@ class Like {
         return true;
     }
 
-    boolean isEquivalentToBetweenPredicate() {
-
-        return !isVariable && iFirstWildCard > 0
-               && iFirstWildCard == wildCardType.length - 1
-               && cLike[iFirstWildCard] == '%';
-    }
-
-    boolean isEquivalentToBetweenPredicateAugmentedWithLike() {
-        return !isVariable && iFirstWildCard > 0
-               && cLike[iFirstWildCard] == '%';
+    int getFirstWildCardIndex() {
+        return iFirstWildCard;
     }
 
     Object getRangeLow() {
@@ -403,12 +419,29 @@ class Like {
         sb.append("iLen=").append(iLen).append('\n');
         sb.append("iFirstWildCard=").append(iFirstWildCard).append('\n');
         sb.append("cLike=");
-        sb.append(StringUtil.arrayToString(cLike));
+
+        if (cLike != null) {
+            sb.append(StringUtil.arrayToString(cLike));
+        }
+
         sb.append('\n');
         sb.append("wildCardType=");
-        sb.append(StringUtil.arrayToString(wildCardType));
+
+        if (wildCardType != null) {
+            sb.append(StringUtil.arrayToString(wildCardType));
+        }
+
         sb.append(']');
 
         return sb.toString();
+    }
+
+    public Like duplicate() {
+
+        try {
+            return (Like) super.clone();
+        } catch (CloneNotSupportedException ex) {
+            throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+        }
     }
 }

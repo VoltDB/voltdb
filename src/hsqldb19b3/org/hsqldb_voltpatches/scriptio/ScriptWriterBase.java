@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,15 +37,17 @@ import java.io.OutputStream;
 
 import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.DatabaseManager;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.NumberSequence;
+import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.FileAccess;
 import org.hsqldb_voltpatches.lib.FileUtil;
 import org.hsqldb_voltpatches.lib.HsqlTimer;
@@ -84,7 +86,7 @@ import org.hsqldb_voltpatches.result.Result;
  * DatabaseScriptReader and its subclasses read back the data at startup time.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.8.0
+ * @version 2.1.1
  * @since 1.7.2
  */
 public abstract class ScriptWriterBase implements Runnable {
@@ -97,59 +99,59 @@ public abstract class ScriptWriterBase implements Runnable {
     HsqlName            schemaToLog;
     boolean             isClosed;
 
+    //
+    boolean isCompressed;
+    boolean isCrypt;
+
     /**
      * this determines if the script is the normal script (false) used
      * internally by the engine or a user-initiated snapshot of the DB (true)
      */
     boolean          isDump;
     boolean          includeCachedData;
+    boolean          includeIndexRoots;
     long             byteCount;
+    long             lineCount;
     volatile boolean needsSync;
-    volatile boolean forceSync;
-    volatile boolean busyWriting;
     private int      syncCount;
     static final int INSERT             = 0;
     static final int INSERT_WITH_SCHEMA = 1;
 
     /** the last schema for last sessionId */
     Session                      currentSession;
-    public static final String[] LIST_SCRIPT_FORMATS      = new String[] {
+    public static final String[] LIST_SCRIPT_FORMATS = new String[] {
         Tokens.T_TEXT, Tokens.T_BINARY, null, Tokens.T_COMPRESSED
     };
-    public static final int      SCRIPT_TEXT_170          = 0;
-    public static final int      SCRIPT_BINARY_172        = 1;
-    public static final int      SCRIPT_ZIPPED_BINARY_172 = 3;
 
-    public static ScriptWriterBase newScriptWriter(Database db, String file,
-            boolean includeCachedData, boolean newFile, int scriptType) {
+    ScriptWriterBase(Database db, OutputStream outputStream,
+                     FileAccess.FileSync descriptor,
+                     boolean includeCachedData) {
 
-        if (scriptType == SCRIPT_TEXT_170) {
-            return new ScriptWriterText(db, file, includeCachedData, newFile,
-                                        false);
-        } else if (scriptType == SCRIPT_BINARY_172) {
-            return new ScriptWriterBinary(db, file, includeCachedData,
-                                          newFile);
-        } else {
-            return new ScriptWriterZipped(db, file, includeCachedData,
-                                          newFile);
-        }
+        initBuffers();
+
+        this.database          = db;
+        this.includeCachedData = includeCachedData;
+        this.includeIndexRoots = !includeCachedData;
+        currentSession         = database.sessionManager.getSysSession();
+
+        // start with neutral schema - no SET SCHEMA to log
+        schemaToLog = currentSession.loggedSchema =
+            currentSession.currentSchema;
+        fileStreamOut = new BufferedOutputStream(outputStream, 1 << 14);
+        outDescriptor = descriptor;
     }
-
-    ScriptWriterBase() {}
 
     ScriptWriterBase(Database db, String file, boolean includeCachedData,
                      boolean isNewFile, boolean isDump) {
-
-        this.isDump = isDump;
 
         initBuffers();
 
         boolean exists = false;
 
         if (isDump) {
-            exists = FileUtil.getDefaultInstance().exists(file);
+            exists = FileUtil.getFileUtil().exists(file);
         } else {
-            exists = db.getFileAccess().isStreamElement(file);
+            exists = db.logger.getFileAccess().isStreamElement(file);
         }
 
         if (exists && isNewFile) {
@@ -157,7 +159,9 @@ public abstract class ScriptWriterBase implements Runnable {
         }
 
         this.database          = db;
+        this.isDump            = isDump;
         this.includeCachedData = includeCachedData;
+        this.includeIndexRoots = !includeCachedData;
         outFile                = file;
         currentSession         = database.sessionManager.getSysSession();
 
@@ -168,8 +172,12 @@ public abstract class ScriptWriterBase implements Runnable {
         openFile();
     }
 
-    public void reopen() {
-        openFile();
+    public void setIncludeIndexRoots(boolean include) {
+        this.includeIndexRoots = include;
+    }
+
+    public void setIncludeCachedData(boolean include) {
+        this.includeCachedData = include;
     }
 
     protected abstract void initBuffers();
@@ -183,26 +191,33 @@ public abstract class ScriptWriterBase implements Runnable {
             return;
         }
 
+        if (needsSync) {
+            forceSync();
+        }
+    }
+
+    public void forceSync() {
+
+        if (isClosed) {
+            return;
+        }
+
+        needsSync = false;
+
         synchronized (fileStreamOut) {
-            if (needsSync) {
-                if (busyWriting) {
-                    forceSync = true;
+            try {
+                fileStreamOut.flush();
+                outDescriptor.sync();
 
-                    return;
-                }
-
-                try {
-                    fileStreamOut.flush();
-                    outDescriptor.sync();
-
-                    syncCount++;
-                } catch (IOException e) {
-                    Error.printSystemOut("flush() or sync() error: "
-                                         + e.toString());
-                }
-
-                needsSync = false;
-                forceSync = false;
+                syncCount++;
+/*
+                System.out.println(
+                    this.outFile + " FD.sync done at "
+                    + new java.sql.Timestamp(System.currentTimeMillis()));
+*/
+            } catch (IOException e) {
+                database.logger.logWarningEvent("ScriptWriter synch error: ",
+                                                e);
             }
         }
     }
@@ -217,18 +232,20 @@ public abstract class ScriptWriterBase implements Runnable {
 
         try {
             synchronized (fileStreamOut) {
-                needsSync = false;
-                isClosed  = true;
-
-                fileStreamOut.flush();
-                outDescriptor.sync();
+                finishStream();
+                forceSync();
                 fileStreamOut.close();
+
+                fileStreamOut = null;
+                outDescriptor = null;
+                isClosed      = true;
             }
         } catch (IOException e) {
             throw Error.error(ErrorCode.FILE_IO_ERROR);
         }
 
         byteCount = 0;
+        lineCount = 0;
     }
 
     public long size() {
@@ -240,7 +257,6 @@ public abstract class ScriptWriterBase implements Runnable {
         try {
             writeDDL();
             writeExistingData();
-            finishStream();
         } catch (IOException e) {
             throw Error.error(ErrorCode.FILE_IO_ERROR);
         }
@@ -253,42 +269,39 @@ public abstract class ScriptWriterBase implements Runnable {
     protected void openFile() {
 
         try {
-            FileAccess   fa  = isDump ? FileUtil.getDefaultInstance()
-                                      : database.getFileAccess();
+            FileAccess   fa  = isDump ? FileUtil.getFileUtil()
+                                      : database.logger.getFileAccess();
             OutputStream fos = fa.openOutputStreamElement(outFile);
 
             outDescriptor = fa.getFileSync(fos);
-            fileStreamOut = new BufferedOutputStream(fos, 2 << 12);
+            fileStreamOut = fos;
+            fileStreamOut = new BufferedOutputStream(fos, 1 << 14);
         } catch (IOException e) {
-            throw Error.error(ErrorCode.FILE_IO_ERROR,
+            throw Error.error(e, ErrorCode.FILE_IO_ERROR,
                               ErrorCode.M_Message_Pair, new Object[] {
                 e.toString(), outFile
             });
         }
     }
 
-    /**
-     * This is not really useful in the current usage but may be if this
-     * class is used in a different way.
-     */
     protected void finishStream() throws IOException {}
 
-    protected void writeDDL() throws IOException {
+    public void writeDDL() throws IOException {
 
-        Result ddlPart = database.getScript(!includeCachedData);
+        Result ddlPart = database.getScript(includeIndexRoots);
 
         writeSingleColumnResult(ddlPart);
     }
 
-    protected void writeExistingData() throws IOException {
+    public void writeExistingData() throws IOException {
 
         // start with blank schema - SET SCHEMA to log
         currentSession.loggedSchema = null;
 
-        Iterator schemas = database.schemaManager.allSchemaNameIterator();
+        String[] schemas = database.schemaManager.getSchemaNamesArray();
 
-        while (schemas.hasNext()) {
-            String schema = (String) schemas.next();
+        for (int i = 0; i < schemas.length; i++) {
+            String schema = schemas[i];
             Iterator tables =
                 database.schemaManager.databaseObjectIterator(schema,
                     SchemaObject.TABLE);
@@ -313,7 +326,7 @@ public abstract class ScriptWriterBase implements Runnable {
                         break;
 
                     case TableBase.TEXT_TABLE :
-                        script = includeCachedData && !t.isReadOnly();
+                        script = includeCachedData && !t.isDataReadOnly();
                         break;
                 }
 
@@ -323,11 +336,13 @@ public abstract class ScriptWriterBase implements Runnable {
 
                         writeTableInit(t);
 
-                        RowIterator it = t.rowIterator(currentSession);
+                        RowIterator it =
+                            t.rowIteratorClustered(currentSession);
 
                         while (it.hasNext()) {
-                            writeRow(currentSession, t,
-                                     it.getNextRow().getData());
+                            Row row = it.getNextRow();
+
+                            writeRow(currentSession, row, t);
                         }
 
                         writeTableTerm(t);
@@ -341,18 +356,9 @@ public abstract class ScriptWriterBase implements Runnable {
         writeDataTerm();
     }
 
-    protected void writeTableInit(Table t) throws IOException {}
+    public void writeTableInit(Table t) throws IOException {}
 
-    protected void writeTableTerm(Table t) throws IOException {
-
-        if (t.isDataReadOnly() && !t.isTemp() && !t.isText()) {
-            StringBuffer a = new StringBuffer("SET TABLE ");
-
-            a.append(t.getName().statementName);
-            a.append(" READONLY TRUE");
-            writeLogStatement(currentSession, a.toString());
-        }
-    }
+    public void writeTableTerm(Table t) throws IOException {}
 
     protected void writeSingleColumnResult(Result r) throws IOException {
 
@@ -365,18 +371,22 @@ public abstract class ScriptWriterBase implements Runnable {
         }
     }
 
-    abstract void writeRow(Session session, Table table,
-                           Object[] data) throws IOException;
+    public abstract void writeRow(Session session, Row row,
+                                  Table table) throws IOException;
 
     protected abstract void writeDataTerm() throws IOException;
 
-    protected abstract void addSessionId(Session session) throws IOException;
+    protected abstract void writeSessionIdAndSchema(Session session)
+    throws IOException;
 
     public abstract void writeLogStatement(Session session,
                                            String s) throws IOException;
 
-    public abstract void writeInsertStatement(Session session, Table table,
-            Object[] data) throws IOException;
+    public abstract void writeOtherStatement(Session session,
+            String s) throws IOException;
+
+    public abstract void writeInsertStatement(Session session, Row row,
+            Table table) throws IOException;
 
     public abstract void writeDeleteStatement(Session session, Table table,
             Object[] data) throws IOException;
@@ -400,7 +410,7 @@ public abstract class ScriptWriterBase implements Runnable {
                 sync();
             }
 
-            /** @todo: try to do Cache.cleanUp() here, too */
+            /** @todo: can do Cache.cleanUp() here, too */
         } catch (Exception e) {
 
             // ignore exceptions
@@ -409,22 +419,15 @@ public abstract class ScriptWriterBase implements Runnable {
     }
 
     public void setWriteDelay(int delay) {
-
         writeDelay = delay;
-
-        int period = writeDelay == 0 ? 1000
-                                     : writeDelay;
-
-        HsqlTimer.setPeriod(timerTask, period);
     }
 
     public void start() {
 
-        int period = writeDelay == 0 ? 1000
-                                     : writeDelay;
-
-        timerTask = DatabaseManager.getTimer().schedulePeriodicallyAfter(0,
-                period, this, false);
+        if (writeDelay > 0) {
+            timerTask = DatabaseManager.getTimer().schedulePeriodicallyAfter(0,
+                    writeDelay, this, false);
+        }
     }
 
     public void stop() {

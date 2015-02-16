@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,15 +34,15 @@ package org.hsqldb_voltpatches.jdbc;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
-import org.hsqldb_voltpatches.ColumnBase;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.persist.HsqlProperties;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.types.DateTimeType;
+import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.types.CharacterType;
+import org.hsqldb_voltpatches.types.Types;
 
-/* $Id: JDBCResultSetMetaData.java 2980 2009-05-02 14:38:05Z fredt $ */
+/* $Id: JDBCResultSetMetaData.java 5313 2014-01-14 20:33:08Z fredt $ */
 
 // fredt@users    - 20040412 - removed DITypeInfo dependencies
 // boucherb@users - 200404xx - removed unused imports;refinement for better
@@ -96,10 +96,10 @@ import org.hsqldb_voltpatches.types.CharacterType;
  * </div>
  * <!-- end release-specific documentation -->
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
- * @revised JDK 1.6, HSQLDB 1.8.x
+ * @version 2.2.6
+ * @revised JDK 1.6, HSQLDB 2.0
  * @see JDBCStatement#executeQuery
  * @see JDBCStatement#getResultSet
  * @see java.sql.ResultSetMetaData
@@ -128,7 +128,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB 1.9.0 fully supports SQL Satandard features T174 and T176 that
+     * HSQLDB 2.0 fully supports SQL Satandard features T174 and T176 that
      * define identity column support.
      *
      * <hr>
@@ -189,10 +189,10 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        Type type = resultMetaData.columnTypes[--column];
+        Type type = translateType(resultMetaData.columnTypes[--column]);
 
         if (type.isCharacterType()) {
-            return !((CharacterType) type).isCaseInsensitive();
+            return type.getCollation().isCaseSensitive();
         }
 
         return false;
@@ -207,7 +207,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB 1.9.0 handles this differently from previous versions. <p>
+     * HSQLDB 2.0 handles this differently from previous versions. <p>
      *
      * If the column in question is a database table or view column, and the
      * type of the column allows searching, then returns true, otherwise false.
@@ -235,7 +235,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB 1.9.0 fully supports this feature and returns true for
+     * HSQLDB 2.0 fully supports this feature and returns true for
      * NUMERIC and DECIMAL columns. <p>
      *
      * </div>
@@ -249,7 +249,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        Type type = resultMetaData.columnTypes[--column];
+        Type type = translateType(resultMetaData.columnTypes[--column]);
 
         return (type.typeCode == Types.SQL_DECIMAL
                 || type.typeCode == Types.SQL_NUMERIC) && type.scale > 0;
@@ -264,13 +264,13 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB 1.9.0 fully supports this feature.  <p>
+     * HSQLDB 2.2 fully supports this feature.  <p>
      *
      * <tt>columnNoNulls</tt> is always returned for result set columns
-     * that do not directly represent table column values (i.e. are calculated),
-     * while the corresponding value in [INFORMATION_SCHEMA.]SYSTEM_COLUMNS.NULLABLE
-     * is returned for result set columns that do directly represent table
-     * column values. <p>
+     * that represent constants, sequences or table columns known
+     * to be not null. <tt>columnNullable</tt> is returned for NULL constants,
+     * or nullable table columns. <tt>columnNullableUnknown</tt> is returned
+     * for all other columns such as aggregates and computed values.<p>
      *
      * To determine the nullable status of a table column in isolation from
      * ResultSetMetaData and in a DBMS-independent fashion, the
@@ -302,7 +302,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB 1.9.0 fully supports this feature.  <p>
+     * HSQLDB 2.0 fully supports this feature.  <p>
      *
      * </div>
      * <!-- end release-specific documentation -->
@@ -315,7 +315,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        Type type = resultMetaData.columnTypes[--column];
+        Type type = translateType(resultMetaData.columnTypes[--column]);
 
         return type.isNumberType();
     }
@@ -329,7 +329,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB 1.9.0 fully supports this feature.  <p>
+     * HSQLDB 2.0 fully supports this feature.  <p>
      *
      * The current calculation follows these rules: <p>
      *
@@ -395,7 +395,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        Type type = resultMetaData.columnTypes[--column];
+        Type type = translateType(resultMetaData.columnTypes[--column]);
 
         return type.displaySize();
     }
@@ -435,8 +435,11 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         String label = resultMetaData.columnLabels[column];
 
-        return label == null ? resultMetaData.columns[column].getNameString()
-                             : label;
+        if (label != null && label.length() > 0) {
+            return label;
+        }
+
+        return resultMetaData.columns[column].getNameString();
     }
 
     /**
@@ -471,16 +474,20 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      */
     public String getColumnName(int column) throws SQLException {
 
-        checkColumn(column);
+        checkColumn(column--);
 
         if (useColumnName) {
-            String name = resultMetaData.columns[--column].getNameString();
+            String name = resultMetaData.columns[column].getNameString();
 
-            return name == null ? ""
-                                : name;
+            if (name != null && name.length() > 0) {
+                return name;
+            }
         }
 
-        return resultMetaData.columnLabels[--column];
+        String label = resultMetaData.columnLabels[column];
+
+        return label == null ? resultMetaData.columns[column].getNameString()
+                             : label;
     }
 
     /**
@@ -506,7 +513,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        String name = resultMetaData.columns[--column].getSchemaNameString();;
+        String name = resultMetaData.columns[--column].getSchemaNameString();
 
         return name == null ? ""
                             : name;
@@ -527,11 +534,9 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.8.0, HSQLDB reports the declared length or precision
-     * specifiers for table columns, if they are defined.<p>
-     *
-     * From 1.9.0, HSQLDB, reports the correct length or precision for
-     * computed columns according to the SQL Standard.<p>
+     * HSQLDB 2.0 reports the correct length or precision for
+     * all columns. For DOUBLE, the binary precision of 64 is returned, while
+     * for other numeric types the decimal precision is returned.<p>
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -544,18 +549,8 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
         checkColumn(column);
 
         // type in columnTypes overrides column type
-        Type type      = resultMetaData.columnTypes[--column];
-        long precision = type.precision;
-
-        if (type.isDateTimeType() || type.isIntervalType()) {
-            precision = type.displaySize();
-        }
-
-        if (precision > Integer.MAX_VALUE) {
-            precision = Integer.MAX_VALUE;
-        }
-
-        return (int) precision;
+        Type type      = translateType(resultMetaData.columnTypes[--column]);
+        return type.getJDBCPrecision();
     }
 
     /**
@@ -568,17 +563,12 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * Starting with 1.8.0, HSQLDB reports the declared
-     * scale for table columns.<p>
+     * HSQLDB 2.0 reports the correct scale for all columns.<p>
      *
-     * From 1.9.0, HSQLDB, reports the correct scale for
-     * computed columns according to the SQL Standard.<p>
-     *
-     * <pre>
-     * sql.enforce_strict_size
-     * </pre>
      * For datetime and interval types such as Timestamp or Time, the
-     * fractional second precision is reported.
+     * fractional second precision is reported.<p>
+     *
+     * The reported scale for INTEGER, BIGINT and DOUBLE is 0<p>
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -588,9 +578,11 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      */
     public int getScale(int column) throws SQLException {
 
-        Type type = resultMetaData.columnTypes[--column];
+        checkColumn(column);
 
-        return type.scale;
+        Type type = translateType(resultMetaData.columnTypes[--column]);
+
+        return type.getJDBCScale();
     }
 
     /**
@@ -621,7 +613,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * From 1.9.0, HSQLDB returns the name of the catalog. The default name is
+     * From 2.0, HSQLDB returns the name of the catalog. The default name is
      * PUBLIC.
      * This value can be changed for the database using an SQL command.<p>
      *
@@ -679,7 +671,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        Type type = resultMetaData.columnTypes[--column];
+        Type type = translateType(resultMetaData.columnTypes[--column]);
 
         return type.getJDBCTypeCode();
     }
@@ -698,7 +690,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        Type type = resultMetaData.columnTypes[--column];
+        Type type = translateType(resultMetaData.columnTypes[--column]);
 
         return type.getNameString();
     }
@@ -712,7 +704,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * From 1.9.0 this method returns true if the ResuleSet is not updatable
+     * From 2.0 this method returns true if the ResuleSet is not updatable
      * or the column in question is not updatable.<p>
      * </div>
      * <!-- end release-specific documentation -->
@@ -738,7 +730,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * From 1.9.0 this method returns false if the ResuleSet is not updatable
+     * From 2.0 this method returns false if the ResuleSet is not updatable
      * or the column in question is not updatable.<p>
      *
      * </div>
@@ -765,7 +757,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * From 1.9.0 this method returns false if the ResuleSet is not updatable
+     * From 2.0 this method returns false if the ResuleSet is not updatable
      * or the column in question is not updatable.<p>
      *
      * </div>
@@ -798,7 +790,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB 1.9.0 fully supports this feature.<p>
+     * HSQLDB 2.0 fully supports this feature.<p>
      *
      * For columns of type OTHER, there is no specific class name and
      * java.lang.Object is returned.
@@ -819,7 +811,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
 
         checkColumn(column);
 
-        Type type = resultMetaData.columnTypes[--column];
+        Type type = translateType(resultMetaData.columnTypes[--column]);
 
         return type.getJDBCClassName();
     }
@@ -852,7 +844,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
             return (T) this;
         }
 
-        throw Util.invalidArgument("iface: " + iface);
+        throw JDBCUtil.invalidArgument("iface: " + iface);
     }
 
 //#endif JAVA6
@@ -887,6 +879,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      * getColumnName().
      */
     private boolean useColumnName;
+    private boolean translateTTIType;
     private int     columnCount;
 
     /**
@@ -895,14 +888,12 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      *
      * @param meta the ResultMetaData object from which to construct a new
      *        JDBCResultSetMetaData object
-     * @param props the HsqlProperties object from which to construct a
-     *        new JDBCResultSetMetaData object
      * @throws SQLException if a database access error occurs
      */
     JDBCResultSetMetaData(ResultMetaData meta, boolean isUpdatable,
                           boolean isInsertable,
-                          HsqlProperties props) throws SQLException {
-        init(meta, props);
+                          JDBCConnection conn) throws SQLException {
+        init(meta, conn);
     }
 
     /**
@@ -911,11 +902,10 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      *
      *  @param meta the ResultMetaData object from which to initialize this
      *         JDBCResultSetMetaData object
-     *  @param props the HsqlProperties object from which to initialize this
-     *         JDBCResultSetMetaData object
+     *  @param conn the JDBCConnection
      *  @throws SQLException if a database access error occurs
      */
-    void init(ResultMetaData meta, HsqlProperties props) throws SQLException {
+    void init(ResultMetaData meta, JDBCConnection conn) throws SQLException {
 
         resultMetaData = meta;
         columnCount    = resultMetaData.getColumnCount();
@@ -924,9 +914,18 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
         //          default behaviour in this case
         // JDBCDriver.getPropertyInfo says
         // default is true
-        useColumnName = (props == null) ? true
-                                        : props.isPropertyTrue(
-                                        "get_column_name", true);
+        useColumnName = true;
+
+        if (conn == null) {
+            return;
+        }
+
+        useColumnName = conn.isUseColumnName;
+
+        if (conn.clientProperties != null) {
+            translateTTIType = conn.clientProperties.isPropertyTrue(
+                HsqlDatabaseProperties.jdbc_translate_tti_types);
+        }
     }
 
     /**
@@ -939,9 +938,27 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
     private void checkColumn(int column) throws SQLException {
 
         if (column < 1 || column > columnCount) {
-            throw Util.sqlException(ErrorCode.JDBC_COLUMN_NOT_FOUND,
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_COLUMN_NOT_FOUND,
                                     String.valueOf(column));
         }
+    }
+
+    /**
+     * Translates an INTERVAL type to VARCHAR.
+     * Removes time zone from datetime types.
+     *
+     */
+    private Type translateType(Type type) {
+
+        if (this.translateTTIType) {
+            if (type.isIntervalType()) {
+                type = ((IntervalType) type).getCharacterType();
+            } else if (type.isDateTimeTypeWithZone()) {
+                type = ((DateTimeType) type).getDateTimeTypeWithoutZone();
+            }
+        }
+
+        return type;
     }
 
     /**

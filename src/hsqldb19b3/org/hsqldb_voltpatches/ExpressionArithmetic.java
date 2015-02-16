@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,20 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Implementation of arithmetic and concatenation operations
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public class ExpressionArithmetic extends Expression {
@@ -97,8 +100,7 @@ public class ExpressionArithmetic extends Expression {
                 }
 
                 if (dataType == null) {
-                    throw Error.runtimeError(ErrorCode.U_S0500,
-                                             "Expression.getSQL()");
+                    throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
                 }
 
                 return dataType.convertToSQLString(valueData);
@@ -162,7 +164,8 @@ public class ExpressionArithmetic extends Expression {
         switch (opType) {
 
             case OpTypes.VALUE :
-                sb.append("VALUE = ").append(valueData);
+                sb.append("VALUE = ").append(
+                    dataType.convertToSQLString(valueData));
                 sb.append(", TYPE = ").append(dataType.getNameString());
 
                 return sb.toString();
@@ -170,7 +173,7 @@ public class ExpressionArithmetic extends Expression {
             case OpTypes.ROW :
 
             //
-            case OpTypes.TABLE :
+            case OpTypes.VALUELIST :
                 sb.append("VALUELIST ");
                 sb.append(" TYPE = ").append(dataType.getNameString());
 
@@ -211,14 +214,14 @@ public class ExpressionArithmetic extends Expression {
                 break;
         }
 
-        if (nodes[LEFT] != null) {
-            sb.append(" arg1=[");
+        if (getLeftNode() != null) {
+            sb.append(" arg_left=[");
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
         }
 
-        if (nodes[RIGHT] != null) {
-            sb.append(" arg2=[");
+        if (getRightNode() != null) {
+            sb.append(" arg_right=[");
             sb.append(nodes[RIGHT].describe(session, blanks + 1));
             sb.append(']');
         }
@@ -226,8 +229,9 @@ public class ExpressionArithmetic extends Expression {
         return sb.toString();
     }
 
-    public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
-            int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
+    public HsqlList resolveColumnReferences(Session session,
+            RangeGroup rangeGroup, int rangeCount, RangeGroup[] rangeGroups,
+            HsqlList unresolvedSet, boolean acceptsSequences) {
 
         if (opType == OpTypes.VALUE) {
             return unresolvedSet;
@@ -238,8 +242,9 @@ public class ExpressionArithmetic extends Expression {
                 continue;
             }
 
-            unresolvedSet = nodes[i].resolveColumnReferences(rangeVarArray,
-                    rangeCount, unresolvedSet, acceptsSequences);
+            unresolvedSet = nodes[i].resolveColumnReferences(session,
+                    rangeGroup, rangeCount, rangeGroups, unresolvedSet,
+                    acceptsSequences);
         }
 
         return unresolvedSet;
@@ -259,18 +264,19 @@ public class ExpressionArithmetic extends Expression {
                 break;
 
             case OpTypes.NEGATE :
-                if (nodes[LEFT].isParam || nodes[LEFT].dataType == null) {
+                if (nodes[LEFT].isUnresolvedParam()
+                        || nodes[LEFT].dataType == null) {
                     throw Error.error(ErrorCode.X_42567);
                 }
 
                 dataType = nodes[LEFT].dataType;
 
                 if (!dataType.isNumberType()) {
-                    throw Error.error(ErrorCode.X_42565);
+                    throw Error.error(ErrorCode.X_42563);
                 }
 
                 if (nodes[LEFT].opType == OpTypes.VALUE) {
-                    setAsConstantValue(session);
+                    setAsConstantValue(session, parent);
                 }
                 break;
 
@@ -283,7 +289,7 @@ public class ExpressionArithmetic extends Expression {
                                                     .isCharacterType())) {
                     opType = OpTypes.CONCAT;
 
-                    resolveTypesForConcat(session);
+                    resolveTypesForConcat(session, parent);
 
                     break;
                 }
@@ -292,29 +298,133 @@ public class ExpressionArithmetic extends Expression {
             case OpTypes.SUBTRACT :
             case OpTypes.MULTIPLY :
             case OpTypes.DIVIDE :
-                resolveTypesForArithmetic(session);
+                resolveTypesForArithmetic(session, parent);
                 break;
 
             case OpTypes.CONCAT :
-                resolveTypesForConcat(session);
+                resolveTypesForConcat(session, parent);
                 break;
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "Expression.resolveTypes()");
+                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
     }
 
-    void resolveTypesForArithmetic(Session session) {
+    void resolveTypesForArithmetic(Session session, Expression parent) {
 
-        if (nodes[LEFT].isParam && nodes[RIGHT].isParam) {
-            throw Error.error(ErrorCode.X_42567);
+        if (nodes[LEFT].isUnresolvedParam()
+                && nodes[RIGHT].isUnresolvedParam()) {
+            nodes[LEFT].dataType  = Type.SQL_INTEGER;
+            nodes[RIGHT].dataType = Type.SQL_INTEGER;
         }
 
-        if (nodes[LEFT].isParam) {
-            nodes[LEFT].dataType = nodes[RIGHT].dataType;
-        } else if (nodes[RIGHT].isParam) {
-            nodes[RIGHT].dataType = nodes[LEFT].dataType;
+        if (nodes[LEFT].dataType == null && nodes[RIGHT].dataType == null) {
+            nodes[LEFT].dataType  = Type.SQL_INTEGER;
+            nodes[RIGHT].dataType = Type.SQL_INTEGER;
+        }
+
+        if (nodes[LEFT].isUnresolvedParam()) {
+            if (nodes[RIGHT].dataType == null) {
+                throw Error.error(ErrorCode.X_42567);
+            }
+
+            if (nodes[RIGHT].dataType.isIntervalType()) {
+                if (parent != null) {
+                    switch (parent.opType) {
+
+                        case OpTypes.EQUAL :
+                        case OpTypes.GREATER_EQUAL :
+                        case OpTypes.SMALLER_EQUAL :
+                        case OpTypes.SMALLER :
+                        case OpTypes.GREATER :
+                            for (int i = 0; i < parent.nodes.length; i++) {
+                                if (parent.nodes[i] != this) {
+                                    if (parent.nodes[i].dataType != null
+                                            && parent.nodes[i].dataType
+                                                .isDateTimeType()) {
+                                        nodes[LEFT].dataType =
+                                            parent.nodes[i].dataType;
+                                    }
+
+                                    break;
+                                }
+                            }
+                            break;
+
+                        default :
+                    }
+                }
+            }
+
+            if (nodes[LEFT].dataType == null) {
+                switch (opType) {
+
+                    case OpTypes.SUBTRACT :
+                        if (nodes[RIGHT].dataType.isIntervalType()) {
+                            nodes[LEFT].dataType =
+                                Type.SQL_TIMESTAMP_WITH_TIME_ZONE;
+                        }
+                        break;
+
+                    case OpTypes.ADD :
+                        if (nodes[RIGHT].dataType.isDateTimeType()) {
+                            if (nodes[RIGHT].dataType.typeComparisonGroup
+                                    == Types.SQL_DATE) {
+                                nodes[LEFT].dataType =
+                                    Type
+                                    .SQL_INTERVAL_YEAR_TO_MONTH_MAX_PRECISION;
+                            } else {
+                                nodes[LEFT].dataType =
+                                    Type
+                                    .SQL_INTERVAL_DAY_TO_SECOND_MAX_PRECISION;
+                            }
+                        } else if (nodes[RIGHT].dataType.isIntervalType()) {
+                            nodes[LEFT].dataType =
+                                Type.SQL_TIMESTAMP_WITH_TIME_ZONE;
+                        }
+                        break;
+                }
+            }
+
+            if (nodes[LEFT].dataType == null) {
+                nodes[LEFT].dataType = nodes[RIGHT].dataType;
+            }
+        } else if (nodes[RIGHT].isUnresolvedParam()) {
+            if (nodes[LEFT].dataType == null) {
+                throw Error.error(ErrorCode.X_42567);
+            }
+
+            switch (opType) {
+
+                case OpTypes.MULTIPLY :
+                case OpTypes.DIVIDE :
+                    if (nodes[LEFT].dataType.isIntervalType()) {
+                        nodes[RIGHT].dataType = Type.SQL_DECIMAL;
+                    } else {
+                        nodes[RIGHT].dataType = nodes[LEFT].dataType;
+                    }
+                    break;
+
+                case OpTypes.SUBTRACT :
+                case OpTypes.ADD :
+                    if (nodes[LEFT].dataType.isDateTimeType()) {
+
+                        // datetime subtract - type predetermined
+                        if (dataType != null && dataType.isIntervalType()) {
+                            nodes[RIGHT].dataType = nodes[LEFT].dataType;
+                        } else if (nodes[LEFT].dataType.typeComparisonGroup
+                                   == Types.SQL_DATE) {
+                            nodes[RIGHT].dataType =
+                                Type.SQL_INTERVAL_YEAR_TO_MONTH_MAX_PRECISION;
+                        } else {
+                            nodes[RIGHT].dataType =
+                                Type.SQL_INTERVAL_DAY_TO_SECOND_MAX_PRECISION;
+                        }
+                    } else {
+                        nodes[RIGHT].dataType = nodes[LEFT].dataType;
+                    }
+                    break;
+            }
         }
 
         if (nodes[LEFT].dataType == null || nodes[RIGHT].dataType == null) {
@@ -322,76 +432,177 @@ public class ExpressionArithmetic extends Expression {
         }
 
         // datetime subtract - type predetermined
-        if (nodes[LEFT].dataType.isDateTimeType()
-                && nodes[RIGHT].dataType.isDateTimeType()) {
-            if (dataType == null) {
-                throw Error.error(ErrorCode.X_42566);
-            } else if (!dataType.isIntervalType()
-                       || nodes[LEFT].dataType.typeCode
-                          != nodes[RIGHT].dataType.typeCode) {
-                throw Error.error(ErrorCode.X_42562);
+        if (dataType != null && dataType.isIntervalType()) {
+            if (nodes[LEFT].dataType.isDateTimeType()
+                    && nodes[RIGHT].dataType.isDateTimeType()) {
+                if (nodes[LEFT].dataType.typeComparisonGroup
+                        != nodes[RIGHT].dataType.typeComparisonGroup) {
+                    throw Error.error(ErrorCode.X_42562);
+                }
+            } else {
+                Type type = nodes[LEFT].dataType.getCombinedType(session,
+                    nodes[RIGHT].dataType, opType);
+
+                if (type == null) {
+                    throw Error.error(ErrorCode.X_42562);
+                }
+
+                if (type.isIntervalType()) {
+                    if (type.typeCode != dataType.typeCode) {
+                        throw Error.error(ErrorCode.X_42562);
+                    }
+                } else if (type.isNumberType()) {
+                    nodes[LEFT]  = new ExpressionOp(nodes[LEFT], dataType);
+                    nodes[RIGHT] = new ExpressionOp(nodes[RIGHT], dataType);
+
+                    nodes[LEFT].resolveTypes(session, this);
+                    nodes[RIGHT].resolveTypes(session, this);
+                } else {
+                    throw Error.error(ErrorCode.X_42562);
+                }
             }
         } else {
-            dataType =
-                nodes[LEFT].dataType.getCombinedType(nodes[RIGHT].dataType,
-                    opType);
+            dataType = nodes[LEFT].dataType.getCombinedType(session,
+                    nodes[RIGHT].dataType, opType);
 
             if (dataType.isDateTimeType()) {
                 if (nodes[LEFT].dataType.isIntervalType()) {
                     if (opType != OpTypes.ADD) {
-                        throw Error.error(ErrorCode.X_42565);
+                        throw Error.error(ErrorCode.X_42563);
                     }
 
                     Expression temp = nodes[LEFT];
 
                     nodes[LEFT]  = nodes[RIGHT];
                     nodes[RIGHT] = temp;
+                } else if (nodes[RIGHT].dataType.isNumberType()) {
+                    if (!session.database.sqlSyntaxOra) {
+                        throw Error.error(ErrorCode.X_42562);
+                    }
                 }
             }
         }
 
         if (nodes[LEFT].opType == OpTypes.VALUE
                 && nodes[RIGHT].opType == OpTypes.VALUE) {
-            setAsConstantValue(session);
+            setAsConstantValue(session, parent);
         }
     }
 
-    void resolveTypesForConcat(Session session) {
+    void resolveTypesForConcat(Session session, Expression parent) {
 
         if (dataType != null) {
             return;
         }
 
-        if (nodes[LEFT].isParam) {
-            nodes[LEFT].dataType = nodes[RIGHT].dataType;
-        } else if (nodes[RIGHT].isParam) {
-            nodes[RIGHT].dataType = nodes[LEFT].dataType;
+        if (nodes[LEFT].isUnresolvedParam()) {
+            nodes[LEFT].dataType = getParameterType(nodes[RIGHT].dataType);
+        } else if (nodes[RIGHT].isUnresolvedParam()) {
+            nodes[RIGHT].dataType = getParameterType(nodes[LEFT].dataType);
         }
 
-        if (nodes[LEFT].dataType == null || nodes[RIGHT].dataType == null) {
-            throw Error.error(ErrorCode.X_42567);
+        if (nodes[LEFT].dataType == null) {
+            nodes[LEFT].dataType = Type.SQL_VARCHAR_DEFAULT;
+        }
+
+        if (nodes[RIGHT].dataType == null) {
+            nodes[RIGHT].dataType = Type.SQL_VARCHAR_DEFAULT;
         }
 
         if (nodes[LEFT].dataType.isBinaryType()
                 ^ nodes[RIGHT].dataType.isBinaryType()) {
-            throw Error.error(ErrorCode.X_42565);
+            throw Error.error(ErrorCode.X_42563);
+        }
+
+        if (nodes[LEFT].dataType.isArrayType()) {
+            Expression e = nodes[RIGHT];
+
+            if (e.opType == OpTypes.ARRAY_ACCESS) {
+                if (parent == null) {
+                    throw Error.error(ErrorCode.X_42563);
+                }
+
+                nodes[RIGHT]  = e.getLeftNode();
+                e.nodes[LEFT] = this;
+
+                parent.replaceNode(this, e);
+            }
+        }
+
+        if (nodes[LEFT].dataType.isArrayType()
+                ^ nodes[RIGHT].dataType.isArrayType()) {
+            throw Error.error(ErrorCode.X_42563);
         }
 
         // conversion of right argument to character for backward compatibility
         if (nodes[LEFT].dataType.isCharacterType()
                 && !nodes[RIGHT].dataType.isCharacterType()) {
-            Type newType = CharacterType.getCharacterType(Types.SQL_VARCHAR,
-                nodes[RIGHT].dataType.displaySize());
+            if (session.database.sqlEnforceTypes) {
+                throw Error.error(ErrorCode.X_42562);
+            }
 
-            nodes[RIGHT] = new ExpressionOp(nodes[RIGHT], newType);
+            Type newType = CharacterType.getCharacterType(Types.SQL_VARCHAR,
+                nodes[RIGHT].dataType.displaySize(),
+                nodes[LEFT].dataType.getCollation());
+
+            nodes[RIGHT] = ExpressionOp.getCastExpression(session,
+                    nodes[RIGHT], newType);
         }
 
-        dataType = nodes[LEFT].dataType.getCombinedType(nodes[RIGHT].dataType,
-                OpTypes.CONCAT);
+        if (nodes[RIGHT].dataType.isCharacterType()
+                && !nodes[LEFT].dataType.isCharacterType()) {
+            if (session.database.sqlEnforceTypes) {
+                throw Error.error(ErrorCode.X_42562);
+            }
+
+            Type newType = CharacterType.getCharacterType(Types.SQL_VARCHAR,
+                nodes[LEFT].dataType.displaySize(),
+                nodes[RIGHT].dataType.getCollation());
+
+            nodes[LEFT] = ExpressionOp.getCastExpression(session, nodes[LEFT],
+                    newType);
+        }
+
+        dataType = nodes[LEFT].dataType.getCombinedType(session,
+                nodes[RIGHT].dataType, OpTypes.CONCAT);
 
         if (nodes[LEFT].opType == OpTypes.VALUE
                 && nodes[RIGHT].opType == OpTypes.VALUE) {
-            setAsConstantValue(session);
+            setAsConstantValue(session, parent);
+        }
+    }
+
+    private Type getParameterType(Type type) {
+
+        if (type == null) {
+            return null;
+        }
+
+        switch (type.typeCode) {
+
+            case Types.SQL_CHAR :
+            case Types.SQL_VARCHAR :
+                return Type.SQL_VARCHAR_DEFAULT;
+
+            case Types.SQL_CLOB :
+                return Type.SQL_CLOB;
+
+            case Types.SQL_BINARY :
+            case Types.SQL_VARBINARY :
+                return Type.SQL_VARBINARY_DEFAULT;
+
+            case Types.SQL_BLOB :
+                return Type.SQL_BLOB;
+
+            case Types.SQL_BIT :
+            case Types.SQL_BIT_VARYING :
+                return Type.SQL_BIT_VARYING_MAX_LENGTH;
+
+            case Types.SQL_ARRAY :
+                return type;
+
+            default :
+                return null;
         }
     }
 
@@ -403,11 +614,11 @@ public class ExpressionArithmetic extends Expression {
                 return valueData;
 
             case OpTypes.SIMPLE_COLUMN : {
-                Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                Object value =
+                    session.sessionContext.rangeIterators[rangePosition]
+                        .getCurrent(columnIndex);
 
-                return data[columnIndex];
+                return value;
             }
             case OpTypes.NEGATE :
                 return ((NumberType) dataType).negate(
@@ -420,18 +631,27 @@ public class ExpressionArithmetic extends Expression {
         switch (opType) {
 
             case OpTypes.ADD :
-                return dataType.add(a, b, nodes[RIGHT].dataType);
+                return dataType.add(session, a, b, nodes[RIGHT].dataType);
 
             case OpTypes.SUBTRACT :
-                return dataType.subtract(a, b, nodes[RIGHT].dataType);
+                return dataType.subtract(session, a, b, nodes[RIGHT].dataType);
 
             case OpTypes.MULTIPLY :
                 return dataType.multiply(a, b);
 
             case OpTypes.DIVIDE :
-                return dataType.divide(a, b);
+                return dataType.divide(session, a, b);
 
             case OpTypes.CONCAT :
+                if (!session.database.sqlConcatNulls
+                        && nodes[LEFT].dataType.isCharacterType()) {
+                    if (a == null && b != null) {
+                        a = "";
+                    } else if (a != null && b == null) {
+                        b = "";
+                    }
+                }
+
                 return dataType.concat(session, a, b);
 
             default :

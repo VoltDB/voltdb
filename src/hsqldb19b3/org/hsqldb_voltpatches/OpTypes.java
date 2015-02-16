@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,8 @@ package org.hsqldb_voltpatches;
 
 public interface OpTypes {
 
-    int VALUE                = 1,     // constant value
+    int NONE                 = 0,
+        VALUE                = 1,     // constant value
         COLUMN               = 2,     // references
         COALESCE             = 3,
         DEFAULT              = 4,
@@ -41,24 +42,36 @@ public interface OpTypes {
         VARIABLE             = 6,
         PARAMETER            = 7,
         DYNAMIC_PARAM        = 8,
-        ASTERISK             = 9,
-        SEQUENCE             = 10,
+        TRANSITION_VARIABLE  = 9,
+        DIAGNOSTICS_VARIABLE = 10,
+        ASTERISK             = 11,
+        SEQUENCE             = 12,
+        SEQUENCE_CURRENT     = 13,
+        ROWNUM               = 14,
+        ARRAY                = 19,
+        MULTISET             = 20,
         SCALAR_SUBQUERY      = 21,    // query based row or table
         ROW_SUBQUERY         = 22,
         TABLE_SUBQUERY       = 23,
+        RECURSIVE_SUBQUERY   = 24,
         ROW                  = 25,    // rows
-        TABLE                = 26,
+        VALUELIST            = 26,
         FUNCTION             = 27,
         SQL_FUNCTION         = 28,
         ROUTINE_FUNCTION     = 29,
+        TABLE                = 30,
         NEGATE               = 31,    // arithmetic operations
         ADD                  = 32,
         SUBTRACT             = 33,
         MULTIPLY             = 34,
         DIVIDE               = 35,
         CONCAT               = 36,    // concatenation
-        EQUAL                = 41,    // logical - comparison
-        GREATER_EQUAL        = 42,
+        LIKE_ARG             = 37,
+        CASEWHEN_COALESCE    = 38,
+        IS_NOT_NULL          = 39,    // logical - comparison
+        EQUAL                = 40,
+        GREATER_EQUAL        = 41,
+        GREATER_EQUAL_PRE    = 42,
         GREATER              = 43,
         SMALLER              = 44,
         SMALLER_EQUAL        = 45,
@@ -81,6 +94,7 @@ public interface OpTypes {
         MATCH_UNIQUE_SIMPLE  = 62,
         MATCH_UNIQUE_PARTIAL = 63,
         MATCH_UNIQUE_FULL    = 64,
+        CONTAINS             = 65,
         COUNT                = 71,    // aggregate functions
         SUM                  = 72,
         MIN                  = 73,
@@ -92,12 +106,20 @@ public interface OpTypes {
         STDDEV_SAMP          = 79,
         VAR_POP              = 80,
         VAR_SAMP             = 81,
+        ARRAY_AGG            = 82,
+        GROUP_CONCAT         = 83,
+        PREFIX               = 84,
+        MEDIAN               = 85,
+        CONCAT_WS            = 86,
         CAST                 = 91,    // other operations
         ZONE_MODIFIER        = 92,
         CASEWHEN             = 93,
         ORDER_BY             = 94,
         LIMIT                = 95,
         ALTERNATIVE          = 96,
-        MULTICOLUMN          = 97
+        MULTICOLUMN          = 97,
+        USER_AGGREGATE       = 98,
+        ARRAY_ACCESS         = 99,
+        ARRAY_SUBQUERY       = 100
     ;
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,10 +35,10 @@ import org.hsqldb_voltpatches.Row;
 
 /**
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.7
  * @since 1.9.0
  */
-public interface RangeIterator {
+public interface RangeIterator extends RowIterator {
 
     boolean isBeforeFirst();
 
@@ -48,11 +48,11 @@ public interface RangeIterator {
 
     Object[] getCurrent();
 
-    long getRowid();
+    Object getCurrent(int i);
+
+    void setCurrent(Object[] data);
 
     Object getRowidObject();
-
-    void remove();
 
     void reset();
 

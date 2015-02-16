@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,19 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.result.ResultProperties;
 
 /**
  * Implementation of Statement for query expressions.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.9.0
  */
 public class StatementQuery extends StatementDMQL {
@@ -50,23 +52,12 @@ public class StatementQuery extends StatementDMQL {
                    CompileContext compileContext) {
 
         super(StatementTypes.SELECT_CURSOR, StatementTypes.X_SQL_DATA,
-              session.currentSchema);
+              session.getCurrentSchemaHsqlName());
 
-        this.queryExpression = queryExpression;
+        this.statementReturnType = StatementTypes.RETURN_RESULT;
+        this.queryExpression     = queryExpression;
 
-        setDatabseObjects(compileContext);
-        checkAccessRights(session);
-    }
-
-    StatementQuery(Session session, QueryExpression queryExpression,
-                   CompileContext compileContext, HsqlName[] targets) {
-
-        super(StatementTypes.SELECT_SINGLE, StatementTypes.X_SQL_DATA,
-              session.currentSchema);
-
-        this.queryExpression = queryExpression;
-
-        setDatabseObjects(compileContext);
+        setDatabseObjects(session, compileContext);
         checkAccessRights(session);
     }
 
@@ -91,13 +82,12 @@ public class StatementQuery extends StatementDMQL {
                 return queryExpression.getMetaData();
 
             default :
-                throw Error.runtimeError(
-                    ErrorCode.U_S0500,
-                    "CompiledStatement.getResultMetaData()");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "StatementQuery.getResultMetaData()");
         }
     }
 
-    void getTableNamesForRead(OrderedHashSet set) {
+    void collectTableNamesForRead(OrderedHashSet set) {
 
         queryExpression.getBaseTableNames(set);
 
@@ -106,10 +96,25 @@ public class StatementQuery extends StatementDMQL {
                 subqueries[i].queryExpression.getBaseTableNames(set);
             }
         }
+
+        for (int i = 0; i < routines.length; i++) {
+            set.addAll(routines[i].getTableNamesForRead());
+        }
     }
 
-    void getTableNamesForWrite(OrderedHashSet set) {}
+    void collectTableNamesForWrite(OrderedHashSet set) {
 
+        if (queryExpression.isUpdatable) {
+            queryExpression.getBaseTableNames(set);
+        }
+    }
+
+    public int getResultProperties() {
+
+        return queryExpression.isUpdatable
+               ? ResultProperties.updatablePropsValue
+               : ResultProperties.defaultPropsValue;
+    }
     /************************* Volt DB Extensions *************************/
 
     /**

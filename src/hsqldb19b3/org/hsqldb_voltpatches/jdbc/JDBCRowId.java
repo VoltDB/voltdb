@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 package org.hsqldb_voltpatches.jdbc;
 
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.StringConverter;
 
 import java.io.IOException;
@@ -39,7 +39,7 @@ import java.sql.RowId;
 import java.sql.SQLException;
 import java.util.Arrays;
 
-/* $Id: JDBCRowId.java 2946 2009-03-22 17:44:48Z fredt $ */
+/* $Id: JDBCRowId.java 5161 2013-02-03 01:45:10Z fredt $ */
 
 //boucherb@users 20060522 - doc 1.8.1 full synch up to Mustang Build 84
 
@@ -75,7 +75,7 @@ import java.util.Arrays;
  * JDBC driver supports the data type.
  *
  * @see java.sql.DatabaseMetaData
- * @since JDK 1.6, HSQLDB 1.9.0
+ * @since JDK 1.6, HSQLDB 2.0
  * @author boucherb@users
  */
 public final class JDBCRowId implements RowId {
@@ -102,7 +102,7 @@ public final class JDBCRowId implements RowId {
     public JDBCRowId(final byte[] id) throws SQLException {
 
         if (id == null) {
-            throw Util.nullArgument("id");
+            throw JDBCUtil.nullArgument("id");
         }
         this.id = id;
     }
@@ -129,13 +129,13 @@ public final class JDBCRowId implements RowId {
     public JDBCRowId(final String hex) throws SQLException {
 
         if (hex == null) {
-            throw Util.nullArgument("hex");
+            throw JDBCUtil.nullArgument("hex");
         }
 
         try {
             this.id = StringConverter.hexStringToByteArray(hex);
         } catch (IOException e) {
-            throw Util.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INVALID_ARGUMENT,
                                     "hex: " + e);
 
             // .illegalHexadecimalCharacterSequenceArgumentException("hex", e);
@@ -160,7 +160,7 @@ public final class JDBCRowId implements RowId {
      * @param obj the <code>Object</code> to compare this <code>RowId</code> object
      *     against.
      * @return true if the <code>RowId</code>s are equal; false otherwise
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public boolean equals(Object obj) {
         return (obj instanceof JDBCRowId)

@@ -1,39 +1,4 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the Hypersonic SQL Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE HYPERSONIC SQL GROUP,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * This software consists of voluntary contributions made by many individuals
- * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -66,13 +31,16 @@
 
 package org.hsqldb_voltpatches;
 
-import java.lang.reflect.Constructor;
-
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.dbinfo.DatabaseInformation;
-import org.hsqldb_voltpatches.lib.FileAccess;
-import org.hsqldb_voltpatches.lib.FileUtil;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.FrameworkLogger;
+import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
+import org.hsqldb_voltpatches.lib.HsqlTimer;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.persist.LobManager;
@@ -82,64 +50,34 @@ import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rights.GranteeManager;
 import org.hsqldb_voltpatches.rights.User;
 import org.hsqldb_voltpatches.rights.UserManager;
-import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Collation;
 
-// fredt@users 20020130 - patch 476694 by velichko - transaction savepoints
-// additions to different parts to support savepoint transactions
-// fredt@users 20020215 - patch 1.7.0 - new HsqlProperties class
-// support use of properties from database.properties file
-// fredt@users 20020218 - patch 1.7.0 - DEFAULT keyword
-// support for default values for table columns
-// fredt@users 20020305 - patch 1.7.0 - restructuring
-// some methods move to Table.java, some removed
-// fredt@users 20020221 - patch 513005 by sqlbob@users (RMP) - restructuring
-// fredt@users 20020221 - patch 513005 by sqlbob@users (RMP) - error trapping
-// boucherb@users 20020130 - patch 1.7.0 - use lookup for speed
-// idents listed in alpha-order for easy check of stats...
-// fredt@users 20020420 - patch523880 by leptipre@users - VIEW support
-// boucherb@users - doc 1.7.0 - added javadoc comments
-// tony_lai@users 20020820 - patch 595073 - duplicated exception msg
-// tony_lai@users 20020820 - changes to shutdown compact to save memory
-// boucherb@users 20020828 - allow reconnect to local db that has shutdown
-// fredt@users 20020912 - patch 1.7.1 by fredt - drop duplicate name triggers
-// fredt@users 20021112 - patch 1.7.2 by Nitin Chauhan - use of switch
-// rewrite of the majority of multiple if(){}else if(){} chains with switch()
-// boucherb@users 20020310 - class loader update for JDK 1.1 compliance
-// fredt@users 20030401 - patch 1.7.2 by akede@users - data files readonly
-// fredt@users 20030401 - patch 1.7.2 by Brendan Ryan - data files in Jar
-// boucherb@users 20030405 - removed 1.7.2 lint - updated JavaDocs
-// boucherb@users 20030425 - DDL methods are moved to DatabaseCommandInterpreter.java
-// boucherb@users - fredt@users 200305..200307 - patch 1.7.2 - DatabaseManager upgrade
-// loosecannon1@users - patch 1.7.2 - properties on the JDBC URL
-// oj@openoffice.org - changed to file access api
+// incorporates following contributions
+// boucherb@users - javadoc comments
 
 /**
- *  Database is the root class for HSQL Database Engine database. <p>
+ * Database is the root class for HSQL Database Engine database. <p>
  *
- *  It holds the data structures that form an HSQLDB database instance.
+ * It holds the data structures that form an HSQLDB database instance.
  *
- * Modified significantly from the Hypersonic original in successive
- * HSQLDB versions.
- *
- * @author Thomas Mueller (Hypersonic SQL Group)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
- * @since Hypersonic SQL
+ * @version 2.3.0
+ * @since 1.9.0
  */
 public class Database {
 
-    int    databaseID;
-    String databaseType;
-    String sName;
-
-// loosecannon1@users 1.7.2 patch properties on the JDBC URL
-    private HsqlProperties urlProperties;
-    private String         sPath;
-    DatabaseInformation    dbInfo;
+    int                        databaseID;
+    String                     databaseUniqueName;
+    String                     databaseType;
+    private final String       canonicalPath;
+    public HsqlProperties      urlProperties;
+    private final String       path;
+    public Collation           collation;
+    public DatabaseInformation dbInfo;
 
     /** indicates the state of the database */
-    private int   dbState;
-    public Logger logger;
+    private volatile int dbState;
+    public Logger        logger;
 
     /** true means that all tables are readonly. */
     boolean databaseReadOnly;
@@ -150,16 +88,40 @@ public class Database {
      */
     private boolean filesReadOnly;
 
-    /** true means filesReadOnly but CACHED and TEXT tables are disallowed */
-    private boolean                filesInJar;
-    public boolean                 sqlEnforceStrictSize;
-    // CHERRY PICK code change from hsqldb-2.2.8
+    /** true means filesReadOnly */
+    private boolean filesInJar;
+
+    /**
+     * Defaults are used in version upgrades, but overridden by
+     *  databaseProperties or URL properties for new databases.
+     */
+    public boolean                sqlEnforceTypes        = false;
+    public boolean                sqlEnforceRefs         = false;
+    public boolean                sqlEnforceSize         = true;
+    public boolean                sqlEnforceNames        = false;
+    public boolean                sqlRegularNames        = true;
+    public boolean                sqlEnforceTDCD         = true;
+    public boolean                sqlEnforceTDCU         = true;
+    public boolean                sqlTranslateTTI        = true;
+    public boolean                sqlConcatNulls         = true;
+    public boolean                sqlUniqueNulls         = true;
+    public boolean                sqlNullsFirst          = true;
+    public boolean                sqlNullsOrder          = true;
     public boolean                sqlConvertTruncate     = true;
-    // End of CHERRY PICK change from hsqldb-2.2.8
-    private boolean                bIgnoreCase;
-    private boolean                bReferentialIntegrity;
-    private HsqlDatabaseProperties databaseProperties;
-    private boolean                shutdownOnNoConnection;
+    public int                    sqlAvgScale            = 0;
+    public boolean                sqlDoubleNaN           = true;
+    public boolean                sqlLongvarIsLob        = false;
+    public boolean                sqlIgnoreCase          = false;
+    public boolean                sqlSyntaxDb2           = false;
+    public boolean                sqlSyntaxMss           = false;
+    public boolean                sqlSyntaxMys           = false;
+    public boolean                sqlSyntaxOra           = false;
+    public boolean                sqlSyntaxPgs           = false;
+    public int                    recoveryMode           = 0;
+    private boolean               isReferentialIntegrity = true;
+    public HsqlDatabaseProperties databaseProperties;
+    private final boolean         shutdownOnNoConnection;
+    int                           resultMaxMemoryRows;
 
     // schema invarient objects
     public UserManager     userManager;
@@ -169,7 +131,8 @@ public class Database {
     // session related objects
     public SessionManager     sessionManager;
     public TransactionManager txManager;
-    public StatementManager   compiledStatementManager;
+    public int defaultIsolationLevel = SessionInterface.TX_READ_COMMITTED;
+    public boolean            txConflictRollback = true;
 
     // schema objects
     public SchemaManager schemaManager;
@@ -179,78 +142,55 @@ public class Database {
 
     //
     public LobManager lobManager;
-    public Collation  collation;
+
+    //
+    public CheckpointRunner checkpointRunner;
+    public TimeoutRunner    timeoutRunner;
+
+    //
+    Result updateZeroResult = Result.updateZeroResult;
 
     //
     public static final int DATABASE_ONLINE       = 1;
-    public static final int DATABASE_OPENING      = 4;
-    public static final int DATABASE_CLOSING      = 8;
-    public static final int DATABASE_SHUTDOWN     = 16;
-    public static final int CLOSEMODE_IMMEDIATELY = -1;
-    public static final int CLOSEMODE_NORMAL      = 0;
-    public static final int CLOSEMODE_COMPACT     = 1;
-    public static final int CLOSEMODE_SCRIPT      = 2;
+    public static final int DATABASE_OPENING      = 2;
+    public static final int DATABASE_CLOSING      = 3;
+    public static final int DATABASE_SHUTDOWN     = 4;
+    public static final int CLOSEMODE_IMMEDIATELY = 1;
+    public static final int CLOSEMODE_NORMAL      = 2;
+    public static final int CLOSEMODE_COMPACT     = 3;
+    public static final int CLOSEMODE_SCRIPT      = 4;
 
     /**
      *  Constructs a new Database object.
      *
      * @param type is the type of the database: "mem:", "file:", "res:"
      * @param path is the given path to the database files
-     * @param name is the combination of type and canonical path
+     * @param canonicalPath is the canonical path
      * @param props property overrides placed on the connect URL
      * @exception  HsqlException if the specified name and path
      *      combination is illegal or unavailable, or the database files the
      *      name and path resolves to are in use by another process
      */
-    Database(String type, String path, String name, HsqlProperties props) {
-
-        urlProperties = props;
+    Database(String type, String path, String canonicalPath,
+             HsqlProperties props) {
 
         setState(Database.DATABASE_SHUTDOWN);
 
-        sName        = name;
-        databaseType = type;
-        sPath        = path;
+        this.databaseType  = type;
+        this.path          = path;
+        this.canonicalPath = canonicalPath;
+        this.urlProperties = props;
 
         if (databaseType == DatabaseURL.S_RES) {
             filesInJar    = true;
             filesReadOnly = true;
         }
 
-// oj@openoffice.org - changed to file access api
-        String fileaccess_class_name =
-            (String) urlProperties.getProperty("fileaccess_class_name");
-
-        if (fileaccess_class_name != null) {
-            String storagekey = urlProperties.getProperty("storage_key");
-
-            try {
-                Class zclass = Class.forName(fileaccess_class_name);
-                Constructor constructor = zclass.getConstructor(new Class[]{
-                    Object.class });
-
-                fileaccess =
-                    (FileAccess) constructor.newInstance(new Object[]{
-                        storagekey });
-                isStoredFileAccess = true;
-            } catch (java.lang.ClassNotFoundException e) {
-                System.out.println("ClassNotFoundException");
-            } catch (java.lang.InstantiationException e) {
-                System.out.println("InstantiationException");
-            } catch (java.lang.IllegalAccessException e) {
-                System.out.println("IllegalAccessException");
-            } catch (Exception e) {
-                System.out.println("Exception");
-            }
-        } else {
-            fileaccess = FileUtil.getDefaultInstance();
-        }
-
-        shutdownOnNoConnection = urlProperties.getProperty("shutdown",
-                "false").equals("true");
-        logger                   = new Logger();
-        compiledStatementManager = new StatementManager(this);
-        lobManager               = new LobManager(this);
+        logger = new Logger(this);
+        shutdownOnNoConnection =
+            urlProperties.isPropertyTrue(HsqlDatabaseProperties.url_shutdown);
+        recoveryMode = urlProperties.getIntegerProperty(
+            HsqlDatabaseProperties.url_recover, 0);
     }
 
     /**
@@ -272,114 +212,61 @@ public class Database {
      */
     void reopen() {
 
-        boolean isNew;
+        boolean isNew = false;
 
         setState(DATABASE_OPENING);
 
         try {
-            databaseProperties = new HsqlDatabaseProperties(this);
-            isNew = !DatabaseURL.isFileBasedDatabaseType(databaseType)
-                    || !databaseProperties.checkFileExists();
-
-            if (isNew && urlProperties.isPropertyTrue(
-                    HsqlDatabaseProperties.url_ifexists)) {
-                throw Error.error(ErrorCode.DATABASE_NOT_EXISTS, sName);
-            }
-
-            databaseProperties.load();
-            databaseProperties.setURLProperties(urlProperties);
-            compiledStatementManager.reset();
-
+            lobManager     = new LobManager(this);
             nameManager    = new HsqlNameManager(this);
             granteeManager = new GranteeManager(this);
             userManager    = new UserManager(this);
             schemaManager  = new SchemaManager(this);
             persistentStoreCollection =
-                new PersistentStoreCollectionDatabase();
-            bReferentialIntegrity = true;
-            sessionManager        = new SessionManager(this);
-            txManager             = new TransactionManager(this);
-            collation             = collation.getDefaultInstance();
+                new PersistentStoreCollectionDatabase(this);
+            isReferentialIntegrity = true;
+            sessionManager         = new SessionManager(this);
+            collation              = collation.newDatabaseInstance();
             dbInfo = DatabaseInformation.newDatabaseInformation(this);
-
-            databaseProperties.setDatabaseVariables();
-
-            String version = databaseProperties.getProperty(
-                HsqlDatabaseProperties.db_version);
-
-            if (version.substring(0, 3).equals("1.7")) {
-                schemaManager.createPublicSchema();
-            }
+            txManager              = new TransactionManager2PL(this);
 
             lobManager.createSchema();
+            sessionManager.getSysLobSession().setSchema(
+                SqlInvariants.LOBS_SCHEMA);
+            schemaManager.setSchemaChangeTimestamp();
+            schemaManager.createSystemTables();
 
-        	// A VoltDB extension to avoid disabled features
-        	/* disable 3 lines ...
-            if (DatabaseURL.isFileBasedDatabaseType(databaseType)) {
-                logger.openLog(this);
-            }
-            ... disabled 3 lines. */
-            // End of VoltDB extension
+            // completed metadata
+            logger.open();
 
-            if (version.substring(0, 3).equals("1.7")
-                    || version.substring(0, 5).equals("1.8.0")) {
-                HsqlName name = schemaManager.findSchemaHsqlName(
-                    SqlInvariants.PUBLIC_SCHEMA);
-
-                if (name != null) {
-                    schemaManager.setDefaultSchemaHsqlName(name);
-                }
-            }
+            isNew = logger.isNewDatabase;
 
             if (isNew) {
-                String tableType = urlProperties.getProperty(
-                    HsqlDatabaseProperties.hsqldb_default_table_type,
-                    "MEMORY");
+                String username = urlProperties.getProperty("user", "SA");
+                String password = urlProperties.getProperty("password", "");
 
-                if ("CACHED".equalsIgnoreCase(tableType)) {
-                    schemaManager.setDefaultTableType(TableBase.CACHED_TABLE);
-                }
-
-                HsqlName name = nameManager.newHsqlName("SA", false,
-                    SchemaObject.GRANTEE);
-
-                userManager.createUser(name, "");
-
-                Session session = sessionManager.getSysSession();
-
-                granteeManager.grant(name.name,
-                                     SqlInvariants.DBA_ADMIN_ROLE_NAME,
-                                     granteeManager.getDBARole());
-                logger.writeToLog(session,
-                                  "CREATE USER SA PASSWORD \'\' ADMIN");
+                userManager.createFirstUser(username, password);
                 schemaManager.createPublicSchema();
-                logger.writeToLog(session,
-                                  "CREATE SCHEMA PUBLIC AUTHORIZATION DBA");
-                logger.writeToLog(
-                    session, "SET DATABASE DEFAULT INITIAL SCHEMA PUBLIC");
-
-                if (schemaManager.getDefaultTableType()
-                        == Table.CACHED_TABLE) {
-                    logger.writeToLog(
-                        session, "SET DATABASE DEFAULT TABLE TYPE CACHED");
-                }
-
-                lobManager.initialiseLobSpace();
-                logger.synchLogForce();
+                logger.checkpoint(false);
             }
 
             lobManager.open();
             dbInfo.setWithContent(true);
+
+            checkpointRunner = new CheckpointRunner();
+            timeoutRunner    = new TimeoutRunner();
         } catch (Throwable e) {
-            logger.closeLog(Database.CLOSEMODE_IMMEDIATELY);
+            logger.close(Database.CLOSEMODE_IMMEDIATELY);
             logger.releaseLock();
             setState(DATABASE_SHUTDOWN);
             clearStructures();
             DatabaseManager.removeDatabase(this);
 
             if (!(e instanceof HsqlException)) {
-                e = Error.error(ErrorCode.GENERAL_ERROR, e.toString());
+                e = Error.error(ErrorCode.GENERAL_ERROR, e);
             }
+
+            logger.logSevereEvent("could not reopen database", e);
 
             throw (HsqlException) e;
         }
@@ -393,15 +280,26 @@ public class Database {
     void clearStructures() {
 
         if (schemaManager != null) {
-            schemaManager.clearStructures();
+            schemaManager.release();
         }
 
-        granteeManager = null;
-        userManager    = null;
-        nameManager    = null;
-        schemaManager  = null;
-        sessionManager = null;
-        dbInfo         = null;
+        if (checkpointRunner != null) {
+            checkpointRunner.stop();
+        }
+
+        if (timeoutRunner != null) {
+            timeoutRunner.stop();
+        }
+
+        lobManager       = null;
+        granteeManager   = null;
+        userManager      = null;
+        nameManager      = null;
+        schemaManager    = null;
+        sessionManager   = null;
+        dbInfo           = null;
+        checkpointRunner = null;
+        timeoutRunner    = null;
     }
 
     /**
@@ -409,6 +307,17 @@ public class Database {
      */
     public int getDatabaseID() {
         return this.databaseID;
+    }
+
+    /**
+     * Returns a unique String identifier for the database.
+     */
+    public String getUniqueName() {
+        return databaseUniqueName;
+    }
+
+    public void setUniqueName(String name) {
+        databaseUniqueName = name;
     }
 
     /**
@@ -422,7 +331,7 @@ public class Database {
      *  Returns the path of the database
      */
     public String getPath() {
-        return sPath;
+        return path;
     }
 
     public HsqlName getCatalogName() {
@@ -450,7 +359,7 @@ public class Database {
     /**
      *  Returns true if database has been shut down, false otherwise
      */
-    synchronized boolean isShutdown() {
+    boolean isShutdown() {
         return dbState == DATABASE_SHUTDOWN;
     }
 
@@ -464,7 +373,7 @@ public class Database {
      * Throws if username or password is invalid.
      */
     synchronized Session connect(String username, String password,
-                                 int timeZoneSeconds) {
+                                 String zoneString, int timeZoneSeconds) {
 
         if (username.equalsIgnoreCase("SA")) {
             username = "SA";
@@ -472,7 +381,7 @@ public class Database {
 
         User user = userManager.getUser(username, password);
         Session session = sessionManager.newSession(this, user,
-            databaseReadOnly, false, timeZoneSeconds);
+            databaseReadOnly, true, zoneString, timeZoneSeconds);
 
         return session;
     }
@@ -530,30 +439,113 @@ public class Database {
      *  Sets the isReferentialIntegrity attribute.
      */
     public void setReferentialIntegrity(boolean ref) {
-        bReferentialIntegrity = ref;
+        isReferentialIntegrity = ref;
     }
 
     /**
      *  Is referential integrity currently enforced?
      */
     public boolean isReferentialIntegrity() {
-        return bReferentialIntegrity;
+        return isReferentialIntegrity;
     }
 
-    /**
-     * Sets the database to treat any new VARCHAR column declarations as
-     * VARCHAR_IGNORECASE.
-     */
-    void setIgnoreCase(boolean b) {
-        bIgnoreCase = b;
+    public int getResultMaxMemoryRows() {
+        return resultMaxMemoryRows;
     }
 
-    /**
-     *  Does the database treat any new VARCHAR column declarations as
-     * VARCHAR_IGNORECASE.
-     */
-    public boolean isIgnoreCase() {
-        return bIgnoreCase;
+    public void setResultMaxMemoryRows(int size) {
+        resultMaxMemoryRows = size;
+    }
+
+    public void setStrictNames(boolean mode) {
+        sqlEnforceNames = mode;
+    }
+
+    public void setRegularNames(boolean mode) {
+
+        sqlRegularNames = mode;
+
+        nameManager.setSqlRegularNames(mode);
+    }
+
+    public void setStrictColumnSize(boolean mode) {
+        sqlEnforceSize = mode;
+    }
+
+    public void setStrictReferences(boolean mode) {
+        sqlEnforceRefs = mode;
+    }
+
+    public void setStrictTypes(boolean mode) {
+        sqlEnforceTypes = mode;
+    }
+
+    public void setStrictTDCD(boolean mode) {
+        sqlEnforceTDCD = mode;
+    }
+
+    public void setStrictTDCU(boolean mode) {
+        sqlEnforceTDCU = mode;
+    }
+
+    public void setTranslateTTI(boolean mode) {
+        sqlTranslateTTI = mode;
+    }
+
+    public void setNullsFirst(boolean mode) {
+        sqlNullsFirst = mode;
+    }
+
+    public void setNullsOrder(boolean mode) {
+        sqlNullsOrder = mode;
+    }
+
+    public void setConcatNulls(boolean mode) {
+        sqlConcatNulls = mode;
+    }
+
+    public void setUniqueNulls(boolean mode) {
+        sqlUniqueNulls = mode;
+    }
+
+    public void setConvertTrunc(boolean mode) {
+        sqlConvertTruncate = mode;
+    }
+
+    public void setDoubleNaN(boolean mode) {
+        sqlDoubleNaN = mode;
+    }
+
+    public void setAvgScale(int scale) {
+        sqlAvgScale = scale;
+    }
+
+    public void setLongVarIsLob(boolean mode) {
+        sqlLongvarIsLob = mode;
+    }
+
+    public void setIgnoreCase(boolean mode) {
+        sqlIgnoreCase = mode;
+    }
+
+    public void setSyntaxDb2(boolean mode) {
+        sqlSyntaxDb2 = mode;
+    }
+
+    public void setSyntaxMss(boolean mode) {
+        sqlSyntaxMss = mode;
+    }
+
+    public void setSyntaxMys(boolean mode) {
+        sqlSyntaxMys = mode;
+    }
+
+    public void setSyntaxOra(boolean mode) {
+        sqlSyntaxOra = mode;
+    }
+
+    public void setSyntaxPgs(boolean mode) {
+        sqlSyntaxPgs = mode;
     }
 
     /**
@@ -574,11 +566,14 @@ public class Database {
 
     void closeIfLast() {
 
-        if (shutdownOnNoConnection && sessionManager.isEmpty()
-                && dbState == this.DATABASE_ONLINE) {
-            try {
-                close(CLOSEMODE_NORMAL);
-            } catch (HsqlException e) {}
+        if (sessionManager.isEmpty() && dbState == DATABASE_ONLINE) {
+            if (shutdownOnNoConnection) {
+                try {
+                    close(CLOSEMODE_NORMAL);
+                } catch (HsqlException e) {}
+            } else {
+                logger.synchLog();
+            }
         }
     }
 
@@ -603,33 +598,45 @@ public class Database {
 
         HsqlException he = null;
 
-        setState(DATABASE_CLOSING);
+        // multiple simultaneous close
+        synchronized (this) {
+            if (getState() != DATABASE_ONLINE) {
+                return;
+            }
+
+            setState(DATABASE_CLOSING);
+        }
+
         sessionManager.closeAllSessions();
-        sessionManager.clearAll();
 
         if (filesReadOnly) {
             closemode = CLOSEMODE_IMMEDIATELY;
         }
 
         /**
-         * @todo  fredt - impact of possible error conditions in closing the log
-         * should be investigated for the CLOSEMODE_COMPACT mode
+         * impact of possible error conditions in closing the log
+         * for the CLOSEMODE_COMPACT mode
          */
-        logger.closeLog(closemode);
+        boolean result = logger.close(closemode);
+
         lobManager.close();
+        sessionManager.close();
 
         try {
-            if (closemode == CLOSEMODE_COMPACT) {
+            if (result && closemode == CLOSEMODE_COMPACT) {
                 clearStructures();
                 reopen();
                 setState(DATABASE_CLOSING);
-                logger.closeLog(CLOSEMODE_NORMAL);
+                sessionManager.closeAllSessions();
+                logger.close(CLOSEMODE_NORMAL);
+                lobManager.close();
+                sessionManager.close();
             }
         } catch (Throwable t) {
             if (t instanceof HsqlException) {
                 he = (HsqlException) t;
             } else {
-                he = Error.error(ErrorCode.GENERAL_ERROR, t.toString());
+                he = Error.error(ErrorCode.GENERAL_ERROR, t);
             }
         }
 
@@ -642,43 +649,19 @@ public class Database {
         // calls
         DatabaseManager.removeDatabase(this);
 
+        // todo - when hsqldb_voltpatches.sql. framework logging is supported, add another call
+        FrameworkLogger.clearLoggers("hsqldb_voltpatches.db." + getUniqueName());
+
         if (he != null) {
             throw he;
         }
     }
 
-    /**
-     * Ensures system table producer's table cache, if it exists, is set dirty.
-     * After this call up-to-date versions are generated in response to
-     * system table requests. <p>
-     *
-     * Also resets all prepared statements if a change to database structure
-     * can possibly affect any existing prepared statement's validity.<p>
-     *
-     * The argument is false if the change to the database structure does not
-     * affect the prepared statement, such as when a new table is added.<p>
-     *
-     * The argument is typically true when a database object is dropped,
-     * altered or a permission was revoked.
-     *
-     * @param  resetPrepared If true, reset all prepared statements.
-     */
-    public void setMetaDirty(boolean resetPrepared) {
-
-        if (dbInfo != null) {
-            dbInfo.setDirty();
-        }
-
-        if (resetPrepared) {
-            compiledStatementManager.resetStatements();
-        }
-    }
-
-    private synchronized void setState(int state) {
+    private void setState(int state) {
         dbState = state;
     }
 
-    synchronized int getState() {
+    int getState() {
         return dbState;
     }
 
@@ -708,49 +691,36 @@ public class Database {
     public String[] getSettingsSQL() {
 
         HsqlArrayList list = new HsqlArrayList();
+        StringBuffer  sb   = new StringBuffer();
 
         if (!getCatalogName().name.equals(
-                HsqlNameManager.DEFAULT_CATALOG_NAME)) {
+                SqlInvariants.DEFAULT_CATALOG_NAME)) {
             String name = getCatalogName().statementName;
 
-            list.add("ALTER CATALOG PUBLIC RENAME TO " + name);
+            sb.append("ALTER CATALOG PUBLIC RENAME TO ").append(name);
+            list.add(sb.toString());
+            sb.setLength(0);
         }
 
-        if (collation.name != null) {
-            String name = collation.getName().statementName;
-
-            list.add("SET DATABASE COLLATION " + name);
+        if (!collation.isDefaultCollation()) {
+            list.add(collation.getDatabaseCollationSQL());
         }
 
-        String[] array = new String[list.size()];
+        HashMappedList lobTables =
+            schemaManager.getTables(SqlInvariants.LOBS_SCHEMA);
 
-        list.toArray(array);
+        for (int i = 0; i < lobTables.size(); i++) {
+            Table table = (Table) lobTables.get(i);
 
-        return array;
-    }
-
-    public String[] getPropertiesSQL() {
-
-        HsqlArrayList list = new HsqlArrayList();
-
-        if (schemaManager.getDefaultTableType() == TableBase.CACHED_TABLE) {
-            list.add("SET DATABASE DEFAULT TABLE TYPE CACHED");
-        }
-
-        if (logger.hasLog()) {
-            int     delay  = logger.getWriteDelay();
-            boolean millis = delay < 1000;
-
-            if (millis) {
-                if (delay != 0 && delay < 20) {
-                    delay = 20;
-                }
-            } else {
-                delay /= 1000;
+            if (table.isCached()) {
+                sb.append(Tokens.T_SET).append(' ').append(Tokens.T_TABLE);
+                sb.append(' ');
+                sb.append(table.getName().getSchemaQualifiedStatementName());
+                sb.append(' ').append(Tokens.T_TYPE).append(' ');
+                sb.append(Tokens.T_CACHED);
+                list.add(sb.toString());
+                sb.setLength(0);
             }
-
-            list.add("SET WRITE_DELAY " + delay + (millis ? " MILLIS"
-                                                          : ""));
         }
 
         String[] array = new String[list.size()];
@@ -765,8 +735,14 @@ public class Database {
      */
     public Result getScript(boolean indexRoots) {
 
-        Result   r = Result.newSingleColumnResult("COMMAND", Type.SQL_VARCHAR);
-        String[] list = getSettingsSQL();
+        Result r = Result.newSingleColumnResult("COMMAND");
+
+        // properties
+        String[] list = logger.getPropertiesSQL(indexRoots);
+
+        addRows(r, list);
+
+        list = getSettingsSQL();
 
         addRows(r, list);
 
@@ -779,12 +755,31 @@ public class Database {
 
         addRows(r, list);
 
+        // optional comments on tables etc.
+        list = schemaManager.getCommentsArray();
+
+        addRows(r, list);
+
+        list = schemaManager.getTableSpaceSQL();
+
+        addRows(r, list);
+
         // index roots
         if (indexRoots) {
             list = schemaManager.getIndexRootsSQL();
 
             addRows(r, list);
         }
+
+        // text headers - readonly - clustered
+        list = schemaManager.getTablePropsSQL(!indexRoots);
+
+        addRows(r, list);
+
+        // password complexity
+        list = getUserManager().getAuthenticationSQL();
+
+        addRows(r, list);
 
         // user session start schema names
         list = getUserManager().getInitialSchemaSQL();
@@ -793,10 +788,6 @@ public class Database {
 
         // grantee rights
         list = getGranteeManager().getRightstSQL();
-
-        addRows(r, list);
-
-        list = getPropertiesSQL();
 
         addRows(r, list);
 
@@ -818,59 +809,139 @@ public class Database {
         }
     }
 
-// boucherb@users - 200403?? - patch 1.7.2 - metadata
-//------------------------------------------------------------------------------
-
-    /**
-     * Retrieves the uri portion of this object's in-process JDBC url.
-     *
-     * @return the uri portion of this object's in-process JDBC url
-     */
     public String getURI() {
-        return sName;
+        return databaseType + canonicalPath;
     }
 
-// oj@openoffice.org - changed to file access api
+    public String getCanonicalPath() {
+        return canonicalPath;
+    }
+
     public HsqlProperties getURLProperties() {
         return urlProperties;
     }
 
-    private FileAccess fileaccess;
-    private boolean    isStoredFileAccess;
-
-    public FileAccess getFileAccess() {
-        return fileaccess;
+    public TimeoutRunner getTimeoutRunner() {
+        return timeoutRunner;
     }
 
-    public boolean isStoredFileAccess() {
-        return isStoredFileAccess;
-    }
+    class CheckpointRunner implements Runnable {
 
-    String tempDirectoryPath;
+        private volatile boolean waiting;
+        private Object           timerTask;
 
-    public String getTempDirectoryPath() {
+        public void run() {
 
-        if (tempDirectoryPath == null) {
-            if (databaseType == DatabaseURL.S_FILE) {
-                String path = sPath + ".tmp";
+            try {
+                Session sysSession = sessionManager.newSysSession();
+                Statement checkpoint =
+                    ParserCommand.getAutoCheckpointStatement(Database.this);
 
-                tempDirectoryPath = FileUtil.makeDirectories(path);
-            } else {
-                tempDirectoryPath = databaseProperties.getProperty(
-                    HsqlDatabaseProperties.hsqldb_temp_directory);
+                sysSession.executeCompiledStatement(checkpoint,
+                                                    ValuePool.emptyObjectArray,
+                                                    0);
+                sysSession.commit(false);
+                sysSession.close();
+
+                waiting = false;
+            } catch (Throwable e) {
+
+                // ignore exceptions
+                // may be InterruptedException or IOException
             }
         }
 
-        return tempDirectoryPath;
-    }
+        public void start() {
 
-    public int getResultMaxMemoryRows() {
+            if (!logger.isLogged()) {
+                return;
+            }
 
-        if (getTempDirectoryPath() == null) {
-            return 0;
+            synchronized (this) {
+                if (waiting) {
+                    return;
+                }
+
+                waiting = true;
+            }
+
+            timerTask = DatabaseManager.getTimer().scheduleAfter(0, this);
         }
 
-        return databaseProperties.getIntegerProperty(
-            HsqlDatabaseProperties.hsqldb_result_max_memory_rows, 0);
+        public void stop() {
+
+            HsqlTimer.cancel(timerTask);
+
+            timerTask = null;
+            waiting   = false;
+        }
+    }
+
+    static class TimeoutRunner implements Runnable {
+
+        private Object timerTask;
+        OrderedHashSet sessionList;
+
+        public void run() {
+
+            try {
+                for (int i = sessionList.size() - 1; i >= 0; i--) {
+                    Session session = (Session) sessionList.get(i);
+
+                    if (session.isClosed()) {
+                        synchronized (this) {
+                            sessionList.remove(i);
+                        }
+
+                        continue;
+                    }
+
+                    boolean result = session.timeoutManager.checkTimeout();
+
+                    if (result) {
+                        synchronized (this) {
+                            sessionList.remove(i);
+                        }
+                    }
+                }
+            } catch (Throwable e) {
+
+                // ignore exceptions
+                // may be InterruptedException or IOException
+            }
+        }
+
+        public void start() {
+
+            sessionList = new OrderedHashSet();
+            timerTask = DatabaseManager.getTimer().schedulePeriodicallyAfter(0,
+                    1000, this, true);
+        }
+
+        public void stop() {
+
+            synchronized (this) {
+                if (timerTask == null) {
+                    return;
+                }
+
+                HsqlTimer.cancel(timerTask);
+                sessionList.clear();
+
+                timerTask   = null;
+                sessionList = null;
+            }
+        }
+
+        public void addSession(Session session) {
+
+            synchronized (this) {
+                if (timerTask == null) {
+                    start();
+                }
+
+                sessionList.add(session);
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -156,10 +156,6 @@ public class UserTypeModifier {
 
     public OrderedHashSet getReferences() {
 
-        if (constraints.length == 0) {
-            return null;
-        }
-
         OrderedHashSet set = new OrderedHashSet();
 
         for (int i = 0; i < constraints.length; i++) {
@@ -189,7 +185,7 @@ public class UserTypeModifier {
     public void compile(Session session) {
 
         for (int i = 0; i < constraints.length; i++) {
-            constraints[i].compile(session);
+            constraints[i].compile(session, null);
         }
     }
 
@@ -203,6 +199,13 @@ public class UserTypeModifier {
             sb.append(name.getSchemaQualifiedStatementName());
             sb.append(' ').append(Tokens.T_AS).append(' ');
             sb.append(dataType.getDefinition());
+
+            if (dataType.isCharacterType() ) {
+                Collation collation = dataType.getCollation();
+                if (collation.isObjectCollation()) {
+                    sb.append(' ').append(collation.getCollateSQL());
+                }
+            }
         } else {
             sb.append(Tokens.T_CREATE).append(' ').append(
                 Tokens.T_DOMAIN).append(' ');

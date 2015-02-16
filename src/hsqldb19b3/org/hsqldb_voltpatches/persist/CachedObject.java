@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,14 +31,15 @@
 
 package org.hsqldb_voltpatches.persist;
 
-import org.hsqldb_voltpatches.lib.IntLookup;
+import org.hsqldb_voltpatches.lib.LongLookup;
+import org.hsqldb_voltpatches.rowio.RowInputInterface;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
 
 /**
  * Interface for an object stored in the memory cache.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.8.0
  */
 public interface CachedObject {
@@ -55,9 +56,13 @@ public interface CachedObject {
 
     int getStorageSize();
 
-    int getPos();
+    boolean isBlock();
 
-    void setPos(int pos);
+    long getPos();
+
+    void setPos(long pos);
+
+    boolean isNew();
 
     boolean hasChanged();
 
@@ -75,7 +80,11 @@ public interface CachedObject {
 
     int getRealSize(RowOutputInterface out);
 
+    void read(RowInputInterface in);
+
+    int getDefaultCapacity();
+
     void write(RowOutputInterface out);
 
-    void write(RowOutputInterface out, IntLookup lookup);
+    void write(RowOutputInterface out, LongLookup lookup);
 }

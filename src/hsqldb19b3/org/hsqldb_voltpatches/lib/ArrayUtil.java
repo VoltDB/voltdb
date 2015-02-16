@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@ import java.lang.reflect.Array;
  * Collection of static methods for operations on arrays
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.7.2
  */
 public class ArrayUtil {
@@ -413,18 +413,20 @@ public class ArrayUtil {
     }
 
     /**
-     * Returns true if arra and the first bcount elements of arrb share any
-     * element. <p>
+     * Returns true if arra and arrb share any element. <p>
      *
      * Used for checks for any overlap between two arrays of column indexes.
      */
-    public static boolean haveCommonElement(int[] arra, int[] arrb,
-            int bcount) {
+    public static boolean haveCommonElement(int[] arra, int[] arrb) {
+
+        if (arra == null || arrb == null) {
+            return false;
+        }
 
         for (int i = 0; i < arra.length; i++) {
             int c = arra[i];
 
-            for (int j = 0; j < bcount; j++) {
+            for (int j = 0; j < arrb.length; j++) {
                 if (c == arrb[j]) {
                     return true;
                 }
@@ -504,6 +506,26 @@ public class ArrayUtil {
             for (int j = 0; j < arrb.length; j++) {
                 if (arra[i] == arrb[j]) {
                     k++;
+
+                    break;
+                }
+            }
+        }
+
+        return k;
+    }
+
+    public static int countCommonElements(Object[] arra, int alen,
+                                          Object[] arrb) {
+
+        int k = 0;
+
+        for (int i = 0; i < alen; i++) {
+            for (int j = 0; j < arrb.length; j++) {
+                if (arra[i] == arrb[j]) {
+                    k++;
+
+                    break;
                 }
             }
         }
@@ -557,6 +579,36 @@ public class ArrayUtil {
         }
 
         return k;
+    }
+
+    /**
+     * Returns an array that contains all the elements of the two arrays.
+     */
+    public static int[] union(int[] arra, int[] arrb) {
+
+        int newSize = arra.length + arrb.length
+                      - ArrayUtil.countCommonElements(arra, arrb);
+
+        if (newSize > arra.length && newSize > arrb.length) {
+            int[] arrn = (int[]) ArrayUtil.resizeArray(arrb, newSize);
+            int   pos  = arrb.length;
+
+            mainloop:
+            for (int i = 0; i < arra.length; i++) {
+                for (int j = 0; j < arrb.length; j++) {
+                    if (arra[i] == arrb[j]) {
+                        continue mainloop;
+                    }
+                }
+
+                arrn[pos++] = arra[i];
+            }
+
+            return arrn;
+        }
+
+        return arra.length > arrb.length ? arra
+                                         : arrb;
     }
 
     /**
@@ -646,6 +698,32 @@ public class ArrayUtil {
     /**
      * Set elements of arrb true if their indexes appear in arrb.
      */
+    public static int[] booleanArrayToIntIndexes(boolean[] arrb) {
+
+        int count = 0;
+
+        for (int i = 0; i < arrb.length; i++) {
+            if (arrb[i]) {
+                count++;
+            }
+        }
+
+        int[] intarr = new int[count];
+
+        count = 0;
+
+        for (int i = 0; i < arrb.length; i++) {
+            if (arrb[i]) {
+                intarr[count++] = i;
+            }
+        }
+
+        return intarr;
+    }
+
+    /**
+     * Set elements of arrb true if their indexes appear in arrb.
+     */
     public static void intIndexesToBooleanArray(int[] arra, boolean[] arrb) {
 
         for (int i = 0; i < arra.length; i++) {
@@ -655,6 +733,25 @@ public class ArrayUtil {
         }
     }
 
+    /**
+     * Return array of indexes of boolean elements that are true.
+     */
+    public static int countStartIntIndexesInBooleanArray(int[] arra,
+            boolean[] arrb) {
+
+        int k = 0;
+
+        for (int i = 0; i < arra.length; i++) {
+            if (arrb[arra[i]]) {
+                k++;
+            } else {
+                break;
+            }
+        }
+
+        return k;
+    }
+
     public static void orBooleanArray(boolean[] source, boolean[] dest) {
 
         for (int i = 0; i < dest.length; i++) {
@@ -662,7 +759,26 @@ public class ArrayUtil {
         }
     }
 
-    public static boolean areIntIndexesInBooleanArray(int[] arra,
+    /**
+     * Returns true if all indexes and no other positions are true in
+     * arrb.
+     * arra must have no duplicates.
+     */
+    public static boolean areAllIntIndexesAsBooleanArray(int[] arra,
+            boolean[] arrb) {
+
+        for (int i = 0; i < arra.length; i++) {
+            if (arrb[arra[i]]) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return arra.length == countTrueElements(arrb);
+    }
+
+    public static boolean areAllIntIndexesInBooleanArray(int[] arra,
             boolean[] arrb) {
 
         for (int i = 0; i < arra.length; i++) {
@@ -674,6 +790,18 @@ public class ArrayUtil {
         }
 
         return true;
+    }
+
+    public static boolean isAnyIntIndexInBooleanArray(int[] arra,
+            boolean[] arrb) {
+
+        for (int i = 0; i < arra.length; i++) {
+            if (arrb[arra[i]]) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -737,7 +865,6 @@ public class ArrayUtil {
 
         return true;
     }
-
 
     /**
      * Returns true if arra from position start contains all elements of arrb
@@ -805,10 +932,112 @@ public class ArrayUtil {
     }
 
     /**
+     * Byte arrays source and dest each begin at an offset in the common space.
+     * If there is an overlap between dest and the first sourceLength elements of
+     * the source, the overlapping elements are copied to dest. Returns count
+     * of copied bytes.
+     */
+    public static int copyBytes(long sourceOffset, byte[] source,
+                                int sourceOff, int sourceLength,
+                                long destOffset, byte[] dest, int destLength) {
+
+        if (sourceOff >= source.length) {
+            return 0;
+        }
+
+        if (sourceOff + sourceLength > source.length) {
+            sourceLength = source.length - sourceOff;
+        }
+
+        if (destLength > dest.length) {
+            destLength = dest.length;
+        }
+
+        if (sourceOffset + sourceOff >= destOffset + destLength
+                || sourceOffset + sourceOff + sourceLength <= destOffset) {
+            return 0;
+        }
+
+        long sourceIndex = destOffset - sourceOffset;
+        long destIndex   = 0;
+        int  sourceLimit = sourceOff + sourceLength;
+
+        if (sourceIndex >= 0) {
+            if (sourceIndex < sourceOff) {
+                sourceIndex = sourceOff;
+            }
+        } else {
+            destIndex   = -sourceIndex + sourceOff;
+            sourceIndex = sourceOff;
+        }
+
+        sourceLength = sourceLimit - (int) sourceIndex;
+
+        if (sourceLength > destLength - destIndex) {
+            sourceLength = destLength - (int) destIndex;
+        }
+
+        System.arraycopy(source, (int) sourceIndex, dest, (int) destIndex,
+                         sourceLength);
+
+        return sourceLength;
+    }
+
+    /**
+     * Copy the source to dest, returning dest or an enlarged array of result is
+     * larger than dest.
+     */
+    public static byte[] copyBytes(byte[] source, byte[] dest,
+                                   int destOffset) {
+
+        if (source.length + destOffset > dest.length) {
+            byte[] newDest = new byte[source.length + destOffset];
+
+            System.arraycopy(dest, 0, newDest, 0, dest.length);
+
+            dest = newDest;
+        }
+
+        System.arraycopy(source, 0, dest, destOffset, source.length);
+
+        return dest;
+    }
+
+    /**
      * Convenience wrapper for System.arraycopy().
      */
     public static void copyArray(Object source, Object dest, int count) {
         System.arraycopy(source, 0, dest, 0, count);
+    }
+
+    public static void copyMoveSegment(Object source, Object dest, int size,
+                                       int index, int segmentSize,
+                                       int destIndex) {
+
+        boolean forward   = index < destIndex;
+        int     sliceSize = forward ? index
+                                    : destIndex;
+
+        System.arraycopy(source, 0, dest, 0, sliceSize);
+
+        sliceSize = forward ? size - destIndex - segmentSize
+                            : size - index - segmentSize;
+
+        int sliceIndex = forward ? destIndex + segmentSize
+                                 : index + segmentSize;
+
+        System.arraycopy(source, sliceIndex, dest, sliceIndex, sliceSize);
+        System.arraycopy(source, index, dest, destIndex, segmentSize);
+
+        sliceSize  = Math.abs(index - destIndex);
+        sliceIndex = forward ? index + segmentSize
+                             : destIndex;
+
+        int targetSliceIndex = forward ? index
+                                       : destIndex + segmentSize;
+
+        System.arraycopy(source, sliceIndex, dest, targetSliceIndex,
+                         sliceSize);
     }
 
     /**
@@ -821,6 +1050,30 @@ public class ArrayUtil {
         System.arraycopy(source, start, slice, 0, count);
 
         return slice;
+    }
+
+    /**
+     * Fills part of the array with a value.
+     */
+    public static void fillArray(char[] array, int offset, char value) {
+
+        int to = array.length;
+
+        while (--to >= offset) {
+            array[to] = value;
+        }
+    }
+
+    /**
+     * Fills part of the array with a value.
+     */
+    public static void fillArray(byte[] array, int offset, byte value) {
+
+        int to = array.length;
+
+        while (--to >= offset) {
+            array[to] = value;
+        }
     }
 
     /**
@@ -839,6 +1092,30 @@ public class ArrayUtil {
      * Fills the int array with a value
      */
     public static void fillArray(int[] array, int value) {
+
+        int to = array.length;
+
+        while (--to >= 0) {
+            array[to] = value;
+        }
+    }
+
+    /**
+     * Fills the double array with a value
+     */
+    public static void fillArray(double[] array, double value) {
+
+        int to = array.length;
+
+        while (--to >= 0) {
+            array[to] = value;
+        }
+    }
+
+    /**
+     * Fills the int array with a value
+     */
+    public static void fillArray(boolean[] array, boolean value) {
 
         int to = array.length;
 
@@ -1116,6 +1393,27 @@ public class ArrayUtil {
             for (int j = 0; j < mainMap.length; j++) {
                 if (subMap[i] == mainMap[j]) {
                     newSubMap[i] = j;
+
+                    break;
+                }
+            }
+        }
+    }
+
+    public static void reorderMaps(int[] mainMap, int[] firstMap,
+                                   int[] secondMap) {
+
+        for (int i = 0; i < mainMap.length; i++) {
+            for (int j = i; j < firstMap.length; j++) {
+                if (mainMap[i] == firstMap[j]) {
+                    int temp = firstMap[i];
+
+                    firstMap[i]  = firstMap[j];
+                    firstMap[j]  = temp;
+                    temp         = secondMap[i];
+                    secondMap[i] = secondMap[j];
+                    secondMap[j] = temp;
+
                     break;
                 }
             }
@@ -1127,5 +1425,299 @@ public class ArrayUtil {
         for (int i = 0; i < colindex.length; i++) {
             colindex[i] = i;
         }
+    }
+
+    public static char[] byteArrayToChars(byte[] bytes) {
+        return byteArrayToChars(bytes, bytes.length);
+    }
+
+    public static char[] byteArrayToChars(byte[] bytes, int bytesLength) {
+
+        char[] chars = new char[bytesLength / 2];
+
+        for (int i = 0, j = 0; j < chars.length; i += 2, j++) {
+            chars[j] = (char) ((bytes[i] << 8) + (bytes[i + 1] & 0xff));
+        }
+
+        return chars;
+    }
+
+    public static byte[] charArrayToBytes(char[] chars) {
+        return charArrayToBytes(chars, chars.length);
+    }
+
+    public static byte[] charArrayToBytes(char[] chars, int length) {
+
+        byte[] bytes = new byte[length * 2];
+
+        for (int i = 0, j = 0; j < length; i += 2, j++) {
+            int c = chars[j];
+
+            bytes[i]     = (byte) (c >> 8);
+            bytes[i + 1] = (byte) c;
+        }
+
+        return bytes;
+    }
+
+    /**
+     * Returns true if char agrument is in array.
+     */
+    public static boolean isInSortedArray(char ch, char[] array) {
+
+        if (array.length == 0 || ch < array[0]
+                || ch > array[array.length - 1]) {
+            return false;
+        }
+
+        int low  = 0;
+        int high = array.length;
+        int mid  = 0;
+
+        while (low < high) {
+            mid = (low + high) >>> 1;
+
+            if (ch < array[mid]) {
+                high = mid;
+            } else if (ch > array[mid]) {
+                low = mid + 1;
+            } else {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * returns true if arra contains all elements of arrb
+     *
+     * @param arra Object[]
+     * @param arrb Object[]
+     * @return boolean
+     */
+    public static boolean containsAll(Object[] arra, Object[] arrb) {
+
+        mainLoop:
+        for (int i = 0; i < arrb.length; i++) {
+            for (int j = 0; j < arra.length; j++) {
+                if (arrb[i] == arra[j] || arrb[i].equals(arra[j])) {
+                    continue mainLoop;
+                }
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * returns true if arra contains any element of arrb
+     *
+     * @param arra Object[]
+     * @param arrb Object[]
+     * @return boolean
+     */
+    public static boolean containsAny(Object[] arra, Object[] arrb) {
+
+        mainLoop:
+        for (int i = 0; i < arrb.length; i++) {
+            for (int j = 0; j < arra.length; j++) {
+                if (arrb[i] == arra[j] || arrb[i].equals(arra[j])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * returns true if arra contains all elements of arrb
+     *
+     * @param arra int[]
+     * @param arrb int[]
+     * @return boolean
+     */
+    public static boolean containsAll(int[] arra, int[] arrb) {
+
+        mainLoop:
+        for (int i = 0; i < arrb.length; i++) {
+            for (int j = 0; j < arra.length; j++) {
+                if (arrb[i] == arra[j]) {
+                    continue mainLoop;
+                }
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * returns true if arra contains all elements of arrb at its start
+     *
+     * @param arra int[]
+     * @param arrb int[]
+     * @return boolean
+     */
+    public static boolean containsAllAtStart(int[] arra, int[] arrb) {
+
+        if (arrb.length > arra.length) {
+            return false;
+        }
+
+        mainLoop:
+        for (int i = 0; i < arra.length; i++) {
+            if (i == arrb.length) {
+                return true;
+            }
+
+            for (int j = 0; j < arrb.length; j++) {
+                if (arra[i] == arrb[j]) {
+                    continue mainLoop;
+                }
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * converts two longs to a byte[]
+     *
+     * @param hi long
+     * @param lo long
+     * @return byte[]
+     */
+    public static byte[] toByteArray(long hi, long lo) {
+
+        byte[] bytes = new byte[16];
+        int    count = 0;
+        int    v;
+
+        while (count < 16) {
+            if (count == 0) {
+                v = (int) (hi >>> 32);
+            } else if (count == 4) {
+                v = (int) hi;
+            } else if (count == 8) {
+                v = (int) (lo >>> 32);
+            } else {
+                v = (int) lo;
+            }
+
+            bytes[count++] = (byte) (v >>> 24);
+            bytes[count++] = (byte) (v >>> 16);
+            bytes[count++] = (byte) (v >>> 8);
+            bytes[count++] = (byte) v;
+        }
+
+        return bytes;
+    }
+
+    /**
+     * Compares two arrays. Returns -1, 0, +1. If one array is shorther and
+     * all the elements are equal to the other's elements, -1 is returned.
+     */
+    public static int compare(byte[] a, byte[] b) {
+        return compare(a, 0, a.length, b, b.length);
+    }
+
+    public static int compare(byte[] a, int aOffset, int aLength, byte[] b,
+                              int bLength) {
+
+        int length = aLength;
+
+        if (length > bLength) {
+            length = bLength;
+        }
+
+        for (int i = 0; i < length; i++) {
+            if (a[aOffset + i] == b[i]) {
+                continue;
+            }
+
+            return (((int) a[aOffset + i]) & 0xff) > (((int) b[i]) & 0xff) ? 1
+                                                                           : -1;
+        }
+
+        if (aLength == bLength) {
+            return 0;
+        }
+
+        return aLength < bLength ? -1
+                                 : 1;
+    }
+
+    /**
+     * uses 2**scale form and returns a multipe of this that is larger or equal to value
+     */
+    public static long getBinaryMultipleCeiling(long value, long unit) {
+
+        long newSize = value & -unit;
+
+        if (newSize != value) {
+            newSize += unit;
+        }
+
+        return newSize;
+    }
+
+    /**
+     * uses 2**scale form and returns a multipe of this that is larger or equal to value
+     */
+    public static long getBinaryNormalisedCeiling(long value, int scale) {
+
+        long mask    = 0xffffffffffffffffl << scale;
+        long newSize = value & mask;
+
+        if (newSize != value) {
+            newSize += 1 << scale;
+        }
+
+        return newSize;
+    }
+
+    /**
+     * returns true if log2 n is in the range (0, max)
+     */
+    public static boolean isTwoPower(int n, int max) {
+
+        for (int i = 0; i <= max; i++) {
+            if ((n & 1) != 0) {
+                return n == 1;
+            }
+
+            n >>= 1;
+        }
+
+        return false;
+    }
+
+    /**
+     * returns the largest value that is 0 or a power of 2 and is smaller or equal to n
+     */
+    public static int getTwoPowerFloor(int n) {
+
+        int shift = 0;
+
+        if (n == 0) {
+            return 0;
+        }
+
+        for (int i = 0; i < 32; i++) {
+            if ((n & 1) != 0) {
+                shift = i;
+            }
+
+            n >>= 1;
+        }
+
+        return 1 << shift;
     }
 }

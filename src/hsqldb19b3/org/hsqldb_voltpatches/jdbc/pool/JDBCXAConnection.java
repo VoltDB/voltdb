@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,39 +30,66 @@
 
 
 package org.hsqldb_voltpatches.jdbc.pool;
-
-import javax.sql.XAConnection;
-
+import java.sql.Connection;
 import java.sql.SQLException;
-
+import javax.sql.XAConnection;
 import javax.transaction.xa.XAResource;
 
-// @(#)$Id: JDBCXAConnection.java 771 2009-01-12 15:21:22Z fredt $
+import org.hsqldb_voltpatches.jdbc.JDBCConnection;
+
+// @(#)$Id: JDBCXAConnection.java 5026 2012-07-14 20:02:27Z fredt $
 
 /**
- * HSQLDB Connection objects for use by a global transaction service manager.
+ * Subclass of JDBCPooledConnection implements the XAConneciton interface.
+ * For use by global transaction service managers.<p>
  *
- * Other than the xaResource, this class deals with Connection Wrappers
- * not the real thing, but these correspond 1:1 with physical
- * JDBCConnections.
+ * Each instance has an JDBCXAResource inherits the superclass's two
+ * JDBCConnection objects, one for internal access, and one for user access.<P>
  *
- * @since HSQLDB v. 1.9.0
- * @author Blaine Simpson (blaine dot simpson at admc dot com)
+ * The getConnection() method returns a user connection and links this with
+ * the JDBCXAResource. This puts the object in the inUse state.
+ * When the user connection is closed, the object is put in the free state.
+ *
+ * @version 2.2.9
+ * @since HSQLDB 2.0
+ * @author Fred Toussi (fredt at users.sourceforge.net)
  * @see javax.sql.XAConnection
  */
 public class JDBCXAConnection extends JDBCPooledConnection implements XAConnection {
 
     JDBCXAResource xaResource;
 
-    public JDBCXAConnection(JDBCXAConnectionWrapper xaConnectionWrapper,
-                            JDBCXAResource xaResource) {
+    public JDBCXAConnection(JDBCXADataSource dataSource, JDBCConnection connection) {
 
-        super(xaConnectionWrapper);
-
-        this.xaResource = xaResource;
+        super(connection);
+        xaResource = new JDBCXAResource(dataSource, connection);
     }
 
     public XAResource getXAResource() throws SQLException {
         return xaResource;
+    }
+
+    /**
+     * Returns a connection that can be used by the user application.
+     *
+     * @throws SQLException if a lease has already been given on this connection
+     * @return Connection
+     */
+    synchronized public Connection getConnection() throws SQLException {
+
+        if (isInUse) {
+            throw new SQLException("Connection in use");
+        }
+
+        isInUse = true;
+
+
+        return new JDBCXAConnectionWrapper(xaResource, this, connection);
+    }
+
+    public void close() throws SQLException {
+        super.close();
+
+        // deal with xaResource
     }
 }

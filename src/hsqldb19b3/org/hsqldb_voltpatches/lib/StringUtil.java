@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,10 +36,9 @@ import java.lang.reflect.Array;
 /** Provides a collection of convenience methods for processing and
  * creating objects with <code>String</code> value components.
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @author Nitin Chauhan
- * @version 1.9.0
+ * @version 2.2.6
  * @since 1.7.0
  */
 public class StringUtil {
@@ -104,6 +103,44 @@ public class StringUtil {
         return sb.toString();
     }
 
+    public static String toPaddedString(String source, int length, String pad,
+                                        boolean trailing) {
+
+        int len = source.length();
+
+        if (len == length) {
+            return source;
+        }
+
+        if (len > length) {
+            if (trailing) {
+                return source.substring(0, length);
+            } else {
+                return source.substring(len - length, len);
+            }
+        }
+
+        StringBuffer sb         = new StringBuffer(length);
+        int          padLength  = source.length();
+        int          partLength = (length - padLength) % pad.length();
+
+        if (trailing) {
+            sb.append(source);
+            sb.append(pad.substring(pad.length() - partLength, pad.length()));
+        }
+
+        for (; padLength + pad.length() <= length; padLength += pad.length()) {
+            sb.append(pad);
+        }
+
+        if (!trailing) {
+            sb.append(pad.substring(0, partLength));
+            sb.append(source);
+        }
+
+        return sb.toString();
+    }
+
     /**
      * Returns a string with non alphanumeric chars converted to the
      * substitute character. A digit first character is also converted.
@@ -115,7 +152,7 @@ public class StringUtil {
     public static String toLowerSubset(String source, char substitute) {
 
         int          len = source.length();
-        StringBuffer sb = new StringBuffer(len);
+        StringBuffer sb  = new StringBuffer(len);
         char         ch;
 
         for (int i = 0; i < len; i++) {
@@ -180,7 +217,7 @@ public class StringUtil {
     public static String getList(String[] s, String separator, String quote) {
 
         int          len = s.length;
-        StringBuffer sb   = new StringBuffer(len * 16);
+        StringBuffer sb  = new StringBuffer(len * 16);
 
         for (int i = 0; i < len; i++) {
             sb.append(quote);
@@ -214,7 +251,25 @@ public class StringUtil {
     public static String getList(int[] s, String separator, String quote) {
 
         int          len = s.length;
-        StringBuffer sb   = new StringBuffer(len * 8);
+        StringBuffer sb  = new StringBuffer(len * 8);
+
+        for (int i = 0; i < len; i++) {
+            sb.append(quote);
+            sb.append(s[i]);
+            sb.append(quote);
+
+            if (i + 1 < len) {
+                sb.append(separator);
+            }
+        }
+
+        return sb.toString();
+    }
+
+    public static String getList(long[] s, String separator, String quote) {
+
+        int          len = s.length;
+        StringBuffer sb  = new StringBuffer(len * 8);
 
         for (int i = 0; i < len; i++) {
             sb.append(quote);
@@ -252,7 +307,7 @@ public class StringUtil {
                                  String quote) {
 
         int          len = s.length;
-        StringBuffer sb   = new StringBuffer(len * 16);
+        StringBuffer sb  = new StringBuffer(len * 16);
 
         for (int i = 0; i < len; i++) {
             sb.append(quote);
@@ -265,24 +320,6 @@ public class StringUtil {
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Appends a pair of string to the string buffer, using the separator between
-     * and terminator at the end
-     * @param b the buffer
-     * @param s1 first string
-     * @param s2 second string
-     * @param separator separator string
-     * @param terminator terminator string
-     */
-    public static void appendPair(StringBuffer b, String s1, String s2,
-                                  String separator, String terminator) {
-
-        b.append(s1);
-        b.append(separator);
-        b.append(s2);
-        b.append(terminator);
     }
 
     /**

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  *
@@ -65,7 +65,7 @@ public class IntKeyHashMap extends BaseHashMap {
     }
 
     public Object put(int key, Object value) {
-        return super.addOrRemove(key, 0, null, value, false);
+        return super.addOrRemove(key, value, null, false);
     }
 
     public boolean containsValue(Object value) {
@@ -73,24 +73,23 @@ public class IntKeyHashMap extends BaseHashMap {
     }
 
     public Object remove(int key) {
-        return super.addOrRemove(key, 0, null, null, true);
+        return super.addOrRemove(key, null, null, true);
     }
 
     public boolean containsKey(int key) {
         return super.containsKey(key);
     }
 
-    public int getOrderedMatchCount(int[] array) {
+    public void valuesToArray(Object[] array) {
 
-        int i = 0;
+        Iterator it = values().iterator();
+        int      i  = 0;
 
-        for (; i < array.length; i++) {
-            if (!super.containsKey(array[i])) {
-                break;
-            }
+        while (it.hasNext()) {
+            array[i] = it.next();
+
+            i++;
         }
-
-        return i;
     }
 
     public Set keySet() {

@@ -1,4 +1,40 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+/*
+ * For work developed by the HSQL Development Group:
+ *
+ * Copyright (c) 2001-2011, The HSQL Development Group
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the HSQL Development Group nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ *
+ * For work originally developed by the Hypersonic SQL Group:
+ *
+ * Copyright (c) 1995-2000, The Hypersonic SQL Group.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,38 +65,6 @@
  *
  * This software consists of voluntary contributions made by many individuals
  * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the HSQL Development Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
@@ -108,7 +112,7 @@ class DatabaseManagerCommon {
     static String[] insertHelp = {
         "INSERT INTO ",
         "INSERT INTO table [ (column [,...] ) ] \n"
-        + "{ VALUES(Expression [,...]) | SelectStatement }"
+        + "{ VALUES(Expression [,...]) [,...] | SelectStatement }"
     };
     static String[] updateHelp = {
         "UPDATE ",
@@ -150,20 +154,16 @@ class DatabaseManagerCommon {
 
         "SET AUTOCOMMIT { TRUE | FALSE }\n"
         + "SET DATABASE COLLATION \"<collationname>\"\n"
-        + "SET CHECKPOINT DEFRAG <size>\n"
-        + "SET IGNORECASE { TRUE | FALSE }\n"
-        + "SET INITIAL SCHEMA <schemaname>\n"                             //
-        + "SET LOGSIZE <size>\n"                                          //
+        + "SET FILES CHECKPOINT DEFRAG <size>\n"
+        + "SET DATABASE INITIAL SCHEMA <schemaname>\n"                             //
+        + "SET FILES LOG SIZE <size>\n"                                          //
         + "SET MAXROWS maxrows\n"                                         //
         + "SET PASSWORD <password>\n"                                     //
-        + "SET PROPERTY \"<propname>\" <propvalue>\n"
-        + "SET READONLY { TRUE | FALSE }\n"
-        + "SET DATABASE REFERENTIAL_INTEGRITY { TRUE | FALSE }\n"
+        + "SET FILES READ { ONLY | WRITE }\n"
         + "SET SCHEMA <schemaname>\n"
-        + "SET DATABASE SCRIPTFORMAT { TEXT | BINARY | COMPRESSED }\n"
-        + "SET TABLE <tablename> READONLY { TRUE | FALSE }\n"
+        + "SET TABLE <tablename> READ { ONLY | WRITE }\n"
+        + "SET TABLE <tablename> SOURCE { ON | OFF }\n"
         + "SET TABLE <tablename> SOURCE \"<file>\" [DESC]\n"
-        + "SET WRITE_DELAY { TRUE | FALSE | <seconds> | <ms> MILLIS }"    //
         + "\n\n"                                                          //
         + "(HSQLDB SQL only)"
     };
@@ -323,7 +323,7 @@ class DatabaseManagerCommon {
 
             return b.toString();
         } catch (IOException e) {
-            return e.getMessage();
+            return e.toString();
         }
     }
 

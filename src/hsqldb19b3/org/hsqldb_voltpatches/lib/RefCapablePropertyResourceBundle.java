@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,21 +31,23 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import java.util.PropertyResourceBundle;
-import java.util.Map;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.ResourceBundle;
+import java.util.Map;
 import java.util.MissingResourceException;
-import java.util.Enumeration;
-import java.util.regex.Pattern;
+import java.util.PropertyResourceBundle;
+import java.util.ResourceBundle;
 import java.util.regex.Matcher;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.util.regex.Pattern;
 
 
-/* $Id: RefCapablePropertyResourceBundle.java 826 2009-01-17 05:04:52Z unsaved $ */
+/* $Id: RefCapablePropertyResourceBundle.java 5221 2013-03-30 10:57:58Z fredt $ */
 
 /**
  * Just like PropertyResourceBundle, except keys mapped to nothing in the
@@ -157,7 +159,9 @@ public class RefCapablePropertyResourceBundle {
     private PropertyResourceBundle wrappedBundle;
     private String baseName;
     private String language, country, variant;
-    static private Map allBundles = new HashMap();
+    static private Map<ResourceBundle, RefCapablePropertyResourceBundle>
+            allBundles =
+            new HashMap<ResourceBundle, RefCapablePropertyResourceBundle>();
     public static String LS = System.getProperty("line.separator");
     private Pattern sysPropVarPattern = Pattern.compile(
             "(?s)\\Q${\\E([^}]+?)(?:\\Q:+\\E([^}]+))?\\Q}");
@@ -169,7 +173,7 @@ public class RefCapablePropertyResourceBundle {
     public static final int EMPTYSTRING_BEHAVIOR = 1;
     public static final int NOOP_BEHAVIOR = 2;
 
-    public Enumeration getKeys() {
+    public Enumeration<String> getKeys() {
         return wrappedBundle.getKeys();
     }
 
@@ -208,8 +212,7 @@ public class RefCapablePropertyResourceBundle {
                 varValue = ((varValue == null)
                         ? ""
                         : condlVal.replaceAll("\\Q$" + varName + "\\E\\b",
-                                RefCapablePropertyResourceBundle.literalize(
-                                        varValue)));
+                                Matcher.quoteReplacement(varValue)));
             }
             if (varValue == null) switch (behavior) {
                 case THROW_BEHAVIOR:
@@ -219,6 +222,7 @@ public class RefCapablePropertyResourceBundle {
                             + s + ").");
                 case EMPTYSTRING_BEHAVIOR:
                     varValue = "";
+                    break;
                 case NOOP_BEHAVIOR:
                     break;
                 default:
@@ -255,8 +259,7 @@ public class RefCapablePropertyResourceBundle {
                 varValue = ((varValue == null)
                         ? ""
                         : condlVal.replaceAll("\\Q%" + (varIndex+1) + "\\E\\b",
-                                RefCapablePropertyResourceBundle.literalize(
-                                        varValue)));
+                                Matcher.quoteReplacement(varValue)));
             }
             // System.err.println("Behavior: " + behavior);
             if (varValue == null) switch (behavior) {
@@ -267,6 +270,7 @@ public class RefCapablePropertyResourceBundle {
                             + "contains (" + matcher.group() + ").");
                 case EMPTYSTRING_BEHAVIOR:
                     varValue = "";
+                    break;
                 case NOOP_BEHAVIOR:
                     break;
                 default:
@@ -328,7 +332,7 @@ public class RefCapablePropertyResourceBundle {
      *           Otherwise returns a copy of inString, with all \n's
      *           transformed to the platform's line separators.
      */
-    static public String toNativeLs(String inString) {
+    public static String toNativeLs(String inString) {
         return LS.equals("\n") ? inString : inString.replaceAll("\\Q\n", LS);
     }
 
@@ -368,8 +372,7 @@ public class RefCapablePropertyResourceBundle {
                     "Found a Resource Bundle, but it is a "
                             + rb.getClass().getName(),
                     PropertyResourceBundle.class.getName(), null);
-        if (allBundles.containsKey(rb))
-            return (RefCapablePropertyResourceBundle) allBundles.get(rb);
+        if (allBundles.containsKey(rb)) return allBundles.get(rb);
         RefCapablePropertyResourceBundle newPRAFP =
                 new RefCapablePropertyResourceBundle(baseName,
                         (PropertyResourceBundle) rb, loader);
@@ -382,13 +385,19 @@ public class RefCapablePropertyResourceBundle {
      */
     private InputStream getMostSpecificStream(
             String key, String l, String c, String v) {
-        String filePath = baseName.replace('.', '/') + '/' + key
+        final String filePath = baseName.replace('.', '/') + '/' + key
                 + ((l == null) ? "" : ("_" + l))
                 + ((c == null) ? "" : ("_" + c))
                 + ((v == null) ? "" : ("_" + v))
                 + ".text";
         // System.err.println("Seeking " + filePath);
-        InputStream is = loader.getResourceAsStream(filePath);
+        InputStream is = (InputStream) AccessController.doPrivileged(
+            new PrivilegedAction() {
+
+            public InputStream run() {
+                return loader.getResourceAsStream(filePath);
+            }
+        });
         // N.b.  If were using Class.getRes... instead of ClassLoader.getRes...
         // we would need to prefix the path with "/".
         return (is == null && l != null)
@@ -459,34 +468,5 @@ public class RefCapablePropertyResourceBundle {
                 + "(try Java -Xm* switches).: " + re,
                 RefCapablePropertyResourceBundle.class.getName(), key);
         }
-    }
-
-    /**
-     * Escape \ and $ characters in replacement strings so that nothing
-     * funny happens.
-     *
-     * Once we can use Java 1.5, wipe out this method and use
-     * java.util.regex.matcher.QuoteReplacement() instead.
-     */
-    public static String literalize(String s) {
-        if ((s.indexOf('\\') == -1) && (s.indexOf('$') == -1)) {
-            return s;
-        }
-        StringBuffer sb = new StringBuffer();
-        for (int i=0; i<s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '\\':
-                    sb.append('\\'); sb.append('\\');
-                    break;
-                case '$':
-                    sb.append('\\'); sb.append('$');
-                    break;
-                default:
-                    sb.append(c);
-                    break;
-            }
-        }
-        return sb.toString();
     }
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,25 +31,27 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import java.io.EOFException;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.io.UTFDataFormatException;
 
 /**
  * A wrapper for OutputStream
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
-public class DataOutputStream extends java.io.BufferedOutputStream {
+public class DataOutputStream extends java.io.BufferedOutputStream
+implements DataOutput {
 
-    byte[] buf = new byte[8];
+    byte[] tempBuffer = new byte[8];
 
     public DataOutputStream(OutputStream stream) {
-        super(stream);
+        super(stream, 8);
     }
 
     public final void writeByte(int v) throws IOException {
@@ -60,12 +62,12 @@ public class DataOutputStream extends java.io.BufferedOutputStream {
 
         int count = 0;
 
-        buf[count++] = (byte) (v >>> 24);
-        buf[count++] = (byte) (v >>> 16);
-        buf[count++] = (byte) (v >>> 8);
-        buf[count++] = (byte) v;
+        tempBuffer[count++] = (byte) (v >>> 24);
+        tempBuffer[count++] = (byte) (v >>> 16);
+        tempBuffer[count++] = (byte) (v >>> 8);
+        tempBuffer[count++] = (byte) v;
 
-        write(buf, 0, count);
+        write(tempBuffer, 0, count);
     }
 
     public final void writeLong(long v) throws IOException {
@@ -77,10 +79,10 @@ public class DataOutputStream extends java.io.BufferedOutputStream {
 
         int count = 0;
 
-        buf[count++] = (byte) (v >>> 8);
-        buf[count++] = (byte) v;
+        tempBuffer[count++] = (byte) (v >>> 8);
+        tempBuffer[count++] = (byte) v;
 
-        write(buf, 0, count);
+        write(tempBuffer, 0, count);
     }
 
     public void writeChars(String s) throws IOException {
@@ -91,10 +93,10 @@ public class DataOutputStream extends java.io.BufferedOutputStream {
             int v     = s.charAt(i);
             int count = 0;
 
-            buf[count++] = (byte) (v >>> 8);
-            buf[count++] = (byte) v;
+            tempBuffer[count++] = (byte) (v >>> 8);
+            tempBuffer[count++] = (byte) v;
 
-            write(buf, 0, count);
+            write(tempBuffer, 0, count);
         }
     }
 
@@ -108,42 +110,103 @@ public class DataOutputStream extends java.io.BufferedOutputStream {
             int v     = c[i];
             int count = 0;
 
-            buf[count++] = (byte) (v >>> 8);
-            buf[count++] = (byte) v;
+            tempBuffer[count++] = (byte) (v >>> 8);
+            tempBuffer[count++] = (byte) v;
 
-            write(buf, 0, count);
+            write(tempBuffer, 0, count);
         }
     }
 
-    public void write(Reader reader, long length) throws IOException {
+    public long write(Reader reader, long length) throws IOException {
 
         InputStream inputStream = new ReaderInputStream(reader);
 
-        write(inputStream, length * 2);
+        return write(inputStream, length * 2) / 2;
     }
 
-    public void write(InputStream inputStream,
+    public long write(InputStream inputStream,
                       long length) throws IOException {
 
-        CountdownInputStream countStream =
-            new CountdownInputStream(inputStream);
-
-        countStream.setCount(length);
-
-        byte[] data = new byte[128];
+        byte[] data       = new byte[1024];
+        long   totalCount = 0;
 
         while (true) {
-            int count = countStream.read(data);
+            long count = length - totalCount;
+
+            if (count > data.length) {
+                count = data.length;
+            }
+
+            count = inputStream.read(data, 0, (int) count);
 
             if (count < 1) {
-                if (countStream.getCount() != 0) {
-                    throw new EOFException();
-                }
-
                 break;
             }
 
-            write(data, 0, count);
+            write(data, 0, (int) count);
+
+            totalCount += count;
         }
+
+        return totalCount;
+    }
+
+    public void writeBoolean(boolean v) throws IOException {
+
+        int val = v ? 1
+                    : 0;
+
+        write(val);
+    }
+
+    public void writeShort(int v) throws IOException {
+
+        int count = 0;
+
+        tempBuffer[count++] = (byte) (v >> 8);
+        tempBuffer[count++] = (byte) v;
+
+        write(tempBuffer, 0, count);
+    }
+
+    public void writeFloat(float v) throws IOException {
+        writeInt(Float.floatToIntBits(v));
+    }
+
+    public void writeDouble(double v) throws IOException {
+        writeLong(Double.doubleToLongBits(v));
+    }
+
+    public void writeBytes(String s) throws IOException {
+
+        int length = s.length();
+
+        for (int i = 0; i < length; i++) {
+            out.write((byte) s.charAt(i));
+        }
+    }
+
+    public void writeUTF(String str) throws IOException {
+
+        int len = str.length();
+
+        if (len > 0xffff) {
+            throw new UTFDataFormatException();
+        }
+
+        int bytecount = StringConverter.getUTFSize(str);
+
+        if (bytecount > 0xffff) {
+            throw new UTFDataFormatException();
+        }
+
+        //
+        writeChar(bytecount);
+
+        HsqlByteArrayOutputStream bao =
+            new HsqlByteArrayOutputStream(bytecount);
+
+        StringConverter.stringToUTFBytes(str, bao);
+        this.write(bao.getBuffer(), 0, bao.size());
     }
 }

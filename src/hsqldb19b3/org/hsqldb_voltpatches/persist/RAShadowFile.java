@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,39 +31,40 @@
 
 package org.hsqldb_voltpatches.persist;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 
 import org.hsqldb_voltpatches.Database;
-import org.hsqldb_voltpatches.lib.FileUtil;
-import org.hsqldb_voltpatches.lib.SimpleLog;
-import org.hsqldb_voltpatches.lib.Storage;
-import org.hsqldb_voltpatches.lib.java.JavaSystem;
-import org.hsqldb_voltpatches.store.BitMap;
 import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
+import org.hsqldb_voltpatches.lib.InputStreamInterface;
+import org.hsqldb_voltpatches.lib.java.JavaSystem;
+import org.hsqldb_voltpatches.map.BitMap;
 
 /*
  * Wrapper for random access file for incremental backup of the .data file.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class RAShadowFile {
 
-    final Database   database;
-    final String     pathName;
-    final Storage    source;
-    RandomAccessFile dest;
-    final int        pageSize;
-    final long       maxSize;
-    final BitMap     bitMap;
-    boolean          zeroPageSet;
-    HsqlByteArrayOutputStream byteArrayOutputStream =
-        new HsqlByteArrayOutputStream(new byte[]{});
+    final Database              database;
+    final String                pathName;
+    final RandomAccessInterface source;
+    RandomAccessInterface       dest;
+    final int                   pageSize;
+    final long                  maxSize;
+    final BitMap                bitMap;
+    boolean                     zeroPageSet;
+    long                        savedLength;
+    long                        synchLength;
+    byte[]                      buffer;
+    HsqlByteArrayOutputStream   byteArrayOutputStream;
 
-    RAShadowFile(Database database, Storage source, String pathName,
-                 long maxSize, int pageSize) {
+    RAShadowFile(Database database, RandomAccessInterface source,
+                 String pathName, long maxSize, int pageSize) {
 
         this.database = database;
         this.pathName = pathName;
@@ -77,7 +78,9 @@ public class RAShadowFile {
             bitSize++;
         }
 
-        bitMap = new BitMap(bitSize);
+        bitMap                = new BitMap(bitSize, false);
+        buffer                = new byte[pageSize + 12];
+        byteArrayOutputStream = new HsqlByteArrayOutputStream(buffer);
     }
 
     void copy(long fileOffset, int size) throws IOException {
@@ -94,9 +97,14 @@ public class RAShadowFile {
             return;
         }
 
-        long endOffset       = fileOffset + size;
-        int  startPageOffset = (int) (fileOffset / pageSize);
-        int  endPageOffset   = (int) (endOffset / pageSize);
+        long endOffset = fileOffset + size;
+
+        if (endOffset > maxSize) {
+            endOffset = maxSize;
+        }
+
+        int startPageOffset = (int) (fileOffset / pageSize);
+        int endPageOffset   = (int) (endOffset / pageSize);
 
         if (endOffset % pageSize == 0) {
             endPageOffset--;
@@ -120,37 +128,48 @@ public class RAShadowFile {
             readSize = (int) (maxSize - position);
         }
 
+        if (dest == null) {
+            open();
+        }
+
+        long writePos = dest.length();
+
         try {
-            if (dest == null) {
-                open();
+            byteArrayOutputStream.reset();
+
+            if (readSize < pageSize) {
+                byteArrayOutputStream.fill(0, buffer.length);
+                byteArrayOutputStream.reset();
             }
 
-            long writePos = dest.length();
-
-            byte[] buffer = new byte[pageSize + 12];
-
-            byteArrayOutputStream.setBuffer(buffer);
             byteArrayOutputStream.writeInt(pageSize);
             byteArrayOutputStream.writeLong(position);
-
             source.seek(position);
             source.read(buffer, 12, readSize);
-
             dest.seek(writePos);
-            dest.write(buffer);
+            dest.write(buffer, 0, buffer.length);
+
+            savedLength = writePos + buffer.length;
         } catch (Throwable t) {
             bitMap.unset(pageOffset);
+            dest.seek(0);
+            dest.setLength(writePos);
             close();
-            database.logger.appLog.logContext(SimpleLog.LOG_ERROR,
-                                              "pos" + position + " "
-                                              + readSize);
+            database.logger.logSevereEvent("shadow backup failure pos "
+                                           + position + " " + readSize, t);
 
-            throw FileUtil.toIOException(t);
-        } finally {}
+            throw JavaSystem.toIOException(t);
+        }
     }
 
     private void open() throws IOException {
-        dest = new RandomAccessFile(pathName, "rws");
+
+        if (database.logger.isStoredFileAccess()) {
+            dest = RAFile.newScaledRAFile(database, pathName, false,
+                                          RAFile.DATA_FILE_STORED);
+        } else {
+            dest = new RAFileSimple(database, pathName, "rws");
+        }
     }
 
     /**
@@ -160,37 +179,168 @@ public class RAShadowFile {
     void close() throws IOException {
 
         if (dest != null) {
+            dest.synch();
             dest.close();
 
             dest = null;
         }
     }
 
+    public void synch() {
+
+        if (dest != null) {
+            synchLength = savedLength;
+
+            dest.synch();
+        }
+    }
+
+    public long getSavedLength() {
+        return savedLength;
+    }
+
+    public InputStreamInterface getInputStream() {
+        return new InputStreamShadow();
+    }
+
+    private static RandomAccessInterface getStorage(Database database,
+            String pathName, String openMode) throws IOException {
+
+        if (database.logger.isStoredFileAccess()) {
+            return RAFile.newScaledRAFile(database, pathName,
+                                          openMode.equals("r"),
+                                          RAFile.DATA_FILE_STORED);
+        } else {
+            return new RAFileSimple(database, pathName, openMode);
+        }
+    }
+
     /** todo - take account of incomplete addition of block due to lack of disk */
 
     // buggy database files had size == position == 0 at the end
-    public static void restoreFile(String sourceName,
+    public static void restoreFile(Database database, String sourceName,
                                    String destName) throws IOException {
 
-        RandomAccessFile source = new RandomAccessFile(sourceName, "r");
-        RandomAccessFile dest   = new RandomAccessFile(destName, "rw");
+        RandomAccessInterface source = getStorage(database, sourceName, "r");
+        RandomAccessInterface dest   = getStorage(database, destName, "rw");
 
         while (source.getFilePointer() != source.length()) {
             int    size     = source.readInt();
             long   position = source.readLong();
             byte[] buffer   = new byte[size];
 
-            source.read(buffer);
+            source.read(buffer, 0, buffer.length);
             dest.seek(position);
-            dest.write(buffer);
+            dest.write(buffer, 0, buffer.length);
         }
 
-        dest.seek(DataFileCache.LONG_FREE_POS_POS);
-
-        long length = dest.readLong();
-
-        JavaSystem.setRAFileLength(dest, length);
         source.close();
+        dest.synch();
         dest.close();
+    }
+
+    class InputStreamShadow implements InputStreamInterface {
+
+        FileInputStream is;
+        long            limitSize   = 0;
+        long            fetchedSize = 0;
+        boolean         initialised = false;
+
+        public int read() throws IOException {
+
+            if (!initialised) {
+                initialise();
+            }
+
+            if (fetchedSize == limitSize) {
+                return -1;
+            }
+
+            int byteread = is.read();
+
+            if (byteread < 0) {
+                throw new IOException("backup file not complete "
+                                      + fetchedSize + " " + limitSize);
+            }
+
+            fetchedSize++;
+
+            return byteread;
+        }
+
+        public int read(byte bytes[]) throws IOException {
+            return read(bytes, 0, bytes.length);
+        }
+
+        public int read(byte bytes[], int offset,
+                        int length) throws IOException {
+
+            if (!initialised) {
+                initialise();
+            }
+
+            if (fetchedSize == limitSize) {
+                return -1;
+            }
+
+            if (limitSize >= 0 && limitSize - fetchedSize < length) {
+                length = (int) (limitSize - fetchedSize);
+            }
+
+            int count = is.read(bytes, offset, length);
+
+            if (count < 0) {
+                throw new IOException("backup file not complete "
+                                      + fetchedSize + " " + limitSize);
+            }
+
+            fetchedSize += count;
+
+            return count;
+        }
+
+        public long skip(long count) throws IOException {
+            return 0;
+        }
+
+        public int available() throws IOException {
+            return 0;
+        }
+
+        public void close() throws IOException {
+
+            if (is != null) {
+                is.close();
+            }
+        }
+
+        public void setSizeLimit(long count) {
+            limitSize = count;
+        }
+
+        public long getSizeLimit() {
+
+            if (!initialised) {
+                initialise();
+            }
+
+            return limitSize;
+        }
+
+        private void initialise() {
+
+            limitSize = synchLength;
+
+            database.logger.logDetailEvent("shadow file size for backup: "
+                                           + limitSize);
+
+            if (limitSize > 0) {
+                try {
+                    is = new FileInputStream(pathName);
+                } catch (FileNotFoundException e) {}
+            }
+
+            initialised = true;
+        }
     }
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,20 +31,33 @@
 
 package org.hsqldb_voltpatches.types;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 
 /**
  * Implementation of data item for INTERVAL SECOND.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class IntervalSecondData {
 
-    public final long units;
-    public final int  nanos;
+    public final static IntervalSecondData oneDay = newIntervalDay(1,
+        Type.SQL_INTERVAL_DAY);
+
+    //
+    final long units;
+    final int  nanos;
+
+    public static IntervalSecondData newInterval(double value, int typeCode) {
+
+        int index = DTIType.intervalIndexMap.get(typeCode);
+
+        value *= DTIType.yearToSecondFactors[index];
+
+        return new IntervalSecondData((long) value, 0);
+    }
 
     public static IntervalSecondData newIntervalDay(long days,
             IntervalType type) {
@@ -142,18 +155,19 @@ public class IntervalSecondData {
 
     public int compareTo(IntervalSecondData b) {
 
-        long diff = units - b.units;
-
-        if (diff == 0) {
-            diff = nanos - b.nanos;
-
-            if (diff == 0) {
+        if (units > b.units) {
+            return 1;
+        } else if (units < b.units) {
+            return -1;
+        } else {
+            if (nanos > b.nanos) {
+                return 1;
+            } else if (nanos < b.nanos) {
+                return -1;
+            } else {
                 return 0;
             }
         }
-
-        return diff > 0 ? 1
-                        : -1;
     }
 
     public long getSeconds() {
@@ -165,6 +179,7 @@ public class IntervalSecondData {
     }
 
     public String toString() {
-        throw Error.runtimeError(ErrorCode.U_S0500, "IntervalSecondData");
+        return Type.SQL_INTERVAL_SECOND_MAX_FRACTION_MAX_PRECISION
+            .convertToString(this);
     }
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,25 +31,24 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.lib.IntLookup;
-import org.hsqldb_voltpatches.lib.java.JavaSystem;
+import org.hsqldb_voltpatches.lib.LongLookup;
 import org.hsqldb_voltpatches.persist.CachedObject;
+import org.hsqldb_voltpatches.persist.PersistentStore;
+import org.hsqldb_voltpatches.rowio.RowInputInterface;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
-import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
  * Base class for a database row object.
  *
  * @author Fred Toussi (fredt@users dot sourceforge dot net)
- * @version 1.9.0
+ * @version 2.3.0
  */
 public class Row implements CachedObject {
 
-    int                       tableId;
-    int                       position;
-    protected Object[]        rowData;
+    long                      position;
+    Object[]                  rowData;
     public volatile RowAction rowAction;
-    public volatile boolean   hasAction;
+    protected TableBase       table;
 
     public RowAction getAction() {
         return rowAction;
@@ -58,7 +57,10 @@ public class Row implements CachedObject {
     /**
      *  Default constructor used only in subclasses.
      */
-    protected Row() {}
+    public Row(TableBase table, Object[] data) {
+        this.table   = table;
+        this.rowData = data;
+    }
 
     /**
      * Returns the array of fields in the database row.
@@ -67,19 +69,25 @@ public class Row implements CachedObject {
         return rowData;
     }
 
-    boolean isDeleted(Session session) {
+    boolean isDeleted(Session session, PersistentStore store) {
 
-        RowAction action = rowAction;
+        RowAction action;
+        Row       row = (Row) store.get(this, false);
+
+        if (row == null) {
+            return true;
+        }
+
+        action = row.rowAction;
 
         if (action == null) {
             return false;
         }
 
-        return RowActionBase.ACTION_DELETE
-               == action.getLastChangeActionType(session.actionTimestamp);
+        return !action.canRead(session, TransactionManager.ACTION_READ);
     }
 
-    public void setChanged() {}
+    public void setChanged(boolean changed) {}
 
     public void setStorageSize(int size) {}
 
@@ -87,12 +95,8 @@ public class Row implements CachedObject {
         return 0;
     }
 
-    public long getId() {
-        return ((long) tableId << 32) + ((long) position);
-    }
-
-    public Object getRowidObject() {
-        return ValuePool.getLong(getId());
+    final public boolean isBlock() {
+        return false;
     }
 
     public boolean isMemory() {
@@ -105,12 +109,20 @@ public class Row implements CachedObject {
         return 0;
     }
 
-    public int getPos() {
+    public long getPos() {
         return position;
     }
 
-    public void setPos(int pos) {
+    public long getId() {
+        return ((long) table.getId() << 40) + position;
+    }
+
+    public void setPos(long pos) {
         position = pos;
+    }
+
+    public boolean isNew() {
+        return false;
     }
 
     public boolean hasChanged() {
@@ -131,26 +143,29 @@ public class Row implements CachedObject {
 
     public void setInMemory(boolean in) {}
 
+    public void delete(PersistentStore store) {}
+
     public void restore() {}
 
-    public void destroy() {
-
-        JavaSystem.memoryRecords++;
-
-        rowData = null;
-    }
+    public void destroy() {}
 
     public int getRealSize(RowOutputInterface out) {
         return 0;
     }
 
     public TableBase getTable() {
-        return null;
+        return table;
     }
+
+    public int getDefaultCapacity() {
+        return 0;
+    }
+
+    public void read(RowInputInterface in) {}
 
     public void write(RowOutputInterface out) {}
 
-    public void write(RowOutputInterface out, IntLookup lookup) {}
+    public void write(RowOutputInterface out, LongLookup lookup) {}
 
     /**
      * Lifetime scope of this method is limited depends on the operations
@@ -167,7 +182,8 @@ public class Row implements CachedObject {
         }
 
         if (obj instanceof Row) {
-            return ((Row) obj).position == position;
+            return ((Row) obj).table == table
+                   && ((Row) obj).position == position;
         }
 
         return false;
@@ -179,6 +195,6 @@ public class Row implements CachedObject {
      * @return file position of row
      */
     public int hashCode() {
-        return position;
+        return (int) position;
     }
 }

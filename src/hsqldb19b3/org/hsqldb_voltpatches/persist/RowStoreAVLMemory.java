@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,41 +31,37 @@
 
 package org.hsqldb_voltpatches.persist;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlException;
+import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.RowAVL;
 import org.hsqldb_voltpatches.RowAction;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
-import org.hsqldb_voltpatches.index.Index;
-import org.hsqldb_voltpatches.index.NodeAVL;
+import org.hsqldb_voltpatches.TransactionManager;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
-import org.hsqldb_voltpatches.lib.IntKeyHashMapConcurrent;
-import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
 
 /*
  * Implementation of PersistentStore for MEMORY tables.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.9.0
  */
 public class RowStoreAVLMemory extends RowStoreAVL implements PersistentStore {
 
-    Table                           table;
-    private IntKeyHashMapConcurrent rowIdMap;
-    int                             rowIdSequence = 0;
+    Database database;
+    int      rowIdSequence = 0;
 
     public RowStoreAVLMemory(PersistentStoreCollection manager, Table table) {
 
+        this.database     = table.database;
         this.manager      = manager;
         this.table        = table;
         this.indexList    = table.getIndexList();
         this.accessorList = new CachedObject[indexList.length];
-        rowIdMap          = new IntKeyHashMapConcurrent();
 
         manager.setStore(table, this);
     }
@@ -80,65 +76,114 @@ public class RowStoreAVLMemory extends RowStoreAVL implements PersistentStore {
 
     public void set(CachedObject object) {}
 
-    public CachedObject get(int i) {
-        return (CachedObject) rowIdMap.get(i);
+    public CachedObject get(long i) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowStoreAVMemory");
     }
 
-    public CachedObject getKeep(int i) {
-        return (CachedObject) rowIdMap.get(i);
-    }
-
-    public CachedObject get(int i, boolean keep) {
-        return (CachedObject) rowIdMap.get(i);
+    public CachedObject get(long i, boolean keep) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowStoreAVLMemory");
     }
 
     public CachedObject get(CachedObject object, boolean keep) {
-        return (CachedObject) rowIdMap.get(object.getPos());
+        return object;
     }
 
-    public int getStorageSize(int i) {
-        return 0;
-    }
-
-    public void add(CachedObject object) {}
+    public void add(Session session, CachedObject object, boolean tx) {}
 
     public CachedObject get(RowInputInterface in) {
-        return null;
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowStoreAVLMemory");
     }
 
-    public CachedObject getNewCachedObject(Session session,
-                                           Object object)
-                                           {
+    public CachedObject getNewCachedObject(Session session, Object object,
+                                           boolean tx) {
 
-        Row row = new RowAVL(table, (Object[]) object);
+        int id;
 
-        if (session != null) {
-            RowAction.addAction(session, RowAction.ACTION_INSERT, table, row);
+        synchronized (this) {
+            id = rowIdSequence++;
         }
 
-        int id = rowIdSequence++;
+        Row row = new RowAVL(table, (Object[]) object, id, this);
 
-        row.setPos(id);
-        rowIdMap.put(id, row);
+        if (tx) {
+            RowAction action = new RowAction(session, table,
+                                             RowAction.ACTION_INSERT, row,
+                                             null);
+
+            row.rowAction = action;
+        }
 
         return row;
     }
 
     public void removeAll() {
-        rowIdMap.clear();
+
+        destroy();
+        setTimestamp(0);
+        elementCount.set(0);
         ArrayUtil.fillArray(accessorList, null);
     }
 
-    public void remove(int i) {
-        rowIdMap.remove(i);
-    }
+    public void remove(CachedObject object) {}
 
-    public void removePersistence(int i) {}
-
-    public void release(int i) {}
+    public void release(long i) {}
 
     public void commitPersistence(CachedObject row) {}
 
+    public void commitRow(Session session, Row row, int changeAction,
+                          int txModel) {
+
+        Object[] data = row.getData();
+
+        switch (changeAction) {
+
+            case RowAction.ACTION_DELETE :
+                database.logger.writeDeleteStatement(session, (Table) table,
+                                                     data);
+                break;
+
+            case RowAction.ACTION_INSERT :
+                database.logger.writeInsertStatement(session, row,
+                                                     (Table) table);
+                break;
+
+            case RowAction.ACTION_INSERT_DELETE :
+
+                // INSERT + DELETE
+                break;
+
+            case RowAction.ACTION_DELETE_FINAL :
+                delete(session, row);
+                break;
+        }
+    }
+
+    public void rollbackRow(Session session, Row row, int changeAction,
+                            int txModel) {
+
+        switch (changeAction) {
+
+            case RowAction.ACTION_DELETE :
+                if (txModel == TransactionManager.LOCKS) {
+                    ((RowAVL) row).setNewNodes(this);
+                    indexRow(session, row);
+                }
+                break;
+
+            case RowAction.ACTION_INSERT :
+                delete(session, row);
+                remove(row);
+                break;
+
+            case RowAction.ACTION_INSERT_DELETE :
+
+                // INSERT + DELETE
+                remove(row);
+                break;
+        }
+    }
+
+    //
     public DataFileCache getCache() {
         return null;
     }
@@ -146,147 +191,10 @@ public class RowStoreAVLMemory extends RowStoreAVL implements PersistentStore {
     public void setCache(DataFileCache cache) {}
 
     public void release() {
+
+        destroy();
+        setTimestamp(0);
+        elementCount.set(0);
         ArrayUtil.fillArray(accessorList, null);
-        rowIdMap.clear();
-    }
-
-    public void setAccessor(Index key, CachedObject accessor) {
-
-        Index index = (Index) key;
-
-        accessorList[index.getPosition()] = accessor;
-    }
-
-    public void setAccessor(Index key, int accessor) {}
-
-    public void resetAccessorKeys(Index[] keys) {
-
-        if (indexList.length == 0 || indexList[0] == null
-                || accessorList[0] == null) {
-            indexList    = keys;
-            accessorList = new CachedObject[indexList.length];
-
-            return;
-        }
-
-        CachedObject[] oldAccessors = accessorList;
-        Index[]        oldIndexList = indexList;
-        int            limit        = indexList.length;
-        int            diff         = 1;
-        int            position     = 0;
-
-        if (keys.length < indexList.length) {
-            diff  = -1;
-            limit = keys.length;
-        }
-
-        for (; position < limit; position++) {
-            if (indexList[position] != keys[position]) {
-                break;
-            }
-        }
-
-        accessorList = (CachedObject[]) ArrayUtil.toAdjustedArray(accessorList,
-                null, position, diff);
-        indexList = keys;
-
-        try {
-            if (diff > 0) {
-                insertIndexNodes(indexList[0], indexList[position]);
-            } else {
-                dropIndexFromRows(indexList[0], oldIndexList[position]);
-            }
-        } catch (HsqlException e) {
-            accessorList = oldAccessors;
-            indexList    = oldIndexList;
-
-            throw e;
-        }
-    }
-
-    public CachedObject getNewInstance(int size) {
-        return null;
-    }
-
-    void dropIndexFromRows(Index primaryIndex,
-                           Index oldIndex) {
-
-        RowIterator it       = primaryIndex.firstRow(this);
-        int         position = oldIndex.getPosition() - 1;
-
-        while (it.hasNext()) {
-            Row     row      = it.getNextRow();
-            int     i        = position - 1;
-            NodeAVL backnode = ((RowAVL) row).getNode(0);
-
-            while (i-- > 0) {
-                backnode = backnode.nNext;
-            }
-
-            backnode.nNext = backnode.nNext.nNext;
-        }
-    }
-
-    boolean insertIndexNodes(Index primaryIndex,
-                             Index newIndex) {
-
-        int           position = newIndex.getPosition();
-        RowIterator   it       = primaryIndex.firstRow(this);
-        int           rowCount = 0;
-        HsqlException error    = null;
-
-        try {
-            while (it.hasNext()) {
-                Row row = it.getNextRow();
-
-                ((RowAVL) row).insertNode(position);
-
-                // count before inserting
-                rowCount++;
-
-                newIndex.insert(null, this, row);
-            }
-
-            return true;
-        } catch (java.lang.OutOfMemoryError e) {
-            error = Error.error(ErrorCode.OUT_OF_MEMORY);
-        } catch (HsqlException e) {
-            error = e;
-        }
-
-        // backtrack on error
-        // rowCount rows have been modified
-        it = primaryIndex.firstRow(this);
-
-        for (int i = 0; i < rowCount; i++) {
-            Row     row      = it.getNextRow();
-            NodeAVL backnode = ((RowAVL) row).getNode(0);
-            int     j        = position;
-
-            while (--j > 0) {
-                backnode = backnode.nNext;
-            }
-
-            backnode.nNext = backnode.nNext.nNext;
-        }
-
-        throw error;
-    }
-
-    /**
-     * for result tables
-     */
-    void reindex(Session session, Index index) {
-
-        setAccessor(index, null);
-
-        RowIterator it = table.rowIterator(session);
-
-        while (it.hasNext()) {
-            Row row = it.getNextRow();
-
-            // may need to clear the node before insert
-            index.insert(session, this, row);
-        }
     }
 }

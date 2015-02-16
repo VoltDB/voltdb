@@ -1,4 +1,40 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+/*
+ * For work developed by the HSQL Development Group:
+ *
+ * Copyright (c) 2001-2011, The HSQL Development Group
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the HSQL Development Group nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ *
+ * For work originally developed by the Hypersonic SQL Group:
+ *
+ * Copyright (c) 1995-2000, The Hypersonic SQL Group.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,38 +65,6 @@
  *
  * This software consists of voluntary contributions made by many individuals
  * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the HSQL Development Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
@@ -68,11 +72,9 @@ package org.hsqldb_voltpatches.lib;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.StringWriter;
 import java.io.UTFDataFormatException;
 
-import org.hsqldb_voltpatches.store.BitMap;
+import org.hsqldb_voltpatches.map.BitMap;
 
 /**
  * Collection of static methods for converting strings between different
@@ -82,7 +84,7 @@ import org.hsqldb_voltpatches.store.BitMap;
  *
  * @author Thomas Mueller (Hypersonic SQL Group)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.2
  */
 public class StringConverter {
@@ -178,7 +180,7 @@ public class StringConverter {
         int    l = s.length();
         int    n;
         int    bitIndex = 0;
-        BitMap map      = new BitMap(l);
+        BitMap map      = new BitMap(l, true);
 
         for (int j = 0; j < l; j++) {
             char c = s.charAt(j);
@@ -361,23 +363,24 @@ public class StringConverter {
     public static void stringToUnicodeBytes(HsqlByteArrayOutputStream b,
             String s, boolean doubleSingleQuotes) {
 
-        final int len = s.length();
-        char[]    chars;
-        int       extras = 0;
-
-        if (s == null || len == 0) {
+        if (s == null) {
             return;
         }
 
-        chars = s.toCharArray();
+        final int len = s.length();
+        int       extras = 0;
+
+        if (len == 0) {
+            return;
+        }
 
         b.ensureRoom(len * 2 + 5);
 
         for (int i = 0; i < len; i++) {
-            char c = chars[i];
+            char c = s.charAt(i);
 
             if (c == '\\') {
-                if ((i < len - 1) && (chars[i + 1] == 'u')) {
+                if ((i < len - 1) && (s.charAt(i + 1) == 'u')) {
                     b.writeNoCheck(c);    // encode the \ as unicode, so 'u' is ignored
                     b.writeNoCheck('u');
                     b.writeNoCheck('0');
@@ -559,7 +562,7 @@ public class StringConverter {
     /**
      * Writes a string to the specified DataOutput using UTF-8 encoding in a
      * machine-independent manner.
-     *
+     * <p>
      * @param      str   a string to be written.
      * @param      out   destination to write to
      * @return     The number of bytes written out.
@@ -625,35 +628,29 @@ public class StringConverter {
     }
 
     /**
-     * Using a Reader and a Writer, returns a String from an InputStream.
+     * Using an output stream, returns a String from an InputStream.
      *
-     * Method based on Hypersonic Code
-     *
-     * @param x InputStream to read from
+     * @param is InputStream to read from
+     * @param encoding character encoding of the string
      * @throws IOException
      * @return a Java string
      */
-    public static String inputStreamToString(InputStream x,
+    public static String inputStreamToString(InputStream is,
             String encoding) throws IOException {
 
-        InputStreamReader in        = new InputStreamReader(x, encoding);
-        StringWriter      writer    = new StringWriter();
-        int               blocksize = 8 * 1024;
-        char[]            buffer    = new char[blocksize];
+        HsqlByteArrayOutputStream baOS = new HsqlByteArrayOutputStream(1024);
 
-        for (;;) {
-            int read = in.read(buffer);
+        while (true) {
+            int c = is.read();
 
-            if (read == -1) {
+            if (c == -1) {
                 break;
             }
 
-            writer.write(buffer, 0, read);
+            baOS.write(c);
         }
 
-        writer.close();
-
-        return writer.toString();
+        return new String(baOS.getBuffer(), 0, baOS.size(), encoding);
     }
 
 // fredt@users 20020130 - patch 497872 by Nitin Chauhan - use byte[] of exact size
@@ -722,5 +719,127 @@ public class StringConverter {
         }
 
         return count;
+    }
+
+    /**
+     * Converts the string to an HTML representation in the ASCII character set
+     * and appends it to a byte array output stream.
+     *
+     * @param b the output byte array output stream
+     * @param s the input string
+     */
+    public static void stringToHtmlBytes(HsqlByteArrayOutputStream b,
+                                         String s) {
+
+        if (s == null) {
+            return;
+        }
+
+        final int len = s.length();
+        char[]    chars;
+
+        if (len == 0) {
+            return;
+        }
+
+        chars = s.toCharArray();
+
+        b.ensureRoom(len);
+
+        for (int i = 0; i < len; i++) {
+            char c = chars[i];
+
+            if (c > 0x007f || c == '"' || c == '&' || c == '<' || c == '>') {
+                int codePoint = Character.codePointAt(chars, i);
+
+                if (Character.charCount(codePoint) == 2) {
+                    i++;
+                }
+
+                b.ensureRoom(16);
+                b.writeNoCheck('&');
+                b.writeNoCheck('#');
+                b.writeBytes(String.valueOf(codePoint));
+                b.writeNoCheck(';');
+            } else if (c < 0x0020 ) {
+                b.writeNoCheck(' ');
+            } else {
+                b.writeNoCheck(c);
+            }
+        }
+    }
+
+    /**
+     * Returns a string representation in UUID form from a binary string.
+     *
+     * UUID string is composed of 8-4-4-4-12 hexadecimal characters.
+     *
+     * @param b the byte array
+     * @return UUID string form
+     */
+    public static String toStringUUID(byte[] b) {
+
+        char[] chars = new char[36];
+        int    hexIndex;
+
+        if (b == null) {
+            return null;
+        }
+
+        if (b.length != 16) {
+            throw new NumberFormatException();
+        }
+
+        for (int i = 0, j = 0; i < b.length; ) {
+            hexIndex   = (b[i] & 0xf0) >> 4;
+            chars[j++] = (char) HEXBYTES[hexIndex];
+            hexIndex   = b[i] & 0xf;
+            chars[j++] = (char) HEXBYTES[hexIndex];
+
+            i++;
+
+            if (i >= 4 && i <= 10 && (i % 2) == 0) {
+                chars[j++] = '-';
+            }
+        }
+
+        return new String(chars);
+    }
+
+    /**
+     * Returns a byte[] representation in UUID form from a UUID string.
+     *
+     * @param s the UUID string
+     * @return byte array
+     */
+    public static byte[] toBinaryUUID(String s) {
+
+        byte[] bytes = new byte[16];
+
+        if (s == null) {
+            return null;
+        }
+
+        if (s.length() != 36) {
+            throw new NumberFormatException();
+        }
+
+        for (int i = 0, j = 0; i < bytes.length; ) {
+            char c    = s.charAt(j++);
+            int  high = getNibble(c);
+
+            c        = s.charAt(j++);
+            bytes[i] = (byte) ((high << 4) + getNibble(c));
+
+            i++;
+
+            if (i >= 4 && i <= 10 && (i % 2) == 0) {
+                c = s.charAt(j++);
+
+                if (c != '-') {}
+            }
+        }
+
+        return bytes;
     }
 }

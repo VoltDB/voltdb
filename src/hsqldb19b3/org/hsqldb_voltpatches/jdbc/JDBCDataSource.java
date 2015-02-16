@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,10 +31,14 @@
 
 package org.hsqldb_voltpatches.jdbc;
 
-import java.io.PrintWriter;
 import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.SQLException;
+
+//#ifdef JAVA6
+import java.sql.Wrapper;
+
+//#endif JAVA6
 import java.util.Properties;
 
 import javax.naming.NamingException;
@@ -43,23 +47,7 @@ import javax.naming.Referenceable;
 import javax.naming.StringRefAddr;
 import javax.sql.DataSource;
 
-import org.hsqldb_voltpatches.jdbc.JDBCDriver;
-
-//#ifdef JAVA6
-import java.sql.Wrapper;
-
-import javax.sql.CommonDataSource;
-
-//#endif JAVA6
-
-/* $Id: JDBCDataSource.java 2944 2009-03-21 22:53:43Z fredt $ */
-
-// boucherb@users 20040411 - doc 1.7.2 - javadoc updates toward 1.7.2 final
-// boucherb@users 20051207 - patch 1.8.0.x initial JDBC 4.0 support work
-// boucherb@users 20060522 - patch 1.9.0 full synch up to Mustang Build 84
-// Revision 1.12  2006/07/12 12:04:06 boucherb
-// - full synch up to Mustang b90
-//- support new createQueryObject signature
+import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 
 /**
  * <p>A factory for connections to the physical data source that this
@@ -100,69 +88,69 @@ import javax.sql.CommonDataSource;
  * object is identical to a connection obtained through the
  * <code>DriverManager</code> facility.
  *
+ * <!-- start Release-specific documentation -->
+ * <div class="ReleaseSpecificDocumentation">
+ * <h3>HSQLDB-Specific Information:</h3> <p>
+ *
+ * This implementation of data source is a basic implementation and does not
+ * perform connection pooling.<p>
+ *
+ * The getter and setter methods of the parent class, {@link JDBCCommonDataSource},
+ * can be used.<p>
+ * </div>
+ * <!-- end Release-specific documentation -->
  * @since JDK 1.4
- * @author deforest@users
- * @author boucherb@users
- * @version 1.9.0
- * @revised JDK 1.6, HSQLDB 1.9.0
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ * @version 2.3.2
+ * @since 1.7.2
  */
+
 //#ifdef JAVA6
 @SuppressWarnings("serial")
 
 //#endif JAVA6
-public class JDBCDataSource implements Serializable, Referenceable, DataSource
+public class JDBCDataSource extends JDBCCommonDataSource implements DataSource,
+        Serializable, Referenceable
 
 //#ifdef JAVA6
-, CommonDataSource, Wrapper
+, Wrapper
 
 //#endif JAVA6
 {
 
     /**
-     * Login timeout
-     */
-    private int loginTimeout = 0;
-
-    /**
-     * Log writer
-     */
-    private transient PrintWriter logWriter;
-
-    /**
-     * Default password to use for connections
-     */
-    private String password = "";
-
-    /**
-     * Default user to use for connections
-     */
-    private String user = "";
-
-    /**
-     * Database location
-     */
-    private String database = "";
-
-    /**
-     * Constructor
-     */
-    public JDBCDataSource() {
-    }
-
-    /**
-     * <p>Attempts to establish a connection with the data source that
-     * this <code>DataSource</code> object represents.
+     * Retrieves a new connection using the properties that have already been
+     * set.
      *
      * @return  a connection to the data source
      * @exception SQLException if a database access error occurs
      */
     public Connection getConnection() throws SQLException {
-        return getConnection(user, password);
+
+        if (url == null) {
+            throw JDBCUtil.nullArgument("url");
+        }
+
+        if (connectionProps == null) {
+            if (user == null) {
+                throw JDBCUtil.invalidArgument("user");
+            }
+
+            if (password == null) {
+                throw JDBCUtil.invalidArgument("password");
+            }
+
+            return getConnection(user, password);
+        }
+
+        return getConnection(url, connectionProps);
     }
 
     /**
-     * <p>Attempts to establish a connection with the data source that
-     * this <code>DataSource</code> object represents.
+     * Retrieves a new connection using the given username and password,
+     * and the database url that has been set. No other properties are
+     * used for the connection
      *
      * @param username the database user on whose behalf the connection is
      *  being made
@@ -173,88 +161,34 @@ public class JDBCDataSource implements Serializable, Referenceable, DataSource
     public Connection getConnection(String username,
                                     String password) throws SQLException {
 
+        if (username == null) {
+            throw JDBCUtil.invalidArgument("user");
+        }
+
+        if (password == null) {
+            throw JDBCUtil.invalidArgument("password");
+        }
+
         Properties props = new Properties();
 
-        if (username != null) {
-            props.put("user", username);
+        props.setProperty("user", username);
+        props.setProperty("password", password);
+        props.setProperty("loginTimeout", Integer.toString(loginTimeout));
+
+        return getConnection(url, props);
+    }
+
+    private Connection getConnection(String url,
+                                     Properties props) throws SQLException {
+
+        if (!url.startsWith("jdbc:hsqldb_voltpatches:")) {
+            url = "jdbc:hsqldb_voltpatches:" + url;
         }
 
-        if (password != null) {
-            props.put("password", password);
-        }
-
-        return JDBCDriver.getConnection(database, props);
+        return JDBCDriver.getConnection(url, props);
     }
 
     //------------------------- JDBC 4.0 -----------------------------------
-
-    /**
-     * Creates a concrete implementation of a Query interface using the JDBC drivers <code>QueryObjectGenerator</code>
-     * implementation.
-     * <p>
-     * If the JDBC driver does not provide its own <code>QueryObjectGenerator</code>, the <code>QueryObjectGenerator</code>
-     * provided with Java SE will be used.
-     * <p>
-     * @param ifc The Query interface that will be created
-     * @return A concrete implementation of a Query interface
-     * @exception SQLException if a database access error occurs.
-     *  @since JDK 1.6, HSQLDB 1.9.0
-     */
-//#ifdef JAVA6BETA
-/*
-   public <T extends BaseQuery> T createQueryObject(Class<T> ifc) throws SQLException {
-        return QueryObjectFactory.createDefaultQueryObject(ifc, this);
-   }
-*/
-
-//#endif JAVA6BETA
-
-    /**
-     * Creates a concrete implementation of a Query interface using the JDBC drivers <code>QueryObjectGenerator</code>
-     * implementation.
-     * <p>
-     * If the JDBC driver does not provide its own <code>QueryObjectGenerator</code>, the <code>QueryObjectGenerator</code>
-     * provided with Java SE will be used.
-     * <p>
-     * This method is primarly for developers of Wrappers to JDBC implementations.
-     * Application developers should use <code>createQueryObject(Class&LT;T&GT; ifc).
-     * <p>
-     * @param ifc The Query interface that will be created
-     * @param ds The <code>DataSource</code> that will be used when invoking methods that access
-     * the data source. The QueryObjectGenerator implementation will use
-     * this <code>DataSource</code> without any unwrapping or modications
-     * to create connections to the data source.
-     *
-     * @return An concrete implementation of a Query interface
-     * @exception SQLException if a database access error occurs.
-     * @since 1.6
-     */
-//#ifdef JAVA6BETA
-/*
-    public <T extends BaseQuery> T createQueryObject(Class<T> ifc, DataSource ds) throws SQLException {
-        return QueryObjectFactory.createQueryObject(ifc, ds);
-    }
-*/
-
-//#endif JAVA6BETA
-
-    /**
-     * Retrieves the QueryObjectGenerator for the given JDBC driver.  If the
-     * JDBC driver does not provide its own QueryObjectGenerator, NULL is
-     * returned.
-     * @return The QueryObjectGenerator for this JDBC Driver or NULL if the driver does not provide its own
-     * implementation
-     * @exception SQLException if a database access error occurs
-     * @since JDK 1.6, HSQLDB 1.9.0
-     */
-//#ifdef JDBC4BETA
-/*
-    public QueryObjectGenerator getQueryObjectGenerator() throws SQLException {
-        return null;
-    }
-*/
-
-//#endif JDBC4BETA
     // ------------------- java.sql.Wrapper implementation ---------------------
 
     /**
@@ -272,7 +206,7 @@ public class JDBCDataSource implements Serializable, Referenceable, DataSource
      * @param iface A Class defining an interface that the result must implement.
      * @return an object that implements the interface. May be a proxy for the actual implementing object.
      * @throws java.sql.SQLException If no object found that implements the interface
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     @SuppressWarnings("unchecked")
@@ -282,7 +216,7 @@ public class JDBCDataSource implements Serializable, Referenceable, DataSource
             return (T) this;
         }
 
-        throw Util.invalidArgument("iface: " + iface);
+        throw JDBCUtil.invalidArgument("iface: " + iface);
     }
 
 //#endif JAVA6
@@ -300,7 +234,7 @@ public class JDBCDataSource implements Serializable, Referenceable, DataSource
      * @return true if this implements the interface or directly or indirectly wraps an object that does.
      * @throws java.sql.SQLException  if an error occurs while determining whether this is a wrapper
      * for an object with the given interface.
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public boolean isWrapperFor(
@@ -309,59 +243,14 @@ public class JDBCDataSource implements Serializable, Referenceable, DataSource
     }
 
 //#endif JAVA6
-    // ------------------------ internal implementation ------------------------
 
     /**
-     * Retrieves the jdbc database connection url attribute. <p>
+     * Retrieves the Reference of this object.
      *
-     * @return the jdbc database connection url attribute
+     * @return The non-null Reference of this object.
+     * @exception NamingException If a naming exception was encountered
+     *          while retrieving the reference.
      */
-    public String getDatabase() {
-        return database;
-    }
-
-    /**
-     * Gets the maximum time in seconds that this data source can wait
-     * while attempting to connect to a database.  A value of zero
-     * means that the timeout is the default system timeout
-     * if there is one; otherwise, it means that there is no timeout.
-     * When a <code>DataSource</code> object is created, the login timeout is
-     * initially zero.
-     *
-     * @return the data source login time limit
-     * @exception SQLException if a database access error occurs.
-     * @see #setLoginTimeout
-     * @see #setLoginTimeout
-     */
-    public int getLoginTimeout() throws SQLException {
-        return 0;
-    }
-
-    /**
-     * <p>Retrieves the log writer for this <code>DataSource</code>
-     * object.
-     *
-     * <p>The log writer is a character output stream to which all logging
-     * and tracing messages for this data source will be
-     * printed.  This includes messages printed by the methods of this
-     * object, messages printed by methods of other objects manufactured
-     * by this object, and so on.  Messages printed to a data source
-     * specific log writer are not printed to the log writer associated
-     * with the <code>java.sql.Drivermanager</code> class.  When a
-     * <code>DataSource</code> object is
-     * created, the log writer is initially null; in other words, the
-     * default is for logging to be disabled.
-     *
-     * @return the log writer for this data source or null if
-     *        logging is disabled
-     * @exception SQLException if a database access error occurs
-     * @see #setLogWriter
-     */
-    public java.io.PrintWriter getLogWriter() throws SQLException {
-        return logWriter;
-    }
-
-    // javadoc to be copied from javax.naming.Referenceable.getReference()
     public Reference getReference() throws NamingException {
 
         String    cname = "org.hsqldb_voltpatches.jdbc.JDBCDataSourceFactory";
@@ -370,83 +259,14 @@ public class JDBCDataSource implements Serializable, Referenceable, DataSource
         ref.add(new StringRefAddr("database", getDatabase()));
         ref.add(new StringRefAddr("user", getUser()));
         ref.add(new StringRefAddr("password", password));
+        ref.add(new StringRefAddr("loginTimeout",
+                                  Integer.toString(loginTimeout)));
 
         return ref;
     }
 
-    /**
-     * Retrieves the user ID for the connection. <p>
-     *
-     * @return the user ID for the connection
-     */
-    public String getUser() {
-        return user;
-    }
-
-    /**
-     * Assigns the value of this object's jdbc database connection
-     * url attribute. <p>
-     *
-     * @param database the new value of this object's jdbc database connection
-     *      url attribute
-     */
-    public void setDatabase(String database) {
-        this.database = database;
-    }
-
-    /**
-     * <p>Sets the maximum time in seconds that this data source will wait
-     * while attempting to connect to a database.  A value of zero
-     * specifies that the timeout is the default system timeout
-     * if there is one; otherwise, it specifies that there is no timeout.
-     * When a <code>DataSource</code> object is created, the login timeout is
-     * initially zero.
-     *
-     * @param seconds the data source login time limit
-     * @exception SQLException if a database access error occurs.
-     * @see #getLoginTimeout
-     */
-    public void setLoginTimeout(int seconds) throws SQLException {
-        loginTimeout = 0;
-    }
-
-    /**
-     * <p>Sets the log writer for this <code>DataSource</code>
-     * object to the given <code>java.io.PrintWriter</code> object.
-     *
-     * <p>The log writer is a character output stream to which all logging
-     * and tracing messages for this data source will be
-     * printed.  This includes messages printed by the methods of this
-     * object, messages printed by methods of other objects manufactured
-     * by this object, and so on.  Messages printed to a data source-
-     * specific log writer are not printed to the log writer associated
-     * with the <code>java.sql.DriverManager</code> class. When a
-     * <code>DataSource</code> object is created the log writer is
-     * initially null; in other words, the default is for logging to be
-     * disabled.
-     *
-     * @param logWriter the new log writer; to disable logging, set to null
-     * @exception SQLException if a database access error occurs
-     * @see #getLogWriter
-     */
-    public void setLogWriter(PrintWriter logWriter) throws SQLException {
-        this.logWriter = logWriter;
-    }
-
-    /**
-     * Sets the password to use for connecting to the database
-     * @param password the password
-     */
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    /**
-     * Sets the userid
-     * @param user the user id
-     */
-    public void setUser(String user) {
-        this.user = user;
+    // ------------------------ custom public methods ------------------------
+    public JDBCDataSource() {
     }
 
     /************************* Volt DB Extensions *************************/

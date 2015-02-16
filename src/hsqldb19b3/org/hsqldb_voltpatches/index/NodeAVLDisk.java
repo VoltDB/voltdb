@@ -1,4 +1,40 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+/*
+ * For work developed by the HSQL Development Group:
+ *
+ * Copyright (c) 2001-2011, The HSQL Development Group
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the HSQL Development Group nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ *
+ * For work originally developed by the Hypersonic SQL Group:
+ *
+ * Copyright (c) 1995-2000, The Hypersonic SQL Group.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,38 +65,6 @@
  *
  * This software consists of voluntary contributions made by many individuals
  * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the HSQL Development Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
@@ -68,15 +72,14 @@ package org.hsqldb_voltpatches.index;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.RowAVL;
 import org.hsqldb_voltpatches.RowAVLDisk;
-import org.hsqldb_voltpatches.Row;
-import org.hsqldb_voltpatches.lib.IntLookup;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.LongLookup;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
-import org.hsqldb_voltpatches.RowAVL;
 
 // fredt@users 20020221 - patch 513005 by sqlbob@users (RMP)
 // fredt@users 20020920 - path 1.7.1 - refactoring to cut mamory footprint
@@ -93,8 +96,9 @@ import org.hsqldb_voltpatches.RowAVL;
  *
  *  New class derived from Hypersonic SQL code and enhanced in HSQLDB. <p>
  *
+ * @author Fred Toussi (fredt@users dot sourceforge dot net)
  * @author Thomas Mueller (Hypersonic SQL Group)
- * @version 1.9.0
+ * @version 2.2.9
  * @since Hypersonic SQL
  */
 public class NodeAVLDisk extends NodeAVL {
@@ -102,12 +106,6 @@ public class NodeAVLDisk extends NodeAVL {
     final RowAVLDisk row;
 
     //
-    protected NodeAVLDisk nLeft;
-    protected NodeAVLDisk nRight;
-    protected NodeAVLDisk nParent;
-
-    //
-    public int              iData;
     private int             iLeft   = NO_POS;
     private int             iRight  = NO_POS;
     private int             iParent = NO_POS;
@@ -119,21 +117,18 @@ public class NodeAVLDisk extends NodeAVL {
 
         row      = r;
         iId      = id;
-        iData    = r.getPos();
         iBalance = in.readInt();
         iLeft    = in.readInt();
+        iRight   = in.readInt();
+        iParent  = in.readInt();
 
         if (iLeft <= 0) {
             iLeft = NO_POS;
         }
 
-        iRight = in.readInt();
-
         if (iRight <= 0) {
             iRight = NO_POS;
         }
-
-        iParent = in.readInt();
 
         if (iParent <= 0) {
             iParent = NO_POS;
@@ -141,10 +136,8 @@ public class NodeAVLDisk extends NodeAVL {
     }
 
     public NodeAVLDisk(RowAVLDisk r, int id) {
-
-        row   = r;
-        iId   = id;
-        iData = r.getPos();
+        row = r;
+        iId = id;
     }
 
     public void delete() {
@@ -152,7 +145,12 @@ public class NodeAVLDisk extends NodeAVL {
         iLeft    = NO_POS;
         iRight   = NO_POS;
         iParent  = NO_POS;
-        iBalance = -2;
+        nLeft    = null;
+        nRight   = null;
+        nParent  = null;
+        iBalance = 0;
+
+        row.setNodesChanged();
     }
 
     public boolean isInMemory() {
@@ -163,11 +161,11 @@ public class NodeAVLDisk extends NodeAVL {
         return false;
     }
 
-    public int getPos() {
-        return iData;
+    public long getPos() {
+        return row.getPos();
     }
 
-    Row getRow(PersistentStore store) {
+    public RowAVL getRow(PersistentStore store) {
 
         if (!row.isInMemory()) {
             return (RowAVLDisk) store.get(this.row, false);
@@ -176,6 +174,10 @@ public class NodeAVLDisk extends NodeAVL {
         }
 
         return row;
+    }
+
+    public Object[] getData(PersistentStore store) {
+        return row.getData();
     }
 
     private NodeAVLDisk findNode(PersistentStore store, int pos) {
@@ -196,7 +198,7 @@ public class NodeAVLDisk extends NodeAVL {
             return iLeft == NO_POS;
         }
 
-        return iLeft == ((NodeAVLDisk) n).getPos();
+        return iLeft == n.getPos();
     }
 
     boolean isRight(NodeAVL n) {
@@ -205,7 +207,7 @@ public class NodeAVLDisk extends NodeAVL {
             return iRight == NO_POS;
         }
 
-        return iRight == ((NodeAVLDisk) n).getPos();
+        return iRight == n.getPos();
     }
 
     NodeAVL getLeft(PersistentStore store) {
@@ -273,23 +275,56 @@ public class NodeAVLDisk extends NodeAVL {
         return node.nParent;
     }
 
-    int getBalance() {
-        return iBalance;
+    public int getBalance(PersistentStore store) {
+
+        NodeAVLDisk node = this;
+        RowAVLDisk  row  = this.row;
+
+        if (!row.isInMemory()) {
+            row  = (RowAVLDisk) store.get(this.row, false);
+            node = (NodeAVLDisk) row.getNode(iId);
+        }
+
+        return node.iBalance;
     }
 
-    boolean isRoot() {
-        return iParent == NodeAVL.NO_POS;
+    boolean isRoot(PersistentStore store) {
+
+        NodeAVLDisk node = this;
+        RowAVLDisk  row  = this.row;
+
+        if (!row.isInMemory()) {
+            row  = (RowAVLDisk) store.get(this.row, false);
+            node = (NodeAVLDisk) row.getNode(iId);
+        }
+
+        return node.iParent == NO_POS;
     }
 
     boolean isFromLeft(PersistentStore store) {
 
-        if (this.isRoot()) {
+        NodeAVLDisk node = this;
+        RowAVLDisk  row  = this.row;
+
+        if (!row.isInMemory()) {
+            row  = (RowAVLDisk) store.get(this.row, false);
+            node = (NodeAVLDisk) row.getNode(iId);
+        }
+
+        if (node.iParent == NO_POS) {
             return true;
         }
 
-        NodeAVLDisk parent = (NodeAVLDisk) getParent(store);
+        if (node.nParent == null || !node.nParent.isInMemory()) {
+            node.nParent = findNode(store, iParent);
+        }
 
-        return getPos() == parent.iLeft;
+        return row.getPos() == ((NodeAVLDisk) node.nParent).iLeft;
+    }
+
+    public NodeAVL child(PersistentStore store, boolean isleft) {
+        return isleft ? getLeft(store)
+                      : getRight(store);
     }
 
     NodeAVL setParent(PersistentStore store, NodeAVL n) {
@@ -303,18 +338,15 @@ public class NodeAVLDisk extends NodeAVL {
         }
 
         if (!row.isInMemory()) {
-            throw Error.runtimeError(ErrorCode.U_S0500, "NAVLD");
+            row.keepInMemory(false);
+
+            throw Error.runtimeError(ErrorCode.U_S0500, "NodeAVLDisk");
         }
 
         row.setNodesChanged();
 
         node.iParent = n == null ? NO_POS
-                                 : n.getPos();
-
-        if (n != null && !n.isInMemory()) {
-            n = findNode(store, n.getPos());
-        }
-
+                                 : (int) n.getPos();
         node.nParent = (NodeAVLDisk) n;
 
         row.keepInMemory(false);
@@ -333,7 +365,7 @@ public class NodeAVLDisk extends NodeAVL {
         }
 
         if (!row.isInMemory()) {
-            throw Error.runtimeError(ErrorCode.U_S0500, "NAVLD");
+            throw Error.runtimeError(ErrorCode.U_S0500, "NodeAVLDisk");
         }
 
         row.setNodesChanged();
@@ -356,18 +388,13 @@ public class NodeAVLDisk extends NodeAVL {
         }
 
         if (!row.isInMemory()) {
-            throw Error.runtimeError(ErrorCode.U_S0500, "NAVLD");
+            throw Error.runtimeError(ErrorCode.U_S0500, "NodeAVLDisk");
         }
 
         row.setNodesChanged();
 
         node.iLeft = n == null ? NO_POS
-                               : n.getPos();
-
-        if (n != null && !n.isInMemory()) {
-            n = findNode(store, n.getPos());
-        }
-
+                               : (int) n.getPos();
         node.nLeft = (NodeAVLDisk) n;
 
         row.keepInMemory(false);
@@ -386,18 +413,13 @@ public class NodeAVLDisk extends NodeAVL {
         }
 
         if (!row.isInMemory()) {
-            throw Error.runtimeError(ErrorCode.U_S0500, "NAVLD");
+            throw Error.runtimeError(ErrorCode.U_S0500, "NodeAVLDisk");
         }
 
         row.setNodesChanged();
 
         node.iRight = n == null ? NO_POS
-                                : n.getPos();
-
-        if (n != null && !n.isInMemory()) {
-            n = findNode(store, n.getPos());
-        }
-
+                                : (int) n.getPos();
         node.nRight = (NodeAVLDisk) n;
 
         row.keepInMemory(false);
@@ -405,9 +427,45 @@ public class NodeAVLDisk extends NodeAVL {
         return node;
     }
 
+    public NodeAVL set(PersistentStore store, boolean isLeft, NodeAVL n) {
+
+        NodeAVL x;
+
+        if (isLeft) {
+            x = setLeft(store, n);
+        } else {
+            x = setRight(store, n);
+        }
+
+        if (n != null) {
+            n.setParent(store, this);
+        }
+
+        return x;
+    }
+
+    public void replace(PersistentStore store, Index index, NodeAVL n) {
+
+        if (iParent == NO_POS) {
+            if (n != null) {
+                n = n.setParent(store, null);
+            }
+
+            store.setAccessor(index, n);
+        } else {
+            boolean isFromLeft = isFromLeft(store);
+
+            getParent(store).set(store, isFromLeft, n);
+        }
+    }
+
     boolean equals(NodeAVL n) {
-        return this == n
-               || (n != null && getPos() == ((NodeAVLDisk) n).getPos());
+
+        if (n instanceof NodeAVLDisk) {
+            return this == n || (getPos() == ((NodeAVLDisk) n).getPos());
+        }
+
+        return false;
     }
 
     public int getRealSize(RowOutputInterface out) {
@@ -426,7 +484,7 @@ public class NodeAVLDisk extends NodeAVL {
             }
 
             if (nParent != null) {
-                if (iData == nParent.iLeft) {
+                if (row.getPos() == ((NodeAVLDisk) nParent).iLeft) {
                     nParent.nLeft = null;
                 } else {
                     nParent.nRight = null;
@@ -448,23 +506,60 @@ public class NodeAVLDisk extends NodeAVL {
                                          : iParent);
     }
 
-    public void writeTranslate(RowOutputInterface out, IntLookup lookup) {
+    public void write(RowOutputInterface out, LongLookup lookup) {
 
         out.writeInt(iBalance);
-        writeTranslatePointer(iLeft, out, lookup);
-        writeTranslatePointer(iRight, out, lookup);
-        writeTranslatePointer(iParent, out, lookup);
+        out.writeInt(getTranslatePointer(iLeft, lookup));
+        out.writeInt(getTranslatePointer(iRight, lookup));
+        out.writeInt(getTranslatePointer(iParent, lookup));
     }
 
-    private static void writeTranslatePointer(int pointer,
-            RowOutputInterface out, IntLookup lookup) {
+    private static int getTranslatePointer(int pointer, LongLookup lookup) {
 
         int newPointer = 0;
 
         if (pointer != NodeAVL.NO_POS) {
-            newPointer = lookup.lookupFirstEqual(pointer);
+            if (lookup == null) {
+                newPointer = pointer;
+            } else {
+                newPointer = (int) lookup.lookup(pointer);
+            }
         }
 
-        out.writeInt(newPointer);
+        return newPointer;
+    }
+
+    public void restore() {}
+
+    public void destroy() {}
+
+    public void updateAccessCount(int count) {}
+
+    public int getAccessCount() {
+        return 0;
+    }
+
+    public void setStorageSize(int size) {}
+
+    public int getStorageSize() {
+        return 0;
+    }
+
+    public void setPos(long pos) {}
+
+    public boolean isNew() {
+        return false;
+    }
+
+    public boolean hasChanged() {
+        return false;
+    }
+
+    public boolean isKeepInMemory() {
+        return false;
+    }
+
+    public boolean keepInMemory(boolean keep) {
+        return false;
     }
 }

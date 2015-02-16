@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,19 +42,20 @@ import java.sql.SQLException;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
-/* $Id: RCData.java 1153 2009-02-14 04:14:23Z unsaved $ */
+/* $Id: RCData.java 5337 2014-01-24 19:26:47Z fredt $ */
 
 /**
- * Manages all the details we need to connect up to database(s),
+ * Manages all the details we need to connect up to JDBC database(s),
  * in a declarative way.
- * <P/>
+ * <P>
  * The file <CODE>src/org/hsqldb_voltpatches/sample/SqlFileEmbedder.java</CODE>
  * in the HSQLDB distribution provides an example of how to use RCData for your
  * own programs.
+ * <P/>
  *
- * @see <a href="../../../../util-guide/sqltool-chapt.html#sqltool_auth-sect"
+ * @see <A href="../../../../util-guide/sqltool-chapt.html#sqltool_auth-sect"
  *      target="guide">
- *     The RC File section of the HyperSQL Utilities Guide</a>
+ *     The RC File section of the HyperSQL Utilities Guide</A>
  * @see org.hsqldb_voltpatches.sample.SqlFileEmbedder
  * @author Blaine Simpson (blaine dot simpson at admc dot com)
  */
@@ -88,6 +89,7 @@ public class RCData {
      *
      * @param dbKey Key to look up in the file.
      *              If null, then will echo all urlids in the file to stdout.
+     *              (A rather ill-conceived design).
      * @param file File containing the authentication information.
      */
     public RCData(File file, String dbKey) throws Exception {
@@ -109,6 +111,7 @@ public class RCData {
         int             linenum = 0;
         BufferedReader  br      = new BufferedReader(new FileReader(file));
 
+        try {
         while ((s = br.readLine()) != null) {
             ++linenum;
 
@@ -201,8 +204,15 @@ public class RCData {
                 }
             }
         }
+        } finally {
+            try  {
+                br.close();
+            } catch (IOException ioe) {
+                // Can only report on so many errors at one time
+            }
+            br = null;  // Encourage GC
+        }
 
-        br.close();
 
         if (dbKey == null) {
             return;
@@ -241,11 +251,13 @@ public class RCData {
     }
 
     /**
-     * <p>Creates a new <code>RCData</code> object.
+     * Creates a new <code>RCData</code> object.
      *
-     * <p>The parameters driver, charset, truststore, and libpath are optional.
+     * <P>
+     * The parameters driver, charset, truststore, and libpath are optional.
      * Setting these parameters to <code>NULL</code> will set them to their
      * default values.
+     * <P/>
      *
      * @param id The identifier for these connection settings
      * @param url The URL of the database to connect to
@@ -283,15 +295,15 @@ public class RCData {
 
     /* Purposefully not using JavaBean paradigm so that these fields can
      * be used as a traditional, public DO */
-    public String id         = null;
-    public String url        = null;
-    public String username   = null;
-    public String password   = null;
-    public String ti         = null;
-    public String driver     = null;
-    public String charset    = null;
-    public String truststore = null;
-    public String libpath    = null;
+    public String id;
+    public String url;
+    public String username;
+    public String password;
+    public String ti;
+    public String driver;
+    public String charset;
+    public String truststore;
+    public String libpath;
 
     /**
      * Gets a JDBC Connection using the data of this RCData object.
@@ -300,7 +312,7 @@ public class RCData {
      */
     public Connection getConnection()
     throws ClassNotFoundException, SQLException, MalformedURLException {
-        return getConnection(null, null, null);
+        return getConnection(null, null);
     }
 
     /**
@@ -309,38 +321,32 @@ public class RCData {
      *
      * @return New JDBC Connection
      */
-    public Connection getConnection(String curDriverIn, String curCharsetIn,
-                                    String curTrustStoreIn)
+    public Connection getConnection(String curDriverIn, String curTrustStoreIn)
                                     throws ClassNotFoundException,
                                            MalformedURLException,
                                            SQLException {
 
         // Local vars to satisfy compiler warnings
-        String curDriver = curDriverIn;
-        String curCharset = curCharsetIn;
-        String curTrustStore = curTrustStoreIn;
+        String curDriver = null;
+        String curTrustStore = null;
 
         Properties sysProps = System.getProperties();
 
-        if (curDriver == null) {
+        if (curDriverIn == null) {
 
             // If explicit driver not specified
             curDriver = ((driver == null) ? DEFAULT_JDBC_DRIVER
                                           : driver);
-        }
-
-        if (curCharset == null && charset != null) {
-            curCharset = charset;
-        }
-
-        if (curTrustStore == null && truststore != null) {
-            curTrustStore = truststore;
-        }
-
-        if (curCharset == null) {
-            sysProps.remove("sqlfile.charset");
         } else {
-            sysProps.put("sqlfile.charset", curCharset);
+            curDriver = expandSysPropVars(curDriverIn);
+        }
+
+        if (curTrustStoreIn == null) {
+            if (truststore != null) {
+                curTrustStore = expandSysPropVars(truststore);
+            }
+        } else {
+            curTrustStore = expandSysPropVars(curTrustStoreIn);
         }
 
         if (curTrustStore == null) {
@@ -354,7 +360,7 @@ public class RCData {
         try {
             urlString = expandSysPropVars(url);
         } catch (IllegalArgumentException iae) {
-            throw new MalformedURLException(iae.getMessage() + " for URL '"
+            throw new MalformedURLException(iae.toString() + " for URL '"
                                             + url + "'");
         }
 
@@ -363,7 +369,7 @@ public class RCData {
         if (username != null) try {
             userString = expandSysPropVars(username);
         } catch (IllegalArgumentException iae) {
-            throw new MalformedURLException(iae.getMessage()
+            throw new MalformedURLException(iae.toString()
                                             + " for user name '" + username
                                             + "'");
         }
@@ -373,7 +379,7 @@ public class RCData {
         if (password != null) try {
             passwordString = expandSysPropVars(password);
         } catch (IllegalArgumentException iae) {
-            throw new MalformedURLException(iae.getMessage()
+            throw new MalformedURLException(iae.toString()
                                             + " for password");
         }
 
@@ -393,13 +399,18 @@ public class RCData {
         // Debug:
         // System.err.println("TI set to " + ti + "\nPOST: "
         // + SqlTool.tiToString(c.getTransactionIsolation()));
-        
+
         return c;
     }
 
-    static public String expandSysPropVars(String inString) {
+    /**
+     * Returns a copy of the given String with System property names in the
+     * format <code>${system.property}</code> replaced by the corresponding Java
+     * System Properties.
+     */
+    public static String expandSysPropVars(String inString) {
 
-        String outString = new String(inString);
+        String outString = inString;
         int    varOffset, varEnd;
         String varVal, varName;
 
@@ -438,7 +449,10 @@ public class RCData {
         return outString;
     }
 
-    static public void setTI(Connection c, String tiString)
+    /**
+     * Set Transaction Isolation level on the specified JDBC Connection
+     */
+    public static void setTI(Connection c, String tiString)
             throws SQLException {
         int i = -1;
         if (tiString.equals("TRANSACTION_READ_UNCOMMITTED"))
@@ -460,12 +474,15 @@ public class RCData {
     }
 
     /**
-     * Return String for numerical java.sql.Connection Transaction level.
-     *
+     * Return a String representation for the given numerical
+     * java.sql.Connection Transaction level.
+     * <P>
+     * Database implementations are free to provide their own transaction
+     * isolation levels, so you can't depend upon this method to much.
+     * </P>
      * Returns null, since DB implementations are free to provide
-     * their own transaction isolation levels.
      */
-    static public String tiToString(int ti) {
+    public static String tiToString(int ti) {
         switch (ti) {
             case Connection.TRANSACTION_READ_UNCOMMITTED:
                 return "TRANSACTION_READ_UNCOMMITTED";
