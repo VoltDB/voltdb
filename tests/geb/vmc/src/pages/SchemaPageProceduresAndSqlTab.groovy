@@ -3,7 +3,7 @@
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * 'Software'), to deal in the Software without restriction, including
+ * "Software"), to deal in the Software without restriction, including
  * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
@@ -12,7 +12,7 @@
  * The above copyright notice and this permission notice shall be
  * included in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
  * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
@@ -21,38 +21,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-apply plugin: "groovy"
+package vmcTest.pages
 
-// The drivers to use
-ext.drivers = ["firefox", "chrome", "safari"]
-
-repositories {
-    mavenCentral() 
-}
-
-dependencies {
-    def gebVersion = "0.9.0"
-    def seleniumVersion = "2.43.1"
-    def spockVersion = "0.7-groovy-2.0"
-
-    //Geb & Spock
-    testCompile "org.gebish:geb-spock:$gebVersion"
-    testCompile "org.spockframework:spock-core:$spockVersion"
-
-    // Drivers
-    drivers.each { driver ->
-        testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
+/**
+ * This class represents the 'Procedures & SQL' tab of the 'Schema' page (or
+ * tab) of the VoltDB Management Center (page), which is the VoltDB web UI
+ * (replacing the old Catalog Report).
+ */
+class SchemaPageProceduresAndSqlTab extends SchemaPage {
+    static content = {
+        // TODO: add content
     }
-}
-
-
-drivers.each { driver ->
-    task "${driver}Test"(type: Test) {
-        testReportDir = reporting.file("$name/tests")
-        testResultsDir = file("$buildDir/test-results/$name")
-
-        systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
-        systemProperty "geb.env", driver
-
+    static at = {
+        proceduresTab.displayed
+        proceduresTab.attr('class') == 'active'
+        // TODO: add a few key elements, that should always appear
     }
+
 }

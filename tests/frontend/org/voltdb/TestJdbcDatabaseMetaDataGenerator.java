@@ -78,7 +78,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create table Export1 (Column1 integer);" +
             "export table Export1;" +
             "create table Export2 (Column1 integer);" +
-            "export table Export2 target foo;" +
+            "export table Export2 to stream foo;" +
             "create procedure sample as select * from Table1;";
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());

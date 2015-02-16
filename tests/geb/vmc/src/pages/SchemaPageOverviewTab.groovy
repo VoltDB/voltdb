@@ -21,29 +21,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import org.openqa.selenium.chrome.ChromeDriver
-import org.openqa.selenium.firefox.FirefoxDriver
-import org.openqa.selenium.safari.SafariDriver
+package vmcTest.pages
 
-
-waiting {
-    timeout = 2
-}
-
-environments {
-    
-    firefox {
-        driver = { new FirefoxDriver() }
+/**
+ * This class represents the 'Overview' tab of the 'Schema' page (or tab) of
+ * the VoltDB Management Center (page), which is the VoltDB web UI (replacing
+ * the old Catalog Report).
+ */
+class SchemaPageOverviewTab extends SchemaPage {
+    static content = {
+        // TODO: add content
     }
-
-    chrome {
-        driver = { new ChromeDriver() }
-    }
-
-    safari {
-        driver = { new SafariDriver() }
+    static at = {
+        overviewTab.displayed
+        overviewTab.attr('class') == 'active'
+        // TODO: add a few key elements, that should always appear
     }
 
 }
-
-// To run the tests with all browsers run “./gradlew test”
