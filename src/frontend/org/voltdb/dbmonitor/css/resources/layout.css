@@ -719,7 +719,7 @@ h1.icon-queryResult{background-position:15px -1039px;}
 
 .imgError {position: relative;top: 5px;padding: 0 5px 0 0;}
 .overlay-contentError {padding: 20px;
-border-bottom: 1px solid #dbdbdb;
+/*border-bottom: 1px solid #dbdbdb;*/
 margin-bottom: 15px;
 min-width:200px;
 overflow: auto;}
@@ -765,7 +765,9 @@ ul.helpSchemaList {}
 ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px  Arial, Helvetica, sans-serif} 
 .VDBQueryHelp {}
 .VDBQueryHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
-.errorQueryDbPause p { line-height: 20px;}.errorQueryDbPause { width: 550px;}
+.errorQueryDbPause p { line-height: 20px;}
+.errorQueryDbPause { width: 550px;}
+
 /**admin**/
 .adminIcons, 
 .pause, 
@@ -994,12 +996,13 @@ font: 14px Arial, Helvetica, sans-serif;
 .userN {display:none;}
 .displayPre { height:100px;}
 ul.rightShowhideList { float:none;}
-  
 ul.rightShowhideList li {padding:10px 0;}/*admin*/
 #popServerList{ position:absolute;right:0;top: 186px;}
 
 
 .overlay-content { min-width:250px;}
+.errorQueryDbPause { width:265px}
+div.popup {position: relative; right: 10px;}
 }
 @media (min-width: 639px) and  (max-width:640px)
  {
@@ -1098,6 +1101,7 @@ top: 3px;}
 	#serverConfigAdmin{ top:99px; width:421px;}
 	.adminRight{ padding-top:15px;}
 	.adminDirectories {overflow:auto; width:auto;}
+	.errorQueryDbPause { width:320px; }
 	
    
 }
@@ -1228,7 +1232,8 @@ top: 3px;}
   input.icoSS { width:135px!important;}
   .restoreCont {overflow:auto; height:146px}
    .adminServer { }	
-  .adminLeft { float:none; width:100%}	
+  .adminLeft { float:none; width:100%}
+
  
  }
 @media screen and (orientation:landscape) {
