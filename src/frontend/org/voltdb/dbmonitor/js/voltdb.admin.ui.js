@@ -1169,7 +1169,7 @@ function loadAdminPage() {
         }
     });
 
-    //Heartbeat time out
+    //Heartbeat timeout
     var toggleHeartbeatTimeoutEdit = function (state) {
 
         adminEditObjects.editStateHeartbeatTimeout = state;
@@ -1306,7 +1306,7 @@ function loadAdminPage() {
         }
     });
 
-    //Query time out
+    //Query timeout
     var toggleQueryTimeoutEdit = function (state) {
 
         adminEditObjects.tBoxQueryTimeout.val(adminEditObjects.tBoxQueryTimeoutValue);
