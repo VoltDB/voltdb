@@ -94,17 +94,11 @@ public class PartitionDRGateway {
         return pdrg;
     }
 
-    public static final boolean USING_DR_V2 = Boolean.getBoolean("USE_DR_V2");
-
     private static PartitionDRGateway tryToLoadProVersion()
     {
         try {
             Class<?> pdrgiClass = null;
-            if (USING_DR_V2) {
-                pdrgiClass = Class.forName("org.voltdb.dr2.PartitionDRGatewayImpl");
-            } else {
-                pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
-            }
+            pdrgiClass = Class.forName("org.voltdb.dr2.PartitionDRGatewayImpl");
             Constructor<?> constructor = pdrgiClass.getConstructor();
             Object obj = constructor.newInstance();
             return (PartitionDRGateway) obj;
