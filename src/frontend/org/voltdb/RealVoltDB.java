@@ -815,7 +815,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 // LeaderAppointer startup blocks if the initiators are not initialized.
                 // So create the LeaderAppointer after the initiators.
-                // arogers: Right now, if we are using DR V2, then the leader appointer should
+                // arogers: The leader appointer should
                 // expect a sync snapshot. This needs to change when the replica supports different
                 // start actions
                 boolean expectSyncSnapshot = m_config.m_replicationRole == ReplicationRole.REPLICA;
