@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +34,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.JsonMappingException;
@@ -64,6 +66,8 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compilereport.ReportMaker;
+
+import scala.actors.threadpool.Arrays;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
@@ -490,48 +494,50 @@ public class HTTPAdminListener {
         }
     }
 
-    private class RoleStruct {
-        private final String name;
-        private final boolean builtIn;
-        private final String permissions[];
-        public RoleStruct(String n, boolean b, String[] p) {
-            name = n;
-            builtIn = b;
-            permissions = p;
+    public static class RoleType {
+        private String name;
+        private boolean builtIn;
+        private String permissions[];
+        public RoleType(String name, boolean builtIn, String[] permissions) {
+            this.name = name;
+            this.builtIn = builtIn;
+            this.permissions = permissions;
+        }
+        public RoleType() {
         }
         public String getName() {
             return name;
         }
+        public void setName(String name) {
+            this.name = name;
+        }
         public boolean getBuiltIn() {
             return builtIn;
         }
+        public void setBuiltIn(boolean builtIn) {
+            this.builtIn = builtIn;
+        }
         public String[] getPermissions() {
             return permissions;
+        }
+        public void setPermissions(String[] permissions) {
+            this.permissions = permissions;
         }
     }
 
     class RolesRequestHandler extends VoltRequestHandler {
 
         final ObjectMapper m_mapper;
-        String m_schema = "";
 
         public RolesRequestHandler() {
             m_mapper = new ObjectMapper();
-            //Mixin for to not output passwords.
-            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
             //We want jackson to stop closing streams
             m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
-            try {
-                JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
-                m_schema = schema.toString();
-            } catch (JsonMappingException ex) {
-                m_log.warn("Failed to generate JSON schema: ", ex);
-            }
         }
 
-        private RoleStruct[] buildRollStruct() {
+        private RoleType[] buildRoleStruct() {
             CatalogMap<Group> groups = VoltDB.instance().getCatalogContext().database.getGroups();
-            RoleStruct[] rolls = new RoleStruct[groups.size()];
+            RoleType[] rolls = new RoleType[groups.size()];
             int grpCnt = 0;
             for (Group grp : groups) {
                 String name = grp.getTypeName();
@@ -546,7 +552,7 @@ public class HTTPAdminListener {
                 if (name.equals("administrator") || name.equals("user")) {
                     builtIn = true;
                 }
-                rolls[grpCnt] = new RoleStruct(name, builtIn, permissions);
+                rolls[grpCnt] = new RoleType(name, builtIn, permissions);
                 grpCnt++;
             }
             return rolls;
@@ -584,13 +590,17 @@ public class HTTPAdminListener {
 
                 //Authenticated and has ADMIN permission
                 if (request.getMethod().equalsIgnoreCase("POST")) {
-                    // noop
+                    handleUpdateRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
+                } else if (request.getMethod().equalsIgnoreCase("PUT")) {
+                    handleNewRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
+                } else if (request.getMethod().equalsIgnoreCase("DELETE")) {
+                    handleRemoveRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
                 } else {
                     //non POST
                     if (jsonp != null) {
                         response.getWriter().write(jsonp + "(");
                     }
-                    m_mapper.writeValue(response.getWriter(), buildRollStruct());
+                    m_mapper.writeValue(response.getWriter(), buildRoleStruct());
                     if (jsonp != null) {
                         response.getWriter().write(")");
                     }
@@ -600,6 +610,135 @@ public class HTTPAdminListener {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             } finally {
                 httpClientInterface.releaseClient(authResult);
+            }
+        }
+
+        private void handleUpdateRoles(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            RoleType[] roles = buildRoleStruct();
+            RoleType role = null;
+            for (int cnt = 0; cnt<roles.length; cnt++) {
+                if (target.split("/")[1].equals(roles[cnt].getName())) {
+                    role = roles[cnt];
+                    break;
+                }
+            }
+            if (role == null) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role not found"));
+                return;
+            }
+            if (role.getBuiltIn()) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Built-in roles are not modifiable"));
+                return;
+            }
+            String update = request.getParameter("role");
+            if (update == null || update.length() == 0) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get role information."));
+                return;
+            }
+            try {
+                RoleType newRole = m_mapper.readValue(update, RoleType.class);
+                if (newRole == null) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse role information."));
+                    return;
+                }
+
+                Group grp = VoltDB.instance().getCatalogContext().database.getGroups().get(newRole.name);
+                Permission.setPermissionsInGroup(grp, Permission.getPermissionsFromAliases(new ArrayList<String>(Arrays.asList(newRole.getPermissions()))));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Role Updated."));
+                notifyOfCatalogUpdate();
+            } catch (Exception ex) {
+                logger.error("Failed to update role from API", ex);
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+
+        private void handleNewRoles(String jsonp, String target,
+                Request baseRequest,
+                HttpServletRequest request,
+                HttpServletResponse response, Client client)
+                throws IOException, ServletException {
+            RoleType[] roles = buildRoleStruct();
+            for (int cnt = 0; cnt<roles.length; cnt++) {
+                if (target.split("/")[1].equals(roles[cnt].getName())) {
+                    response.setStatus(HttpServletResponse.SC_CONFLICT);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role already exists"));
+                    return;
+                }
+            }
+            String update = request.getParameter("role");
+            if (update == null || update.length() == 0) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get new role information."));
+                return;
+            }
+            try {
+                RoleType newRole = m_mapper.readValue(update, RoleType.class);
+                if (newRole == null) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse role information."));
+                    return;
+                }
+
+                ClientResponse adhocResponse = client.callProcedure("@AdHoc",
+                        "CREATE ROLE " + newRole.getName() + " WITH " + StringUtils.join(newRole.getPermissions(), ","));
+                if (adhocResponse.getStatus() < 0) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                } else {
+                    response.setStatus(HttpServletResponse.SC_CREATED);
+                }
+                response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
+                notifyOfCatalogUpdate();
+            } catch (Exception ex) {
+                logger.error("Failed to create role from API", ex);
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+
+        private void handleRemoveRoles(String jsonp, String target,
+                Request baseRequest,
+                HttpServletRequest request,
+                HttpServletResponse response, Client client)
+                throws IOException, ServletException {
+            RoleType[] roles = buildRoleStruct();
+            RoleType role = null;
+            for (int cnt = 0; cnt<roles.length; cnt++) {
+                if (target.split("/")[1].equals(roles[cnt].getName())) {
+                    role = roles[cnt];
+                    break;
+                }
+            }
+            if (role == null) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role not found"));
+                return;
+            }
+            if (role.getBuiltIn()) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Built-in roles are not modifiable"));
+                return;
+            }
+            try {
+                ClientResponse adhocResponse = client.callProcedure("@AdHoc",
+                        "DROP ROLE " + role.getName());
+                if (adhocResponse.getStatus() < 0) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                }
+                response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
+                notifyOfCatalogUpdate();
+            } catch (Exception ex) {
+                logger.error("Failed to create role from API", ex);
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
             }
         }
     }
