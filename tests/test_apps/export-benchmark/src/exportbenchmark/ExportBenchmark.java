@@ -34,6 +34,7 @@
 
 package exportbenchmark;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Timer;
@@ -86,7 +87,10 @@ public class ExportBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 10;
+        int duration = 30;
+        
+        @Option(desc = "Objects to insert during the benchmark (per thread)")
+        int count=0;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 5;
@@ -102,7 +106,9 @@ public class ExportBenchmark {
 
         @Override
         public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
+            if (count < 0) exitWithMessageAndUsage("count must be >= 0 ");
+            if (duration <= 0 && count <= 0) exitWithMessageAndUsage("Either count or duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
@@ -145,7 +151,7 @@ public class ExportBenchmark {
      * processed.
      * @throws Exception
      */
-    public void waitForStreamedAllocatedMemoryZero() throws Exception {
+    public boolean waitForStreamedAllocatedMemoryZero() throws Exception {
         boolean passed = false;
 
         VoltTable stats = null;
@@ -198,6 +204,7 @@ public class ExportBenchmark {
         }
         System.out.println("Passed is: " + passed);
         System.out.println(stats);
+        return passed;
     }
     
     /**
@@ -260,16 +267,32 @@ public class ExportBenchmark {
 
         @Override
         public void run() {
+            long count = 0;
+            while (warmupComplete.get() == false) {
+                // Don't track warmup inserts
+                try {
+                    client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
+                } catch (IOException ignore) {}
+            }
             while (benchmarkComplete.get() == false) {
                 // Insert objects
                 try {
+                    // TODO: Check return value
                     client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
+                    count++;
                 } catch (Exception e) {
                     System.err.println("Couldn't insert into VoltDB\n");
                     e.printStackTrace();
                     System.exit(1);
                 }
+                if (config.count > 0 && count >= config.count) {
+                    synchronized (benchmarkComplete) {
+                        benchmarkComplete.set(true);
+                        benchmarkComplete.notify();
+                    }
+                }
             }
+            System.out.println("Benchmark complete: wrote " + count + " objects");
         }
     }
 
@@ -301,21 +324,40 @@ public class ExportBenchmark {
         
         schedulePeriodicStats();
         
-        // Wait until the insertion is done
-        System.out.println("\nRunning benchmark...");
-        Thread.sleep(1000l * config.duration);
-        System.out.println("Object insertion complete");
+        // Start duration timer
+        Thread running_timer = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (int i = 0; i < config.duration; i++) {
+                        Thread.sleep(1000l);
+                        if (benchmarkComplete.get() == true) { return; }
+                    }
+                    synchronized (benchmarkComplete) {
+                        benchmarkComplete.set(true);
+                        benchmarkComplete.notify();
+                    }
+                } catch (InterruptedException doNothing) {}
+            }
+        });
+        running_timer.start();
         
-        benchmarkComplete.set(true);
+        // Wait until the insertion is done (either by duration or count)
+        System.out.println("\nRunning benchmark...");
+        synchronized (benchmarkComplete) {
+            benchmarkComplete.wait();
+        }
+        
         client.drain();
+        System.out.println("Client flushed; waiting for export to finish"); 
         
         // Wait until export is done
+        boolean success = false;
         try {
-            waitForStreamedAllocatedMemoryZero();
+            success = waitForStreamedAllocatedMemoryZero();
         } catch (Exception e) {
             System.err.println("Error while waiting for export: ");
             e.printStackTrace();
-            System.exit(1);
         }
         
         timer.cancel();
@@ -323,6 +365,9 @@ public class ExportBenchmark {
         // Print results & close
         printResults();
         client.close();
+        if (!success) {
+            System.exit(1);
+        }
     }
     
     /**
