@@ -643,17 +643,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
             // DR overflow directory
-            boolean useDRV2 = Boolean.getBoolean("USE_DR_V2");
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
                     File drOverflowDir;
                     drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
-                    if (useDRV2) {
-                        ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
-                    } else {
-                        ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
-                    }
+                    ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive,
@@ -766,7 +761,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             // Configure consumer-side DR if relevant
-            if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+            if (m_config.m_isEnterprise && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
                 byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
                 if (drProducerHost == null || drProducerHost.isEmpty()) {
@@ -820,10 +815,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 // LeaderAppointer startup blocks if the initiators are not initialized.
                 // So create the LeaderAppointer after the initiators.
-                // arogers: Right now, if we are using DR V2, then the leader appointer should
+                // arogers: The leader appointer should
                 // expect a sync snapshot. This needs to change when the replica supports different
                 // start actions
-                boolean expectSyncSnapshot = useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA;
+                boolean expectSyncSnapshot = m_config.m_replicationRole == ReplicationRole.REPLICA;
                 m_leaderAppointer = new LeaderAppointer(
                         m_messenger,
                         m_configuredNumberOfPartitions,

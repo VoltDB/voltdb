@@ -51,10 +51,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
-    static {
-        System.getProperties().put("USE_DR_V2", "TRUE");
-    }
-
     private final static int SITES = 2;
     private final static int HOSTS = 3;
     private final static int KFACTOR = MiscUtils.isPro() ? 1 : 0;

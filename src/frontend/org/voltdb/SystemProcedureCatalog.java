@@ -131,10 +131,9 @@ public class SystemProcedureCatalog {
 
     static {                                                                                            // SP     RO     Every  Param ParamType       Pro  (DR: kill, skip, replica-ok) durable?)
         // special-case replica acceptability by DR version
-        boolean useDRV2 = Boolean.getBoolean("USE_DR_V2");
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
-        builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0, VoltType.INVALID,   false, false, false, !useDRV2, true));
-        builder.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, 0, VoltType.VARBINARY, false, false, false, !useDRV2, true));
+        builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0, VoltType.INVALID,   false, false, false, false, true));
+        builder.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, 0, VoltType.VARBINARY, false, false, false, false, true));
         builder.put("@AdHoc_RO_MP",             new Config("org.voltdb.sysprocs.AdHoc_RO_MP",              false, true,  false, 0, VoltType.INVALID,   false, false, false, true, false));
         builder.put("@AdHoc_RO_SP",             new Config("org.voltdb.sysprocs.AdHoc_RO_SP",              true,  true,  false, 0, VoltType.VARBINARY, false, false, false, true, false));
         builder.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));
@@ -152,7 +151,7 @@ public class SystemProcedureCatalog {
         builder.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation",        false, true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@UpdateLogging",           new Config("org.voltdb.sysprocs.UpdateLogging",            false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions",        false, false, false, 0, VoltType.INVALID,   true,  true,  true,  false, true));
-        builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, false, false, 0, VoltType.INVALID,   false, false, false, useDRV2, true));
+        builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, false, false, 0, VoltType.INVALID,   false, false, false, true, true));
         builder.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, 0, VoltType.INVALID,   false, false, false, false, true));
         builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, 0, VoltType.VARBINARY, false, false, false, false, true));
         builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));

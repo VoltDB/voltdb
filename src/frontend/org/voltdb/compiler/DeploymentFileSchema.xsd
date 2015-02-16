@@ -40,7 +40,6 @@
       <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
-      <xs:element name="replication" minOccurs="0" maxOccurs="1" type="replicationType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
@@ -165,11 +164,6 @@
   <xs:complexType name="adminModeType">
     <xs:attribute name="port" type="xs:int" default="21211"/>
     <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
-  </xs:complexType>
-
-  <!-- <replication> -->
-  <xs:complexType name="replicationType">
-    <xs:attribute name="port" type="xs:int" default="5555"/>
   </xs:complexType>
 
   <!-- <command log> -->
@@ -340,7 +334,7 @@
         <xs:enumeration value="kerberos"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- DR -->
   <xs:complexType name="drType">
     <xs:sequence>
@@ -351,7 +345,7 @@
     <xs:attribute name="listen" type="xs:boolean" default="false" />
     <xs:attribute name="port" type="xs:int" default="5555"/>
   </xs:complexType>
-  
+
   <xs:complexType name="connectionType">
     <xs:attribute name="source" use="required">
       <xs:simpleType>
@@ -363,7 +357,7 @@
       </xs:simpleType>
     </xs:attribute>
   </xs:complexType>
-  
+
   <!-- restriction on id -->
   <xs:simpleType name="clusterIdType">
     <xs:restriction base="xs:int">
@@ -371,5 +365,5 @@
       <xs:maxInclusive value="127"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
 </xs:schema>
