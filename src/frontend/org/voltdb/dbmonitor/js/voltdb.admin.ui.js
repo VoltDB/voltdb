@@ -1793,7 +1793,6 @@ function deleteRow(row)
 }
 function insRow()
 {
-   debugger;
     var x=document.getElementById('secTbl');
     var new_row = x.rows[1].cloneNode(true);
     var len = x.rows.length;

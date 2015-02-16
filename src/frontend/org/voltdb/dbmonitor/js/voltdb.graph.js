@@ -353,7 +353,6 @@
             MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 1]);
 
             MonitorGraphUI.ChartPartitionIdleTime.tooltipContent(function (key, y, e, graph) {
-                debugger;
                 return '<h3> Partition Idle Time </h3>'
                     + '<p>' + e + ' % at ' + y + '</p>';
             });
@@ -874,7 +873,6 @@
         }
 
         this.RefreshPartitionIdleTime = function (partitionDetails, currentServer, graphView, currentTab) {
-            debugger;
             var monitor = MonitorGraphUI.Monitors;
             if (monitor.partitionData.length < 1 || monitor.partitionDataMin.length < 1 || monitor.partitionDataDay.length < 1) {
                 getPartitionData();
