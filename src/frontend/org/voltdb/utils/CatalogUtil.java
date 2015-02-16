@@ -751,11 +751,6 @@ public abstract class CatalogUtil {
                 jsonApi = new HttpdType.Jsonapi();
                 httpd.setJsonapi(jsonApi);
             }
-            //replication
-            if (deployment.getReplication() == null) {
-                ReplicationType repl = new ReplicationType();
-                deployment.setReplication(repl);
-            }
             //snapshot
             if (deployment.getSnapshot() == null) {
                 SnapshotType snap = new SnapshotType();
