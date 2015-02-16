@@ -517,9 +517,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // set by the executeQuery / executeFrag type methods
         int m_currentInputDepId;
 
-        /** EL subsystem on/off, pulled from catalog */
-        bool m_isELEnabled;
-
         /** Stats manager for this execution engine **/
         voltdb::StatsAgent m_statsManager;
 

@@ -380,6 +380,8 @@ function loadAdminPage() {
     });
 
     var toggleSecurityEdit = function (state) {
+		var userList = $("#UsersList");
+		var userListEditable = $("#UsersListEditable");
         if (adminEditObjects.chkSecurityValue) {
             adminEditObjects.chkSecurity.iCheck('check');
         } else {
@@ -397,7 +399,9 @@ function loadAdminPage() {
             adminEditObjects.iconSecurityOption.hide();
             adminEditObjects.spanSecurity.hide();
             adminEditObjects.loadingSecurity.show();
-
+			
+			userList.hide();
+			userListEditable.hide();
         }
         else if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingSecurity.hide();
@@ -407,6 +411,9 @@ function loadAdminPage() {
             adminEditObjects.btnEditSecurityOk.show();
             adminEditObjects.btnEditSecurityCancel.show();
             adminEditObjects.chkSecurity.parent().addClass("customCheckbox");
+			
+			userList.hide();
+			userListEditable.show();
         }
         else {
             adminEditObjects.loadingSecurity.hide();
@@ -416,6 +423,9 @@ function loadAdminPage() {
             adminEditObjects.btnEditSecurityOk.hide();
             adminEditObjects.btnEditSecurityCancel.hide();
             adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
+			
+			userList.show();
+			userListEditable.hide();
         }
     };
 
@@ -468,7 +478,7 @@ function loadAdminPage() {
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
                             msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
-                            msg += result.statusstring != null ? result.statusstring : "Please try again later.";
+                            msg += "Please try again later.";
                         }
 
                         adminEditObjects.updateErrorFieldMsg.text(msg);
@@ -554,9 +564,6 @@ function loadAdminPage() {
                     txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
-            
-            $("#saveSnapshotConfirm").hide();
-            $("#saveSnapshot").show();
         },
         afterOpen: function (event) {
             var popup = $(this)[0];
@@ -585,23 +592,6 @@ function loadAdminPage() {
                     return;
                 }
 
-                $("#saveSnapshot").hide();
-                $("#saveSnapshotConfirm").show();
-            });
-
-            $("#btnSaveSnapshotCancel").unbind("click");
-            $("#btnSaveSnapshotCancel").on("click", function () {
-                popup.close();
-            });
-            
-            $("#btnSaveSnapshotConfirmCancel").unbind("click");
-            $("#btnSaveSnapshotConfirmCancel").on("click", function () {
-                $("#saveSnapshotConfirm").hide();
-                $("#saveSnapshot").show();
-            });
-            
-            $("#btnSaveSnapshotOk").unbind("click");
-            $("#btnSaveSnapshotOk").on("click", function (e) {
                 var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
@@ -618,6 +608,12 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
+                popup.close();
+
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -682,9 +678,8 @@ function loadAdminPage() {
     });
 
     var getDateTime = function () {
-
-        var currentDate = new Date().toISOString(); // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
-        return currentDate.substr(0, 19).replace('T', '.').replace(/-/g, '.').replace(/:/g, '.');
+        var currentDate = new Date();
+        return (currentDate.getFullYear() + '.' + (currentDate.getMonth() + 1) + '.' + currentDate.getDate() + '.' + currentDate.getHours() + '.' + currentDate.getMinutes() + '.' + currentDate.getSeconds()).toString();
     };
 
     $('#restoreConfirmation').popup({
@@ -816,7 +811,7 @@ function loadAdminPage() {
             var searchError = false;
             $.each(snapshotList, function (id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
-                    result += '<tr><td style="color:#c70000" colspan="3"> Error: Failure getting snapshots. ' + snapshot.ERR_MSG + '</td></tr>';
+                    result += '<tr><td style="color:#c70000" colspan="3"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
                     searchError = true;
                     return false;
                 } else if (snapshot.NONCE == undefined) {
@@ -1523,6 +1518,7 @@ function loadAdminPage() {
         this.runningServerIds = "";
         this.firstResponseReceived = false;
         this.adminPort = -1;
+        this.isDbPaused = false;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1738,9 +1734,11 @@ function loadAdminPage() {
                 if (clusterValues.clusterState.toLowerCase() == "running") {
                     adminClusterObjects.btnClusterPause.show();
                     adminClusterObjects.btnClusterResume.hide();
+                    VoltDbAdminConfig.isDbPaused = false;
                 } else if (clusterValues.clusterState.toLowerCase() == "paused") {
                     adminClusterObjects.btnClusterPause.hide();
                     adminClusterObjects.btnClusterResume.show();
+                    VoltDbAdminConfig.isDbPaused = true;
                 }
             }
         };
@@ -1787,3 +1785,31 @@ var getOnOffClass = function (isOn) {
     return (isOn) ? "onIcon" : "offIcon";
 };
 
+//    add/remove table row in security 
+function deleteRow(row)
+{
+    var i=row.parentNode.parentNode.rowIndex;
+    document.getElementById('secTbl').deleteRow(i);
+}
+function insRow()
+{
+   debugger;
+    var x=document.getElementById('secTbl');
+    var new_row = x.rows[1].cloneNode(true);
+    var len = x.rows.length;
+    //new_row.cells[0].innerHTML = len;//sn number increment
+    
+    var inp1 = new_row.cells[1].getElementsByTagName('input')[0];
+    inp1.id += len;
+    inp1.value = '';
+	
+	var inp0 = new_row.cells[0].getElementsByTagName('input')[0];
+    inp0.id += len;
+    inp0.value = '';
+	
+	var sel = new_row.cells[2].getElementsByTagName('select')[0];
+    sel.id += len;
+    sel.value = '';
+	
+    x.appendChild( new_row );
+}

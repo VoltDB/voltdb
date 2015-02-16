@@ -33,6 +33,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.jar.JarEntry;
@@ -1173,8 +1175,12 @@ public class VoltCompiler {
         addDatabaseEstimatesInfo(m_estimates, db);
 
         // Process DDL exported tables
-        for( String exportedTableName: voltDdlTracker.getExportedTables()) {
-            addExportTableToConnector(exportedTableName, db);
+        NavigableMap<String, NavigableSet<String>> exportTables = voltDdlTracker.getExportedTables();
+        for (Entry<String, NavigableSet<String>> e : exportTables.entrySet()) {
+            String targetName = e.getKey();
+            for (String tableName : e.getValue()) {
+                addExportTableToConnector(targetName, tableName, db);
+            }
         }
 
         // Process and add exports and connectors to the catalog
@@ -1555,23 +1561,10 @@ public class VoltCompiler {
             return;
         }
 
-        // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        //
-        // This check is also done here to mimic the same behavior of the
-        // previous implementation of this method, where the connector is created as
-        // long as the export element is present in project XML. Now that we are
-        // deprecating project.xml, we won't be able to mimic in DDL, what an
-        // empty <export/> element currently implies.
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
-        if (catconn == null) {
-            catconn = catdb.getConnectors().add("0");
-        }
-
-        // Catalog Connector.ConnectorTableInfo
+        // This code is used for adding export tables to the default group connector
         if (export.getTables() != null) {
             for (Tables.Table xmltable : export.getTables().getTable()) {
-                addExportTableToConnector(xmltable.getName(), catdb);
+                addExportTableToConnector(Constants.DEFAULT_EXPORT_CONNECTOR_NAME, xmltable.getName(), catdb);
             }
             if (export.getTables().getTable().isEmpty()) {
                 compilerLog.warn("Export defined with an empty <tables> element");
@@ -1581,16 +1574,15 @@ public class VoltCompiler {
         }
     }
 
-    void addExportTableToConnector( final String tableName, final Database catdb)
+    void addExportTableToConnector(final String targetName, final String tableName, final Database catdb)
             throws VoltCompilerException
     {
         assert tableName != null && ! tableName.trim().isEmpty() && catdb != null;
 
         // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase(targetName);
         if (catconn == null) {
-            catconn = catdb.getConnectors().add("0");
+            catconn = catdb.getConnectors().add(targetName);
         }
         org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tableName);
         if (tableref == null) {

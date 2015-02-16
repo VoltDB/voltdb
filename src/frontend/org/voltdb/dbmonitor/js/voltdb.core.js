@@ -479,8 +479,7 @@
             var serverName = server == null ? 'localhost' : $.trim(server);
             var portId = port == null ? '8080' : $.trim(port);
             var userName = user == '' ? null : user;
-            var key = (serverName + '_' + portId + '_' + (userName == '' ? '' : userName) + '_' +
-                (admin == true ? 'Admin' : '') + "_" + processName).replace(/[^_a-zA-Z0-9]/g, "_");
+            var key = (serverName + '_' + (userName == '' ? '' : userName) + '_' + processName).replace(/[^_a-zA-Z0-9]/g, "_");
 
             if (this.connections[key] != undefined) {
                 var conn = this.connections[key];

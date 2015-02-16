@@ -48,6 +48,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
@@ -200,7 +201,7 @@ public class ExportGeneration {
         return m_isContinueingGeneration;
     }
 
-    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
+    boolean initializeGenerationFromDisk(final CatalogMap<Connector> connectors, HostMessenger messenger) {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -379,30 +380,33 @@ public class ExportGeneration {
     }
 
     void initializeGenerationFromCatalog(
-            final Connector conn,
+            final CatalogMap<Connector> connectors,
             int hostId,
             HostMessenger messenger,
             List<Integer> partitions)
     {
+        //Only populate partitions in use if export is actually happening
+        Set<Integer> partitionsInUse = new HashSet<Integer>();
+
         /*
          * Now create datasources based on the catalog
          */
-        Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
-        //Only populate partitions in use if export is actually happening
-        Set<Integer> partitionsInUse = new HashSet<Integer>();
-        while (tableInfoIt.hasNext()) {
-            ConnectorTableInfo next = tableInfoIt.next();
-            Table table = next.getTable();
-            addDataSources(table, hostId, partitions);
+        for (Connector conn : connectors) {
+            if (conn.getEnabled()) {
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    Table table = ti.getTable();
+                    addDataSources(table, hostId, partitions);
 
-            partitionsInUse.addAll(partitions);
+                    partitionsInUse.addAll(partitions);
+                }
+            }
         }
 
         createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
     void initializeMissingPartitionsFromCatalog(
-            final Connector conn,
+            final CatalogMap<Connector> connectors,
             int hostId,
             HostMessenger messenger,
             List<Integer> partitions) {
@@ -410,7 +414,7 @@ public class ExportGeneration {
         findMissingDataSources(partitions, missingPartitions);
         if (missingPartitions.size() > 0) {
             exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
-            initializeGenerationFromCatalog(conn, hostId, messenger, new ArrayList(missingPartitions));
+            initializeGenerationFromCatalog(connectors, hostId, messenger, new ArrayList(missingPartitions));
         }
     }
 

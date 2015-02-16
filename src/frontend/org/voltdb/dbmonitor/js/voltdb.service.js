@@ -474,22 +474,20 @@
 
         };
         
-        this.SetConnectionForSQLExecution = function (sqlPort) {
+        this.SetConnectionForSQLExecution = function (useAdminPort) {
             try {
-                var processName = "SQLQUERY_EXECUTE";
+                var processNameSuffix = useAdminPort ? '_ADMINPORT' : '_CLIENTPORT';
+                var processName = "SQLQUERY_EXECUTE" + processNameSuffix;
                 var procedureNames = ['@Statistics'];
                 var parameters = ["TABLE"];
                 var values = ['0'];
-                //For SQL Query tab, we need to pass admin as false. This way, if the database is paused, 
-                //users can't accidentally send requests that might change database contents.
-                var isAdmin = false;
-                var newSqlPort = sqlPort != null ? sqlPort : port;
-                _connection = VoltDBCore.HasConnection(server, newSqlPort, isAdmin, user, processName);
+                //For SQL Query tab, we need to pass admin as false. This way, if the database is paused, users can't accidentally send 
+                //requests that might change database contents. However, if the user has admin privileges he should be given an option to 
+                //run the query even when the database is paused. This is done by passing admin as true.
+                var isAdmin = useAdminPort ? true : false;
+                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.AddConnection(server, newSqlPort, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function(connection, status) {
-                    }, null, false);
-                } else {
-                    VoltDBCore.updateConnection(server, newSqlPort, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function(connection, status) {
+                    VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                     }, null, false);
                 }
             } catch (e) {

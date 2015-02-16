@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - Class vmcTest.tests.DbMonitorTest</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<h1>Class vmcTest.tests.DbMonitorTest</h1>
+<div class="breadcrumbs">
+<a href="../index.html">all</a> &gt; 
+<a href="../packages/vmcTest.tests.html">vmcTest.tests</a> &gt; DbMonitorTest</div>
+<div id="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox" id="tests">
+<div class="counter">1</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="failures">
+<div class="counter">1</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="ignored">
+<div class="counter">0</div>
+<p>ignored</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="duration">
+<div class="counter">0s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox failures" id="successRate">
+<div class="percent">0%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div id="tabs">
+<ul class="tabLinks">
+<li>
+<a href="#tab0">Failed tests</a>
+</li>
+<li>
+<a href="#tab1">Tests</a>
+</li>
+</ul>
+<div id="tab0" class="tab">
+<h2>Failed tests</h2>
+<div class="test">
+<a name="classMethod"></a>
+<h3 class="failures">classMethod</h3>
+<span class="code">
+<pre>org.openqa.selenium.NoSuchWindowException: Window not found. The browser window may have been closed.
+Command duration or timeout: 283 milliseconds
+Build info: version: '2.44.0', revision: '76d78cf323ce037c5f92db6c1bba601c2ac43ad8', time: '2014-10-23 13:11:40'
+System info: host: 'DWNPCPU0720', ip: '192.168.0.107', os.name: 'Windows 7', os.arch: 'amd64', os.version: '6.1', java.version: '1.8.0_25'
+Driver info: org.openqa.selenium.firefox.FirefoxDriver
+Capabilities [{applicationCacheEnabled=true, rotatable=false, handlesAlerts=true, databaseEnabled=true, version=35.0, platform=WINDOWS, nativeEvents=false, acceptSslCerts=true, webStorageEnabled=true, locationContextEnabled=true, browserName=firefox, takesScreenshot=true, javascriptEnabled=true, cssSelectorsEnabled=true}]
+Session ID: bb22c60e-c6bd-4c8c-a44a-f43fce039ba0
+	at org.openqa.selenium.remote.ErrorHandler.createThrowable(ErrorHandler.java:204)
+	at org.openqa.selenium.remote.ErrorHandler.throwIfResponseFailed(ErrorHandler.java:156)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:599)
+	at org.openqa.selenium.remote.RemoteWebDriver$RemoteWebDriverOptions$RemoteWindow.setSize(RemoteWebDriver.java:793)
+	at vmcTest.tests.TestBase.setupSpec(TestBase.groovy:58)
+Caused by: org.openqa.selenium.NoSuchWindowException: Window not found. The browser window may have been closed.
+Build info: version: '2.44.0', revision: '76d78cf323ce037c5f92db6c1bba601c2ac43ad8', time: '2014-10-23 13:11:40'
+System info: host: 'DWNPCPU0720', ip: '192.168.0.107', os.name: 'Windows 7', os.arch: 'amd64', os.version: '6.1', java.version: '1.8.0_25'
+Driver info: driver.version: unknown
+	at &lt;anonymous class&gt;.nsCommandProcessor.prototype.execute(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/command-processor.js:11706:23)
+	at &lt;anonymous class&gt;.Dispatcher.executeAs/&lt;(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:8437:5)
+	at &lt;anonymous class&gt;.Resource.prototype.handle(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:8584:219)
+	at &lt;anonymous class&gt;.Dispatcher.prototype.dispatch(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:8531:36)
+	at &lt;anonymous class&gt;.WebDriverServer/&lt;.handle(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/driver-component.js:11489:5)
+	at &lt;anonymous class&gt;.createHandlerFunc/&lt;(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1935:41)
+	at &lt;anonymous class&gt;.ServerHandler.prototype.handleResponse(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:2261:15)
+	at &lt;anonymous class&gt;.Connection.prototype.process(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1168:5)
+	at &lt;anonymous class&gt;.RequestReader.prototype._handleResponse(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1616:5)
+	at &lt;anonymous class&gt;.RequestReader.prototype._processBody(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1464:9)
+	at &lt;anonymous class&gt;.RequestReader.prototype.onInputStreamReady(file:///C:/Users/LAVTHA~1/AppData/Local/Temp/anonymous4871956737507944493webdriver-profile/extensions/fxdriver@googlecode.com/components/httpd.js:1333:9)
+</pre>
+</span>
+</div>
+</div>
+<div id="tab1" class="tab">
+<h2>Tests</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Duration</th>
+<th>Result</th>
+</tr>
+</thead>
+<tr>
+<td class="failures">classMethod</td>
+<td>0s</td>
+<td class="failures">failed</td>
+</tr>
+</table>
+</div>
+</div>
+<div id="footer">
+<p>Generated by 
+<a href="http://www.gradle.org">Gradle 2.2.1</a> at Feb 11, 2015 2:51:29 PM</p>
+</div>
+</div>
+</body>

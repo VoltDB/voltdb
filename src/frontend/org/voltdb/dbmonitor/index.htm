@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+﻿<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>VoltDB Management Center</title>
@@ -37,7 +37,7 @@
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
-       
+
 </head>
 <body>
     <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
@@ -78,6 +78,11 @@
                 <div class="clear"></div>
             </div>
             <div class="contents">
+                <!-- Loading -->
+                <div id="overlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
                 <div class="container" id="containerMain">
                     <div class="clusterDetailsWrapper" id="clusterDetails">
                         <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
@@ -184,7 +189,7 @@
                                 </div>
                               <svg id="visualisationPartitionIdleTime" width="100%" height="400"></svg>
                             </div>
-                            <div id="" class="chart right" style="display:none;">
+                            <div id="" class="chart right" style="display: none;">
                                 <div class="chartHeader">
                                     <h1>Data replicated over time </h1>
                                 </div>
@@ -275,6 +280,12 @@
             <!--Admin-->
 
             <div id="admin" class="container contents">
+                <!-- Loading -->
+                <div id="adminActionOverlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
+
                 <div class="adminWrapper">
                     <div class="adminLeft">
                         <h1 class="headText clusterIcon">Cluster</h1>
@@ -353,8 +364,8 @@
                                     <td id="partitionDetectionLabel"></td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                 <!--<tr class="security" id="securityRow">
-							    <td class="configLabel">Security</td>-->
+                                <!--<tr class="security" id="securityRow">
+                                    <td class="configLabel">Security</td>-->
                                 <tr class="hasSubLabel parent security" id="row-6">
                                     <td class="configLabel"><a href="javascript:vold(0)" class="labelCollapsed">Security</a></td>
                                     <td align="right" class="securitytd">
@@ -368,33 +379,55 @@
                                         <a id="btnEditSecurityCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
                                         <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
-                                
+
                                 <tr class="child-row-6 subLabelRow">
                                     <td colspan="4">
-                                    <div class="securWrapper">
-                                    <div class="userName">Users</div>
-                                    <div class="editBtn">
-                                    <a href="#" class="btnEd"><span class="userPlus">+</span> Add User</a>                    
-                                  
-                                    </div>
-                                    <div class="clear"></div>
-                                    <table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
-                                    <tr>
-                                    <th>Username</th>
-                                    <th>Password</th>
-                                    <th>Delete</th>
-                                    </tr>
-                                    <tr>
-                                   	<td>test</td>
-                                    <td>test</td>
-                                    <td class="securityDelete"></td>
-                                    </tr>
-                                    </table>
-                                    
-                                    </div>
-                                    </td>                                    
+                                        <div class="securWrapper" id="UsersList">
+                                            <table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                                <tr>
+                                                    <th>Username</th>
+                                                    <th>Password</th>
+                                                    <th>Role</th>
+                                                </tr>
+                                                <tr>
+                                                    <td>Test</td>
+                                                    <td>Test</td>
+                                                    <td>User</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        <div class="securWrapper" id="UsersListEditable" style="display: none;">
+                                            <div class="userName">Users</div>
+                                            <div class="editBtn"><a href="javascript:vold(0)" class="btnEd" id="addmorePOIbutton" onclick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
+                                            <div class="clear secLine"></div>
+
+                                            <table id="secTbl" width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                                <tr>
+                                                    <th>Username</th>
+                                                    <th>Password</th>
+                                                    <th>Role</th>
+                                                    <th>Delete</th>
+                                                </tr>
+                                                <tr>
+                                                    <td id="latbox">
+                                                        <input size="15" type="text" value="Test"></td>
+                                                    <td id="latbox">
+                                                        <input size="15" type="text" value="Test"></td>
+                                                    <td id="lngbox">
+                                                        <select>
+                                                            <option></option>
+                                                            <option selected="selected">User</option>
+                                                            <option>Admin</option>
+                                                        </select></td>
+                                                    <td>
+                                                        <div class="securityDelete" id="delPOIbutton" onclick="deleteRow(this)"></div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </td>
                                 </tr>
-                                
+
                                 <tr class="hasSubLabel parent" id="row-1">
                                     <td class="configLabel"><a href="javascript:vold(0)" class="labelCollapsed">HTTP Access</a></td>
                                     <td align="right">
@@ -600,44 +633,44 @@
                             <div class="headerAdminContent">
                                 <h1>Network Interfaces</h1>
                             </div>
-							<div style="overflow:auto" >
-                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
-                                <tr>
-                                  <th width="50%">Port Name</th>
-                                  <th width="25%">Server Setting</th>
-                                  <th width="25%" >Cluster Setting</th>
-                                </tr>
-                                <tr>
-                                    <td>Client Port</td>
-                                    <td id="clientport" ></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Admin Port</td>
-                                    <td id="adminport"></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>HTTP Port</td>
-                                    <td id="httpport"></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Internal Port</td>
-                                    <td id="internalPort"></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Zookeeper Port</td>
-                                    <td id="zookeeperPort"></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Replication Port</td>
-                                    <td id="replicationPort"></td>
-                                    <td></td>
-                                </tr>
-                            </table>
+                            <div style="overflow: auto">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
+                                    <tr>
+                                        <th width="50%">Port Name</th>
+                                        <th width="25%">Cluster Setting</th>
+                                        <th width="25%">Server Setting</th>
+                                    </tr>
+                                    <tr>
+                                        <td>Client Port</td>
+                                        <td id="clientport"></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Admin Port</td>
+                                        <td id="adminport"></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>HTTP Port</td>
+                                        <td id="httpport"></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Internal Port</td>
+                                        <td id="internalPort"></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Zookeeper Port</td>
+                                        <td id="zookeeperPort"></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Replication Port</td>
+                                        <td id="replicationPort"></td>
+                                        <td></td>
+                                    </tr>
+                                </table>
                             </div>
                         </div>
                         <div class="adminDirectories">
@@ -675,16 +708,21 @@
             </div>
 
             <!--Schema Tab-->
-            <div id="schema" class="contents"></div>
-
+            <div id="schema" class="contents">
+            </div>
             <!--Sql Query Tab-->
             <div id="sqlQuery" class="containerStudio contents">
                 <div class="blockWrapper" id="BlockContainer01">
                     <div class="objectExplorer">
+                        <!-- Loading -->
+                        <div id="sqlQueryOverlay" style="display: none;">
+                            <div class="loading-medium"></div>
+                        </div>
+                        <!-- Loading -->
                         <div class="explorer">
                             <!--tab-->
                             <div class="tabContant" id="tabMain">
-                             <button class="refreshBtn">Refresh</button>
+                                <button class="refreshBtn">Refresh</button>
                                 <ul class="tabs">
                                     <li><a href="#tab1">Tables</a></li>
                                     <li><a href="#tab2">Views</a></li>
@@ -693,7 +731,8 @@
                                 <div class="tab_container">
                                     <div id="tabScroller">
                                         <div id="tab1" class="tab_content">
-                                            <div id="accordionTable"></div>
+                                            <div id="accordionTable">
+                                            </div>
                                         </div>
                                         <div id="tab2" class="tab_content">
                                             <div id="accordionViews"></div>
@@ -1331,19 +1370,6 @@
         </div>
     </div>
     <!-- Query error because of Paused Database Popup-->
-
-    <!-- Loading -->
-    <div id="overlay" style="display: none;">
-        <div class="loading"></div>
-    </div>
-    <!-- Loading -->
-
-
-    <!-- Loading -->
-    <div id="adminActionOverlay" style="display: none;">
-        <div class="loading"></div>
-    </div>
-    <!-- Loading -->
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>

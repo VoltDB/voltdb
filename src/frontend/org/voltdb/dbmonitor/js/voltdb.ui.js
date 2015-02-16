@@ -1,9 +1,10 @@
 ﻿var ispopupRevoked = false;
+
 $(document).ready(function () {
     voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
         MonitorGraphUI.GetPartitionDetailData(partitionDetail);
     });
-
+    var rv = -1;
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
     } else {
@@ -16,12 +17,30 @@ $(document).ready(function () {
 
     //Prevent scrolling of page.
     $('#navSchema').on("click", function (e) {
-
+        //Browser validation for IE version less than IE 11
         if (navigator.userAgent.indexOf('MSIE') >= 0) {
             window.location.hash = "#o"; //This is required for IE.
             setTimeout(function () {
                 window.scrollTo(0, 0);
             }, 10);
+        }
+
+        //IE 11 is just a preview release. 
+        //Hence validation expressions may differs after the full version is released 
+        //In such case, below validation has to be updated
+        else if (navigator.appName == 'Netscape') {
+            var ua = navigator.userAgent;
+            var re = new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})");
+
+            if (re.exec(ua) != null) {
+                rv = parseFloat(RegExp.$1);
+                if (rv == 11) {
+                    window.location.hash = "#o"; //This is required for IE.
+                    setTimeout(function () {
+                        window.scrollTo(0, 0);
+                    }, 10);
+                }
+            }            
         }
         e.preventDefault();
     });
@@ -249,11 +268,7 @@ $(document).ready(function () {
         loadPage(serverName, portid);
     });
 
-    $('.refreshBtn.schm').unbind("click");
-    $('.refreshBtn.schm').click(function () {
-        VoltDbUI.refreshSqlAndSchemaTab();
-    });
-
+    window.onscroll = function () { if (VoltDbUI.isSchemaTabLoading) window.scrollTo(0, 0); };
 });
 
 function logout() {
@@ -268,7 +283,7 @@ var loadPage = function (serverName, portid) {
 
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
-    
+
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
 
@@ -278,6 +293,12 @@ var loadPage = function (serverName, portid) {
     var showAdminPage = function () {
         if (!VoltDbAdminConfig.isAdmin) {
             VoltDbAdminConfig.isAdmin = true;
+
+            if ($.cookie("sql_port_for_paused_db") == sqlPortForPausedDB.UseAdminPort) {
+                VoltDBService.SetConnectionForSQLExecution(true);
+                SQLQueryRender.saveConnectionKey(true);
+            }
+
             $("#navAdmin").show();
             loadAdminPage();
         }
@@ -1517,7 +1538,7 @@ var adjustGraphSpacing = function () {
 
 (function (window) {
     var iVoltDbUi = (function () {
-        this.templateScriptLoaded = false;
+        this.isSchemaTabLoading = false;
         this.ACTION_STATES = {
             NONE: -1,
             NEXT: 0,
@@ -1568,7 +1589,7 @@ var adjustGraphSpacing = function () {
         //load schema tab and table and views tabs inside sql query 
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();
-            //SQLQueryRender.populateTablesAndViews();
+            SQLQueryRender.populateTablesAndViews();
         };
 
         this.refreshConnectionTime = function (seconds) {
@@ -1598,22 +1619,38 @@ var adjustGraphSpacing = function () {
         };
 
         this.loadSchemaTab = function () {
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
+            this.isSchemaTabLoading = true;
+
+            var schemaHtml = '<div id="schemaOverlay" style="display: block;"><div class="loading"></div></div>';
+            schemaHtml = schemaHtml + $('#schema').html();
+            $('#schema').html(schemaHtml);
+
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';              
             var templateJavascript = "js/template.js";
 
             $.post(templateUrl, function (result) {
                 result = result.replace('<!--##SIZES##>', '');
                 var body = $(result).filter("#wrapper").html();
                 $("#schema").html(body);
-
+                $("#overlay").hide();
                 $("#schemaLinkSqlQuery").on("click", function (e) {
                     $("#navSqlQuery").trigger("click");
                     e.preventDefault();
                 });
 
-                $.getScript(templateJavascript);                
-                $("#overlay").hide();
+                $.getScript(templateJavascript, function () {
+                    $('.schm').css("display", "block");
+                    $('.refreshBtn').unbind("click");
+                    $('.refreshBtn.schm').unbind("click");
+                    $('.refreshBtn.schm,.refreshBtn').click(function () {
+                        VoltDbUI.refreshSqlAndSchemaTab();
+
+                    });
+                    VoltDbUI.isSchemaTabLoading = false;
+                });
+
             });
+
         };
 
     });
@@ -1640,7 +1677,6 @@ function RefreshServerUI() {
 
     }
 
-
 }
 
 function getParameterByName(name) {
@@ -1653,5 +1689,3 @@ function getParameterByName(name) {
     else
         return decodeURIComponent(results[1].replace(/\+/g, " "));
 }
-
-

@@ -671,11 +671,11 @@ ul.topRightList li a:hover { color: #222222 !important;text-decoration: none !im
 .contentQuery {background:#CCCCCC; padding:20px;}
 .queryResult { background:#FFFFFF; padding:15px;}
 
-.blockWrapper{background:; margin-bottom:20px;}
-.objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;}
+.blockWrapper{margin-bottom:20px;}
+.objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;position: relative;}
 .queryInput{float:right; width:68%;}
 #queryForm{ background:#FFFFFF;}
-.queryInput .query textarea{width:98%; padding:1%; resize:none!important; height:186px;border: 1px solid #CCCCCC;line-height:25px; font-size:18px;}
+.queryInput .query textarea{width:98%; padding:1%; resize:none!important; height:215px;border: 1px solid #CCCCCC;line-height:25px; font-size:18px;}
 .queryInput .query textarea:focus{outline:none;}
 .textWritingArea { padding:13px;}
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
@@ -710,7 +710,10 @@ h1.icon-queryResult{background-position:15px -1039px;}
 .resultHtml, .resultCsv, .resultMonospace{width:100%; overflow:auto;height:400px;}
 .queryResult pre{line-height:20px;}
 #overlay, #adminActionOverlay{ position: fixed;height: 100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 9999;}
-.loading{ background: #fff url(images/loader.GIF) no-repeat center center;height: 75px;width: 75px;margin: 20% auto;}
+#schemaOverlay{ position: fixed;height:100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 999; top:10.5%;}
+#sqlQueryOverlay {position: absolute;height:100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 999;left: 0px;}
+.loading{ background: #fff url(images/loader.GIF) no-repeat center center;height: 75px;width: 75px;margin: 20% auto; z-index: 99999;}
+.loading-medium{ background: #fff url(images/loader-medium.GIF) no-repeat center center;height: 30px;width: 30px;margin: 38% auto;}
 .loading-small{ background: #fff url(images/loader-small.GIF) no-repeat center center;height: 20px;width: 20px;
                 position: absolute;top: 11px;left: 102px;}
 
@@ -762,9 +765,7 @@ ul.helpSchemaList {}
 ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px  Arial, Helvetica, sans-serif} 
 .VDBQueryHelp {}
 .VDBQueryHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
-.errorQueryDbPause p { line-height: 20px;}
-.errorQueryDbPause { width: 550px;}
-
+.errorQueryDbPause p { line-height: 20px;}.errorQueryDbPause { width: 550px;}
 /**admin**/
 .adminIcons, 
 .pause, 
@@ -907,8 +908,10 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 
 
 .tblshutdown tr td  { border:none;}
-.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
-.tblshutdown tr td a.disableServer { display:inline-block;background-position:-925px -150px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.shutdown { display:inline-block;background-position:-785px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-978px -150px; width:40px; height:36px;line-height:39px; }
+/*.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-925px -150px; width:40px; height:36px;line-height:39px; }*/
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
 .shutdownServerPause {position: relative; top: 17px; right:3px; color: #cccccc;}
@@ -970,17 +973,19 @@ color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
 }
 .refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;}
-.schm { margin:9px}
-.securWrapper { margin:10px 40px;}
-.secTbl { border:1px solid #CCCCCC; }
-.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; padding:0 10px;}
+.schm { margin: 9px;display: none;}
+.securWrapper { /*margin:10px 40px;*/ margin:0 0 -3px 0;}
+.secTbl {/* border:1px solid #CCCCCC;*/ }
+.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; /*padding:5px 0 10px 10px;*/ padding:5px 0 0 40px;}
 
 .secTbl tr th { font-weight:bold; background:#FBFBFB;}
-.userName { float:left;font-weight:bold;font-size:14px;}
-.editBtn { float:right}
+.secTbl input[type="text"]{ margin:0 0 10px 0;}
+.userName { float:left;font-weight:bold;font-size:14px; padding:0 0 0 40px;}
+.secLine { border-bottom:1px solid #CCCCCC;}
+.editBtn { float:right; padding:0 35px 0 0}
 .editBtn ul li { float:left;margin: 0 0 0 5px;}
 .btnEd {cursor: pointer;background: #D0D2D2;padding:5px;font-weight: bold; font-size:12px;}
-.securityDelete {background-position:-1019px -12px; width:25px; height:20px; position:relative; top:10px; cursor:pointer;}
+.securityDelete {background-position:-1042px -12px; width:25px; height:20px; position:relative; top:5px; cursor:pointer;}
 .userPlus {font-size:15px;position:relative;top:2px}
 
 /*********************************************media Qu********************/
