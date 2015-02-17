@@ -58,6 +58,9 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
+def minutes_colon_seconds(seconds):
+    return re.sub("^0:", "", str(datetime.timedelta(0, round(seconds))), 1)
+
 def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
                   include_current_time=False):
     """ Prints, and returns, a message containing the specified number of
@@ -73,7 +76,7 @@ def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
 
     time_msg = str(seconds) + " seconds"
     if (seconds >= 60):
-        time_msg += " (" + re.sub("^0:", "", str(datetime.timedelta(0, round(seconds))), 1) + ")"
+        time_msg += " (" + minutes_colon_seconds(seconds) + ")"
     if (include_current_time):
         time_msg += " [at " + str(time.time()) + "]"
 
@@ -285,10 +288,37 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     success = compare_results(suite_name, random_seed, statements_path, hsql_path,
                               jni_path, output_dir, report_all)
 
-    # Print the elapsed time and total time, with a message
+    # Print & save the elapsed time and total time, with a message
     global compar_time
     compar_time += print_elapsed_seconds("for comparing DB results (" + suite_name + ")")
-    print_elapsed_seconds("for run_config of '" + suite_name + "'", time0, "Sub-tot time: ")
+    suite_secs = print_elapsed_seconds("for run_config of '" + suite_name + "'", time0, "Sub-tot time: ")
+
+    # Accumulate the total number of Valid, Invalid, Mismatched & Total statements
+    global total_statements
+    def next_keyStats_column_value():
+        prefix = "<td align=right>"
+        suffix = "</td>"
+        global keyStats_start_index
+        start_index = success["keyStats"].index(prefix, keyStats_start_index) + len(prefix)
+        end_index   = success["keyStats"].index(suffix, start_index)
+        next_col_val = success["keyStats"][start_index: end_index]
+        keyStats_start_index = end_index + len(suffix)
+        return next_col_val
+    global valid_statements
+    global invalid_statements
+    global mismatched_statements
+    global keyStats_start_index
+    keyStats_start_index = 0
+    valid_statements      += int(next_keyStats_column_value())
+    next_keyStats_column_value()  # ignore Valid %
+    invalid_statements    += int(next_keyStats_column_value())
+    next_keyStats_column_value()  # ignore Invalid %
+    total_statements      += int(next_keyStats_column_value())
+    mismatched_statements += int(next_keyStats_column_value())
+
+    # Save the total time for this test suite
+    success["keyStats"] = success["keyStats"].replace('</tr>', '\n<td align=right>%s</td></tr>' %
+                                                      minutes_colon_seconds(suite_secs))
 
     return success
 
@@ -452,6 +482,11 @@ if __name__ == "__main__":
     voltdb_time = 0.0
     hsqldb_time = 0.0
     compar_time = 0.0
+    keyStats_start_index = 0
+    valid_statements = 0
+    invalid_statements = 0
+    mismatched_statements = 0
+    total_statements = 0
 
     parser = OptionParser()
     parser.add_option("-l", "--leader", dest="hostname",
@@ -542,6 +577,18 @@ if __name__ == "__main__":
 
     # Write the summary
     time1 = time.time()
+    statistics["totals"] = "\n<td align=right>" + str(valid_statements) + "</td>" + \
+                           "\n<td align=right>" + str(100.00 * valid_statements / total_statements) + "%</td>" + \
+                           "\n<td align=right>" + str(invalid_statements) + "</td>" + \
+                           "\n<td align=right>" + str(100.00 * invalid_statements / total_statements) + "%</td>" + \
+                           "\n<td align=right>" + str(total_statements) + "</td>" + \
+                           "\n<td align=right>" + str(mismatched_statements) + "</td>" + \
+                           "\n<td align=right>" + str(100.00 * mismatched_statements / total_statements) + "%</td>" + \
+                           "\n<td align=right>" + str(minutes_colon_seconds(time1-time0)) + "</td></tr>\n"
+    statistics["time_for_gensql"] = str(gensql_time) + " seconds (" + minutes_colon_seconds(gensql_time) + ")"
+    statistics["time_for_voltdb"] = str(voltdb_time) + " seconds (" + minutes_colon_seconds(voltdb_time) + ")"
+    statistics["time_for_hsqldb"] = str(hsqldb_time) + " seconds (" + minutes_colon_seconds(hsqldb_time) + ")"
+    statistics["time_for_compare"] = str(compar_time) + " seconds (" + minutes_colon_seconds(compar_time) + ")"
     generate_summary(output_dir, statistics)
 
     # Print the elapsed time, and the current system time
