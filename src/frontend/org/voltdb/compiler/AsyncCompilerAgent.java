@@ -39,6 +39,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.parser.SQLLexer.CheckPermittedResult;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
 
@@ -192,10 +193,23 @@ public class AsyncCompilerAgent {
             // do a couple of additional checks if it's DDL
             if (hasDDL) {
                 // check that the DDL is allowed
-                if (!SQLLexer.isPermitted(stmt)) {
+                CheckPermittedResult checkResult = SQLLexer.checkPermitted(stmt);
+                if (checkResult.rejected) {
+                    StringBuilder message = new StringBuilder();
+                    if (checkResult.blacklisted) {
+                        message.append("AdHoc DDL contains a black-listed statement");
+                        if (checkResult.rejectionExplanation != null) {
+                            message.append(": ");
+                            message.append(checkResult.rejectionExplanation);
+                        }
+                    }
+                    else {
+                        message.append("AdHoc DDL contains an unsupported DDL statement");
+                    }
+                    message.append(": ");
+                    message.append(stmt);
                     AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "AdHoc DDL contains an unsupported DDL statement: " + stmt);
+                        AsyncCompilerResult.makeErrorResult(w, message.toString());
                     w.completionHandler.onCompletion(errResult);
                     return;
                 }

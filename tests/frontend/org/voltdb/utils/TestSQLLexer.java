@@ -32,6 +32,7 @@ import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.junit.Test;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.parser.SQLLexer.CheckPermittedResult;
 
 public class TestSQLLexer {
 
@@ -97,31 +98,117 @@ public class TestSQLLexer {
     }
 
     @Test
-    public void testIsPermitted()
+    public void testCheckPermitted()
     {
-        assertTrue(SQLLexer.isPermitted("create table PANTS (ID int, RENAME varchar(50));"));
-        assertTrue(SQLLexer.isPermitted("create table PANTS (\n ID int,\n RENAME varchar(50)\n);"));
-        assertTrue(SQLLexer.isPermitted("create view PANTS (ID int, RENAME varchar(50));"));
-        assertTrue(SQLLexer.isPermitted("create index PANTS (ID int, RENAME varchar(50));"));
-        assertFalse(SQLLexer.isPermitted("create tabel PANTS (ID int, RENAME varchar(50));"));
-        assertFalse(SQLLexer.isPermitted("craete table PANTS (ID int, RENAME varchar(50));"));
-        assertTrue(SQLLexer.isPermitted("create role pants with pockets;"));
-        assertTrue(SQLLexer.isPermitted("create role\n pants\n with cuffs;\n"));
+        final int REN_UNSUP = 0;
+        final int REN_UNK = 1;
+        final int REN_UNIMP = 2;
+        final int STMT_UNSUP = 3;
 
-        assertTrue(SQLLexer.isPermitted("drop table pants;"));
-        assertTrue(SQLLexer.isPermitted("drop view pants;"));
-        assertTrue(SQLLexer.isPermitted("drop index pants;"));
-        assertFalse(SQLLexer.isPermitted("dorp table pants;"));
-        assertFalse(SQLLexer.isPermitted("drop tabel pants;"));
+        class Tester
+        {
+            // Test that a good command is not rejected.
+            void testOK(String sql)
+            {
+                CheckPermittedResult res = SQLLexer.checkPermitted(sql);
+                assertFalse(String.format("GOOD: Expect no rejection: %s",  sql),
+                            res.rejected);
+                assertFalse(String.format("GOOD: Expect no black-list: %s",  sql),
+                            res.blacklisted);
+                assertTrue(String.format("GOOD: Expect null explanation: %s",  sql),
+                            res.rejectionExplanation == null);
+            }
 
-        assertTrue(SQLLexer.isPermitted("alter table pants add column blargy blarg;"));
-        assertTrue(SQLLexer.isPermitted("alter table pants add constraint blargy blarg;"));
-        assertTrue(SQLLexer.isPermitted("alter index pants"));
-        assertFalse(SQLLexer.isPermitted("alter table pants rename to shorts;"));
-        assertFalse(SQLLexer.isPermitted("alter index pants rename to shorts;"));
-        assertFalse(SQLLexer.isPermitted("alter table pants alter column rename to shorts;"));
-        assertFalse(SQLLexer.isPermitted("altre table pants blargy blarg;"));
-        assertFalse(SQLLexer.isPermitted("alter tabel pants blargy blarg;"));
+            // Test that an unrecognized command doesn't pass the white-list.
+            void testWL(String sql)
+            {
+                CheckPermittedResult res = SQLLexer.checkPermitted(sql);
+                assertTrue(String.format("WHITELIST: Expect rejection: %s",  sql),
+                           res.rejected);
+                assertFalse(String.format("WHITELIST: Expect not black-listed: %s",  sql),
+                            res.blacklisted);
+                assertTrue(String.format("WHITELIST: Expect non-null explanation: %s",  sql),
+                           res.rejectionExplanation != null);
+            }
+
+            // Test black-listed statements.
+            void testBL(String sql, int error, String symbol)
+            {
+                CheckPermittedResult res = SQLLexer.checkPermitted(sql);
+                assertTrue(String.format("RENAME: Expect rejection: %s",  sql),
+                           res.rejected);
+                assertTrue(String.format("RENAME: Expect black-listed: %s",  sql),
+                           res.blacklisted);
+                assertTrue(String.format("RENAME: Expect non-null explanation: %s",  sql),
+                           res.rejectionExplanation != null);
+                String fragment;
+                switch (error) {
+                case REN_UNIMP:
+                    fragment = "ALTER/RENAME is not yet supported for object type";
+                    break;
+                case REN_UNK:
+                    fragment = "Unknown ALTER/RENAME object type";
+                    break;
+                case REN_UNSUP:
+                    fragment = "Unsupported ALTER/RENAME object type";
+                    break;
+                case STMT_UNSUP:
+                    fragment = "Statement is not yet supported";
+                    break;
+                default:
+                    fragment = null;    // humor the compiler
+                    break;
+                }
+                if (symbol != null) {
+                    fragment += ": " + symbol;
+                }
+                assertTrue(String.format("RENAME: Expect explanation '%s...', got '%s': %s",
+                           fragment, res.rejectionExplanation, sql),
+                           res.rejectionExplanation.toLowerCase().contains(fragment.toLowerCase()));
+            }
+        }
+
+        Tester tester = new Tester();
+
+        //=== Good statements that should be white-listed, but not black-listed.
+
+        tester.testOK("create table PANTS (ID int, RENAME varchar(50));");
+        tester.testOK("create table PANTS (\n ID int,\n RENAME varchar(50)\n);");
+        tester.testOK("create view PANTS (ID int, RENAME varchar(50));");
+        tester.testOK("create index PANTS (ID int, RENAME varchar(50));");
+        tester.testOK("create role pants with pockets;");
+        tester.testOK("create role\n pants\n with cuffs;\n");
+
+        tester.testOK("drop table pants;");
+        tester.testOK("drop view pants;");
+        tester.testOK("drop index pants;");
+
+        tester.testOK("alter table pants add column blargy blarg;");
+        tester.testOK("alter table pants add constraint blargy blarg;");
+        tester.testOK("alter index pants");
+
+        //=== Statements that should be filtered out by the white-list.
+
+        tester.testWL("create tabel PANTS (ID int, RENAME varchar(50));");
+        tester.testWL("craete table PANTS (ID int, RENAME varchar(50));");
+        tester.testWL("dorp table pants;");
+        tester.testWL("drop tabel pants;");
+
+        tester.testWL("altre table pants blargy blarg;");
+        tester.testWL("alter tabel pants blargy blarg;");
+
+        //=== Statements that should be rejected by the black-list.
+
+        tester.testBL("import blah", STMT_UNSUP, "import");
+
+        tester.testBL("alter table pants rename to shorts;", REN_UNIMP, "table");
+        tester.testBL("alter view pants rename to shorts;", REN_UNSUP, "view");
+        tester.testBL("alter tuble pants rename to shorts;", REN_UNK, "tuble");
+
+        tester.testBL("alter table pants alter column cut rename to style;", REN_UNIMP, "column");
+        tester.testBL("alter table pants alter role cut rename to style;", REN_UNSUP, "role");
+        tester.testBL("alter tuble pants alter calumn cut rename to style;", REN_UNK, "tuble");
+        tester.testBL("alter table pants alter calumn cut rename to style;", REN_UNK, "calumn");
     }
 
     void checkValidHSQLPreprocessing(String ddl,
