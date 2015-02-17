@@ -179,7 +179,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     @SuppressWarnings("resource")
     private int callSQLcmdBase(boolean stopOnError, String inputText,
-            boolean fastModeDDL, String expectedErrorMsg) throws Exception {
+            boolean batchModeDDL, String expectedErrorMsg) throws Exception {
         String commandPath = "bin/sqlcmd";
 
         File f = new File("ddl.sql");
@@ -189,12 +189,18 @@ public class TestSqlCmdErrorHandling extends TestCase {
         fos.close();
 
         File out = new File("out.log");
-
         File error = new File("error.log");
 
         ProcessBuilder pb = null;
-        if (fastModeDDL) {
-            pb = new ProcessBuilder(commandPath, "--ddl-file=" + f.getPath());
+        if (batchModeDDL) {
+            pb = new ProcessBuilder(commandPath);
+            File batchScript = new File("script.sql");
+            batchScript.deleteOnExit();
+            fos = new FileOutputStream(batchScript);
+            fos.write(new String("FILE -batch " + f.getPath()).getBytes());
+            fos.close();
+
+            pb.redirectInput(batchScript);
         } else {
             pb = new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
             pb.redirectInput(f);
@@ -223,7 +229,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
                 //*/enable for debug*/ System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
                 //*/enable for debug*/ System.err.println(" on input:\n" + inputText);
 
-                if (fastModeDDL) {
+                if (batchModeDDL) {
                     String errorMsg = new Scanner(error).useDelimiter("\\Z").next();
                     if (expectedErrorMsg != null && !expectedErrorMsg.equals("")) {
                         assertTrue(errorMsg.contains(expectedErrorMsg));
@@ -463,7 +469,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     }
 
     private final String prompts = "sqlcmd did not fail as expected";
-    public void testDDLModeBadCommandLineInput() throws Exception {
+    public void testBadCommandLineInput() throws Exception {
         String errorMsgPrefix = "Missing input value for ";
         assertEquals(prompts, 255, callSQLcmdWithErrors("--servers=", errorMsgPrefix + "--servers"));
         assertEquals(prompts, 255, callSQLcmdWithErrors("--port=", errorMsgPrefix + "--port"));
@@ -472,14 +478,12 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertEquals(prompts, 255, callSQLcmdWithErrors("--kerberos=", errorMsgPrefix + "--kerberos"));
         assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=", errorMsgPrefix + "--output-format"));
         assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=", errorMsgPrefix + "--stop-on-error"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file=", errorMsgPrefix + "--ddl-file"));
 
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file= haha.txt", "DDL file not found at path: haha.txt"));
         assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=haha", "Invalid value for --output-format"));
         assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=haha", "Invalid value for --stop-on-error"));
     }
 
-    public void testDDLModeBadInput() throws Exception
+    public void notestDDLModeBadInput() throws Exception
     {
         String inputDDL = "";
 

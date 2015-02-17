@@ -362,7 +362,8 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s+([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s+['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
-
+    private static final Pattern FileBatchToken = Pattern.compile("^\\s*file\\s+-batch\\s+['\"]*([^;'\"]+)['\"]*\\s*;*\\s*",
+            Pattern.CASE_INSENSITIVE);
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
@@ -876,17 +877,33 @@ public class SQLParser extends SQLPatternFactory
         return null;
     }
 
+    public static class FileInfo {
+        public File file = null;
+        public boolean batch = false;
+
+        FileInfo(File f, boolean b) {
+            file = f;
+            batch = b;
+        }
+    }
+
     /**
      * Parse FILE statement for sqlcmd.
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static File parseFileStatement(String statement)
+    public static FileInfo parseFileStatement(String statement)
     {
-        Matcher matcher = FileToken.matcher(statement);
-        if (matcher.matches()) {
-            return new File(matcher.group(1));
+        Matcher batchMatcher = FileBatchToken.matcher(statement);
+        if (batchMatcher.matches()) {
+            return new FileInfo(new File(batchMatcher.group(1)), true);
+        } else {
+            Matcher matcher = FileToken.matcher(statement);
+            if (matcher.matches()) {
+                return new FileInfo(new File(matcher.group(1)), false);
+            }
         }
+
         return null;
     }
 

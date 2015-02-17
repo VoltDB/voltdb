@@ -46,6 +46,8 @@ import java.util.regex.PatternSyntaxException;
 import org.junit.Test;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.ExecuteCallResults;
+import org.voltdb.parser.SQLParser.FileInfo;
+import org.voltdb.utils.SQLCommand.QueryInfo;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -277,7 +279,8 @@ public class TestSqlCmdInterface
     public void testParseQuery21() throws FileNotFoundException {
         ID = 21;
         final File sqlFile = new File("./tests/frontend/org/voltdb/utils/localQry.txt");
-        String raw = SQLCommand.readScriptFile(sqlFile);
+        List<QueryInfo> queryBatchInfo = SQLCommand.readScriptFile(sqlFile);
+        String raw = QueryInfo.convertToString(queryBatchInfo);
 
         int numOfQueries = -1;
         String qryFrmFile = "";
@@ -543,5 +546,18 @@ public class TestSqlCmdInterface
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";
         assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
+    }
+
+    @Test
+    public void testParseFileBatchDDL()
+    {
+        ID = 50;
+        FileInfo fileInfo = null;
+
+        fileInfo = SQLParser.parseFileStatement("FILE  -batch haha.sql;\n");
+        assertTrue(fileInfo.batch);
+
+        fileInfo = SQLParser.parseFileStatement("FILE haha.sql;\n");
+        assertFalse(fileInfo.batch);
     }
 }
