@@ -50,6 +50,7 @@ public class SchemaChangeUtility
     static ClientResponse callROProcedureWithRetry(Client client, String procName, int timeout, Object... params) {
         long startTime = System.currentTimeMillis();
         long now = startTime;
+        int retry = 0;
 
         while (now - startTime < (timeout * 1000)) {
             ClientResponse cr = null;
@@ -103,8 +104,15 @@ public class SchemaChangeUtility
                     log.error(String.format("Error in procedure call for: %s", procName));
                     log.error(((ClientResponseImpl)cr).toJSONString());
                     // for starters, I'm assuming these errors can't happen for reads in a sound system
-                    assert(false);
-                    System.exit(-1);
+                    if (retry < 3) {
+                        // Cluster might not have come back get, retry after a delay
+                        retry++;
+                        try{ Thread.sleep(5 * 1000); } catch (InterruptedException ignore) {}
+                        break;
+                    } else {
+                        assert(false);
+                        System.exit(-1);
+                    }
                 }
             }
 
