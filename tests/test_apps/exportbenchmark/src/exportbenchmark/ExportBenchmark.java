@@ -61,7 +61,7 @@ import com.google_voltpatches.common.base.Throwables;
  * Asychronously sends data to an export table to test VoltDB export performance.
  */
 public class ExportBenchmark {
-    
+
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
@@ -82,9 +82,9 @@ public class ExportBenchmark {
     // CSV logger
     CsvLogger csvlogger = null;
 
-    
+
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
-    
+
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -96,22 +96,22 @@ public class ExportBenchmark {
 
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 30;
-        
+
         @Option(desc = "Objects to insert during the benchmark (per thread)")
         int count=0;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 5;
-        
+
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 1;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
-        
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
-        
+
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
@@ -125,7 +125,7 @@ public class ExportBenchmark {
             if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
         }
     }
-    
+
     static class CsvLogger implements AutoCloseable {
         final PrintWriter m_writer;
         final SimpleDateFormat m_df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
@@ -167,13 +167,13 @@ public class ExportBenchmark {
                     );
         }
     }
-    
+
     void logMetric(final ClientStats stats) {
         if (csvlogger != null) {
             csvlogger.log(stats);
         }
     }
-    
+
     /**
      * Creates a new instance of the test to be run.
      * Establishes a client connection to a voltdb server, which should already be running
@@ -185,15 +185,15 @@ public class ExportBenchmark {
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
-        
+
         fullStatsContext = client.createStatsContext();
         periodicStatsContext = client.createStatsContext();
-        
+
         if (config.csvfile != null && !config.csvfile.trim().isEmpty()) {
             csvlogger = new CsvLogger(config.csvfile);
         }
     }
-    
+
     /**
      * Create a Timer task to display performance data on the Vote procedure
      * It calls printStatistics() every displayInterval seconds
@@ -208,7 +208,7 @@ public class ExportBenchmark {
                                   config.displayinterval * 1000,
                                   config.displayinterval * 1000);
     }
-    
+
     /**
      * Checks the export table to make sure that everything has been successfully
      * processed.
@@ -269,7 +269,7 @@ public class ExportBenchmark {
         System.out.println(stats);
         return passed;
     }
-    
+
     /**
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
@@ -320,7 +320,7 @@ public class ExportBenchmark {
         // block until all have connected
         connections.await();
     }
-    
+
     /**
      * While <code>benchmarkComplete</code> is set to false, run as many
      * synchronous procedure calls as possible and record the results.
@@ -367,26 +367,26 @@ public class ExportBenchmark {
         // Connect to servers
         System.out.println("Test initialization");
         connect(config.servers);
-        
+
         // Start the work
         Thread threads[] = new Thread[config.threads];
         for (int i = 0; i < config.threads; ++i) {
             threads[i] = new Thread(new ExportThread());
             threads[i].start();
         }
-        
+
         // Run the benchmark loop for the requested warmup time
         System.out.println("Warming up...");
         Thread.sleep(1000l * config.warmup);
-        
+
         warmupComplete.set(true);
-        
+
         // reset the stats after initialization
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
-        
+
         schedulePeriodicStats();
-        
+
         // Start duration timer
         Thread running_timer = new Thread(new Runnable() {
             @Override
@@ -404,16 +404,16 @@ public class ExportBenchmark {
             }
         });
         running_timer.start();
-        
+
         // Wait until the insertion is done (either by duration or count)
         System.out.println("\nRunning benchmark...");
         synchronized (benchmarkComplete) {
             benchmarkComplete.wait();
         }
-        
+
         client.drain();
-        System.out.println("Client flushed; waiting for export to finish"); 
-        
+        System.out.println("Client flushed; waiting for export to finish");
+
         // Wait until export is done
         boolean success = false;
         try {
@@ -422,23 +422,23 @@ public class ExportBenchmark {
             System.err.println("Error while waiting for export: ");
             e.printStackTrace();
         }
-        
+
         timer.cancel();
-        
+
         // Print results & close
         printResults();
         client.close();
-        
+
         // if enabled close the csv logger
         if (csvlogger != null) {
             csvlogger.close();
         }
-        
+
         if (!success) {
             System.exit(1);
         }
     }
-    
+
     /**
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
@@ -455,7 +455,7 @@ public class ExportBenchmark {
         System.out.printf("Avg/99.999%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.99999));
     }
-    
+
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
@@ -507,7 +507,7 @@ public class ExportBenchmark {
     public static void main(String[] args) throws Exception {
         ExportBenchConfig config = new ExportBenchConfig();
         config.parse(ExportBenchmark.class.getName(), args);
-        
+
         ExportBenchmark bench = new ExportBenchmark(config);
         bench.runTest();
     }
