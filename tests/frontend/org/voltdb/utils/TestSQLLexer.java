@@ -111,11 +111,11 @@ public class TestSQLLexer {
             void testOK(String sql)
             {
                 CheckPermittedResult res = SQLLexer.checkPermitted(sql);
-                assertFalse(String.format("GOOD: Expect no rejection: %s",  sql),
+                assertFalse(String.format("testOK: Expect no rejection: %s",  sql),
                             res.rejected);
-                assertFalse(String.format("GOOD: Expect no black-list: %s",  sql),
+                assertFalse(String.format("testOK: Expect no black-list: %s",  sql),
                             res.blacklisted);
-                assertTrue(String.format("GOOD: Expect null explanation: %s",  sql),
+                assertTrue(String.format("testOK: Expect null explanation: %s",  sql),
                             res.rejectionExplanation == null);
             }
 
@@ -123,11 +123,11 @@ public class TestSQLLexer {
             void testWL(String sql)
             {
                 CheckPermittedResult res = SQLLexer.checkPermitted(sql);
-                assertTrue(String.format("WHITELIST: Expect rejection: %s",  sql),
+                assertTrue(String.format("testWL: Expect rejection: %s",  sql),
                            res.rejected);
-                assertFalse(String.format("WHITELIST: Expect not black-listed: %s",  sql),
+                assertFalse(String.format("testWL: Expect not black-listed: %s",  sql),
                             res.blacklisted);
-                assertTrue(String.format("WHITELIST: Expect non-null explanation: %s",  sql),
+                assertTrue(String.format("testWL: Expect non-null explanation: %s",  sql),
                            res.rejectionExplanation != null);
             }
 
@@ -135,11 +135,11 @@ public class TestSQLLexer {
             void testBL(String sql, int error, String symbol)
             {
                 CheckPermittedResult res = SQLLexer.checkPermitted(sql);
-                assertTrue(String.format("RENAME: Expect rejection: %s",  sql),
+                assertTrue(String.format("testBL: Expect rejection: %s",  sql),
                            res.rejected);
-                assertTrue(String.format("RENAME: Expect black-listed: %s",  sql),
+                assertTrue(String.format("testBL: Expect black-listed: %s",  sql),
                            res.blacklisted);
-                assertTrue(String.format("RENAME: Expect non-null explanation: %s",  sql),
+                assertTrue(String.format("testBL: Expect non-null explanation: %s",  sql),
                            res.rejectionExplanation != null);
                 String fragment;
                 switch (error) {
@@ -162,7 +162,7 @@ public class TestSQLLexer {
                 if (symbol != null) {
                     fragment += ": " + symbol;
                 }
-                assertTrue(String.format("RENAME: Expect explanation '%s...', got '%s': %s",
+                assertTrue(String.format("testBL: Expect explanation '%s...', got '%s': %s",
                            fragment, res.rejectionExplanation, sql),
                            res.rejectionExplanation.toLowerCase().contains(fragment.toLowerCase()));
             }
