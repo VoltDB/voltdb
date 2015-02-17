@@ -602,12 +602,18 @@ public class SynchronizedStatesManager {
             boolean agree = false;
             for (String memberId : memberList) {
                 byte result[];
-                result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
-                if (result != null) {
-                    if (result[0] == 0) {
-                        return RESULT_CONCENSUS.DISAGREE;
+                try {
+                    result = m_zk.getData(ZKUtil.joinZKPath(m_barrierResultsPath, memberId), false, null);
+                    if (result != null) {
+                        if (result[0] == 0) {
+                            return RESULT_CONCENSUS.DISAGREE;
+                        }
+                        agree = true;
                     }
-                    agree = true;
+                }
+                catch (NoNodeException ke) {
+                    // This can happen when a new member joins and other members detect the new member before
+                    // it's initialization code is called and a Null result is supplied to treat this as a null result.
                 }
             }
             if (agree) {
