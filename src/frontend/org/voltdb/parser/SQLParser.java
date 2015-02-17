@@ -1206,4 +1206,13 @@ public class SQLParser extends SQLPatternFactory
         // None of the above - return the untranslated input command.
         return statement;
     }
+
+    public static boolean isLoadOrRemoveClassesDirective(String stmt) {
+        String arg = loadClassesParser.parse(stmt);
+        if (arg != null)
+            return true;
+
+        arg = removeClassesParser.parse(stmt);
+        return arg != null;
+    }
 }
