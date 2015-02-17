@@ -47,6 +47,7 @@ import jline.console.CursorBuffer;
 import jline.console.KeyMap;
 import jline.console.history.FileHistory;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -58,6 +59,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 
+import com.google_voltpatches.common.base.Optional;
+import com.google_voltpatches.common.base.Strings;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class SQLCommand
@@ -514,6 +517,37 @@ public class SQLCommand
             }
         }
     }
+
+    /**
+    * This method parses a batch of SQL statements passed in as a string
+    * and verifies that they're all DDL statements.  If there are any statements
+    * that are not allowed in a DDL batch, this method will indicate the position
+    * and text of the first such statement.
+    *
+    * @param batch  A string containing one or more SQL statements
+    * @return Optional.absent() if all valid statements, or an
+    *   optional pair:
+    *     first  - the offset of the first invalid statement in the batch
+    *              (0 if it's the first stmt, 1 if it's the second, etc)
+    *     second - the text of the invalid statement
+    */
+   static Optional<Pair<Integer, String>> findInvalidStatementInDdlBatch(String batch) {
+
+       batch = Strings.nullToEmpty(batch);
+
+       List<String> stmts = SQLParser.parseQuery(batch);
+       int i = 0;
+       for (String stmt : stmts) {
+           if (! SQLParser.queryIsDDL(stmt)) {
+               return Optional.of(Pair.of(i, stmt));
+           }
+
+           ++i;
+       }
+
+       // Everything looks okay!
+       return Optional.absent();
+   }
 
     private static long m_startTime;
     private static void executeQuery(String statement)
