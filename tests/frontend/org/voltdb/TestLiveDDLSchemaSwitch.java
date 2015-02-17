@@ -55,9 +55,6 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
     //    - Verify adhoc queries
     //    - Promote
     //    - Re-verify (2)
-    static {
-        System.getProperties().put("USE_DR_V2", "TRUE");
-    }
 
     String m_pathToCatalog;
     String m_pathToDeployment;
