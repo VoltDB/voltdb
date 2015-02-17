@@ -104,9 +104,6 @@ public class TestSQLCommandBatching extends TestCase {
                 + "create table t (i integer); "
                 + "partition procedure p on table t3 column z;");
 
-        assertIsValidDdlBatch("load classes fibonacci.jar;\n"
-                + "remove classes trubonacci.jar;\n");
-
         // A longer batch.
         assertIsValidDdlBatch(
                 "create table t ( \n"
@@ -126,7 +123,6 @@ public class TestSQLCommandBatching extends TestCase {
                 + "j integer\n"
                 + ");\n"
                 + "export table t_ex;\n"
-                + "load classes purchase-data.jar;\n"
                 + "import from something something;\n");
     }
 
@@ -185,10 +181,22 @@ public class TestSQLCommandBatching extends TestCase {
                 + "i integer,\n"
                 + "j integer\n"
                 + ");\n"
-                + "export table t_ex;\n"
-                + "load classes purchase-data.jar;\n",
+                + "export table t_ex;\n",
                 4,
                 "truncate table t");
+
+        // LOAD and REMOVE CLASSES are not DDL.  They are translated to
+        // system procedure calls in sqlcmd.
+        assertIsInvalidDdlBatchAtOffset("load classes fibonacci.jar;\n"
+                + "remove classes trubonacci.jar;\n",
+                0,
+                "load classes fibonacci.jar");
+
+        assertIsInvalidDdlBatchAtOffset("remove classes trubonacci.jar;\n"
+                + "load classes fibonacci.jar;\n",
+                0,
+                "remove classes trubonacci.jar");
+
     }
 
 }

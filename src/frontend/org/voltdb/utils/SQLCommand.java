@@ -538,9 +538,7 @@ public class SQLCommand
        List<String> stmts = SQLParser.parseQuery(batch);
        int i = 0;
        for (String stmt : stmts) {
-           boolean isDdl = SQLParser.queryIsDDL(stmt);
-           boolean isLoadOrRemoveClasses = SQLParser.isLoadOrRemoveClassesDirective(stmt);
-           if (! isDdl && ! isLoadOrRemoveClasses) {
+           if (! SQLParser.queryIsDDL(stmt)) {
                return Optional.of(Pair.of(i, stmt));
            }
 
