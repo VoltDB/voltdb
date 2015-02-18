@@ -246,6 +246,7 @@ PRIMARY ENTRY POINTS
     <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit" />
+        <arg value="sqlcmdtest" />
         <arg value="distcheck" />
         <arg value="pythonfser" />
         <arg value="-Dbuild=${build}" />
@@ -2042,6 +2043,45 @@ TEST CASES
           fork="true">
         <arg line="-C=${config} -sv ${explain} -r=${reportpath} -sp=${workpath} "/>
     </java>
+</target>
+
+<target name="sqlcmdtest" depends='default' description="Test sqlcmd via scripts">
+    <property name="sqlcmdtest.dir" value="tests/sqlcmd"/>
+    <echo message="Running from ${sqlcmdtest.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/sqlcmdtest/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
+
+    <exec dir='${sqlcmdtest.dir}' executable='python2.6'>
+        <arg value='sqlcmdtest.py' />
+    </exec>
+</target>
+
+<target name="sqlcmdtestrefresh" depends='default' description="Reset result baselines for sqlcmd test scripts">
+    <property name="sqlcmdtest.dir" value="tests/sqlcmd"/>
+    <echo message="Running from ${sqlcmdtest.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/sqlcmdtest/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
+
+    <exec dir='${sqlcmdtest.dir}' executable='python2.6'>
+        <arg value='sqlcmdtest.py' />
+        <arg value='--refresh' />
+    </exec>
 </target>
 
 <!--
