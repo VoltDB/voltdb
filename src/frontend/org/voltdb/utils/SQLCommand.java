@@ -85,11 +85,11 @@ public class SQLCommand
 
     private static void executeQueryWithBatches(List<QueryInfo> queryBatchList) throws Exception {
         for (QueryInfo qryInfo: queryBatchList) {
-            if (qryInfo.batch) {
+            if (qryInfo.isBatch()) {
                 // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.query.toString() + "=======\n");
-                VoltDB.callProcedure("@AdHoc", qryInfo.query.toString());
+                VoltDB.callProcedure("@AdHoc", qryInfo.getQuery().toString());
             } else {
-                List<String> parsedQueries = SQLParser.parseQuery(qryInfo.query.toString());
+                List<String> parsedQueries = SQLParser.parseQuery(qryInfo.getQuery().toString());
                 for (String parsedQuery : parsedQueries) {
                     executeQuery(parsedQuery);
                 }
@@ -198,9 +198,9 @@ public class SQLCommand
                 if (fileInfo != null) {
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if, in the recursive call, stopOrContinue decided to continue.
-                    File file = fileInfo.file;
+                    File file = fileInfo.getFile();
                     assert(file != null);
-                    m_inFileBatchMode = fileInfo.batch;
+                    m_inFileBatchMode = fileInfo.isBatch();
 
                     List<QueryInfo> contentInfo = readScriptFile(file);
                     if (m_returningToPromptAfterError) {
@@ -211,20 +211,19 @@ public class SQLCommand
                         // so, this reset is not 100% effective (as discovered in ENG-7335).
                         m_returningToPromptAfterError = false;
                         m_inFileBatchMode = false;
-                        executeImmediate = false; // return to prompt.
                         continue;
                     }
 
                     if (contentInfo == null || contentInfo.isEmpty()) {
                         m_inFileBatchMode = false;
-                        executeImmediate = false; // return to prompt.
+                        executeImmediate = true; // Execute the FILE directive immediately
                         continue;
                     }
 
                     query = updateQueryBatch(contentInfo, queryBatchList, query);
 
                     m_inFileBatchMode = false;
-                    executeImmediate = false; // return to prompt.
+                    executeImmediate = true; // Execute the FILE directive immediately
                     continue;
                 }
 
@@ -271,20 +270,27 @@ public class SQLCommand
         return lineIn;
     }
 
-    public static class QueryInfo {
-        StringBuilder query;
-        boolean batch = false;
-
+    public static final class QueryInfo {
+        private final StringBuilder m_query;
+        private final boolean m_batch;
 
         QueryInfo(StringBuilder sb, boolean b) {
-            query = sb;
-            batch = b;
+            m_query = sb;
+            m_batch = b;
+        }
+
+        public StringBuilder getQuery() {
+            return m_query;
+        }
+
+        public boolean isBatch() {
+            return m_batch;
         }
 
         public static StringBuilder convertToStringBuilder(List<QueryInfo> queryBatchInfo) {
             StringBuilder queryString = new StringBuilder();
             for (QueryInfo qryInfo: queryBatchInfo) {
-                queryString.append(qryInfo.query);
+                queryString.append(qryInfo.getQuery());
             }
             return queryString;
         }
@@ -327,9 +333,9 @@ public class SQLCommand
 
             // If the line is a FILE command - include the content of the file into the query queue
             FileInfo fileInfo = SQLParser.parseFileStatement(line);
-            if (fileInfo != null && fileInfo.file != null) {
-                File file = fileInfo.file;
-                m_inFileBatchMode = fileInfo.batch;
+            if (fileInfo != null && fileInfo.getFile() != null) {
+                File file = fileInfo.getFile();
+                m_inFileBatchMode = fileInfo.isBatch();
 
                 // Get the line(s) from the file(s) to queue as regular database commands,
                 // or get back a null if in the recursive call, stopOrContinue decided to continue.
@@ -510,7 +516,7 @@ public class SQLCommand
             queryBatchList.add(new QueryInfo(query, false));
             query = new StringBuilder();
 
-            queryBatchList.add(new QueryInfo(contentInfo.get(0).query, true));
+            queryBatchList.add(new QueryInfo(contentInfo.get(0).getQuery(), true));
         } else {
             queryBatchList.addAll(contentInfo);
         }
@@ -574,8 +580,8 @@ public class SQLCommand
 
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if in the recursive call, stopOrContinue decided to continue.
-                    File nestedFile = nestedFileInfo.file;
-                    m_inFileBatchMode = nestedFileInfo.batch;
+                    File nestedFile = nestedFileInfo.getFile();
+                    m_inFileBatchMode = nestedFileInfo.isBatch();
 
                     List<QueryInfo> contentInfo = readScriptFile(nestedFile);
                     if (contentInfo == null || contentInfo.isEmpty()) {

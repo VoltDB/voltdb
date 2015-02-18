@@ -877,13 +877,21 @@ public class SQLParser extends SQLPatternFactory
         return null;
     }
 
-    public static class FileInfo {
-        public File file = null;
-        public boolean batch = false;
+    public static final class FileInfo {
+        private final File m_file;
+        private final boolean m_batch;
 
         FileInfo(File f, boolean b) {
-            file = f;
-            batch = b;
+            m_file = f;
+            m_batch = b;
+        }
+
+        public File getFile() {
+            return m_file;
+        }
+
+        public boolean isBatch() {
+            return m_batch;
         }
     }
 
@@ -897,11 +905,10 @@ public class SQLParser extends SQLPatternFactory
         Matcher batchMatcher = FileBatchToken.matcher(statement);
         if (batchMatcher.matches()) {
             return new FileInfo(new File(batchMatcher.group(1)), true);
-        } else {
-            Matcher matcher = FileToken.matcher(statement);
-            if (matcher.matches()) {
-                return new FileInfo(new File(matcher.group(1)), false);
-            }
+        }
+        Matcher matcher = FileToken.matcher(statement);
+        if (matcher.matches()) {
+            return new FileInfo(new File(matcher.group(1)), false);
         }
 
         return null;

@@ -555,9 +555,9 @@ public class TestSqlCmdInterface
         FileInfo fileInfo = null;
 
         fileInfo = SQLParser.parseFileStatement("FILE  -batch haha.sql;\n");
-        assertTrue(fileInfo.batch);
+        assertTrue(fileInfo.isBatch());
 
         fileInfo = SQLParser.parseFileStatement("FILE haha.sql;\n");
-        assertFalse(fileInfo.batch);
+        assertFalse(fileInfo.isBatch());
     }
 }
