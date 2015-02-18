@@ -24,7 +24,6 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -32,7 +31,6 @@ import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.junit.Test;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
-import org.voltdb.parser.SQLLexer.CheckPermittedResult;
 
 public class TestSQLLexer {
 
@@ -110,47 +108,32 @@ public class TestSQLLexer {
             // Test that a good command is not rejected.
             void testOK(String sql)
             {
-                CheckPermittedResult res = SQLLexer.checkPermitted(sql);
-                assertFalse(String.format("testOK: Expect no rejection: %s",  sql),
-                            res.rejected);
-                assertFalse(String.format("testOK: Expect no black-list: %s",  sql),
-                            res.blacklisted);
-                assertTrue(String.format("testOK: Expect null explanation: %s",  sql),
-                            res.rejectionExplanation == null);
+                String rej = SQLLexer.checkPermitted(sql);
+                assertTrue(String.format("testOK: Expect no rejection: %s: %s",  rej, sql), rej == null);
             }
 
             // Test that an unrecognized command doesn't pass the white-list.
             void testWL(String sql)
             {
-                CheckPermittedResult res = SQLLexer.checkPermitted(sql);
-                assertTrue(String.format("testWL: Expect rejection: %s",  sql),
-                           res.rejected);
-                assertFalse(String.format("testWL: Expect not black-listed: %s",  sql),
-                            res.blacklisted);
-                assertTrue(String.format("testWL: Expect non-null explanation: %s",  sql),
-                           res.rejectionExplanation != null);
+                String rej = SQLLexer.checkPermitted(sql);
+                assertTrue(String.format("testWL: Expect rejection: %s",  sql), rej != null);
             }
 
             // Test black-listed statements.
-            void testBL(String sql, int error, String symbol)
+            void testBL(String sql, int error, String typeName)
             {
-                CheckPermittedResult res = SQLLexer.checkPermitted(sql);
-                assertTrue(String.format("testBL: Expect rejection: %s",  sql),
-                           res.rejected);
-                assertTrue(String.format("testBL: Expect black-listed: %s",  sql),
-                           res.blacklisted);
-                assertTrue(String.format("testBL: Expect non-null explanation: %s",  sql),
-                           res.rejectionExplanation != null);
+                String rej = SQLLexer.checkPermitted(sql);
+                assertTrue(String.format("testBL: Expect rejection: %s",  sql), rej != null);
                 String fragment;
                 switch (error) {
                 case REN_UNIMP:
-                    fragment = "ALTER/RENAME is not yet supported for object type";
+                    fragment = "AdHoc DDL ALTER/RENAME is not yet supported";
                     break;
                 case REN_UNK:
-                    fragment = "Unknown ALTER/RENAME object type";
+                    fragment = String.format("AdHoc DDL ALTER/RENAME refers to an unknown object type '%s'", typeName);
                     break;
                 case REN_UNSUP:
-                    fragment = "Unsupported ALTER/RENAME object type";
+                    fragment = String.format("AdHoc DDL ALTER/RENAME is not supported for object type '%s'", typeName);
                     break;
                 case STMT_UNSUP:
                     fragment = "Statement is not yet supported";
@@ -159,12 +142,8 @@ public class TestSQLLexer {
                     fragment = null;    // humor the compiler
                     break;
                 }
-                if (symbol != null) {
-                    fragment += ": " + symbol;
-                }
-                assertTrue(String.format("testBL: Expect explanation '%s...', got '%s': %s",
-                           fragment, res.rejectionExplanation, sql),
-                           res.rejectionExplanation.toLowerCase().contains(fragment.toLowerCase()));
+                String msg = String.format("testBL: Expect explanation '%s...', got '%s': %s", fragment, rej, sql);
+                assertTrue(msg, rej.toLowerCase().contains(fragment.toLowerCase()));
             }
         }
 

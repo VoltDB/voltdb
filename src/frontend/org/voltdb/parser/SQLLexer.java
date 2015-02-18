@@ -240,39 +240,13 @@ public class SQLLexer extends SQLPatternFactory
     }
 
     /**
-     * Provides information about why a statement was rejected by checkPermitted().
-     */
-    public static class CheckPermittedResult
-    {
-        /// True if rejected
-        public boolean rejected;
-        /// True if rejected by blacklist
-        public boolean blacklisted;
-        /// Non-null with explanation of rejection
-        public String rejectionExplanation;
-
-        /**
-         * Constructor
-         * @param rejected              rejection flag
-         * @param blacklisted           blacklisted flag
-         * @param rejectionExplanation  explanation of rejection (may be null)
-         */
-        CheckPermittedResult(boolean rejected, boolean blacklisted, String rejectionExplanation)
-        {
-            this.rejected = rejected;
-            this.blacklisted = blacklisted;
-            this.rejectionExplanation = rejectionExplanation;
-        }
-    }
-
-    /**
      * Naive filtering for stuff we haven't implemented yet.
      * Hopefully this gets whittled away and eventually disappears.
      *
      * @param sql  statement to check
-     * @return     result (always non-null) with rejection flag and explanation
+     * @return     rejection explanation string or null if accepted
      */
-    public static CheckPermittedResult checkPermitted(String sql)
+    public static String checkPermitted(String sql)
     {
         /*
          *  IMPORTANT: Black-lists are checked first because they know more about
@@ -286,8 +260,7 @@ public class SQLLexer extends SQLPatternFactory
         for (CheckedPattern cp : BLACKLISTS) {
             CheckedPattern.Result result = cp.check(sql);
             if (result.matcher != null) {
-                return new CheckPermittedResult(true, true,
-                    String.format("Statement: %s, failed blacklist: %s", sql, result.explanation));
+                return String.format("%s, in statement: %s", result.explanation, sql);
             }
         }
 
@@ -301,12 +274,11 @@ public class SQLLexer extends SQLPatternFactory
             }
         }
         if (!hadWLMatch) {
-            return new CheckPermittedResult(true, false,
-                String.format("Statement: %s, failed to match any whitelist", sql));
+            return String.format("AdHoc DDL contains an unsupported statement: %s", sql);
         }
 
         // The statement is permitted.
-        return new CheckPermittedResult(false, false, null);
+        return null;
     }
 
     /**
@@ -696,16 +668,16 @@ public class SQLLexer extends SQLPatternFactory
             assert typeName != null;
             ObjectToken token = findObjectToken(typeName);
             if (token == null) {
-                return String.format("Unknown ALTER/RENAME object type: %s", typeName);
+                return String.format("AdHoc DDL ALTER/RENAME refers to an unknown object type '%s'", typeName);
             }
             if (isParent) {
                 // The parent is okay, still need to check the child.
                 return null;
             }
             if (!token.renameable) {
-                return String.format("Unsupported ALTER/RENAME object type: %s", typeName);
+                return String.format("AdHoc DDL ALTER/RENAME is not supported for object type '%s'", typeName);
             }
-            return String.format("ALTER/RENAME is not yet supported for object type: %s", typeName);
+            return "AdHoc DDL ALTER/RENAME is not yet supported";
         }
 
         /**
