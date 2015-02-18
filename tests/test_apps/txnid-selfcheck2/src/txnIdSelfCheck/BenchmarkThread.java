@@ -21,17 +21,40 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package txnIdSelfCheck.procedures;
+package txnIdSelfCheck;
 
-import org.voltdb.VoltTable;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.client.ClientResponse;
 
-public class ReadMPInProcAdHoc extends ReadMP {
+class BenchmarkThread extends Thread {
 
-    @SuppressWarnings("deprecation")
-    @Override
-    public VoltTable[] run(byte cid) {
-        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
-        return voltExecuteSQL(true);
+    VoltLogger log;
+
+    BenchmarkThread() {
+        super();
+        setDaemon(true);
+        setUncaughtExceptionHandler(Benchmark.h);
+        log = new VoltLogger(getClass().getSimpleName());
     }
 
+    public void hardStop(String msg) {
+        Benchmark.hardStop(msg);
+    }
+
+    public void hardStop(Exception e) {
+        Benchmark.hardStop(e);
+    }
+
+    public void hardStop(String msg, Exception e) {
+        Benchmark.hardStop(msg, e);
+    }
+
+    public void hardStop(String msg, ClientResponse resp) {
+        Benchmark.hardStop(msg, (ClientResponseImpl) resp);
+    }
+
+    public void hardStop(String msg, ClientResponseImpl resp) {
+        Benchmark.hardStop(msg, resp);
+    }
 }
