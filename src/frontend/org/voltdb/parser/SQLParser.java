@@ -881,8 +881,8 @@ public class SQLParser extends SQLPatternFactory
         private final File m_file;
         private final boolean m_batch;
 
-        FileInfo(File f, boolean b) {
-            m_file = f;
+        FileInfo(String fileName, boolean b) {
+            m_file = new File(fileName);
             m_batch = b;
         }
 
@@ -904,11 +904,11 @@ public class SQLParser extends SQLPatternFactory
     {
         Matcher batchMatcher = FileBatchToken.matcher(statement);
         if (batchMatcher.matches()) {
-            return new FileInfo(new File(batchMatcher.group(1)), true);
+            return new FileInfo(batchMatcher.group(1), true);
         }
         Matcher matcher = FileToken.matcher(statement);
         if (matcher.matches()) {
-            return new FileInfo(new File(matcher.group(1)), false);
+            return new FileInfo(matcher.group(1), false);
         }
 
         return null;

@@ -86,8 +86,15 @@ public class SQLCommand
     private static void executeQueryWithBatches(List<QueryInfo> queryBatchList) throws Exception {
         for (QueryInfo qryInfo: queryBatchList) {
             if (qryInfo.isBatch()) {
-                // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.query.toString() + "=======\n");
-                VoltDB.callProcedure("@AdHoc", qryInfo.getQuery().toString());
+                // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.getQuery().toString() + "=======\n");
+                // TODO: check the valid DDL batch probably here
+                ClientResponse response = VoltDB.callProcedure("@AdHoc", qryInfo.getQuery().toString());
+                if (response.getStatus() != ClientResponse.SUCCESS) {
+                    throw new Exception("Execution Error: " + response.getStatusString());
+                }
+                // Assert the current DDL AdHoc batch call behavior
+                assert(response.getResults().length == 1);
+                System.out.println("Batch command succeeded.");
             } else {
                 List<String> parsedQueries = SQLParser.parseQuery(qryInfo.getQuery().toString());
                 for (String parsedQuery : parsedQueries) {
@@ -170,7 +177,7 @@ public class SQLCommand
                 // lines, so this call would move down a ways.
                 RecallableSessionLines.add(line);
 
-                if (executesShowCmdAsSimpleDirective(line)) {
+                if (executesAsSimpleDirective(line)) {
                     executeImmediate = false; // return to prompt.
                     continue;
                 }
@@ -220,7 +227,8 @@ public class SQLCommand
                         continue;
                     }
 
-                    query = updateQueryBatch(contentInfo, queryBatchList, query);
+                    updateQueryBatch(contentInfo, queryBatchList, query);
+                    query = new StringBuilder();
 
                     m_inFileBatchMode = false;
                     executeImmediate = true; // Execute the FILE directive immediately
@@ -345,7 +353,8 @@ public class SQLCommand
                     continue;
                 }
 
-                query = updateQueryBatch(contentInfo, queryBatchList, query);
+                updateQueryBatch(contentInfo, queryBatchList, query);
+                query = new StringBuilder();
 
                 m_inFileBatchMode = false;
             } else {
@@ -360,7 +369,7 @@ public class SQLCommand
     /// input loop can proceed to the next line.
     //TODO: There have been suggestions that some or all of these directives could be made
     // available in non-interactive contexts. This function is available to enable that.
-    private static boolean executesShowCmdAsSimpleDirective(String line) throws Exception {
+    private static boolean executesAsSimpleDirective(String line) throws Exception {
 
         // SHOW or LIST <blah> statement
         String subcommand = SQLParser.parseShowStatementSubcommand(line);
@@ -508,20 +517,19 @@ public class SQLCommand
     }
 
     // function update the queryBatchList and query
-    private static StringBuilder updateQueryBatch(List<QueryInfo> contentInfo,
+    private static void updateQueryBatch(List<QueryInfo> contentInfo,
             List<QueryInfo> queryBatchList, StringBuilder query) {
+        // found contents for FILE cmd, flush the previous lines into a batch
+        if (query.length() > 0) {
+            queryBatchList.add(new QueryInfo(query, false));
+        }
+
         if (m_inFileBatchMode) {
             assert(contentInfo.size() == 1);
-            // found contents for FILE cmd, flush the previous lines into a batch
-            queryBatchList.add(new QueryInfo(query, false));
-            query = new StringBuilder();
-
             queryBatchList.add(new QueryInfo(contentInfo.get(0).getQuery(), true));
         } else {
             queryBatchList.addAll(contentInfo);
         }
-
-        return query;
     }
 
     public static List<QueryInfo> readScriptFile(File file)
@@ -597,7 +605,8 @@ public class SQLCommand
                         continue;
                     }
 
-                    query = updateQueryBatch(contentInfo, queryBatchList, query);
+                    updateQueryBatch(contentInfo, queryBatchList, query);
+                    query = new StringBuilder();
 
                 } else {
                     // normal commands other than FILE
