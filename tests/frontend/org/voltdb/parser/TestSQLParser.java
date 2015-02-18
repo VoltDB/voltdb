@@ -106,5 +106,20 @@ public class TestSQLParser extends TestCase {
         assertFalse(SQLParser.batchBeginsWithDDLKeyword(
                 "/* create table was done earlier... */\n"
                 + "update t set i = 70 where i > 69;"));
+
+        // Near misses that might appear in a ddl.sql file
+        // but that cannot be batched
+
+        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+                "load classes foo-bar.jar"));
+
+        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+                "remove classes foo-bar.jar"));
+
+        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+                "exec SelectAllRowsWithKey 10;"));
+
+        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+                "file \"mysqlcommands.sql\";"));
     }
 }
