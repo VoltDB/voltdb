@@ -130,7 +130,7 @@ $(document).ready(function () {
     $('#showHideGraphBlock').click(function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
-            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false) {
+            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false) {
                 var graphState = $("#mainGraphBlock").css('display');
                 if (graphState == 'none') {
                     $(".showhideIcon").removeClass('collapsed');
@@ -554,7 +554,7 @@ var loadPage = function (serverName, portid) {
         });
 
         voltDbRenderer.GetPartitionIdleTimeInformation(function(partitionDetail) {
-            MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
+                MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
         var loadProcedureInformations = function (procedureMetadata) {
@@ -1324,6 +1324,7 @@ var configureUserPreferences = function () {
     userPreference["serverRAM"] = {};
     userPreference["clusterLatency"] = {};
     userPreference["clusterTransactions"] = {};
+    userPreference["partitionIdleTime"] = {};
     userPreference["storedProcedures "] = {};
     userPreference["databaseTables "] = {};
 
@@ -1435,7 +1436,7 @@ var getUserPreferences = function () {
     } catch (e) {
 
         voltDbRenderer.userPreferences = {};
-        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables"];
+        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime"];
         for (var i = 0; i < preferencesList.length; i++) {
             voltDbRenderer.userPreferences[preferencesList[i]] = true;
         }
@@ -1473,6 +1474,11 @@ var showHideGraph = function (userpreferences) {
     else
         $("#chartClusterTransactions").show();
 
+    if (userpreferences["PartitionIdleTime"] == false)
+        $("#chartPartitionIdleTime").hide();
+    else
+        $("#chartPartitionIdleTime").show();
+
     if (userpreferences["StoredProcedures"] == false)
         $("#tblStoredProcedures").hide();
     else
@@ -1496,7 +1502,7 @@ var showHideGraph = function (userpreferences) {
 function ChangeGraphLabelColor() {
     if ($.cookie("user-preferences") != undefined) {
         var userPreferences = $.parseJSON($.cookie("user-preferences"));
-        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false) {
+        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false) {
             $('#showHideGraphBlock').css('color', '#000000');
             $("#GraphBlock").removeClass("graphOpacity");
         } else {
@@ -1519,7 +1525,7 @@ function ChangeTableProcedureLabelColor() {
 
 // Graph Spacing adjustment on preference change
 var adjustGraphSpacing = function () {
-    var graphList = [$("#chartServerCPU"), $("#chartServerRAM"), $("#chartClusterLatency"), $("#chartClusterTransactions")];
+    var graphList = [$("#chartServerCPU"), $("#chartServerRAM"), $("#chartClusterLatency"), $("#chartClusterTransactions"), $("#chartPartitionIdleTime")];
 
     var css = "left";
 

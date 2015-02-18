@@ -76,16 +76,20 @@
         function getEmptyDataForPartition() {
             var count = 0;
             var dataPartition = [];
+            
             if (dataParitionDetails != undefined) {
                 $.each(dataParitionDetails, function(key, value) {
                     $.each(value, function(datatype, datatypeValue) {
                         $.each(datatypeValue, function(partitionKey, partitionValue) {
+                            var arr = [];
+                            arr.push(emptyData[0]);
+                            arr.push(emptyData[emptyData.length - 1]);
                             if (datatype == "data") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyData(), color: "#D3D3D3" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyData(), color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyData(), color: "#4C76B0" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
                             dataMapperSec[partitionKey] = count;
                             count++;
@@ -103,12 +107,15 @@
                 $.each(dataParitionDetails, function(key, value) {
                     $.each(value, function(datatype, datatypeValue) {
                         $.each(datatypeValue, function(partitionKey, partitionValue) {
+                            var arr = [];
+                            arr.push(emptyDataForMinutes[0]);
+                            arr.push(emptyDataForMinutes[emptyDataForMinutes.length - 1]);
                             if (datatype == "data") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyDataForMinutes(), color: "#D3D3D3" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyDataForMinutes(), color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyDataForMinutes(), color: "#4C76B0" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
                             dataMapperMin[partitionKey] = count;
                             count++;
@@ -126,12 +133,15 @@
                 $.each(dataParitionDetails, function(key, value) {
                     $.each(value, function(datatype, datatypeValue) {
                         $.each(datatypeValue, function(partitionKey, partitionValue) {
+                            var arr = [];
+                            arr.push(emptyDataForDays[0]);
+                            arr.push(emptyDataForDays[emptyDataForDays.length - 1]);
                             if (datatype == "data") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyDataForDays(), color: "#D3D3D3" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyDataForDays(), color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
-                                dataPartition.push({ key: partitionKey, values: getEmptyDataForDays(), color: "#4C76B0" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
                             dataMapperDay[partitionKey] = count;
                             count++;
@@ -840,7 +850,6 @@
                 MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
                 cpuMinCount = 0;
             }
-
             cpuData = sliceFirstData(cpuData, dataView.Seconds);
             cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
             MonitorGraphUI.Monitors.cpuData = cpuData;
@@ -881,7 +890,6 @@
             var partitionDataMin = monitor.partitionDataMin;
             var partitionDataDay = monitor.partitionDataDay;
             var partitionDetail = partitionDetails;
-
             var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
             $.each(partitionDetail["partitionDetail"], function (datatype, datavalue) {
                 $.each(datavalue, function (partitionKey, partitionValue) {
@@ -896,8 +904,7 @@
                     if (partitionSecCount >= 6 || monitor.partitionFirstData) {
                         if (!partitionDataMin.hasOwnProperty(keyValue)) {
                             var keyIndex = dataMapperMin[keyValue];
-                            //partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
-                            partitionDataMin[keyIndex]["values"] = partitionDataMin[keyIndex]["values"].slice(1);
+                            partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
                             partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
                             MonitorGraphUI.Monitors.partitionDataMin = partitionDataMin;
                         }
@@ -905,16 +912,14 @@
 
                     if (partitionMinCount >= 60 || monitor.partitionFirstData) {
                         var keyIndexDay = dataMapperDay[keyValue];
-                        partitionDataDay[keyIndexDay]["values"] = partitionDataDay[keyIndexDay]["values"].slice(1);
+                        partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
                         partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
                         MonitorGraphUI.Monitors.partitionDataDay = partitionDataDay;
                     }
-
                     var keyIndexSec = dataMapperSec[keyValue];
-                    partitionData[keyIndexSec]["values"] = partitionData[keyIndexSec]["values"].slice(1);
-                    partitionData[keyIndexSec]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
+                    partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
+                    partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
                     MonitorGraphUI.Monitors.partitionData = partitionData;
-                    
                 });
             });
             monitor.partitionFirstData = false;
