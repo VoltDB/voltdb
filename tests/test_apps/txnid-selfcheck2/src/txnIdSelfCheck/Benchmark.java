@@ -670,7 +670,7 @@ public class Benchmark {
             exitcode = reportDeadThread(rlt);
         */if (! readThread.isAlive())
             exitcode = reportDeadThread(readThread);
-        if (! adHocMayhemThread.isAlive())
+        if (! config.disableadhoc && ! adHocMayhemThread.isAlive())
             exitcode = reportDeadThread(adHocMayhemThread);
         if (! idpt.isAlive())
             exitcode = reportDeadThread(idpt);

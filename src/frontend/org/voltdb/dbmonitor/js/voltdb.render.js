@@ -618,10 +618,11 @@ function alertNodeClicked(obj) {
                     adminConfigValues['logSegmentSize'] = data.commandlog.logsize;
                 }
 
+                //Export
                 if (data.export != null) {
                     adminConfigValues['export'] = data.export.enabled;
                     adminConfigValues['targets'] = data.export.target;
-                    adminConfigValues['properties'] = data.export.configuration.property;
+                    adminConfigValues['configuration'] = data.export.configuration;
                 }
 
                 //Advanced 
