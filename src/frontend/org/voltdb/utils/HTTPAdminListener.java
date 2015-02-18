@@ -61,6 +61,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Group;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -535,7 +536,7 @@ public class HTTPAdminListener {
             m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
         }
 
-        private RoleType[] buildRoleStruct() {
+        private RoleType[] buildRoles() {
             CatalogMap<Group> groups = VoltDB.instance().getCatalogContext().database.getGroups();
             RoleType[] rolls = new RoleType[groups.size()];
             int grpCnt = 0;
@@ -556,6 +557,26 @@ public class HTTPAdminListener {
                 grpCnt++;
             }
             return rolls;
+        }
+
+        private RoleType findRole(String role) {
+            for (Group grp : VoltDB.instance().getCatalogContext().database.getGroups()) {
+                if (role.equalsIgnoreCase(grp.getTypeName())) {
+                    EnumSet<Permission> perms = Permission.getPermissionSetForGroup(grp);
+                    String[] permissions = new String[perms.size()];
+                    int permCnt = 0;
+                    for (Permission perm : perms) {
+                        permissions[permCnt] = perm.toString();
+                        permCnt++;
+                    }
+                    boolean builtIn = false;
+                    if (role.equalsIgnoreCase("administrator") || role.equalsIgnoreCase("user")) {
+                        builtIn = true;
+                    }
+                    return new RoleType(role, builtIn, permissions);
+                }
+            }
+            return null;
         }
 
         @Override
@@ -592,7 +613,7 @@ public class HTTPAdminListener {
                 if (request.getMethod().equalsIgnoreCase("POST")) {
                     handleUpdateRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
                 } else if (request.getMethod().equalsIgnoreCase("PUT")) {
-                    handleNewRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    handleCreateRole(jsonp, target, baseRequest, request, response, authResult.m_client);
                 } else if (request.getMethod().equalsIgnoreCase("DELETE")) {
                     handleRemoveRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
                 } else {
@@ -600,7 +621,7 @@ public class HTTPAdminListener {
                     if (jsonp != null) {
                         response.getWriter().write(jsonp + "(");
                     }
-                    m_mapper.writeValue(response.getWriter(), buildRoleStruct());
+                    m_mapper.writeValue(response.getWriter(), buildRoles());
                     if (jsonp != null) {
                         response.getWriter().write(")");
                     }
@@ -613,19 +634,13 @@ public class HTTPAdminListener {
             }
         }
 
+        //Method for handling POST
         private void handleUpdateRoles(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
                            HttpServletResponse response, Client client)
                            throws IOException, ServletException {
-            RoleType[] roles = buildRoleStruct();
-            RoleType role = null;
-            for (int cnt = 0; cnt<roles.length; cnt++) {
-                if (target.split("/")[1].equals(roles[cnt].getName())) {
-                    role = roles[cnt];
-                    break;
-                }
-            }
+            RoleType role = findRole(target.split("/")[1]);
             if (role == null) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role not found"));
@@ -650,10 +665,17 @@ public class HTTPAdminListener {
                     return;
                 }
 
-                Group grp = VoltDB.instance().getCatalogContext().database.getGroups().get(newRole.name);
-                Permission.setPermissionsInGroup(grp, Permission.getPermissionsFromAliases(new ArrayList<String>(Arrays.asList(newRole.getPermissions()))));
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Role Updated."));
-                notifyOfCatalogUpdate();
+                ClientResponse adhocResponse = client.callProcedure("@AdHoc",
+                        "DROP ROLE " + role.getName() + ";" +
+                        "CREATE ROLE " + newRole.getName() + " WITH " + StringUtils.join(newRole.getPermissions(), ","));
+                if (adhocResponse.getStatus() < 0) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
+                } else {
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), "Role updated"));
+                    notifyOfCatalogUpdate();
+                }
             } catch (Exception ex) {
                 logger.error("Failed to update role from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -661,18 +683,17 @@ public class HTTPAdminListener {
             }
         }
 
-        private void handleNewRoles(String jsonp, String target,
+        //Method for handling PUT
+        private void handleCreateRole(String jsonp, String target,
                 Request baseRequest,
                 HttpServletRequest request,
                 HttpServletResponse response, Client client)
                 throws IOException, ServletException {
-            RoleType[] roles = buildRoleStruct();
-            for (int cnt = 0; cnt<roles.length; cnt++) {
-                if (target.split("/")[1].equals(roles[cnt].getName())) {
-                    response.setStatus(HttpServletResponse.SC_CONFLICT);
-                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role already exists"));
-                    return;
-                }
+            RoleType role = findRole(target.split("/")[1]);
+            if (role != null && role.getBuiltIn()) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Built-in roles are not modifiable"));
+                return;
             }
             String update = request.getParameter("role");
             if (update == null || update.length() == 0) {
@@ -688,15 +709,30 @@ public class HTTPAdminListener {
                     return;
                 }
 
-                ClientResponse adhocResponse = client.callProcedure("@AdHoc",
-                        "CREATE ROLE " + newRole.getName() + " WITH " + StringUtils.join(newRole.getPermissions(), ","));
-                if (adhocResponse.getStatus() < 0) {
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                if (role == null) {
+                    ClientResponse adhocResponse = client.callProcedure("@AdHoc",
+                            "CREATE ROLE " + newRole.getName() + " WITH " + StringUtils.join(newRole.getPermissions(), ","));
+                    if (adhocResponse.getStatus() < 0) {
+                        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                        response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
+                    } else {
+                        response.setStatus(HttpServletResponse.SC_CREATED);
+                        response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), "Role created"));
+                        notifyOfCatalogUpdate();
+                    }
                 } else {
-                    response.setStatus(HttpServletResponse.SC_CREATED);
+                    ClientResponse adhocResponse = client.callProcedure("@AdHoc",
+                            "DROP ROLE" + role.getName() + ";" +
+                            "CREATE ROLE " + newRole.getName() + " WITH " + StringUtils.join(newRole.getPermissions(), ","));
+                    if (adhocResponse.getStatus() < 0) {
+                        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                        response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
+                    } else {
+                        response.setStatus(HttpServletResponse.SC_OK);
+                        response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), "Role updated"));
+                        notifyOfCatalogUpdate();
+                    }
                 }
-                response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
-                notifyOfCatalogUpdate();
             } catch (Exception ex) {
                 logger.error("Failed to create role from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -704,19 +740,13 @@ public class HTTPAdminListener {
             }
         }
 
+        //Method for handling DELETE
         private void handleRemoveRoles(String jsonp, String target,
                 Request baseRequest,
                 HttpServletRequest request,
                 HttpServletResponse response, Client client)
                 throws IOException, ServletException {
-            RoleType[] roles = buildRoleStruct();
-            RoleType role = null;
-            for (int cnt = 0; cnt<roles.length; cnt++) {
-                if (target.split("/")[1].equals(roles[cnt].getName())) {
-                    role = roles[cnt];
-                    break;
-                }
-            }
+            RoleType role = findRole(target.split("/")[1]);
             if (role == null) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role not found"));
@@ -732,9 +762,12 @@ public class HTTPAdminListener {
                         "DROP ROLE " + role.getName());
                 if (adhocResponse.getStatus() < 0) {
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
+                } else {
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), "Role deleted"));
+                    notifyOfCatalogUpdate();
                 }
-                response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
-                notifyOfCatalogUpdate();
             } catch (Exception ex) {
                 logger.error("Failed to create role from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);

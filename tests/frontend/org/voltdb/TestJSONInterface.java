@@ -1618,6 +1618,10 @@ public class TestJSONInterface extends TestCase {
             Map<String,String> params = new HashMap<>();
             params.put("role", map);
             putUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 201,  "application/json", params);
+            map = mapper.writeValueAsString(new RoleType("user", false, putPerms));
+            params = new HashMap<>();
+            params.put("role", map);
+            putUrlOverJSON("http://localhost:8095/roles/user/", null, null, null, 403,  "application/json", params);
 
             //Get roles
             json = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
@@ -1637,6 +1641,10 @@ public class TestJSONInterface extends TestCase {
             params = new HashMap<>();
             params.put("role", map);
             postUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 200,  "application/json", params);
+            map = mapper.writeValueAsString(new RoleType("user", false, putPerms));
+            params = new HashMap<>();
+            params.put("role", map);
+            postUrlOverJSON("http://localhost:8095/roles/user/", null, null, null, 403,  "application/json", params);
 
             //Get roles
             json = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
@@ -1651,6 +1659,7 @@ public class TestJSONInterface extends TestCase {
 
             //Delete roles
             deleteUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 200,  "application/json");
+            deleteUrlOverJSON("http://localhost:8095/roles/user/", null, null, null, 403,  "application/json");
 
             //Get roles
             json = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
