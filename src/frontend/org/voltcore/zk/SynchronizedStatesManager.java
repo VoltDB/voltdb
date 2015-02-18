@@ -1385,10 +1385,10 @@ public class SynchronizedStatesManager {
             }
             if (m_log.isDebugEnabled()) {
                 if (m_pendingProposal.hasRemaining()) {
-                    m_log.debug(m_stateMachineId + ": New Task request " + taskToString(m_pendingProposal.asReadOnlyBuffer()));
+                    m_log.debug(m_stateMachineId + ": Requested new Task " + taskToString(m_pendingProposal.asReadOnlyBuffer()));
                 }
                 else {
-                    m_log.debug(m_stateMachineId + ": New unspecified Task");
+                    m_log.debug(m_stateMachineId + ": Requested unspecified new Task");
 
                 }
             }
