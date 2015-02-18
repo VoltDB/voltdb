@@ -1,9 +1,6 @@
 ﻿var ispopupRevoked = false;
 
 $(document).ready(function () {
-    voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
-        MonitorGraphUI.GetPartitionDetailData(partitionDetail);
-    });
     var rv = -1;
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
@@ -290,6 +287,10 @@ var loadPage = function (serverName, portid) {
     loadSQLQueryPage(serverName, portid, userName);
     VoltDbUI.refreshSqlAndSchemaTab();
 
+    voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
+        MonitorGraphUI.GetPartitionDetailData(partitionDetail);
+    });
+
     var showAdminPage = function () {
         if (!VoltDbAdminConfig.isAdmin) {
             VoltDbAdminConfig.isAdmin = true;
@@ -554,6 +555,7 @@ var loadPage = function (serverName, portid) {
         });
 
         voltDbRenderer.GetPartitionIdleTimeInformation(function(partitionDetail) {
+            if (getCurrentServer() != undefined)
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
