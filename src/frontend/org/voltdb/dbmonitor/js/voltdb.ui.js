@@ -268,7 +268,10 @@ $(document).ready(function () {
         loadPage(serverName, portid);
     });
 
-    //window.onscroll = function () { if (VoltDbUI.isSchemaTabLoading) window.scrollTo(0, 0); };
+    window.onscroll = function () {
+        if (VoltDbUI.isSchemaTabLoading && VoltDbUI.CurrentTab == NavigationTabs.Schema)
+            window.scrollTo(0, 0);
+    };
 });
 
 function logout() {
@@ -1631,9 +1634,10 @@ var adjustGraphSpacing = function () {
             schemaHtml = schemaHtml + $('#schema').html();
             $('#schema').html(schemaHtml);
 
-            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';              
+            var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
             var templateJavascript = "js/template.js";
 
+            
             $.post(templateUrl, function (result) {
                 result = result.replace('<!--##SIZES##>', '');
                 var body = $(result).filter("#wrapper").html();
