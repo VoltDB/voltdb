@@ -1929,7 +1929,7 @@ function alertNodeClicked(obj) {
                 }
                 timeStamp = info[colIndex["TIMESTAMP"]];
             });
-            if (previousSiteId != mpiIndex[previousHost]) {
+            if (previousHostKey!="" && previousSiteId != mpiIndex[previousHost]) {
                 starvMinData[previousHostKey + '(Min)'] = minPer;
                 starvMaxData[previousHostKey + '(Max)'] = maxPer;
             }
@@ -1940,8 +1940,10 @@ function alertNodeClicked(obj) {
             }
             partitionDetail["partitionDetail"]["data"] = starvStats;
             partitionDetail["partitionDetail"]["dataMPI"] = starvMpiData;
-            partitionDetail["partitionDetail"]["dataMax"] = starvMaxData;
-            partitionDetail["partitionDetail"]["dataMin"] = starvMinData;
+            if (!$.isEmptyObject(starvMaxData))
+                partitionDetail["partitionDetail"]["dataMax"] = starvMaxData;
+            if (!$.isEmptyObject(starvMinData))
+                partitionDetail["partitionDetail"]["dataMin"] = starvMinData;
             partitionDetail["partitionDetail"]["timeStamp"] = timeStamp;
         };
 
