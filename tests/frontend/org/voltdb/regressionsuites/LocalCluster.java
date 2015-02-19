@@ -372,6 +372,10 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     void startLocalServer(int hostId, boolean clearLocalDataDirectories) {
+        startLocalServer(hostId, clearLocalDataDirectories, templateCmdLine.m_startAction);
+    }
+
+    void startLocalServer(int hostId, boolean clearLocalDataDirectories, StartAction action) {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
         try {
@@ -390,6 +394,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
+        cmdln.startCommand(action);
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
@@ -800,15 +805,13 @@ public class LocalCluster implements VoltServerConfig {
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, StartAction startAction) {
 
-        // Lookup the client interface port of the rejoin host
-        // I have no idea why this code ignores the user's input
-        // based on other state in this class except to say that whoever wrote
-        // it this way originally probably eats kittens and hates cake.
-        if (rejoinHostId == null || m_hasLocalServer) {
-            rejoinHostId = 0;
-        }
-
         int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
+
+        if (hostId == 0 && m_hasLocalServer) {
+            templateCmdLine.leaderPort(portNoToRejoin);
+            startLocalServer(rejoinHostId, false, StartAction.REJOIN);
+            return true;
+        }
 
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
@@ -893,6 +896,7 @@ public class LocalCluster implements VoltServerConfig {
                 m_pipes.set(hostId, ptf);
                 // replace the existing dead proc
                 m_cluster.set(hostId, proc);
+                m_cmdLines.set(hostId, rejoinCmdLn);
             }
             Thread t = new Thread(ptf);
             t.setName("ClusterPipe:" + String.valueOf(hostId));
@@ -915,13 +919,15 @@ public class LocalCluster implements VoltServerConfig {
             if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
             while (ptf.m_witnessedReady.get() != true) {
                 // if eof, then no point in waiting around
-                if (ptf.m_eof.get())
+                if (ptf.m_eof.get()) {
+                    System.out.println("PipeToFile: Reported EOF");
                     break;
-
+                }
                 // if process is dead, no point in waiting around
-                if (isProcessDead(ptf.getProcess()))
+                if (isProcessDead(ptf.getProcess())) {
+                    System.out.println("PipeToFile: Reported Dead Process");
                     break;
-
+                }
                 try {
                     // wait for explicit notification
                     ptf.wait(1000);
