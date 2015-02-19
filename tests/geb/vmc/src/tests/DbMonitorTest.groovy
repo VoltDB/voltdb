@@ -140,4 +140,175 @@ class DbMonitorTest extends TestBase {
         debugPrint "Memory Usage (0)        : " + page.getMemoryUsage(serverNames.get(0))
         debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
     }
+
+    // HEADER TESTS
+
+	def "header banner exists" () {
+		when:
+			at DbMonitorPage
+		then:
+			header.banner.isPresent()
+	}
+
+
+    def "header image exists" () {
+        when:
+            at DbMonitorPage
+        then:
+            header.image.isDisplayed();
+    }
+
+    def "header username exists" () {
+        when:
+            at DbMonitorPage
+        then:
+            header.username.isDisplayed();
+    }
+
+    def "header logout exists" () {
+        when:
+            at DbMonitorPage
+        then:
+            header.logout.isDisplayed();
+    }
+
+    def "header help exists" () {
+        when:
+            at DbMonitorPage
+        then:
+            header.help.isDisplayed();
+    }
+
+    // HEADER TAB TESTS
+
+    def "header tab dbmonitor exists" ()  {
+        when:
+            at DbMonitorPage
+        then:
+            header.tabDBMonitor.isDisplayed();
+            header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
+    }
+
+    def "header tab admin exists" ()  {
+        when:
+            at DbMonitorPage
+        then:
+            header.tabAdmin.isDisplayed();
+            header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
+    }
+
+    def "header tab schema exists" ()  {
+        when:
+            at DbMonitorPage
+        then:
+            header.tabSchema.isDisplayed();
+            header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
+    }
+
+    def "header tab sql query exists" ()  {
+        when:
+            at DbMonitorPage
+        then:
+            header.tabSQLQuery.isDisplayed();
+            header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
+    }
+
+    // USERNAME TEST
+
+    def "header username check" () {
+        def $line
+        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+
+        when:
+            at DbMonitorPage
+        then:
+            header.username.text().equals($line);
+    }
+
+    def "header username click and close" () {
+        when:
+            at DbMonitorPage
+        then:
+            header.username.click()
+            header.logoutPopup.isDisplayed()
+            header.logoutPopupTitle.isDisplayed()
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+            header.popupClose.click()
+    }
+
+    def "header username click and cancel" () {
+        when:
+            at DbMonitorPage
+        then:
+            header.username.click()
+            header.logoutPopup.isDisplayed()
+            header.logoutPopupTitle.isDisplayed()
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+            header.logoutPopupCancelButton.click()
+    }
+
+
+    // LOGOUT TEST
+
+    def "logout button test close" ()  {
+        when:
+            at DbMonitorPage
+        then:
+            header.logout.click()
+            header.logoutPopup.isDisplayed()
+            header.logoutPopupTitle.isDisplayed()
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+            header.popupClose.click()
+
+    }
+
+    def "logout button test cancel" ()  {
+        when:
+        at DbMonitorPage
+        then:
+        header.logout.click()
+        header.logoutPopup.isDisplayed()
+        header.logoutPopupTitle.isDisplayed()
+        header.logoutPopupOkButton.isDisplayed()
+        header.logoutPopupCancelButton.isDisplayed()
+        header.popupClose.isDisplayed()
+        header.logoutPopupCancelButton.click()
+
+    }
+
+    // HELP POPUP TEST
+
+    def "help popup existance" () {
+        when:
+            at DbMonitorPage
+            header.help.click()
+        then:
+            header.popup.isDisplayed()
+            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
+            header.popupClose.click()
+    }
+
+	// FOOTER TESTS
+
+    def "footer exists" () {
+        when:
+            at DbMonitorPage
+        then:
+            footer.banner.isDisplayed();
+    }
+
+    def "footer text exists and valid"() {
+
+        when:
+            at DbMonitorPage
+        then:
+            footer.banner.isDisplayed();
+            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase());
+    }
 }
