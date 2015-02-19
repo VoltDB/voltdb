@@ -2032,6 +2032,27 @@ public class TestSubQueries extends PlannerTestCase {
         assertEquals(0, ((ParameterValueExpression)cp).getParameterIndex().intValue());
     }
 
+    public void testMaterializedView() {
+        List<AbstractPlanNode> planNodes;
+        String sql;
+
+        // partitioned matview self join on partition column
+        sql = "SELECT user_heat.s, max(user_heat.hotspot_hm) "
+                + "FROM user_heat, (SELECT s, max(heat) heat FROM user_heat  GROUP BY s) maxheat "
+                + "WHERE user_heat.s = maxheat.s AND user_heat.heat = maxheat.heat "
+                + "GROUP BY user_heat.s;";
+        planNodes = compileToFragments(sql);
+        assertEquals(2, planNodes.size());
+
+        // rename the partition column and verify it works also
+        sql = "SELECT user_heat.s, max(user_heat.hotspot_hm) "
+                + "FROM user_heat, (SELECT s as sss, max(heat) heat FROM user_heat  GROUP BY s) maxheat "
+                + "WHERE user_heat.s = maxheat.sss AND user_heat.heat = maxheat.heat "
+                + "GROUP BY user_heat.s;";
+        planNodes = compileToFragments(sql);
+        assertEquals(2, planNodes.size());
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
