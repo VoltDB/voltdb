@@ -95,18 +95,129 @@ def launch_and_wait_on_voltdb(reportout):
     # -- at least for a few minutes.
     # This may need to change if we ever allowed sqlcmd to launch a connection-less session
     # that could connect later in response to a directive.
-    for waited in xrange(0, 20):
-        if waited == 20:
-            reportout.write("voltdb server not responding -- so giving up\n")
-            kill_voltdb()
-            return
+    for waited in xrange(0, 19):
         empty_input.seek(0)
         waiting = subprocess.call(['../../bin/sqlcmd'], stdin=empty_input)
         if not waiting:
             break
+        if waited == 19:
+            reportout.write("voltdb server not responding -- so giving up\n")
+            kill_voltdb()
+            return
+        print "Connection will be retried shortly."
         # give the server a little more setup time.
         time.sleep(10)
     empty_input.close()
+
+purge_only_count = 0
+
+# The purgeonly utility mode was enabled. Purge anything that matches the pattern of a generated file,
+def purgeonly(script_dir):
+    global purge_only_count
+    for parent, dirs, files in os.walk(script_dir):
+        for inpath in files:
+            # Exempt the expected ".in" files up front as a common case,
+            # but DO NOT ASSUME that other files are non-persistent or expendable.
+            if inpath.endswith(".in"):
+                continue
+            # Rely on explicit positive pattern matching of generated fie extensions to identify garbage.
+            if (inpath.endswith(".err") or
+                inpath.endswith(".errclean") or
+                inpath.endswith(".errdiffs") or
+                inpath.endswith(".out") or
+                inpath.endswith(".outclean") or
+                inpath.endswith(".outdiffs")):
+                scratchpath = os.path.join(parent, inpath)
+                purge_only_count += 1
+                subprocess.call(['rm', scratchpath])
+
+def clean_output(parent, path):
+    # fuzz the sqlcmd output for reliable comparison
+    outbackin = open(os.path.join(parent, path), 'r')
+    cleanedpath = os.path.join(parent, path + 'clean')
+    cleanedout = open(cleanedpath, 'w+')
+    # Currently, the following cases of fuzzing are required:
+    # 1. Allow consistent baselines across different builds with java memcheck enabled
+    # or disabled by filtering out the warning that gets issued when it is enabled.
+    memory_check_matcher = re.compile(r"""
+            ^WARN:\sStrict\sjava\smemory\schecking.*$  # Match the start.
+            """, re.VERBOSE)
+    # 2. Allow different latency numbers to be reported like
+    # "(Returned 3 rows in 9.99s)" vs. "(Returned 3 rows in 10.01s)".
+    # These both get "fuzzed" into the same generic string "(Returned 3 rows in #.##s)".
+    # This produces identical 'baseline` results on platforms and builds that
+    # may run at different speeds.
+    latency_matcher = re.compile(r"""
+            ([0-9]\srows\sin\s)  # required to match a latency report line,
+                                 # survives as \g<1>
+            [0-9]+\.[0-9]+s      # also required, replaced with #.##s
+            """, re.VERBOSE)
+    for line in outbackin:
+        # Note len(cleanedline) here counts 1 EOL character.
+        # Preserve blank lines as is -- there's no need to try cleaning them.
+        if len(line) == 1:
+            cleanedout.write(line)
+            continue
+        cleanedline = memory_check_matcher.sub("", line)
+        cleanedline = latency_matcher.sub("\g<1>#.##s", cleanedline)
+        # # enable for debug print "DEBUG line length %d" % (len(cleanedline))
+        # # enable for debug #print cleanedline
+        # Here, a blank line resulted from a total text replacement,
+        # so skip it.
+        # This allows us to eliminate without a trace lines that are optional
+        # from one run to the next. This is a known use case,
+        # involving memory_checker_matcher.
+        # The alternative use case where the intent is that a non-blank line
+        # from one run be fuzzed to match a blank line from another run has not
+        # yet surfaced, so, for now, we just hope it doesn't.
+        if len(cleanedline) > 1:
+            cleanedout.write(cleanedline)
+    cleanedout.flush()
+    # # enable for debug
+    # subprocess.call(
+    #             ['cat',
+    #              cleanedpath],
+    #             stdin=cleanedout)
+    # #
+
+
+def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, reportout):
+    cleanedpath = os.path.join(parent, path + 'clean')
+    baselinepath = os.path.join(baseparent, path + 'baseline')
+    gotdiffs = True  # default in case baseline does not exist.
+    if os.path.isfile(baselinepath):
+        outdiffspath = os.path.join(parent, path + 'diffs')
+        diffout = open(outdiffspath, 'w+')
+        gotdiffs = subprocess.call(['diff', cleanedpath, baselinepath],
+                stdout=diffout)
+        if gotdiffs:
+            print >> sys.stderr, \
+                    'See diffs in ', outdiffspath
+            # Would it be better to append the diffs into the report file?
+            reportout.write('See diffs in ' +
+                    os.path.abspath(outdiffspath) + "\n")
+            reportout.write(os.path.join(parent, inpath) +
+                    " failed to match its baseline.\n")
+        else:
+            reportout.write(os.path.join(parent, inpath) +
+                    " matched its baseline.\n")
+            # clean up
+            subprocess.call(['rm', outdiffspath])
+    else:
+        reportout.write("Did not find baseline file: " +
+                os.path.abspath(baselinepath) + "\n")
+    # If requested, rewrite baseline files that are missing or have changed.
+    if gotdiffs:
+        if do_refresh:
+            mkdir_p(baseparent)
+            subprocess.call(['mv', cleanedpath, baselinepath])
+            reportout.write(os.path.join(parent, inpath) +
+                    " refreshed its baseline: " +
+                    os.path.abspath(baselinepath) + "\n")
+        else:
+            return True
+    return False
+
 
 def do_main():
     parser = OptionParser()
@@ -114,21 +225,32 @@ def do_main():
                       help="top level test case script directory")
     parser.add_option("-b", "--baselines", dest="baseline_dir", default="./baselines",
                       help="top level test output baseline directory")
-    parser.add_option("-o", "--reportfile", dest="reportfile",
+    parser.add_option("-o", "--report_file", dest="report_file",
                       default="./sqlcmdtest.report",
                       help="report output file")
     parser.add_option("-r", "--refresh", dest="refresh",
                       action="store_true", default=False,
                       help="enable baseline refresh")
+    parser.add_option("-p", "--purge_only", dest="purge_only",
+                      action="store_true", default=False,
+                      help="instead of running tests, purge temp scratch files from prior runs")
     # TODO add a way to pass non-default options to the VoltDB server and tweak the sqlcmd
     # command line options if/when these settings effect the connection string
     # (non-default ports. security, etc.)
     # TODO add a way to pass sqlcmd command line options to be used with all test scripts.
     (options, args) = parser.parse_args()
-    reportout = open(options.reportfile, 'w+')
+
+    if options.purge_only:
+        purgeonly(options.script_dir)
+        sys.exit("The -p/--purge_only option does not run tests. It purged %d scratch files." % (purge_only_count))
+
+    # TODO Output jenkins-friendly html-formatted report artifacts as an alternative to plain text.
+    reportout = open(options.report_file, 'w+')
 
     launch_and_wait_on_voltdb(reportout)
 
+    # Except in refresh mode, any diffs change the scripts exit code to fail ant/jenkins
+    haddiffs = False
     try:
         for parent, dirs, files in os.walk(options.script_dir):
             # Process each ".in" file found in the recursive directory walk.
@@ -136,81 +258,43 @@ def do_main():
             # written to a temp directory instead, or they may be backup files (like from a text editor)
             # or in the future they may be other kinds of input like a ".options" file that
             # could provide sqlcmd command line options to use with a corresponding ".in" file.
-            for input in files:
-                if not input.endswith(".in"):
+            for inpath in files:
+                if not inpath.endswith(".in"):
                     continue
-                print "Running ", os.path.join(parent, input)
-                prefix = input[:-3]
-                childin = open(os.path.join(parent, input))
+                print "Running ", os.path.join(parent, inpath)
+                prefix = inpath[:-3]
+                childin = open(os.path.join(parent, inpath))
                 # TODO use temp scratch files instead of local files to avoid polluting the git
-                # workspace. Ideally they would be self-cleaning except in failure cases or debug
+                # workspace. Ideally they would be self-purging except in failure cases or debug
                 # modes when they may contain useful diagnostic detail.
                 childout = open(os.path.join(parent, prefix + '.out'), 'w+')
                 childerr = open(os.path.join(parent, prefix + '.err'), 'w+')
                 subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
+                # TODO launch a hard-coded script that verifies a clean database and healthy server
+                # ("show tables" or equivalent) after each test run to prevent cross-contamination.
+
                 # fuzz the sqlcmd output for reliable comparison
-                outbackin = open(os.path.join(parent, prefix + '.out'), 'r')
-                cleanedpath = os.path.join(parent, prefix + '.outclean')
-                cleanedout = open(cleanedpath, 'w+')
-                # Currently, the only fuzzing required is to allow different latency numbers to be
-                # reported like "(Returned 3 rows in 9.99s)" vs. "(Returned 3 rows in 10.01s)".
-                # These both get "fuzzed" into the same generic string "(Returned 3 rows in #.##s)".
-                # This produces identical 'baseline` results on platforms and builds that
-                # may run at different speeds.
-                latency_matcher = re.compile(r"""
-                        ([0-9]\srows\sin\s)  # required to match a latency report line, survives as \g<1>
-                        [0-9]+\.[0-9]+s      # also required, replaced with #.##s
-                        """, re.VERBOSE)
-                for line in outbackin:
-                    cleanedline = latency_matcher.sub("\g<1>#.##s", line)
-                    # # enable for debug #print cleanedline
-                    cleanedout.write(cleanedline)
-                cleanedout.flush()
-                # # enable for debug
-                # subprocess.call(
-                #             ['cat',
-                #              cleanedpath],
-                #             stdin=cleanedout)
-                # #
+                clean_output(parent, prefix + '.out')
+                clean_output(parent, prefix + '.err')
+
                 baseparent = replace_parent_dir_prefix(parent, options.script_dir, options.baseline_dir)
-                # The ".outbaseline" extension was chosen with the thought that for some test cases
-                # we may be interested in validating sqlcmd's stderr output against a ".errbaseline"
-                # (TODO).
-                baselinepath = os.path.join(baseparent, prefix + '.outbaseline')
-                gotdiffs = True  # default in case baseline does not exist.
-                if os.path.isfile(baselinepath):
-                    outdiffspath = os.path.join(parent, prefix + '.outdiffs')
-                    diffout = open(outdiffspath, 'w+')
-                    gotdiffs = subprocess.call(['diff', cleanedpath, baselinepath],
-                            stdout=diffout)
-                    if gotdiffs:
-                        print >> sys.stderr, \
-                                'See diffs in ', outdiffspath
-                        # Would it be better to append the diffs into the report file?
-                        reportout.write('See diffs in ' + os.path.abspath(outdiffspath) + "\n")
-                        reportout.write(os.path.join(parent, input) +
-                                " failed to match its output baseline.\n")
-                    else:
-                        reportout.write(os.path.join(parent, input) +
-                                " matched its output baseline.\n")
-                        # clean up
-                        subprocess.call(['rm', outdiffspath])
-                else:
-                    reportout.write("Did not find baseline file: " +
-                            os.path.abspath(baselinepath) + "\n")
-                # If requested, rewrite baseline files that are missing or have changed.
-                if gotdiffs and options.refresh:
-                    mkdir_p(baseparent)
-                    subprocess.call(['mv', cleanedpath, baselinepath])
-                    reportout.write(os.path.join(parent, input) +
-                            " refreshed its baseline output: " +
-                            os.path.abspath(baselinepath) + "\n")
+                if compare_cleaned_to_baseline(parent, baseparent,
+                        prefix + '.out', inpath,
+                        options.refresh, reportout):
+                    haddiffs = True;
+                if compare_cleaned_to_baseline(parent, baseparent,
+                        prefix + '.err', inpath,
+                        options.refresh, reportout):
+                    haddiffs = True;
     finally:
         kill_voltdb()
-        print "Summary report written to ", os.path.abspath(options.reportfile)
+        print "Summary report written to file://" + os.path.abspath(options.report_file)
         # Would it be useful to dump the report file content to stdout?
+        # Except in refresh mode, any diffs change the scripts exit code to fail ant/jenkins
+        if haddiffs:
+            sys.exit("One or more sqlcmdtest script failures or errors was detected.")
 
 if __name__ == "__main__":
     do_main()
