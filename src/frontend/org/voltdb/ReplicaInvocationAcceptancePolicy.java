@@ -87,9 +87,17 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
                                 Procedure proc) {
         if (invocation == null || proc == null) {
             return null;
-        } else if (invocation.getType() == ProcedureInvocationType.ORIGINAL &&
-                !invocation.procName.equalsIgnoreCase("@AdHoc")) {
-            Config sysProc = SystemProcedureCatalog.listing.get(invocation.getProcName());
+        }
+
+        // Duplicate hack from ClientInterface
+        String procName = invocation.getProcName();
+        if (procName.equalsIgnoreCase("@UpdateClasses")) {
+            procName = "@UpdateApplicationCatalog";
+        }
+
+        if (invocation.getType() == ProcedureInvocationType.ORIGINAL &&
+                !procName.equalsIgnoreCase("@AdHoc")) {
+            Config sysProc = SystemProcedureCatalog.listing.get(procName);
             if (sysProc != null && sysProc.allowedInReplica) {
                 // white-listed sysprocs, adhoc is a special case
                 return null;
