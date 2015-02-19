@@ -197,6 +197,32 @@ class AdminTest extends TestBase {
             footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase());
     }
 
+    //server test
+
+    def "when server3 is clicked"() {
+        when:
+        at AdminPage
+        server.serverbutton.isDisplayed()
+        then:
+        server.serverbutton.click()
+        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
+        server.deerwalkserver3stopbutton.click()
+        server.deeerwalkservercancelbutton.click()
+        //server.serverbutton.click()
+    }
+
+    def "when server4 is clicked"() {
+        when:
+        at AdminPage
+        serverbutton.isDisplayed()
+        then:
+        server.serverbutton.click()
+        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
+        server.deerwalkserver4stopbutton.click()
+        server.deeerwalkservercancelbutton.click()
+        //server.serverbutton.click()
+    }
+
 
 	// NETWORK INTERFACES
 
@@ -344,6 +370,166 @@ class AdminTest extends TestBase {
 				!(string.equals(""))
 			}
 	}
+
+    //cluster test
+
+    def "cluster title"(){
+        when:
+        at AdminPage
+        cluster.clusterTitle.isDisplayed()
+        then:
+        cluster.clusterTitle.text().equals("Cluster")}
+
+
+        def "check promote button"(){
+            when:
+            at AdminPage
+
+
+            then:
+            cluster.promotebutton.isDisplayed()
+            /* promotebutton.click()
+            promoteconfirmation.isDisplayed()
+            promoteconfirmation.isDisplayed()
+            promoteconfirmation.text().equals("Promote: Confirmation".toLowerCase())
+            promotecancel.click()*/
+        }
+
+    def "when Resume cancel"(){
+        when:
+        at AdminPage
+        cluster.resumebutton.click()
+        then:
+        cluster.resumeconfirmation.isDisplayed()
+        cluster.resumeconfirmation.text().toLowerCase().equals("Do you want to resume the cluster and exit admin mode?".toLowerCase());
+        cluster.resumeconfirmation.resumecancel.click()
+    }
+    def "when Resume ok"(){
+        when:
+        at AdminPage
+        cluster.resumebutton.click()
+        then:
+        cluster.resumeconfirmation.isDisplayed()
+        cluster.resumeconfirmation.text().toLowerCase().equals("Do you want to resume the cluster and exit admin mode?".toLowerCase());
+        cluster.resumeconfirmation.resumeok.click()
+    }
+
+    def "when save for cancel"(){
+        when:
+        at AdminPage
+        cluster.savebutton.click()
+        then:
+        cluster.saveconfirmation.isDisplayed()
+        cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
+        cluster.savecancel.click()
+    }
+
+    def "when save for yes"(){
+        when:
+        at AdminPage
+        cluster.savebutton.click()
+        then:
+        cluster.saveconfirmation.isDisplayed()
+        cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
+        cluster.savedirectory.value("/var/opt/test/manual_snapshots")
+        cluster.saveok.click()
+        cluster.saveyes.click()
+        // failsavedok.click()
+    }
+
+    def "when save for No"(){
+        when:
+        at AdminPage
+        cluster.savebutton.click()
+        then:
+        cluster.saveconfirmation.isDisplayed()
+        cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
+        cluster.savedirectory.value("bbb")
+        cluster.saveok.click()
+        cluster.saveno.click()
+        cluster.savecancel.click()
+    }
+
+    def "when restore and ok"(){
+        when:
+        at AdminPage
+        cluster.restorebutton.click()
+        then:
+        waitFor(30) {
+            cluster.restoreconfirmation.isDisplayed()
+            cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+            cluster.restoredirectory.value("/var/opt/test/manual_snapshots")
+            cluster.restoresearch.click()}
+        cluster.restorecancelbutton.click()
+        // restoreok.click()
+        // restoreokyes.click()
+    }
+
+    def "when restore and cancel"(){
+        when:
+        at AdminPage
+        cluster.restorebutton.click()
+        then:
+        cluster.restoreconfirmation.isDisplayed()
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+        cluster.restorecancelbutton.click()
+
+    }
+
+    def "when restore and close"(){
+        when:
+        at AdminPage
+        cluster.restorebutton.click()
+        then:
+        cluster.restoreconfirmation.isDisplayed()
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+        cluster.restoreclosebutton.click()
+
+    }
+
+    def "when shutdown cancel button"(){
+        when:
+        at AdminPage
+        cluster.shutdownbutton.click()
+        then:
+        cluster.shutdownconfirmation.isDisplayed()
+        cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
+        cluster.shutdowncancelbutton.click()
+    }
+
+    def "when shutdown close button"(){
+        when:
+        at AdminPage
+        cluster.shutdownbutton.click()
+        then:
+        cluster.shutdownconfirmation.isDisplayed()
+        cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
+        cluster.shutdownclosebutton.click()
+    }
+
+    def "when cluster pause in cancel"() {
+
+        when:
+        at AdminPage
+        cluster.pausebutton.click()
+        then:
+        cluster.pauseconfirmation.isDisplayed()
+        cluster.pauseconfirmation.text().equals("Pause: Confirmation");
+        cluster.pausecancel.click()
+    }
+
+    def "when cluster pause in ok"() {
+
+        when:
+        at AdminPage
+        cluster.pausebutton.click()
+        then:
+        cluster.pauseconfirmation.isDisplayed()
+        cluster.pauseconfirmation.text().equals("Pause: Confirmation");
+        cluster.pauseok.click()
+    }
+
+
 
     // DIRECTORIES
 
