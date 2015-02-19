@@ -351,11 +351,13 @@ public class SynchronizedStatesManager {
             boolean ownDistributedLock = requestDistributedLock();
             ByteBuffer startStates = buildProposal(REQUEST_TYPE.INITIALIZING,
                     m_requestedInitialState.asReadOnlyBuffer(), m_requestedInitialState.asReadOnlyBuffer());
+            addIfMissing(m_barrierResultsPath, CreateMode.PERSISTENT, startStates.array());
             boolean stateMachineNodeCreated = false;
             if (ownDistributedLock) {
-                // Only the very first initializer of the state machine with both get the lock and successfully
-                // allocate m_barrierResultsPath
-                stateMachineNodeCreated = addIfMissing(m_barrierResultsPath, CreateMode.PERSISTENT, startStates.array());
+                // Only the very first initializer of the state machine will both get the lock and successfully
+                // allocate "STATE_INITIALIZED". This guarantees that only one node will assign the initial state.
+                stateMachineNodeCreated = addIfMissing(ZKUtil.joinZKPath(m_statePath, "STATE_INITIALIZED"),
+                        CreateMode.PERSISTENT, null);
             }
 
             if (m_membershipChangePending) {
