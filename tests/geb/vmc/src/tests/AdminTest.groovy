@@ -344,4 +344,109 @@ class AdminTest extends TestBase {
 				!(string.equals(""))
 			}
 	}
+
+    // DIRECTORIES
+
+    def "check Directories title"() {
+        when:
+        at AdminPage
+        then:
+        directories.title.isDisplayed()
+        directories.title.text().toLowerCase().equals("Directories".toLowerCase())
+    }
+
+    def "check Root title"() {
+        when:
+        at AdminPage
+        then:
+        directories.rootTitle.isDisplayed()
+        directories.rootTitle.text().toLowerCase().equals("Root (Destination)".toLowerCase())
+    }
+
+    def "check Snapshot title"() {
+        when:
+        at AdminPage
+        then:
+        directories.snapshotTitle.isDisplayed()
+        directories.snapshotTitle.text().toLowerCase().equals("Snapshot".toLowerCase())
+    }
+
+    def "check Export Overflow title"() {
+        when:
+        at AdminPage
+        then:
+        directories.exportOverflowTitle.isDisplayed()
+        directories.exportOverflowTitle.text().toLowerCase().equals("Export Overflow".toLowerCase())
+    }
+
+    def "check Command Logs title"() {
+        when:
+        at AdminPage
+        then:
+        directories.commandLogsTitle.isDisplayed()
+        directories.commandLogsTitle.text().toLowerCase().equals("Command Logs".toLowerCase())
+    }
+
+    def "check Command Log Snapshots title"() {
+        when:
+        at AdminPage
+        then:
+        directories.commandLogSnapshotTitle.isDisplayed()
+        directories.commandLogSnapshotTitle.text().toLowerCase().equals("Command Log Snapshots".toLowerCase())
+    }
+
+    def "check Root Value not empty"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            directories.rootValue.isDisplayed()
+            String string = directories.rootValue.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "check SnapShot Value not empty"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            directories.snapshotValue.isDisplayed()
+            String string = directories.snapshotValue.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "check Export Overflow Value not empty"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            directories.exportOverflowValue.isDisplayed()
+            String string = directories.exportOverflowValue.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "check Command Logs Value not empty"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            directories.commandLogsValue.isDisplayed()
+            String string = directories.commandLogsValue.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "check Log Snapshot Value not empty"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            directories.commandLogSnapshotValue.isDisplayed()
+            String string = directories.commandLogSnapshotValue.text()
+            !(string.equals(""))
+        }
+    }
 }
