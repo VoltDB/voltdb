@@ -1,5 +1,6 @@
 Unique Devices application
 ===========================
+The Unique Devices appllication demonstrates real-time analytics on fast moving data.  It also can be considered a representative implementation of the speed layer in the Lambda Architecture.  
 
 This example application solves a specific problem. Assume you offer a service to mobile app developers. Every time someone starts a mobile app, a message is sent to your service containing the application identifier and a unique id representing the device. Your service gives developers a bounded estimate of how many unique devices have used their app on any given day.
 
