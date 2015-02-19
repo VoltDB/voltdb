@@ -34,10 +34,7 @@
 
 package exportbenchmark;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Timer;
@@ -53,9 +50,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NullCallback;
-
-import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Asychronously sends data to an export table to test VoltDB export performance.
@@ -79,8 +73,6 @@ public class ExportBenchmark {
     // Flags to tell the worker threads to stop or go
     AtomicBoolean warmupComplete = new AtomicBoolean(false);
     AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
-    // CSV logger
-    CsvLogger csvlogger = null;
 
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
@@ -126,54 +118,6 @@ public class ExportBenchmark {
         }
     }
 
-    static class CsvLogger implements AutoCloseable {
-        final PrintWriter m_writer;
-        final SimpleDateFormat m_df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
-
-        public CsvLogger(String csvFN) {
-            Preconditions.checkArgument(csvFN != null && !csvFN.trim().isEmpty(),"file name is null or empty");
-            File fh = new File(csvFN);
-            PrintWriter pw = null;
-            try {
-                // 'true' to flush the buffer every println/printf
-                pw = new PrintWriter(new FileWriter(fh), true);
-            } catch (IOException ioex) {
-                Throwables.propagate(ioex);
-            }
-            m_writer = pw;
-            pw.println("TIMESTAMP,TSMILLIS,COMPLETED,ABORTS,ERRORS,TIMEOUTS,THROUGHPUT,AVERAGE_LATENCY,TWO9S_LATENCY,THREE9S_LATENCY,FOUR9S_LATENCY,FIVE9S_LATENCY");
-        }
-
-        @Override
-        public void close() throws IOException {
-            m_writer.close();
-        }
-
-        public void log(final ClientStats stats) {
-            String ts = m_df.format(new Date(stats.getEndTimestamp()));
-            m_writer.printf("%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f\n",
-                    ts,                                        // col 00 string timestamp
-                    stats.getEndTimestamp(),                   // col 01 long   timestamp millis
-                    stats.getInvocationsCompleted(),           // col 02 long   invocations completed
-                    stats.getInvocationAborts(),               // col 03 long   invocation aborts
-                    stats.getInvocationErrors(),               // col 04 long   invocation errors
-                    stats.getInvocationTimeouts(),             // col 05 long   invocation timeouts
-                    stats.getTxnThroughput(),                  // col 06 long   transaction throughput
-                    stats.getAverageLatency(),                 // col 07 double average latency
-                    stats.kPercentileLatencyAsDouble(0.99),    // col 08 double two nines latency
-                    stats.kPercentileLatencyAsDouble(0.999),   // col 09 double three nines latency
-                    stats.kPercentileLatencyAsDouble(0.9999),  // col 10 double four nines latency
-                    stats.kPercentileLatencyAsDouble(0.99999)  // col 11 double five nines latency
-                    );
-        }
-    }
-
-    void logMetric(final ClientStats stats) {
-        if (csvlogger != null) {
-            csvlogger.log(stats);
-        }
-    }
-
     /**
      * Creates a new instance of the test to be run.
      * Establishes a client connection to a voltdb server, which should already be running
@@ -188,10 +132,6 @@ public class ExportBenchmark {
 
         fullStatsContext = client.createStatsContext();
         periodicStatsContext = client.createStatsContext();
-
-        if (config.csvfile != null && !config.csvfile.trim().isEmpty()) {
-            csvlogger = new CsvLogger(config.csvfile);
-        }
     }
 
     /**
@@ -428,11 +368,6 @@ public class ExportBenchmark {
         // Print results & close
         printResults();
         client.close();
-
-        // if enabled close the csv logger
-        if (csvlogger != null) {
-            csvlogger.close();
-        }
 
         if (!success) {
             System.exit(1);
