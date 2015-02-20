@@ -16,6 +16,6 @@ import org.openqa.selenium.JavascriptExecutor
  */
 class downloadconfigbtn extends Module {
     static content = {
-    downloadconfigurationbutton {$("#downloadAdminConfigurations")}
+        downloadconfigurationbutton { $("#downloadAdminConfigurations") }
     }
 }

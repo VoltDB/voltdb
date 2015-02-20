@@ -40,7 +40,7 @@ class AdminPage extends VoltDBManagementCenterPage {
     def boolean doesOverviewExist() {
         return overview.displayed
     }
-    
+
     /**
      * Returns true if the "Overview"
      * currently exists (displayed).
