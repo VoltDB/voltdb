@@ -155,7 +155,7 @@ public class ZooKeeperMain {
         private String command = null;
 
         public MyCommandOptions() {
-            options.put("server", "localhost:2181");
+            options.put("server", "localhost:7181");
             options.put("timeout", "30000");
         }
 
