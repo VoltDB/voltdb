@@ -412,6 +412,18 @@ public class SQLParser extends SQLPatternFactory
             ";*" +         // optional semicolons
             "\\s*",        // more optional whitespace
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern FileBatchToken = Pattern.compile(
+            "^\\s*" +      // optional indent at start of line
+            "file\\s+" +   // required FILE command token, whitespace terminated
+            "-batch\\s+" + // required -batch option token, whitespace terminated
+            "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
+            "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
+            "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
+            "\\s*" +       // optional whitespace
+            //FIXME: strangely allowing more than one strictly adjacent semicolon.
+            ";*" +         // optional semicolons
+            "\\s*",        // more optional whitespace
+            Pattern.CASE_INSENSITIVE);
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile(
@@ -954,17 +966,40 @@ public class SQLParser extends SQLPatternFactory
         return null;
     }
 
+    public static final class FileInfo {
+        private final File m_file;
+        private final boolean m_batch;
+
+        FileInfo(String fileName, boolean b) {
+            m_file = new File(fileName);
+            m_batch = b;
+        }
+
+        public File getFile() {
+            return m_file;
+        }
+
+        public boolean isBatch() {
+            return m_batch;
+        }
+    }
+
     /**
      * Parse FILE statement for sqlcmd.
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static File parseFileStatement(String statement)
+    public static FileInfo parseFileStatement(String statement)
     {
+        Matcher batchMatcher = FileBatchToken.matcher(statement);
+        if (batchMatcher.matches()) {
+            return new FileInfo(batchMatcher.group(1), true);
+        }
         Matcher matcher = FileToken.matcher(statement);
         if (matcher.matches()) {
-            return new File(matcher.group(1));
+            return new FileInfo(matcher.group(1), false);
         }
+
         return null;
     }
 
@@ -1283,5 +1318,17 @@ public class SQLParser extends SQLPatternFactory
 
         // None of the above - return the untranslated input command.
         return statement;
+    }
+
+    /**
+     * Make sure that a batch starts with a DDL statement by checking the first keyword.
+     * @param batch  A SQL string containing multiple statements separated by semicolons
+     * @return true if the first keyword of the first statement is a DDL verb
+     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT
+     */
+    public static boolean batchBeginsWithDDLKeyword(String batch) {
+        // This method is really supposed to look at a single statement, but it seems
+        // also to work for a batch of statements.
+        return queryIsDDL(batch);
     }
 }
