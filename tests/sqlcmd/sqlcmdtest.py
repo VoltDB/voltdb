@@ -140,7 +140,7 @@ def clean_output(parent, path):
     # 1. Allow consistent baselines across different builds with java memcheck enabled
     # or disabled by filtering out the warning that gets issued when it is enabled.
     memory_check_matcher = re.compile(r"""
-            ^WARN:\sStrict\sjava\smemory\schecking.*$  # Match the start.
+            ^(WARN:\s)?Strict\sjava\smemory\schecking.*$  # Match the start.
             """, re.VERBOSE)
     # 2. Allow different latency numbers to be reported like
     # "(Returned 3 rows in 9.99s)" vs. "(Returned 3 rows in 10.01s)".
@@ -247,6 +247,9 @@ def do_main():
     # TODO Output jenkins-friendly html-formatted report artifacts as an alternative to plain text.
     reportout = open(options.report_file, 'w+')
 
+    # TODO -- support different server modes  -- either by explicit command line
+    # option or automatic-but-verbosely -- to detect and use an already running
+    # VoltDB server and remember to leave it running on exit.
     launch_and_wait_on_voltdb(reportout)
 
     # Except in refresh mode, any diffs change the scripts exit code to fail ant/jenkins
