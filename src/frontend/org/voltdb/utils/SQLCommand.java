@@ -82,19 +82,32 @@ public class SQLCommand
 
     private static List<String> RecallableSessionLines = new ArrayList<String>();
 
+    private static void executeDDLBatch(QueryInfo queryInfo) {
+        try {
+            // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.getQuery().toString() + "=======\n");
+
+            if (! SQLParser.batchBeginsWithDDLKeyword(queryInfo.getQuery().toString())) {
+                throw new Exception("Error: This batch begins with a non-DDL statement.  "
+                        + "Currently batching is only supported for DDL.");
+            }
+
+            ClientResponse response = VoltDB.callProcedure("@AdHoc", queryInfo.getQuery().toString());
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                throw new Exception("Execution Error: " + response.getStatusString());
+            }
+            // Assert the current DDL AdHoc batch call behavior
+            assert(response.getResults().length == 1);
+            System.out.println("Batch command succeeded.");
+        }
+        catch (Exception ex) {
+            stopOrContinue(ex);
+        }
+    }
 
     private static void executeQueryWithBatches(List<QueryInfo> queryBatchList) throws Exception {
         for (QueryInfo qryInfo: queryBatchList) {
             if (qryInfo.isBatch()) {
-                // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.getQuery().toString() + "=======\n");
-                // TODO: check the valid DDL batch probably here
-                ClientResponse response = VoltDB.callProcedure("@AdHoc", qryInfo.getQuery().toString());
-                if (response.getStatus() != ClientResponse.SUCCESS) {
-                    throw new Exception("Execution Error: " + response.getStatusString());
-                }
-                // Assert the current DDL AdHoc batch call behavior
-                assert(response.getResults().length == 1);
-                System.out.println("Batch command succeeded.");
+                executeDDLBatch(qryInfo);
             } else {
                 List<String> parsedQueries = SQLParser.parseQuery(qryInfo.getQuery().toString());
                 for (String parsedQuery : parsedQueries) {

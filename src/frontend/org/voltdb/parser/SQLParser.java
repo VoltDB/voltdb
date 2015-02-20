@@ -1230,4 +1230,16 @@ public class SQLParser extends SQLPatternFactory
         // None of the above - return the untranslated input command.
         return statement;
     }
+
+    /**
+     * Make sure that a batch starts with a DDL statement by checking the first keyword.
+     * @param batch  A SQL string containing multiple statements separated by semicolons
+     * @return true if the first keyword of the first statement is a DDL verb
+     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT
+     */
+    public static boolean batchBeginsWithDDLKeyword(String batch) {
+        // This method is really supposed to look at a single statement, but it seems
+        // also to work for a batch of statements.
+        return queryIsDDL(batch);
+    }
 }
