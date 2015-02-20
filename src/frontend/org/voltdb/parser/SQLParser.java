@@ -285,7 +285,7 @@ public class SQLParser extends SQLPatternFactory
             "(" +                                  // start (group 1)
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
-            "(?<=\\ACREATE\\s{0,1024})"            //TODO: 0 min whitespace should be 1?
+            "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
             "(?:PROCEDURE|ROLE)|" +                // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
