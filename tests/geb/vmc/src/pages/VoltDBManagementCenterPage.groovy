@@ -45,15 +45,20 @@ class VoltDBManagementCenterPage extends Page {
     static content = {
         navTabs { $('#nav') }
         dbMonitorTab { navTabs.find('#navDbmonitor') }
+	adminTab { navTabs.find('#navAdmin') }
         schemaTab    { navTabs.find('#navSchema') }
         sqlQueryTab  { navTabs.find('#navSqlQuery') }
         dbMonitorLink(to: DbMonitorPage) { dbMonitorTab.find('a') }
+	adminLink(to: AdminPage) { adminTab.find('a') }
         schemaLink   (to: SchemaPage)    { schemaTab.find('a') }
         sqlQueryLink (to: SqlQueryPage)  { sqlQueryTab.find('a') }
         loginDialog  (required: false) { $('#loginBox') }
         usernameInput   (required: false) { loginDialog.find('input#username') }
         passwordInput   (required: false) { loginDialog.find('input#password') }
         loginButton  (required: false) { loginDialog.find('#LoginBtn') }
+	
+	header { module Header }
+        footer { module Footer }	
     }
     static at = {
         title == 'VoltDB Management Center'
@@ -232,6 +237,19 @@ class VoltDBManagementCenterPage extends Page {
         }
     }
 
+/**
+     * Returns true if the current page is a AdminPage (i.e., the "Admin"
+     * tab of the VoltDB Management Center page is currently open).
+     * @return true if a AdminPage is currently open.
+     */
+    def boolean isAdminPageOpen() {
+        if (adminTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
     /**
      * Returns true if the current page is a SchemaPage (i.e., the "Schema"
      * tab of the VoltDB Management Center page is currently open).
@@ -268,10 +286,22 @@ class VoltDBManagementCenterPage extends Page {
         }
     }
 
+/**
+     * Clicks the "Admin" link, opening the "Admin" page (or tab);
+     * if the "Admin" page is already open, no action is taken.
+     */
+    def void openAdminPage() {
+        if (!isAdminPageOpen()) {
+            adminLink.click()
+        }
+    }
+
     /**
      * Clicks the "Schema" link, opening the "Schema" page (or tab);
      * if the "Schema" page is already open, no action is taken.
      */
+   
+
     def void openSchemaPage() {
         if (!isSchemaPageOpen()) {
             schemaLink.click()

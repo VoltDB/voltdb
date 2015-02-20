@@ -646,4 +646,346 @@ class AdminTest extends TestBase {
             !(string.equals(""))
         }
     }
+
+    // Overview
+
+    def "check title"() {
+        when:
+        at AdminPage
+        then:
+        overview.title.text().toLowerCase().equals("Overview".toLowerCase())
+    }
+
+    def "check Site Per Host"() {
+        when:
+        at AdminPage
+        then:
+        overview.sitePerHost.text().toLowerCase().equals("Sites Per Host".toLowerCase())
+    }
+
+    def "check K-safety"() {
+        when:
+        at AdminPage
+        then:
+        overview.ksafety.text().toLowerCase().equals("K-safety".toLowerCase())
+    }
+
+    def "check Partition Detection"() {
+        when:
+        at AdminPage
+        then:
+        overview.partitionDetection.text().toLowerCase().equals("Partition detection".toLowerCase())
+    }
+
+    def "check Security"() {
+        when:
+        at AdminPage
+        then:
+        overview.security.text().toLowerCase().equals("Security".toLowerCase())
+    }
+
+    def "check HTTP Access"() {
+        when:
+        at AdminPage
+        then:
+        overview.httpAccess.text().toLowerCase().equals("HTTP Access".toLowerCase())
+    }
+
+    def "check Auto Snapshots"() {
+        when:
+        at AdminPage
+        then:
+        overview.autoSnapshots.text().toLowerCase().equals("Auto Snapshots".toLowerCase())
+    }
+
+    def "check Command Logging"() {
+        when:
+        at AdminPage
+        then:
+        overview.commandLogging.text().toLowerCase().equals("Command Logging".toLowerCase())
+    }
+
+    def "check Export"() {
+        when:
+        at AdminPage
+        then:
+        overview.export.text().toLowerCase().equals("Export".toLowerCase())
+    }
+
+    def "check Advanced"() {
+        when:
+        at AdminPage
+        then:
+        overview.advanced.text().toLowerCase().equals("Advanced".toLowerCase())
+    }
+
+    //values
+
+    def "check Site Per Host value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.sitePerHostValue.isDisplayed()
+            String string = overview.sitePerHostValue.text()
+            !(string.equals(""))
+        }
+
+    }
+
+    def "check K-safety value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.ksafetyValue.isDisplayed()
+            String string = overview.ksafetyValue.text()
+            !(string.equals(""))
+        }
+
+    }
+
+    def "check Partition Detection value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.partitionDetectionValue.isDisplayed()
+            String string = overview.partitionDetectionValue.text()
+            !(string.equals(""))
+        }
+
+    }
+
+    def "check Security value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.securityValue.isDisplayed()
+            String string = overview.securityValue.text()
+            !(string.equals(""))
+        }
+    }
+
+
+    def "check HTTP Access value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.httpAccessValue.isDisplayed()
+            String string = overview.httpAccessValue.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "check Auto Snapshots value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.autoSnapshotsValue.isDisplayed()
+            String string = overview.autoSnapshotsValue.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "check Command Logging value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.commandLoggingValue.isDisplayed()
+            String string = overview.commandLoggingValue.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "check Export value"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.exportValue.isDisplayed()
+            String string = overview.exportValue.text()
+            !(string.equals(""))
+        }
+    }
+    // edit
+
+    //--security
+
+    def "click security button"(){
+        when:
+        at AdminPage
+        overview.securityEdit.isDisplayed()
+        then:
+        overview.securityEdit.click()
+    }
+
+    def "click security edit button and cancel"(){
+        when:
+        at AdminPage
+        waitFor(10) {
+            overview.securityEdit.isDisplayed()
+        }
+        then:
+        overview.securityEdit.click()
+        overview.securityEditOk.isDisplayed()
+        overview.securityEditOk.click()
+        overview.securityPopupCancel.click()
+    }
+
+    def "click security edit button and ok"(){
+        when:
+        at AdminPage
+        waitFor(10) {
+            overview.securityEdit.isDisplayed()
+        }
+        then:
+        overview.securityEdit.click()
+        overview.securityEditOk.isDisplayed()
+        overview.securityEditOk.click()
+        overview.securityPopupOk.click()
+    }
+
+    // --Auto snapshot
+
+    def "check Auto Snapshots edit"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10){
+            overview.autoSnapshotsEdit.isDisplayed()
+            String string = overview.autoSnapshotsEdit.text()
+            !(string.equals(""))
+        }
+    }
+
+    def "click edit Auto Snapshots and check"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10) {
+            overview.autoSnapshotsEdit.isDisplayed()
+        }
+        overview.autoSnapshotsEdit.click()
+
+        overview.autoSnapshotsEditCheckbox.isDisplayed()
+        overview.autoSnapshotsEditOk.isDisplayed()
+        overview.autoSnapshotsEditCancel.isDisplayed()
+    }
+
+    def "click Auto Snapshot edit and click cancel"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10) {
+            overview.autoSnapshotsEdit.isDisplayed()
+        }
+
+        when:
+        overview.autoSnapshotsEdit.click()
+        then:
+        overview.autoSnapshotsEditOk.isDisplayed()
+        overview.autoSnapshotsEditCancel.isDisplayed()
+
+        when:
+        overview.autoSnapshotsEditCancel.click()
+        then:
+        !(overview.autoSnapshotsEditCancel.isDisplayed())
+        !(overview.autoSnapshotsEditOk.isDisplayed())
+    }
+
+    def "click Auto Snapshots edit and click checkbox to change on off"() {
+        when:
+        at AdminPage
+        then:
+        waitFor(10) {
+            overview.autoSnapshotsEdit.isDisplayed()
+        }
+
+        when:
+        overview.autoSnapshotsEdit.click()
+        String string = overview.autoSnapshotsValue.text()
+        then:
+        waitFor(10){
+            overview.autoSnapshotsEditCheckbox.isDisplayed()
+            overview.autoSnapshotsEditOk.isDisplayed()
+            overview.autoSnapshotsEditCancel.isDisplayed()
+        }
+
+        when:
+        overview.autoSnapshotsEditCheckbox1.click()
+        then:
+        String stringChange = overview.autoSnapshotsValue.text()
+
+        if ( string.toLowerCase() == "on" ) {
+            assert stringChange.toLowerCase().equals("off")
+        }
+        else if ( string.toLowerCase() == "off" ) {
+            assert stringChange.toLowerCase().equals("on")
+        }
+        else {
+        }
+    }
+
+    def "click edit and ok to check popup"() {
+        String prefix 			= "SNAPSHOTNONCE"
+        String frequency 		= "10"
+        String frequencyUnit	= "Hrs"
+        String retained 		= "1"
+
+        String title			= "Auto Snapshots"
+        String display			= "Do you want to save the value?"
+        String ok				= "Ok"
+        String cancel			= "Cancel"
+
+        when:
+        at AdminPage
+        then:
+        waitFor(10) {
+            overview.autoSnapshotsEdit.isDisplayed()
+        }
+
+        when:
+        overview.autoSnapshotsEdit.click()
+        String string = overview.autoSnapshotsValue.text()
+        then:
+        waitFor(10) {
+            overview.autoSnapshotsEditCheckbox.isDisplayed()
+            overview.autoSnapshotsEditOk.isDisplayed()
+            overview.autoSnapshotsEditCancel.isDisplayed()
+        }
+        overview.filePrefixField.value(prefix)
+        overview.frequencyField.value(frequency)
+        overview.frequencyUnitField.click()
+        overview.frequencyUnitField.value(frequencyUnit)
+        overview.retainedField.value(retained)
+        assert withConfirm(true) { overview.autoSnapshotsEditOk.click() } == "Do you want to save the value?"
+        when:
+        overview.filePrefixField.value(prefix)
+        overview.frequencyField.value(frequency)
+        overview.frequencyUnitField.click()
+        overview.frequencyUnitField.value(frequencyUnit)
+        overview.retainedField.value(retained)
+        overview.autoSnapshotsEditOk.click()
+        then:
+        waitFor(10) {
+            overview.autoSnapshotsPopup.isDisplayed()
+            overview.autoSnapshotsPopupTitle.isDisplayed()
+            overview.autoSnapshotsPopupDisplay.isDisplayed()
+            overview.autoSnapshotsPopupClose.isDisplayed()
+            overview.autoSnapshotsPopupOk.isDisplayed()
+            overview.autoSnapshotsPopupCancel.isDisplayed()
+        }
+        overview.autoSnapshotsPopupTitle.text().equals(title)
+        overview.autoSnapshotsPopupDisplay.text().equals(display)
+        overview.autoSnapshotsPopupOk.text().equals(ok)
+        overview.autoSnapshotsPopupCancel.text().equals(cancel)
+
+    }
+
+
 }
