@@ -51,7 +51,6 @@ function loadAdminPage() {
         commandLogSegmentSize: $("#commandLogSegmentSize"),
         commandLogSegmentSizeLabel: $("#commandLogSegmentSizeUnit"),
         exportConfiguration: $("#exportConfiguration"),
-        target: $("#target"),
         properties: $("#properties"),
         maxJavaHeap: $("#maxJavaHeap"),
         maxJavaHeapLabel: $("#maxJavaHeapUnit"),
@@ -1602,7 +1601,6 @@ function loadAdminPage() {
             adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions != null ? adminConfigValues.commandLogFrequencyTransactions : "");
             adminDOMObjects.commandLogSegmentSize.text(adminConfigValues.logSegmentSize != null ? adminConfigValues.logSegmentSize : "");
             adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize != null ? "MB" : "");
-            adminDOMObjects.target.text(adminConfigValues.targets != null ?adminConfigValues.targets : "");
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != null ? adminConfigValues.heartBeatTimeout : "");
 
 
