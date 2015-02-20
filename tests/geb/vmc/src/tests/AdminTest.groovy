@@ -371,6 +371,17 @@ class AdminTest extends TestBase {
 			}
 	}
 
+
+    //download automation test
+    def "when download configuration is clicked"(){
+        when:
+        at voltDBadmin
+        downloadbtn.downloadconfigurationbutton.isDisplayed()
+        then:
+        downloadbtn.downloadconfigurationbutton.click()
+    }
+
+
     //cluster test
 
     def "cluster title"(){

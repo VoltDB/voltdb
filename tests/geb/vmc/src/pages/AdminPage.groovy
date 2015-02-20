@@ -19,6 +19,7 @@ class AdminPage extends VoltDBManagementCenterPage {
 		header              { module Header }
         footer              { module Footer }
         server              { module voltDBclusterserver}
+        downloadbtn         {module downloadconfigbtn}
 
     }
     static at = {
