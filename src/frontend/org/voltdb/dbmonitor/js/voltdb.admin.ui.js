@@ -50,9 +50,7 @@ function loadAdminPage() {
         commandLogFrequencyTransactions: $("#commandLogFrequencyTxns"),
         commandLogSegmentSize: $("#commandLogSegmentSize"),
         commandLogSegmentSizeLabel: $("#commandLogSegmentSizeUnit"),
-        exports: $("#exports"),
-        exportLabel: $("#txtExportLabel"),
-        target: $("#target"),
+        exportConfiguration: $("#exportConfiguration"),
         properties: $("#properties"),
         maxJavaHeap: $("#maxJavaHeap"),
         maxJavaHeapLabel: $("#maxJavaHeapUnit"),
@@ -254,6 +252,17 @@ function loadAdminPage() {
             var parent = $(this).parent();
             parent.siblings('.child-' + parent.attr("id")).toggle();
             parent.find(".labelCollapsed").toggleClass("labelExpanded");
+
+            //Handle export configuration
+            if ($(this).text() == "Export") {
+                //If parent is closed, then hide export configuration
+                if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
+                    adminDOMObjects.exportConfiguration.hide();
+                    //If parent is open, then open the export configuration.
+                } else {
+                    adminDOMObjects.exportConfiguration.show();
+                }
+            }
         });
     $('tr[class^=child-]').hide().children('td');
 
@@ -1170,7 +1179,7 @@ function loadAdminPage() {
         }
     });
 
-    //Heartbeat time out
+    //Heartbeat timeout
     var toggleHeartbeatTimeoutEdit = function (state) {
 
         adminEditObjects.editStateHeartbeatTimeout = state;
@@ -1307,7 +1316,7 @@ function loadAdminPage() {
         }
     });
 
-    //Query time out
+    //Query timeout
     var toggleQueryTimeoutEdit = function (state) {
 
         adminEditObjects.tBoxQueryTimeout.val(adminEditObjects.tBoxQueryTimeoutValue);
@@ -1525,6 +1534,7 @@ function loadAdminPage() {
         this.firstResponseReceived = false;
         this.adminPort = -1;
         this.isDbPaused = false;
+        this.toggleStates = {};
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1567,6 +1577,10 @@ function loadAdminPage() {
             adminDOMObjects.adminServerList.html(serverList);
         };
 
+        this.escapeHtml = function(value) {
+            return $('<div/>').text(value).html();
+        };
+
         var configureAdminValues = function (adminConfigValues) {
             adminDOMObjects.siteNumberHeader.text(adminConfigValues.sitesperhost);
             adminDOMObjects.kSafety.text(adminConfigValues.kSafety);
@@ -1593,9 +1607,6 @@ function loadAdminPage() {
             adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions != null ? adminConfigValues.commandLogFrequencyTransactions : "");
             adminDOMObjects.commandLogSegmentSize.text(adminConfigValues.logSegmentSize != null ? adminConfigValues.logSegmentSize : "");
             adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize != null ? "MB" : "");
-            adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
-            adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
-            adminDOMObjects.target.text(adminConfigValues.targets);
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != null ? adminConfigValues.heartBeatTimeout : "");
 
 
@@ -1623,39 +1634,96 @@ function loadAdminPage() {
             adminEditObjects.spanAutoSnapshotFreq.text(snapshotFrequency);
             var spanshotUnit = adminConfigValues.frequency != undefined ? adminConfigValues.frequency.slice(-1) : '';
             setSnapShotUnit(spanshotUnit);
-            getExportProperties(adminConfigValues.properties);
+            getExportProperties(adminConfigValues.configuration);
 
         };
 
         var getExportProperties = function (data) {
+            
             var result = "";
             if (data != undefined) {
+                
                 for (var i = 0; i < data.length; i++) {
-                    if (i == 0) {
-                        result += '<tr>' +
-                            '<td width="67%">' + data[i].name + '</td>' +
-                            '<td width="33%">' + data[i].value + '</td>' +
-                            '</tr>';
-                    } else if (i == (data.length - 1)) {
-                        result += '<tr class="propertyLast">' +
-                            '<td>' + data[i].name + '</td>' +
-                            '<td>' + data[i].value + '</td>' +
-                            '</tr>';
-                    } else {
-                        result += '<tr>' +
-                            '<td>' + data[i].name + '</td>' +
-                            '<td>' + data[i].value + '</td>' +
-                            '</tr>';
+                    var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
+                    var type = VoltDbAdminConfig.escapeHtml(data[i].type);
+                    var enabled = data[i].enabled;
+                    var streamProperty = data[i].property;
+                    var rowId = 'row-4' + i;
+                    var style = '';
+                    var additionalCss = (VoltDbAdminConfig.toggleStates[rowId] === true) ? 'labelExpanded' : '';
+                    
+                    if (!VoltDbAdminConfig.toggleStates.hasOwnProperty(rowId) || VoltDbAdminConfig.toggleStates[rowId] === false) {
+                        VoltDbAdminConfig.toggleStates[rowId] = false;
+                        style = 'style = "display:none;"';
                     }
+
+                    result +='<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
+                            '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + ' </a>' +
+                            '   </td>' +
+                            '   <td align="right">' +
+                            '       <div class="' + getOnOffClass(enabled) + '"></div>' +
+                            '   </td>' +
+                            '   <td>' + getOnOffText(enabled) + '</td>' +
+                            '   <td>' +
+                            '       <div class="exportDelete" style="display:none;"></div>' +
+                            '   </td>' +
+                            '</tr>' +
+                        
+                            '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                            '   <td class="configLabel expoProper">Type </td>' +
+                            '   <td align="right">' + type + '</td>' +
+                            '   <td>&nbsp;</td>' +
+                            '   <td>&nbsp;</td>' +
+                            '   <td>&nbsp;</td>' +
+                            '</tr>' +                            
+                            '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                            '   <td class="configLabe1 expoProper">Properties</td>' +
+                            '   <td>&nbsp;</td>' +
+                            '   <td>&nbsp;</td>' +
+                            '   <td>&nbsp;</td>' +
+                            '</tr>';
+
+                    if (streamProperty && streamProperty.length > 0) {
+
+                        result += '' +
+                            '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                            '   <td class="configLabe1" colspan="4">' +
+                            '       <table cellpadding="0" cellspacing="0" class="properTbl" width="100%">';
+
+                        for (var j = 0; j < streamProperty.length; j++) {
+                            var name = streamProperty[j].name;
+                            var value = streamProperty[j].value;
+
+                            result += '' +
+                                '<tr>' +
+                                '   <td width="76%">' + name + '</td>' +
+                                '   <td>' + value + '</td>' +
+                                '</tr>';
+                        }
+
+                        result += '</table>' +
+                            '<table cellpadding="0" cellspacing="0" class="properTbl" style="display:none;"><tr><td><input type="text"/></td><td><input type="text"/></td><td><div class="exportDelete"></div></td></tr><tr><td><input type="text"/></td><td><input type="text"/></td><td><div class="exportDelete"></div></td></tr><tr><td><input type="text"/></td><td><input type="text"/></td><td><div class="exportDelete"></div></td></tr></table>' +
+                            '</td>';
+
+                    } else {
+                        result += '<tr class="childprop-' + rowId + ' propertyLast" ' + style + '>' +
+                            '<td width="67%" class="expoNoProperty" colspan="3">No properties available.</td>' +
+                            '<td width="33%">&nbsp</td>';
+                    }
+                    
+                    result += '</tr>';
                 }
             }
+
             if (result == "") {
                 result += '<tr class="propertyLast">' +
-                        '<td width="67%">No properties available.</td>' +
+                        '<td width="67%" class="expoNoProperty" colspan="3">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }
-            $('#exportProperties').html(result);
+
+            $('#exportConfiguration').html(result);
 
         };
 
@@ -1832,3 +1900,12 @@ function insRow() {
 
     x.appendChild(new_row);
 }
+
+var toggleProperties = function (ele) {
+    var parent = $(ele).parent();
+    parent.siblings('.childprop-' + parent.attr("id")).toggle();
+    parent.find(".labelCollapsed").toggleClass("labelExpanded");
+
+    VoltDbAdminConfig.toggleStates[parent.attr("id")] = parent.find('td:first-child > a').hasClass('labelExpanded');
+};
+
