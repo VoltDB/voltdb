@@ -112,7 +112,7 @@ public class Inits {
 
     Inits(RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
-        m_config = rvdb.m_config;
+        m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
         if (m_config.m_startAction.doesRejoin()) {
