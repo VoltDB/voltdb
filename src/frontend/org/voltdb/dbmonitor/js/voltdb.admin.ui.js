@@ -74,9 +74,15 @@ function loadAdminPage() {
         exportOverflow: $('#exportOverflow'),
         commandLogPath: $('#commandlogpath'),
         commandLogSnapshotPath: $('#commandlogsnapshotpath'),
-
+        clusterClientPort: $('#clusterClientport'),
+        clusterAdminPort: $('#clusterAdminport'),
+        clusterHttpPort: $('#clusterHttpport'),
+        clusterInternalPort: $('#clusterInternalPort'),
+        clusterZookeeperPort: $('#clusterZookeeperPort'),
+        clusterReplicationPort: $('#clusterReplicationPort'),
         //ServerList Section
-        adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody")
+        adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody"),
+        serverSettingHeader: $('#hServerSettings')
 
     };
 
@@ -380,8 +386,8 @@ function loadAdminPage() {
     });
 
     var toggleSecurityEdit = function (state) {
-		var userList = $("#UsersList");
-		var userListEditable = $("#UsersListEditable");
+        var userList = $("#UsersList");
+        var userListEditable = $("#UsersListEditable");
         if (adminEditObjects.chkSecurityValue) {
             adminEditObjects.chkSecurity.iCheck('check');
         } else {
@@ -399,9 +405,9 @@ function loadAdminPage() {
             adminEditObjects.iconSecurityOption.hide();
             adminEditObjects.spanSecurity.hide();
             adminEditObjects.loadingSecurity.show();
-			
-			userList.hide();
-			userListEditable.hide();
+
+            userList.hide();
+            userListEditable.hide();
         }
         else if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingSecurity.hide();
@@ -411,9 +417,9 @@ function loadAdminPage() {
             adminEditObjects.btnEditSecurityOk.show();
             adminEditObjects.btnEditSecurityCancel.show();
             adminEditObjects.chkSecurity.parent().addClass("customCheckbox");
-			
-			userList.hide();
-			userListEditable.show();
+
+            userList.hide();
+            userListEditable.show();
         }
         else {
             adminEditObjects.loadingSecurity.hide();
@@ -423,9 +429,9 @@ function loadAdminPage() {
             adminEditObjects.btnEditSecurityOk.hide();
             adminEditObjects.btnEditSecurityCancel.hide();
             adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
-			
-			userList.show();
-			userListEditable.hide();
+
+            userList.show();
+            userListEditable.hide();
         }
     };
 
@@ -515,12 +521,12 @@ function loadAdminPage() {
             });
         }
     });
-    
+
 
     $("#loginWarnPopup").popup({
         afterOpen: function (event, ui, ele) {
             var popup = $(this)[0];
-           
+
             $("#btnLoginWarningOk").unbind("click");
             $("#btnLoginWarningOk").on('click', function () {
                 if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
@@ -1549,9 +1555,9 @@ function loadAdminPage() {
         };
 
 
-        this.displayPortAndRefreshClusterState = function (portAndClusterValues) {
+        this.displayPortAndRefreshClusterState = function (portAndClusterValues, serverSettings) {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
-                configurePortAndOverviewValues(portAndClusterValues);
+                configurePortAndOverviewValues(portAndClusterValues, serverSettings);
                 refreshClusterValues(portAndClusterValues);
                 configurePromoteAction(portAndClusterValues);
             }
@@ -1717,18 +1723,34 @@ function loadAdminPage() {
             adminEditObjects.tBoxQueryTimeoutValue = adminConfigValues.queryTimeout;
         };
 
-        var configurePortAndOverviewValues = function (configValues) {
+        var configurePortAndOverviewValues = function (configValues, serverSettings) {
             VoltDbAdminConfig.adminPort = configValues.adminPort;
-            adminDOMObjects.adminPort.text(configValues.adminPort);
-            adminDOMObjects.httpPort.text(configValues.httpPort);
-            adminDOMObjects.internalPort.text(configValues.internalPort);
-            adminDOMObjects.zookeeperPort.text(configValues.zookeeperPort);
-            adminDOMObjects.replicationPort.text(configValues.replicationPort);
-            adminDOMObjects.clientPort.text(configValues.clientPort);
+            adminDOMObjects.clusterAdminPort.text(configValues.adminPort);
+            adminDOMObjects.clusterHttpPort.text(configValues.httpPort);
+            adminDOMObjects.clusterInternalPort.text(configValues.internalPort);
+            adminDOMObjects.clusterZookeeperPort.text(configValues.zookeeperPort);
+            adminDOMObjects.clusterReplicationPort.text(configValues.replicationPort);
+            adminDOMObjects.clusterClientPort.text(configValues.clientPort);
             adminDOMObjects.maxJavaHeap.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? parseFloat(configValues.maxJavaHeap / 1024) : "");
             adminDOMObjects.maxJavaHeapLabel.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? "MB" : "");
-        };
 
+
+            //if clusterwide settings are present
+            if (serverSettings) {
+                adminDOMObjects.adminPort.text(configValues.adminInterface);
+                adminDOMObjects.httpPort.text(configValues.httpInterface);
+                adminDOMObjects.clientPort.text(configValues.clientInterface);
+                adminDOMObjects.internalPort.text(configValues.internalInterface);
+                adminDOMObjects.zookeeperPort.text(configValues.zookeeperInterface);
+                adminDOMObjects.replicationPort.text(configValues.replicationInterface);  
+                
+            } else {
+                adminDOMObjects.serverSettingHeader.text("");
+                
+            }
+            
+        };
+       
         var refreshClusterValues = function (clusterValues) {
             if (clusterValues != undefined && clusterValues.hasOwnProperty('clusterState')) {
                 if (clusterValues.clusterState.toLowerCase() == "running") {
@@ -1786,29 +1808,27 @@ var getOnOffClass = function (isOn) {
 };
 
 //    add/remove table row in security 
-function deleteRow(row)
-{
-    var i=row.parentNode.parentNode.rowIndex;
+function deleteRow(row) {
+    var i = row.parentNode.parentNode.rowIndex;
     document.getElementById('secTbl').deleteRow(i);
 }
-function insRow()
-{
-    var x=document.getElementById('secTbl');
+function insRow() {
+    var x = document.getElementById('secTbl');
     var new_row = x.rows[1].cloneNode(true);
     var len = x.rows.length;
     //new_row.cells[0].innerHTML = len;//sn number increment
-    
+
     var inp1 = new_row.cells[1].getElementsByTagName('input')[0];
     inp1.id += len;
     inp1.value = '';
-	
-	var inp0 = new_row.cells[0].getElementsByTagName('input')[0];
+
+    var inp0 = new_row.cells[0].getElementsByTagName('input')[0];
     inp0.id += len;
     inp0.value = '';
-	
-	var sel = new_row.cells[2].getElementsByTagName('select')[0];
+
+    var sel = new_row.cells[2].getElementsByTagName('select')[0];
     sel.id += len;
     sel.value = '';
-	
-    x.appendChild( new_row );
+
+    x.appendChild(new_row);
 }

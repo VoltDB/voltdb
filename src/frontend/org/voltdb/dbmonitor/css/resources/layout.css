@@ -852,7 +852,7 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-786
 .adminTbl2 th:nth-child(1) { text-align:left}
 .adminTbl1 tr td { margin:0; padding:2px 2px 2px 2px; border-left:none; border-right:none; line-height:38px; /*height:32px;*/}
 .adminTbl2 tr td { margin:0; padding:15px 25px 15px 20px; border-left:none; border-right:none;}
-.network tr td:nth-child(2) { text-align:center;}
+.network tr td:nth-child(2), .network tr td:nth-child(3) { text-align:center;}
 .adminTbl1 tr td a.save {position:relative;top:4px}
 
 .onIcon			 { background-position: -266px -58px; width: 31px; height: 17px; position:relative; top:4px;}

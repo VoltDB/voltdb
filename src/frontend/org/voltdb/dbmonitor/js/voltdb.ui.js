@@ -458,8 +458,8 @@ var loadPage = function (serverName, portid) {
             var lUserPreferences = getUserPreferences();
             showHideGraph(lUserPreferences);
         };
-        var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
-            VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
+        var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues, serverSettings) {
+            VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues,serverSettings);
         };
 
         var loadAdminServerList = function (serverList) {
