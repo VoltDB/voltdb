@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="export-benchmark"
+APPNAME="exportbenchmark"
 COUNT=10000
 
 # find voltdb binaries in either installation or distribution directory.
