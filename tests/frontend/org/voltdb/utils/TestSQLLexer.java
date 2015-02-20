@@ -136,7 +136,7 @@ public class TestSQLLexer {
                     fragment = String.format("AdHoc DDL ALTER/RENAME is not supported for object type '%s'", typeName);
                     break;
                 case STMT_UNSUP:
-                    fragment = "Statement is not yet supported";
+                    fragment = "Statement is not supported";
                     break;
                 default:
                     fragment = null;    // humor the compiler
