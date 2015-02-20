@@ -670,6 +670,10 @@ public abstract class CatalogUtil {
                     return null;
                 }
                 //OLD syntax use target as type.
+                if (export.getConfiguration().isEmpty()) {
+                    // this code is for RestRoundtripTest
+                    export.getConfiguration().add(new ExportConfigurationType());
+                }
                 ExportConfigurationType exportConfig = export.getConfiguration().get(0);
                 if (export.isEnabled() != null) {
                     exportConfig.setEnabled(export.isEnabled());
@@ -681,7 +685,7 @@ public abstract class CatalogUtil {
                     exportConfig.setExportconnectorclass(export.getExportconnectorclass());
                 }
                 //Set target to default name.
-                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                exportConfig.setStream(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             }
 
             populateDefaultDeployment(deployment);
@@ -1086,46 +1090,46 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        List<String> targetList = new ArrayList<String>();
+        List<String> streamList = new ArrayList<String>();
         boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            // Get the target name from the xml attribute "target"
+            // Get the stream name from the xml attribute "stream"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String targetName = exportConfiguration.getTarget();
-            if (noEmptyTarget && (targetName == null || targetName.trim().isEmpty()) ) {
-                    throw new RuntimeException("target must be specified along with type in export configuration.");
+            String streamName = exportConfiguration.getStream();
+            if (noEmptyTarget && (streamName == null || streamName.trim().isEmpty()) ) {
+                    throw new RuntimeException("stream must be specified along with type in export configuration.");
             }
 
             if (connectorEnabled) {
-                if (targetList.contains(targetName)) {
-                    throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
-                            targetName + ".");
+                if (streamList.contains(streamName)) {
+                    throw new RuntimeException("Multiple connectors can not be assigned to single export stream: " +
+                            streamName + ".");
                 }
                 else {
-                    targetList.add(targetName);
+                    streamList.add(streamName);
                 }
             }
-            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
-            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
             if (catconn == null) {
                 if (connectorEnabled) {
                     if (defaultConnector) {
                         hostLog.info("Export configuration enabled and provided for the default export " +
-                                     "target in deployment file, however, no export " +
-                                     "tables are assigned to the default target. " +
-                                     "Export target will be disabled.");
+                                     "stream in deployment file, however, no export " +
+                                     "tables are assigned to the default stream. " +
+                                     "Export stream will be disabled.");
                     }
                     else {
-                        hostLog.info("Export configuration enabled and provided for export target " +
-                                     targetName +
+                        hostLog.info("Export configuration enabled and provided for export stream " +
+                                     streamName +
                                      " in deployment file however no export " +
-                                     "tables are assigned to the this target. " +
-                                     "Export target " + targetName + " will be disabled.");
+                                     "tables are assigned to the this stream. " +
+                                     "Export stream " + streamName + " will be disabled.");
                     }
                 }
                 continue;
@@ -1143,26 +1147,26 @@ public abstract class CatalogUtil {
 
             if (!connectorEnabled) {
                 if (defaultConnector) {
-                    hostLog.info("Export configuration for the default export target is present and is " +
-                            "configured to be disabled. The default export target will be disabled.");
+                    hostLog.info("Export configuration for the default export stream is present and is " +
+                            "configured to be disabled. The default export stream will be disabled.");
                 }
                 else {
-                    hostLog.info("Export configuration for export target " + targetName + " is present and is " +
-                                 "configured to be disabled. Export target " + targetName + " will be disabled.");
+                    hostLog.info("Export configuration for export stream " + streamName + " is present and is " +
+                                 "configured to be disabled. Export stream " + streamName + " will be disabled.");
                 }
             } else {
                 if (defaultConnector) {
-                    hostLog.info("Default export target is configured and enabled with type=" + exportConfiguration.getType());
+                    hostLog.info("Default export stream is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 else {
-                    hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
+                    hostLog.info("Export stream " + streamName + " is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 if (exportConfiguration.getProperty() != null) {
                     if (defaultConnector) {
-                        hostLog.info("Default export target configuration properties are: ");
+                        hostLog.info("Default export stream configuration properties are: ");
                     }
                     else {
-                        hostLog.info("Export target " + targetName + " configuration properties are: ");
+                        hostLog.info("Export stream " + streamName + " configuration properties are: ");
                     }
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
                         if (!configProp.getName().toLowerCase().contains("password")) {

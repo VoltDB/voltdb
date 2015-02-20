@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
+import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
@@ -60,11 +62,9 @@ import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.types.ArrayType;
-import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Collation;
 import org.hsqldb_voltpatches.types.NullType;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.Types;
 
@@ -499,7 +499,6 @@ public class Expression implements Cloneable {
         }
     }
 
-    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -513,7 +512,6 @@ public class Expression implements Cloneable {
         return false;
     }
 
-    @Override
     public int hashCode() {
 
         int val = opType + exprSubType;
@@ -1599,7 +1597,7 @@ public class Expression implements Cloneable {
                 Object[] value = table.getValues(session);
 
                 if (value.length == 1) {
-                    return value[0];
+                    return ((Object[]) value)[0];
                 }
 
                 return value;
@@ -2104,7 +2102,7 @@ public class Expression implements Cloneable {
 
         try {
             e       = (Expression) super.clone();
-            e.nodes = nodes.clone();
+            e.nodes = (Expression[]) nodes.clone();
 
             for (int i = 0; i < nodes.length; i++) {
                 if (nodes[i] != null) {

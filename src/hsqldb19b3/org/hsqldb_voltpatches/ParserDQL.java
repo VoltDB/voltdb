@@ -73,6 +73,10 @@ public class ParserDQL extends ParserBase {
     protected Session              session;
     protected final CompileContext compileContext;
     HsqlException                  lastError;
+    // A VoltDB extension to reject quoted (delimited) names.
+    // TODO: Set flag from property?
+    boolean rejectQuotedSchemaObjectNames = true;
+    // End of VoltDB extension
 
     /**
      *  Constructs a new Parser object with the given context.
@@ -109,6 +113,11 @@ public class ParserDQL extends ParserBase {
         } else {
             checkIsNonCoreReservedIdentifier();
         }
+        // A VoltDB extension to reject quoted (delimited) names.
+        if (rejectQuotedSchemaObjectNames && token.isDelimitedIdentifier) {
+            throw unexpectedToken();
+        }
+        // End of VoltDB extension
 
         if (database.sqlRegularNames) {
             checkIsIrregularCharInIdentifier();

@@ -34,6 +34,7 @@ package org.hsqldb_voltpatches;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.RangeGroup.RangeGroupSimple;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorRight;
 import org.hsqldb_voltpatches.error.Error;
 import org.hsqldb_voltpatches.error.ErrorCode;
@@ -46,6 +47,7 @@ import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.navigator.RangeIterator;
@@ -195,7 +197,6 @@ public class QuerySpecification extends QueryExpression {
         return null;
     }
 
-    @Override
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
     }
@@ -282,12 +283,10 @@ public class QuerySpecification extends QueryExpression {
         havingColumnCount = 1;
     }
 
-    @Override
     void addSortAndSlice(SortAndSlice sortAndSlice) {
         this.sortAndSlice = sortAndSlice;
     }
 
-    @Override
     public void resolveReferences(Session session, RangeGroup[] rangeGroups) {
 
         if (isReferencesResolved) {
@@ -308,7 +307,6 @@ public class QuerySpecification extends QueryExpression {
         isReferencesResolved = true;
     }
 
-    @Override
     public boolean hasReference(RangeVariable range) {
 
         if (unresolvedExpressions == null) {
@@ -325,12 +323,10 @@ public class QuerySpecification extends QueryExpression {
         return false;
     }
 
-    @Override
     public boolean areColumnsResolved() {
         return super.areColumnsResolved();
     }
 
-    @Override
     public void resolveTypes(Session session) {
 
         if (isResolved) {
@@ -344,7 +340,6 @@ public class QuerySpecification extends QueryExpression {
                             unionColumnTypes.length);
     }
 
-    @Override
     void resolveTypesPartOne(Session session) {
 
         if (isPartOneResolved) {
@@ -365,7 +360,6 @@ public class QuerySpecification extends QueryExpression {
     /**
      * additional resolution for union
      */
-    @Override
     void resolveTypesPartTwoRecursive(Session session) {
 
         for (int i = 0; i < unionColumnTypes.length; i++) {
@@ -379,7 +373,6 @@ public class QuerySpecification extends QueryExpression {
         createTable(session);
     }
 
-    @Override
     void resolveTypesPartTwo(Session session) {
 
         if (isPartTwoResolved) {
@@ -425,7 +418,6 @@ public class QuerySpecification extends QueryExpression {
         isPartTwoResolved = true;
     }
 
-    @Override
     void resolveTypesPartThree(Session session) {
 
         if (isResolved) {
@@ -451,7 +443,6 @@ public class QuerySpecification extends QueryExpression {
         isResolved        = true;
     }
 
-    @Override
     public void addExtraConditions(Expression e) {
 
         if (isAggregated || isGrouped) {
@@ -994,7 +985,6 @@ public class QuerySpecification extends QueryExpression {
         throw Error.error(ErrorCode.X_42576);
     }
 
-    @Override
     OrderedHashSet collectRangeVariables(RangeVariable[] rangeVars,
                                          OrderedHashSet set) {
 
@@ -1013,7 +1003,6 @@ public class QuerySpecification extends QueryExpression {
         return set;
     }
 
-    @Override
     OrderedHashSet collectRangeVariables(OrderedHashSet set) {
 
         for (int i = 0; i < indexStartAggregates; i++) {
@@ -1528,7 +1517,6 @@ public class QuerySpecification extends QueryExpression {
      * Positive values limit the size of the result set.
      * @return the result of executing this Select
      */
-    @Override
     Result getResult(Session session, int maxrows) {
 
 //todo single row
@@ -1564,7 +1552,7 @@ public class QuerySpecification extends QueryExpression {
     private Result buildResult(Session session, int[] limits) {
 
         RowSetNavigatorData navigator = new RowSetNavigatorData(session,
-            this);
+            (QuerySpecification) this);
         Result  result        = Result.newResult(navigator);
         boolean resultGrouped = isGrouped && !isSimpleDistinct;
 
@@ -1774,7 +1762,7 @@ public class QuerySpecification extends QueryExpression {
 
         if (havingCondition != null) {
             while (navigator.hasNext()) {
-                Object[] data = navigator.getNext();
+                Object[] data = (Object[]) navigator.getNext();
 
                 if (!Boolean.TRUE.equals(
                         data[indexLimitVisible + groupByColumnCount])) {
@@ -1880,7 +1868,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     void createTable(Session session) {
 
         createResultTable(session);
@@ -1957,7 +1944,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     void createResultTable(Session session) {
 
         HsqlName tableName =
@@ -2074,12 +2060,10 @@ public class QuerySpecification extends QueryExpression {
         return sb.toString();
     }
 
-    @Override
     public ResultMetaData getMetaData() {
         return resultMetaData;
     }
 
-    @Override
     public String describe(Session session, int blanks) {
 
         StringBuffer sb;
@@ -2453,7 +2437,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     public OrderedHashSet getSubqueries() {
 
         OrderedHashSet set = null;
@@ -2479,7 +2462,6 @@ public class QuerySpecification extends QueryExpression {
         return set;
     }
 
-    @Override
     public Table getBaseTable() {
         return baseTable;
     }
@@ -2517,7 +2499,32 @@ public class QuerySpecification extends QueryExpression {
         return set;
     }
 
-    @Override
+    public OrderedHashSet collectAllExpressions(OrderedHashSet set,
+            OrderedIntHashSet typeSet, OrderedIntHashSet stopAtTypeSet) {
+
+        for (int i = 0; i < indexStartAggregates; i++) {
+            set = exprColumns[i].collectAllExpressions(set, typeSet,
+                    stopAtTypeSet);
+        }
+
+        if (queryCondition != null) {
+            set = queryCondition.collectAllExpressions(set, typeSet,
+                    stopAtTypeSet);
+        }
+
+        if (havingCondition != null) {
+            set = havingCondition.collectAllExpressions(set, typeSet,
+                    stopAtTypeSet);
+        }
+
+        for (int i = 0; i < rangeVariables.length; i++) {
+            rangeVariables[i].collectAllExpressions(set, typeSet,
+                    stopAtTypeSet);
+        }
+
+        return set;
+    }
+
     public void collectObjectNames(Set set) {
 
         for (int i = 0; i < indexStartAggregates; i++) {
@@ -2539,7 +2546,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     public void replaceColumnReferences(RangeVariable range,
                                         Expression[] list) {
 
@@ -2563,7 +2569,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     public void replaceRangeVariables(RangeVariable[] ranges,
                                       RangeVariable[] newRanges) {
 
@@ -2587,7 +2592,6 @@ public class QuerySpecification extends QueryExpression {
     /**
      * Not for views. Only used on root node.
      */
-    @Override
     public void setReturningResult() {
 
         setReturningResultSet();
@@ -2596,17 +2600,14 @@ public class QuerySpecification extends QueryExpression {
         isTopLevel       = true;
     }
 
-    @Override
     void setReturningResultSet() {
         persistenceScope = TableBase.SCOPE_SESSION;
     }
 
-    @Override
     public boolean isSingleColumn() {
         return indexLimitVisible == 1;
     }
 
-    @Override
     public String[] getColumnNames() {
 
         String[] names = new String[indexLimitVisible];
@@ -2618,7 +2619,6 @@ public class QuerySpecification extends QueryExpression {
         return names;
     }
 
-    @Override
     public Type[] getColumnTypes() {
 
         if (resultColumnTypes.length == indexLimitVisible) {
@@ -2632,22 +2632,18 @@ public class QuerySpecification extends QueryExpression {
         return types;
     }
 
-    @Override
     public int getColumnCount() {
         return indexLimitVisible;
     }
 
-    @Override
     public int[] getBaseTableColumnMap() {
         return columnMap;
     }
 
-    @Override
     public Expression getCheckCondition() {
         return queryCondition;
     }
 
-    @Override
     void getBaseTableNames(OrderedHashSet set) {
 
         for (int i = 0; i < rangeVariables.length; i++) {
@@ -2673,7 +2669,6 @@ public class QuerySpecification extends QueryExpression {
     /**
      * returns true if almost equivalent
      */
-    @Override
     boolean isEquivalent(QueryExpression other) {
 
         if (!(other instanceof QuerySpecification)) {

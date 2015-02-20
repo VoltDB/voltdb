@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches.types;
 
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
@@ -76,7 +77,6 @@ public abstract class Type implements SchemaObject, Cloneable {
     }
 
     // interface specific methods
-    @Override
     public final int getType() {
 
         if (userTypeModifier == null) {
@@ -86,7 +86,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getType();
     }
 
-    @Override
     public final HsqlName getName() {
 
         if (userTypeModifier == null) {
@@ -96,7 +95,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getName();
     }
 
-    @Override
     public final HsqlName getCatalogName() {
 
         if (userTypeModifier == null) {
@@ -106,7 +104,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName().schema;
     }
 
-    @Override
     public final HsqlName getSchemaName() {
 
         if (userTypeModifier == null) {
@@ -116,7 +113,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName();
     }
 
-    @Override
     public final Grantee getOwner() {
 
         if (userTypeModifier == null) {
@@ -126,7 +122,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getOwner();
     }
 
-    @Override
     public final OrderedHashSet getReferences() {
 
         if (userTypeModifier == null) {
@@ -136,7 +131,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getReferences();
     }
 
-    @Override
     public final OrderedHashSet getComponents() {
 
         if (userTypeModifier == null) {
@@ -146,7 +140,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getComponents();
     }
 
-    @Override
     public final void compile(Session session, SchemaObject parentObject) {
 
         if (userTypeModifier == null) {
@@ -163,7 +156,6 @@ public abstract class Type implements SchemaObject, Cloneable {
      * @return the SQL character sequence required to (re)create the
      *  trigger
      */
-    @Override
     public String getSQL() {
 
         if (userTypeModifier == null) {
@@ -173,7 +165,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSQL();
     }
 
-    @Override
     public long getChangeTimestamp() {
         return 0;
     }
@@ -566,7 +557,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return a.hashCode();
     }
 
-    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -591,7 +581,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         return false;
     }
 
-    @Override
     public int hashCode() {
         return typeCode + (int) precision << 8 + scale << 16;
     }
@@ -610,17 +599,14 @@ public abstract class Type implements SchemaObject, Cloneable {
             this.session = session;
         }
 
-        @Override
         public int compare(Object a, Object b) {
             return type.compare(session, a, b, sort);
         }
 
-        @Override
         public int hashCode(Object a) {
             return type.hashCode(a);
         }
 
-        @Override
         public long longKey(Object a) {
             return 0;
         }

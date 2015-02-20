@@ -35,6 +35,7 @@ import java.lang.reflect.Method;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
+import org.hsqldb_voltpatches.RangeGroup.RangeGroupSimple;
 import org.hsqldb_voltpatches.error.Error;
 import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.index.Index;
@@ -76,7 +77,6 @@ public class ParserDDL extends ParserRoutine {
         super(session, scanner);
     }
 
-    @Override
     void reset(String sql) {
         super.reset(sql);
     }
@@ -852,7 +852,6 @@ public class ParserDDL extends ParserRoutine {
         }
     }
 
-
     private Statement compileAlterTableDropConstraint(Table table) {
 
         boolean cascade = false;
@@ -866,6 +865,7 @@ public class ParserDDL extends ParserRoutine {
 
             cascade = true;
         }
+
 // A VoltDB extension to support LIMIT PARTITION ROWS syntax
         return compileAlterTableDropConstraint(table, (Constraint) object, cascade);
     }
@@ -880,7 +880,7 @@ public class ParserDDL extends ParserRoutine {
         HsqlName[] writeLockNames =
             database.schemaManager.getCatalogAndBaseTableNames(
                 table.getName());
-        HsqlName mainTableName = object.getMainTableName();
+        HsqlName mainTableName = ((Constraint) object).getMainTableName();
 
         if (mainTableName != null && mainTableName != table.getName()) {
             writeLockNames =

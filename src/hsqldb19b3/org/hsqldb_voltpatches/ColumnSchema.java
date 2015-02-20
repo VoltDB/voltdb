@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.RangeGroup.RangeGroupSimple;
 import org.hsqldb_voltpatches.error.Error;
@@ -79,45 +78,37 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         setReferences();
     }
 
-    @Override
     public int getType() {
         return columnName.type;
     }
 
-    @Override
     public HsqlName getName() {
         return columnName;
     }
 
-    @Override
     public String getNameString() {
         return columnName.name;
     }
 
-    @Override
     public String getTableNameString() {
         return columnName.parent == null ? null
                                          : columnName.parent.name;
     }
 
-    @Override
     public HsqlName getSchemaName() {
         return columnName.schema;
     }
 
-    @Override
     public String getSchemaNameString() {
         return columnName.schema == null ? null
                                          : columnName.schema.name;
     }
 
-    @Override
     public HsqlName getCatalogName() {
         return columnName.schema == null ? null
                                          : columnName.schema.schema;
     }
 
-    @Override
     public String getCatalogNameString() {
 
         return columnName.schema == null ? null
@@ -126,23 +117,19 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
                                            : columnName.schema.schema.name;
     }
 
-    @Override
     public Grantee getOwner() {
         return columnName.schema == null ? null
                                          : columnName.schema.owner;
     }
 
-    @Override
     public OrderedHashSet getReferences() {
         return references;
     }
 
-    @Override
     public OrderedHashSet getComponents() {
         return null;
     }
 
-    @Override
     public void compile(Session session, SchemaObject table) {
 
         if (generatingExpression == null) {
@@ -163,7 +150,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         setReferences();
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -193,12 +179,10 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return sb.toString();
     }
 
-    @Override
     public long getChangeTimestamp() {
         return 0;
     }
 
-    @Override
     public void setType(Type type) {
 
         this.dataType = type;
@@ -229,7 +213,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      *
      * @return boolean
      */
-    @Override
     public boolean isNullable() {
 
         boolean isNullable = super.isNullable();
@@ -243,7 +226,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         return isNullable;
     }
 
-    @Override
     public byte getNullability() {
         return isPrimaryKey ? SchemaObject.Nullability.NO_NULLS
                             : super.getNullability();
@@ -262,17 +244,14 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      *
      * @return boolean
      */
-    @Override
     public boolean isWriteable() {
         return !isGenerated();
     }
 
-    @Override
     public void setWriteable(boolean value) {
         throw Error.runtimeError(ErrorCode.U_S0500, "ColumnSchema");
     }
 
-    @Override
     public boolean isSearchable() {
         return Types.isSearchable(dataType.typeCode);
     }
@@ -440,7 +419,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     VoltXMLElement voltGetColumnXML(Session session)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException

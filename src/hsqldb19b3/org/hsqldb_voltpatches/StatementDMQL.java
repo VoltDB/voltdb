@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -173,7 +172,6 @@ public abstract class StatementDMQL extends Statement {
         return cursorName;
     }
 
-    @Override
     public Result execute(Session session) {
 
         Result result;
@@ -499,7 +497,6 @@ public abstract class StatementDMQL extends Statement {
      * Returns the metadata, which is empty if the CompiledStatement does not
      * generate a Result.
      */
-    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -520,7 +517,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Returns the metadata for the placeholder parameters.
      */
-    @Override
     public ResultMetaData getParametersMetaData() {
         return parameterMetaData;
     }
@@ -593,7 +589,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Retrieves a String representation of this object.
      */
-    @Override
     public String describe(Session session) {
 
         try {
@@ -821,20 +816,16 @@ public abstract class StatementDMQL extends Statement {
                                      "]\n");
     }
 
-    @Override
     public void resolve(Session session) {}
 
-    @Override
     public final boolean isCatalogLock() {
         return false;
     }
 
-    @Override
     public boolean isCatalogChange() {
         return false;
     }
 
-    @Override
     public void clearStructures(Session session) {
         session.sessionContext.clearStructures(this);
     }
@@ -909,7 +900,7 @@ public abstract class StatementDMQL extends Statement {
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     @Override
     VoltXMLElement voltGetStatementXML(Session session)

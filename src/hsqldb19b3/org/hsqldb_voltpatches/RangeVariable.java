@@ -1054,12 +1054,10 @@ public class RangeVariable {
 
         private RangeIteratorBase() {}
 
-        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
-        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -1081,45 +1079,37 @@ public class RangeVariable {
             }
         }
 
-        @Override
         public Row getCurrentRow() {
             return currentRow;
         }
 
-        @Override
         public Object[] getCurrent() {
             return currentData;
         }
 
-        @Override
         public Object getCurrent(int i) {
             return currentData == null ? null
                                        : currentData[i];
         }
 
-        @Override
         public void setCurrent(Object[] data) {
             currentData = data;
         }
 
-        @Override
         public long getRowId() {
 
             return currentRow == null ? 0
                                       : ((long) rangeVar.rangeTable.getId() << 32)
-                                        + (currentRow.getPos());
+                                        + ((long) currentRow.getPos());
         }
 
-        @Override
         public Object getRowidObject() {
             return currentRow == null ? null
                                       : ValuePool.getLong(getRowId());
         }
 
-        @Override
         public void removeCurrent() {}
 
-        @Override
         public void reset() {
 
             if (it != null) {
@@ -1131,32 +1121,26 @@ public class RangeVariable {
             isBeforeFirst = true;
         }
 
-        @Override
         public int getRangePosition() {
             return rangePosition;
         }
 
-        @Override
         public Row getNextRow() {
             throw Error.runtimeError(ErrorCode.U_S0500, "RangeVariable");
         }
 
-        @Override
         public boolean hasNext() {
             throw Error.runtimeError(ErrorCode.U_S0500, "RangeVariable");
         }
 
-        @Override
         public Object[] getNext() {
             throw Error.runtimeError(ErrorCode.U_S0500, "RangeVariable");
         }
 
-        @Override
         public boolean setRowColumns(boolean[] columns) {
             throw Error.runtimeError(ErrorCode.U_S0500, "RangeVariable");
         }
 
-        @Override
         public void release() {
 
             if (it != null) {
@@ -1206,12 +1190,10 @@ public class RangeVariable {
             }
         }
 
-        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
-        @Override
         public boolean next() {
 
             while (condIndex < conditions.length) {
@@ -1237,10 +1219,8 @@ public class RangeVariable {
             return false;
         }
 
-        @Override
         public void removeCurrent() {}
 
-        @Override
         public void reset() {
 
             if (it != null) {
@@ -1253,7 +1233,6 @@ public class RangeVariable {
             isBeforeFirst = true;
         }
 
-        @Override
         public int getRangePosition() {
             return rangeVar.rangePosition;
         }
@@ -1489,7 +1468,6 @@ public class RangeVariable {
             initialiseIterator();
         }
 
-        @Override
         public boolean next() {
 
             if (isOnRightOuterRows) {
@@ -1577,12 +1555,10 @@ public class RangeVariable {
             isBeforeFirst       = true;
         }
 
-        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
-        @Override
         public boolean next() {
 
             while (currentIndex >= 0) {
@@ -1619,10 +1595,8 @@ public class RangeVariable {
             return false;
         }
 
-        @Override
         public void removeCurrent() {}
 
-        @Override
         public void release() {
 
             if (it != null) {
@@ -1634,7 +1608,6 @@ public class RangeVariable {
             }
         }
 
-        @Override
         public void reset() {
 
             super.reset();
@@ -1644,7 +1617,6 @@ public class RangeVariable {
             }
         }
 
-        @Override
         public int getRangePosition() {
             return 0;
         }
@@ -2036,8 +2008,8 @@ public class RangeVariable {
                     terminalCondition.replaceColumnReferences(range, list);
             }
         }
+        // A VoltDB extension to export predicates as a VoltXMLElement
 
-        // A VoltDB extension to export predicates
         private Expression voltCombineConditions() {
             Expression indexConds = Expression.voltCombineWithAnd(indexCond);
             Expression indexEndConds = Expression.voltCombineWithAnd(indexEndCond);
@@ -2062,7 +2034,7 @@ public class RangeVariable {
             return cond;
         }
 
-// End of VoltDB extension
+        // End of VoltDB extension
     }
     /************************* Volt DB Extensions *************************/
 
@@ -2165,7 +2137,7 @@ public class RangeVariable {
      * This method is called for DML statements against a single table where the
      * concept of a "join condition" is a little strange. Regardless, its result
      * merges any "join conditions" and "where conditions" it finds.
-     * HSQL has a history of identifying filters as "join" filters in "don't care" cases.
+     * HSQL has a history of identifying filters as join filters in "don't care" cases.
      * @return all the filters for a scan expressed as a single predicate Expression
      */
     Expression voltCombineConditions() {
