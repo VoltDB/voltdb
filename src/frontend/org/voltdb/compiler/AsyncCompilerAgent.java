@@ -192,10 +192,10 @@ public class AsyncCompilerAgent {
             // do a couple of additional checks if it's DDL
             if (hasDDL) {
                 // check that the DDL is allowed
-                if (!SQLLexer.isPermitted(stmt)) {
+                String rejectionExplanation = SQLLexer.checkPermitted(stmt);
+                if (rejectionExplanation != null) {
                     AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "AdHoc DDL contains an unsupported DDL statement: " + stmt);
+                            AsyncCompilerResult.makeErrorResult(w, rejectionExplanation);
                     w.completionHandler.onCompletion(errResult);
                     return;
                 }
