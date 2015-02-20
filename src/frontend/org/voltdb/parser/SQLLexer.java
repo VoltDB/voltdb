@@ -643,7 +643,7 @@ public class SQLLexer extends SQLPatternFactory
         @Override
         String explainMatch(Matcher matcher)
         {
-            return String.format("Statement is not yet supported: %s", matcher.group(1).toUpperCase());
+            return String.format("Statement is not supported: %s", matcher.group(1).toUpperCase());
         }
     }
 

@@ -479,7 +479,7 @@ def join_shell_cmd(cmd, *args):
     Join shell command and arguments into one string.
     Add quotes as appropriate.
     """
-    return ' '.join(quote_shell_args(*args))
+    return ' '.join(quote_shell_args(cmd, *args))
 
 #===============================================================================
 def run_cmd(cmd, *args):
