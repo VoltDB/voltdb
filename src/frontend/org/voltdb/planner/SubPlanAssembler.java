@@ -286,14 +286,14 @@ public abstract class SubPlanAssembler {
                 // It is the original expression that we need to remember
                 exactMatchCoveringExprs.add(coveringExpr);
             }
-
-            // Now try to find non-exact match
-            exprsToCover = removeCoveredExpressions(tableScan, coveringExpr, exprsToCover);
-
-            // reverse the covering expression and try again
-            if (reversedCoveringExpr != null) {
-                exprsToCover = removeCoveredExpressions(tableScan, reversedCoveringExpr, exprsToCover);
-            }
+            // @TODO commeneted out the non-exact match expressions 
+//            // Now try to find non-exact match
+//            exprsToCover = removeCoveredExpressions(tableScan, coveringExpr, exprsToCover);
+//
+//            // reverse the covering expression and try again
+//            if (reversedCoveringExpr != null) {
+//                exprsToCover = removeCoveredExpressions(tableScan, reversedCoveringExpr, exprsToCover);
+//            }
         }
 
         // Handle remaining NOT NULL index predicate expressions that can be covered by NULL rejecting expressions
