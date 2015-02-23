@@ -1359,7 +1359,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if ((deployment.getExport() != null) && (deployment.getExport().isEnabled())) {
+                if ((deployment.getExport() != null) && Boolean.TRUE.equals(deployment.getExport().isEnabled())) {
                     consoleLog.error("Export is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;

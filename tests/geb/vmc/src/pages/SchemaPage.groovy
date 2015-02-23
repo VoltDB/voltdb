@@ -28,14 +28,155 @@ package vmcTest.pages
  * page, which is the VoltDB web UI (replacing the old Catalog Report).
  */
 class SchemaPage extends VoltDBManagementCenterPage {
-    //static content = {
-        //schemaTab { $('#navSchema') }
-        //schemaLink   { schemaTab.find('a') }
-    //}
+    static content = {
+        schemaTabs  { $('#catalogNavlist') }
+        overviewTab { schemaTabs.find('#o-nav') }
+        schemaSubTab    { schemaTabs.find('#s-nav') }
+        proceduresTab   { schemaTabs.find('#p-nav') }
+        sizeTab     { schemaTabs.find('#z-nav') }
+        ddlTab      { schemaTabs.find('#d-nav') }
+        overviewLink    (to: SchemaPageOverviewTab) { overviewTab.find('a') }
+        schemaSubLink   (to: SchemaPageSchemaTab)   { schemaSubTab.find('a') }
+        proceduresLink  (to: SchemaPageProceduresAndSqlTab) { proceduresTab.find('a') }
+        sizeLink    (to: SchemaPageSizeWorksheetTab){ sizeTab.find('a') }
+        ddlLink     (to: SchemaPageDdlSourceTab)    { ddlTab.find('a') }
+        voltDbDocumentationLink { $('a#iconDoc') }
+    }
     static at = {
         schemaTab.displayed
         schemaTab.attr('class') == 'active'
-        // TODO: add a few key elements, that should always appear
+        overviewLink.displayed
+        schemaSubLink.displayed
+        proceduresLink.displayed
+        sizeLink.displayed
+        ddlLink.displayed
+    }
+
+    /**
+     * Returns true if the current page is a SchemaPage and the current tab
+     * open on that page is the "Overview" tab (i.e., the "Overview" tab of
+     * the "Schema" tab of the VoltDB Management Center page is currently
+     * open).
+     * @return true if a SchemaPage's "Overview" tab is currently open.
+     */
+    def boolean isSchemaPageOverviewTabOpen() {
+        if (isSchemaPageOpen() && overviewTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Returns true if the current page is a SchemaPage and the current tab
+     * open on that page is the "Schema" tab (i.e., the "Schema" tab of the
+     * "Schema" tab of the VoltDB Management Center page is currently open).
+     * @return true if a SchemaPage's "Schema" tab is currently open.
+     */
+    def boolean isSchemaPageSchemaTabOpen() {
+        if (isSchemaPageOpen() && schemaSubTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Returns true if the current page is a SchemaPage and the current tab
+     * open on that page is the "Procedures & SQL" tab (i.e., the "Procedures
+     * & SQL" tab of the "Schema" tab of the VoltDB Management Center page is
+     * currently open).
+     * @return true if a SchemaPage's "Procedures & SQL" tab is currently open.
+     */
+    def boolean isSchemaPageProceduresAndSqlTabOpen() {
+        if (isSchemaPageOpen() && proceduresTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Returns true if the current page is a SchemaPage and the current tab
+     * open on that page is the "Size Worksheet" tab (i.e., the "Size Worksheet"
+     * tab of the "Schema" tab of the VoltDB Management Center page is currently
+     * open).
+     * @return true if a SchemaPage's "Size Worksheet" tab is currently open.
+     */
+    def boolean isSchemaPageSizeWorksheetTabOpen() {
+        if (isSchemaPageOpen() && sizeTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Returns true if the current page is a SchemaPage and the current tab
+     * open on that page is the "DDL Source" tab (i.e., the "DDL Source" tab
+     * of the "Schema" tab of the VoltDB Management Center page is currently
+     * open).
+     * @return true if a SchemaPage's "DDL Source" tab is currently open.
+     */
+    def boolean isSchemaPageDdlSourceTabOpen() {
+        if (isSchemaPageOpen() && ddlTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Clicks the "Overview" link, opening the "Overview" tab, on the "Schema"
+     * page (or tab); if the "Overview" tab is already open, no action is taken.
+     */
+    def void openSchemaPageOverviewTab() {
+        if (!isSchemaPageOverviewTabOpen()) {
+            overviewLink.click()
+        }
+    }
+
+    /**
+     * Clicks the "Schema" (sub-)link, opening the "Schema" tab, on the "Schema"
+     * page (or tab); if the "Schema" tab is already open, no action is taken.
+     */
+    def void openSchemaPageSchemaTab() {
+        if (!isSchemaPageSchemaTabOpen()) {
+            schemaSubLink.click()
+        }
+    }
+
+    /**
+     * Clicks the "Procedures & SQL" link, opening the "Procedures & SQL" tab,
+     * on the "Schema" page (or tab); if the "Procedures & SQL" tab is already
+     * open, no action is taken.
+     */
+    def void openSchemaPageProceduresAndSqlTab() {
+        if (!isSchemaPageProceduresAndSqlTabOpen()) {
+            proceduresLink.click()
+        }
+    }
+
+    /**
+     * Clicks the "Size Worksheet" link, opening the "Size Worksheet" tab, on
+     * the "Schema" page (or tab); if the "Size Worksheet" tab is already open,
+     * no action is taken.
+     */
+    def void openSchemaPageSizeWorksheetTab() {
+        if (!isSchemaPageSizeWorksheetTabOpen()) {
+            sizeLink.click()
+        }
+    }
+
+    /**
+     * Clicks the "DDL Source" link, opening the "DDL Source" tab, on the
+     * "Schema" page (or tab); if the "DDL Source" tab is already open, no
+     * action is taken.
+     */
+    def void openSchemaPageDdlSourceTab() {
+        if (!isSchemaPageDdlSourceTabOpen()) {
+            ddlLink.click()
+        }
     }
 
 }

@@ -372,6 +372,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return (m_tempTableMemoryLimit * 3) / 4;
         }
 
+        int32_t getPartitionId() const {
+            return m_partitionId;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -516,9 +520,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // used for sending and recieving deps
         // set by the executeQuery / executeFrag type methods
         int m_currentInputDepId;
-
-        /** EL subsystem on/off, pulled from catalog */
-        bool m_isELEnabled;
 
         /** Stats manager for this execution engine **/
         voltdb::StatsAgent m_statsManager;

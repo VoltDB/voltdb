@@ -26,6 +26,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.SortedSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
@@ -35,8 +36,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.GroupRef;
@@ -137,6 +136,10 @@ public class ReportMaker {
                 }
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
+            }
+            if (annotation.statementsThatUseThis.size() > 0) {
+                assert(annotation.statementsThatUseThis.size() == 1);
+                sb.append("<p>Used by the LIMIT PARTITION ROWS Statement</p>");
             }
         }
 
@@ -295,6 +298,31 @@ public class ReportMaker {
             }
         }
 
+        // LIMIT PARTITION ROW statement may also use the index in this table, prepare the information for report
+        if (! table.getTuplelimitdeletestmt().isEmpty()) {
+            assert(table.getTuplelimitdeletestmt().size() == 1);
+            Statement stmt = table.getTuplelimitdeletestmt().iterator().next();
+
+            for (String tableDotIndexPair : stmt.getIndexesused().split(",")) {
+                if (tableDotIndexPair.length() == 0) continue;
+                String parts[] = tableDotIndexPair.split("\\.", 2);
+                assert(parts.length == 2);
+                if (parts.length != 2) continue;
+                String tableName = parts[0];
+                String indexName = parts[1];
+                if (! table.getTypeName().equals(tableName)) continue;
+
+                Index i = table.getIndexes().get(indexName);
+                assert(i != null);
+                IndexAnnotation ia = (IndexAnnotation) i.getAnnotation();
+                if (ia == null) {
+                    ia = new IndexAnnotation();
+                    i.setAnnotation(ia);
+                }
+                ia.statementsThatUseThis.add(stmt);
+            }
+        }
+
         if (table.getIndexes().size() > 0) {
             sb.append(generateIndexesTable(table));
         }
@@ -307,10 +335,10 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSchemaTable(CatalogMap<Table> tables, CatalogMap<Connector> connectors) {
+    static String generateSchemaTable(Database db) {
         StringBuilder sb = new StringBuilder();
-        List<Table> exportTables = getExportTables(connectors);
-        for (Table table : tables) {
+        SortedSet<Table> exportTables = CatalogUtil.getExportTables(db);
+        for (Table table : db.getTables()) {
             sb.append(generateSchemaRow(table, exportTables.contains(table) ? true : false));
         }
         return sb.toString();
@@ -432,7 +460,6 @@ public class ReportMaker {
                 i.setAnnotation(ia);
             }
             ia.proceduresThatUseThis.add(procedure);
-            ia.statementsThatUseThis.add(statement);
             procAnnotation.indexesUsed.add(i);
 
             String uindexName = indexName.toUpperCase();
@@ -944,7 +971,7 @@ public class ReportMaker {
         String procData = generateProceduresTable(db.getTables(), db.getProcedures());
         contents = contents.replace("##PROCS##", procData);
 
-        String schemaData = generateSchemaTable(db.getTables(), db.getConnectors());
+        String schemaData = generateSchemaTable(db);
         contents = contents.replace("##SCHEMA##", schemaData);
 
         DatabaseSizes sizes = CatalogSizing.getCatalogSizes(db);
@@ -969,17 +996,6 @@ public class ReportMaker {
         contents = contents.replace("get.py?a=KEY&", String.format("get.py?a=%s&", msg));
 
         return contents;
-    }
-
-    private static List<Table> getExportTables(CatalogMap<Connector> connectors) {
-        List<Table> retval = new ArrayList<Table>();
-
-        for (Connector conn : connectors) {
-            for (ConnectorTableInfo cti : conn.getTableinfo()) {
-                retval.add(cti.getTable());
-            }
-        }
-        return retval;
     }
 
     public static String getLiveSystemOverview()

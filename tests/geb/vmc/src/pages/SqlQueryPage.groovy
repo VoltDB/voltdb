@@ -25,6 +25,7 @@ package vmcTest.pages
 
 import geb.navigator.Navigator
 import geb.waiting.WaitTimeoutException
+import org.openqa.selenium.support.ui.Select
 
 /**
  * This class represents the 'SQL Query' tab of the VoltDB Management Center
@@ -38,9 +39,10 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         tablesTab   { tabControls.find("a[href='#tab1']") }
         viewsTab    { tabControls.find("a[href='#tab2']") }
         storedProcsTab  { tabControls.find("a[href='#tab3']") }
-        tablesNames { tabArea.find('#accordionTable').find('h3') }
-        viewsNames  { tabArea.find('#accordionViews').find('h3') }
-        storedProcs { tabArea.find('#accordionProcedures') }
+        listsArea   { tabArea.find('#tabScroller') }
+        tablesNames { listsArea.find('#accordionTable').find('h3') }
+        viewsNames  { listsArea.find('#accordionViews').find('h3') }
+        storedProcs { listsArea.find('#accordionProcedures') }
         systemStoredProcsHeader  { storedProcs.find('.systemHeader').first() }
         defaultStoredProcsHeader { storedProcs.find('.systemHeader').last() }
         systemStoredProcs   { storedProcs.find('#systemProcedure').find('h3') }
@@ -52,6 +54,9 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryInput  { $('#theQueryText') }
         runButton   { $('#runBTn') }
         clearButton { $('#clearQuery') }
+        qrFormatDropDown    { $('#exportType') }
+        qrfddOptions    { qrFormatDropDown.find('option') }
+        qrfddSelected   { qrFormatDropDown.find('option', selected: "selected") }
         queryResHtml { $('#resultHtml') }
         queryTables  (required: false) { queryResHtml.find('table') }
         queryErrHtml (required: false) { queryResHtml.find('span') }
@@ -60,8 +65,10 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     static at = {
         sqlQueryTab.displayed
         sqlQueryTab.attr('class') == 'active'
-        tabArea.displayed
+        tablesTab.displayed
+        viewsTab.displayed
         storedProcsTab.displayed
+        listsArea.displayed
         queryInput.displayed
         queryResHtml.displayed
     }
@@ -356,9 +363,11 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
                 (queryResHtml.text() != initQueryResultText || queryDurHtml.text() != initQueryDurationText)
             }
         } catch (WaitTimeoutException e) {
-            println "\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; see standard error for stack trace."
+            String message = '\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; this is probably nothing to worry about'
+            println message + '.'
+            System.err.println message + ':'
             e.printStackTrace()
-            println "This is probably nothing to worry about.\n"
+            println 'See Standard error for stack trace.\n'
         }
         return this
     }
@@ -374,23 +383,42 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /**
-     * Returns the contents of the element specified by Navigator, which must
-     * be a "table" HTML element, in the form of a Map, with each element a
-     * List of Strings; each Key of the Map is a column header of the table,
-     * and its List contains the displayed text of that column.
-     * @param tableElement - a Navigator specifying the "table" element whose
-     * contents are to be returned.
-     * @return a Map representing the contents of the specified table element.
+     * Returns a list of (the text of) the options available on query result
+     * format drop-down menu. (Typically, these are "HTML", "CSV" and
+     * "Monospace".)
      */
-    private def Map<String,List<String>> getTableResult(Navigator tableElement) {
-        def result = [:]
-        def columnHeaders = tableElement.find('thead').find('th')*.text()
-        columnHeaders = columnHeaders.collect {it.toLowerCase()}
-        def rows = tableElement.find('tbody').find('tr')
-        def colNum = 0
-        def makeColumn = { index,rowset -> rowset.collect { row -> row.find('td',index).text() } }
-        columnHeaders.each { result.put(it, makeColumn(colNum++, rows)) }
-        return result
+    def List<String> getQueryResultFormatOptions() {
+        List<String> options = []
+        qrfddOptions.each { options.add(it.text()) }
+        return options
+    }
+
+    /**
+     * Returns a list of the values of the options available on query result
+     * format drop-down menu. (Typically, these are the same as the text
+     * values, i.e., normally "HTML", "CSV" and "Monospace".)
+     */
+    def List<String> getQueryResultFormatOptionValues() {
+        List<String> values = []
+        qrfddOptions.each { values.add(it.value()) }
+        return values
+    }
+
+    /**
+     * Returns the value of the currently selected option of the query result
+     * format drop-down menu. (Typically, "HTML", "CSV" or "Monospace".)
+     */
+    def String getSelectedQueryResultFormat() {
+        return qrFormatDropDown.value()
+    }
+
+    /**
+     * Sets the query result format drop-down menu to the specified value.
+     * @param format - the value to which the menu should be set (typically
+     * "HTML", "CSV" or "Monospace").
+     */
+    def selectQueryResultFormat(String format) {
+        qrFormatDropDown.value(format)
     }
 
     /**
@@ -398,11 +426,14 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * in the form of a List (for each table) of Maps, with each Map element a
      * List of Strings; each Key of the Map is a column header of the table,
      * and its List contains the displayed text of that column.
+     * @param colHeaderFormat - the case in which you want each table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
      * @return a List of Maps representing the contents of every table.
      */
-    def List<Map<String,List<String>>> getQueryResults() {
+    def List<Map<String,List<String>>> getQueryResults(
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
         def results = []
-        queryTables.each { results.add(getTableResult(it)) }
+        queryTables.each { results.add(getTableByColumn(it, colHeaderFormat)) }
         return results
     }
 
@@ -414,10 +445,13 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * this method with index 0 will return the first table.
      * @param index - the index (0-based) of the "table" element whose contents
      * are to be returned.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
      * @return a Map representing the contents of the specified table.
      */
-    def Map<String,List<String>> getQueryResult(int index) {
-        return getQueryResults().get(index)
+    def Map<String,List<String>> getQueryResult(int index,
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
+        return getQueryResults(colHeaderFormat).get(index)
     }
 
     /**
@@ -425,10 +459,24 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * Result" area, in the form of a Map, with each element a List of Strings;
      * each Key of the Map is a column header of the table, and its List
      * contains the displayed text of that column.
+     * @param colHeaderFormat - the case in which you want the table's column
+     * headers returned: converted to lower case, to upper case, or as-is.
      * @return a Map representing the contents of the <i>last</i> table.
      */
-    def Map<String,List<String>> getQueryResult() {
-        return getTableResult(queryTables.last())
+    def Map<String,List<String>> getQueryResult(
+                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
+        return getTableByColumn(queryTables.last(), colHeaderFormat)
+    }
+
+    /**
+     * Returns the text of whatever is shown in the "Query Result" area, in its
+     * entirety; normally, this would include query results and/or errors, but
+     * at times it could also be "Connect to a datasource first.", which would
+     * not show up as either a result nor an error message.
+     * @return the text of whatever is shown in the "Query Result" area.
+     */
+    def String getQueryResultText() {
+        return queryResHtml.text()
     }
 
     /**

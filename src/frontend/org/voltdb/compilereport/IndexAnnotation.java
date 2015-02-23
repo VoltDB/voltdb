@@ -30,6 +30,9 @@ import org.voltdb.catalog.Statement;
  *
  */
 public class IndexAnnotation {
+    // Statements are only inserted when the index is used in a LIMIT PARTITION ROWS trigger
     public SortedSet<Statement> statementsThatUseThis = new TreeSet<Statement>();
+
+    // Procedures are inserted when the query statements inside use the index
     public SortedSet<Procedure> proceduresThatUseThis = new TreeSet<Procedure>();
 }

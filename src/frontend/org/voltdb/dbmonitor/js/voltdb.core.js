@@ -519,6 +519,7 @@
                         else if (processName == "SYSTEMINFORMATION_SCANSNAPSHOTS") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results;
+                            connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
                         }
                         else if (processName == "SYSTEMINFORMATION_PROMOTECLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
@@ -588,7 +589,7 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization) {
-
+        
         if (VoltDBCore.hostIP == "") {
 
             jQuery.ajax({
@@ -631,7 +632,8 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {     
+    getJSON: function (url, formData, callback, authorization) {
+        
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',

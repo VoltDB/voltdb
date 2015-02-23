@@ -60,12 +60,21 @@ class Pool;
  */
 class InsertPlanNode : public AbstractOperationPlanNode {
 public:
-    InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() { }
+    InsertPlanNode()
+        : AbstractOperationPlanNode()
+        , m_multiPartition(false)
+        , m_fieldMap()
+        , m_isUpsert(false)
+        , m_sourceIsPartitioned(false) {
+    }
+
     PlanNodeType getPlanNodeType() const;
 
     bool isMultiPartition() const { return m_multiPartition; }
 
     bool isUpsert() const { return m_isUpsert; }
+
+    bool sourceIsPartitioned() const { return m_sourceIsPartitioned; }
 
     bool isMultiRowInsert() const {
         // Materialize nodes correspond to INSERT INTO ... VALUES syntax.
@@ -88,6 +97,7 @@ private:
     bool m_multiPartition;
     std::vector<int> m_fieldMap;
     bool m_isUpsert;
+    bool m_sourceIsPartitioned;
 };
 
 } // namespace voltdb

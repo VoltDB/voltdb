@@ -425,26 +425,93 @@ def format_volt_tables(table_list, caption_list = None, headings = True):
     return '\n\n'.join(output)
 
 #===============================================================================
+def quote_shell_arg(arg):
+#===============================================================================
+    """
+    Return an argument with quotes added as needed.
+    """
+    sarg = str(arg)
+    if len(sarg) == 0 or len(sarg.split()) > 1:
+        return '"%s"' % sarg
+    return sarg
+
+#===============================================================================
+def unquote_shell_arg(arg):
+#===============================================================================
+    """
+    Return an argument with quotes removed if present.
+    """
+    sarg = str(arg)
+    if len(sarg) == 0:
+        return sarg
+    quote_char = sarg[-1]
+    if quote_char not in ('"', "'"):
+        return sarg
+    # Deal with a starting quote that might not be at the beginning
+    if sarg[0] == quote_char:
+        return sarg[1:-1]
+    pos = sarg.find(quote_char)
+    if pos == len(sarg) - 1:
+        # No first quote, don't know what else to do but return as is
+        return sarg
+    return sarg[:pos] + sarg[pos+1:-1]
+
+#===============================================================================
+def quote_shell_args(*args_in):
+#===============================================================================
+    """
+    Return a list of arguments that are quoted as needed.
+    """
+    return [quote_shell_arg(arg) for arg in args_in]
+
+#===============================================================================
+def unquote_shell_args(*args_in):
+#===============================================================================
+    """
+    Return a list of arguments with quotes removed when present.
+    """
+    return [unquote_shell_arg(arg) for arg in args_in]
+
+#===============================================================================
+def join_shell_cmd(cmd, *args):
+#===============================================================================
+    """
+    Join shell command and arguments into one string.
+    Add quotes as appropriate.
+    """
+    return ' '.join(quote_shell_args(cmd, *args))
+
+#===============================================================================
 def run_cmd(cmd, *args):
 #===============================================================================
     """
     Run external program without capturing or suppressing output and check return code.
     """
-    fullcmd = cmd
-    for arg in args:
-        sarg = str(arg)
-        if len(sarg) == 0 or len(sarg.split()) > 1:
-            fullcmd += ' "%s"' % sarg
-        else:
-            fullcmd += ' %s' % sarg
+    fullcmd = join_shell_cmd(cmd, *args)
     if Global.dryrun_enabled:
-        sys.stdout.write('%s\n' % fullcmd)
+        sys.stdout.write('Run: %s\n' % fullcmd)
     else:
         if Global.verbose_enabled:
             verbose_info('Run: %s' % fullcmd)
         retcode = os.system(fullcmd)
         if retcode != 0:
             abort(return_code=retcode)
+
+#===============================================================================
+def exec_cmd(cmd, *args):
+#===============================================================================
+    """
+    Run external program by replacing the current (Python) process.
+    """
+    display_cmd = join_shell_cmd(cmd, *args)
+    if Global.dryrun_enabled:
+        sys.stdout.write('Exec: %s\n' % display_cmd)
+    else:
+        if Global.verbose_enabled:
+            verbose_info('Exec: %s' % display_cmd)
+        # Need to strip out quotes because the shell won't be doing it for us.
+        cmd_and_args = unquote_shell_args(cmd, *args)
+        os.execvp(cmd, cmd_and_args)
 
 #===============================================================================
 def pipe_cmd(*args):

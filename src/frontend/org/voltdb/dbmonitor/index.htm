@@ -321,19 +321,19 @@
                         <div class="overviewTbl">
                             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
                                 <tr>
-                                    <td width="62%" class="configLabel">Site per host</td>
+                                    <td width="62%" class="configLabel">Sites Per Host</td>
                                     <td id="sitePerHost" width="20%" align="right"></td>
                                     <td width="2%">&nbsp;</td>
                                     <td width="16%">&nbsp;</td>
                                 </tr>
                                 <tr>
-                                    <td class="configLabel">K-safety </td>
+                                    <td class="configLabel">K-Safety </td>
                                     <td id="kSafety" align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr>
-                                    <td class="configLabel">Partition detection </td>
+                                    <td class="configLabel">Partition Detection </td>
                                     <td align="right">
                                         <div id="partitionDetectionIcon" class="onIcon"></div>
                                     </td>
@@ -436,7 +436,7 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
-                                    <td class="configLabel">Log Frequency, time </td>
+                                    <td class="configLabel">Log Frequency Time </td>
                                     <td align="right">
                                         <span id="commandLogFrequencyTime"></span>
                                         <span id="commandLogFrequencyUnit"></span>
@@ -446,13 +446,13 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
-                                    <td class="configLabel">Log Frequency, transactions </td>
+                                    <td class="configLabel">Log Frequency Transactions </td>
                                     <td id="commandLogFrequencyTxns" align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
-                                    <td class="configLabel">Log Segment Size</td>
+                                    <td class="configLabel">Log Size</td>
                                     <td align="right">
                                         <span id="commandLogSegmentSize"></span>
                                         <span id="commandLogSegmentSizeUnit"></span>
@@ -463,34 +463,12 @@
                                 </tr>
                                 <tr class="hasSubLabel parent" id="row-4">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
-                                    <td align="right">
-                                        <div id="exports" class="offIcon"></div>
-                                    </td>
-                                    <td id="txtExportLabel"></td>
+                                    <td align="right"></td>
+                                    <td></td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabel">Target</td>
-                                    <td align="right">
-                                        <span id="target"></span>
-                                    </td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                </tr>
-                                <tr class="child-row-4 subLabelRow">
-                                    <td style="font-weight: bold" class="configLabel">Properties:</td>
-                                    <td id="properties"></td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                </tr>
-                                <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabe1" colspan="4">
-                                        <table width="100%" class="propertiesTbl" id="exportProperties">
-                                        </table>
-                                    </td>
-                                </tr>
+                                <tbody id="exportConfiguration" style="display: none;">
+                                </tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
                                     <td>&nbsp;</td>
@@ -508,7 +486,7 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="heartbeatTimeoutRow">
-                                    <td class="configLabel">Heartbeat time out </td>
+                                    <td class="configLabel">Heartbeat Timeout </td>
                                     <td align="right" class="heartbeattd">
                                         <form id="formHeartbeatTimeout" method="get" action="">
                                             <div id="loadingHeartbeatTimeout" class="loading-small" style="display: none;"></div>
@@ -522,7 +500,7 @@
                                     <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="queryTimoutRow">
-                                    <td class="configLabel">Query time out</td>
+                                    <td class="configLabel">Query Timeout</td>
                                     <td align="right" class="queryTimeOut">
                                         <form id="formQueryTimeout" method="get" action="">
                                             <div id="loadingQueryTimeout" class="loading-small" style="display: none;"></div>
@@ -536,7 +514,7 @@
                                     <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow">
-                                    <td class="configLabel">Max temp table memory</td>
+                                    <td class="configLabel">Max Temp Table Memory</td>
                                     <td align="right">
                                         <span id="temptablesmaxsize"></span>
                                         <span id="temptablesmaxsizeUnit"></span>
@@ -545,7 +523,7 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow">
-                                    <td class="configLabel">Snapshot priority</td>
+                                    <td class="configLabel">Snapshot Priority</td>
                                     <td id="snapshotpriority" align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
@@ -605,11 +583,11 @@
                                         <td id="exportOverflow"></td>
                                     </tr>
                                     <tr>
-                                        <td>Command Logs</td>
+                                        <td>Command Log</td>
                                         <td id="commandlogpath"></td>
                                     </tr>
                                     <tr>
-                                        <td>Command log Snapshots</td>
+                                        <td>Command Log Snapshots</td>
                                         <td id="commandlogsnapshotpath"></td>
                                     </tr>
                                 </table>
@@ -996,7 +974,7 @@
         <div class="overlay-title icon-alert">Auto Snapshots</div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight">
-            <p class="txt-bold">Do you want to save the value?</p>
+            <p class="txt-bold">Do you want to save the value(s)?</p>
         </div>
         <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray">Cancel</a></div>
     </div>
@@ -1032,7 +1010,7 @@
     <div id="savePop" style="display: none">
         <div class="overlay-title icon-alert">Save</div>
         <div class="clear"></div>
-        <div class="saveInfo">
+        <div id="saveSnapshot" class="saveInfo">
             <div class="overlay-content ">
                 <form id="formSaveSnapshot" method="get" action="">
                     <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
@@ -1049,11 +1027,11 @@
             </div>
             <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
         </div>
-        <div class="saveConfirmation" style="display: none;">
+        <div id="saveSnapshotConfirm" class="saveConfirmation" style="display: none;">
             <div class="overlay-content ">
                 <div class="confirmationInfo">Are you sure you want to save?</div>
             </div>
-            <div class="overlay-btns"><a class="btn closeBtn">Yes</a> <a class="btn btn-gray confirmNoSave">No</a> </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshotOk" class="btn closeBtn">Yes</a> <a id="btnSaveSnapshotConfirmCancel" class="btn btn-gray confirmNoSave">No</a> </div>
         </div>
     </div>
     <!-- POPUP savePop -->
@@ -1108,7 +1086,7 @@
     <!-- POPUP restorePop -->
     <!-- POPUP restorePop -->
     <div id="HrtTimeOutPopup" style="display: none">
-        <div class="overlay-title icon-alert">Heartbeat time out</div>
+        <div class="overlay-title icon-alert">Heartbeat Timeout</div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to save the value?</p>
@@ -1117,16 +1095,16 @@
     </div>
     <!-- POPUP restorePop -->
 
-    <!-- POPUP Query time out Popup -->
+    <!-- POPUP Query timeout Popup -->
     <div id="QueryTimeOutPopup" style="display: none">
-        <div class="overlay-title icon-alert">Query time out</div>
+        <div class="overlay-title icon-alert">Query Timeout</div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
         <div class="overlay-btns"><a class="btn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
     </div>
-    <!-- POPUP Query time out Popup -->
+    <!-- POPUP Query timeout Popup -->
     <!-- POPUP saveConfirmationPopup -->
     <div id="Div2" style="display: none">
         <div class="overlay-title icon-alert">Save Confirmation</div>
@@ -1150,7 +1128,7 @@
     <!-- POPUP RestoreConfirmationPopup -->
 
     <!-- POPUP SaveSnapshotPopup -->
-    <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Cluster Shutdown</a></div>
+    <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Save Snapshot</a></div>
     <div id="saveSnapShotPopup" style="display: none">
         <div id="saveSnaps">
             <div class="overlay-title ">
@@ -1223,7 +1201,7 @@
     </div>
     <!--Update error Popup-->
 
-    <!--Update Query Time out error Popup-->
+    <!--Update Query Timeout error Popup-->
     <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
     <div id="queryTimeoutUpdateErrorPopup" style="display: none">
         <div id="queryTimeoutUpdateInnerErrorPopup">

@@ -33,6 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
@@ -466,6 +467,43 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
     }
 
+
+    private void checkMultiPartitionCappedTableContents(Client client, String tableName, long partitionRowLimit)
+            throws NoConnectionsException, IOException, ProcCallException {
+        long numPartitions = getLogicalPartitionCount();
+        if (numPartitions > 1) {
+            VoltTable vt = null;
+            // For multi-partition tables, it's possible that just one partition
+            // got all the rows, or that rows were evenly distributed (all partitions full).
+            final long minRows = partitionRowLimit;
+            final long maxRows = partitionRowLimit * numPartitions;
+            vt = client.callProcedure("@AdHoc",
+                    "select count(*) from " + tableName)
+                    .getResults()[0];
+            long numRows = vt.asScalarLong();
+            assertTrue ("Too many rows in target table: ", numRows <= maxRows);
+            assertTrue ("Too few rows in target table: ", numRows >= minRows);
+
+            // Get all rows in descending order
+            vt = client.callProcedure("@AdHoc",
+                    "SELECT info FROM " + tableName + " "
+                            + "ORDER BY when_occurred desc, info desc "
+                            + "LIMIT 50 OFFSET 5")
+                            .getResults()[0];
+            long prevValue = 50;
+            while (vt.advanceRow()) {
+                long curValue = vt.getLong(0);
+
+                // row numbers may not be adjacent, depending on how UUID hashed,
+                // but there should be no duplicates
+                assertTrue(curValue < prevValue);
+                prevValue = curValue;
+
+                // not sure what else we could assert here?
+            }
+        }
+    }
+
     // DELETE .. LIMIT <n> is intended to support the row limit trigger
     // so let's test it here.
     public void testLimitPartitionRowsDeleteWithLimit() throws Exception {
@@ -473,7 +511,6 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
             return;
 
         final long partitionRowLimit = 5; // from DDL
-        final long numPartitions = getLogicalPartitionCount();
 
         Client client = getClient();
 
@@ -501,40 +538,9 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
             }
 
             // Check the contents
+            checkMultiPartitionCappedTableContents(client, "events_capped", partitionRowLimit);
 
-            if (numPartitions > 1) {
-                // For multi-partition tables, it's possible that just one partition
-                // got all the rows, or that rows were evenly distributed (all partitions full).
-                final long minRows = partitionRowLimit;
-                final long maxRows = partitionRowLimit * numPartitions;
-                vt = client.callProcedure("@AdHoc",
-                        "select count(*) from events_capped")
-                        .getResults()[0];
-                long numRows = vt.asScalarLong();
-                assertTrue ("Too many rows in target table: ", numRows <= maxRows);
-                assertTrue ("Too few rows in target table: ", numRows >= minRows);
-
-                // Get all rows in descending order, skipping the 5 most recent rows
-                // (we check the 5 most recent below)
-                vt = client.callProcedure("@AdHoc",
-                        "SELECT info FROM events_capped "
-                                + "ORDER BY when_occurred desc, info desc "
-                                + "LIMIT 50 OFFSET 5")
-                                .getResults()[0];
-                long prevValue = 50;
-                while (vt.advanceRow()) {
-                    long curValue = vt.getLong(0);
-
-                    // row numbers may not be adjacent, depending on how UUID hashed,
-                    // but there should be no duplicates
-                    assertTrue(curValue < prevValue);
-                    prevValue = curValue;
-
-                    // not sure what else we could assert here?
-                }
-            }
-
-            // Should have all of the most recent 5 rows.
+            // Should have all of the most recent 5 rows, regardless of how the table is partitioned.
             vt = client.callProcedure("@AdHoc",
                     "select info from events_capped order by when_occurred desc, info desc limit 5")
                     .getResults()[0];
@@ -546,6 +552,60 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "delete from events_capped");
             }
         }
+    }
+
+    // Make sure that DELETE ... OFFSET <n> works in partition limit rows context
+    public void testLimitPartitionRowsDeleteWithOffset() throws Exception {
+        if (isHSQL())
+            return;
+
+        final long partitionRowLimit = 5; // from DDL
+        final long numPartitions = getLogicalPartitionCount();
+
+        Client client = getClient();
+
+        // The table EVENTS_CAPPED_OFFSET is capped at 5 rows/partition.  Inserts that
+        // would cause the constraint to fail trigger a delete of
+        // all rows except the newest.
+        //
+        // The DELETE statement looks like this:
+        //   DELETE FROM events_capped_offset
+        //   ORDER BY when_occurred DESC, event_id ASC offset 1
+        VoltTable vt;
+        for (int i = 0; i < 50; ++i) {
+
+            boolean deleteMustBeTriggered = false;
+            if (numPartitions == 1) {
+                long currNumRows = client.callProcedure("@AdHoc",
+                        "select count(*) from events_capped_offset")
+                        .getResults()[0].asScalarLong();
+                deleteMustBeTriggered = (currNumRows == partitionRowLimit);
+            }
+
+            String uuid = UUID.randomUUID().toString();
+            vt = client.callProcedure("@AdHoc",
+                    "INSERT INTO events_capped_offset VALUES ('" + uuid + "', NOW, " + i + ")")
+                    .getResults()[0];
+
+            // Note: this should be *one*, even if insert triggered a delete
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            // ensure that the events are inserted have a unique timestamp so we
+            // can sort by it.
+            client.drain();
+            Thread.sleep(1);
+
+            if (deleteMustBeTriggered) {
+                // The last insert just triggered a delete.
+                // We should have only the last 2 rows
+                validateTableOfScalarLongs(client,
+                        "select info from events_capped_offset order by info",
+                        new long[] {i - 1, i});
+            }
+        }
+
+        // Check the contents
+        checkMultiPartitionCappedTableContents(client, "events_capped_offset", partitionRowLimit);
     }
 
     public void testLimitRowsWithTruncatingTrigger() throws IOException, ProcCallException {

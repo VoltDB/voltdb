@@ -265,3 +265,23 @@ create table sm_idx_tbl(
 create index sm_idx on sm_idx_tbl(ti1, ti2);
 -- End table for ENG-7349    --
 -- ************************* --
+
+-- ****************************** --
+-- Stored procedures for ENG-7354 --
+create procedure one_list_param as
+       select id from P1 where ID in ?
+       order by id;
+
+create procedure one_string_list_param as
+       select id from P1 where desc in ?
+       order by id;
+
+create procedure one_scalar_param as
+       select id from P1 where ID in (?)
+       order by id;
+
+create procedure one_string_scalar_param as
+       select id from P1 where desc in (?)
+       order by id;
+-- End stored procedures for ENG-7354 --
+-- ********************************** --

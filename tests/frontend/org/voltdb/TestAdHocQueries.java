@@ -532,6 +532,96 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    private void verifyIncorrectParameterMessage(TestEnv env, String adHocQuery, Object[] params) {
+        int expected = 0;
+        for (int i=0; i < adHocQuery.length(); i++ ) {
+            if (adHocQuery.charAt(i) == '?' ) {
+                expected++;
+            }
+        }
+        String errorMsg = String.format("Incorrect number of parameters passed: expected %d, passed %d",
+                expected, params.length);
+        try {
+            switch (params.length) {
+            case 1:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0]);
+                break;
+            case 2:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1]);
+                break;
+            case 3:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1], params[2]);
+                break;
+            case 4:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1], params[2], params[3]);
+                break;
+            case 5:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1], params[2], params[3], params[4]);
+                break;
+            default:
+                // guard against other number of parameters tests
+                fail("This test does not support other than 1-5 parameters!");
+            }
+
+            // expecting failure above
+            fail();
+        } catch(Exception ex) {
+            assertEquals(errorMsg, ex.getMessage());
+        }
+    }
+
+    @Test
+    public void testAdHocWithParamsNegative() throws Exception {
+        System.out.println("Starting testAdHocWithParamsNegative cases");
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        String adHocQuery;
+
+        try {
+            env.setUp();
+
+            // no constants
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = ? and a2 = ?;";
+            verifyIncorrectParameterMessage(env, adHocQuery, new Integer[]{1});
+            verifyIncorrectParameterMessage(env, adHocQuery, new Integer[]{1, 1, 1});
+
+            // mix question mark and constants
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = ? and a2 = 'a2' and a3 = 'a3';";
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1", "a2"});
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1", "a2", "a3"});
+
+            // constants only
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1';";
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a2"});
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a2", "a3"});
+
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1' and a2 = 'a2';";
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1"});
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1", "a2"});
+
+            //
+            // test batch with extra parameter call
+            //
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = 'a2';";
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1"});
+
+            // test batch question mark parameter guards
+            String errorMsg = "The @AdHoc stored procedure when called with more than one parameter "
+                    + "must be passed a single parameterized SQL statement as its first parameter. "
+                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = ?;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
+                fail();
+            } catch (Exception ex) {
+                assertEquals(errorMsg, ex.getMessage());
+            }
+        }
+        finally {
+            env.tearDown();
+            System.out.println("Ending testAdHocWithParamsNegative cases");
+        }
+    }
+
     @Test
     public void testAdHocBatches() throws Exception {
         TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);

@@ -163,6 +163,11 @@
                                          "ddl": "int-DDL.sql",
                                          "template": "regression-advanced-ints-cntonly.sql",
                                          "normalizer": "not-a-normalizer.py"},
+# To test advanced IN/EXISTS
+    "advanced-inexists": {"schema": "int-schema.py",
+                          "ddl": "int-DDL.sql",
+                          "template": "advanced-inexists.sql",
+                          "normalizer": "normalizer.py"},
 
 # ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
     "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",

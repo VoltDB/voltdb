@@ -239,7 +239,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     /**
      * For convenience, serialization is accomplished with this single method,
      * but deserialization is piecemeal via the static methods userParamsFromBuffer
-     * and planArrayFromBuffer wih no dummy "AdHocPlannedStmtBatch receiver" instance required.
+     * and planArrayFromBuffer with no dummy "AdHocPlannedStmtBatch receiver" instance required.
      */
     public ByteBuffer flattenPlanArrayToBuffer() throws IOException {
         int size = 0; // sizeof batch
