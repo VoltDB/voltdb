@@ -1895,6 +1895,25 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
     }
 }
 
+void VoltDBEngine::collectDRTupleStreamStateInfo() {
+    std::size_t size = 2 * sizeof(int64_t) + 1;
+    if (m_drReplicatedStream) {
+        size += 2 * sizeof(int64_t);
+    }
+    m_resultOutput.writeInt(static_cast<int32_t>(size));
+    std::pair<int64_t, int64_t> stateInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueId();
+    m_resultOutput.writeLong(stateInfo.first);
+    m_resultOutput.writeLong(stateInfo.second);
+    if (m_drReplicatedStream) {
+        m_resultOutput.writeByte(static_cast<int8_t>(1));
+        stateInfo = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueId();
+        m_resultOutput.writeLong(stateInfo.first);
+        m_resultOutput.writeLong(stateInfo.second);
+    } else {
+        m_resultOutput.writeByte(static_cast<int8_t>(0));
+    }
+}
+
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     switch (taskType) {
     case TASK_TYPE_VALIDATE_PARTITIONING:
@@ -1908,14 +1927,8 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
         break;
     }
-    case TASK_TYPE_GET_DR_SEQUENCE_NUMBERS:
-        m_resultOutput.writeInt(static_cast<int32_t>(2 * sizeof(int64_t)));
-        m_resultOutput.writeLong(m_drStream->getLastCommittedSequenceNumber());
-        if (m_drReplicatedStream) {
-            m_resultOutput.writeLong(m_drReplicatedStream->getLastCommittedSequenceNumber());
-        } else {
-            m_resultOutput.writeLong(std::numeric_limits<int64_t>::min());
-        }
+    case TASK_TYPE_GET_DR_TUPLESTREAM_STATE:
+        collectDRTupleStreamStateInfo();
         break;
     case TASK_TYPE_SET_DR_SEQUENCE_NUMBERS: {
         ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());

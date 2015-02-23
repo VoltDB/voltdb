@@ -128,12 +128,12 @@ public interface SiteProcedureConnection {
      * Set the spHandle that's used by snapshot digest as the per-partition txnId. This gets updated during rejoin so
      * that the snapshot right after rejoin can have the correct value. It is also updated when transaction commits.
      */
-    public void setSpHandleAndUniqueIdForSnapshotDigest(long spHandle, long uniqueId);
+    public void setSpHandleForSnapshotDigest(long spHandle);
 
     /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long spHandle, long uniqueId, List<UndoAction> undoActions);
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoActions);
 
     /**
      * IV2: send dependencies to the EE
@@ -166,7 +166,7 @@ public interface SiteProcedureConnection {
 
     public long[] getUSOForExportTable(String signature);
 
-    public Pair<Long, Long> getDRSequenceNumbers();
+    public TupleStreamStateInfo getDRTupleStreamStateInfo();
 
     public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber);
 

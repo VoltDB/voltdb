@@ -77,7 +77,7 @@ public:
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn);
 
-    int64_t getLastCommittedSequenceNumber() { return m_committedSequenceNumber; }
+    std::pair<int64_t, int64_t> getLastCommittedSequenceNumberAndUniqueId() { return std::pair<int64_t, int64_t>(m_committedSequenceNumber, m_committedUniqueId); }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
     bool m_enabled;

@@ -57,7 +57,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
         APPLY_BINARY_LOG(1),
-        GET_DR_SEQUENCE_NUMBERS(2),
+        GET_DR_TUPLESTREAM_STATE(2),
         SET_DR_SEQUENCE_NUMBERS(3);
 
         private TaskType(int taskId) {
