@@ -142,7 +142,7 @@ public class VoltCompiler {
     public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
 
     String m_projectFileURL = null;
-    String m_currentFilename = null;
+    String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
     String[] m_importLines = null;
@@ -773,8 +773,8 @@ public class VoltCompiler {
     private DatabaseType getProjectDatabase(final VoltCompilerReader projectReader)
     {
         DatabaseType database = null;
-        m_currentFilename = (projectReader != null ? projectReader.getName() : NO_FILENAME);
         if (projectReader != null) {
+            m_currentFilename = projectReader.getName();
             try {
                 JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.projectfile");
                 // This schema shot the sheriff.
@@ -1103,15 +1103,18 @@ public class VoltCompiler {
 
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             String origFilename = m_currentFilename;
-            if (m_currentFilename.equals(NO_FILENAME))
-                m_currentFilename = schemaReader.getName();
+            try {
+                if (m_currentFilename.equals(NO_FILENAME))
+                    m_currentFilename = schemaReader.getName();
 
-            // add the file object's path to the list of files for the jar
-            m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
+                // add the file object's path to the list of files for the jar
+                m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-            ddlcompiler.loadSchema(schemaReader, db, whichProcs);
-
-            m_currentFilename = origFilename;
+                ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+            }
+            finally {
+                m_currentFilename = origFilename;
+            }
         }
 
         ddlcompiler.compileToCatalog(db);
