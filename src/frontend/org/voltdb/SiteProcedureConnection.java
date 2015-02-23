@@ -69,7 +69,6 @@ public interface SiteProcedureConnection {
             long txnId,
             long spHandle,
             long uniqueId,
-            long spUniqueId,
             String clusterName,
             String databaseName,
             String tableName,
@@ -86,7 +85,6 @@ public interface SiteProcedureConnection {
             long txnId,
             long spHandle,
             long uniqueId,
-            long spUniqueId,
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
@@ -107,7 +105,6 @@ public interface SiteProcedureConnection {
             long txnId,
             long spHandle,
             long uniqueId,
-            long spUniqueId,
             boolean readOnly) throws EEException;
 
     /**
@@ -131,12 +128,12 @@ public interface SiteProcedureConnection {
      * Set the spHandle that's used by snapshot digest as the per-partition txnId. This gets updated during rejoin so
      * that the snapshot right after rejoin can have the correct value. It is also updated when transaction commits.
      */
-    public void setSpHandleAndSpUniqueIdForSnapshotDigest(long spHandle, long spUniqueId);
+    public void setSpHandleAndUniqueIdForSnapshotDigest(long spHandle, long uniqueId);
 
     /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long spHandle, long spUniqueId, List<UndoAction> undoActions);
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, long uniqueId, List<UndoAction> undoActions);
 
     /**
      * IV2: send dependencies to the EE

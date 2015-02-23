@@ -71,12 +71,10 @@ public class MpRepairTask extends SiteTasker
             if (!m_repairRan) {
                 try {
                     long txnid = Long.MIN_VALUE;
-                    long uniqueId = Long.MIN_VALUE;
                     boolean success = false;
                     try {
                         RepairResult res = algo.start().get();
                         txnid = res.m_txnId;
-                        uniqueId = res.m_uniqueId;
                         success = true;
                     } catch (CancellationException e) {}
                     if (success) {

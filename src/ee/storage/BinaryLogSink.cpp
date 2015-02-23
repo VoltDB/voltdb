@@ -73,11 +73,9 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             tempTuple.deserializeFromDR(rowInput, pool);
 
             if (type == DR_RECORD_DELETE) {
-                //std::cout << "Deleting row id " << spUniqueId << std::endl;
                 TableTuple deleteTuple = table->lookupTuple(tempTuple);
                 table->deleteTuple(deleteTuple, false);
             } else {
-                //std::cout << "Inserting row id " << spUniqueId << std::endl;
                 table->insertPersistentTuple(tempTuple, false);
             }
             break;

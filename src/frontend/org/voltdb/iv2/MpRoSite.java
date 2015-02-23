@@ -123,7 +123,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public long getSpUniqueIdForSnapshotDigest() {
+        public long getUniqueIdForSnapshotDigest() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
@@ -354,7 +354,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long unqiueId, long spUniqueId, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, long unqiueId, String clusterName, String databaseName,
             String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) throws VoltAbortException
     {
@@ -362,7 +362,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
             boolean shouldDRStream,
             boolean undo)
     {
@@ -383,14 +383,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setSpHandleAndSpUniqueIdForSnapshotDigest(long spHandle, long spUniqueId)
+    public void setSpHandleAndUniqueIdForSnapshotDigest(long spHandle, long uniqueId)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, long spUniqueId,
-            List<UndoAction> undoActions)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle,
+            long uniqueId, List<UndoAction> undoActions)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -494,7 +494,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long txnId,
             long spHandle,
             long uniqueId,
-            long spUniqueId,
             boolean readOnly)
             throws EEException
     {

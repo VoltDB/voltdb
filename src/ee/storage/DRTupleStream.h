@@ -32,9 +32,9 @@ const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JA
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
-    //Version(1), type(1), uniqueId(8), spUniqueId(8), checksum(4)
+    //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
-    //Version(1), type(1), sphandle(8), checksum(4)
+    //Version(1), type(1), drId(8), checksum(4)
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
