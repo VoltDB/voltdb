@@ -577,14 +577,17 @@ if __name__ == "__main__":
 
     # Write the summary
     time1 = time.time()
+    valid_percent = '{0:.2f}'.format(100.00 * valid_statements / total_statements)
+    invalid_percent = '{0:.2f}'.format(100.00 * invalid_statements / total_statements)
+    mismatched_percent = '{0:.2f}'.format(100.00 * mismatched_statements / total_statements)
     statistics["totals"] = "\n<td align=right>" + str(valid_statements) + "</td>" + \
-                           "\n<td align=right>" + str(100.00 * valid_statements / total_statements) + "%</td>" + \
+                           "\n<td align=right>" + valid_percent + "%</td>" + \
                            "\n<td align=right>" + str(invalid_statements) + "</td>" + \
-                           "\n<td align=right>" + str(100.00 * invalid_statements / total_statements) + "%</td>" + \
+                           "\n<td align=right>" + invalid_percent + "%</td>" + \
                            "\n<td align=right>" + str(total_statements) + "</td>" + \
                            "\n<td align=right>" + str(mismatched_statements) + "</td>" + \
-                           "\n<td align=right>" + str(100.00 * mismatched_statements / total_statements) + "%</td>" + \
-                           "\n<td align=right>" + str(minutes_colon_seconds(time1-time0)) + "</td></tr>\n"
+                           "\n<td align=right>" + mismatched_percent + "%</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(time1-time0) + "</td></tr>\n"
     statistics["time_for_gensql"] = str(gensql_time) + " seconds (" + minutes_colon_seconds(gensql_time) + ")"
     statistics["time_for_voltdb"] = str(voltdb_time) + " seconds (" + minutes_colon_seconds(voltdb_time) + ")"
     statistics["time_for_hsqldb"] = str(hsqldb_time) + " seconds (" + minutes_colon_seconds(hsqldb_time) + ")"
