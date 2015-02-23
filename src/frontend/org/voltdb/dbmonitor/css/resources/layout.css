@@ -969,12 +969,11 @@ a.restoreBtn{cursor: default;}
 .exportTbl tr td { white-space: nowrap}
 .properTbl {position: relative;top: 3px;}
 
-.properTbl tr td:first-child{ padding: 0 0 0 80px;}
+.properTbl tr td:first-child{ padding: 0 0 0 60px;}
 .properTbl tr td input[type="text"]{ width:204px;}
 .properbtn {padding: 0 35px 0 0;}
-.adminTbl1 tr.subLabelRow td.expoStream { padding-left: 50px;font-weight: bold;cursor: pointer;}
+.adminTbl1 tr.subLabelRow td.expoStream { padding-left: 40px;font-weight: bold;cursor: pointer;}
 .expoProper {padding-left: 70px!important; font-weight: bold;}
-.expoNoProperty { padding-left: 80px!important;}
 /****Export details Ends*******/
 
 /*********************************************media Qu********************/

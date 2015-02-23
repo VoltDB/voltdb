@@ -1574,7 +1574,10 @@ function loadAdminPage() {
             adminDOMObjects.adminServerList.html(serverList);
         };
 
-        this.escapeHtml = function(value) {
+        this.escapeHtml = function (value) {
+            if (!value)
+                return "";
+            
             return $('<div/>').text(value).html();
         };
 
@@ -1642,7 +1645,7 @@ function loadAdminPage() {
                 
                 for (var i = 0; i < data.length; i++) {
                     var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
-                    var type = VoltDbAdminConfig.escapeHtml(data[i].type);
+                    var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
                     var enabled = data[i].enabled;
                     var streamProperty = data[i].property;
                     var rowId = 'row-4' + i;
@@ -1656,7 +1659,7 @@ function loadAdminPage() {
 
                     result +='<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
                             '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
-                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + ' </a>' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + type + '</a>' +
                             '   </td>' +
                             '   <td align="right">' +
                             '       <div class="' + getOnOffClass(enabled) + '"></div>' +
@@ -1665,57 +1668,37 @@ function loadAdminPage() {
                             '   <td>' +
                             '       <div class="exportDelete" style="display:none;"></div>' +
                             '   </td>' +
-                            '</tr>' +
-                        
-                            '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
-                            '   <td class="configLabel expoProper">Type </td>' +
-                            '   <td align="right">' + type + '</td>' +
-                            '   <td>&nbsp;</td>' +
-                            '   <td>&nbsp;</td>' +
-                            '   <td>&nbsp;</td>' +
-                            '</tr>' +                            
-                            '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
-                            '   <td class="configLabe1 expoProper">Properties</td>' +
-                            '   <td>&nbsp;</td>' +
-                            '   <td>&nbsp;</td>' +
-                            '   <td>&nbsp;</td>' +
                             '</tr>';
 
                     if (streamProperty && streamProperty.length > 0) {
-
-                        result += '' +
-                            '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
-                            '   <td class="configLabe1" colspan="4">' +
-                            '       <table cellpadding="0" cellspacing="0" class="properTbl" width="100%">';
 
                         for (var j = 0; j < streamProperty.length; j++) {
                             var name = streamProperty[j].name;
                             var value = streamProperty[j].value;
 
                             result += '' +
-                                '<tr>' +
-                                '   <td width="76%">' + name + '</td>' +
-                                '   <td>' + value + '</td>' +
+                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                                '   <td class="configLabe2">' + name + '</td>' +
+                                '   <td align="right">' + value + '</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
                                 '</tr>';
                         }
 
-                        result += '</table>' +
-                            '<table cellpadding="0" cellspacing="0" class="properTbl" style="display:none;"><tr><td><input type="text"/></td><td><input type="text"/></td><td><div class="exportDelete"></div></td></tr><tr><td><input type="text"/></td><td><input type="text"/></td><td><div class="exportDelete"></div></td></tr><tr><td><input type="text"/></td><td><input type="text"/></td><td><div class="exportDelete"></div></td></tr></table>' +
-                            '</td>';
 
                     } else {
-                        result += '<tr class="childprop-' + rowId + ' propertyLast" ' + style + '>' +
-                            '<td width="67%" class="expoNoProperty" colspan="3">No properties available.</td>' +
-                            '<td width="33%">&nbsp</td>';
+                        result += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
+                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
+                            '   <td width="33%">&nbsp</td>' +
+                            '</tr>';
                     }
-                    
-                    result += '</tr>';
                 }
             }
 
             if (result == "") {
-                result += '<tr class="propertyLast">' +
-                        '<td width="67%" class="expoNoProperty" colspan="3">No configuration available.</td>' +
+                result += '<tr class="propertyLast subLabelRow">' +
+                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }
