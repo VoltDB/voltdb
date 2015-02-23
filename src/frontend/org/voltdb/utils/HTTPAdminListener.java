@@ -18,11 +18,13 @@
 package org.voltdb.utils;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,9 +33,12 @@ import java.util.Map.Entry;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.bind.annotation.XmlAttribute;
 
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
+import org.codehaus.jackson.annotate.JsonPropertyOrder;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
@@ -320,9 +325,33 @@ public class HTTPAdminListener {
         }
     }
 
-    //This is for password on User not to be reported.
+    //This is for password on User in the deployment to not to be reported.
     abstract class IgnorePasswordMixIn {
         @JsonIgnore abstract String getPassword();
+    }
+
+    @JsonPropertyOrder({"name","roles","password","plaintext","id"})
+    public class IdUser extends UsersType.User {
+        @XmlAttribute(name = "id")
+        protected String id;
+
+        IdUser(UsersType.User user, String header) {
+            this.name = user.getName();
+            this.roles = user.getRoles();
+            this.password = user.getPassword();
+            this.plaintext = user.isPlaintext();
+            this.id = header + "/deployment/users/" + this.name;
+        }
+
+        @JsonProperty("id")
+        public void setId(String value) {
+            this.id = value;
+        }
+
+        @JsonProperty("id")
+        public String getId() {
+            return id;
+        }
     }
 
     class DeploymentRequestHandler extends VoltRequestHandler {
@@ -352,6 +381,17 @@ public class HTTPAdminListener {
         //Get deployment bytes from catalog context
         private byte[] getDeploymentBytes() {
             return VoltDB.instance().getCatalogContext().getDeploymentBytes();
+        }
+
+        private UsersType.User findUser(String user, DeploymentType dep) {
+            if (dep.getUsers() != null) {
+                for(User u : dep.getUsers().getUser()) {
+                    if (user.equalsIgnoreCase(u.getName())) {
+                        return u;
+                    }
+                }
+            }
+            return null;
         }
 
         // TODO - subresources.
@@ -404,6 +444,16 @@ public class HTTPAdminListener {
                     //Deployment xml is text/xml
                     response.setContentType("text/xml;charset=utf-8");
                     response.getWriter().write(new String(getDeploymentBytes()));
+                } else if (baseRequest.getRequestURI().contains("/users")) {
+                    if (request.getMethod().equalsIgnoreCase("POST")) {
+                        handleUpdateUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    } else if (request.getMethod().equalsIgnoreCase("PUT")) {
+                        handleCreateUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    } else if (request.getMethod().equalsIgnoreCase("DELETE")) {
+                        handleRemoveUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    } else {
+                        handleGetUsers(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    }
                 } else {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
                         handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
@@ -492,6 +542,212 @@ public class HTTPAdminListener {
             } catch (Exception ex) {
                 logger.error("Failed to update deployment from API", ex);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+
+        //Handle POST for users
+        public void handleUpdateUser(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            String update = request.getParameter("user");
+            if (update == null || update.length() == 0) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get user information."));
+                return;
+            }
+            try {
+                User newUser = m_mapper.readValue(update, User.class);
+                if (newUser == null) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse user information."));
+                    return;
+                }
+
+                DeploymentType newDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(getDeploymentBytes()));
+                User user = null;
+                String[] splitTarget = target.split("/");
+                if (splitTarget.length == 3) {
+                    user = findUser(splitTarget[2], newDeployment);
+                }
+                if (user == null) {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "User not found"));
+                    return;
+                }
+                user.setName(newUser.getName());
+                user.setPassword(newUser.getPassword());
+                user.setPlaintext(newUser.isPlaintext());
+                user.setRoles(newUser.getRoles());
+
+                String dep = CatalogUtil.getDeployment(newDeployment);
+                if (dep == null || dep.trim().length() <= 0) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
+                Object[] params = new Object[2];
+                params[0] = null;
+                params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
+                client.callProcedure("@UpdateApplicationCatalog", params);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Updated."));
+                notifyOfCatalogUpdate();
+            } catch (Exception ex) {
+                logger.error("Failed to update user from API", ex);
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+
+        //Handle PUT for users
+        public void handleCreateUser(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            String update = request.getParameter("user");
+            if (update == null || update.length() == 0) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get user information."));
+                return;
+            }
+            try {
+                User newUser = m_mapper.readValue(update, User.class);
+                if (newUser == null) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse user information."));
+                    return;
+                }
+
+                DeploymentType newDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(getDeploymentBytes()));
+                User user = null;
+                String[] splitTarget = target.split("/");
+                if (splitTarget.length == 3) {
+                    user = findUser(splitTarget[2], newDeployment);
+                }
+                String returnString = "User created";
+                if (user == null) {
+                    if (newDeployment.getUsers() == null) {
+                        newDeployment.setUsers(new UsersType());
+                    }
+                    newDeployment.getUsers().getUser().add(newUser);
+                    response.setStatus(HttpServletResponse.SC_CREATED);
+                } else {
+                    user.setName(newUser.getName());
+                    user.setPassword(newUser.getPassword());
+                    user.setPlaintext(newUser.isPlaintext());
+                    user.setRoles(newUser.getRoles());
+                    returnString = "User updated";
+                    response.setStatus(HttpServletResponse.SC_OK);
+                }
+
+                String dep = CatalogUtil.getDeployment(newDeployment);
+                if (dep == null || dep.trim().length() <= 0) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
+                Object[] params = new Object[2];
+                params[0] = null;
+                params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
+                client.callProcedure("@UpdateApplicationCatalog", params);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, returnString));
+                notifyOfCatalogUpdate();
+            } catch (Exception ex) {
+                logger.error("Failed to create user from API", ex);
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+
+        //Handle DELETE for users
+        public void handleRemoveUser(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            try {
+                DeploymentType newDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(getDeploymentBytes()));
+                User user = null;
+                String[] splitTarget = target.split("/");
+                if (splitTarget.length == 3) {
+                    user = findUser(splitTarget[2], newDeployment);
+                }
+                if (user == null) {
+                    response.setStatus(HttpServletResponse.SC_GONE);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "User not found"));
+                    return;
+                }
+                if (newDeployment.getUsers().getUser().size() == 1) {
+                    newDeployment.setUsers(null);
+                } else {
+                    newDeployment.getUsers().getUser().remove(user);
+                }
+
+                String dep = CatalogUtil.getDeployment(newDeployment);
+                if (dep == null || dep.trim().length() <= 0) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
+                Object[] params = new Object[2];
+                params[0] = null;
+                params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
+                client.callProcedure("@UpdateApplicationCatalog", params);
+                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User removed"));
+                notifyOfCatalogUpdate();
+            } catch (Exception ex) {
+                logger.error("Failed to update role from API", ex);
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+
+        //Handle GET for users
+        public void handleGetUsers(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            ObjectMapper mapper = new ObjectMapper();
+            User user = null;
+            String[] splitTarget = target.split("/");
+            if (splitTarget.length < 3 || splitTarget[2].isEmpty()) {
+                if (jsonp != null) {
+                    response.getWriter().write(jsonp + "(");
+                }
+                if (getDeployment().getUsers() != null) {
+                    List<IdUser> id = new ArrayList<IdUser>();
+                    for(UsersType.User u : getDeployment().getUsers().getUser()) {
+                        id.add(new IdUser(u, getHostHeader()));
+                    }
+                    mapper.writeValue(response.getWriter(), id);
+                } else {
+                    response.getWriter().write("");
+                }
+                if (jsonp != null) {
+                    response.getWriter().write(")");
+                }
+                return;
+            }
+            user = findUser(splitTarget[2], getDeployment());
+            if (user == null) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "User not found"));
+                return;
+            } else {
+                if (jsonp != null) {
+                    response.getWriter().write(jsonp + "(");
+                }
+                mapper.writeValue(response.getWriter(), new IdUser(user, getHostHeader()));
+                if (jsonp != null) {
+                    response.getWriter().write(")");
+                }
             }
         }
     }
