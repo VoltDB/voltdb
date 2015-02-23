@@ -332,7 +332,7 @@ public class SQLParser extends SQLPatternFactory
             "^\\s*" +         // optional indent at start of line
             "help" +          // required HELP command token
             "\\s*" +          // optional whitespace
-            "(.*)" +          // optional subcommand BUG: subcommand should require prior whitespace.
+            "(.*)" +          // optional subcommand (group 1) BUG: subcommand should require prior whitespace.
             //FIXME: simplify -- a prior .* starves out all of these optional patterns
             "\\s*" +          // optional whitespace before semicolon
             //FIXME: strangely allowing more than one strictly adjacent semicolon.
@@ -345,46 +345,49 @@ public class SQLParser extends SQLPatternFactory
             //TODO: allow "\\s*" + // optional whitespace before semicolon
             //FIXME: strangely allowing more than one strictly adjacent semicolon.
             ";*" +                 // optional semicolons
-            "\\s*$",               //
+            "\\s*$",               // optional terminating whitespace
             Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
             "(exit|quit)" +   // required command (group 1 -- probably not used)
-            //TODO: allow "\\s*" + // optional whitespace before semicolon
+            "\\s*" +          // optional whitespace before semicolon
             //FIXME: strangely allowing more than one strictly adjacent semicolon.
             ";*" +            // optional semicolons
             "\\s*$",          // optional terminating whitespace
             Pattern.CASE_INSENSITIVE);
     private static final Pattern ShowToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
-            "list|show" +     // keyword alternatives -- BUG! SHOULD BE in a group (non-capturing)
+            "(?:list|show)" + // keyword alternatives, synonymous so don't bother capturing
             "\\s+" +          // one or more spaces
-            "([a-z+])" +      // subcommand (group 1) -- 2 BUGS
+            "(proc|procedure|tables|classes)" + // subcommand (group 1) over-specified, see ***Note***
+            "\\s*" + // optional whitespace before semicolon
             // long-term, move + outside '[]'s for "([a-z]+)" +
-            // short-term, over-specify as "(proc|procedure|tables|classes)" + // See ***Note***
-            //TODO: allow "\\s*" + // optional whitespace before semicolon
             //FIXME: strangely allowing more than one strictly adjacent semicolon.
             ";*" +            // optional semicolons
             "\\s*$",          // optional terminating whitespace
             Pattern.CASE_INSENSITIVE);
     // ***Note***
-    // TODO: It would be nice to be very forgiving initially about subcommands as in:
+    // TODO: It would be better to be very forgiving initially about subcommands as in:
     // "([a-z]*)" + // alphabetic subcommand (group 1)
+    // or even
+    // "([^;\\s]*)" + // non-space non-semicolon subcommand (group 1)
     // That would allow list/show command processing to be "locked in" here even if the
-    // subcommand was later found to be garbage -- or missing.
+    // subcommand was later found to be garbage -- or missing or followed by garbage.
     // A custom error message could usefully explain the correct list/show command options.
     // For now, with a strict match for only valid list/show subcommands, invalid or
-    // missing subcommands fail through to the generic @AdHoc sql statement
-    // processor which unhelpfully claims that show or list is some kind of syntax error.
+    // missing subcommands or directives with extra garbage sharacters fail
+    // through to the generic @AdHoc sql statement processor which unhelpfully
+    // claims that show or list is some kind of syntax error.
     // The reason NOT to fix this right away is that sqlcmd has a bug so that it
     // tries to parse things like list and show commands on each new line of input
     // EVEN when it is processing the middle of a multi-line sql statement. So, it could
     // legitimately encounter the line "list integer" (in the middle of a create
-    // table statement) and passing it on to @AdHoc is the correct behavior.
+    // table statement) and must correctly pass it on to @AdHoc.
     // It should NOT treat this case as an invalid list subcommand.
-    // Once that bug is fixed, we can go back to very general subcommand matching here.
+    // Once that bug is fixed, we can shift to very general subcommand and
+    // end-of-directive matching here and for other directives.
     // For now (as before) look for only the specific valid subcommands and let @AdHoc
-    // give its misleading error messages for the actual invalid subcommands.
+    // give its misleading error messages for any invalid usage.
     private static final Pattern SemicolonToken = Pattern.compile(
             "^.*" +           // match anything
             //FIXME: simplify -- a prior .* starves out this next optional pattern
@@ -395,7 +398,16 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern RecallToken = Pattern.compile(
             "^\\s*" +      // optional indent at start of line
             "recall\\s+" + // required RECALL command token, whitespace terminated
-            "([^;]+)" +    // required non-whitespace non-semicolon parameter (group 1)
+            //TODO: For now, at least until the directive processor is fixed,
+            // avoid false positives on uses of "recall" as a schema name by
+            // completely failing to recognize a recall directive that does
+            // not have its expected integer argument.
+            // When the directive processing is fixed,
+            // this pattern match can be generalized to something like
+            // "([^;]+)" +    // required non-whitespace non-semicolon parameter (group 1)
+            // leaving it to ParseRecallResults to produce a more precise
+            // error message than the @AdHoc fallback could give.
+            "([0-9]+)" +   // required integer parameter (group 1)
             "\\s*" +       // optional whitespace
             //FIXME: strangely allowing more than one strictly adjacent semicolon.
             ";*" +         // optional semicolons
@@ -427,21 +439,18 @@ public class SQLParser extends SQLPatternFactory
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile(
-            "^" +              //TODO: allow indent at start of line -- or is input always trimmed?
-            "(exec|execute)" + // required command alternatives TODO: make non-grouping?
-            " ",               //TODO: allow any whitespace(s), not just ' '
+            "^" +                   //TODO: allow indent at start of line -- or is input always trimmed?
+            "(?:exec|execute)\\s+", // required command or alias whitespace terminated non-grouping
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
     private static final Pattern ExplainCall = Pattern.compile(
             "^" +           //TODO: allow indent at start of line -- or is input always trimmed?
-            "explain" +     // required command
-            " ",            //TODO: allow any whitespace(s), not just ' '
+            "explain\\s+",  // required command, whitespace terminated
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
     private static final Pattern ExplainProcCall = Pattern.compile(
-            "^" +           //TODO: allow indent at start of line -- or is input always trimmed?
-            "explainProc" + // required command
-            " ",            //TODO: allow any whitespace(s), not just ' '
+            "^" +              //TODO: allow indent at start of line -- or is input always trimmed?
+            "explainProc\\s+", // required command, whitespace terminated
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -630,7 +639,7 @@ public class SQLParser extends SQLPatternFactory
      * Capture groups (if not non-capturing):
      *  (1) Entire role list with commas and internal whitespace
      */
-    static String formatProcedureAllowClause(boolean nonCapturing)
+    private static String formatProcedureAllowClause(boolean nonCapturing)
     {
         final String groupPrefix = nonCapturing ? "(?:" : "(";
         return String.format("ALLOW\\s+%s[\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)", groupPrefix);
@@ -657,11 +666,11 @@ public class SQLParser extends SQLPatternFactory
      * </pre>
      *
      * Capture groups (if not non-capturing):
-     *  (1) Procedure name
-     *  (2) Table name
-     *  (3) Column name
+     *  (1) Table name
+     *  (2) Column name
+     *  (3) Parameter index
      */
-    static final String formatProcedurePartitionClause(boolean nonCapturing)
+    private static final String formatProcedurePartitionClause(boolean nonCapturing)
     {
         final String groupPrefix = nonCapturing ? "(?:" : "(";
         return String.format(
@@ -671,9 +680,14 @@ public class SQLParser extends SQLPatternFactory
 
     /**
      * Optional ALLOW or PARTITION clause that can modify CREATE PROCEDURE statements.
-     * 2 repetitions support one of each possible clause. The code should check that
-     * if there are two clauses it is one of each, not one repeated twice. The code
-     * should also not care about ordering.
+     * Capture must be enabled to distinguish which clause (ALLOW or PARTITION)
+     * was matched based on whether group 1 (roles for ALLOW) or 2
+     * (table for PARTITION) is non-empty.
+     * The caller should try to match any number of repetitions to
+     * support any number of ALLOW clauses and up to one PARTITION clause.
+     * Used this way, the patterns will match all possible clause orderings
+     * BUT will also allow a false positive match on two or more PARTITION
+     * clauses. The caller is responsible for detecting that invalid case.
      *
      * Regex Description:
      * <pre>
@@ -686,8 +700,11 @@ public class SQLParser extends SQLPatternFactory
      *
      * Capture groups (if not non-capturing):
      *  (1) Entire role list with commas and internal whitespace
+     *  (2) Partitioning table name
+     *  (3) Partitioning column name
+     *  (4) Partitioning parameter index
      */
-    static String formatCreateProcedureClause(boolean nonCapturing)
+    private static final String formatCreateProcedureClause(boolean nonCapturing)
     {
         return String.format("(?:(?:%s)|(?:%s))",
                              formatProcedureAllowClause(nonCapturing),
@@ -931,14 +948,20 @@ public class SQLParser extends SQLPatternFactory
      */
     public static class ParseRecallResults
     {
-        public int line;
-        public String error;
+        // These are declared public because trying to declare them as private
+        // and force use of public accessors gets a mysterious NoSuchMethodError.
+        public final int line;
+        public final String error;
 
         ParseRecallResults(int line, String error)
         {
             this.line = line;
             this.error = error;
         }
+        // Attempts to use these methods gets a mysterious NoSuchMethodError,
+        // so keep them disabled and keep the attributes public for now.
+        // public int getLine() { return line; }
+        // public String getError() { return error; }
     }
 
     /**

@@ -11,6 +11,12 @@
 /.DS_Store
 .DS_Store
 .cache/
+*.err
+*.errclean
+*.errdiff
+*.out
+*.outclean
+*.outdiff
 *.pyc
 *.swp
 *~
