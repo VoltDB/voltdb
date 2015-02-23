@@ -55,13 +55,7 @@ public class ShutdownHooks
         }
     }
 
-    private static VoltLogger consoleLog = new VoltLogger("CONSOLE");
-
-    private static ShutdownHooks m_instance = null;
-
-    static {
-        m_instance = new ShutdownHooks();
-    }
+    private static final ShutdownHooks m_instance = new ShutdownHooks();
 
     /**
      * Register an action to be run when the JVM exits.
@@ -124,7 +118,7 @@ public class ShutdownHooks
     private synchronized void runHooks()
     {
         if (m_iAmAServer && !m_crashing) {
-            consoleLog.warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
+            new VoltLogger("CONSOLE").warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
             for (ShutdownTask task : tasks.getValue()) {
@@ -132,11 +126,12 @@ public class ShutdownHooks
                     try {
                         task.m_action.run();
                     } catch (Exception e) {
-                        consoleLog.warn("Exception while running shutdown hooks.", e);
+                        new VoltLogger("CONSOLE").warn("Exception while running shutdown hooks.", e);
                     }
                 }
             }
         }
+        VoltLogger.shutdownAsynchLogging();
     }
 
     private synchronized void crashing()

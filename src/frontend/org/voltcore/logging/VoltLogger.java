@@ -25,8 +25,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.voltcore.utils.ShutdownHooks;
-
 import com.google_voltpatches.common.base.Throwables;
 
 /**
@@ -63,29 +61,32 @@ public class VoltLogger {
 
     // The pool containing the logger thread(s) or null if asynch logging is disabled so that
     // all logging takes place synchronously on the caller's thread.
-    private static final ExecutorService m_asynchLoggerPool =
+    private static ExecutorService m_asynchLoggerPool =
             Boolean.getBoolean("DISABLE_ASYNC_LOGGING") ?
                     null :
                     new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
                             new LoggerThreadFactory());
 
-    static {
+    /// ShutdownHooks potentially makes some (minimal) use of logging during
+    /// shutdown task processing. Given that dependency, it makes more sense
+    /// for ShutdownHooks to make an explicit call to "shutdown" logging
+    /// when it is finished, rather than having VoltLogger inject its shutdown
+    /// into some arbitrary position in ShutdownHooks' task queue.
+    /// This also eliminates an interdependency.
+    public static synchronized void shutdownAsynchLogging() {
         if (m_asynchLoggerPool != null) {
-            // Queue and wait on an empty asynch logging task to ensure that the
-            // queue is flushed before shutdown.
-            ShutdownHooks.registerShutdownHook(ShutdownHooks.VOLT_LOGGER, true, new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        m_asynchLoggerPool.submit(new Runnable() {
-                            @Override
-                            public void run() {}
-                        }).get();
-                    } catch (Exception e) {
-                        Throwables.getRootCause(e).printStackTrace();
-                    }
-                }
-            });
+            try {
+                // Submit and wait on an empty logger task to flush the queue.
+                m_asynchLoggerPool.submit(new Runnable() {
+                    @Override
+                    public void run() {}
+                }).get();
+            } catch (Exception e) {
+                Throwables.getRootCause(e).printStackTrace();
+            }
+            // Any logging that falls after the official shutdown flush of the
+            // asynch logger can just fall back to synchronous on the caller thread.
+            m_asynchLoggerPool = null;
         }
     }
 
