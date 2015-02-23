@@ -193,10 +193,11 @@ public class SnapshotSaveAPI
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
+            Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
             SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
-                    TxnEgo.getPartitionId(partitionTxnId) + " and unique id " + partitionUniqueId);
-            m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
-            m_partitionLastSeenUniqueIds.put((int)UniqueIdGenerator.getPartitionIdFromUniqueId(partitionUniqueId), partitionUniqueId);
+                    partitionId + " and unique id " + partitionUniqueId);
+            m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
+            m_partitionLastSeenUniqueIds.put(partitionId, partitionUniqueId);
 
         }
 

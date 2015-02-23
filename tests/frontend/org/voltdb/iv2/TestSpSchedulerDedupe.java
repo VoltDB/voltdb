@@ -35,8 +35,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.SnapshotCompletionMonitor;
-
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
@@ -50,6 +48,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;
@@ -121,8 +120,6 @@ public class TestSpSchedulerDedupe extends TestCase
         return task;
     }
 
-    private final long ZERO_UNIQUE_ID = UniqueIdGenerator.makeIdFromComponents(UniqueIdGenerator.VOLT_EPOCH, 0, 0);
-
     private FragmentTaskMessage createFrag(long txnId, boolean readOnly, long destHSId)
     {
         FragmentTaskMessage frag =
@@ -133,7 +130,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                     readOnly,
                                     false,
                                     false);
-        frag.setSpHandleAndSpUniqueId(TxnEgo.makeZero(0).getTxnId(), ZERO_UNIQUE_ID);
+        frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
         return frag;
     }
 
@@ -145,7 +142,7 @@ public class TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
-        sptask.setSpHandleAndSpUniqueId(txnid, ZERO_UNIQUE_ID);
+        sptask.setSpHandle(txnid);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -162,7 +159,7 @@ public class TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, dut_hsid);
-        sptask.setSpHandleAndSpUniqueId(txnid, ZERO_UNIQUE_ID);
+        sptask.setSpHandle(txnid);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());

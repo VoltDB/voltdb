@@ -88,7 +88,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setParams(57, "gooniestoo", "dudemandude");
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
-        itask.setSpHandleAndSpUniqueId(31337, 31337);
+        itask.setSpHandle(31337);
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
 
         assertEquals(10L, itask.getTruncationHandle());
@@ -265,7 +265,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setParams(57, "gooniestoo", "dudemandude");
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
-        itask.setSpHandleAndSpUniqueId(31337, 31337);
+        itask.setSpHandle(31337);
 
         // this is the important part.
         ft.setStateForDurability(itask, Sets.newHashSet(0, 1, 2));
@@ -412,7 +412,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         Iv2InitiateTaskMessage itask =
                 new Iv2InitiateTaskMessage(23, 8, 100044, 100045, 99, true, false, spi, 2101, 3101, false);
-        itask.setSpHandleAndSpUniqueId(31337, 31337);
+        itask.setSpHandle(31337);
 
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, 3L, itask);
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
@@ -446,7 +446,7 @@ public class TestVoltMessageSerialization extends TestCase {
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(
                 0, 10, Long.MAX_VALUE, Long.MAX_VALUE,
                 Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3}),
-                Long.MAX_VALUE, Long.MIN_VALUE, Long.MIN_VALUE
+                Long.MIN_VALUE, Long.MIN_VALUE
                 );
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
@@ -454,7 +454,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(r1.getTxnId(), r2.getTxnId());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
-        assertEquals(r1.getUniqueId(), r2.getUniqueId());
         assertEquals(r1.getBinaryLogUniqueId(), r2.getBinaryLogUniqueId());
         assertTrue(r1.hasHashinatorConfig());
         assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));

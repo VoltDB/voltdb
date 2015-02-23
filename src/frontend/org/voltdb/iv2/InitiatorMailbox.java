@@ -76,9 +76,9 @@ public class InitiatorMailbox implements Mailbox
     public static final CopyOnWriteArrayList<InitiatorMailbox> m_allInitiatorMailboxes
                                                                          = new CopyOnWriteArrayList<InitiatorMailbox>();
 
-    synchronized public void setLeaderState(long maxSeenTxnId, long maxSeenUniqueId)
+    synchronized public void setLeaderState(long maxSeenTxnId)
     {
-        setLeaderStateInternal(maxSeenTxnId, maxSeenUniqueId);
+        setLeaderStateInternal(maxSeenTxnId);
     }
 
     public synchronized void setMaxLastSeenMultipartTxnId(long txnId) {
@@ -106,13 +106,12 @@ public class InitiatorMailbox implements Mailbox
         m_algo = algo;
     }
 
-    protected void setLeaderStateInternal(long maxSeenTxnId, long maxSeenUniqueId)
+    protected void setLeaderStateInternal(long maxSeenTxnId)
     {
         assert(lockingVows());
         m_repairLog.setLeaderState(true);
         m_scheduler.setLeaderState(true);
         m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
-        m_scheduler.setMaxSeenUniqueId(maxSeenUniqueId);
     }
 
     protected void setMaxLastSeenMultipartTxnIdInternal(long txnId) {

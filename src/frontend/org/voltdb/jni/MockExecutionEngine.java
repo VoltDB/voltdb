@@ -53,7 +53,6 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
-            final long spUniqueId,
             final long undoToken) throws EEException
     {
         if (numFragmentIds != 1) {
@@ -134,8 +133,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
-        final long lastCommittedTxnId, long uniqueId, long spUniqueId,
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+        final long spHandle, final long lastCommittedTxnId, long uniqueId,
         boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {

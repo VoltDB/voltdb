@@ -33,7 +33,7 @@ public interface SystemProcedureExecutionContext {
 
     public long getSpHandleForSnapshotDigest();
 
-    public long getSpUniqueIdForSnapshotDigest();
+    public long getUniqueIdForSnapshotDigest();
 
     public long getSiteId();
 

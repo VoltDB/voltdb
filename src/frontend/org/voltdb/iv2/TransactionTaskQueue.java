@@ -41,7 +41,6 @@ public class TransactionTaskQueue
      * Track the maximum spHandle offered to the task queue
      */
     private long m_maxTaskedSpHandle;
-    private long m_maxTaskedSpUniqueId;
 
     TransactionTaskQueue(SiteTaskerQueue queue, long initialSpHandle)
     {
@@ -62,7 +61,6 @@ public class TransactionTaskQueue
         TransactionState txnState = task.getTransactionState();
         if (!txnState.isReadOnly()) {
             m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, txnState.m_spHandle);
-            m_maxTaskedSpUniqueId = Math.max(m_maxTaskedSpUniqueId, txnState.m_spUniqueId);
         }
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
@@ -110,13 +108,6 @@ public class TransactionTaskQueue
      */
     public long getMaxTaskedSpHandle() {
         return m_maxTaskedSpHandle;
-    }
-
-    /**
-     * @return the maximum spUniqueId offered to the task queue
-     */
-    public long getMaxTaskedSpUniqueId() {
-        return m_maxTaskedSpUniqueId;
     }
 
     /**

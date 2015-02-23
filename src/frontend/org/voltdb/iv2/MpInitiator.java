@@ -121,13 +121,11 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
-                long uniqueId = UniqueIdGenerator.makeZero(MP_INIT_PID);
                 long binaryLogDRId = Long.MIN_VALUE;
                 long binaryLogUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
-                    uniqueId = res.m_uniqueId;
                     binaryLogDRId = res.m_binaryLogDRId;
                     binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
@@ -135,7 +133,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     success = false;
                 }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(txnid, uniqueId);
+                    m_initiatorMailbox.setLeaderState(txnid);
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
                         // Should only be one restarting MP txn
