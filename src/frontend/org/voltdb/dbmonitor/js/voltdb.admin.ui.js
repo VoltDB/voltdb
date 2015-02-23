@@ -1810,7 +1810,8 @@ function loadAdminPage() {
                 adminDOMObjects.clientPort.text(configValues.clientInterface);
                 adminDOMObjects.internalPort.text(configValues.internalInterface);
                 adminDOMObjects.zookeeperPort.text(configValues.zookeeperInterface);
-                adminDOMObjects.replicationPort.text(configValues.replicationInterface);  
+                adminDOMObjects.replicationPort.text(configValues.replicationInterface);
+                adminDOMObjects.serverSettingHeader.text("Server Settings");
                 
             } else {
                 adminDOMObjects.serverSettingHeader.text("");
