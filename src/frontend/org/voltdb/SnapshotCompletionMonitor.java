@@ -197,11 +197,12 @@ public class SnapshotCompletionMonitor {
             exportSequenceNumbers = builder.build();
 
             Map<Integer, Long> drSequenceNumbers = new HashMap<>();
-            JSONObject drSequenceJSON = jsonObj.getJSONObject("drSequenceNumbers");
-            Iterator<String> partitionKeys = drSequenceJSON.keys();
+            JSONObject drTupleStreamJSON = jsonObj.getJSONObject("drTupleStreamStateInfo");
+            Iterator<String> partitionKeys = drTupleStreamJSON.keys();
             while (partitionKeys.hasNext()) {
                 String partitionIdString = partitionKeys.next();
-                drSequenceNumbers.put(Integer.valueOf(partitionIdString), drSequenceJSON.getLong(partitionIdString));
+                JSONObject stateInfo = drTupleStreamJSON.getJSONObject(partitionIdString);
+                drSequenceNumbers.put(Integer.valueOf(partitionIdString), stateInfo.getLong("sequenceNumber"));
             }
 
             Map<Integer, Long> partitionTxnIdsMap = ImmutableMap.of();

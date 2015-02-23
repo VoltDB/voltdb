@@ -55,7 +55,6 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.m_spHandle,
-                    m_txnState.uniqueId,
                     m_txnState.getUndoLog());
         }
         if (!m_completeMsg.isRestart()) {
@@ -95,7 +94,7 @@ public class CompleteTransactionTask extends TransactionTask
             //   the spHandle should have the latest value. If all replayed transactions rolled back,
             //   the spHandle is still guaranteed to be the spHandle of the stream snapshot that transfered the
             //   rejoin data, which is the correct value.
-            siteConnection.setSpHandleAndUniqueIdForSnapshotDigest(m_txnState.m_spHandle, m_txnState.uniqueId);
+            siteConnection.setSpHandleForSnapshotDigest(m_txnState.m_spHandle);
         }
 
         if (!m_completeMsg.isRestart()) {
@@ -127,7 +126,6 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.m_spHandle,
-                    m_txnState.uniqueId,
                     m_txnState.getUndoLog());
         }
         if (!m_completeMsg.isRestart()) {

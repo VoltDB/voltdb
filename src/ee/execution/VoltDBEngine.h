@@ -386,6 +386,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         void dispatchValidatePartitioningTask(const char *taskParams);
 
+        void collectDRTupleStreamStateInfo();
+
         void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
 
         // -------------------------------------------------

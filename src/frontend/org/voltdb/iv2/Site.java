@@ -60,6 +60,7 @@ import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -213,7 +214,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Advanced in complete transaction.
     long m_lastCommittedSpHandle = 0;
     long m_spHandleForSnapshotDigest = 0;
-    long m_uniqueIdForSnapshotDigest = 0;
     long m_currentTxnId = Long.MIN_VALUE;
     long m_lastTxnTime = System.currentTimeMillis();
 
@@ -255,11 +255,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public long getSpHandleForSnapshotDigest() {
             return m_spHandleForSnapshotDigest;
-        }
-
-        @Override
-        public long getUniqueIdForSnapshotDigest() {
-            return m_uniqueIdForSnapshotDigest;
         }
 
         @Override
@@ -425,7 +420,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_startupConfig = new StartupConfig(context.catalog, context.m_uniqueId);
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_spHandleForSnapshotDigest = m_lastCommittedSpHandle;
-        m_uniqueIdForSnapshotDigest = UniqueIdGenerator.makeZero(partitionId);
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
@@ -749,10 +743,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
             Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
-                                        exportSequenceNumbers, drSequenceNumbers,
+                                        exportSequenceNumbers, drTupleStreamInfo,
                                         remoteDCLastIds);
     }
 
@@ -836,14 +830,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setSpHandleAndUniqueIdForSnapshotDigest(long spHandle, long uniqueId)
+    public void setSpHandleForSnapshotDigest(long spHandle)
     {
-        assert(uniqueId != 0);
         // During rejoin, the spHandle is updated even though the site is not executing the tasks. If it's a live
         // rejoin, all logged tasks will be replayed. So the spHandle may go backward and forward again. It should
         // stop at the same point after replay.
         m_spHandleForSnapshotDigest = Math.max(m_spHandleForSnapshotDigest, spHandle);
-        m_uniqueIdForSnapshotDigest = Math.max(m_uniqueIdForSnapshotDigest, uniqueId);
     }
 
     private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
@@ -858,7 +850,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
-    private void setLastCommittedSpHandleAndUniqueId(long spHandle, long uniqueId)
+    private void setLastCommittedSpHandle(long spHandle)
     {
         if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != m_partitionId) {
             VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
@@ -866,15 +858,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                     TxnEgo.getPartitionId(spHandle), true, null);
         }
         m_lastCommittedSpHandle = spHandle;
-        setSpHandleAndUniqueIdForSnapshotDigest(m_lastCommittedSpHandle, uniqueId);
+        setSpHandleForSnapshotDigest(m_lastCommittedSpHandle);
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, long uniqueId, List<UndoAction> undoLog)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, List<UndoAction> undoLog)
     {
         // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
         if (!rollback) {
-            setLastCommittedSpHandleAndUniqueId(spHandle, uniqueId);
+            setLastCommittedSpHandle(spHandle);
         }
 
         //Any new txnid will create a new undo quantum, including the same txnid again
@@ -923,12 +915,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public Pair<Long, Long> getDRSequenceNumbers()
+    public TupleStreamStateInfo getDRTupleStreamStateInfo()
     {
-        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_SEQUENCE_NUMBERS, null));
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_TUPLESTREAM_STATE, null));
         long partitionSequenceNumber = resultBuffer.getLong();
-        long mpSequenceNumber = resultBuffer.getLong();
-        return Pair.of(partitionSequenceNumber, mpSequenceNumber < -1 ? null : mpSequenceNumber);
+        long partitionUniqueId = resultBuffer.getLong();
+        byte hasReplicatedStateInfo = resultBuffer.get();
+        TupleStreamStateInfo info = null;
+        if (hasReplicatedStateInfo != 0) {
+            long replicatedSequenceNumber = resultBuffer.getLong();
+            long replicatedUniqueId = resultBuffer.getLong();
+            info = new TupleStreamStateInfo(partitionSequenceNumber, partitionUniqueId,
+                    replicatedSequenceNumber, replicatedUniqueId);
+        } else {
+            info = new TupleStreamStateInfo(partitionSequenceNumber, partitionUniqueId);
+        }
+        return info;
     }
 
     @Override

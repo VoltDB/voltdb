@@ -35,7 +35,7 @@ public interface SiteSnapshotConnection
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
             Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds);
 
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);

@@ -33,8 +33,6 @@ public interface SystemProcedureExecutionContext {
 
     public long getSpHandleForSnapshotDigest();
 
-    public long getUniqueIdForSnapshotDigest();
-
     public long getSiteId();
 
     // does this site have "lowest site id" responsibilities.
