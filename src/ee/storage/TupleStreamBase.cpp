@@ -149,7 +149,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_openUniqueId = uniqueId;
 
         if (flush) {
-            extendBufferChain(0);
+            // Don't move the txn we've just finished to the new buffer
+            extendBufferChain(0, false);
         }
 
         beginTransaction(m_openSequenceNumber, uniqueId);
@@ -171,7 +172,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_committedUniqueId = m_openUniqueId;
 
         if (flush) {
-            extendBufferChain(0);
+            // Don't move the txn we've just finished to the new buffer
+            extendBufferChain(0, false);
         }
     }
 
@@ -266,7 +268,7 @@ void TupleStreamBase::discardBlock(StreamBlock *sb) {
  * Allocate another buffer, preserving the current buffer's content in
  * the pending queue.
  */
-void TupleStreamBase::extendBufferChain(size_t minLength)
+void TupleStreamBase::extendBufferChain(size_t minLength, bool continueTxn /*= true*/)
 {
     if (m_defaultCapacity < minLength) {
         // exportxxx: rollback instead?
@@ -289,7 +291,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         }
     }
     size_t blockSize = m_defaultCapacity;
-    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
+    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso, continueTxn);
 
     char *buffer = new char[blockSize];
     if (!buffer) {

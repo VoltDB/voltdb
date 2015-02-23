@@ -280,8 +280,9 @@ void DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
-bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
-    if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
+bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn) {
+    if (sb && continueTxn           /* this is not a flush, or there's still a transaction ongoing */
+           && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && sb->lastDRBeginTxnOffset() != sb->offset() /* current txn is not a DR begin txn */) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
         if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {

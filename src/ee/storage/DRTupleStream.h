@@ -75,7 +75,7 @@ public:
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     void endTransaction(int64_t sequenceNumber, int64_t uniqueId);
 
-    bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
+    bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn);
 
     int64_t getLastCommittedSequenceNumber() { return m_committedSequenceNumber; }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);

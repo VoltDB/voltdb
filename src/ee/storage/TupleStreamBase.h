@@ -70,14 +70,14 @@ public:
     void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);
 
-    virtual void extendBufferChain(size_t minLength);
+    virtual void extendBufferChain(size_t minLength, bool continueTxn = true);
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
     virtual void beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {}
     virtual void endTransaction(int64_t sequenceNumber, int64_t uniqueId) {}
 
-    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
+    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn) { return false; }
 
     /** Send committed data to the top end */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
