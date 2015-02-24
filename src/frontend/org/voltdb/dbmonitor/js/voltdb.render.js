@@ -317,6 +317,8 @@ function alertNodeClicked(obj) {
 
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
+                
+                onInformationLoaded();
             });
 
         };
