@@ -284,7 +284,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
         }
 
-        switch(funcType) {
+        switch(m_def.getId()) {
         case FunctionId.FUNC_CONCAT:
             for (int ii = 0; ii < nodes.length; ii++) {
                 if (nodes[ii].dataType == null && nodes[ii].isParam) {
@@ -437,30 +437,22 @@ public class FunctionForVoltDB extends FunctionSQL {
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
-        sb.append(name).append(Tokens.T_OPENBRACKET);
+        sb.append(m_def.getName()).append(Tokens.T_OPENBRACKET);
 
-        switch (funcType) {
-            case FunctionId.FUNC_VOLT_ARRAY_LENGTH:
-            case FunctionId.FUNC_VOLT_FROM_UNIXTIME:
-            case FunctionId.FUNC_VOLT_SET_FIELD:
-            case FunctionId.FUNC_CONCAT:
-            case FunctionId.FUNC_VOLT_DECODE:
-            case FunctionId.FUNC_VOLT_FIELD:
-            case FunctionId.FUNC_VOLT_ARRAY_ELEMENT:
-                sb.append(nodes[0].getSQL());
-                for (int ii = 1; ii < nodes.length; ii++) {
-                    sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
-                }
-                break;
-            case FunctionId.FUNC_VOLT_SINCE_EPOCH:
-            case FunctionId.FUNC_VOLT_TO_TIMESTAMP:
-            case FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
-                int timeUnit = ((Number) nodes[0].valueData).intValue();
-                sb.append(Tokens.getKeyword(timeUnit)).append(Tokens.T_COMMA).append(nodes[1].getSQL());
-                break;
-            }
-            default :
-                return super.getSQL();
+        switch (m_def.getId()) {
+        case FunctionId.FUNC_VOLT_SINCE_EPOCH:
+        case FunctionId.FUNC_VOLT_TO_TIMESTAMP:
+        case FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
+            int timeUnit = ((Number) nodes[0].valueData).intValue();
+            sb.append(Tokens.getKeyword(timeUnit));
+            break;
+        }
+        default:
+            sb.append(nodes[0].getSQL());
+            break;
+        }
+        for (int ii = 1; ii < nodes.length; ii++) {
+            sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
         }
         sb.append(Tokens.T_CLOSEBRACKET);
         return sb.toString();

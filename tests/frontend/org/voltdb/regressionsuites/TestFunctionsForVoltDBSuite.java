@@ -1693,6 +1693,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
                 ";\n" +
 
+                "CREATE INDEX ENG7792_UNUSED_INDEX_USES_CONCAT ON P3_INLINE_DESC (CONCAT(DESC, DESC2))" +
+                ";\n" +
+
                 "";
         try {
             project.addLiteralSchema(literalSchema);
