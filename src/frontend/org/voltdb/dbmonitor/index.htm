@@ -539,8 +539,8 @@
                                 <tr class="hasSubLabel parent" id="row-4">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
                                     <td align="right"></td>
-                                    <td></td>
                                     <td>&nbsp;</td>
+                                    <td><a href="#addConfigPopup" id="addConfigPopupLink" class="edit" title="Add Configuration">&nbsp;</a></td>
                                 </tr>
                                 <tbody id="exportConfiguration" style="display: none;">
                                 </tbody>
@@ -1328,6 +1328,37 @@
     </div>
 
     <!-- POPUP StopServerErrorPopup-->
+    
+    <!--Add Configuration Popup-->
+    <div id="addConfigPopup" style="display: none">
+        <div id="addConfigInnerPopup">
+            
+            <div class="overlay-title icon-alert">
+                <div class="addConfigHeader">Add Configuration</div>
+                <div id="deleteAddConfig" class="deleteAddConfig"><a href="#">Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
+
+            <div id="addConfigControls">
+                <div class="clear"></div>
+                <form id="formAddConfiguration" method="get" action="" novalidate="novalidate">
+                    <div id="addConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddConfigSave" class="btn">Save</a> <a id="btnAddConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+
+            <div id="saveConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to save?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+
+        </div>
+    </div>
+    <!--Add Configuration Popup-->
 
     <!-- Query error because of Paused Database Popup-->
     <div style="display: none"><a href="#queryDatabasePausedErrorPopup" id="queryDatabasePausedErrorPopupLink">Query Error</a></div>
