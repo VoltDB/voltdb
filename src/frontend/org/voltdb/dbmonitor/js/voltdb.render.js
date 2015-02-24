@@ -2075,13 +2075,18 @@ function alertNodeClicked(obj) {
         };
 
         var validateServerSpecificSettings = function (overviewValues) {
-            if (overviewValues['ADMININTERFACE'] != "" || overviewValues['HTTPINTERFACE'] != ""
+            if (overviewValues['ADMININTERFACE'] == "" && overviewValues['HTTPINTERFACE'] == "" &&
+                overviewValues['CLIENTINTERFACE'] == "" &&  overviewValues['INTERNALINTERFACE'] == "" &&
+                overviewValues['ZKINTERFACE'] == "" && overviewValues['DRINTERFACE'] == "") {
+                return false;
+            }
+
+            else if (overviewValues['ADMININTERFACE'] != "" || overviewValues['HTTPINTERFACE'] != ""
                 || overviewValues['CLIENTINTERFACE'] != "" || overviewValues['INTERNALINTERFACE'] != ""
                 || overviewValues['ZKINTERFACE'] != "" || overviewValues['DRINTERFACE'] != "") {
                 return true;
             }
             return false;
-
         };
 
         this.editConfigurationItem = function (configGroup, configMember, configValue, onConfigurationUpdated) {
