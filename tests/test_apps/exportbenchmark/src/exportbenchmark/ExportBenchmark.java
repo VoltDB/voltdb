@@ -442,7 +442,7 @@ public class ExportBenchmark {
             fw.append(String.format("%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
                                 stats.getStartTimestamp(),
                                 stats.getTxnThroughput(),
-                                duration));
+                                (float)duration));
             fw.close();
         }
 
