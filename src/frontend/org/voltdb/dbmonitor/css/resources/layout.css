@@ -40,7 +40,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring, 
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, 
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 ul.servers-list li.pauseActiveMonitoring{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;background-color: #f0f3f4}
 
@@ -789,7 +789,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .arrow, 
 .labelCollapsed, 
 .labelExpanded,
-a.restoreConfirmationDisable, .securityDelete, .exportDelete { background-image:url(images/admin-icons.png);}
+a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd { background-image:url(images/admin-icons.png);}
 label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
@@ -1024,6 +1024,7 @@ a.restoreBtn{cursor: default;}
 .deleteAddConfig { float: right;padding: 8px 20px 0 0;font-size: 12px;font-weight: bold;position: relative;top: 6px;}
 .deleteAddConfig a { color: #c70000;}
 #chkStreamValue { padding-left: 2px;}
+.plusAdd {background-position:-418px -61px; width: 31px; height: 17px; display: inline-block; position: relative;top: 8px;}
 /****Export details Ends*******/
 
 /*********************************************media Qu********************/

@@ -11,9 +11,9 @@
     <link href="css/resources/aero.css" rel="stylesheet" />
     <link href="css/resources/nv.d3.css" rel="stylesheet" />
     <link href="css/resources/tablesorter.css" rel="stylesheet" />
-    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled" rel="stylesheet">
+    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
+    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
+    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
@@ -540,7 +540,7 @@
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
-                                    <td><a href="#addConfigPopup" id="addConfigPopupLink" class="edit" title="Add Configuration">&nbsp;</a></td>
+                                    <td><a href="#addConfigPopup" id="addConfigPopupLink" class="plusAdd" title="Add Configuration">&nbsp;</a></td>
                                 </tr>
                                 <tbody id="exportConfiguration" style="display: none;">
                                 </tbody>
@@ -1341,7 +1341,7 @@
 
             <div id="addConfigControls">
                 <div class="clear"></div>
-                <form id="formAddConfiguration" method="get" action="" novalidate="novalidate">
+                <form id="formAddConfiguration" method="get" action="" novalidate>
                     <div id="addConfigWrapper" class="configWrapper">
                     </div>
                 </form>
