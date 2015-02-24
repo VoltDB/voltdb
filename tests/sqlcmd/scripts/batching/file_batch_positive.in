@@ -1,3 +1,6 @@
+drop table t if exists;
+drop table s if exists;
+
 file -batch ./scripts/batching/successful_batch.sqlfile
 
 insert into t values (0, 'cats');
