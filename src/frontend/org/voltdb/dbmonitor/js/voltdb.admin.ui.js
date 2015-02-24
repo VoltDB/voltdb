@@ -2012,7 +2012,13 @@ function loadAdminPage() {
                 adminDOMObjects.serverSettingHeader.text("Server Settings");
                 
             } else {
-                adminDOMObjects.serverSettingHeader.text("");
+                adminDOMObjects.adminPort.text('');
+                adminDOMObjects.httpPort.text('');
+                adminDOMObjects.clientPort.text('');
+                adminDOMObjects.internalPort.text('');
+                adminDOMObjects.zookeeperPort.text('');
+                adminDOMObjects.replicationPort.text('');
+                adminDOMObjects.serverSettingHeader.text('');
                 
             }
             

@@ -304,7 +304,7 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.GetSystemInformation = function (onInformationLoaded, onAdminPagePortAndOverviewDetailsLoaded, onAdminPageServerListLoaded, onAdminPageClusterPortAndOverviewDetailsLoaded) {
+        this.GetSystemInformation = function (onInformationLoaded, onAdminPagePortAndOverviewDetailsLoaded, onAdminPageServerListLoaded) {
 
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
@@ -317,6 +317,8 @@ function alertNodeClicked(obj) {
 
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
+                
+                onInformationLoaded();
             });
 
         };
@@ -2074,14 +2076,19 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
-        var validateServerSpecificSettings = function (overviewValues){             
-            if (!overviewValues['ADMININTERFACE'] && !overviewValues['HTTPINTERFACE']
-                && !overviewValues['CLIENTINTERFACE'] && !overviewValues['INTERNALINTERFACE']
-                && !overviewValues['ZKINTERFACE'] && !overviewValues['DRINTERFACE']) {                
+        var validateServerSpecificSettings = function (overviewValues) {
+            if (overviewValues['ADMININTERFACE'] == "" && overviewValues['HTTPINTERFACE'] == "" &&
+                overviewValues['CLIENTINTERFACE'] == "" &&  overviewValues['INTERNALINTERFACE'] == "" &&
+                overviewValues['ZKINTERFACE'] == "" && overviewValues['DRINTERFACE'] == "") {
                 return false;
             }
-            return true;
 
+            else if (overviewValues['ADMININTERFACE'] != "" || overviewValues['HTTPINTERFACE'] != ""
+                || overviewValues['CLIENTINTERFACE'] != "" || overviewValues['INTERNALINTERFACE'] != ""
+                || overviewValues['ZKINTERFACE'] != "" || overviewValues['DRINTERFACE'] != "") {
+                return true;
+            }
+            return false;
         };
 
         this.editConfigurationItem = function (configGroup, configMember, configValue, onConfigurationUpdated) {
