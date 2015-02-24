@@ -983,7 +983,8 @@ font: 14px Arial, Helvetica, sans-serif;
 .secLine { border-bottom:1px solid #CCCCCC;}
 .editBtn { float:right; padding:0 35px 0 0}
 .editBtn ul li { float:left;margin: 0 0 0 5px;}
-a.restoreBtn{cursor: default;}
+a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-align: center; color: #fff; font: 14px Arial, Helvetica, sans-serif; text-shadow: none; text-decoration: none; border-radius: 0; border: none; }
+
 /****Export details*******/
 .btnEd { cursor: pointer; background: #D0D2D2; padding: 5px; font-weight: bold; font-size: 12px;}
 .properTbl tr td:first-child
