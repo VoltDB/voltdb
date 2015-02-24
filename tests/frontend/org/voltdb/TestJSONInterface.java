@@ -1658,7 +1658,7 @@ public class TestJSONInterface extends TestCase {
             assertEquals(roles[i].getPermissions()[0].toLowerCase(), "allproc");
 
             //Delete roles
-            deleteUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 200,  "application/json");
+            deleteUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 204,  "application/json");
             deleteUrlOverJSON("http://localhost:8095/roles/user/", null, null, null, 403,  "application/json");
 
             //Get roles

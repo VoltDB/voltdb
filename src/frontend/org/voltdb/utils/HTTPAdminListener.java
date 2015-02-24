@@ -617,14 +617,7 @@ public class HTTPAdminListener {
                 } else if (request.getMethod().equalsIgnoreCase("DELETE")) {
                     handleRemoveRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
                 } else {
-                    //non POST
-                    if (jsonp != null) {
-                        response.getWriter().write(jsonp + "(");
-                    }
-                    m_mapper.writeValue(response.getWriter(), buildRoles());
-                    if (jsonp != null) {
-                        response.getWriter().write(")");
-                    }
+                    handleGetRoles(jsonp, target, baseRequest, request, response, authResult.m_client);
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
@@ -640,7 +633,11 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response, Client client)
                            throws IOException, ServletException {
-            RoleType role = findRole(target.split("/")[1]);
+            RoleType role = null;
+            String[] splitTarget = target.split("/");
+            if (splitTarget.length == 2) {
+                role = findRole(splitTarget[1]);
+            }
             if (role == null) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role not found"));
@@ -689,7 +686,13 @@ public class HTTPAdminListener {
                 HttpServletRequest request,
                 HttpServletResponse response, Client client)
                 throws IOException, ServletException {
-            RoleType role = findRole(target.split("/")[1]);
+            String[] splitTarget = target.split("/");
+            if (splitTarget.length != 2) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "No target to create role"));
+                return;
+            }
+            RoleType role = findRole(splitTarget[1]);
             if (role != null && role.getBuiltIn()) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Built-in roles are not modifiable"));
@@ -746,7 +749,11 @@ public class HTTPAdminListener {
                 HttpServletRequest request,
                 HttpServletResponse response, Client client)
                 throws IOException, ServletException {
-            RoleType role = findRole(target.split("/")[1]);
+            RoleType role = null;
+            String[] splitTarget = target.split("/");
+            if (splitTarget.length == 2) {
+                role = findRole(splitTarget[1]);
+            }
             if (role == null) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role not found"));
@@ -764,7 +771,7 @@ public class HTTPAdminListener {
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), adhocResponse.getStatusString()));
                 } else {
-                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.setStatus(HttpServletResponse.SC_NO_CONTENT);
                     response.getWriter().print(buildClientResponse(jsonp, adhocResponse.getStatus(), "Role deleted"));
                     notifyOfCatalogUpdate();
                 }
@@ -772,6 +779,39 @@ public class HTTPAdminListener {
                 logger.error("Failed to create role from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+
+        //Method for handling GET
+        private void handleGetRoles(String jsonp, String target,
+                Request baseRequest,
+                HttpServletRequest request,
+                HttpServletResponse response, Client client)
+                throws IOException, ServletException {
+            String[] splitTarget = target.split("/");
+            if (splitTarget.length < 2) {
+                if (jsonp != null) {
+                    response.getWriter().write(jsonp + "(");
+                }
+                m_mapper.writeValue(response.getWriter(), buildRoles());
+                if (jsonp != null) {
+                    response.getWriter().write(")");
+                }
+                return;
+            }
+            RoleType role = findRole(splitTarget[1]);
+            if (role == null) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Role not found"));
+                return;
+            } else {
+                if (jsonp != null) {
+                    response.getWriter().write(jsonp + "(");
+                }
+                m_mapper.writeValue(response.getWriter(), role);
+                if (jsonp != null) {
+                    response.getWriter().write(")");
+                }
             }
         }
     }
