@@ -34,6 +34,7 @@
 
 package exportbenchmark;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -323,6 +324,8 @@ public class ExportBenchmark {
 
         warmupComplete.set(true);
 
+        long benchmarkStartTS = System.currentTimeMillis();
+
         // reset the stats after initialization
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
@@ -365,10 +368,12 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
+        long benchmarkEndTS = System.currentTimeMillis();
+
         timer.cancel();
 
         // Print results & close
-        printResults();
+        printResults(benchmarkEndTS - benchmarkStartTS);
         client.close();
 
         if (!success) {
@@ -399,7 +404,7 @@ public class ExportBenchmark {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public synchronized void printResults() throws Exception {
+    public synchronized void printResults(long duration) throws Exception {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // Performance statistics
@@ -432,7 +437,15 @@ public class ExportBenchmark {
         System.out.println(stats.latencyHistoReport());
 
         // Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+            FileWriter fw = new FileWriter(config.statsfile);
+            fw.append(String.format("%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                stats.getStartTimestamp(),
+                                stats.getTxnThroughput(),
+                                duration));
+            fw.close();
+        }
+
     }
 
     /**
