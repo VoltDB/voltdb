@@ -119,7 +119,7 @@ struct NValueExtractor
         m_value(value), m_hasNext(true)
     {}
 
-    int resultSize() const
+    int64_t resultSize() const
     {
         return hasNullValue() ? 0 : 1;
     }
@@ -178,7 +178,7 @@ struct TupleExtractor
         m_size(m_table->activeTupleCount())
     {}
 
-    int resultSize() const
+    int64_t resultSize() const
     {
         return m_size;
     }
@@ -231,7 +231,7 @@ private:
     Table* m_table;
     TableIterator& m_iterator;
     ValueType m_tuple;
-    int m_size;
+    int64_t m_size;
 };
 
 template <typename OP, typename ValueExtractorOuter, typename ValueExtractorInner>

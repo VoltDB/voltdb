@@ -700,7 +700,9 @@ string quantifiernToString(QuantifierType type)
         return "ALL";
     }
     }
+    return "INVALID";
 }
+
 QuantifierType stringToQunatifier(string str )
 {
     if (str == "ANY") {
