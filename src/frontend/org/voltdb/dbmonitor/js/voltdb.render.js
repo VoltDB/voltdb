@@ -304,7 +304,7 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.GetSystemInformation = function (onInformationLoaded, onAdminPagePortAndOverviewDetailsLoaded, onAdminPageServerListLoaded, onAdminPageClusterPortAndOverviewDetailsLoaded) {
+        this.GetSystemInformation = function (onInformationLoaded, onAdminPagePortAndOverviewDetailsLoaded, onAdminPageServerListLoaded) {
 
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
