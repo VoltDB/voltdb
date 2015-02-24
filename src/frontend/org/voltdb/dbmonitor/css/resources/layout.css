@@ -40,7 +40,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring, 
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, 
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu 
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 ul.servers-list li.pauseActiveMonitoring{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;background-color: #f0f3f4}
 
@@ -910,7 +910,7 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 
 
 .tblshutdown tr td  { border:none;}
-.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.shutdown { display:inline-block;background-position:-786px -105px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.disableServer { display:inline-block;background-position:-978px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
