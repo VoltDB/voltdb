@@ -160,11 +160,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
-                long uniqueId = UniqueIdGenerator.makeZero(m_partitionId);
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
-                    uniqueId = res.m_uniqueId;
                     binaryLogDRId = res.m_binaryLogDRId;
                     binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
@@ -172,7 +170,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     success = false;
                 }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(txnid, uniqueId);
+                    m_initiatorMailbox.setLeaderState(txnid);
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");

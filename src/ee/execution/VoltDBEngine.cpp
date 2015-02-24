@@ -572,7 +572,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
                                        int64_t uniqueId,
-                                       int64_t spUniqueId,
                                        int64_t undoToken)
 {
     // count failures
@@ -604,7 +603,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                 spHandle,
                                 lastCommittedSpHandle,
                                 uniqueId,
-                                spUniqueId,
                                 m_currentIndexInBatch == 0,
                                 m_currentIndexInBatch == (numFragments - 1))) {
             ++failures;
@@ -628,7 +626,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t spHandle,
                                       int64_t lastCommittedSpHandle,
                                       int64_t uniqueId,
-                                      int64_t spUniqueId,
                                       bool first,
                                       bool last)
 {
@@ -670,8 +667,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId,
-                                             spUniqueId);
+                                             uniqueId);
 
     // count the number of plan fragments executed
     ++m_pfCount;
@@ -1248,7 +1244,7 @@ bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
-                        int64_t uniqueId, int64_t spUniqueId,
+                        int64_t uniqueId,
                         bool returnUniqueViolations,
                         bool shouldDRStream)
 {
@@ -1260,8 +1256,7 @@ VoltDBEngine::loadTable(int32_t tableId,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId,
-                                             spUniqueId);
+                                             uniqueId);
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
@@ -1900,6 +1895,25 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
     }
 }
 
+void VoltDBEngine::collectDRTupleStreamStateInfo() {
+    std::size_t size = 2 * sizeof(int64_t) + 1;
+    if (m_drReplicatedStream) {
+        size += 2 * sizeof(int64_t);
+    }
+    m_resultOutput.writeInt(static_cast<int32_t>(size));
+    std::pair<int64_t, int64_t> stateInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueId();
+    m_resultOutput.writeLong(stateInfo.first);
+    m_resultOutput.writeLong(stateInfo.second);
+    if (m_drReplicatedStream) {
+        m_resultOutput.writeByte(static_cast<int8_t>(1));
+        stateInfo = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueId();
+        m_resultOutput.writeLong(stateInfo.first);
+        m_resultOutput.writeLong(stateInfo.second);
+    } else {
+        m_resultOutput.writeByte(static_cast<int8_t>(0));
+    }
+}
+
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     switch (taskType) {
     case TASK_TYPE_VALIDATE_PARTITIONING:
@@ -1913,14 +1927,8 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
         break;
     }
-    case TASK_TYPE_GET_DR_SEQUENCE_NUMBERS:
-        m_resultOutput.writeInt(static_cast<int32_t>(2 * sizeof(int64_t)));
-        m_resultOutput.writeLong(m_drStream->getLastCommittedSequenceNumber());
-        if (m_drReplicatedStream) {
-            m_resultOutput.writeLong(m_drReplicatedStream->getLastCommittedSequenceNumber());
-        } else {
-            m_resultOutput.writeLong(std::numeric_limits<int64_t>::min());
-        }
+    case TASK_TYPE_GET_DR_TUPLESTREAM_STATE:
+        collectDRTupleStreamStateInfo();
         break;
     case TASK_TYPE_SET_DR_SEQUENCE_NUMBERS: {
         ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());

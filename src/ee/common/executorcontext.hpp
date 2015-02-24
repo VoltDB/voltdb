@@ -70,8 +70,7 @@ class ExecutorContext {
                                int64_t txnId,
                                int64_t spHandle,
                                int64_t lastCommittedSpHandle,
-                               int64_t uniqueId,
-                               int64_t spUniqueId)
+                               int64_t uniqueId)
     {
         m_undoQuantum = undoQuantum;
         m_spHandle = spHandle;
@@ -79,7 +78,6 @@ class ExecutorContext {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
         m_uniqueId = uniqueId;
-        m_spUniqueId = spUniqueId;
     }
 
     // data available via tick()
@@ -135,11 +133,6 @@ class ExecutorContext {
         return m_uniqueId;
     }
 
-    /** Unique id for this transaction **/
-    int64_t currentSpUniqueId() {
-        return m_spUniqueId;
-    }
-
     /** Timestamp from unique id for this transaction */
     int64_t currentTxnTimestamp() {
         return m_currentTxnTimestamp;
@@ -181,7 +174,6 @@ class ExecutorContext {
     int64_t m_txnId;
     int64_t m_spHandle;
     int64_t m_uniqueId;
-    int64_t m_spUniqueId;
     int64_t m_currentTxnTimestamp;
   public:
     int64_t m_lastCommittedSpHandle;

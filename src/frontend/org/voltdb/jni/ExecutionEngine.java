@@ -57,7 +57,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
         APPLY_BINARY_LOG(1),
-        GET_DR_SEQUENCE_NUMBERS(2),
+        GET_DR_TUPLESTREAM_STATE(2),
         SET_DR_SEQUENCE_NUMBERS(3);
 
         private TaskType(int taskId) {
@@ -526,7 +526,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
-                                            long spUniqueId,
                                             long undoQuantumToken) throws EEException
     {
         try {
@@ -539,7 +538,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_sqlTexts = sqlTexts;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, spUniqueId, undoQuantumToken);
+                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
@@ -562,7 +561,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,
-                                                            long spUniqueId,
                                                             long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
@@ -572,7 +570,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, long uniqueId, long spUniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
+        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -769,7 +767,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, long spUniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
             long undoToken);
 
     /**
@@ -788,7 +786,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long spHandle,
             long lastCommittedSpHandle,
             long uniqueId,
-            long spUniqueId,
             long undoToken);
 
     /**

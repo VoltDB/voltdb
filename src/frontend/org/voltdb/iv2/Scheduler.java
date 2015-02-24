@@ -25,7 +25,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
@@ -205,6 +204,4 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void enableWritingIv2FaultLog();
 
     abstract public boolean sequenceForReplay(VoltMessage m);
-
-    abstract public void setMaxSeenUniqueId(final long maxSeenUniqueId);
 }

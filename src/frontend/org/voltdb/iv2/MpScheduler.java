@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -51,6 +49,9 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.sysprocs.BalancePartitionsRequest;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 public class MpScheduler extends Scheduler
 {
@@ -541,10 +542,5 @@ public class MpScheduler extends Scheduler
             }
         }
         return null;
-    }
-
-    @Override
-    public void setMaxSeenUniqueId(final long maxSeenUniqueId) {
-        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(maxSeenUniqueId);
     }
 }

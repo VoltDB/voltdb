@@ -218,14 +218,10 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
-//    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
-//    std::cout << "Pushing block with start " << (block->startSpUniqueId() & UniqueId::PARTITION_ID_MASK) << " and end " << (block->lastSpUniqueId() & UniqueId::PARTITION_ID_MASK) << std::endl;
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
-//    std::cout << "Beginning txn uniqueId " << uniqueId << " spUniqueId " << spUniqueId << std::endl;
-//    std::cout << "Beginning txn uniqueId " << (uniqueId & UniqueId::PARTITION_ID_MASK) << " spUniqueId " << (spUniqueId & UniqueId::PARTITION_ID_MASK) << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -253,7 +249,6 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 }
 
 void DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
-//    std::cout << "Ending txn spUniqueId " << spUniqueId << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }

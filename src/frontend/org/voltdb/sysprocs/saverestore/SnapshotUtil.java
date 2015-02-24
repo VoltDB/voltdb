@@ -142,9 +142,8 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-        Map<Integer, Long> drSequenceNumbers,
+        Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
         Map<Integer, Long> partitionTransactionIds,
-        Map<Integer, Long> partitionUniqueIds,
         Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
         InstanceId instanceId,
         long timestamp,
@@ -200,12 +199,6 @@ public class SnapshotUtil {
                 }
                 stringer.endObject();
 
-                stringer.key("partitionUniqueIds").object();
-                for (Map.Entry<Integer, Long> entry : partitionUniqueIds.entrySet()) {
-                    stringer.key(entry.getKey().toString()).value(entry.getValue());
-                }
-                stringer.endObject();
-
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
 
@@ -224,10 +217,14 @@ public class SnapshotUtil {
                     stringer.endObject();
                 }
                 stringer.endObject();
-                stringer.key("drSequenceNumbers");
+                stringer.key("drTupleStreamStateInfo");
                 stringer.object();
-                for (Map.Entry<Integer, Long> e : drSequenceNumbers.entrySet()) {
-                    stringer.key(e.getKey().toString()).value(e.getValue());
+                for (Map.Entry<Integer, Pair<Long, Long>> e : drTupleStreamInfo.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    stringer.key("sequenceNumber").value(e.getValue().getFirst());
+                    stringer.key("uniqueId").value(e.getValue().getSecond());
+                    stringer.endObject();
                 }
                 stringer.endObject();
                 stringer.endObject();

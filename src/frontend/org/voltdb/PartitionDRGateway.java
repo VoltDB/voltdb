@@ -114,7 +114,7 @@ public class PartitionDRGateway {
     public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
                                           StoredProcedureInvocation spi,
                                           ClientResponseImpl response) {}
-    public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, long spUniqueId, int hash,
+    public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
     public void onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber, long lastUniqueId, ByteBuffer buf) {

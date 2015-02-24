@@ -255,7 +255,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long spHandle,
             final long lastCommittedSpHandle,
             long uniqueId,
-            long spUniqueId,
             final long undoToken) throws EEException
     {
         // plan frag zero is invalid
@@ -314,7 +313,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     spHandle,
                     lastCommittedSpHandle,
                     uniqueId,
-                    spUniqueId,
                     undoToken);
 
         try {
@@ -376,7 +374,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long spHandle,
         final long lastCommittedSpHandle,
         final long uniqueId,
-        final long spUniqueId,
         boolean returnUniqueViolations,
         boolean shouldDRStream,
         long undoToken) throws EEException
@@ -392,7 +389,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //Clear is destructive, do it before the native call
         deserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId,
-                                              spHandle, uniqueId, spUniqueId, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
+                                              spHandle, uniqueId, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
                                               undoToken);
         checkErrorCode(errorCode);
 
