@@ -23,6 +23,8 @@
 
 package org.voltdb.parser;
 
+import org.voltdb.parser.SQLParser.FileOption;
+
 import junit.framework.TestCase;
 
 public class TestSQLParser extends TestCase {
@@ -121,5 +123,50 @@ public class TestSQLParser extends TestCase {
 
         assertFalse(SQLParser.batchBeginsWithDDLKeyword(
                 "file \"mysqlcommands.sql\";"));
+    }
+
+    public void testParseFileStatement() {
+        SQLParser.FileInfo fi;
+
+        // Plain file directive
+        fi = SQLParser.parseFileStatement("  file 'foo.sql';");
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertEquals("foo.sql", fi.getFile().getName());
+        assertFalse(fi.isBatch());
+
+        // Plain file directive
+        // no quotes and trailing whitespace.
+        // trailing whitespace is included in the file name
+        // This seems buggy: see ENG-7794.
+        fi = SQLParser.parseFileStatement("  file foo.sql  ");
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertFalse(fi.isBatch());
+        assertEquals("foo.sql  ", fi.getFile().getName());
+
+        // file -batch directive
+        fi = SQLParser.parseFileStatement("file -batch myddl.sql");
+        assertEquals(FileOption.BATCH, fi.getOption());
+        assertEquals("myddl.sql", fi.getFile().getName());
+        assertTrue(fi.isBatch());
+
+        // file -inlinebatch directive
+        fi = SQLParser.parseFileStatement("file -inlinebatch EOF");
+        assertEquals(FileOption.INLINEBATCH, fi.getOption());
+        assertEquals("EOF", fi.getDelimiter());
+        assertTrue(fi.isBatch());
+
+        fi = SQLParser.parseFileStatement("file -inlinebatch <<<<   ");
+        assertEquals(FileOption.INLINEBATCH, fi.getOption());
+        assertEquals("<<<<", fi.getDelimiter());
+        assertTrue(fi.isBatch());
+
+        // Delimiter tokens containing whitespace is not valid
+        // syntax, but current regex's will interpret this as a
+        // plain file command to execute a file named
+        //   "-inlinebatch EOF EOF   ".
+        // Again see ENG-7794.
+        fi = SQLParser.parseFileStatement("file -inlinebatch EOF EOF   ");
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertEquals("-inlinebatch EOF EOF   ", fi.getFile().getName());
     }
 }

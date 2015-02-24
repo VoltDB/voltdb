@@ -424,6 +424,14 @@ public class SQLParser extends SQLPatternFactory
             ";*" +         // optional semicolons
             "\\s*",        // more optional whitespace
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern FileInlineBatchToken = Pattern.compile(
+            "^\\s*" +            // optional indent at start of line
+            "file\\s+" +         // required FILE command token, whitespace terminated
+            "-inlinebatch\\s+" + // required -inlinebatch option token, whitespace terminated
+            "([^\\s]+)" +          // delimiter: a string of non-whitespace characters
+            "\\s*",              // optional whitespace
+            Pattern.CASE_INSENSITIVE);
+
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile(
@@ -966,21 +974,65 @@ public class SQLParser extends SQLPatternFactory
         return null;
     }
 
-    public static final class FileInfo {
-        private final File m_file;
-        private final boolean m_batch;
+    /**
+     * An enum that describes the options that can be applied
+     * to sqlcmd's "file" command
+     */
+    static public enum FileOption {
+        PLAIN,
+        BATCH,
+        INLINEBATCH
+    }
 
-        FileInfo(String fileName, boolean b) {
-            m_file = new File(fileName);
-            m_batch = b;
+    /**
+     * This class encapsulates information produced by
+     * parsing sqlcmd's "file" command.
+     */
+    public static final class FileInfo {
+        private final FileOption m_option;
+        private final File m_file;
+        private final String m_delimiter;
+
+        FileInfo(FileOption option, String filenameOrDelimiter) {
+            m_option = option;
+            switch (option) {
+            case PLAIN:
+            case BATCH:
+                m_file = new File(filenameOrDelimiter);
+                m_delimiter = null;
+                break;
+            case INLINEBATCH:
+            default:
+                assert(option == FileOption.INLINEBATCH);
+                m_file = null;
+                m_delimiter = filenameOrDelimiter;
+                break;
+            }
         }
 
         public File getFile() {
             return m_file;
         }
 
+        public String getDelimiter() {
+            assert (m_option == FileOption.INLINEBATCH);
+            return m_delimiter;
+        }
+
         public boolean isBatch() {
-            return m_batch;
+            return m_option == FileOption.BATCH
+                    || m_option == FileOption.INLINEBATCH;
+        }
+
+        public FileOption getOption() {
+            return m_option;
+        }
+
+        @Override
+        public String toString() {
+            return "FILE command: " + m_option.name() +
+                    ", file: \"" + m_file.getName() +
+                    "\", delimiter: " + m_delimiter;
         }
     }
 
@@ -993,11 +1045,19 @@ public class SQLParser extends SQLPatternFactory
     {
         Matcher batchMatcher = FileBatchToken.matcher(statement);
         if (batchMatcher.matches()) {
-            return new FileInfo(batchMatcher.group(1), true);
+            return new FileInfo(FileOption.BATCH, batchMatcher.group(1));
         }
+
+        Matcher inlineBatchMatcher = FileInlineBatchToken.matcher(statement);
+        if (inlineBatchMatcher.matches()) {
+            return new FileInfo(FileOption.INLINEBATCH, inlineBatchMatcher.group(1));
+        }
+
+        // Note: this pattern can match a lot of stuff that it probably
+        // shouldn't.  See ENG-7794.
         Matcher matcher = FileToken.matcher(statement);
         if (matcher.matches()) {
-            return new FileInfo(matcher.group(1), false);
+            return new FileInfo(FileOption.PLAIN, matcher.group(1));
         }
 
         return null;
