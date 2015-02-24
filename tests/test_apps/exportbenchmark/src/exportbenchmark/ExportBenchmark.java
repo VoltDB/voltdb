@@ -271,6 +271,7 @@ public class ExportBenchmark {
         @Override
         public void run() {
             long count = 0;
+            long failures = 0;
             while (warmupComplete.get() == false) {
                 // Don't track warmup inserts
                 try {
@@ -280,9 +281,9 @@ public class ExportBenchmark {
             while (benchmarkComplete.get() == false) {
                 // Insert objects
                 try {
-                    // TODO: Check return value
-                    client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
+                    boolean success = client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
                     count++;
+                    if (!success) { failures++; }
                 } catch (Exception e) {
                     System.err.println("Couldn't insert into VoltDB\n");
                     e.printStackTrace();
@@ -296,6 +297,7 @@ public class ExportBenchmark {
                 }
             }
             System.out.println("Benchmark complete: wrote " + count + " objects");
+            System.out.println("Encountered " + failures + " errors");
         }
     }
 
