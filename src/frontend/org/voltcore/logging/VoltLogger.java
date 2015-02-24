@@ -67,13 +67,13 @@ public class VoltLogger {
                     new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
                             new LoggerThreadFactory());
 
-    /// ShutdownHooks potentially makes some (minimal) use of logging during
-    /// shutdown task processing. Given that dependency, it makes more sense
-    /// for ShutdownHooks to make an explicit call to "shutdown" logging
-    /// when it is finished, rather than having VoltLogger inject its shutdown
-    /// into some arbitrary position in ShutdownHooks' task queue.
-    /// This also eliminates an interdependency.
-    public static synchronized void shutdownAsynchLogging() {
+    /// ShutdownHooks calls shutdownAsynchronousLogging when it is finished running its hooks
+    /// just before executing its final action -- which is typically to shutdown Log4J logging.
+    /// Since ShutdownHooks potentially makes some (minimal) use of logging during its
+    /// shutdown task processing, so it already has a VoltLogger dependency, hard-coding a
+    /// direct call to shutdownAsynchronousLogging is simpler than trying to register this step
+    /// as a generic high-priority shutdown hook.
+    public static synchronized void shutdownAsynchronousLogging() {
         if (m_asynchLoggerPool != null) {
             try {
                 // Submit and wait on an empty logger task to flush the queue.

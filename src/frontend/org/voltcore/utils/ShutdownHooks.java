@@ -37,10 +37,8 @@ public class ShutdownHooks
      */
     public static int FIRST = 1;
     public static int MIDDLE = 50;
-    // Async volt logger needs to purge before log4j shuts down
-    public static int VOLT_LOGGER = 99;
-    // Kill log4j
-    public static int VOLT_LOG4J = 100;
+    // There is only 1 final action allowed after VoltLogger shuts down.
+    private Runnable m_finalAction;
 
     class ShutdownTask {
         final int m_priority;
@@ -67,6 +65,16 @@ public class ShutdownHooks
     public static void registerShutdownHook(int priority, boolean runOnCrash, Runnable action)
     {
         m_instance.addHook(priority, runOnCrash, action);
+    }
+
+    /**
+     * Register a final action to be run when the JVM exits.
+     * @param action   A Runnable containing the action to be run on shutdown.
+     */
+    public static void registerFinalShutdownAction(Runnable action)
+    {
+        // There should be only one -- otherwise, the last one to register wins.
+        m_instance.m_finalAction = action;
     }
 
     /**
@@ -131,7 +139,14 @@ public class ShutdownHooks
                 }
             }
         }
-        VoltLogger.shutdownAsynchLogging();
+        // Async volt logger needs to purge after other shutdown tasks but
+        // before log4j shuts down in the (typical) final action.
+        VoltLogger.shutdownAsynchronousLogging();
+        if (m_finalAction != null) {
+            try {
+                m_finalAction.run();
+            } catch (Exception e) {} // Don't even try to log that the logger failed to shutdown.
+        }
     }
 
     private synchronized void crashing()
