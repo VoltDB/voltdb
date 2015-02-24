@@ -2074,13 +2074,13 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
-        var validateServerSpecificSettings = function (overviewValues){             
-            if (!overviewValues['ADMININTERFACE'] && !overviewValues['HTTPINTERFACE']
-                && !overviewValues['CLIENTINTERFACE'] && !overviewValues['INTERNALINTERFACE']
-                && !overviewValues['ZKINTERFACE'] && !overviewValues['DRINTERFACE']) {                
-                return false;
+        var validateServerSpecificSettings = function (overviewValues) {
+            if (overviewValues['ADMININTERFACE'] != "" || overviewValues['HTTPINTERFACE'] != ""
+                || overviewValues['CLIENTINTERFACE'] != "" || overviewValues['INTERNALINTERFACE'] != ""
+                || overviewValues['ZKINTERFACE'] != "" || overviewValues['DRINTERFACE'] != "") {
+                return true;
             }
-            return true;
+            return false;
 
         };
 
