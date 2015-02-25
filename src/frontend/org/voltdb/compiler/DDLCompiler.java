@@ -356,6 +356,26 @@ public class DDLCompiler {
     }
 
     /**
+     * Check whether or not a procedure name is acceptible.
+     * @param identifier the identifier to check
+     * @param statement the statement where the identifier is
+     * @return the given identifier unmodified
+     * @throws VoltCompilerException
+     */
+    private String checkProcedureIdentifier(
+            final String identifier, final String statement
+            ) throws VoltCompilerException {
+        String retIdent = checkIdentifierStart(identifier, statement);
+        if (retIdent.contains(".")) {
+            String msg = String.format(
+                "Invalid procedure name \"%s\" in DDL: \"%s\"",
+                identifier, statement.substring(0,statement.length()-1));
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+        return retIdent;
+    }
+
+   /**
      * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
      * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
@@ -426,36 +446,27 @@ public class DDLCompiler {
             return true;
         }
 
-        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
-        statementMatcher = SQLParser.matchCreateProcedureAsSQL(statement);
-        if (statementMatcher.matches()) {
-            String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
-            String sqlStatement = statementMatcher.group(3) + ";";
-
-            ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
-
-            // Parse the ALLOW and PARTITION clauses.
-            // Populate descriptor roles and returned partition data as needed.
-            CreateProcedurePartitionData partitionData =
-                    parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
-
-            m_tracker.add(descriptor);
-
-            // add partitioning if specified
-            addProcedurePartitionInfo(clazz, partitionData, statement);
-
-            return true;
-        }
-
         // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
         // ### <code-block> ### LANGUAGE <language-name>
         statementMatcher = SQLParser.matchCreateProcedureAsScript(statement);
         if (statementMatcher.matches()) {
 
-            String className = checkIdentifierStart(statementMatcher.group(1), statement);
+            String className = checkProcedureIdentifier(statementMatcher.group(1), statement);
             String codeBlock = statementMatcher.group(3);
-            Language language = Language.valueOf(statementMatcher.group(4).toUpperCase());
+            String languageToken = statementMatcher.group(4);
+            if (languageToken == null) {
+                throw m_compiler.new VoltCompilerException("LANGUAGE clause is bad or missing.");
+            }
+            languageToken = languageToken.toUpperCase();
+
+            Language language;
+            try {
+                language = Language.valueOf(languageToken);
+            }
+            catch (IllegalArgumentException e) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Language \"%s\" is not a supported", languageToken));
+            }
 
             Class<?> scriptClass = null;
 
@@ -470,6 +481,8 @@ public class DDLCompiler {
                     throw m_compiler.new VoltCompilerException(ex);
                 }
             } else {
+                // Not sure how to get here with exception handling above, but help yourself
+                // to a belt with those suspenders!
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Language \"%s\" is not a supported", language.name()));
             }
@@ -487,6 +500,28 @@ public class DDLCompiler {
 
             // add partitioning if specified
             addProcedurePartitionInfo(procName, partitionData, statement);
+
+            return true;
+        }
+
+        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
+        statementMatcher = SQLParser.matchCreateProcedureAsSQL(statement);
+        if (statementMatcher.matches()) {
+            String clazz = checkProcedureIdentifier(statementMatcher.group(1), statement);
+            String sqlStatement = statementMatcher.group(3) + ";";
+
+            ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
+
+            // Parse the ALLOW and PARTITION clauses.
+            // Populate descriptor roles and returned partition data as needed.
+            CreateProcedurePartitionData partitionData =
+                    parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
+
+            m_tracker.add(descriptor);
+
+            // add partitioning if specified
+            addProcedurePartitionInfo(clazz, partitionData, statement);
 
             return true;
         }
@@ -785,7 +820,13 @@ public class DDLCompiler {
     private CreateProcedurePartitionData parseCreateProcedureClauses(
             ProcedureDescriptor descriptor,
             String clauses) throws VoltCompilerException {
-        assert clauses != null;
+
+        // Nothing to do if there were no clauses.
+        // Null means there's no partition data to return.
+        // There's also no roles to add.
+        if (clauses == null || clauses.isEmpty()) {
+            return null;
+        }
         CreateProcedurePartitionData data = null;
 
         Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);

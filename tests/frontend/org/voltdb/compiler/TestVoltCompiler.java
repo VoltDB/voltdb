@@ -2947,15 +2947,6 @@ public class TestVoltCompiler extends TestCase {
         fbs = checkInvalidProcedureDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE org.kanamuri.Foo AS DELETE FROM PKEY_INTEGER;" +
-                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
-
-        fbs = checkInvalidProcedureDDL(
-                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
-                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE 7Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
@@ -3104,7 +3095,7 @@ public class TestVoltCompiler extends TestCase {
                 "### LANGUAGE KROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "### LANGUAGE KROOVY\", expected syntax: \"CREATE PROCEDURE [ALLOW";
+        expectedError = "Language \"KROOVY\" is not a supported";
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
@@ -3731,6 +3722,20 @@ public class TestVoltCompiler extends TestCase {
 
         success = compileFromDDL(compiler, testout_jar);
         assertFalse(success);
+    }
+
+    public void testDDLStmtProcNameWithDots() throws Exception
+    {
+        final File ddlFile = VoltProjectBuilder.writeStringToTempFile(StringUtils.join(new String[] {
+            "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));",
+            "create procedure a.Foo as select * from books;"
+        }, "\n"));
+
+        final VoltCompiler compiler = new VoltCompiler();
+        assertFalse("Compile with dotted proc name should fail",
+                    compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
+        assertTrue("Compile with dotted proc name did not have the expected error message",
+                   isFeedbackPresent("Invalid procedure name", compiler.m_errors));
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

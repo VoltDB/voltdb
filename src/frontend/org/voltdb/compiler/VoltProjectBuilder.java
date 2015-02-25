@@ -38,6 +38,7 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
+import org.apache.commons.lang.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
@@ -388,6 +389,19 @@ public class VoltProjectBuilder {
         out.write(ddlText);
         out.close();
         addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
+    }
+
+    /**
+     * Convenience method that front-ends addLiteralSchema() to take a variable
+     * array of strings to make it slightly easier to declare. Automatically
+     * terminates lines with semi-colons and separates with linefeeds.
+     *
+     * @param lines The array of schema lines to add.
+     * @throws IOException
+     */
+    public void addLiteralSchemaLines(final String... lines) throws IOException {
+        String schema = StringUtils.join(lines, ";\n") + ";";
+        addLiteralSchema(schema);
     }
 
     /**
@@ -786,6 +800,19 @@ public class VoltProjectBuilder {
             System.out.println("path to deployment is " + m_pathToDeployment);
             return m_pathToDeployment;
         }
+    }
+
+    /**
+     * Utility convenience method that front-ends writeStringToTempFile() to take
+     * an array of strings to make it slightly easier to declare. Inserts linefeeds
+     * and semi-colons between strings. Also appends a semi-colon.
+     *
+     * @param lines The array of schema lines to save.
+     * @return A reference to the file created or null on failure.
+     */
+    public static File writeSchemaToTempFile(final String[] lines) {
+        String schema = StringUtils.join(lines, ";\n") + ";";
+        return writeStringToTempFile(schema);
     }
 
     /**

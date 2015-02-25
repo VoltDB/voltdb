@@ -85,7 +85,7 @@ public class SQLLexer extends SQLPatternFactory
         "assumeunique", "unique"
     };
 
-    static final char   BLOCK_DELIMITER_CHAR = '#';
+    static final char BLOCK_DELIMITER_CHAR = '#';
     static final String BLOCK_DELIMITER = "###";
 
     //===== Special non-DDL/DML/SQL patterns
@@ -116,14 +116,14 @@ public class SQLLexer extends SQLPatternFactory
         SPF.statementLeader(
             SPF.capture(SPF.tokenAlternatives("create", "drop")),   // DDL commands we're looking for
             SPF.token("table"),                                     // target is table
-            SPF.capture(SPF.symbol())                               // table name (captured)
-        ).compile();
+            SPF.capture(SPF.databaseObjectName())                        // table name (captured)
+        ).compile("PAT_TABLE_DDL_PREAMBLE");
 
     // Matches the start of a SELECT statement
     private static final Pattern PAT_SELECT_STATEMENT_PREAMBLE =
         SPF.statementLeader(
             SPF.token("select")
-        ).compile();
+        ).compile("PAT_SELECT_STATEMENT_PREAMBLE");
 
     // Pattern for plausible ALTER...RENAME statements.
     // Keep the matching loose in order to support clear messaging.
@@ -131,16 +131,16 @@ public class SQLLexer extends SQLPatternFactory
         SPF.statementLeader(
             SPF.token("alter"),
             SPF.capture("parenttype", SPF.databaseObjectTypeName()),
-            SPF.capture("parentname", SPF.symbol()),
+            SPF.capture("parentname", SPF.databaseObjectName()),
             SPF.optional(
                 SPF.clause(
                     SPF.token("alter"),
                     SPF.capture("childtype", SPF.databaseObjectTypeName()),
-                    SPF.capture("childname", SPF.symbol())
+                    SPF.capture("childname", SPF.databaseObjectName())
                 )
             ),
             SPF.token("rename"), SPF.token("to")
-        ).compile();
+        ).compile("PAT_ALTER_RENAME");
 
     //========== Public Methods ==========
 
@@ -449,7 +449,7 @@ public class SQLLexer extends SQLPatternFactory
             SPF.statementLeader(
                 SPF.capture(SPF.tokenAlternatives(verbsAll)),
                 SPF.anyClause()
-            ).compile();
+            ).compile("PAT_ANY_DDL_FIRST_TOKEN");
 
         // Whitelists for acceptable statement preambles.
         WHITELISTS = new CheckedPattern[] {
@@ -587,7 +587,7 @@ public class SQLLexer extends SQLPatternFactory
                         SPF.tokenAlternatives(verbsSupported),
                         SPF.tokenAlternatives(secondTokens)
                     )
-                ).compile();
+                ).compile("PAT_WHITELISTS-PREAMBLES");
         }
 
         WhitelistSupportedPreamblePattern()
@@ -628,7 +628,7 @@ public class SQLLexer extends SQLPatternFactory
             blacklistPattern =
                 SPF.statementLeader(
                     SPF.capture(SPF.tokenAlternatives(verbsNotSupported))
-                ).compile();
+                ).compile("PAT_BLACKLISTS-PREAMBLES");
         }
 
         BlacklistUnsupportedPreamblePattern()
