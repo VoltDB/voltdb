@@ -359,7 +359,7 @@ public abstract class CatalogSchemaTools {
         if (isExportTableWithTarget != null) {
             sb.append("EXPORT TABLE " + catalog_tbl.getTypeName());
             if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
-                sb.append(" TARGET " + isExportTableWithTarget);
+                sb.append(" TO STREAM " + isExportTableWithTarget);
             }
             sb.append(";\n");
         }

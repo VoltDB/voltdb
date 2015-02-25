@@ -522,6 +522,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
+        if (m_es.isShutdown()) {
+           m_bufferPushPermits.release();
+           return;
+        }
         m_es.execute((new Runnable() {
             @Override
             public void run() {
