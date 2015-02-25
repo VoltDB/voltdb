@@ -50,6 +50,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 
 /**
@@ -74,6 +75,9 @@ public class ExportBenchmark {
     // Flags to tell the worker threads to stop or go
     AtomicBoolean warmupComplete = new AtomicBoolean(false);
     AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
+    // Test stats variables
+    long test_count = 0;
+    long benchmarkStartTS, benchmarkEndTS;
 
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
@@ -88,10 +92,10 @@ public class ExportBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 30;
+        int duration = 15;
 
         @Option(desc = "Objects to insert during the benchmark (per thread)")
-        int count=0;
+        int count=1000000;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 5;
@@ -265,22 +269,23 @@ public class ExportBenchmark {
     /**
      * While <code>benchmarkComplete</code> is set to false, run as many
      * synchronous procedure calls as possible and record the results.
-     *
      */
-    class ExportThread implements Runnable {
+    class ExportThreadByCount implements Runnable {
 
         @Override
         public void run() {
             long count = 0;
             long failures = 0;
+
+            // Don't track warmup inserts
             while (warmupComplete.get() == false) {
-                // Don't track warmup inserts
                 try {
                     client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
                 } catch (IOException ignore) {}
             }
-            while (benchmarkComplete.get() == false) {
-                // Insert objects
+
+            // Insert objects until count is reached
+            while (count < config.count) {
                 try {
                     boolean success = client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
                     count++;
@@ -290,41 +295,69 @@ public class ExportBenchmark {
                     e.printStackTrace();
                     System.exit(1);
                 }
-                if (config.count > 0 && count >= config.count) {
-                    synchronized (benchmarkComplete) {
-                        benchmarkComplete.set(true);
-                        benchmarkComplete.notify();
-                    }
+            }
+
+            System.out.println("Benchmark complete: wrote " + count + " objects");
+            System.out.println("Encountered " + failures + " errors");
+        }
+    }
+
+    class ExportThreadByDuration implements Runnable {
+
+        @Override
+        public void run() {
+            test_count = 0;
+            long failures = 0;
+
+            // Don't track warmup inserts
+            while (warmupComplete.get() == false) {
+                try {
+                    client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
+                } catch (IOException ignore) {}
+            }
+
+            // Insert objects, wait until we're told to stop
+            while (benchmarkComplete.get() == false) {
+                try {
+                    boolean success = client.callProcedure(new NullCallback(), "ExportInsert", 532532, 1, 53, 64, 42, 2.452, "String", 48932098, 0x421);
+                    test_count++;
+                    if (!success) { failures++; }
+                } catch (Exception e) {
+                    System.err.println("Couldn't insert into VoltDB\n");
+                    e.printStackTrace();
+                    System.exit(1);
                 }
             }
-            System.out.println("Benchmark complete: wrote " + count + " objects");
+            System.out.println("Benchmark complete: wrote " + test_count + " objects");
             System.out.println("Encountered " + failures + " errors");
         }
     }
 
 
     /**
-     * Runs the export benchmark test
+     * Runs a test that inserts a certain number of items
+     * @return Whether the export was successful
      */
-    private void runTest() throws Exception{
-        // Connect to servers
-        System.out.println("Test initialization");
-        connect(config.servers);
+    private boolean runTestByCount () throws InterruptedException, NoConnectionsException {
+        System.out.println("=== Insertion by Count ===");
 
-        // Start the work
+        // Reset variables
+        warmupComplete.set(false);
+        benchmarkComplete.set(false);
+
+        // Set up worker threads
         Thread threads[] = new Thread[config.threads];
         for (int i = 0; i < config.threads; ++i) {
-            threads[i] = new Thread(new ExportThread());
+            threads[i] = new Thread(new ExportThreadByCount());
             threads[i].start();
         }
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("Warming up...");
         Thread.sleep(1000l * config.warmup);
-
         warmupComplete.set(true);
 
-        long benchmarkStartTS = System.currentTimeMillis();
+        benchmarkStartTS = System.currentTimeMillis();
 
         // reset the stats after initialization
         fullStatsContext.fetchAndResetBaseline();
@@ -332,30 +365,11 @@ public class ExportBenchmark {
 
         schedulePeriodicStats();
 
-        // Start duration timer
-        Thread running_timer = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    for (int i = 0; i < config.duration; i++) {
-                        Thread.sleep(1000l);
-                        if (benchmarkComplete.get() == true) { return; }
-                    }
-                    synchronized (benchmarkComplete) {
-                        benchmarkComplete.set(true);
-                        benchmarkComplete.notify();
-                    }
-                } catch (InterruptedException doNothing) {}
-            }
-        });
-        running_timer.start();
-
-        // Wait until the insertion is done (either by duration or count)
+        // Wait until the threads stop
         System.out.println("\nRunning benchmark...");
-        synchronized (benchmarkComplete) {
-            benchmarkComplete.wait();
-        }
+        for (Thread thread: threads) { thread.join(); }
 
+        timer.cancel();
         client.drain();
         System.out.println("Client flushed; waiting for export to finish");
 
@@ -368,13 +382,99 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
-        long benchmarkEndTS = System.currentTimeMillis();
+        benchmarkEndTS = System.currentTimeMillis();
+
+        System.out.println("Finished benchmark (test by count)");
+        return success;
+    }
+
+    /**
+     * Runs a test that inserts objects for a certain time
+     * @return Whether the export was successful
+     */
+    private boolean runTestByDuration() throws InterruptedException, NoConnectionsException {
+        System.out.println("=== Insertion by Duration ===");
+
+        // Reset variables
+        warmupComplete.set(false);
+        benchmarkComplete.set(false);
+
+        // Set up worker threads
+        Thread threads[] = new Thread[config.threads];
+        for (int i = 0; i < config.threads; ++i) {
+            threads[i] = new Thread(new ExportThreadByDuration());
+            threads[i].start();
+        }
+
+        // Run the benchmark loop for the requested warmup time
+        System.out.println("Warming up...");
+        Thread.sleep(1000l * config.warmup);
+        warmupComplete.set(true);
+
+        // reset the stats after initialization
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
+
+        schedulePeriodicStats();
+
+        // Run for the duration given, then stop
+        System.out.println("\nRunning benchmark...");
+        Thread.sleep(1000l * config.duration);
+        benchmarkComplete.set(true);
 
         timer.cancel();
+        client.drain();
+        System.out.println("Client flushed; waiting for export to finish");
+
+        // Wait until export is done
+        boolean success = false;
+        try {
+            success = waitForStreamedAllocatedMemoryZero();
+        } catch (Exception e) {
+            System.err.println("Error while waiting for export: ");
+            e.printStackTrace();
+        }
+
+        System.out.println("Finished benchmark (test by duration)");
+        return success;
+    }
+
+
+    /**
+     * Runs the export benchmark test
+     * Runs two tests with two different conditions:
+     *   <li>Inserts a certain number of objects</li>
+     *   <li>Inserts objects for a certain amount of time</li>
+     */
+    private void runTest() {
+        // Connect to servers
+        try {
+            System.out.println("Test initialization");
+            connect(config.servers);
+        } catch (InterruptedException e) {
+            System.err.println("Error connecting to VoltDB");
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        // Run the two tests
+        boolean success = true;
+        try{
+            if (config.count > 0) {
+                success = runTestByCount() && success;
+            }
+            if (config.duration > 0) {
+                success = runTestByDuration() && success;
+            }
+        } catch (InterruptedException|NoConnectionsException e) {
+            System.err.println("Error running benchmark test");
+            e.printStackTrace();
+            System.exit(1);
+        }
 
         // Print results & close
-        printResults(benchmarkEndTS - benchmarkStartTS);
-        client.close();
+        printResults(benchmarkEndTS-benchmarkStartTS, test_count);
+        try { client.close(); } catch (InterruptedException ignore) {}
 
         if (!success) {
             System.exit(1);
@@ -401,10 +501,11 @@ public class ExportBenchmark {
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
-     *
+     * @param duration   How long the test by count ran
+     * @param count      How many objects the test by duration inserted
      * @throws Exception if anything unexpected happens.
      */
-    public synchronized void printResults(long duration) throws Exception {
+    public synchronized void printResults(long duration, long count) {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // Performance statistics
@@ -437,15 +538,19 @@ public class ExportBenchmark {
         System.out.println(stats.latencyHistoReport());
 
         // Write stats to file if requested
-        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
-            FileWriter fw = new FileWriter(config.statsfile);
-            fw.append(String.format("%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
-                                stats.getStartTimestamp(),
-                                stats.getTxnThroughput(),
-                                (float)duration));
-            fw.close();
+        try {
+            if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+                FileWriter fw = new FileWriter(config.statsfile);
+                fw.append(String.format("%d,-1,%d,0,0,0,%.2f,0,0,0,0,0,0\n",
+                                    stats.getStartTimestamp(),
+                                    count,
+                                    (float)duration));
+                fw.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error writing stats file");
+            e.printStackTrace();
         }
-
     }
 
     /**

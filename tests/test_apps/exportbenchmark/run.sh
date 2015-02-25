@@ -130,8 +130,10 @@ function run_benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
-        --duration=30 \
-        --servers=localhost 
+	--count=5000000 \
+        --duration=0 \
+        --servers=localhost \
+	--statsfile=exportbench.csv
 }
 
 function help() {
