@@ -1010,10 +1010,10 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .configBtn { float:right}
 .proLeft { float: left;font-weight: bold;}
 .addProBtn { float: right;padding: 0;}
-.configWrapper { width: 500px;padding: 20px;}
+.configWrapper { width: 500px;padding: 20px; overflow:auto;}
 .configurTbl {  }
 .configurTbl tr td { border: none;padding: 5px 0;}
-.configurTbl tr td input[type="text"]{ }
+.configurTbl tr td input[type="text"]{}
 .propertiesAlign { margin: 10px 0 0 0;border-top: 1px solid #CCCCCC; padding:20px 0 10px 0}
 .addConfigProperWrapper { overflow: auto; max-height:180px;}
 .addConfigProperTbl { border: 1px solid #CCCCCC; }
@@ -1252,14 +1252,15 @@ top: 3px;}
         width: 90%;
     }
 	
+	
 }
-
 	 
  @media (min-width: 480px) and (max-width: 700px) {
 		 .adminRight{ padding-top:15px;}
 		 #serverConfigAdmin{ top:99px;}
          .resizeCon {width:330px}
         .resizeRestore{width:80%}
+		.configWrapper { width:380px;}
 		 
  }
 
