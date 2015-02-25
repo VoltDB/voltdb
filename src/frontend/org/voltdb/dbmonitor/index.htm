@@ -367,7 +367,7 @@
                                 <!--<tr class="security" id="securityRow">
                                     <td class="configLabel">Security</td>-->
                                 <tr class="hasSubLabel parent security" id="row-6">
-                                    <td class="configLabel"><a href="javascript:vold(0)" class="labelCollapsed">Security</a></td>
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Security</a></td>
                                     <td align="right" class="securitytd">
                                         <div id="securityOptionIcon" class="offIcon"></div>
                                         <input type="checkbox" id="chkSecurity" class="chkSecurity" />
@@ -383,7 +383,7 @@
                                 <tr class="child-row-6 subLabelRow">
                                     <td colspan="4">
                                         <div class="securWrapper" id="UsersList">
-                                            <table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                            <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
                                                 <tr>
                                                     <th>Username</th>
                                                     <th>Password</th>
@@ -394,42 +394,23 @@
                                                     <td>Test</td>
                                                     <td>User</td>
                                                 </tr>
-                                            </table>
+                                            </table>-->
                                         </div>
                                         <div class="securWrapper" id="UsersListEditable" style="display: none;">
                                             <div class="userName">Users</div>
-                                            <div class="editBtn"><a href="javascript:vold(0)" class="btnEd" id="addmorePOIbutton" onclick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
+                                            <div class="editBtn"><a href="javascript:void(0)" class="btnEd" id="addmorePOIbutton" onclick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
                                             <div class="clear secLine"></div>
-
-                                            <table id="secTbl" width="100%" cellpadding="0" cellspacing="0" class="secTbl">
-                                                <tr>
-                                                    <th>Username</th>
-                                                    <th>Password</th>
-                                                    <th>Role</th>
-                                                    <th>Delete</th>
-                                                </tr>
-                                                <tr>
-                                                    <td id="latbox">
-                                                        <input size="15" type="text" value="Test"></td>
-                                                    <td id="latbox">
-                                                        <input size="15" type="text" value="Test"></td>
-                                                    <td id="lngbox">
-                                                        <select>
-                                                            <option></option>
-                                                            <option selected="selected">User</option>
-                                                            <option>Admin</option>
-                                                        </select></td>
-                                                    <td>
-                                                        <div class="securityDelete" id="delPOIbutton" onclick="deleteRow(this)"></div>
-                                                    </td>
-                                                </tr>
-                                            </table>
+                                            <form id="frmUserList" method="get" action="">
+                                                <div id="editUserList">
+                                                    
+                                                </div>
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>
 
                                 <tr class="hasSubLabel parent" id="row-1">
-                                    <td class="configLabel"><a href="javascript:vold(0)" class="labelCollapsed">HTTP Access</a></td>
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">HTTP Access</a></td>
                                     <td align="right">
                                         <div id="httpAccessIcon" class="onIcon"></div>
                                     </td>

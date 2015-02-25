@@ -989,6 +989,7 @@ font: 14px Arial, Helvetica, sans-serif;
 .btnEd {cursor: pointer;background: #D0D2D2;padding:5px;font-weight: bold; font-size:12px;}
 .securityDelete {background-position:-1042px -12px; width:25px; height:20px; position:relative; top:5px; cursor:pointer;}
 .userPlus {font-size:15px;position:relative;top:2px}
+.errorSecurity { height: auto!important;line-height: 12px!important;padding-top: 0px!important;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {

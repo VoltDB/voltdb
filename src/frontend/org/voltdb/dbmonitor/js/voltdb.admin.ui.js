@@ -22,8 +22,9 @@ function loadAdminPage() {
         btnErrorClusterPromote: $('#btnErrorPromotePopup'),
         errorPromoteMessage: $('#promoteErrorMessage'),
         updateMessageBar: $('#snapshotBar'),
-        errorRestoreMsgContainer: $('#errorRestoreMsgContainer')
-    };
+        errorRestoreMsgContainer: $('#errorRestoreMsgContainer'),
+        userListObj:[]
+};
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -239,7 +240,6 @@ function loadAdminPage() {
         }
     });
 
-
     // Make Expandable Rows.
     $('tr.parent > td:first-child' || 'tr.parent > td:fourth-child')
         .css("cursor", "pointer")
@@ -430,8 +430,10 @@ function loadAdminPage() {
     };
 
     adminEditObjects.LinkSecurityEdit.on("click", function () {
-        if (adminEditObjects.securityStateOriginal.linkSecurityEdit == true)
+        if (adminEditObjects.securityStateOriginal.linkSecurityEdit == true) {
             toggleSecurityEdit(editStates.ShowOkCancel);
+            VoltDbAdminConfig.getEditUserList(adminClusterObjects.userListObj);
+        }
     });
 
     adminEditObjects.btnEditSecurityCancel.on("click", function () {
@@ -439,21 +441,90 @@ function loadAdminPage() {
         toggleSecurityEdit(editStates.ShowEdit);
     });
 
+    //pm
+    adminEditObjects.btnEditSecurityOk.on("click", function(e) {
+        var passwordValidation = $('.passwordtxt');
+        for (var i = 0; i < passwordValidation.length; i++) {
+            $(passwordValidation[i]).rules("add", {
+                required: true,
+                messages: {
+                    required: "This field is required",
+                }
+            });
+        } 
+        
+        var usernameValidation = $('.usernametxt');
+        for (var j = 0; j < usernameValidation.length; j++) {
+            $(usernameValidation[j]).rules("add", {
+                required: true,
+                regex: /^[a-zA-Z0-9_.]+$/,
+                messages: {
+                    required: "This field is required",
+                    regex: 'Only alphabets, numbers, <br/> _ and . are allowed.'
+                }
+            });
+        }
+
+        if (!$("#frmUserList").valid()) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    });
+
     adminEditObjects.btnEditSecurityOk.popup({
         open: function (event, ui, ele) {
+            
         },
         afterOpen: function () {
             var popup = $(this)[0];
             $("#btnSecurityOk").unbind("click");
-            $("#btnSecurityOk").on("click", function () {
+            $("#btnSecurityOk").on("click", function() {
+                var userObject = {user:[]};
+                var name = undefined;
+                var password = undefined;
+                var role = undefined;
+                $('#secTbl tr td').each(function (i, row) {
+                    if ($(this).hasClass("username")) {
+                        name=$(this).find("input.usernametxt").val();
+                    } else if ($(this).hasClass("password")) {
+                        password=$(this).find("input.passwordtxt").val();
+                    } else if ($(this).hasClass("roleoption")) {
+                        role=$(this).find("select.roleoptiontxt").val();
+                    }
+                    if (name != undefined && password != undefined && role != undefined) {
+                        if (role == "Admin")
+                            role = "administrator";
+                        if (role == "User")
+                            role = "user";
+                        if (password == "") {
+                            userObject.user.push({
+                                name: name,
+                                roles: role,
+                                plaintext: true,
+                            });
+                        } else {
+                            userObject.user.push({
+                                name: name,
+                                roles: role,
+                                plaintext: true,
+                                password: password
+                            });
+                        }
+                        name = password = role = undefined;
+                    }
+                });
+                
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if (!adminConfigurations.hasOwnProperty("security")) {
                     adminConfigurations.security = {};
                 }
-
+                if (!adminConfigurations.hasOwnProperty("users")) {
+                    adminConfigurations.users = {};
+                }
                 //Set the new value to be saved.
                 adminConfigurations.security.enabled = adminEditObjects.chkSecurity.is(':checked');
-
+                adminConfigurations.users = userObject;
+                
                 //Call the loading image only after setting the new value to be saved.
                 toggleSecurityEdit(editStates.ShowLoading);
 
@@ -1047,6 +1118,7 @@ function loadAdminPage() {
 
     });
 
+    
     $("#frmSnapshotFrequency").validate({
         rules: {
             txtFrequency: adminValidationRules.numericRules
@@ -1073,7 +1145,7 @@ function loadAdminPage() {
             txtRetained: adminValidationRules.numericMessages
         }
     });
-
+    $("#frmUserList").validate();
     adminEditObjects.btnEditAutoSnapshotOk.popup({
         open: function (event, ui, ele) {
         },
@@ -1618,7 +1690,9 @@ function loadAdminPage() {
             var spanshotUnit = adminConfigValues.frequency != undefined ? adminConfigValues.frequency.slice(-1) : '';
             setSnapShotUnit(spanshotUnit);
             getExportProperties(adminConfigValues.properties);
-
+            adminClusterObjects.userListObj = adminConfigValues.users;
+            getUserList(adminConfigValues.users);
+            //getEditUserList(adminConfigValues.users);
         };
 
         var getExportProperties = function (data) {
@@ -1651,6 +1725,77 @@ function loadAdminPage() {
             }
             $('#exportProperties').html(result);
 
+        };
+
+        var getUserList = function (userData) {
+            var result = "";
+            var tableHeader = '<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">' +
+                '<tr>' +
+                '<th>Username</th>' +
+                '<th>Role</th>' +
+                '</tr>';
+            var tableFooter = '</table>';
+            if (userData != undefined) {
+                for (var i = 0; i < userData.length; i++) {
+                    var userName = userData[i].name;
+                    var role = userData[i].roles;
+                    result += '<tr>' +
+                        '<td>' + userName + '</td>' +
+                        '<td>' + role + '</td>' +
+                        '</tr>';
+                }
+            }
+            $('#UsersList').html(tableHeader + result + tableFooter);
+
+        };
+        
+        this.getEditUserList = function (userData) {
+            var result = "";
+            var tableHeader = '<table id="secTbl" width="100%" cellpadding="0" cellspacing="0" class="secTbl">' +
+                '<tr>' +
+                '<th>Username</th>' +
+                '<th>Password</th>' +
+                '<th>Role</th>' +
+                '<th>Delete</th>' +
+                '</tr>';
+            var tableFooter = '</table>';
+            if (userData != undefined) {
+                for (var i = 0; i < userData.length; i++) {
+                    var userName = userData[i].name;
+                    var role = userData[i].roles;
+                    result += '<tr>' +
+                        '<td id="latbox" class="username">' +
+                        '<input class="usernametxt" size="15" type="text" value=' + userName + ' id="inputUserName' + i + '" name="inputUserName' + i + '">' +
+                        '<label id="errorUserName' + i + '" for="inputUserName' + i + '" class="error errorSecurity" style="display:none"></label>' +
+                        '</td>' +
+                        '<td id="latbox' + i + '" class="password">' +
+                        '<a href ="javascript:void(0)" onclick="changePassword(this);" id="anchor'+i+'" >Change Password</a>' +
+                        '<input class="passwordtxt" size="15" type="text" style="display:none" id="input' + i + '" name="input' + i + '">' +
+                        '<label id="errorUser' + i + '" for="input' + i + '" class="error errorSecurity" style="display:none"></label>' +
+                        '</td>' +
+                        '<td id="lngbox" class="roleoption">' +
+                        '<select class="roleoptiontxt">';
+                        
+                    if (role.toLowerCase() == 'administrator') {
+                        result += '<option selected="selected">Admin</option>' +
+                            '<option>User</option>';
+                    } else if (role.toLowerCase() == 'user') {
+                        result += '<option selected="selected">User</option>' +
+                            '<option>Admin</option>';
+                    }
+                    //else {
+                    //    result += '<option selected="selected">Role</option>' +
+                    //        '<option>Admin</option>' +
+                    //        '<option>User</option>';
+                    //}
+                    result += '</select></td>' +
+                        '<td>' +
+                        '<div class="securityDelete" id="delPOIbutton" onclick="deleteRow(this)"></div>' +
+                        '</td>' +
+                        '</tr>';
+                }
+                $('#editUserList').html(tableHeader + result + tableFooter);
+            }
         };
 
         var setSnapShotUnit = function (unit) {
@@ -1791,24 +1936,42 @@ function deleteRow(row)
     var i=row.parentNode.parentNode.rowIndex;
     document.getElementById('secTbl').deleteRow(i);
 }
-function insRow()
-{
-    var x=document.getElementById('secTbl');
+function insRow() {
+    var x = document.getElementById('secTbl');
     var new_row = x.rows[1].cloneNode(true);
     var len = x.rows.length;
     //new_row.cells[0].innerHTML = len;//sn number increment
     
     var inp1 = new_row.cells[1].getElementsByTagName('input')[0];
-    inp1.id += len;
+    inp1.id = 'input' + (len - 1);
+    inp1.name = 'input' + (len - 1);
     inp1.value = '';
-	
+    $(inp1).css("display", "inline-block");
+    
+    var lbl1 = new_row.cells[1].getElementsByTagName('label')[0];
+    lbl1.id = 'errorUser' + (len - 1);
+    lbl1.htmlFor = 'input' + (len - 1);
+    lbl1.value = '';
+    $(lbl1).css("display", "none");
+
+    var anch = new_row.cells[1].getElementsByTagName('a')[0];
+    $(anch).css("display", "none");
+        
 	var inp0 = new_row.cells[0].getElementsByTagName('input')[0];
-    inp0.id += len;
+	inp0.id = 'inputUserName' + (len - 1);
+	inp0.name = 'inputUserName' + (len - 1);
     inp0.value = '';
+    $(inp0).css("display", "inline-block");
+
+    var lbl0 = new_row.cells[0].getElementsByTagName('label')[0];
+    lbl0.id = 'errorUserName' + (len - 1);
+    lbl0.htmlFor = 'inputUserName' + (len - 1);
+    lbl0.value = '';
+    $(lbl0).css("display", "none");
 	
 	var sel = new_row.cells[2].getElementsByTagName('select')[0];
     sel.id += len;
     sel.value = '';
 	
-    x.appendChild( new_row );
+    x.appendChild(new_row);
 }
