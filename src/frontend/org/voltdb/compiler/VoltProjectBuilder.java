@@ -38,7 +38,6 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
-import org.apache.commons.lang.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
@@ -787,19 +786,6 @@ public class VoltProjectBuilder {
             System.out.println("path to deployment is " + m_pathToDeployment);
             return m_pathToDeployment;
         }
-    }
-
-    /**
-     * Utility convenience method that front-ends writeStringToTempFile() to take
-     * an array of strings to make it slightly easier to declare. Inserts linefeeds
-     * and semi-colons between strings. Also appends a semi-colon.
-     *
-     * @param lines The array of schema lines to save.
-     * @return A reference to the file created or null on failure.
-     */
-    public static File writeSchemaToTempFile(final String[] lines) {
-        String schema = StringUtils.join(lines, ";\n") + ";";
-        return writeStringToTempFile(schema);
     }
 
     /**
