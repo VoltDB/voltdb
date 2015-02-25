@@ -115,6 +115,10 @@
 </condition>
 
 <!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
+<condition property="VOLT_LOG_LEVEL" value="500">
+    <not><isset property="VOLT_LOG_LEVEL"/></not>
+</condition>
+
 <condition property="verifycatalogdebug" value="true">
     <not><isset property="verifycatalogdebug"/></not>
 </condition>
@@ -1152,6 +1156,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} test" />
     </exec>
 </target>
@@ -1161,6 +1166,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} build" />
     </exec>
 </target>
@@ -1168,6 +1174,7 @@ NATIVE EE STUFF
 <target name='voltdbipc' depends="ee"
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} voltdbipc" />
     </exec>
 </target>
@@ -1175,6 +1182,7 @@ NATIVE EE STUFF
 <target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
         <arg line="build.py ${build}" />
     </exec>
@@ -1206,6 +1214,7 @@ NATIVE EE STUFF
     description="Just make the makefile for the C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="EEONLYBUILDMAKEFILE" value="true"/>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build}" />
     </exec>
 </target>
@@ -1213,6 +1222,7 @@ NATIVE EE STUFF
 <target name='recompile_ee_nodepends'
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build}" />
     </exec>
     <copy todir='voltdb'>
@@ -1225,6 +1235,7 @@ NATIVE EE STUFF
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} profile" />
     </exec>
 </target>
@@ -1232,6 +1243,7 @@ NATIVE EE STUFF
 <target name='execplanfrag' depends="ee"
         description="Create test program that loads catalog and tables and executes a plan fragment.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py EXECPLANFRAG ${build}" />
     </exec>
 </target>
@@ -1641,6 +1653,7 @@ TEST CASES
   <!-- Generate instrumented objects -->
   <!-- Whether any work needs doing is left to the C++ makefile -->
   <exec dir='.' executable='python' failonerror='true'>
+    <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
     <arg line="build.py ${build} coverage" />
   </exec>
   <mkdir dir="${lcov.dir}" />
@@ -1702,6 +1715,7 @@ TEST CASES
     description="Run C++ unit tests from the coverage directory">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} test coverage" />
     </exec>
 </target>

@@ -179,4 +179,24 @@ inline void outputLogHeader_(const char *file, int line, const char *func, int l
     printf("[%s] [%s:%d:%s()] %s - ", type, file, line, func, time_str);
 }
 
+#include <vector>
+namespace voltdb {
+class StackTrace {
+public:
+    /**
+     * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
+     *
+     */
+	StackTrace();
+	~StackTrace();
+
+	char** m_traceSymbols;
+	std::vector<std::string> m_traces;
+};
+} // namespace voltdb
+
+
+void printStackTrace_();
+#define PRINT_STACK_TRACE outputLogHeader_(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE);::printf("OUTPUTING STACK TRACE\n");printStackTrace_();::fflush(stdout)
+
 #endif // HSTOREDEBUGLOG_H
