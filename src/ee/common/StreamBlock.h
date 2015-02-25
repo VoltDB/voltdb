@@ -162,6 +162,8 @@ namespace voltdb
                                     "\n m_uso(%jd), m_offset(%jd), mark(%jd)\n",
                                     (intmax_t)m_uso, (intmax_t)m_offset, (intmax_t)mark);
             }
+
+            recordLastBeginTxnOffset();
         }
 
         void recordLastBeginTxnOffset() {
