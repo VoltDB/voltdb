@@ -392,19 +392,6 @@ public class VoltProjectBuilder {
     }
 
     /**
-     * Convenience method that front-ends addLiteralSchema() to take a variable
-     * array of strings to make it slightly easier to declare. Automatically
-     * terminates lines with semi-colons and separates with linefeeds.
-     *
-     * @param lines The array of schema lines to add.
-     * @throws IOException
-     */
-    public void addLiteralSchemaLines(final String... lines) throws IOException {
-        String schema = StringUtils.join(lines, ";\n") + ";";
-        addLiteralSchema(schema);
-    }
-
-    /**
      * Add a schema based on a URL.
      * @param schemaURL Schema file URL
      */
