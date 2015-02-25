@@ -17,7 +17,10 @@
 
 package org.voltdb.parser;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -1327,8 +1330,28 @@ public class SQLParser extends SQLPatternFactory
      *     like CREATE, ALTER, DROP, PARTITION, or EXPORT
      */
     public static boolean batchBeginsWithDDLKeyword(String batch) {
-        // This method is really supposed to look at a single statement, but it seems
-        // also to work for a batch of statements.
-        return queryIsDDL(batch);
+
+        BufferedReader reader = new BufferedReader(new StringReader(batch));
+        String line;
+        try {
+            while ((line = reader.readLine()) != null) {
+
+                line = SingleLineComments.matcher(line).replaceAll("");
+                line = line.trim();
+                if (line.equals(""))
+                    continue;
+
+                // we have a non-blank line that contains more than just a comment.
+                return queryIsDDL(line);
+            }
+        }
+        catch (IOException e) {
+            // This should never happen for a StringReader
+            assert(false);
+        }
+
+
+        // degenerate batch: no lines are non-blank or non-comment
+        return false;
     }
 }

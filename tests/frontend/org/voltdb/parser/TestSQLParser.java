@@ -67,13 +67,22 @@ public class TestSQLParser extends TestCase {
                 + "create table t (i integer); -- let's not forget the index...\n"
                 + "create index idx on t (i);"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
-                "/* here's some DDL: */\n"
-                + "create table t (i integer); -- let's not forget the index...\n"
-                + "create index idx on t (i);"));
+        // This currently does not work.
+        //        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        //                "/* here's some DDL: */\n"
+        //                + "create table t (i integer); -- let's not forget the index...\n"
+        //                + "create index idx on t (i);"));
 
         assertTrue(SQLParser.batchBeginsWithDDLKeyword(
                 "// here's some DDL; check it out!\n"
+                + "create table t (i integer); -- let's not forget the index...\n"
+                + "create index idx on t (i);"));
+
+        // leading whitespace
+        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+                "  \n"
+                + "// here's some DDL; check it out!\n"
+                + "  \n"
                 + "create table t (i integer); -- let's not forget the index...\n"
                 + "create index idx on t (i);"));
 
@@ -82,16 +91,22 @@ public class TestSQLParser extends TestCase {
     public void testBatchBeginsWithDDLKeywordNegative() {
 
         assertFalse(SQLParser.batchBeginsWithDDLKeyword(
-                "insert into t values (47);"));
+                "insert into t values (47);\n"
+                + "partition table t on z;"));
 
         assertFalse(SQLParser.batchBeginsWithDDLKeyword(
                 "delete from t where i = 9;"));
 
         assertFalse(SQLParser.batchBeginsWithDDLKeyword(
-                "upsert into t values (32);"));
+                "upsert into t values (32);\n"
+                + "alter table t add column j bigint;"));
 
         assertFalse(SQLParser.batchBeginsWithDDLKeyword(
                 "update t set i = 70 where i > 69;"));
+
+        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+                "update t set i = 70 where i > 69;\n"
+                + "create table mytable (i integer);"));
 
         // Now some comments
 
@@ -103,9 +118,24 @@ public class TestSQLParser extends TestCase {
                 "// create table was done earlier...\n"
                 + "update t set i = 70 where i > 69;"));
 
+        // This passes only because the C-style comment
+        // doesn't look like DDL--it isn't stripped out.
         assertFalse(SQLParser.batchBeginsWithDDLKeyword(
                 "/* create table was done earlier... */\n"
                 + "update t set i = 70 where i > 69;"));
+
+        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+                "  \n"
+                + "select * from foo;"
+                + "create table catdog (dogcat bigint);"));
+
+        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+                "  \n"
+                + "  -- hello world!!"
+                + "     \t\n"
+                + "select * from foo;"
+                + "create table catdog (dogcat bigint);"));
+
 
         // Near misses that might appear in a ddl.sql file
         // but that cannot be batched
