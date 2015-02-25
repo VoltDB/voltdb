@@ -22,6 +22,8 @@ class AdminPage extends VoltDBManagementCenterPage {
         downloadbtn         { module downloadconfigbtn}
         schema              { module schemaTab}
 
+
+        
     }
     static at = {
         adminTab.displayed

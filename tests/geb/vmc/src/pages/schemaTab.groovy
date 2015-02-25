@@ -8,7 +8,6 @@ import java.util.Map;
 import geb.*
 import geb.navigator.Navigator
 import geb.waiting.WaitTimeoutException
-
 import org.openqa.selenium.JavascriptExecutor
 
 
