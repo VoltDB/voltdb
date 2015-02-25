@@ -64,6 +64,8 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
+import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 
 public class HTTPAdminListener {
 
@@ -324,6 +326,11 @@ public class HTTPAdminListener {
     abstract class IgnorePasswordMixIn {
         @JsonIgnore abstract String getPassword();
     }
+    abstract class IgnoreLegacyExportAttributesMixIn {
+        @JsonIgnore abstract String getExportconnectorclass();
+        @JsonIgnore abstract ServerExportEnum getTarget();
+        @JsonIgnore abstract Boolean isEnabled();
+    }
 
     class DeploymentRequestHandler extends VoltRequestHandler {
 
@@ -334,6 +341,7 @@ public class HTTPAdminListener {
             m_mapper = new ObjectMapper();
             //Mixin for to not output passwords.
             m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            m_mapper.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
             //We want jackson to stop closing streams
             m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             try {
