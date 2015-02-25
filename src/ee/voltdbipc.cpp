@@ -438,6 +438,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
+    cs->createDrReplicatedStream = ntohl(cs->createDrReplicatedStream);
     bool createDrReplicatedStream = cs->createDrReplicatedStream != 0;
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
@@ -457,8 +458,8 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 createDrReplicatedStream,
-                                 cs->tempTableMemory) == true) {
+                                 cs->tempTableMemory,
+                                 createDrReplicatedStream) == true) {
             return kErrorCode_Success;
         }
     } catch (const FatalException &e) {
