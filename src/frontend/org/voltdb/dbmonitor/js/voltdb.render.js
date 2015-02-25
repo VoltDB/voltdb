@@ -117,6 +117,7 @@ function alertNodeClicked(obj) {
         var joiningCount = 0;
         var missingCount = 0;
         var alertCount = 0;
+        var serverSettings = false;
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
@@ -304,21 +305,22 @@ function alertNodeClicked(obj) {
         };
 
         this.GetSystemInformation = function (onInformationLoaded, onAdminPagePortAndOverviewDetailsLoaded, onAdminPageServerListLoaded) {
+
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
 
                 if (VoltDbAdminConfig.isAdmin) {
-                    onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails());
+                    onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails(),serverSettings);
                     onAdminPageServerListLoaded(getAdminServerList());
                 }
 
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
+                
                 onInformationLoaded();
-
-
             });
+
         };
 
         this.GetClusterInformation = function (onInformationLoaded) {
@@ -618,10 +620,11 @@ function alertNodeClicked(obj) {
                     adminConfigValues['logSegmentSize'] = data.commandlog.logsize;
                 }
 
+                //Export
                 if (data.export != null) {
                     adminConfigValues['export'] = data.export.enabled;
                     adminConfigValues['targets'] = data.export.target;
-                    adminConfigValues['properties'] = data.export.configuration.property;
+                    adminConfigValues['configuration'] = data.export.configuration;
                 }
 
                 //Advanced 
@@ -1872,7 +1875,7 @@ function alertNodeClicked(obj) {
             });
 
             //to get MPI site id
-            connection.Metadata['@Statistics_STARVATION'].data.forEach(function(info) {
+            connection.Metadata['@Statistics_STARVATION'].data.forEach(function (info) {
                 if (currentServer == info[colIndex["HOSTNAME"]]) {
                     if (parseInt(info[colIndex["SITE_ID"]]) > siteId) {
                         siteId = parseInt(info[colIndex["SITE_ID"]]);
@@ -1887,7 +1890,7 @@ function alertNodeClicked(obj) {
                 }
             });
             //
-            
+
             connection.Metadata['@Statistics_STARVATION'].data.forEach(function (info) {
                 if (currentServer == info[colIndex["HOSTNAME"]]) {
                     if (siteId == parseInt(info[colIndex["SITE_ID"]])) {
@@ -1954,7 +1957,7 @@ function alertNodeClicked(obj) {
 
             if (connection.Metadata['@SystemInformation_OVERVIEW' + suffix] == null) {
                 return;
-            }              
+            }
             connection.Metadata['@SystemInformation_OVERVIEW' + suffix].data.forEach(function (info) {
                 var singleData = info;
                 var id = singleData[0];
@@ -1998,7 +2001,7 @@ function alertNodeClicked(obj) {
                     counter++;
                 });
             }
-           
+
             var dataCount = 0;
             connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
                 var srcData = table;
@@ -2043,7 +2046,21 @@ function alertNodeClicked(obj) {
                     portConfigValues['replicationPort'] = val["DRPORT"];
                     portConfigValues['clusterState'] = val["CLUSTERSTATE"];
                     portConfigValues['replicationRole'] = val["REPLICATIONROLE"];
-                    return false;
+
+                    if (validateServerSpecificSettings(val)) {
+                        portConfigValues['adminInterface'] = val['ADMININTERFACE'];
+                        portConfigValues['httpInterface'] = val['HTTPINTERFACE'];
+                        portConfigValues['clientInterface'] = val['CLIENTINTERFACE'];
+                        portConfigValues['internalInterface'] = val['INTERNALINTERFACE'];
+                        portConfigValues['zookeeperInterface'] = val['ZKINTERFACE'];
+                        portConfigValues['replicationInterface'] = val['DRINTERFACE'];
+                        serverSettings = true;
+                        
+                    } else {
+                        serverSettings = false;
+                        return false;
+                    }
+                   
                 }
                 return true;
             });
@@ -2057,6 +2074,21 @@ function alertNodeClicked(obj) {
             });
 
             return portConfigValues;
+        };
+
+        var validateServerSpecificSettings = function (overviewValues) {
+            if (overviewValues['ADMININTERFACE'] == "" && overviewValues['HTTPINTERFACE'] == "" &&
+                overviewValues['CLIENTINTERFACE'] == "" &&  overviewValues['INTERNALINTERFACE'] == "" &&
+                overviewValues['ZKINTERFACE'] == "" && overviewValues['DRINTERFACE'] == "") {
+                return false;
+            }
+
+            else if (overviewValues['ADMININTERFACE'] != "" || overviewValues['HTTPINTERFACE'] != ""
+                || overviewValues['CLIENTINTERFACE'] != "" || overviewValues['INTERNALINTERFACE'] != ""
+                || overviewValues['ZKINTERFACE'] != "" || overviewValues['DRINTERFACE'] != "") {
+                return true;
+            }
+            return false;
         };
 
         this.editConfigurationItem = function (configGroup, configMember, configValue, onConfigurationUpdated) {
@@ -2293,7 +2325,7 @@ function alertNodeClicked(obj) {
         this.getSaveSnapshotStatus = function (connection, snapshotStatus, saveStatus) {
             var colIndex = {};
             var counter = 0;
-            
+
             //Handle error for community edition of VoltDB.
             if (saveStatus == -2) {
                 var currentServer = getCurrentServer();

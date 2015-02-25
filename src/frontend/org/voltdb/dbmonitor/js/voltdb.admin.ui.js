@@ -51,9 +51,7 @@ function loadAdminPage() {
         commandLogFrequencyTransactions: $("#commandLogFrequencyTxns"),
         commandLogSegmentSize: $("#commandLogSegmentSize"),
         commandLogSegmentSizeLabel: $("#commandLogSegmentSizeUnit"),
-        exports: $("#exports"),
-        exportLabel: $("#txtExportLabel"),
-        target: $("#target"),
+        exportConfiguration: $("#exportConfiguration"),
         properties: $("#properties"),
         maxJavaHeap: $("#maxJavaHeap"),
         maxJavaHeapLabel: $("#maxJavaHeapUnit"),
@@ -75,9 +73,15 @@ function loadAdminPage() {
         exportOverflow: $('#exportOverflow'),
         commandLogPath: $('#commandlogpath'),
         commandLogSnapshotPath: $('#commandlogsnapshotpath'),
-
+        clusterClientPort: $('#clusterClientport'),
+        clusterAdminPort: $('#clusterAdminport'),
+        clusterHttpPort: $('#clusterHttpport'),
+        clusterInternalPort: $('#clusterInternalPort'),
+        clusterZookeeperPort: $('#clusterZookeeperPort'),
+        clusterReplicationPort: $('#clusterReplicationPort'),
         //ServerList Section
-        adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody")
+        adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody"),
+        serverSettingHeader: $('#hServerSettings')
 
     };
 
@@ -202,7 +206,16 @@ function loadAdminPage() {
         },
         restoreSnapshotMessages: {
             required: "Please select a snapshot to restore."
-        }
+        },
+        
+        streamNameRules: {
+            required: true,
+            regex: /^[a-zA-Z0-9_.]+$/
+        },
+        streamNameMessages: {
+            required: "This field is required",
+            regex: 'Only alphabets, numbers, _ and . are allowed.'
+        },
     };
 
     //Admin Page download link
@@ -248,6 +261,17 @@ function loadAdminPage() {
             var parent = $(this).parent();
             parent.siblings('.child-' + parent.attr("id")).toggle();
             parent.find(".labelCollapsed").toggleClass("labelExpanded");
+
+            //Handle export configuration
+            if ($(this).text() == "Export") {
+                //If parent is closed, then hide export configuration
+                if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
+                    adminDOMObjects.exportConfiguration.hide();
+                    //If parent is open, then open the export configuration.
+                } else {
+                    adminDOMObjects.exportConfiguration.show();
+                }
+            }
         });
     $('tr[class^=child-]').hide().children('td');
 
@@ -380,8 +404,8 @@ function loadAdminPage() {
     });
 
     var toggleSecurityEdit = function (state) {
-		var userList = $("#UsersList");
-		var userListEditable = $("#UsersListEditable");
+        var userList = $("#UsersList");
+        var userListEditable = $("#UsersListEditable");
         if (adminEditObjects.chkSecurityValue) {
             adminEditObjects.chkSecurity.iCheck('check');
         } else {
@@ -399,9 +423,9 @@ function loadAdminPage() {
             adminEditObjects.iconSecurityOption.hide();
             adminEditObjects.spanSecurity.hide();
             adminEditObjects.loadingSecurity.show();
-			
-			userList.hide();
-			userListEditable.hide();
+
+            userList.hide();
+            userListEditable.hide();
         }
         else if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingSecurity.hide();
@@ -411,9 +435,9 @@ function loadAdminPage() {
             adminEditObjects.btnEditSecurityOk.show();
             adminEditObjects.btnEditSecurityCancel.show();
             adminEditObjects.chkSecurity.parent().addClass("customCheckbox");
-			
-			userList.hide();
-			userListEditable.show();
+
+            userList.hide();
+            userListEditable.show();
         }
         else {
             adminEditObjects.loadingSecurity.hide();
@@ -423,9 +447,9 @@ function loadAdminPage() {
             adminEditObjects.btnEditSecurityOk.hide();
             adminEditObjects.btnEditSecurityCancel.hide();
             adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
-			
-			userList.show();
-			userListEditable.hide();
+
+            userList.show();
+            userListEditable.hide();
         }
     };
 
@@ -586,12 +610,12 @@ function loadAdminPage() {
             });
         }
     });
-    
+
 
     $("#loginWarnPopup").popup({
         afterOpen: function (event, ui, ele) {
             var popup = $(this)[0];
-           
+
             $("#btnLoginWarningOk").unbind("click");
             $("#btnLoginWarningOk").on('click', function () {
                 if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
@@ -1236,7 +1260,7 @@ function loadAdminPage() {
         }
     });
 
-    //Heartbeat time out
+    //Heartbeat timeout
     var toggleHeartbeatTimeoutEdit = function (state) {
 
         adminEditObjects.editStateHeartbeatTimeout = state;
@@ -1373,7 +1397,7 @@ function loadAdminPage() {
         }
     });
 
-    //Query time out
+    //Query timeout
     var toggleQueryTimeoutEdit = function (state) {
 
         adminEditObjects.tBoxQueryTimeout.val(adminEditObjects.tBoxQueryTimeoutValue);
@@ -1492,6 +1516,212 @@ function loadAdminPage() {
             });
         }
     });
+    
+    $("#addConfigPopupLink").popup({
+        open: function (event, ui, ele) {
+            
+            var contents = '' +
+                '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
+                '<tr id="Tr1">' +
+                '    <td>Stream</td>' +
+                '    <td width="10%">' +
+                '       <input id="txtStream" name="txtStream" type="text" size="30">' +
+                '       <label id="errorStream" for="txtStream" class="error" style="display: none;"></label>' +
+                '    </td>' +
+                '    <td width="8%" align="right"><input type="checkbox" checked="true" id="chkStream" class="chkStream"/></td>' +
+                '    <td id="chkStreamValue">On</td>' +
+                '</tr>' +
+                '<tr>' +
+                '    <td>Type </td>' +
+                '    <td>' +
+                '       <input id="txtType" name="txtType" type="text" size="30">' +
+                '       <label id="errorType" for="txtType" class="error" style="display: none;"></label>' +
+                '    </td>' +
+                '    <td>&nbsp;</td>' +
+                '    <td>&nbsp;</td>' +
+                '</tr>' +
+                '</table>' +
+                
+                '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
+                '<tr>' +
+                '    <td class="configLabe1">' +
+                '        <div class="propertiesAlign">' +
+                '            <div class="proLeft ">Properties</div>' +
+                '            <div class="editBtn addProBtn"> ' +
+                '                <a href="javascript:void(0)" id="lnkAddNewProperty" class="btnEd"> <span class="userPlus">+</span> Add Property</a> ' +
+                '            </div>' +
+                '            <div class="clear"> </div>' +
+                '        </div>' +
+                '    </td>' +
+                '</tr>' +
+                '<tr>' +
+                '    <td>' +
+                '       ' +
+                '        <div class="addConfigProperWrapper">' +
+                '            <table id="tblAddNewProperty" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
+                '                <tr>' +
+                '                    <th>Name</th>' +
+                '                    <th align="right">Value</th>' +
+                '                    <th>Delete</th>' +
+                '                </tr>' +
+                '                <tr>' +
+                '                    <td>' +
+                '                        <input size="15" id="txtName0" name="txtName0" class="newStreamProperty" type="text">' +
+                '                        <label id="errorName0" for="txtName0" class="error" style="display: none;"></label>' +
+                '                    </td>' +
+                '                    <td>' +
+                '                        <input size="15" id="txtValue0" name="txtValue0" class="newStreamProperty" type="text">' +
+                '                        <label id="errorValue0" for="txtValue0" class="error" style="display: none;"></label>' +
+                '                    </td>' +
+                '                    <td><div class="securityDelete" id="delRow0" onclick="deleteRow(this)"></div></td>' +
+                '                </tr>' +
+                '            </table>' +
+                '        </div>' +
+                '    </td>' +
+                '</tr>' +
+                '</table>';
+
+            $("#addConfigWrapper").html(contents);
+            
+            $("#deleteAddConfig").hide();
+            $("#addConfigControls").show();
+            $("#saveConfigConfirmation").hide();
+            
+            $('#chkStream').iCheck({
+                checkboxClass: 'icheckbox_square-aero customCheckbox',
+                increaseArea: '20%'
+            });
+
+            $('#chkStream').on('ifChanged', function () {
+                $("#chkStreamValue").text(getOnOffText($('#chkStream').is(":checked")));
+            });
+
+            var count = 0;
+
+            $("#lnkAddNewProperty").on("click", function () {
+                count++;
+                var nameId = 'txtName' + count;
+                var valueId = 'txtValue' + count;
+                
+                var newRow = '<tr>' +
+                    '   <td>' +
+                    '       <input size="15" id="' + nameId + '" name="' + nameId + '" class="newStreamProperty" type="text">' +
+                    '       <label id="errorName' + count + '" for="' + nameId + '" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td>' +
+                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newStreamProperty" type="text">' +
+                    '       <label id="errorValue' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
+                    '   </td>' +
+                    '   <td><div class="securityDelete" onclick="deleteRow(this)"></div></td>' +
+                    '</tr>';
+                $("#tblAddNewProperty").append(newRow);
+            });
+
+            $("#formAddConfiguration").validate({
+                rules: {
+                    txtStream: adminValidationRules.streamNameRules,
+                    txtType: adminValidationRules.streamNameRules,
+                },
+                messages: {
+                    txtStream: adminValidationRules.streamNameMessages,
+                    txtType: adminValidationRules.streamNameMessages,
+                }
+            });
+        },
+        afterOpen: function () {
+
+            var popup = $(this)[0];
+            $("#btnAddConfigSave").unbind("click");
+            $("#btnAddConfigSave").on("click", function (e) {
+
+                var newStreamProperties = $(".newStreamProperty");
+                for (var i = 0; i < newStreamProperties.length; i++) {
+                    $(newStreamProperties[i]).rules("add", {
+                        required: true,
+                        regex: /^[a-zA-Z0-9_.]+$/,
+                        messages: {
+                            required: "This field is required",
+                            regex: 'Only alphabets, numbers, <br/> _ and . are allowed.'
+                        }
+                    });
+                }
+
+                if (!$("#formAddConfiguration").valid()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    $("#addConfigControls").hide();
+                    $("#saveConfigConfirmation").show();
+                }
+            });
+
+            $("#btnAddConfigCancel").unbind("click");
+            $("#btnAddConfigCancel").on("click", function () {
+
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnSaveConfigOk").unbind("click");
+            $("#btnSaveConfigOk").on("click", function () {
+                
+                var newConfig = {};
+                newConfig["stream"] = $("#txtStream").val();
+                newConfig["type"] = $("#txtType").val();
+                newConfig["enabled"] = $("#chkStream").is(':checked');
+                newConfig["property"] = [];
+                
+                var newStreamProperties = $(".newStreamProperty");
+                for (var i = 0; i < newStreamProperties.length; i += 2) {
+                    newConfig["property"].push({
+                        "name": $(newStreamProperties[i]).val(),
+                        "value": $(newStreamProperties[i + 1]).val(),
+                    });
+                }
+                
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                
+                if (!adminConfigurations.export) {
+                    adminConfigurations.export = {};
+                    adminConfigurations.export["configuration"] = [];
+                }
+
+                adminConfigurations.export.configuration.push(newConfig);
+                //TODO: Show loading image
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            //TODO: Hide loading image
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                        });
+
+                    } else {
+                        var msg = '"Export Configuration". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorPopupLink").trigger("click");
+                    }
+                });
+
+                //Close the popup
+                popup.close();
+            });
+            
+            $("#btnSaveConfigCancel").unbind("click");
+            $("#btnSaveConfigCancel").on("click", function () {
+
+                $("#saveConfigConfirmation").hide();
+                $("#addConfigControls").show();
+            });
+        }
+    });
 
     $("#updateErrorPopupLink").popup({
         open: function (event, ui, ele) {
@@ -1591,6 +1821,7 @@ function loadAdminPage() {
         this.firstResponseReceived = false;
         this.adminPort = -1;
         this.isDbPaused = false;
+        this.toggleStates = {};
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1621,9 +1852,9 @@ function loadAdminPage() {
         };
 
 
-        this.displayPortAndRefreshClusterState = function (portAndClusterValues) {
+        this.displayPortAndRefreshClusterState = function (portAndClusterValues, serverSettings) {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
-                configurePortAndOverviewValues(portAndClusterValues);
+                configurePortAndOverviewValues(portAndClusterValues, serverSettings);
                 refreshClusterValues(portAndClusterValues);
                 configurePromoteAction(portAndClusterValues);
             }
@@ -1631,6 +1862,13 @@ function loadAdminPage() {
 
         this.refreshServerList = function (serverList, serverCount) {
             adminDOMObjects.adminServerList.html(serverList);
+        };
+
+        this.escapeHtml = function (value) {
+            if (!value)
+                return "";
+            
+            return $('<div/>').text(value).html();
         };
 
         var configureAdminValues = function (adminConfigValues) {
@@ -1659,9 +1897,6 @@ function loadAdminPage() {
             adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions != null ? adminConfigValues.commandLogFrequencyTransactions : "");
             adminDOMObjects.commandLogSegmentSize.text(adminConfigValues.logSegmentSize != null ? adminConfigValues.logSegmentSize : "");
             adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize != null ? "MB" : "");
-            adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
-            adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
-            adminDOMObjects.target.text(adminConfigValues.targets);
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != null ? adminConfigValues.heartBeatTimeout : "");
 
 
@@ -1689,41 +1924,78 @@ function loadAdminPage() {
             adminEditObjects.spanAutoSnapshotFreq.text(snapshotFrequency);
             var spanshotUnit = adminConfigValues.frequency != undefined ? adminConfigValues.frequency.slice(-1) : '';
             setSnapShotUnit(spanshotUnit);
-            getExportProperties(adminConfigValues.properties);
             adminClusterObjects.userListObj = adminConfigValues.users;
             getUserList(adminConfigValues.users);
             //getEditUserList(adminConfigValues.users);
+            getExportProperties(adminConfigValues.configuration);
         };
 
         var getExportProperties = function (data) {
+            
             var result = "";
             if (data != undefined) {
+                
                 for (var i = 0; i < data.length; i++) {
-                    if (i == 0) {
-                        result += '<tr>' +
-                            '<td width="67%">' + data[i].name + '</td>' +
-                            '<td width="33%">' + data[i].value + '</td>' +
+                    var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
+                    var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
+                    var enabled = data[i].enabled;
+                    var streamProperty = data[i].property;
+                    var rowId = 'row-4' + i;
+                    var style = '';
+                    var additionalCss = (VoltDbAdminConfig.toggleStates[rowId] === true) ? 'labelExpanded' : '';
+                    
+                    if (!VoltDbAdminConfig.toggleStates.hasOwnProperty(rowId) || VoltDbAdminConfig.toggleStates[rowId] === false) {
+                        VoltDbAdminConfig.toggleStates[rowId] = false;
+                        style = 'style = "display:none;"';
+                    }
+
+                    result +='<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
+                            '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + type + '</a>' +
+                            '   </td>' +
+                            '   <td align="right">' +
+                            '       <div class="' + getOnOffClass(enabled) + '"></div>' +
+                            '   </td>' +
+                            '   <td>' + getOnOffText(enabled) + '</td>' +
+                            '   <td>' +
+                            '       <div class="exportDelete" style="display:none;"></div>' +
+                            '   </td>' +
                             '</tr>';
-                    } else if (i == (data.length - 1)) {
-                        result += '<tr class="propertyLast">' +
-                            '<td>' + data[i].name + '</td>' +
-                            '<td>' + data[i].value + '</td>' +
-                            '</tr>';
+
+                    if (streamProperty && streamProperty.length > 0) {
+
+                        for (var j = 0; j < streamProperty.length; j++) {
+                            var name = streamProperty[j].name;
+                            var value = streamProperty[j].value;
+
+                            result += '' +
+                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                                '   <td class="configLabe2">' + name + '</td>' +
+                                '   <td align="right">' + value + '</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '</tr>';
+                        }
+
+
                     } else {
-                        result += '<tr>' +
-                            '<td>' + data[i].name + '</td>' +
-                            '<td>' + data[i].value + '</td>' +
+                        result += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
+                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
+                            '   <td width="33%">&nbsp</td>' +
                             '</tr>';
                     }
                 }
             }
+
             if (result == "") {
-                result += '<tr class="propertyLast">' +
-                        '<td width="67%">No properties available.</td>' +
+                result += '<tr class="propertyLast subLabelRow">' +
+                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }
-            $('#exportProperties').html(result);
+
+            $('#exportConfiguration').html(result);
 
         };
 
@@ -1862,18 +2134,41 @@ function loadAdminPage() {
             adminEditObjects.tBoxQueryTimeoutValue = adminConfigValues.queryTimeout;
         };
 
-        var configurePortAndOverviewValues = function (configValues) {
+        var configurePortAndOverviewValues = function (configValues, serverSettings) {
             VoltDbAdminConfig.adminPort = configValues.adminPort;
-            adminDOMObjects.adminPort.text(configValues.adminPort);
-            adminDOMObjects.httpPort.text(configValues.httpPort);
-            adminDOMObjects.internalPort.text(configValues.internalPort);
-            adminDOMObjects.zookeeperPort.text(configValues.zookeeperPort);
-            adminDOMObjects.replicationPort.text(configValues.replicationPort);
-            adminDOMObjects.clientPort.text(configValues.clientPort);
+            adminDOMObjects.clusterAdminPort.text(configValues.adminPort);
+            adminDOMObjects.clusterHttpPort.text(configValues.httpPort);
+            adminDOMObjects.clusterInternalPort.text(configValues.internalPort);
+            adminDOMObjects.clusterZookeeperPort.text(configValues.zookeeperPort);
+            adminDOMObjects.clusterReplicationPort.text(configValues.replicationPort);
+            adminDOMObjects.clusterClientPort.text(configValues.clientPort);
             adminDOMObjects.maxJavaHeap.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? parseFloat(configValues.maxJavaHeap / 1024) : "");
             adminDOMObjects.maxJavaHeapLabel.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? "MB" : "");
-        };
 
+
+            //if clusterwide settings are present
+            if (serverSettings) {
+                adminDOMObjects.adminPort.text(configValues.adminInterface);
+                adminDOMObjects.httpPort.text(configValues.httpInterface);
+                adminDOMObjects.clientPort.text(configValues.clientInterface);
+                adminDOMObjects.internalPort.text(configValues.internalInterface);
+                adminDOMObjects.zookeeperPort.text(configValues.zookeeperInterface);
+                adminDOMObjects.replicationPort.text(configValues.replicationInterface);
+                adminDOMObjects.serverSettingHeader.text("Server Settings");
+                
+            } else {
+                adminDOMObjects.adminPort.text('');
+                adminDOMObjects.httpPort.text('');
+                adminDOMObjects.clientPort.text('');
+                adminDOMObjects.internalPort.text('');
+                adminDOMObjects.zookeeperPort.text('');
+                adminDOMObjects.replicationPort.text('');
+                adminDOMObjects.serverSettingHeader.text('');
+                
+            }
+            
+        };
+       
         var refreshClusterValues = function (clusterValues) {
             if (clusterValues != undefined && clusterValues.hasOwnProperty('clusterState')) {
                 if (clusterValues.clusterState.toLowerCase() == "running") {
@@ -1931,9 +2226,8 @@ var getOnOffClass = function (isOn) {
 };
 
 //    add/remove table row in security 
-function deleteRow(row)
-{
-    var i=row.parentNode.parentNode.rowIndex;
+function deleteRow(row) {
+    var i = row.parentNode.parentNode.rowIndex;
     document.getElementById('secTbl').deleteRow(i);
 }
 function insRow() {
@@ -1941,7 +2235,7 @@ function insRow() {
     var new_row = x.rows[1].cloneNode(true);
     var len = x.rows.length;
     //new_row.cells[0].innerHTML = len;//sn number increment
-    
+
     var inp1 = new_row.cells[1].getElementsByTagName('input')[0];
     inp1.id = 'input' + (len - 1);
     inp1.name = 'input' + (len - 1);
@@ -1972,6 +2266,19 @@ function insRow() {
 	var sel = new_row.cells[2].getElementsByTagName('select')[0];
     sel.id += len;
     sel.value = '';
-	
     x.appendChild(new_row);
 }
+
+var toggleProperties = function (ele) {
+    var parent = $(ele).parent();
+    parent.siblings('.childprop-' + parent.attr("id")).toggle();
+    parent.find(".labelCollapsed").toggleClass("labelExpanded");
+
+    VoltDbAdminConfig.toggleStates[parent.attr("id")] = parent.find('td:first-child > a').hasClass('labelExpanded');
+};
+
+var deleteRow = function (cell) {
+    var row = $(cell).parent().parent();
+    if (row.length > 0)
+        row.remove();
+};

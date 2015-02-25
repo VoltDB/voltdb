@@ -69,11 +69,14 @@ public class DdlThread extends BenchmarkThread {
             }
             catch (ProcCallException e) {
                 ClientResponse cr = e.getClientResponse();
-                if (cr.getStatusString().matches("Unexpected exception applying DDL statements to original catalog: DDL Error: \"object name already exists:.*")) {
-                    if (errcnt > 1) {
-                        hardStop("too many ddl errors", e);
-                    } else
-                        errcnt++;
+                String ss = cr.getStatusString();
+                // nb if rejoining and table exists create table will get table exists but drop table will get rejoin in progress
+                if (ss.matches("(?s).*Can't do a catalog update while an elastic join or rejoin is active.*"))
+                    errcnt = 0;
+                if (errcnt > 1) {
+                    hardStop("too many ddl errors", e);
+                } else {
+                    errcnt++;
                 }
             }
             catch (Exception e) {

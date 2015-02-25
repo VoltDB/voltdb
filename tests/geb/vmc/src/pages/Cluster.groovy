@@ -1,0 +1,56 @@
+package vmcTest.pages
+
+import geb.Module
+import java.util.List;
+import java.util.Map;
+
+import geb.*
+import geb.navigator.Navigator
+import geb.waiting.WaitTimeoutException
+
+import org.openqa.selenium.JavascriptExecutor
+
+/**
+ * Created by anrai on 2/16/15.
+ */
+
+class Cluster extends Module {
+    static content = {
+        clusterTitle                { $("#admin > div.adminWrapper > div.adminLeft > h1") }
+        promotebutton				{ $("#promoteConfirmation") }
+        promoteconfirmation			{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
+        promotecancel				{ $("#promoteConfirmCancel") }
+        promoteok					{ $("#promoteConfirmOk") }
+        title						{ $("#admin > div.adminWrapper > div.adminLeft > h1") }
+        pausebutton					{ $("#pauseConfirmation") }
+        resumebutton				{ $("#resumeConfirmation") }
+        resumeok					{ $("#btnResumeConfirmationOk") }
+        pauseok						{ $("#btnPauseConfirmationOk") }
+        pausecancel					{ $("#btnPauseConfirmationCancel") }
+        resumecancel				{ $("#btnResumeConfirmationCancel") }
+        resumeconfirmation			{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
+        pauseconfirmation			{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
+        savebutton					{ $("#saveConfirmation") }
+        saveconfirmation			{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
+        saveclose					{ $("body > div.popup_cont > div.popup_close") }
+        savecancel					{ $("#btnSaveSnapshotCancel") }
+        saveok						{ $("#btnSaveSnapshots") }
+		// $("#txtSnapshotDirectory")
+        savedirectory 				{ $("input", type:"text", name:"txtSnapshotDirectory", id:"txtSnapshotDirectory") }
+        wanttosavecloseconfirm		{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
+        wantotsaveclosebutton		{ $("body > div.popup_cont > div.popup_close") }
+        restorebutton				{ $("#restoreConfirmation") }
+        restoreconfirmation			{ $("#restoredPopup > div.overlay-title.icon-alert") }
+        restorecancelbutton			{ $("#btnRestoreCancel") }
+        restoreclosebutton			{ $("body > div.popup_cont > div.popup_close") }
+        shutdownbutton				{ $("#shutDownConfirmation") }
+        shutdownconfirmation		{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
+        shutdowncancelbutton		{ $("#btnShutdownConfirmationCancel") }
+        shutdownclosebutton			{ $("body > div.popup_cont > div.popup_close") }
+        saveno                      {$("body > div.popup_cont > div.popup > div > div.saveConfirmation > div.overlay-btns > a.btn.btn-gray.confirmNoSave")}
+        saveyes                     {$("body > div.popup_cont > div.popup > div > div.saveConfirmation > div.overlay-btns > a.btn.closeBtn")}
+      //  downloadconfigurationbutton	{ $("#downloadAdminConfigurations") }
+
+    }
+
+}

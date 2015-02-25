@@ -11,9 +11,9 @@
     <link href="css/resources/aero.css" rel="stylesheet" />
     <link href="css/resources/nv.d3.css" rel="stylesheet" />
     <link href="css/resources/tablesorter.css" rel="stylesheet" />
-    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled" rel="stylesheet">
+    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
+    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
+    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
@@ -345,19 +345,19 @@
                         <div class="overviewTbl">
                             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
                                 <tr>
-                                    <td width="62%" class="configLabel">Site per host</td>
+                                    <td width="62%" class="configLabel">Sites Per Host</td>
                                     <td id="sitePerHost" width="20%" align="right"></td>
                                     <td width="2%">&nbsp;</td>
                                     <td width="16%">&nbsp;</td>
                                 </tr>
                                 <tr>
-                                    <td class="configLabel">K-safety </td>
+                                    <td class="configLabel">K-Safety </td>
                                     <td id="kSafety" align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr>
-                                    <td class="configLabel">Partition detection </td>
+                                    <td class="configLabel">Partition Detection </td>
                                     <td align="right">
                                         <div id="partitionDetectionIcon" class="onIcon"></div>
                                     </td>
@@ -492,7 +492,7 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
-                                    <td class="configLabel">Log Frequency, time </td>
+                                    <td class="configLabel">Log Frequency Time </td>
                                     <td align="right">
                                         <span id="commandLogFrequencyTime"></span>
                                         <span id="commandLogFrequencyUnit"></span>
@@ -502,13 +502,13 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
-                                    <td class="configLabel">Log Frequency, transactions </td>
+                                    <td class="configLabel">Log Frequency Transactions </td>
                                     <td id="commandLogFrequencyTxns" align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
-                                    <td class="configLabel">Log Segment Size</td>
+                                    <td class="configLabel">Log Size</td>
                                     <td align="right">
                                         <span id="commandLogSegmentSize"></span>
                                         <span id="commandLogSegmentSizeUnit"></span>
@@ -519,34 +519,12 @@
                                 </tr>
                                 <tr class="hasSubLabel parent" id="row-4">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
-                                    <td align="right">
-                                        <div id="exports" class="offIcon"></div>
-                                    </td>
-                                    <td id="txtExportLabel"></td>
+                                    <td align="right"></td>
                                     <td>&nbsp;</td>
+                                    <td><a href="#addConfigPopup" id="addConfigPopupLink" class="plusAdd" title="Add Configuration">&nbsp;</a></td>
                                 </tr>
-                                <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabel">Target</td>
-                                    <td align="right">
-                                        <span id="target"></span>
-                                    </td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                </tr>
-                                <tr class="child-row-4 subLabelRow">
-                                    <td style="font-weight: bold" class="configLabel">Properties:</td>
-                                    <td id="properties"></td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
-                                </tr>
-                                <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabe1" colspan="4">
-                                        <table width="100%" class="propertiesTbl" id="exportProperties">
-                                        </table>
-                                    </td>
-                                </tr>
+                                <tbody id="exportConfiguration" style="display: none;">
+                                </tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
                                     <td>&nbsp;</td>
@@ -564,7 +542,7 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="heartbeatTimeoutRow">
-                                    <td class="configLabel">Heartbeat time out </td>
+                                    <td class="configLabel">Heartbeat Timeout </td>
                                     <td align="right" class="heartbeattd">
                                         <form id="formHeartbeatTimeout" method="get" action="">
                                             <div id="loadingHeartbeatTimeout" class="loading-small" style="display: none;"></div>
@@ -578,7 +556,7 @@
                                     <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="queryTimoutRow">
-                                    <td class="configLabel">Query time out</td>
+                                    <td class="configLabel">Query Timeout</td>
                                     <td align="right" class="queryTimeOut">
                                         <form id="formQueryTimeout" method="get" action="">
                                             <div id="loadingQueryTimeout" class="loading-small" style="display: none;"></div>
@@ -592,7 +570,7 @@
                                     <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow">
-                                    <td class="configLabel">Max temp table memory</td>
+                                    <td class="configLabel">Max Temp Table Memory</td>
                                     <td align="right">
                                         <span id="temptablesmaxsize"></span>
                                         <span id="temptablesmaxsizeUnit"></span>
@@ -601,7 +579,7 @@
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow">
-                                    <td class="configLabel">Snapshot priority</td>
+                                    <td class="configLabel">Snapshot Priority</td>
                                     <td id="snapshotpriority" align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
@@ -617,39 +595,39 @@
                             <div style="overflow: auto">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
                                     <tr>
-                                        <th width="50%">Port Name</th>
-                                        <th width="25%">Cluster Setting</th>
-                                        <th width="25%">Server Setting</th>
+                                        <th width="30%">Port Name</th>
+                                        <th width="45%" id="hServerSettings">Server Settings</th>
+                                        <th width="25%">Cluster Settings</th>
                                     </tr>
                                     <tr>
                                         <td>Client Port</td>
                                         <td id="clientport"></td>
-                                        <td></td>
+                                        <td id="clusterClientport"></td>
                                     </tr>
                                     <tr>
                                         <td>Admin Port</td>
                                         <td id="adminport"></td>
-                                        <td></td>
+                                        <td id="clusterAdminport"></td>
                                     </tr>
                                     <tr>
                                         <td>HTTP Port</td>
                                         <td id="httpport"></td>
-                                        <td></td>
+                                        <td id="clusterHttpport"></td>
                                     </tr>
                                     <tr>
                                         <td>Internal Port</td>
                                         <td id="internalPort"></td>
-                                        <td></td>
+                                        <td id="clusterInternalPort"></td>
                                     </tr>
                                     <tr>
                                         <td>Zookeeper Port</td>
                                         <td id="zookeeperPort"></td>
-                                        <td></td>
+                                        <td id="clusterZookeeperPort"></td>
                                     </tr>
                                     <tr>
                                         <td>Replication Port</td>
                                         <td id="replicationPort"></td>
-                                        <td></td>
+                                        <td id="clusterReplicationPort"></td>
                                     </tr>
                                 </table>
                             </div>
@@ -673,11 +651,11 @@
                                         <td id="exportOverflow"></td>
                                     </tr>
                                     <tr>
-                                        <td>Command Logs</td>
+                                        <td>Command Log</td>
                                         <td id="commandlogpath"></td>
                                     </tr>
                                     <tr>
-                                        <td>Command log Snapshots</td>
+                                        <td>Command Log Snapshots</td>
                                         <td id="commandlogsnapshotpath"></td>
                                     </tr>
                                 </table>
@@ -1186,7 +1164,7 @@
     <!-- POPUP restorePop -->
     <!-- POPUP restorePop -->
     <div id="HrtTimeOutPopup" style="display: none">
-        <div class="overlay-title icon-alert">Heartbeat time out</div>
+        <div class="overlay-title icon-alert">Heartbeat Timeout</div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to save the value?</p>
@@ -1195,16 +1173,16 @@
     </div>
     <!-- POPUP restorePop -->
 
-    <!-- POPUP Query time out Popup -->
+    <!-- POPUP Query timeout Popup -->
     <div id="QueryTimeOutPopup" style="display: none">
-        <div class="overlay-title icon-alert">Query time out</div>
+        <div class="overlay-title icon-alert">Query Timeout</div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
         <div class="overlay-btns"><a class="btn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
     </div>
-    <!-- POPUP Query time out Popup -->
+    <!-- POPUP Query timeout Popup -->
     <!-- POPUP saveConfirmationPopup -->
     <div id="Div2" style="display: none">
         <div class="overlay-title icon-alert">Save Confirmation</div>
@@ -1301,7 +1279,7 @@
     </div>
     <!--Update error Popup-->
 
-    <!--Update Query Time out error Popup-->
+    <!--Update Query Timeout error Popup-->
     <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
     <div id="queryTimeoutUpdateErrorPopup" style="display: none">
         <div id="queryTimeoutUpdateInnerErrorPopup">
@@ -1331,6 +1309,37 @@
     </div>
 
     <!-- POPUP StopServerErrorPopup-->
+    
+    <!--Add Configuration Popup-->
+    <div id="addConfigPopup" style="display: none">
+        <div id="addConfigInnerPopup">
+            
+            <div class="overlay-title icon-alert">
+                <div class="addConfigHeader">Add Configuration</div>
+                <div id="deleteAddConfig" class="deleteAddConfig"><a href="#">Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
+
+            <div id="addConfigControls">
+                <div class="clear"></div>
+                <form id="formAddConfiguration" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddConfigSave" class="btn">Save</a> <a id="btnAddConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+
+            <div id="saveConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to save?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+
+        </div>
+    </div>
+    <!--Add Configuration Popup-->
 
     <!-- Query error because of Paused Database Popup-->
     <div style="display: none"><a href="#queryDatabasePausedErrorPopup" id="queryDatabasePausedErrorPopupLink">Query Error</a></div>

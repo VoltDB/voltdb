@@ -48,6 +48,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         graphsArea      { $('#graphChart') }
         showHideData    { $('#ShowHideBlock') }
         dataArea        { $('.menu_body') }
+        header              { module Header }
+        footer              { module Footer }
     }
     static at = {
         dbMonitorTab.displayed

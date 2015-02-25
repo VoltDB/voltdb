@@ -512,6 +512,9 @@ class ServerBundle(JavaBundle):
             runner.setup_daemon_kwargs(kwargs, name=self.daemon_name,
                                                description=daemon_description,
                                                output=self.daemon_output)
+        else:
+            # Replace the Python process.
+            kwargs['exec'] = True
         self.run_java(verb, runner, *final_args, **kwargs)
 
     def stop(self, verb, runner):
