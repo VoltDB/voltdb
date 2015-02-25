@@ -486,7 +486,7 @@ public class VoltCompiler {
 
     private static void addBuildInfo(final InMemoryJarfile jarOutput) {
         StringBuilder buildinfo = new StringBuilder();
-        String info[] = RealVoltDB.extractBuildInfo();
+        String info[] = RealVoltDB.extractBuildInfo(compilerLog);
         buildinfo.append(info[0]).append('\n');
         buildinfo.append(info[1]).append('\n');
         buildinfo.append(System.getProperty("user.name")).append('\n');
