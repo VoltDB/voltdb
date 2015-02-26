@@ -101,6 +101,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.HTTPAdminListener.RoleType;
 
 public class TestJSONInterface extends TestCase {
 
@@ -196,12 +197,21 @@ public class TestJSONInterface extends TestCase {
         return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
     }
 
+    private static String putUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+        return httpUrlOverJSON("PUT", url, user, password, scheme, expectedCode, expectedCt, params);
+    }
+
+    private static String deleteUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+        return httpUrlOverJSON("DELETE", url, user, password, scheme, expectedCode, expectedCt, null);
+    }
+
     private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setRequestMethod(method);
         conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         if (user != null && password != null) {
             if (scheme.equalsIgnoreCase("hashed")) {
                 MessageDigest md = MessageDigest.getInstance("SHA-1");
@@ -1569,6 +1579,254 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
+    public void testRoles() throws Exception {
+        try {
+            String simpleSchema
+            = "CREATE TABLE foo (\n"
+            + "    bar BIGINT NOT NULL,\n"
+            + "    PRIMARY KEY (bar)\n"
+            + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            builder.setUseDDLSchema(true);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get roles
+            String json = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
+            assertEquals(json.split("]},").length, 2);
+
+            //Put roles
+            ObjectMapper mapper = new ObjectMapper();
+            String[] putPerms = {"DEFAULTPROCREAD"};
+            String map = mapper.writeValueAsString(new RoleType("apps", false, putPerms));
+            Map<String,String> params = new HashMap<>();
+            params.put("role", map);
+            putUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 201,  "application/json", params);
+            map = mapper.writeValueAsString(new RoleType("user", false, putPerms));
+            params = new HashMap<>();
+            params.put("role", map);
+            putUrlOverJSON("http://localhost:8095/roles/user/", null, null, null, 403,  "application/json", params);
+
+            //Get roles
+            json = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
+            assertEquals(json.split("]},").length, 3);
+            RoleType[] roles = mapper.readValue(json, RoleType[].class);
+            int i;
+            for (i=0;i<roles.length;i++) {
+                if (roles[i].getName().equals("apps")) {
+                    break;
+                }
+            }
+            assertEquals(roles[i].getPermissions()[0].toLowerCase(), "defaultprocread");
+
+            //Post roles
+            String[] postPerms = {"ALLPROC"};
+            map = mapper.writeValueAsString(new RoleType("apps", false, postPerms));
+            params = new HashMap<>();
+            params.put("role", map);
+            postUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 200,  "application/json", params);
+            map = mapper.writeValueAsString(new RoleType("user", false, putPerms));
+            params = new HashMap<>();
+            params.put("role", map);
+            postUrlOverJSON("http://localhost:8095/roles/user/", null, null, null, 403,  "application/json", params);
+
+            //Get roles
+            json = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
+            assertEquals(json.split("]},").length, 3);
+            roles = mapper.readValue(json, RoleType[].class);
+            for (i=0;i<roles.length;i++) {
+                if (roles[i].getName().equals("apps")) {
+                    break;
+                }
+            }
+            assertEquals(roles[i].getPermissions()[0].toLowerCase(), "allproc");
+
+            //Delete roles
+            deleteUrlOverJSON("http://localhost:8095/roles/apps/", null, null, null, 204,  "application/json");
+            deleteUrlOverJSON("http://localhost:8095/roles/user/", null, null, null, 403,  "application/json");
+
+            //Get roles
+            json = getUrlOverJSON("http://localhost:8095/roles/", null, null, null, 200,  "application/json");
+            assertEquals(json.split("]},").length, 2);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testRolesSecurity() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            UserInfo users[] = new UserInfo[] {
+                    new UserInfo("user1", "admin", new String[] {"user"}),
+                    new UserInfo("user2", "admin", new String[] {"administrator"}),
+            };
+            builder.addUsers(users);
+
+            // suite defines its own ADMINISTRATOR user
+            builder.setSecurityEnabled(true, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment bad user
+            String json = getUrlOverJSON("http://localhost:8095/roles/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            assertTrue(json.contains("Permission denied"));
+            //good user
+            json = getUrlOverJSON("http://localhost:8095/roles/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            assertEquals(json.split("]},").length, 2);
+            //get with jsonp
+            json = getUrlOverJSON("http://localhost:8095/roles/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
+            assertEquals(json.split("]},").length, 2);
+            assertTrue(json.contains("jackson5"));
+            assertTrue(json.matches("^jackson5(.*)"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testRolesSecurityAuthorizationHashed() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            UserInfo users[] = new UserInfo[] {
+                    new UserInfo("user1", "admin", new String[] {"user"}),
+                    new UserInfo("user2", "admin", new String[] {"administrator"}),
+            };
+            builder.addUsers(users);
+
+            // suite defines its own ADMINISTRATOR user
+            builder.setSecurityEnabled(true, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment bad user
+            String json = getUrlOverJSON("http://localhost:8095/roles/", "user1", "admin", "hashed", 200, "application/json");
+            assertTrue(json.contains("Permission denied"));
+            //good user
+            json = getUrlOverJSON("http://localhost:8095/roles/", "user2", "admin", "hashed", 200, "application/json");
+            assertEquals(json.split("]},").length, 2);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testRolesSecurityAuthorizationBasic() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            UserInfo users[] = new UserInfo[] {
+                    new UserInfo("user1", "admin", new String[] {"user"}),
+                    new UserInfo("user2", "admin", new String[] {"administrator"}),
+            };
+            builder.addUsers(users);
+
+            // suite defines its own ADMINISTRATOR user
+            builder.setSecurityEnabled(true, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment bad user
+            String json = getUrlOverJSON("http://localhost:8095/roles/", "user1", "admin", "basic", 200, "application/json");
+            assertTrue(json.contains("Permission denied"));
+            //good user
+            json = getUrlOverJSON("http://localhost:8095/roles/", "user2", "admin", "basic", 200, "application/json");
+            assertEquals(json.split("]},").length, 2);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
 
     public void testProfile() throws Exception {
         try {
