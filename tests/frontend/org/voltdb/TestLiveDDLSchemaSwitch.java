@@ -83,6 +83,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                 );
         builder.addPartitionInfo("FOO", "ID");
         builder.setUseDDLSchema(useLiveDDL);
+        builder.setDRMasterHost("localhost"); // fake DR connection so that replica can start
         boolean success = builder.compile(m_pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToDeployment);
