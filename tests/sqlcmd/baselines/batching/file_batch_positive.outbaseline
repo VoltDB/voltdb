@@ -1,7 +1,7 @@
 drop table t if exists;
 drop table s if exists;
 
-file -batch ./scripts/batching/successful_batch.sqlfile
+file -batch ./scripts/batching/file_batch_positive.sqlfile
 
 insert into t values (0, 'cats');
 insert into t values (1, 'dogs');
