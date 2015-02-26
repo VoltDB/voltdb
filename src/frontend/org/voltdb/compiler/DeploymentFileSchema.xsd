@@ -265,9 +265,9 @@
 
   <!-- <snapshot> -->
   <xs:complexType name="snapshotType">
-    <xs:attribute name="frequency" type="xs:string" use="optional" default="10m" />
-    <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="1" />
-    <xs:attribute name="prefix" type="xs:string" use="optional" default="SNAPSHOTNONCE" />
+    <xs:attribute name="frequency" type="xs:string" use="optional" default="24h" />
+    <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="2" />
+    <xs:attribute name="prefix" type="xs:string" use="optional" default="AUTOSNAP" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
