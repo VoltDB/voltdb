@@ -905,8 +905,8 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 /*a.serverHighlight {color:#76bd1d;}*/
 .stopDisable { color: #aaaaaa!important;}
 .tblshutdown tr {border:1px solid #CCCCCC;}
-.tblshutdown tr:hover, .tblshutdown tr.activeHost { background: #F0F3F4}
-.tblshutdown tr.activeHost td a { color:#76bd1d;}
+.tblshutdown tr:hover, .tblshutdown tr.activeHostMonitoring { background: #F0F3F4}
+.tblshutdown tr.activeHostMonitoring td a { color:#76bd1d;}
 
 
 .tblshutdown tr td  { border:none;}

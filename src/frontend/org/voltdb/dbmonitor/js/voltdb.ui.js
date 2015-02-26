@@ -469,6 +469,31 @@ var loadPage = function (serverName, portid) {
                 openPopup($(this));
             });
 
+            $('.tblshutdown  >tbody > tr.activeHost > td > a').click(function () {
+                var clickedServer = $(this).html();
+                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').find("a").attr('data-hostid'));
+                var currentUrl = window.location.href.split('?')[0];
+                var urlArray = currentUrl.split('/');
+                var newUrl = '';
+                if (urlArray != null && urlArray.length > 0) {
+                    var urlArray2 = urlArray[2].split(':');
+                    urlArray2[0] = serverIp;
+                    urlArray[2] = urlArray2.join(':');
+                    newUrl = urlArray.join('/');
+                }
+
+                var data = {
+                    CurrentServer: clickedServer,
+                    GraphView: $.cookie("graph-view"),
+                    DisplayPreferences: $.cookie("user-preferences"),
+                    AlertThreshold: $.cookie("alert-threshold"),
+                    username: $.cookie("username"),
+                    password: $.cookie("password")
+                };
+                
+                var win = window.open(newUrl + '?data=' + encodeURIComponent(JSON.stringify(data)), '_parent');
+                win.focus();
+            });
         };
 
         var openPopup = function (srcElement) {
