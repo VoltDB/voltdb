@@ -11,9 +11,9 @@
     <link href="css/resources/aero.css" rel="stylesheet" />
     <link href="css/resources/nv.d3.css" rel="stylesheet" />
     <link href="css/resources/tablesorter.css" rel="stylesheet" />
-    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled" rel="stylesheet">
+    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
+    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
+    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
@@ -383,7 +383,7 @@
                                 <tr class="child-row-6 subLabelRow">
                                     <td colspan="4">
                                         <div class="securWrapper" id="UsersList">
-                                            <table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                            <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
                                                 <tr>
                                                     <th>Username</th>
                                                     <th>Password</th>
@@ -394,36 +394,17 @@
                                                     <td>Test</td>
                                                     <td>User</td>
                                                 </tr>
-                                            </table>
+                                            </table>-->
                                         </div>
                                         <div class="securWrapper" id="UsersListEditable" style="display: none;">
                                             <div class="userName">Users</div>
                                             <div class="editBtn"><a href="javascript:void(0)" class="btnEd" id="addmorePOIbutton" onclick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
                                             <div class="clear secLine"></div>
-
-                                            <table id="secTbl" width="100%" cellpadding="0" cellspacing="0" class="secTbl">
-                                                <tr>
-                                                    <th>Username</th>
-                                                    <th>Password</th>
-                                                    <th>Role</th>
-                                                    <th>Delete</th>
-                                                </tr>
-                                                <tr>
-                                                    <td id="latbox">
-                                                        <input size="15" type="text" value="Test"></td>
-                                                    <td id="latbox">
-                                                        <input size="15" type="text" value="Test"></td>
-                                                    <td id="lngbox">
-                                                        <select>
-                                                            <option></option>
-                                                            <option selected="selected">User</option>
-                                                            <option>Admin</option>
-                                                        </select></td>
-                                                    <td>
-                                                        <div class="securityDelete" id="delPOIbutton" onclick="deleteRow(this)"></div>
-                                                    </td>
-                                                </tr>
-                                            </table>
+                                            <form id="frmUserList" method="get" action="">
+                                                <div id="editUserList">
+                                                    
+                                                </div>
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>
@@ -539,8 +520,8 @@
                                 <tr class="hasSubLabel parent" id="row-4">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
                                     <td align="right"></td>
-                                    <td></td>
                                     <td>&nbsp;</td>
+                                    <td><a href="#addConfigPopup" id="addConfigPopupLink" class="plusAdd" title="Add Configuration">&nbsp;</a></td>
                                 </tr>
                                 <tbody id="exportConfiguration" style="display: none;">
                                 </tbody>
@@ -1328,6 +1309,37 @@
     </div>
 
     <!-- POPUP StopServerErrorPopup-->
+    
+    <!--Add Configuration Popup-->
+    <div id="addConfigPopup" style="display: none">
+        <div id="addConfigInnerPopup">
+            
+            <div class="overlay-title icon-alert">
+                <div class="addConfigHeader">Add Configuration</div>
+                <div id="deleteAddConfig" class="deleteAddConfig"><a href="#">Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
+
+            <div id="addConfigControls">
+                <div class="clear"></div>
+                <form id="formAddConfiguration" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddConfigSave" class="btn">Save</a> <a id="btnAddConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+
+            <div id="saveConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to save?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+
+        </div>
+    </div>
+    <!--Add Configuration Popup-->
 
     <!-- Query error because of Paused Database Popup-->
     <div style="display: none"><a href="#queryDatabasePausedErrorPopup" id="queryDatabasePausedErrorPopupLink">Query Error</a></div>

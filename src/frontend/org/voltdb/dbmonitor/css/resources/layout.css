@@ -40,7 +40,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring, 
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu 
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 ul.servers-list li.pauseActiveMonitoring{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;background-color: #f0f3f4}
 
@@ -789,7 +789,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .arrow, 
 .labelCollapsed, 
 .labelExpanded,
-a.restoreConfirmationDisable, .securityDelete, .exportDelete { background-image:url(images/admin-icons.png);}
+a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd { background-image:url(images/admin-icons.png);}
 label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
@@ -910,7 +910,7 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 
 
 .tblshutdown tr td  { border:none;}
-.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.shutdown { display:inline-block;background-position:-786px -105px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.disableServer { display:inline-block;background-position:-978px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
@@ -983,12 +983,15 @@ font: 14px Arial, Helvetica, sans-serif;
 .secLine { border-bottom:1px solid #CCCCCC;}
 .editBtn { float:right; padding:0 35px 0 0}
 .editBtn ul li { float:left;margin: 0 0 0 5px;}
-a.restoreBtn{cursor: default;}
+a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-align: center; color: #fff; font: 14px Arial, Helvetica, sans-serif; text-shadow: none; text-decoration: none; border-radius: 0; border: none; }
+
 /****Export details*******/
+.btnEd { cursor: pointer; background: #D0D2D2; padding: 5px; font-weight: bold; font-size: 12px;}
 .properTbl tr td:first-child
 .btnEd { cursor: pointer; background: #D0D2D2; padding: 5px; font-weight: bold; font-size: 12px;}
 .securityDelete {background-position:-1042px -12px; width:25px; height:20px; position:relative; top:5px; cursor:pointer;}
 .userPlus {font-size:15px;position:relative;top:2px}
+.errorSecurity { height: auto!important;line-height: 12px!important;padding-top: 0px!important;}
 .adminTbl1 tr.subLabelRow td.configExport {padding-left: 40px;font-weight: bold;}
 .exportDelete {background-position:-422px -10px; width:25px; height:20px; cursor:pointer; position:relative; top:4px; left:5px;}
 .exportTbl { margin:0; padding:0;}
@@ -1000,6 +1003,30 @@ a.restoreBtn{cursor: default;}
 .properbtn {padding: 0 35px 0 0;}
 .adminTbl1 tr.subLabelRow td.expoStream { padding-left: 40px;font-weight: bold;cursor: pointer;}
 .expoProper {padding-left: 70px!important; font-weight: bold;}
+.streamTbl {position: relative;top: 3px;}
+.streamTbl tr th,.streamTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; /*padding:5px 0 10px 10px;*/ padding:5px 0 0 40px;}
+.streamTbl tr th:first-child,.streamTbl tr td:first-child { padding-left: 80px;}
+.streamTbl tr th { font-weight:bold; background:#FBFBFB;}
+.configalign { float:left}
+.configBtn { float:right}
+.proLeft { float: left;font-weight: bold;}
+.addProBtn { float: right;padding: 0;}
+.configWrapper { width: 500px;padding: 20px; overflow:auto;}
+.configurTbl {  }
+.configurTbl tr td { border: none;padding: 5px 0;}
+.configurTbl tr td input[type="text"]{}
+.propertiesAlign { margin: 10px 0 0 0;border-top: 1px solid #CCCCCC; padding:20px 0 10px 0}
+.addConfigProperWrapper { overflow: auto; max-height:180px;}
+.addConfigProperTbl { border: 1px solid #CCCCCC; }
+.addConfigProperTbl tr th { font-weight: bold; background: #FBFBFB}
+.addConfigProperTbl tr th, .addConfigProperTbl tr td { border-bottom: 1px solid #CCCCCC;padding: 8px 5px 10px 5px;text-align: left;}
+.addConfigProperTbl tr td { padding-left:10px}
+.addConfigProperTbl tr td label.error { line-height:12px;height: auto;}
+.addConfigHeader { float: left;}
+.deleteAddConfig { float: right;padding: 8px 20px 0 0;font-size: 12px;font-weight: bold;position: relative;top: 6px;}
+.deleteAddConfig a { color: #c70000;}
+#chkStreamValue { padding-left: 2px;}
+.plusAdd {background-position:-418px -61px; width: 31px; height: 17px; display: inline-block; position: relative;top: 8px;}
 /****Export details Ends*******/
 
 /*********************************************media Qu********************/
@@ -1226,14 +1253,15 @@ top: 3px;}
         width: 90%;
     }
 	
+	
 }
-
 	 
  @media (min-width: 480px) and (max-width: 700px) {
 		 .adminRight{ padding-top:15px;}
 		 #serverConfigAdmin{ top:99px;}
          .resizeCon {width:330px}
         .resizeRestore{width:80%}
+		.configWrapper { width:380px;}
 		 
  }
 

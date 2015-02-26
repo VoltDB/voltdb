@@ -279,6 +279,14 @@ function logout() {
     location.reload(true);
 };
 
+function changePassword(obj) {
+    var id = obj.id;
+    $(obj).css('display', 'none');
+    $(obj.parentElement).children('input').each(function () {
+        $(this).css('display', 'inline-block'); // "this" is the current element in the loop
+    });
+}
+
 var loadPage = function (serverName, portid) {
 
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
