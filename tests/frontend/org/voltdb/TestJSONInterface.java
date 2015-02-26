@@ -131,7 +131,7 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
-        URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
+        URL jsonAPIURL = new URL("http://localhost:10777/api/1.0/");
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setRequestMethod("POST");
@@ -377,7 +377,7 @@ public class TestJSONInterface extends TestCase {
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(simpleSchema);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -508,7 +508,7 @@ public class TestJSONInterface extends TestCase {
             builder.addPartitionInfo("blah", "ival");
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true);
             assertTrue(success);
 
@@ -609,7 +609,7 @@ public class TestJSONInterface extends TestCase {
             builder.addPartitionInfo("blah", "ival");
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false);
             assertTrue(success);
 
@@ -809,7 +809,7 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
             builder.addStmtProcedure("Select", "select * from HELLOWORLD;");
             builder.addProcedures(SelectStarHelloWorld.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -885,7 +885,7 @@ public class TestJSONInterface extends TestCase {
             pi[1] = new ProcedureInfo(new String[]{"foo"}, "Select", "select * from HELLOWORLD;", null);
             builder.addProcedures(pi);
 
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
 
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
@@ -976,7 +976,7 @@ public class TestJSONInterface extends TestCase {
 
             builder2.setSecurityEnabled(true, true);
             builder2.addProcedures(pi);
-            builder2.setHTTPDPort(8095);
+            builder2.setHTTPDPort(10777);
 
             success = builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar"));
             assertTrue(success);
@@ -1024,7 +1024,7 @@ public class TestJSONInterface extends TestCase {
 
             builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
 
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             builder.setJSONAPIEnabled(false);
 
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
@@ -1066,7 +1066,7 @@ public class TestJSONInterface extends TestCase {
             builder.addLiteralSchema(simpleSchema);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -1102,7 +1102,7 @@ public class TestJSONInterface extends TestCase {
             builder.addLiteralSchema(simpleSchema);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -1163,7 +1163,7 @@ public class TestJSONInterface extends TestCase {
             builder.addLiteralSchema(simpleSchema);
             builder.addPartitionInfo("foo", "bar");
             builder.addStmtProcedure("Insert", "insert into foo values (?, ?);");
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -1224,7 +1224,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -1262,7 +1262,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -1274,10 +1274,10 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON("http://localhost:10777/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             //Download deployment
-            String xdep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
+            String xdep = getUrlOverJSON("http://localhost:10777/deployment/download", null, null, null, 200, "text/xml");
             assertTrue(xdep.contains("<deployment>"));
             assertTrue(xdep.contains("</deployment>"));
         } finally {
@@ -1305,7 +1305,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -1317,19 +1317,19 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON("http://localhost:10777/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             //POST deployment with no content
-            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
+            String pdep = postUrlOverJSON("http://localhost:10777/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
             params.put("deployment", jdep);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON("http://localhost:10777/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
             //POST deployment in admin mode
             params.put("admin", "true");
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON("http://localhost:10777/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
             ObjectMapper mapper = new ObjectMapper();
@@ -1345,10 +1345,10 @@ public class TestJSONInterface extends TestCase {
             }
             String ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON("http://localhost:10777/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON("http://localhost:10777/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
@@ -1371,10 +1371,10 @@ public class TestJSONInterface extends TestCase {
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON("http://localhost:10777/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON("http://localhost:10777/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
@@ -1385,10 +1385,10 @@ public class TestJSONInterface extends TestCase {
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON("http://localhost:10777/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON("http://localhost:10777/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
@@ -1419,7 +1419,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             UserInfo users[] = new UserInfo[] {
                     new UserInfo("user1", "admin", new String[] {"user"}),
                     new UserInfo("user2", "admin", new String[] {"administrator"}),
@@ -1439,20 +1439,20 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            String dep = getUrlOverJSON("http://localhost:10777/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
             //get with jsonp
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             assertTrue(dep.contains("jackson5"));
             assertTrue(dep.matches("^jackson5(.*)"));
@@ -1481,7 +1481,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             UserInfo users[] = new UserInfo[] {
                     new UserInfo("user1", "admin", new String[] {"user"}),
                     new UserInfo("user2", "admin", new String[] {"administrator"}),
@@ -1501,16 +1501,16 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "hashed", 200, "application/json");
+            String dep = getUrlOverJSON("http://localhost:10777/deployment/", "user1", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "hashed", 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/", "user2", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "hashed", 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/download", "user1", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
@@ -1538,7 +1538,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             UserInfo users[] = new UserInfo[] {
                     new UserInfo("user1", "admin", new String[] {"user"}),
                     new UserInfo("user2", "admin", new String[] {"administrator"}),
@@ -1558,16 +1558,16 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "basic", 200, "application/json");
+            String dep = getUrlOverJSON("http://localhost:10777/deployment/", "user1", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "basic", 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/", "user2", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "basic", 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/download", "user1", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "basic", 200, "text/xml");
+            dep = getUrlOverJSON("http://localhost:10777/deployment/download", "user2", "admin", "basic", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
@@ -1595,7 +1595,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             builder.setUseDDLSchema(true);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
@@ -1608,9 +1608,9 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get users
-            String json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            String json = getUrlOverJSON("http://localhost:10777/deployment/users/", null, null, null, 200,  "application/json");
             assertEquals(json, "");
-            getUrlOverJSON("http://localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
+            getUrlOverJSON("http://localhost:10777/deployment/users/foo", null, null, null, 404,  "application/json");
 
             //Put users
             ObjectMapper mapper = new ObjectMapper();
@@ -1620,10 +1620,10 @@ public class TestJSONInterface extends TestCase {
             String map = mapper.writeValueAsString(user);
             Map<String,String> params = new HashMap<>();
             params.put("user", map);
-            putUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 201,  "application/json", params);
+            putUrlOverJSON("http://localhost:10777/deployment/users/foo/", null, null, null, 201,  "application/json", params);
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON("http://localhost:10777/deployment/users/", null, null, null, 200,  "application/json");
             JSONArray jarray = new JSONArray(json);
             assertEquals(jarray.length(), 1);
             JSONObject jobj = jarray.getJSONObject(0);
@@ -1634,20 +1634,20 @@ public class TestJSONInterface extends TestCase {
             user.setRoles("foo");
             map = mapper.writeValueAsString(user);
             params.put("user", map);
-            postUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
+            postUrlOverJSON("http://localhost:10777/deployment/users/foo/", null, null, null, 200,  "application/json", params);
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON("http://localhost:10777/deployment/users/", null, null, null, 200,  "application/json");
             jarray = new JSONArray(json);
             assertEquals(jarray.length(), 1);
             jobj = jarray.getJSONObject(0);
             assertTrue(jobj.getString("roles").equals("foo"));
 
             //Delete users
-            deleteUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
+            deleteUrlOverJSON("http://localhost:10777/deployment/users/foo/", null, null, null, 204,  "application/json");
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON("http://localhost:10777/deployment/users/", null, null, null, 200,  "application/json");
             assertEquals(json, "");
         } finally {
             if (server != null) {
@@ -1674,7 +1674,7 @@ public class TestJSONInterface extends TestCase {
             builder.addSchema(schemaPath);
             builder.addPartitionInfo("foo", "bar");
             builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(10777);
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
@@ -1686,7 +1686,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get profile
-            String dep = getUrlOverJSON("http://localhost:8095/profile", null, null, null, 200, "application/json");
+            String dep = getUrlOverJSON("http://localhost:10777/profile", null, null, null, 200, "application/json");
             assertTrue(dep.contains("\"user\""));
             assertTrue(dep.contains("\"permissions\""));
         } finally {

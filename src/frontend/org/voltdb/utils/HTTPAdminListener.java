@@ -493,39 +493,10 @@ public class HTTPAdminListener {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse deployment information."));
                     return;
                 }
-                //For users that are listed if they exists without password set their password to current else password will get changed for existing user.
-                //New users if valid will get updated.
-                //For Scrambled passowrd this will work also but new passwords will be unscrambled
-                //TODO: add switch to post to scramble??
-                if (newDeployment.getSecurity() != null) {
-                    DeploymentType currentDeployment = this.getDeployment();
-                    //Merge passwords for existing users.
-                    List<User> users = null;
-                    List<User> newusers = null;
-                    if (currentDeployment.getUsers() != null) {
-                        users = currentDeployment.getUsers().getUser();
-                    }
-                    if (newDeployment.getUsers() != null) {
-                        newusers = newDeployment.getUsers().getUser();
-                    }
-                    //We check current users also because enabling uses existing users that we copy over.
-                    if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled() &&
-                            (newusers == null || newusers.isEmpty() || users == null || users.isEmpty())) {
-                        response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Enabling security without any users is not allowed."));
-                        return;
-                    }
-                    //For security disabled copy all user's passwords to ensure deployment is good.
-                    if (newusers != null) {
-                        for (UsersType.User user : newusers) {
-                            if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
-                                for (User u : users) {
-                                    if (user.getName().equalsIgnoreCase(u.getName())) {
-                                        user.setPassword(u.getPassword());
-                                    }
-                                }
-                            }
-                        }
-                    }
+
+                DeploymentType currentDeployment = this.getDeployment();
+                if (currentDeployment.getUsers() != null) {
+                    newDeployment.setUsers(currentDeployment.getUsers());
                 }
 
                 String dep = CatalogUtil.getDeployment(newDeployment);
@@ -533,9 +504,7 @@ public class HTTPAdminListener {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
                     return;
                 }
-                Object[] params = new Object[2];
-                params[0] = null;
-                params[1] = dep;
+                Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
                 client.callProcedure("@UpdateApplicationCatalog", params);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
@@ -552,7 +521,7 @@ public class HTTPAdminListener {
                            HttpServletResponse response, Client client)
                            throws IOException, ServletException {
             String update = request.getParameter("user");
-            if (update == null || update.length() == 0) {
+            if (update == null || update.trim().length() == 0) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get user information."));
                 return;
@@ -587,9 +556,7 @@ public class HTTPAdminListener {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
                     return;
                 }
-                Object[] params = new Object[2];
-                params[0] = null;
-                params[1] = dep;
+                Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
                 client.callProcedure("@UpdateApplicationCatalog", params);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Updated."));
@@ -608,7 +575,7 @@ public class HTTPAdminListener {
                            HttpServletResponse response, Client client)
                            throws IOException, ServletException {
             String update = request.getParameter("user");
-            if (update == null || update.length() == 0) {
+            if (update == null || update.trim().length() == 0) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get user information."));
                 return;
@@ -649,9 +616,7 @@ public class HTTPAdminListener {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
                     return;
                 }
-                Object[] params = new Object[2];
-                params[0] = null;
-                params[1] = dep;
+                Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
                 client.callProcedure("@UpdateApplicationCatalog", params);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, returnString));
@@ -677,7 +642,7 @@ public class HTTPAdminListener {
                     user = findUser(splitTarget[2], newDeployment);
                 }
                 if (user == null) {
-                    response.setStatus(HttpServletResponse.SC_GONE);
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "User not found"));
                     return;
                 }
@@ -693,9 +658,7 @@ public class HTTPAdminListener {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
                     return;
                 }
-                Object[] params = new Object[2];
-                params[0] = null;
-                params[1] = dep;
+                Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
                 client.callProcedure("@UpdateApplicationCatalog", params);
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
