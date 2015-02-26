@@ -298,9 +298,15 @@ var loadPage = function (serverName, portid) {
     loadSQLQueryPage(serverName, portid, userName);
     VoltDbUI.refreshSqlAndSchemaTab();
 
-    voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
-        MonitorGraphUI.GetPartitionDetailData(partitionDetail);
-    });
+    VoltDbUI.partitionGraphInterval = setInterval(function() {
+        if (getCurrentServer() != undefined) {
+            window.clearInterval(VoltDbUI.partitionGraphInterval);
+            voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
+                MonitorGraphUI.GetPartitionDetailData(partitionDetail);
+            });
+        }
+    }, 5000);
+    
 
     var showAdminPage = function () {
         if (!VoltDbAdminConfig.isAdmin) {
@@ -1604,7 +1610,7 @@ var adjustGraphSpacing = function () {
         this.tableSortStatus = this.SORT_STATES.NONE;
         this.isConnectionChecked = false;
         this.connectionTimeInterval = null;
-
+        this.partitionGraphInterval = null;
         //load schema tab and table and views tabs inside sql query 
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();
