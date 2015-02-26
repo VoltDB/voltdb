@@ -16,9 +16,9 @@
  */
 #include "debuglog.h"
 #include <execinfo.h>
-#include <malloc.h>
 #include <cstring>
 #include <cxxabi.h>   // for abi
+#include <cstdlib> // for malloc/free
 
 namespace voltdb {
 StackTrace::StackTrace() {

@@ -20,7 +20,6 @@
 #include <cxxabi.h>   // for abi
 #include <execinfo.h> // for backtrace, backtrace_symbols
 
-#include <cstdlib> // for malloc/free
 #include <cstring> // for strn*
 #include <dlfcn.h>
 #include <stdio.h> // for fopen, fprintf, fclose
