@@ -57,6 +57,8 @@
 #include <string>
 #include <ctime>
 #include <cstdio>
+#include <vector>
+namespace voltdb {
 
 // Log levels.
 #define VOLT_LEVEL_OFF    1000
@@ -89,7 +91,7 @@
     #define __FUNCTION__ ""
 #endif
 
-void outputLogHeader_(const char *file, int line, const char *func, int level);
+void outputLogHeader(const char *file, int line, const char *func, int level);
 
 // Two convenient macros for debugging
 // 1. Logging macros.
@@ -100,7 +102,8 @@ void outputLogHeader_(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_ERROR
     #define VOLT_ERROR_ENABLED
     //#pragma message("VOLT_ERROR was enabled.")
-    #define VOLT_ERROR(...) outputLogHeader_(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ERROR);::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
+    #define VOLT_ERROR(...) outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ERROR); \
+            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
 #else
     #define VOLT_ERROR(...) ((void)0)
 #endif
@@ -111,7 +114,8 @@ void outputLogHeader_(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_WARN
     #define VOLT_WARN_ENABLED
     //#pragma message("VOLT_WARN was enabled.")
-    #define VOLT_WARN(...) outputLogHeader_(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_WARN);::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
+    #define VOLT_WARN(...) outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_WARN); \
+            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
 #else
     #define VOLT_WARN(...) ((void)0)
 #endif
@@ -122,7 +126,8 @@ void outputLogHeader_(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_INFO
     #define VOLT_INFO_ENABLED
     //#pragma message("VOLT_INFO was enabled.")
-    #define VOLT_INFO(...) outputLogHeader_(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_INFO);::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
+    #define VOLT_INFO(...) outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_INFO); \
+            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
 #else
     #define VOLT_INFO(...) ((void)0)
 #endif
@@ -133,7 +138,8 @@ void outputLogHeader_(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_DEBUG
     #define VOLT_DEBUG_ENABLED
     //#pragma message("VOLT_DEBUG was enabled.")
-    #define VOLT_DEBUG(...) outputLogHeader_(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG);::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
+    #define VOLT_DEBUG(...) outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
+            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
 #else
     #define VOLT_DEBUG(...) ((void)0)
 #endif
@@ -144,14 +150,15 @@ void outputLogHeader_(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
     #define VOLT_TRACE_ENABLED
     //#pragma message("VOLT_TRACE was enabled.")
-    #define VOLT_TRACE(...) outputLogHeader_(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE);::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
+    #define VOLT_TRACE(...) outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE); \
+            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
 #else
     #define VOLT_TRACE(...) ((void)0)
 #endif
 
 // Output log message header in this format: [type] [file:line:function] time -
 // ex: [ERROR] [somefile.cpp:123:doSome()] 2008/07/06 10:00:00 -
-inline void outputLogHeader_(const char *file, int line, const char *func, int level) {
+inline void outputLogHeader(const char *file, int line, const char *func, int level) {
     time_t t = ::time(NULL) ;
     tm *curTime = localtime(&t);
     char time_str[32]; // FIXME
@@ -179,24 +186,43 @@ inline void outputLogHeader_(const char *file, int line, const char *func, int l
     printf("[%s] [%s:%d:%s()] %s - ", type, file, line, func, time_str);
 }
 
-#include <vector>
-namespace voltdb {
 class StackTrace {
 public:
-    /**
-     * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
-     *
-     */
-	StackTrace();
-	~StackTrace();
+    StackTrace();
+    ~StackTrace();
 
-	char** m_traceSymbols;
-	std::vector<std::string> m_traces;
+    static void printMangledAndUnmangledToFile(FILE *targetFile) {
+        StackTrace st;
+        // write header for backtrace file
+        int numFrames = (int)st.m_traces.size();
+        // Ignore the stack frames specific to StackTrace object
+        fprintf(targetFile, "VoltDB Backtrace (%d stack frames)\n", numFrames-2);
+        for (int ii = 2; ii < numFrames; ii++) {
+            // write original symbol to file.
+            fprintf(targetFile, "raw[%d]: %s\n", ii, st.m_traceSymbols[ii]);
+        }
+        for (int ii=2; ii < numFrames; ii++) {
+            const char* str = st.m_traces[ii].c_str();
+            fprintf(targetFile, "demangled[%d]: %s\n", ii, str);
+        }
+    }
+
+
+    static void printStackTrace() {
+        StackTrace st;
+        for (int ii=1; ii < st.m_traces.size(); ii++) {
+            printf("   %s\n", st.m_traces[ii].c_str());
+        }
+    }
+
+private:
+    char** m_traceSymbols;
+    std::vector<std::string> m_traces;
 };
+
+#define PRINT_STACK_TRACE outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE); \
+        ::printf("STACK TRACE\n");StackTrace::printStackTrace();::fflush(stdout)
+
 } // namespace voltdb
-
-
-void printStackTrace_();
-#define PRINT_STACK_TRACE outputLogHeader_(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE);::printf("OUTPUTING STACK TRACE\n");printStackTrace_();::fflush(stdout)
 
 #endif // HSTOREDEBUGLOG_H
