@@ -228,18 +228,19 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         // And so should adhoc queries
         verifyAdhocQuery();
 
-        // Also, @UpdateClasses should only work with adhoc DDL
-        assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
-        InMemoryJarfile jarfile = new InMemoryJarfile();
-        VoltCompiler comp = new VoltCompiler();
-        comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
-        try {
-            m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+        // If the procedure doesn't already exist, add it using @UpdateClasses
+        if (!findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc")) {
+            // Also, @UpdateClasses should only work with adhoc DDL
+            InMemoryJarfile jarfile = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
+            try {
+                m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            } catch (ProcCallException pce) {
+                fail("Should be able to call @UpdateClasses when adhoc DDL enabled.");
+            }
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
         }
-        catch (ProcCallException pce) {
-            fail("Should be able to call @UpdateClasses when adhoc DDL enabled.");
-        }
-        assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
     }
 
     public void testMasterWithAdhocDDL() throws Exception
@@ -321,7 +322,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 threw = true;
-                assertTrue(pce.getMessage().contains("Write procedure @UpdateClasses is not allowed"));
+                assertTrue(pce.getMessage().contains("@UpdateClasses is forbidden"));
             }
             assertTrue("@UpdateClasses should have failed", threw);
             assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
@@ -407,8 +408,8 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                 threw = true;
                 assertTrue(pce.getMessage().contains("Write procedure @UpdateClasses is not allowed"));
             }
-            assertTrue("@UpdateClasses should have failed", threw);
-            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+            assertFalse("@UpdateClasses should have worked", threw);
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
 
             // adhoc queries still work
             ClientResponse result = m_client.callProcedure("@AdHoc", "select * from baz;");
