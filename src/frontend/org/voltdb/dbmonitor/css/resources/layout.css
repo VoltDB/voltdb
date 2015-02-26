@@ -905,8 +905,8 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 /*a.serverHighlight {color:#76bd1d;}*/
 .stopDisable { color: #aaaaaa!important;}
 .tblshutdown tr {border:1px solid #CCCCCC;}
-.tblshutdown tr:hover, .tblshutdown tr.activeHost { background: #F0F3F4}
-.tblshutdown tr.activeHost td a { color:#76bd1d;}
+.tblshutdown tr:hover, .tblshutdown tr.activeHostMonitoring { background: #F0F3F4}
+.tblshutdown tr.activeHostMonitoring td a { color:#76bd1d;}
 
 
 .tblshutdown tr td  { border:none;}
@@ -924,8 +924,10 @@ td.pauseCursorDefault a{cursor: default;}
 .confirmationInfo{font-weight: bold;}
 td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix,td.tdSnapshotFrequency,td.tdSnapshotRetained, td.snapshottd { position: relative;}
 td.heartbeattd span, td.queryTimeOut span{position:relative; top:auto;}
+div.userSecurity{ position: relative;height: 38px;}
 td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px;left:1px;*/}
 .customCheckbox{display:inline-block !important;}
+.loadingSecurity { left: 300px;top: 9px;}
 
 .btnSave { background-color: #aa1f2f;
 			cursor: pointer;
@@ -1027,7 +1029,10 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .deleteAddConfig a { color: #c70000;}
 #chkStreamValue { padding-left: 2px;}
 .plusAdd {background-position:-418px -61px; width: 31px; height: 17px; display: inline-block; position: relative;top: 8px;}
+
 /****Export details Ends*******/
+a.changePsd {color: #0079bb;}
+a:hover.changePsd { text-decoration: underline; }
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -1262,6 +1267,7 @@ top: 3px;}
          .resizeCon {width:330px}
         .resizeRestore{width:80%}
 		.configWrapper { width:380px;}
+		
 		 
  }
 
@@ -1294,6 +1300,7 @@ top: 3px;}
 			 
 			 .restoreInfo .overlay-content { height:120px;}
 			 .restoreCont {height:120px;}
+			 .configWrapper{height: 133px;}
 			 }
 		 
 @media (min-width: 480px) and (max-width: 1024px) and (orientation:landscape)   {		 

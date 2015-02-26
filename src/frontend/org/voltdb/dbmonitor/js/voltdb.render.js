@@ -2182,7 +2182,7 @@ function alertNodeClicked(obj) {
                 $.each(VoltDbAdminConfig.servers, function (id, val) {
                     if ((val.serverName != null || val.serverName != "") && val.serverState == 'RUNNING') {
                         className = voltDbRenderer.currentHost == val.serverName ? "disableServer" : "shutdown";
-                        currentServerRowClass = voltDbRenderer.currentHost == val.serverName ? "activeHost" : "";
+                        currentServerRowClass = voltDbRenderer.currentHost == val.serverName ? "activeHostMonitoring" : "activeHost";
                         currentServerColumnClass = voltDbRenderer.currentHost == val.serverName ? "shutdownServer stopDisable" : "shutdownServer";
 
                         htmlServerListHtml = htmlServerListHtml.concat("<tr class=\"" + currentServerRowClass + "\"><td class=\"configLabel\" width=\"85%\"><a href=\"#\" >" + val.serverName + "</a></td>" +
@@ -2191,7 +2191,7 @@ function alertNodeClicked(obj) {
 
                     } else if ((val.serverName != null || val.serverName != "") && val.serverState == 'PAUSED') {
                         className = voltDbRenderer.currentHost == val.serverName ? "disableServer" : "shutdown";
-                        currentServerRowClass = voltDbRenderer.currentHost == val.serverName ? "activeHost" : "";
+                        currentServerRowClass = voltDbRenderer.currentHost == val.serverName ? "activeHostMonitoring" : "activeHost";
                         currentServerColumnClass = "shutdownServerPause";
 
                         htmlServerListHtml = htmlServerListHtml.concat("<tr class=\"" + currentServerRowClass + "\"><td class=\"configLabel\" width=\"85%\"><a href=\"#\" >" + val.serverName + "</a></td>" +
