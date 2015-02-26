@@ -25,6 +25,7 @@ package txnIdSelfCheck;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Random;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -38,6 +39,7 @@ public class DdlThread extends BenchmarkThread {
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final String[] createOrDrop = { "create table anothertable (a int);",
                                     "drop table anothertable if exists;" };
+    final Random rnd = new Random();
 
     public DdlThread(Client client) {
         setName("DdlThread");
@@ -83,7 +85,8 @@ public class DdlThread extends BenchmarkThread {
                 hardStop("DdlThread threw an error:", e);
             }
             count = ++count & 1;
-            try { Thread.sleep(10000); }
+            int nextInMs = rnd.nextInt(60) * 1000 + 30000;
+            try { Thread.sleep(nextInMs); }
             catch (Exception e) {}
         }
         log.info(getName() + " thread has stopped");
