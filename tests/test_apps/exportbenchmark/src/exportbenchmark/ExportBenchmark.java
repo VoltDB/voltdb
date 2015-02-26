@@ -41,7 +41,6 @@ import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -75,13 +74,12 @@ public class ExportBenchmark {
     final ClientStatsContext fullStatsContext;
     // Timer for periodic stats
     Timer timer;
-    // Flags to tell the worker threads to stop or go
-    AtomicBoolean warmupComplete = new AtomicBoolean(false);
-    AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
     // Test stats variables
-    long testCount = 0;
-    long failures = 0;
-    long benchmarkStartTS, benchmarkEndTS;
+    long insertNumber = 0;
+    long successfulInserts = 0;
+    long failedInserts = 0;
+    // Test timestamp markers
+    long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
 
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
@@ -112,25 +110,24 @@ public class ExportBenchmark {
 
         @Override
         public void validate() {
-            if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
         }
     }
 
     /**
-     * Callback for export insert method
+     * Callback for export insert method. Tracks successes & failures
      */
-    static class ExportCallBack implements ProcedureCallback {
+    class ExportCallback implements ProcedureCallback {
         @Override
-        public void clientCallback(ClientResponse clientResponse)
-                throws Exception {
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println("Error inserting into export table");
-                System.err.println(clientResponse.getStatusString());
+        public void clientCallback(ClientResponse response) throws Exception {
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                successfulInserts++;
+            } else {
+                failedInserts++;
             }
         }
-
     }
 
     /**
@@ -176,7 +173,7 @@ public class ExportBenchmark {
         long ftime = 0;
         long st = System.currentTimeMillis();
         //Wait 10 mins only
-        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        long end = st + (10 * 60 * 1000);
         while (true) {
             stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             boolean passedThisTime = true;
@@ -277,42 +274,52 @@ public class ExportBenchmark {
     }
 
     /**
-     * While <code>benchmarkComplete</code> is set to false, run as many
-     * synchronous procedure calls as possible and record the results.
+     * Inserts values into the export table for the test. First it does warmup
+     * inserts, then tracked inserts.
      */
-    class ExportThread implements Runnable {
+    public void doInserts() {
 
-        @Override
-        public void run() {
-
-            // Don't track warmup inserts
-            while (warmupComplete.get() == false) {
-                try {
-                    client.callProcedure(new NullCallback(), "ExportInsert", testCount, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                } catch (IOException ignore) {}
-            }
-
-            // Insert objects, wait until we're told to stop
-            while (benchmarkComplete.get() == false) {
-                try {
-                    boolean success = client.callProcedure(new ExportCallBack(), "ExportInsert", testCount, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                    testCount++;
-                    if (!success) { failures++; }
-                } catch (Exception e) {
-                    System.err.println("Couldn't insert into VoltDB\n");
-                    e.printStackTrace();
-                    System.exit(1);
-                }
-            }
-            System.out.println("Benchmark complete: wrote " + testCount + " objects");
-            System.out.println("Encountered " + failures + " errors");
+        // Don't track warmup inserts
+        System.out.println("Warming up...");
+        while (benchmarkWarmupEndTS > System.currentTimeMillis()) {
+            try {
+                client.callProcedure(new NullCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
+                insertNumber++;
+            } catch (IOException ignore) {}
         }
+        System.out.println("Warmup complete");
+
+        // reset the stats after warmup is done
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
+
+        schedulePeriodicStats();
+
+        // Insert objects until we've run for long enough
+        System.out.println("Running benchmark...");
+        while (benchmarkEndTS > System.currentTimeMillis()) {
+            try {
+                boolean success = client.callProcedure(new ExportCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
+                insertNumber++;
+                if (!success) {
+                    System.err.println("Stored procedure not queuing");
+                }
+            } catch (Exception e) {
+                System.err.println("Couldn't insert into VoltDB\n");
+                e.printStackTrace();
+                System.exit(1);
+            }
+        }
+        System.out.println("Benchmark complete: wrote " + successfulInserts + " objects");
+        System.out.println("Failed to insert " + failedInserts + " objects");
     }
 
     /**
      * Runs the export benchmark test
+     * @throws InterruptedException
+     * @throws NoConnectionsException
      */
-    private void runTest() throws InterruptedException,NoConnectionsException{
+    private void runTest() throws NoConnectionsException, InterruptedException {
         // Connect to servers
         try {
             System.out.println("Test initialization");
@@ -323,27 +330,13 @@ public class ExportBenchmark {
             System.exit(1);
         }
 
-        // Set up worker thread
-        Thread thread = new Thread(new ExportThread());
-        thread.start();
-
-        // Run the benchmark loop for the requested warmup time
-        System.out.println("Warming up...");
-        Thread.sleep(1000l * config.warmup);
-        warmupComplete.set(true);
-
+        // Figure out how long to run for
         benchmarkStartTS = System.currentTimeMillis();
+        benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
+        benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
 
-        // reset the stats after initialization
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
-
-        schedulePeriodicStats();
-
-        // Run for the duration given, then stop
-        System.out.println("\nRunning benchmark...");
-        Thread.sleep(1000l * config.duration);
-        benchmarkComplete.set(true);
+        // Do the inserts
+        doInserts();
 
         timer.cancel();
         client.drain();
@@ -358,9 +351,7 @@ public class ExportBenchmark {
             e.printStackTrace();
         }
 
-        benchmarkEndTS = System.currentTimeMillis();
-
-        System.out.println("Finished benchmark (test by count)");
+        System.out.println("Finished benchmark");
 
         // Print results & close
         printResults(benchmarkEndTS-benchmarkStartTS);
@@ -434,7 +425,7 @@ public class ExportBenchmark {
                 fw.append(String.format("%d,%d,%d,0,0,0,0,0,0,0,0,0,0\n",
                                     stats.getStartTimestamp(),
                                     duration,
-                                    testCount));
+                                    successfulInserts));
                 fw.close();
             }
         } catch (IOException e) {
@@ -456,11 +447,7 @@ public class ExportBenchmark {
         try {
             ExportBenchmark bench = new ExportBenchmark(config);
             bench.runTest();
-        } catch (InterruptedException e) {
-            System.err.println("Threading error");
-            e.printStackTrace();
-            System.exit(1);
-        } catch (NoConnectionsException e) {
+        } catch (NoConnectionsException|InterruptedException e) {
             System.err.println("VoltDB client error");
             e.printStackTrace();
             System.exit(1);
