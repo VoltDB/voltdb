@@ -24,6 +24,11 @@
 package vmcTest.tests
 
 import vmcTest.pages.*
+import java.io.*;
+import java.util.Date;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 
 /**
  * This class contains tests of the 'DB Monitor' tab of the VoltDB Management
@@ -310,5 +315,86 @@ class DbMonitorTest extends TestBase {
         then:
             footer.banner.isDisplayed();
             footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase());
+    }
+
+    def clickGraphViewSeconds() {
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Seconds in Graph View'
+        page.chooseGraphView("Seconds")
+        then: 'display'
+
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        Date date = new Date();
+        String stringTwo = dateFormat.format(date)
+
+        String stringOne = timeOne.text()
+        int hourOne = page.changeToHour(stringOne)
+        int minuteOne = page.changeToMinute(stringOne)
+
+        int hourTwo = page.changeToHour(stringTwo)
+        int minuteTwo = page.changeToMinute(stringTwo)
+
+        int diff = minuteTwo - minuteOne
+
+        if ( hourOne == hourTwo && diff < 20 ) {
+            assert true
+        }
+        else if ( hourOne < hourTwo && minuteTwo < 20 ){
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+    def clickGraphViewMinute() {
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Seconds in Graph View'
+        page.chooseGraphView("Minutes")
+        then: 'display'
+
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        Date date = new Date();
+        String stringTwo = dateFormat.format(date)
+
+        String stringOne = timeOne.text()
+        int hourOne = page.changeToHour(stringOne)
+        int minuteOne = page.changeToMinute(stringOne)
+
+        int hourTwo = page.changeToHour(stringTwo)
+        int minuteTwo = page.changeToHour(stringTwo)
+
+        int hourDiff = hourTwo - hourOne
+
+        if ( hourDiff == 1 ) {
+            assert true
+        }
+        else if ( hourDiff > 1 && minuteTwo < 30 ){
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+    def clickGraphViewDays() {
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Seconds in Graph View'
+        page.chooseGraphView("Days")
+        then: 'display'
+
+        String stringOne = timeOne.text()
+        if ( stringOne.length() > 8 ) {
+            assert true
+        }
+        else {
+            assert false
+        }
     }
 }
