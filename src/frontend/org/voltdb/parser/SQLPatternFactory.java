@@ -300,26 +300,26 @@ public class SQLPatternFactory
     {
         SQLPatternPartElement retElem = new SQLPatternPartElement(parts);
         if (beginLine) {
-            retElem.m_leader = "^\\s*";
+            retElem.m_leader = "\\A\\s*";
         }
         else {
-            retElem.m_leader = "^.*?";
+            retElem.m_leader = "\\A.*?";
         }
         if (endLine) {
             if (terminated) {
                 if (terminatorRequired) {
-                    retElem.m_trailer = "\\s*;\\s*$";
+                    retElem.m_trailer = "\\s*;\\s*\\z";
                 }
                 else {
-                    retElem.m_trailer = "\\s*;?\\s*$";
+                    retElem.m_trailer = "\\s*;?\\s*\\z";
                 }
             }
             else {
-                retElem.m_trailer = "\\s*$";
+                retElem.m_trailer = "\\s*\\z";
             }
         }
         else {
-            retElem.m_trailer = ".*$";
+            retElem.m_trailer = ".*\\z";
         }
         retElem.m_flags |= SQLPatternFactory.CHILD_SPACE_SEPARATOR;
         return retElem;

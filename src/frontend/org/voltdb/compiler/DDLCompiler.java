@@ -451,7 +451,8 @@ public class DDLCompiler {
         statementMatcher = SQLParser.matchCreateProcedureAsScript(statement);
         if (statementMatcher.matches()) {
 
-            String className = checkProcedureIdentifier(statementMatcher.group(1), statement);
+            // Dots are okay in script procedures because they are a class name
+            String className = checkIdentifierStart(statementMatcher.group(1), statement);
             String codeBlock = statementMatcher.group(3);
             String languageToken = statementMatcher.group(4);
             if (languageToken == null) {
