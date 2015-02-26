@@ -488,7 +488,7 @@ public class CatalogDiffEngine {
             Database suspectDb = (Database) suspect.getParent();
             retval[0] = CatalogUtil.getExportTableNames(suspectDb, suspectConnector).first();
             retval[1] = String.format(
-                    "Unable to export table %s because it is not empty.",
+                    "Unable to change table %s to an export table because the table is not empty.",
                     retval[0]);
             return retval;
         }
@@ -497,7 +497,7 @@ public class CatalogDiffEngine {
             ConnectorTableInfo suspectConnInfo = (ConnectorTableInfo) suspect;
             retval[0] = suspectConnInfo.getTable().getTypeName();
             retval[1] = String.format(
-                    "Unable to export table %s because it is not empty.",
+                    "Unable to change table %s to an export table because the table is not empty.",
                     retval[0]);
             return retval;
         }
