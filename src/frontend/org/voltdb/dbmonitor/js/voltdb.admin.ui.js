@@ -99,6 +99,7 @@ function loadAdminPage() {
         securityLabel: $("#securityRow").find("td:first-child").text(),
         editStateSecurity: editStates.ShowEdit,
         securityStateOriginal: { "SecurityStatus": false, "linkSecurityEdit": false },
+        loadingUserList: $("#loadingUserList"),
 
         //Edit Auto Snapshot objects
         btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
@@ -427,6 +428,7 @@ function loadAdminPage() {
 
             userList.hide();
             userListEditable.hide();
+            adminEditObjects.loadingUserList.show();
         }
         else if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingSecurity.hide();
@@ -439,6 +441,7 @@ function loadAdminPage() {
 
             userList.hide();
             userListEditable.show();
+            adminEditObjects.loadingUserList.hide();
         }
         else {
             adminEditObjects.loadingSecurity.hide();
@@ -451,6 +454,7 @@ function loadAdminPage() {
 
             userList.show();
             userListEditable.hide();
+            adminEditObjects.loadingUserList.hide();
         }
     };
 
@@ -466,7 +470,6 @@ function loadAdminPage() {
         toggleSecurityEdit(editStates.ShowEdit);
     });
 
-    //pm
     adminEditObjects.btnEditSecurityOk.on("click", function(e) {
         var passwordValidation = $('.passwordtxt');
         for (var i = 0; i < passwordValidation.length; i++) {
@@ -2097,7 +2100,7 @@ function loadAdminPage() {
                         '<label id="errorUserName' + i + '" for="inputUserName' + i + '" class="error errorSecurity" style="display:none"></label>' +
                         '</td>' +
                         '<td id="latbox' + i + '" class="password">' +
-                        '<a href ="javascript:void(0)" onclick="changePassword(this);" id="anchor'+i+'" >Change Password</a>' +
+                        '<a class="changePsd" href ="javascript:void(0)" onclick="changePassword(this);" id="anchor'+i+'" >Change Password</a>' +
                         '<input class="passwordtxt" size="15" type="text" style="display:none" id="input' + i + '" name="input' + i + '">' +
                         '<label id="errorUser' + i + '" for="input' + i + '" class="error errorSecurity" style="display:none"></label>' +
                         '</td>' +
