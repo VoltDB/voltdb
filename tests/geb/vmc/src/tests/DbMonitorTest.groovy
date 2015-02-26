@@ -397,4 +397,365 @@ class DbMonitorTest extends TestBase {
             assert false
         }
     }
+
+    def "click display preferences and close"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'click close button'
+        page.closePreferences()
+        then: 'all graph exist'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Server Cpu and again add Server Cpu"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server CPU checkbox is displayed'
+        page.serverCpuCheckboxDisplayed()
+        then: 'Remove Server CPU'
+        page.serverCpuCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Server CPU displayed'
+        !page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server CPU checkbox is displayed'
+        page.serverCpuCheckboxDisplayed()
+        then: 'Add Server CPU'
+        page.serverCpuCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Server CPU displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Server RAM and again add Server RAM"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server RAM checkbox is displayed'
+        page.serverRamCheckboxDisplayed()
+        then: 'Remove Server RAM'
+        page.serverRamCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Server RAM displayed'
+        page.serverCpuDisplayed()
+        !page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server RAM checkbox is displayed'
+        page.serverRamCheckboxDisplayed()
+        then: 'Add Server RAM'
+        page.serverRamCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Server RAM displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+
+    def "click display preferences remove Cluster Latency and again add Cluster Latency"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Latency checkbox is displayed'
+        page.clusterLatencyCheckboxDisplayed()
+        then: 'Remove Cluster Latency'
+        page.clusterLatencyCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Cluster Latency displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        !page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Latency is displayed'
+        page.clusterLatencyCheckboxDisplayed()
+        then: 'Add Cluster Latency'
+        page.clusterLatencyCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Cluster Latency displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Cluster Transactions and again add Cluster Transactions"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Transactions checkbox is displayed'
+        page.clusterTransactionsCheckboxDisplayed()
+        then: 'Remove Cluster Transactions'
+        page.clusterTransactionsCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Cluster Transactions displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        !page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Transactions is displayed'
+        page.clusterTransactionsCheckboxDisplayed()
+        then: 'Add Cluster Transactions'
+        page.clusterTransactionsCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Cluster Transactions displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Partition Idle Time and again add Partition Idle Time"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time checkbox is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Remove Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Partition Idle Time displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        !page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Add Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Partition Idle Time displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+
+
+    def "click display preferences remove Stored Procedures and again add Stored Procedures"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Stored Procedures displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        !page.storedProceduresDisplayed()
+        page.dataTablesDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Add Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Stored Procedures displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        page.storedProceduresDisplayed()
+        page.dataTablesDisplayed()
+    }
+
+    def "click display preferences remove Data Tables and again add Data Tables"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Data Tables checkbox is displayed'
+        page.dataTablesCheckboxDisplayed()
+        then: 'Remove Data Tables'
+        page.dataTablesCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Data Tables displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        page.storedProceduresDisplayed()
+        !page.dataTablesDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Data Tables is displayed'
+        page.dataTablesCheckboxDisplayed()
+        then: 'Add Data Tables'
+        page.dataTablesCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Data Tables displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        page.storedProceduresDisplayed()
+        page.dataTablesDisplayed()
+    }
 }
