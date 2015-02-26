@@ -55,13 +55,6 @@ public class RepairLog
     long m_lastMpHandle = Long.MAX_VALUE;
 
     /*
-     * Track the highest seen MP unique id so that it can be provided to the MPI
-     * on repair
-     */
-    private long m_maxSeenMpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenSpUniqueId = Long.MIN_VALUE;
-
-    /*
      * Track the last master-cluster unique ID associated with an
      *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
      *  ReplicaDRGateway on repair
@@ -169,7 +162,6 @@ public class RepairLog
                 m_lastSpHandle = m.getSpHandle();
                 truncate(m.getTruncationHandle(), IS_SP);
                 m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
-                m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
                 if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
                     StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
                     // params[3] is the end sequence number from the original cluster
@@ -188,8 +180,6 @@ public class RepairLog
                     m_lastMpHandle = m.getTxnId();
                     m_lastSpHandle = m.getSpHandle();
                 }
-                m_maxSeenMpUniqueId = Math.max(m_maxSeenMpUniqueId, m.getUniqueId());
-                m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
 
                 final Iv2InitiateTaskMessage initiateTask = m.getInitiateTask();
                 if (initiateTask != null && "@ApplyBinaryLogMP".equals(initiateTask.getStoredProcedureName())) {
@@ -278,12 +268,10 @@ public class RepairLog
         List<Item> items = new LinkedList<Item>();
         // All cases include the log of MP transactions
         items.addAll(m_logMP);
-        long maxSeenUniqueId = m_maxSeenMpUniqueId;
         long maxSeenBinaryLogUniqueId = m_maxSeenMpBinaryLogUniqueId;
         long maxSeenBinaryLogDRId = m_maxSeenMpBinaryLogDRId;
         // SP repair requests also want the SP transactions
         if (!forMPI) {
-            maxSeenUniqueId = m_maxSeenSpUniqueId;
             maxSeenBinaryLogUniqueId = m_maxSeenSpBinaryLogUniqueId;
             maxSeenBinaryLogDRId = m_maxSeenSpBinaryLogDRId;
             items.addAll(m_logSP);
@@ -306,7 +294,6 @@ public class RepairLog
                         m_lastSpHandle,
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
-                        maxSeenUniqueId,
                         maxSeenBinaryLogDRId,
                         maxSeenBinaryLogUniqueId);
         responses.add(hheader);

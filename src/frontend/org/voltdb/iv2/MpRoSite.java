@@ -39,6 +39,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -119,11 +120,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public long getSpHandleForSnapshotDigest() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
-        }
-
-        @Override
-        public long getSpUniqueIdForSnapshotDigest() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
@@ -354,7 +350,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long unqiueId, long spUniqueId, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, long unqiueId, String clusterName, String databaseName,
             String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) throws VoltAbortException
     {
@@ -362,7 +358,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, long uniqueId, long spUniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
             boolean shouldDRStream,
             boolean undo)
     {
@@ -383,13 +379,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setSpHandleAndSpUniqueIdForSnapshotDigest(long spHandle, long spUniqueId)
+    public void setSpHandleForSnapshotDigest(long spHandle)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, long spUniqueId,
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle,
             List<UndoAction> undoActions)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -423,7 +419,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public Pair<Long, Long> getDRSequenceNumbers()
+    public TupleStreamStateInfo getDRTupleStreamStateInfo()
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -494,7 +490,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long txnId,
             long spHandle,
             long uniqueId,
-            long spUniqueId,
             boolean readOnly)
             throws EEException
     {

@@ -148,7 +148,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t spHandle,
                                  int64_t lastCommittedSpHandle,
                                  int64_t uniqueId,
-                                 int64_t spUniqueId,
                                  int64_t undoToken);
 
         int getUsedParamcnt() const { return m_usedParamcnt; }
@@ -191,7 +190,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        ReferenceSerializeInputBE &serializeIn,
                        int64_t txnId,
                        int64_t spHandle, int64_t lastCommittedSpHandle,
-                       int64_t uniqueId, int64_t spUniqueId,
+                       int64_t uniqueId,
                        bool returnUniqueViolations,
                        bool shouldDRStream);
 
@@ -387,6 +386,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         void dispatchValidatePartitioningTask(const char *taskParams);
 
+        void collectDRTupleStreamStateInfo();
+
         void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
 
         // -------------------------------------------------
@@ -410,7 +411,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                 int64_t spHandle,
                                 int64_t lastCommittedSpHandle,
                                 int64_t uniqueId,
-                                int64_t spUniqueId,
                                 bool first,
                                 bool last);
 

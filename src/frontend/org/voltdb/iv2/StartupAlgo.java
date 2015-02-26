@@ -85,7 +85,6 @@ public class StartupAlgo implements RepairAlgo
         m_promotionResult.set(
                 new RepairResult(
                     TxnEgo.makeZero(m_partitionId).getTxnId(),
-                    new UniqueIdGenerator(m_partitionId, 0).getNextUniqueId(),
                     Long.MIN_VALUE,
                     Long.MIN_VALUE));
     }

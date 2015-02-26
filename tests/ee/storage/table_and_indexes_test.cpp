@@ -58,7 +58,7 @@ class TableAndIndexTest : public Test {
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
 
-            engine->setupForPlanFragments( NULL, 44, 44, 44, 44, 44);
+            engine->setupForPlanFragments( NULL, 44, 44, 44, 44);
 
             vector<voltdb::ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;
@@ -310,7 +310,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     drStream.m_enabled = true;
     districtTable->setDR(true);
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), addPartitionId(70));
+    engine->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70));
 
     vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple temp_tuple = districtTempTable->tempTuple();
@@ -370,7 +370,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72), addPartitionId(72));
+    engine->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
 
     /*
      * Test that update propagates
@@ -409,7 +409,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(0, toDelete.getNValue(3).compare(cachedStringValues.back()));
 
     //Prep another transaction to test propagating a delete
-    engine->setupForPlanFragments( NULL, addPartitionId(102), addPartitionId(102), addPartitionId(101), addPartitionId(89), addPartitionId(89));
+    engine->setupForPlanFragments( NULL, addPartitionId(102), addPartitionId(102), addPartitionId(101), addPartitionId(89));
 
     districtTable->deleteTuple( toDelete, true);
 

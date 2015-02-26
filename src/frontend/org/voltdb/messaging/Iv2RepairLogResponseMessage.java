@@ -39,11 +39,6 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private long m_txnId;
 
     /*
-     * The largest seen unique id from the MPI
-     */
-    private long m_uniqueId = Long.MIN_VALUE;
-
-    /*
      * The largest seen original (master cluster) ids
      * for a binary logging (DR) invocation
      */
@@ -84,7 +79,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
             long spHandle, long txnId,
             Pair<Long, byte[]> versionedHashinatorConfig,
-            long uniqueId, long binaryLogSequenceNumber, long binaryLogUniqueId)
+            long binaryLogSequenceNumber, long binaryLogUniqueId)
     {
         super();
         m_requestId = requestId;
@@ -92,7 +87,6 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = ofTotal;
         m_handle = spHandle;
         m_txnId = txnId;
-        m_uniqueId = uniqueId;
         m_binaryLogDRId = binaryLogSequenceNumber;
         m_binaryLogUniqueId = binaryLogUniqueId;
         m_hashinatorVersion = versionedHashinatorConfig.getFirst();
@@ -121,10 +115,6 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public long getTxnId() {
         return m_txnId;
-    }
-
-    public long getUniqueId() {
-        return m_uniqueId;
     }
 
     public long getBinaryLogSequenceNumber() {
@@ -163,7 +153,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
         msgsize += 8; // txnId
-        msgsize += 8; // uniqueId
+        msgsize += 8; // binaryLogDRId
+        msgsize += 8; // binaryLogUniqueId
         if (m_payload != null) {
             msgsize += m_payload.getSerializedSize();
         }
@@ -184,7 +175,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_ofTotal);
         buf.putLong(m_handle);
         buf.putLong(m_txnId);
-        buf.putLong(m_uniqueId);
+        buf.putLong(m_binaryLogDRId);
+        buf.putLong(m_binaryLogUniqueId);
 
         if (m_payload != null) {
             ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
@@ -211,7 +203,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = buf.getInt();
         m_handle = buf.getLong();
         m_txnId = buf.getLong();
-        m_uniqueId = buf.getLong();
+        m_binaryLogDRId = buf.getLong();
+        m_binaryLogUniqueId = buf.getLong();
 
         // going inception.
         // The first message in the repair log response stream is always a null
@@ -244,8 +237,6 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         sb.append(m_handle);
         sb.append(" TXNID: ");
         sb.append(m_txnId);
-        sb.append(" UNIQUEID: ");
-        sb.append(m_uniqueId);
         sb.append(" PAYLOAD: ");
         if (m_payload == null) {
             sb.append("null");

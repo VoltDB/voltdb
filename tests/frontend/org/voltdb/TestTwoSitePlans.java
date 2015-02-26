@@ -198,7 +198,6 @@ public class TestTwoSitePlans extends TestCase {
                 1,
                 0,
                 42,
-                42,
                 Long.MAX_VALUE);
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
@@ -215,7 +214,6 @@ public class TestTwoSitePlans extends TestCase {
                 2,
                 1,
                 42,
-                42,
                 Long.MAX_VALUE);
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
@@ -231,7 +229,7 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, 42, Long.MAX_VALUE)[0];
+                3, 3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
@@ -245,7 +243,7 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, 42, Long.MAX_VALUE)[0];
+                3, 3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
@@ -262,7 +260,7 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { outDepId },
                 new ParameterSet[] { params },
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, 42, Long.MAX_VALUE)[0];
+                3, 3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());

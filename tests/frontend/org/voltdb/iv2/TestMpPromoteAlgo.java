@@ -82,7 +82,6 @@ public class TestMpPromoteAlgo
         when(m.getPayload()).thenReturn(frag);
         when(m.getHandle()).thenReturn(-1L);
         when(m.getTxnId()).thenReturn(handle);
-        when(m.getUniqueId()).thenReturn(uniqueId);
         return m;
     }
 
@@ -94,7 +93,6 @@ public class TestMpPromoteAlgo
         when(m.getPayload()).thenReturn(complete);
         when(m.getHandle()).thenReturn(-1L);
         when(m.getTxnId()).thenReturn(handle);
-        when(m.getUniqueId()).thenReturn(uniqueId);
         return m;
     }
 
@@ -111,12 +109,11 @@ public class TestMpPromoteAlgo
 
     Iv2RepairLogResponseMessage makeRealAckResponse(long requestId,
             long sourceHSId, int sequence, int ofTotal, long handle,
-            Pair<Long,byte[]> versionedHashinatorConfig,
-            long uniqueId)
+            Pair<Long,byte[]> versionedHashinatorConfig)
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
-            ofTotal, handle, handle, versionedHashinatorConfig, uniqueId, Long.MIN_VALUE, Long.MIN_VALUE);
+            ofTotal, handle, handle, versionedHashinatorConfig, Long.MIN_VALUE, Long.MIN_VALUE);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -151,8 +148,6 @@ public class TestMpPromoteAlgo
     public void setUp() {
         m_hashinatorConfig = TheHashinator.getCurrentVersionedConfigCooked();
     }
-
-    UniqueIdGenerator uig = new UniqueIdGenerator(MpInitiator.MP_INIT_PID, 0);
 
     // verify that responses are correctly unioned and ordered.
 //    @Test
@@ -216,14 +211,12 @@ public class TestMpPromoteAlgo
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
-        final long uid = uig.getNextUniqueId();
-
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, txnEgo(1000L)));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // also has a complete. MP handle is 1000L
         // and deliver a newer version of the hashinator config
@@ -231,12 +224,12 @@ public class TestMpPromoteAlgo
                 m_hashinatorConfig.getFirst()+1,
                 m_hashinatorConfig.getSecond()
                 );
-        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 3, txnEgo(1000L), torv3, uid));
+        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 3, txnEgo(1000L), torv3));
         algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, txnEgo(1000L)));
 
         // deliver the same complete from the MPI's repair log
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1000L)));
 
         // Verify that we send a complete to every site.
@@ -246,7 +239,6 @@ public class TestMpPromoteAlgo
         needsRepair.add(3L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
-        assertEquals(uid, result.get().m_uniqueId);
 
         // check if the hashinator was updated to the newer version
         assertEquals(torv3.getFirst(), TheHashinator.getCurrentVersionedConfig().getFirst());
@@ -268,11 +260,10 @@ public class TestMpPromoteAlgo
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
 
-        long uid = uig.getNextUniqueId();
         // Master 1
         // First, everyone completed
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId,      1L, 0, 8, txnEgo(1000L), m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId,      1L, 0, 8, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId,     1L, 1, 8, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 1L, 2, 8, txnEgo(1000L)));
         // Second, 3 will lose complete
@@ -286,7 +277,7 @@ public class TestMpPromoteAlgo
 
         // Master 2
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId,      2L, 0, 6, txnEgo(1000L), m_hashinatorConfig, uid - 1));
+        algo.deliver(makeRealAckResponse(requestId,      2L, 0, 6, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId,     2L, 1, 6, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 2L, 2, 6, txnEgo(1000L)));
         // second, 3 loses complete
@@ -297,7 +288,7 @@ public class TestMpPromoteAlgo
 
         // Master 3
         // also has a complete. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId,      3L, 0, 4, txnEgo(1000L), m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId,      3L, 0, 4, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId,     3L, 1, 4, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 4, txnEgo(1000L)));
         // 3 loses complete
@@ -305,7 +296,7 @@ public class TestMpPromoteAlgo
 
         // MPI
         // Deliver the last complete
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1002L), m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1002L), m_hashinatorConfig));
         algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1002L)));
 
         // We should send to all hosts in all cases for all non-truncated MP txns now
@@ -316,7 +307,6 @@ public class TestMpPromoteAlgo
         inOrder.verify(mailbox, times(4)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
 
         assertEquals(txnEgo(1003L), result.get().m_txnId);
-        assertEquals(uid, result.get().m_uniqueId);
     }
 
     // verify correct txnID when no MP has ever been done
@@ -337,20 +327,19 @@ public class TestMpPromoteAlgo
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig, Long.MIN_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig, Long.MIN_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig, Long.MIN_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig, Long.MIN_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // verify that the discovered txn id is 0 (the correct starting txnid).
         assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), result.get().m_txnId);
-        assertEquals(UniqueIdGenerator.makeZero(MpInitiator.MP_INIT_PID), result.get().m_uniqueId);
     }
 
     // Verify that if the MPI is the only person with a complete, that we
@@ -371,16 +360,15 @@ public class TestMpPromoteAlgo
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
-        long uid = uig.getNextUniqueId();
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, txnEgo(1000L)));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig, Long.MIN_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // deliver the same complete from the MPI's repair log
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfig, uid));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1000L)));
 
         // Verify that we send a complete to every site.
@@ -389,7 +377,6 @@ public class TestMpPromoteAlgo
         needsRepair.add(2L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
         assertEquals(txnEgo(1000L), result.get().m_txnId);
-        assertEquals(uid, result.get().m_uniqueId);
     }
 
     @Test
@@ -416,7 +403,7 @@ public class TestMpPromoteAlgo
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
-            msg.setSpHandleAndSpUniqueId(sphandle.getTxnId(), uig.getNextUniqueId());
+            msg.setSpHandle(sphandle.getTxnId());
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 if (!stops[0]) {

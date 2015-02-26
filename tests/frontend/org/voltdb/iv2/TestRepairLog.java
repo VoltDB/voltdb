@@ -292,7 +292,7 @@ public class TestRepairLog
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
-            msg.setSpHandleAndSpUniqueId(sphandle.getTxnId(), uig.getNextUniqueId());
+            msg.setSpHandle(sphandle.getTxnId());
             if (msg instanceof InitiateTaskMessage) {
                 binaryLogSpUniqueId = Math.max(binaryLogSpUniqueId, setBinaryLogUniqueId(msg, spbuig));
             } else if (msg instanceof FragmentTaskMessage) {
@@ -379,7 +379,7 @@ public class TestRepairLog
         Iv2InitiateTaskMessage msg =
                 new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,
                         spi, 0l, 0l, false);
-        msg.setSpHandleAndSpUniqueId(900l, 999l);
+        msg.setSpHandle(900l);
         RepairLog log = new RepairLog();
         log.deliver(msg);
         validateRepairLog(log.contents(1l, false), endUniqueId);

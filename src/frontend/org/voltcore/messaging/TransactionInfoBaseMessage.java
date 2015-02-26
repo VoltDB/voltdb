@@ -34,7 +34,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_coordinatorHSId;
     protected long m_txnId;
     protected long m_uniqueId;
-    protected long m_spUniqueId;
     // IV2: within a partition, the primary initiator and its replicas
     // use this for intra-partition ordering/lookup
     private long m_spHandle;
@@ -80,7 +79,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = rhs.m_txnId;
         m_uniqueId = rhs.m_uniqueId;
-        m_spUniqueId = rhs.m_spUniqueId;
         m_isReadOnly = rhs.m_isReadOnly;
         m_isForReplay = rhs.m_isForReplay;
         m_subject = rhs.m_subject;
@@ -113,17 +111,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_uniqueId = uniqueId;
     }
 
-    public long getSpUniqueId() {
-        return m_spUniqueId;
-    }
-
-    public void setSpUniqueId(long spUniqueId) {
-        m_spUniqueId = spUniqueId;
-    }
-
-    public void setSpHandleAndSpUniqueId(long spHandle, long spUniqueId) {
+    public void setSpHandle(long spHandle) {
         m_spHandle = spHandle;
-        m_spUniqueId = spUniqueId;
     }
 
     public long getSpHandle() {
@@ -170,7 +159,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
             + 8        // m_txnId
             + 8        // m_timestamp
             + 8        // m_spHandle
-            + 8        // m_spUniqueId
             + 8        // m_truncationHandle
             + 8        // m_originalDRTxnId
             + 1        // m_isReadOnly
@@ -185,7 +173,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_txnId);
         buf.putLong(m_uniqueId);
         buf.putLong(m_spHandle);
-        buf.putLong(m_spUniqueId);
         buf.putLong(m_truncationHandle);
         buf.putLong(m_originalDRTxnId);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
@@ -199,7 +186,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_txnId = buf.getLong();
         m_uniqueId = buf.getLong();
         m_spHandle = buf.getLong();
-        m_spUniqueId = buf.getLong();
         m_truncationHandle = buf.getLong();
         m_originalDRTxnId = buf.getLong();
         m_isReadOnly = buf.get() == 1;
