@@ -149,7 +149,7 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
     //#pragma message("VOLT_DEBUG was enabled.")
     #define VOLT_DEBUG(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
             ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_TRACE_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
+    #define VOLT_DEBUG_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
             ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
 #else
     #define VOLT_DEBUG(...) ((void)0)
