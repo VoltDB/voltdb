@@ -41,6 +41,7 @@ import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -76,8 +77,8 @@ public class ExportBenchmark {
     Timer timer;
     // Test stats variables
     long insertNumber = 0;
-    long successfulInserts = 0;
-    long failedInserts = 0;
+    AtomicLong successfulInserts = new AtomicLong(0);
+    AtomicLong failedInserts = new AtomicLong(0);
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
 
@@ -123,9 +124,9 @@ public class ExportBenchmark {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() == ClientResponse.SUCCESS) {
-                successfulInserts++;
+                successfulInserts.incrementAndGet();
             } else {
-                failedInserts++;
+                failedInserts.incrementAndGet();
             }
         }
     }
@@ -281,10 +282,13 @@ public class ExportBenchmark {
 
         // Don't track warmup inserts
         System.out.println("Warming up...");
-        while (benchmarkWarmupEndTS > System.currentTimeMillis()) {
+        long now = System.currentTimeMillis();
+        while (benchmarkWarmupEndTS > now) {
             try {
                 client.callProcedure(new NullCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                insertNumber++;
+                if (++insertNumber % 50 == 0) {
+                    now = System.currentTimeMillis();
+                }
             } catch (IOException ignore) {}
         }
         System.out.println("Warmup complete");
@@ -297,10 +301,13 @@ public class ExportBenchmark {
 
         // Insert objects until we've run for long enough
         System.out.println("Running benchmark...");
-        while (benchmarkEndTS > System.currentTimeMillis()) {
+        now = System.currentTimeMillis();
+        while (benchmarkEndTS > now) {
             try {
                 boolean success = client.callProcedure(new ExportCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                insertNumber++;
+                if (++insertNumber % 50 == 0) {
+                    now = System.currentTimeMillis();
+                }
                 if (!success) {
                     System.err.println("Stored procedure not queuing");
                 }
@@ -310,8 +317,8 @@ public class ExportBenchmark {
                 System.exit(1);
             }
         }
-        System.out.println("Benchmark complete: wrote " + successfulInserts + " objects");
-        System.out.println("Failed to insert " + failedInserts + " objects");
+        System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
+        System.out.println("Failed to insert " + failedInserts.get() + " objects");
     }
 
     /**
@@ -354,7 +361,7 @@ public class ExportBenchmark {
         System.out.println("Finished benchmark");
 
         // Print results & close
-        printResults(benchmarkEndTS-benchmarkStartTS);
+        printResults(benchmarkEndTS-benchmarkWarmupEndTS);
         client.close();
 
         if (!success) {
@@ -425,7 +432,7 @@ public class ExportBenchmark {
                 fw.append(String.format("%d,%d,%d,0,0,0,0,0,0,0,0,0,0\n",
                                     stats.getStartTimestamp(),
                                     duration,
-                                    successfulInserts));
+                                    successfulInserts.get()));
                 fw.close();
             }
         } catch (IOException e) {
