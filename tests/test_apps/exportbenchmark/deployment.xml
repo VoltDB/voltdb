@@ -5,8 +5,7 @@
 <deployment>
    <cluster hostcount="1" />
    <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.NoOpExporter">
-     <configuration>
-     </configuration>
+     <configuration/>
    </export>
    <httpd enabled="true">
       <jsonapi enabled="true" />
