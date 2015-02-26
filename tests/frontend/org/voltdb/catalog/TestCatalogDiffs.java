@@ -819,6 +819,44 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
+    public void testExportRejectedIfNotEmpty() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("B", "C1");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+        catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("B", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE B;");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
+        catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
+
     public void testAddTableConstraintRejectedIfNotEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 

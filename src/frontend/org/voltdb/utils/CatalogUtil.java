@@ -381,6 +381,14 @@ public abstract class CatalogUtil {
         return exportTables.build();
     }
 
+    public static NavigableSet<String> getExportTableNames(Database db, Connector conn) {
+        ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
+        for (ConnectorTableInfo tinfo : conn.getTableinfo()) {
+            exportTables.add(tinfo.getTable().getTypeName());
+        }
+        return exportTables.build();
+    }
+
     /**
      * Return true if a table is a streamed / export table
      * This function is duplicated in CatalogUtil.h

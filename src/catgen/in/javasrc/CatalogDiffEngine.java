@@ -317,7 +317,6 @@ public class CatalogDiffEngine {
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
-            suspect instanceof Connector ||
             suspect instanceof SnapshotSchedule ||
             // refs are safe to add drop if the thing they reference is
             suspect instanceof ConstraintRef ||
@@ -333,6 +332,10 @@ public class CatalogDiffEngine {
             // Support add/drop of the top level object.
             suspect instanceof Table)
         {
+            return null;
+        }
+
+        else if ((suspect instanceof Connector) && (changeType == ChangeType.DELETION)) {
             return null;
         }
 
@@ -414,7 +417,6 @@ public class CatalogDiffEngine {
         // if it is found anywhere in these sub-trees.
         for (CatalogType parent = suspect.getParent(); parent != null; parent = parent.getParent()) {
             if (parent instanceof Procedure ||
-                parent instanceof Connector ||
                 parent instanceof ConstraintRef ||
                 parent instanceof Column) {
                 if (m_triggeredVerbosity) {
@@ -423,6 +425,11 @@ public class CatalogDiffEngine {
                                        " of schema object '" + suspect + "'" +
                                        " rescued by context '" + parent + "'");
                 }
+                return null;
+            }
+
+            else if ((parent instanceof Connector) &&
+                     !((suspect instanceof ConnectorTableInfo) && (changeType == ChangeType.ADDITION))) {
                 return null;
             }
         }
@@ -473,6 +480,25 @@ public class CatalogDiffEngine {
             retval[1] = String.format(
                     "Unable to add NOT NULL column %s because table %s is not empty and no default value was specified.",
                     suspect.getTypeName(), retval[0]);
+            return retval;
+        }
+
+        if (suspect instanceof Connector) {
+            Connector suspectConnector = (Connector) suspect;
+            Database suspectDb = (Database) suspect.getParent();
+            retval[0] = CatalogUtil.getExportTableNames(suspectDb, suspectConnector).first();
+            retval[1] = String.format(
+                    "Unable to export table %s because it is not empty.",
+                    retval[0]);
+            return retval;
+        }
+
+        if (suspect instanceof ConnectorTableInfo) {
+            ConnectorTableInfo suspectConnInfo = (ConnectorTableInfo) suspect;
+            retval[0] = suspectConnInfo.getTable().getTypeName();
+            retval[1] = String.format(
+                    "Unable to export table %s because it is not empty.",
+                    retval[0]);
             return retval;
         }
 
