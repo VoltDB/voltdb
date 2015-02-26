@@ -1,0 +1,1 @@
+Unexpected exception applying DDL statements to original catalog: [successful_batch.sqlfile:1]: DDL Error: "object name already exists: T in statement [create table t (   i integer not null primary key,   vc varchar(32) )]"

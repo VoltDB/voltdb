@@ -1,0 +1,86 @@
+drop table t if exists;
+drop procedure p if exists;
+create table t ( c integer );
+create procedure p as select * from t;
+
+list tables
+show proc
+list procedures
+show classes
+-- w/ semicolon
+show tables;
+list proc;
+show procedures;
+list classes;
+
+-- all again with random whitespace
+ show tables
+  show proc
+  -- here comes a tab separator or two
+list	procedures
+list		classes
+	list procedures
+list		classes
+-- w/ semicolon
+  -- here comes a tab separator or two
+list tables		;
+list proc;
+list procedures;
+list classes;
+
+-- all again with trailing whitespace -- tabs even
+list tables 
+list proc  
+show procedures		
+list classes  
+-- w/ semicolon
+list tables ;
+list proc	;
+list procedures;	
+show classes; 
+list classes	 ;  	
+
+-- mandatory cleanup is done early, here
+drop procedure p;
+drop table t;
+
+-- Check that lists reflect local ddl changes
+list tables
+list proc
+list procedures
+
+-- test some syntax errors
+-- MANY cases disabled for now because sqlcmd gets confused when syntax errors are not bounded by semicolons
+-- show
+-- list 
+show;
+list ;
+-- list table
+-- list procs
+-- list procedure
+-- list class
+list table;
+list procs;
+list procedure;
+list class;
+
+-- shower tables
+-- list_ proc
+-- please list classes
+shower tables;
+list_ proc;
+please list classes;
+
+-- list tables would be valid except for this extra text
+list proc would be too;
+list procedures similarly ;
+list classes ; likewise after semi
+
+-- list view
+list view;
+-- list garbage
+list garbagewithsemi;
+-- list garbage too many words
+list garbage too many words and semi ;
+
+

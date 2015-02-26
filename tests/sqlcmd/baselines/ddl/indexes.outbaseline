@@ -12,15 +12,4 @@ select * from t;
 
 drop table t;
 
-Command succeeded.
-Command succeeded.
-Command succeeded.
-Command succeeded.
-Command succeeded.
-Command succeeded.
-STABLE  ALTKEY 
-------- -------
-
-(Returned 0 rows in #.##s)
-Command succeeded.
 
