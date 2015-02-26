@@ -20,7 +20,7 @@ h1 {font:16px Arial, Helvetica, sans-serif;}
 .btn:hover{background-color:#76bd1d; color:#fff;}
 .graphOpacity {opacity: 0.5}
 h1, h2, h3, h4, h5, h6 {margin:0!important;}
-
+.errorValue{ color: #c70000;}
 
 /*****Global Ends******/
 /******sprite*************/
@@ -784,7 +784,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .arrow, 
 .labelCollapsed, 
 .labelExpanded,
-a.restoreConfirmationDisable { background-image:url(images/admin-icons.png);}
+a.restoreConfirmationDisable, .securityDelete, .exportDelete { background-image:url(images/admin-icons.png);}
 label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
@@ -806,7 +806,7 @@ ul.adminClusterList li a.saveme { display:inline-block;background-position:-120p
 ul.adminClusterList li a.restoreConfirmationDisable {display: inline-block;  width:40px; height:36px; background-position:-310px -12px; color:#bbb;}
 
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739px -56px; width:40px; height:36px;}
+ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-786px -56px; width:40px; height:36px;}
 /*ul.adminClusterList li a:hover{color:#000;}*/
 .adminTxt01 { margin:0 0 0 6px;}
 .adminTxt02 { margin:0 0 0 2px;}
@@ -863,8 +863,8 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739
 
 .adminTbl1 td .edit, .adminTbl1 td .editDisabled {top:9px;}
 .hasSubLabel{} 
-.labelCollapsed{ background-position:-422px -11px; padding-left:22px;}
-.labelExpanded{ background-position:-422px -55px; padding-left:22px;}
+.labelCollapsed{ background-position:-468px -11px; padding-left:22px;}
+.labelExpanded{ background-position:-468px -55px; padding-left:22px;}
 .adminTbl2 tr td:nth-child(1){font-weight:bold;}
 
 .adminWrapper{position:relative;}
@@ -902,7 +902,7 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 
 .tblshutdown tr td  { border:none;}
 .tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
-.tblshutdown tr td a.disableServer { display:inline-block;background-position:-933px -150px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-978px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
 .shutdownServerPause {position: relative; top: 17px; right:3px; color: #cccccc;}
@@ -957,13 +957,24 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 
 .resizeCon {width:452px}
 .resizeRestore{width:95%}
-a.restoreBtn { cursor: default; background-color: #999;
-padding: 8px 10px;
-text-align: center;
-color: #fff;
-font: 14px Arial, Helvetica, sans-serif;
-}
+a.restoreBtn{cursor: default;}
+/****Export details*******/
+.properTbl tr td:first-child
+.btnEd { cursor: pointer; background: #D0D2D2; padding: 5px; font-weight: bold; font-size: 12px;}
+.securityDelete {background-position:-1042px -12px; width:25px; height:20px; position:relative; top:5px; cursor:pointer;}
+.userPlus {font-size:15px;position:relative;top:2px}
+.adminTbl1 tr.subLabelRow td.configExport {padding-left: 40px;font-weight: bold;}
+.exportDelete {background-position:-422px -10px; width:25px; height:20px; cursor:pointer; position:relative; top:4px; left:5px;}
+.exportTbl { margin:0; padding:0;}
+.exportTbl tr td { white-space: nowrap}
+.properTbl {position: relative;top: 3px;}
 
+.properTbl tr td:first-child{ padding: 0 0 0 60px;}
+.properTbl tr td input[type="text"]{ width:204px;}
+.properbtn {padding: 0 35px 0 0;}
+.adminTbl1 tr.subLabelRow td.expoStream { padding-left: 40px;font-weight: bold;cursor: pointer;}
+.expoProper {padding-left: 70px!important; font-weight: bold;}
+/****Export details Ends*******/
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -1043,7 +1054,6 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 .adminContentRight {width:100%;}
 .parameterValue{ }
 .returnValue{ color:#0079bb;}
-.errorValue{color:red}
 
 h3.systemHeader{}
 .editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}

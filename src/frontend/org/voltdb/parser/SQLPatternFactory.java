@@ -136,6 +136,11 @@ public class SQLPatternFactory
             return new SQLPatternPartElement("[a-z][a-z0-9_]*");
         }
 
+        public static SQLPatternPart databaseObjectTypeName()
+        {
+            return new SQLPatternPartElement("[a-z][a-z]*");
+        }
+
         public static SQLPatternPart ddlName()
         {
             //TODO: Unify or rationalize difference with symbol(). See comments in symbol().

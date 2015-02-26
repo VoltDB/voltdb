@@ -487,7 +487,7 @@ public class VoltCompiler {
 
     private static void addBuildInfo(final InMemoryJarfile jarOutput) {
         StringBuilder buildinfo = new StringBuilder();
-        String info[] = RealVoltDB.extractBuildInfo();
+        String info[] = RealVoltDB.extractBuildInfo(compilerLog);
         buildinfo.append(info[0]).append('\n');
         buildinfo.append(info[1]).append('\n');
         buildinfo.append(System.getProperty("user.name")).append('\n');
@@ -1426,18 +1426,46 @@ public class VoltCompiler {
         // and its grouped columns are only locally unique but not globally unique.
         Table destTable = mvi.getDest();
         // Get the grouped columns in "index" order.
-        // This order corresponds to the iteration order of the MaterializedViewInfo's getGroupbycols.
+        // This order corresponds to the iteration order of the MaterializedViewInfo's group by columns.
         List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
         String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
-        int index = 0;
-        for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
-            Column srcCol = cref.getColumn();
-            if (srcCol.getName().equals(partitionColName)) {
-                Column destCol = destColumnArray.get(index);
-                destTable.setPartitioncolumn(destCol);
-                return;
+
+        if (mvi.getGroupbycols().size() > 0) {
+            int index = 0;
+            for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
+                Column srcCol = cref.getColumn();
+                if (srcCol.getName().equals(partitionColName)) {
+                    Column destCol = destColumnArray.get(index);
+                    destTable.setPartitioncolumn(destCol);
+                    return;
+                }
+                ++index;
             }
-            ++index;
+        } else {
+            String complexGroupbyJson = mvi.getGroupbyexpressionsjson();
+            assert(complexGroupbyJson != null && complexGroupbyJson.length() > 0);
+            if (complexGroupbyJson.length() > 0) {
+                int partitionColIndex =  partitionColumn.getIndex();
+
+                  List<AbstractExpression> mvComplexGroupbyCols = null;
+                  try {
+                      mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
+                  } catch (JSONException e) {
+                      e.printStackTrace();
+                  }
+                  int index = 0;
+                  for (AbstractExpression expr: mvComplexGroupbyCols) {
+                      if (expr instanceof TupleValueExpression) {
+                          TupleValueExpression tve = (TupleValueExpression) expr;
+                          if (tve.getColumnIndex() == partitionColIndex) {
+                              Column destCol = destColumnArray.get(index);
+                              destTable.setPartitioncolumn(destCol);
+                              return;
+                          }
+                      }
+                      ++index;
+                  }
+            }
         }
     }
 
