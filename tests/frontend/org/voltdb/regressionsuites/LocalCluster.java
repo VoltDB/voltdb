@@ -804,6 +804,13 @@ public class LocalCluster implements VoltServerConfig {
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, StartAction startAction) {
+        // Lookup the client interface port of the rejoin host
+        // I have no idea why this code ignores the user's input
+        // based on other state in this class except to say that whoever wrote
+        // it this way originally probably eats kittens and hates cake.
+        if (rejoinHostId == null || m_hasLocalServer) {
+            rejoinHostId = 0;
+        }
 
         int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
 
