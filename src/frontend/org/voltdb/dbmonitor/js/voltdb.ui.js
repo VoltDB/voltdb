@@ -1711,7 +1711,7 @@ var adjustGraphSpacing = function () {
 
 
 function RefreshServerUI() {
-    var clickedServer = getParameterByName("currentServer");
+    var clickedServer = window.location.hostname;
     if (clickedServer != "") {
         $('.activeServerName').html(clickedServer).attr('title', clickedServer);
         saveCurrentServer(clickedServer);

@@ -1267,6 +1267,7 @@ top: 3px;}
          .resizeCon {width:330px}
         .resizeRestore{width:80%}
 		.configWrapper { width:380px;}
+		
 		 
  }
 
@@ -1299,6 +1300,7 @@ top: 3px;}
 			 
 			 .restoreInfo .overlay-content { height:120px;}
 			 .restoreCont {height:120px;}
+			 .configWrapper{height: 133px;}
 			 }
 		 
 @media (min-width: 480px) and (max-width: 1024px) and (orientation:landscape)   {		 
