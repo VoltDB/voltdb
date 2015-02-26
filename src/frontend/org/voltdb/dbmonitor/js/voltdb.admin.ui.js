@@ -96,7 +96,7 @@ function loadAdminPage() {
         chkSecurityValue: $("#chkSecurity").is(":checked"),
         iconSecurityOption: $("#securityOptionIcon"),
         spanSecurity: $("#spanSecurity"),
-        securityLabel: $("#securityRow").find("td:first-child").text(),
+        securityLabel: $("#row-6").find("td:first-child").text(),
         editStateSecurity: editStates.ShowEdit,
         securityStateOriginal: { "SecurityStatus": false, "linkSecurityEdit": false },
         loadingUserList: $("#loadingUserList"),
