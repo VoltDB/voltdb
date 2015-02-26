@@ -1,0 +1,29 @@
+file -batch ./scripts/batching/successful_batch.sqlfile
+
+insert into t values (0, 'cats');
+insert into t values (1, 'dogs');
+
+insert into s values (2, 'aardvarks');
+insert into s values (3, 'platypii');
+
+select * from t order by i;
+
+select * from s order by i;
+Batch command succeeded.
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+I  VC   
+-- -----
+ 0 cats 
+ 1 dogs 
+
+(Returned 2 rows in #.##s)
+I  VCC       
+-- ----------
+ 2 aardvarks 
+ 3 platypii  
+
+(Returned 2 rows in #.##s)
+

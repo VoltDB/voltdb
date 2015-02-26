@@ -278,8 +278,11 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery21() throws FileNotFoundException {
         ID = 21;
-        final File sqlFile = new File("./tests/frontend/org/voltdb/utils/localQry.txt");
-        List<QueryInfo> queryBatchInfo = SQLCommand.readScriptFile(sqlFile);
+
+        String fileCmd = "file ./tests/frontend/org/voltdb/utils/localQry.txt";
+        final FileInfo fileInfo = SQLParser.parseFileStatement(fileCmd);
+        final File sqlFile = fileInfo.getFile();
+        List<QueryInfo> queryBatchInfo = SQLCommand.readScriptFile(fileInfo);
         String raw = QueryInfo.convertToString(queryBatchInfo);
 
         int numOfQueries = -1;
