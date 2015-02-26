@@ -26,6 +26,7 @@ function loadAdminPage() {
     };
 
     adminDOMObjects = {
+        addConfigLink: $("#addConfigPopupLink"),
         siteNumberHeader: $("#sitePerHost"),
         kSafety: $("#kSafety"),
         partitionDetection: $("#partitionDetectionIcon"),
@@ -1444,10 +1445,27 @@ function loadAdminPage() {
             });
         }
     });
-    
+
+    $("#addNewConfigLink").on("click", function () {
+        adminDOMObjects.addConfigLink.data("id", -1);
+        adminDOMObjects.addConfigLink.trigger("click");
+    });
+
+    var editId = -1;
     $("#addConfigPopupLink").popup({
         open: function (event, ui, ele) {
-            
+            editId = adminDOMObjects.addConfigLink.data("id");
+
+            //For adding a new configuration
+            if (editId == "-1") {
+                $("#addConfigHeader").text("Add Configuration");
+                $("#deleteAddConfig").hide();
+            }//For editing an existing configuration
+            else {
+                $("#addConfigHeader").text("Edit Configuration");
+                $("#deleteAddConfig").show();
+            }
+
             var contents = '' +
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
@@ -1511,7 +1529,6 @@ function loadAdminPage() {
 
             $("#addConfigWrapper").html(contents);
             
-            $("#deleteAddConfig").hide();
             $("#addConfigControls").show();
             $("#saveConfigConfirmation").hide();
             
@@ -1540,7 +1557,7 @@ function loadAdminPage() {
                     '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newStreamProperty" type="text">' +
                     '       <label id="errorValue' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
-                    '   <td><div class="securityDelete" onclick="deleteRow(this)"></div></td>' +
+                    '   <td><div class="securityDelete" id="deleteFirstProperty" onclick="deleteRow(this)"></div></td>' +
                     '</tr>';
                 $("#tblAddNewProperty").append(newRow);
             });
@@ -1557,6 +1574,31 @@ function loadAdminPage() {
             });
         },
         afterOpen: function () {
+            
+            //For editing an existing configuration
+            if (editId != "-1") {
+                var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                var config = existingAdminConfig.export.configuration[editId * 1];
+
+                $("#txtStream").val(config.stream);
+                $("#txtType").val(config.type);
+                $("#chkStream").iCheck(config.enabled ? 'check' : 'uncheck');
+
+                var properties = config.property;
+                
+                if (properties.length == 0) {
+                    $("#deleteFirstProperty").trigger("click");
+                }
+
+                for (var i = 0; i < properties.length; i++) {
+                    if (i > 0) {
+                        $("#lnkAddNewProperty").trigger("click");
+                    }
+
+                    $("#txtName" + i).val(properties[i].name);
+                    $("#txtValue" + i).val(properties[i].value);
+                }
+            }
 
             var popup = $(this)[0];
             $("#btnAddConfigSave").unbind("click");
@@ -1566,10 +1608,10 @@ function loadAdminPage() {
                 for (var i = 0; i < newStreamProperties.length; i++) {
                     $(newStreamProperties[i]).rules("add", {
                         required: true,
-                        regex: /^[a-zA-Z0-9_.]+$/,
+                        regex: /^[a-zA-Z0-9_\-.]+$/,
                         messages: {
                             required: "This field is required",
-                            regex: 'Only alphabets, numbers, <br/> _ and . are allowed.'
+                            regex: 'Only alphabets, numbers, <br/> _, - and . are allowed.'
                         }
                     });
                 }
@@ -1594,9 +1636,6 @@ function loadAdminPage() {
             $("#btnSaveConfigOk").on("click", function () {
                 
                 var newConfig = {};
-                newConfig["stream"] = $("#txtStream").val();
-                newConfig["type"] = $("#txtType").val();
-                newConfig["enabled"] = $("#chkStream").is(':checked');
                 newConfig["property"] = [];
                 
                 var newStreamProperties = $(".newStreamProperty");
@@ -1607,6 +1646,11 @@ function loadAdminPage() {
                     });
                 }
                 
+                newConfig["stream"] = $("#txtStream").val();
+                newConfig["type"] = $("#txtType").val();
+                newConfig["enabled"] = $("#chkStream").is(':checked');
+                newConfig["exportconnectorclass"] = "";
+                
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 
                 if (!adminConfigurations.export) {
@@ -1614,7 +1658,18 @@ function loadAdminPage() {
                     adminConfigurations.export["configuration"] = [];
                 }
 
-                adminConfigurations.export.configuration.push(newConfig);
+                //For editing an existing configuration
+                if (editId == "-1") {
+                    adminConfigurations.export.configuration.push(newConfig);
+                } else {
+                    var updatedConfig = adminConfigurations.export.configuration[editId * 1];
+                    
+                    updatedConfig.stream = newConfig.stream;
+                    updatedConfig.type = newConfig.type;
+                    updatedConfig.enabled = newConfig.enabled;
+                    updatedConfig.property = newConfig.property;
+                }
+
                 //TODO: Show loading image
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
@@ -1885,6 +1940,7 @@ function loadAdminPage() {
                             '   <td>' + getOnOffText(enabled) + '</td>' +
                             '   <td>' +
                             '       <div class="exportDelete" style="display:none;"></div>' +
+                            '       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
                             '   </td>' +
                             '</tr>';
 
@@ -2118,4 +2174,9 @@ var deleteRow = function (cell) {
     var row = $(cell).parent().parent();
     if (row.length > 0)
         row.remove();
+};
+
+var editStream = function (editId) {
+    adminDOMObjects.addConfigLink.data("id", editId);
+    adminDOMObjects.addConfigLink.trigger("click");
 };

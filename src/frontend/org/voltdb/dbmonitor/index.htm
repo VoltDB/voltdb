@@ -540,7 +540,9 @@
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
-                                    <td><a href="#addConfigPopup" id="addConfigPopupLink" class="edit" title="Add Configuration">&nbsp;</a></td>
+                                    <td><a href="javascript:void(0);" id="addNewConfigLink" class="edit" title="Add Configuration">&nbsp;</a>
+                                        <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
+                                    </td>
                                 </tr>
                                 <tbody id="exportConfiguration" style="display: none;">
                                 </tbody>
@@ -1334,8 +1336,8 @@
         <div id="addConfigInnerPopup">
             
             <div class="overlay-title icon-alert">
-                <div class="addConfigHeader">Add Configuration</div>
-                <div id="deleteAddConfig" class="deleteAddConfig"><a href="#">Delete this Configuration</a></div>
+                <div id="addConfigHeader" class="addConfigHeader">Add Configuration</div>
+                <div id="deleteAddConfig" class="deleteAddConfig"><a href="javascript:void(0);">Delete this Configuration</a></div>
                 <div class="clear"></div>
             </div>
 
