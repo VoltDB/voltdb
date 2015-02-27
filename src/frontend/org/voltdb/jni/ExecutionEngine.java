@@ -671,7 +671,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task);
+    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException;
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
@@ -923,8 +923,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * This is a generic entry point into the EE that doesn't need to be updated in the IPC
      * client every time you add a new task
      * @param pointer
+     * @return error code
      */
-    protected native void nativeExecuteTask(long pointer);
+    protected native int nativeExecuteTask(long pointer);
 
     /**
      * Perform an export poll or ack action. Poll data will be returned via the usual
