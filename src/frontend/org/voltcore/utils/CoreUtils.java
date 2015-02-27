@@ -75,8 +75,6 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
@@ -736,7 +734,7 @@ public class CoreUtils {
                         try {
                             r.run();
                         } catch (Throwable t) {
-                            hostLog.error("Exception thrown in thread " + threadName, t);
+                            new VoltLogger("HOST").error("Exception thrown in thread " + threadName, t);
                         } finally {
                             m_threadLocalDeallocator.run();
                         }

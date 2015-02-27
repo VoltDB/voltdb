@@ -548,9 +548,7 @@ public class SQLLexer extends SQLPatternFactory
      */
     private static class WhitelistSupportedPreamblePattern extends CheckedPattern
     {
-        private static Pattern whitelistPattern = null;
-
-        static
+        private static Pattern initPattern()
         {
             // All handled (white-listed) patterns.
             String[] secondTokens = new String[OBJECT_TOKENS.length + MODIFIER_TOKENS.length];
@@ -582,18 +580,19 @@ public class SQLLexer extends SQLPatternFactory
                     verbsSupported[supportedVerbCount++] = VERB_TOKENS[i].token;
                 }
             }
-            whitelistPattern =
+            Pattern whitelistPattern =
                 SPF.statementLeader(
                     SPF.clause(
                         SPF.tokenAlternatives(verbsSupported),
                         SPF.tokenAlternatives(secondTokens)
                     )
                 ).compile();
+            return whitelistPattern;
         }
 
         WhitelistSupportedPreamblePattern()
         {
-            super(whitelistPattern);
+            super(initPattern());
         }
 
         // Whitelist match provides no explanation.
@@ -609,9 +608,7 @@ public class SQLLexer extends SQLPatternFactory
      */
     private static class BlacklistUnsupportedPreamblePattern extends CheckedPattern
     {
-        private static Pattern blacklistPattern = null;
-
-        static
+        private static Pattern initPattern()
         {
             int unsupportedVerbCount = 0;
             for (int i = 0; i < VERB_TOKENS.length; ++i) {
@@ -626,15 +623,16 @@ public class SQLLexer extends SQLPatternFactory
                     verbsNotSupported[unsupportedVerbCount++] = VERB_TOKENS[i].token;
                 }
             }
-            blacklistPattern =
+            Pattern blacklistPattern =
                 SPF.statementLeader(
                     SPF.capture(SPF.tokenAlternatives(verbsNotSupported))
                 ).compile();
+            return blacklistPattern;
         }
 
         BlacklistUnsupportedPreamblePattern()
         {
-            super(blacklistPattern);
+            super(initPattern());
         }
 
         /**
