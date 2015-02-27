@@ -618,20 +618,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
-
-        byte retval[] = null;
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
         try {
             psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();
-            nativeExecuteTask(pointer);
+            final int errorCode = nativeExecuteTask(pointer);
+            checkErrorCode(errorCode);
             return (byte[])deserializer.readArray(byte.class);
         } catch (IOException e) {
             Throwables.propagate(e);
         }
-        return retval;
+        return null;
     }
 
     @Override

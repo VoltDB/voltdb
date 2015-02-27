@@ -1361,13 +1361,19 @@ void VoltDBIPC::pushExportBuffer(
 }
 
 void VoltDBIPC::executeTask(struct ipc_command *cmd) {
-    execute_task *task = (execute_task*)cmd;
-    voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
-    m_engine->resetReusedResultOutputBuffer(1);
-    m_engine->executeTask(taskId, task->task);
-    int32_t responseLength = m_engine->getResultsSize();
-    char *resultsBuffer = m_engine->getReusedResultBuffer();
-    writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
+    try {
+        execute_task *task = (execute_task*)cmd;
+        voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
+        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->executeTask(taskId, task->task);
+        int32_t responseLength = m_engine->getResultsSize();
+        char *resultsBuffer = m_engine->getReusedResultBuffer();
+        writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    } catch (const SerializableEEException &e) {
+        crashVoltDB(e);
+    }
 }
 
 void VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
