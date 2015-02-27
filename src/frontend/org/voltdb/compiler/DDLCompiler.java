@@ -368,7 +368,7 @@ public class DDLCompiler {
         String retIdent = checkIdentifierStart(identifier, statement);
         if (retIdent.contains(".")) {
             String msg = String.format(
-                "Invalid procedure name \"%s\" in DDL: \"%s\"",
+                "Invalid procedure name containing dots \"%s\" in DDL: \"%s\"",
                 identifier, statement.substring(0,statement.length()-1));
             throw m_compiler.new VoltCompilerException(msg);
         }
