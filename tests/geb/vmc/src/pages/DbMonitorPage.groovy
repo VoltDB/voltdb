@@ -24,6 +24,11 @@
 package vmcTest.pages
 
 import geb.navigator.Navigator
+import java.io.*
+import java.util.Date
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Calendar
 
 /**
  * This class represents the 'DB Monitor' tab of the VoltDB Management Center
@@ -48,8 +53,32 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         graphsArea      { $('#graphChart') }
         showHideData    { $('#ShowHideBlock') }
         dataArea        { $('.menu_body') }
-        header              { module Header }
-        footer              { module Footer }
+
+		serverCpu			{ $("#chartServerCPU") }
+		serverRam			{ $("#chartServerRAM") }
+		clusterLatency		{ $("#chartClusterLatency") }
+		clusterTransactions	{ $("#chartClusterTransactions") }
+		partitionIdleTime	{ $("#chartPartitionIdleTime") }
+		storedProcedures 	{ $("#tblStoredProcedures") }
+		dataTables			{ $("#tblDataTables") }
+
+		serverCpuCheckbox				{ $("#ServerCPU") }
+		serverRamCheckbox				{ $("#ServerRAM") }
+		clusterLatencyCheckbox			{ $("#ClusterLatency") }
+		clusterTransactionsCheckbox		{ $("#ClusterTransactions") }
+		partitionIdleTimeCheckbox		{ $("#PartitionIdleTime") }
+		storedProceduresCheckbox		{ $("#StoredProcedures") }
+		dataTablesCheckbox				{ $("#DatabaseTables") }
+
+	    displayPreference           { $("#showMyPreference") }
+		graphView		{ $('#graphView') }
+		timeOne			{ $(class:"nv-axisMaxMin", transform:"translate(0,0)") }
+
+		preferencesTitle	{ $(class:"overlay-title", text:"Graph/Data Preferences") }
+		savePreferencesBtn		{ $("#savePreference") }
+		popupClose		{ $(class:"popup_close") }
+        header          { module Header }
+        footer          { module Footer }
     }
     static at = {
         dbMonitorTab.displayed
@@ -298,4 +327,229 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clickToNotDisplay(showHideData, dataArea)
         return true
     }
+
+	/**
+	 *	Edits from here 
+	 */
+
+    /**
+     * Check if preference button is displayed
+     */
+    def boolean displayPreferenceDisplayed() {
+        return displayPreference.displayed
+    }
+	
+	/**
+     * Check if graph view button is displayed
+     */
+	def boolean graphViewDisplayed() {
+		return graphView.displayed
+	}
+
+	/**
+     * Check if Title of Preferences is displayed
+     */
+	def boolean preferencesTitleDisplayed() {
+		return preferencesTitle.displayed
+	}
+
+	/**
+     * Check if Save button of Preferences is displayed
+     */
+	def boolean savePreferencesBtnDisplayed() {
+		return savePreferencesBtn.displayed
+	}
+
+	/**
+     * Check if Popup Close is displayed
+     */
+	def boolean popupCloseDisplayed() {
+		return popupClose.displayed
+	}
+	
+	/**
+     * Check if Server CPU is displayed
+     */
+	def boolean serverCpuDisplayed() {
+		return serverCpu.displayed
+	}
+	
+	/**
+     * Check if Server RAM is displayed
+     */
+	def boolean serverRamDisplayed() {
+		return serverRam.displayed
+	}
+
+	/**
+     * Check if Cluster Latency is displayed
+     */
+	def boolean clusterLatencyDisplayed() {
+		return clusterLatency.displayed
+	}
+
+	/**
+     * Check if Cluster Transactions is displayed
+     */
+	def boolean clusterTransactionsDisplayed() {
+		return clusterTransactions.displayed
+	}
+
+	/**
+     * Check if Partition Idle Time is displayed
+     */
+	def boolean partitionIdleTimeDisplayed() {
+		return partitionIdleTime.displayed
+	}
+
+	/**
+     * Check if Stored Procedures is displayed
+     */
+	def boolean storedProceduresDisplayed() {
+		return storedProcedures.displayed
+	}
+
+	/**
+     * Check if Data Tables is displayed
+     */
+	def boolean dataTablesDisplayed() {
+		return dataTables.displayed
+	}
+
+	/*
+	 *	Returns true if Checkbox for Server CPU in preferences
+	 */
+	def boolean serverCpuCheckboxDisplayed() {
+		return serverCpuCheckbox.displayed
+	}
+
+	/*
+	 *	Returns true if Checkbox for Server RAM in preferences
+	 */
+	def boolean serverRamCheckboxDisplayed() {
+		return serverRamCheckbox.displayed
+	}
+
+	/*
+	 *	Returns true if Checkbox for Cluster Latency in preferences
+	 */
+	def boolean clusterLatencyCheckboxDisplayed() {
+		return clusterLatencyCheckbox.displayed
+	}
+
+	/*
+	 *	Returns true if Checkbox for Cluster Transactions in preferences
+	 */
+	def boolean clusterTransactionsCheckboxDisplayed() {
+		return clusterTransactionsCheckbox.displayed
+	}
+
+	/*
+	 *	Returns true if Checkbox for Partition Idle Time in preferences
+	 */
+	def boolean partitionIdleTimeCheckboxDisplayed() {
+		return partitionIdleTimeCheckbox.displayed
+	}
+
+	/*
+	 *	Returns true if Checkbox for Stored Procedures in preferences
+	 */
+	def boolean storedProceduresCheckboxDisplayed() {
+		return storedProceduresCheckbox.displayed
+	}
+
+	/*
+	 *	Returns true if Checkbox for Data Tables in preferences
+	 */
+	def boolean dataTablesCheckboxDisplayed() {
+		return dataTablesCheckbox.displayed
+	}
+
+	/*
+	 *	Returns true if display preferences is clicked
+	 */
+    def boolean openDisplayPreference() {
+        displayPreference.click()
+    }
+
+	/*
+	 *	Returns true if save button of preferences is clicked
+	 */
+	def boolean savePreferences() {
+		savePreferencesBtn.click()
+	}
+
+	/*
+	 *	Returns true if close popup button is clicked
+	 */
+	def boolean closePreferences() {
+		popupClose.click()
+	}
+
+	/*
+	 *	Click the check in Server CPU Checkbox
+	 */
+	def boolean serverCpuCheckboxClick() {
+		serverCpuCheckbox.click()
+	}
+
+	/*
+	 *	Click the check in Server RAM Checkbox
+	 */
+	def boolean serverRamCheckboxClick() {
+		serverRamCheckbox.click()
+	}
+
+	/*
+	 *	Click the check in Cluster Latency Checkbox
+	 */
+	def boolean clusterLatencyCheckboxClick() {
+		clusterLatencyCheckbox.click()
+	}
+	
+	/*
+	 *	Click the check in Cluster Transactions Checkbox
+	 */
+	def boolean clusterTransactionsCheckboxClick() {
+		clusterTransactionsCheckbox.click()
+	}
+
+	/*
+	 *	Click the check in Partition Idle Time Checkbox
+	 */
+	def boolean partitionIdleTimeCheckboxClick() {
+		partitionIdleTimeCheckbox.click()
+	}
+
+	/*
+	 *	Click the check in Stored Procedures Checkbox
+	 */
+	def boolean storedProceduresCheckboxClick() {
+		storedProceduresCheckbox.click()
+	}
+
+	/*
+	 *	Click the check in Data Tables Checkbox
+	 */
+	def boolean dataTablesCheckboxClick() {
+		dataTablesCheckbox.click()
+	}
+
+	def boolean chooseGraphView( String choice ) {
+		graphView.value(choice)
+	}
+
+	def int changeToMinute( String string ) {
+		String minute = string.substring(3, string.length()-3)
+		int minuteInt = Integer.parseInt(minute)
+		return minuteInt
+	}
+
+	def int changeToHour(String string) {
+		String hour = string.substring(0, string.length()-6)
+		int hourInt = Integer.parseInt(hour)
+		return hourInt
+	}
+
+	
 }
