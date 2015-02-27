@@ -56,7 +56,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
-        APPLY_BINARY_LOG(1);
+        APPLY_BINARY_LOG(1),
+        GET_DR_TUPLESTREAM_STATE(2),
+        SET_DR_SEQUENCE_NUMBERS(3);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -568,7 +570,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -669,7 +671,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task);
+    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException;
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
@@ -715,6 +717,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int hostId,
             byte hostname[],
             long tempTableMemory,
+            boolean createDrReplicatedStream,
             int compactionThreshold);
 
     /**
@@ -764,7 +767,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
             long undoToken);
 
     /**
@@ -780,7 +783,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoToken);
 
     /**
      * Serialize the result temporary table.
@@ -917,8 +923,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * This is a generic entry point into the EE that doesn't need to be updated in the IPC
      * client every time you add a new task
      * @param pointer
+     * @return error code
      */
-    protected native void nativeExecuteTask(long pointer);
+    protected native int nativeExecuteTask(long pointer);
 
     /**
      * Perform an export poll or ack action. Poll data will be returned via the usual
@@ -950,6 +957,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
+
+    public native static byte[] getTestDRBuffer();
 
     /**
      * Start collecting statistics (starts timer).
