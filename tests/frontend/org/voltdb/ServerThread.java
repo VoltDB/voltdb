@@ -179,4 +179,8 @@ public class ServerThread extends Thread {
     {
         return VoltDB.instance().getHostMessenger().getInstanceId();
     }
+
+    public VoltDB.Configuration getServerConfig() {
+        return m_config;
+    }
 }

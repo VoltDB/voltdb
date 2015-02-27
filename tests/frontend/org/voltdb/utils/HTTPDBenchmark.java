@@ -273,10 +273,12 @@ public class HTTPDBenchmark extends TestCase {
         final int m_iterations;
         public long totalExecTime = 0;
         final int m_id;
+        final int m_port;
 
-        public JSONClient(int clientId, int iterations) {
+        public JSONClient(int clientId, int iterations, int port) {
             m_id = clientId;
             m_iterations = iterations;
+            m_port = port;
         }
 
         @Override
@@ -284,7 +286,7 @@ public class HTTPDBenchmark extends TestCase {
             for (int i = 0; i < m_iterations; i++) {
                 try {
                     long start = System.nanoTime();
-                    /*String jsonResponse =*/ TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
+                    /*String jsonResponse =*/ TestJSONInterface.callProcOverJSON("Select", pset, null, null, false, m_port);
                     long stop = System.nanoTime();
                     totalExecTime += stop - start;
                     //System.out.println(jsonResponse);
@@ -306,7 +308,7 @@ public class HTTPDBenchmark extends TestCase {
 
         JSONClient[] clients = new JSONClient[clientCount];
         for (int i = 0; i < clientCount; i++)
-            clients[i] = new JSONClient(i, iterations);
+            clients[i] = new JSONClient(i, iterations, server.getServerConfig().m_httpPort);
 
         long execTime = 0;
 

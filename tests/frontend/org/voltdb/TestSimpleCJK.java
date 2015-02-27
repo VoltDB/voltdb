@@ -88,7 +88,6 @@ public class TestSimpleCJK extends TestCase {
         builder.addPartitionInfo("cjk", "sval1");
         builder.addStmtProcedure("Insert", "insert into cjk values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from cjk;");
-        builder.setHTTPDPort(8095);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0);
         assertTrue(success);
 
@@ -134,7 +133,7 @@ public class TestSimpleCJK extends TestCase {
         String responseJSON;
         Response response2;
 
-        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
+        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false, server.getServerConfig().m_httpPort);
         System.out.println(responseJSON);
         response2 = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response2.status == ClientResponse.SUCCESS);
@@ -172,14 +171,14 @@ public class TestSimpleCJK extends TestCase {
 
         // Call insert
         pset = ParameterSet.fromArrayNoCopy(POORLY_TRANSLATED_CHINESE, POORLY_TRANSLATED_JAPANESE, POORLY_TRANSLATED_KOREAN);
-        responseJSON = TestJSONInterface.callProcOverJSON("Insert", pset, null, null, false);
+        responseJSON = TestJSONInterface.callProcOverJSON("Insert", pset, null, null, false, server.getServerConfig().m_httpPort);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call select
         pset = ParameterSet.emptyParameterSet();
-        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
+        responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false, server.getServerConfig().m_httpPort);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
