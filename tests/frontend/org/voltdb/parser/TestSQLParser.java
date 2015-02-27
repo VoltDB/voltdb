@@ -155,6 +155,19 @@ public class TestSQLParser extends TestCase {
                 "file \"mysqlcommands.sql\";"));
     }
 
+    private void assertThrowsParseException(String expectedMessage, String fileCommand) {
+        try {
+            SQLParser.parseFileStatement(fileCommand);
+        }
+        catch (SQLParser.Exception ex) {
+            assertEquals(expectedMessage, ex.getMessage());
+            return;
+        }
+
+        fail("Expected input \"" + fileCommand + "\" to fail with message \""
+                + expectedMessage + "\", but it did not fail.");
+    }
+
     public void testParseFileStatement() {
         SQLParser.FileInfo fi;
 
@@ -173,13 +186,22 @@ public class TestSQLParser extends TestCase {
         assertFalse(fi.isBatch());
         assertEquals("foo.sql  ", fi.getFile().getName());
 
+        // Similar to above.  This makes the filename a single space.
+        fi = SQLParser.parseFileStatement("file  ");
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertFalse(fi.isBatch());
+        assertEquals(" ", fi.getFile().getName());
+
         // file -batch directive
         fi = SQLParser.parseFileStatement("file -batch myddl.sql");
         assertEquals(FileOption.BATCH, fi.getOption());
         assertEquals("myddl.sql", fi.getFile().getName());
         assertTrue(fi.isBatch());
+    }
 
-        // file -inlinebatch directive
+    public void testParseFileStatementInlineBatch() {
+        SQLParser.FileInfo fi = null;
+
         fi = SQLParser.parseFileStatement("file -inlinebatch EOF");
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("EOF", fi.getDelimiter());
@@ -190,13 +212,68 @@ public class TestSQLParser extends TestCase {
         assertEquals("<<<<", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
-        // Delimiter tokens containing whitespace is not valid
-        // syntax, but current regex's will interpret this as a
-        // plain file command to execute a file named
-        //   "-inlinebatch EOF EOF   ".
-        // Again see ENG-7794.
-        fi = SQLParser.parseFileStatement("file -inlinebatch EOF EOF   ");
-        assertEquals(FileOption.PLAIN, fi.getOption());
-        assertEquals("-inlinebatch EOF EOF   ", fi.getFile().getName());
+        // terminating semicolon is ignored, as bash does.
+        fi = SQLParser.parseFileStatement("file -inlinebatch EOF;");
+        assertEquals(FileOption.INLINEBATCH, fi.getOption());
+        assertEquals("EOF", fi.getDelimiter());
+        assertTrue(fi.isBatch());
+
+        // There can be whitespace around the semicolon
+        fi = SQLParser.parseFileStatement("file -inlinebatch END_OF_THE_BATCH  ; ");
+        assertEquals(FileOption.INLINEBATCH, fi.getOption());
+        assertEquals("END_OF_THE_BATCH", fi.getDelimiter());
+        assertTrue(fi.isBatch());
+
     }
+
+    public void testParseFileStatementNegative() {
+        assertThrowsParseException("Did not find valid delimiter for \"file -inlinebatch\" command.",
+                "  file   -inlinebatch");
+
+        // no embedded whitespace
+        assertThrowsParseException("Did not find valid delimiter for \"file -inlinebatch\" command.",
+                "  file   -inlinebatch  EOF EOF");
+
+        // embedded semicolons not allowed
+        assertThrowsParseException("Did not find valid delimiter for \"file -inlinebatch\" command.",
+                "  file   -inlinebatch  EOF;EOF");
+
+        assertThrowsParseException("Did not find valid delimiter for \"file -inlinebatch\" command.",
+                "  file   -inlinebatch;");
+
+        assertThrowsParseException("Did not find valid delimiter for \"file -inlinebatch\" command.",
+                "  file   -inlinebatch EOF; hello");
+
+        assertThrowsParseException("Did not find valid file name in \"file -batch\" command.",
+                "  file   -batch");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file;");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file ");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file '");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file ''");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file \"\"");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file \";\"");
+
+        // This won't be regarded as a file command.
+        assertEquals(null, SQLParser.parseFileStatement("filename"));
+
+        // Edge case.
+        assertEquals(null, SQLParser.parseFileStatement(""));
+    }
+
+
 }

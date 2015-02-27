@@ -73,7 +73,7 @@ END_OF_BATCH
 LOAD CLASSES voter-procs.jar;
 
 -- The following CREATE PROCEDURE statements can all be batched.
-file -inlinebatch END_OF_BATCH
+file -inlinebatch END_OF_2ND_BATCH
 
 -- stored procedures
 CREATE PROCEDURE FROM CLASS voter.Initialize;
@@ -82,4 +82,4 @@ CREATE PROCEDURE PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.V
 CREATE PROCEDURE FROM CLASS voter.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.GetStateHeatmap;
 
-END_OF_BATCH
+END_OF_2ND_BATCH

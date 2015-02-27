@@ -141,7 +141,22 @@ public class SQLCommand
     public static void interactWithTheUser() throws Exception
     {
         List<QueryInfo> queryBatchList = null;
-        while ((queryBatchList = getInteractiveQueries()) != null) {
+
+        while (true) {
+            try {
+                queryBatchList = getInteractiveQueries();
+            }
+            catch (Exception ex) {
+                // If there was a parse error getting interactive
+                // commands, stop or continue depending on how we're
+                // configured.
+                stopOrContinue(ex);
+                continue;
+            }
+
+            if (queryBatchList == null)
+                break;
+
             executeQueryWithBatches(queryBatchList);
         }
     }
