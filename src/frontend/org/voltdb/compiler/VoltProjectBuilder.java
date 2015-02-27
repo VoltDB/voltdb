@@ -984,8 +984,10 @@ public class VoltProjectBuilder {
         // <httpd>. Disabled unless port # is configured by a testcase
         HttpdType httpd = factory.createHttpdType();
         deployment.setHttpd(httpd);
-        httpd.setEnabled(m_httpdPortNo != -1);
-        httpd.setPort(m_httpdPortNo);
+        httpd.setEnabled(true);
+        if (m_httpdPortNo != -1) {
+            httpd.setPort(m_httpdPortNo);
+        }
         Jsonapi json = factory.createHttpdTypeJsonapi();
         httpd.setJsonapi(json);
         json.setEnabled(m_jsonApiEnabled);
