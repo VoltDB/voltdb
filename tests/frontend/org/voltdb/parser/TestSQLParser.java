@@ -185,18 +185,25 @@ public class TestSQLParser extends TestCase {
 
         // Plain file directive
         // no quotes and trailing whitespace.
-        // trailing whitespace is included in the file name
-        // This seems buggy: see ENG-7794.
         fi = SQLParser.parseFileStatement("  file foo.sql  ");
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertFalse(fi.isBatch());
-        assertEquals("foo.sql  ", fi.getFile().getName());
+        assertEquals("foo.sql", fi.getFile().getName());
 
         // file -batch directive
         fi = SQLParser.parseFileStatement("file -batch myddl.sql");
         assertEquals(FileOption.BATCH, fi.getOption());
         assertEquals("myddl.sql", fi.getFile().getName());
         assertTrue(fi.isBatch());
+
+        // Plain file directive
+        // quotes and trailing whitespace.
+        // Whitespace in quotes is trimmed.  What are the rules here?
+        // Please see ENG-7794.
+        fi = SQLParser.parseFileStatement("  file '  foo.sql  '");
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertFalse(fi.isBatch());
+        assertEquals("foo.sql", fi.getFile().getName());
     }
 
     public void testParseFileStatementInlineBatch() {

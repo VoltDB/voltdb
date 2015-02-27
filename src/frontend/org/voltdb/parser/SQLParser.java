@@ -1094,10 +1094,15 @@ public class SQLParser extends SQLPatternFactory
         // Use matches to match all input, not just beginning
         if (filenameMatcher.matches()) {
             filename = filenameMatcher.group(1);
+
+            // Trim whitespace from beginning and end of the file name.
+            // User may have wanted quoted whitespace at the beginning or end
+            // of the file name, but that seems very unlikely.
+            filename = filename.trim();
         }
 
         // If no filename, or a filename of only spaces, then throw an error.
-        if (filename == null || filename.trim().length() == 0) {
+        if (filename == null || filename.length() == 0) {
             String msg = String.format("Did not find valid file name in \"file%s\" command.",
                     option == FileOption.BATCH ? " -batch" : "");
             throw new SQLParser.Exception(msg);
