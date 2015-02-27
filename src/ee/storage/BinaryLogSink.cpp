@@ -74,6 +74,14 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             if (type == DR_RECORD_DELETE) {
                 TableTuple deleteTuple = table->lookupTuple(tempTuple);
+                if (deleteTuple.isNullTuple()) {
+                    char msg[1024 * 100];
+                    snprintf(msg, 1024 * 100,
+                             "Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+                    VOLT_ERROR("%s", msg);
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+                }
                 table->deleteTuple(deleteTuple, false);
             } else {
                 table->insertPersistentTuple(tempTuple, false);
