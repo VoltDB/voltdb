@@ -458,6 +458,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
             totalRowCnt = JDBCStatementReader.m_totalRowCount.get();
 
+            out_reportfile.write("Input stopped after "
+                    + totalRowCnt + " rows read" + "\n");
             out_reportfile.write("Number of rows read from source: "
                     + totalRowCnt + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
