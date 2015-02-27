@@ -85,7 +85,6 @@ import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.VoltTypeUtil;
 
 
 /**
@@ -104,6 +103,7 @@ public class DDLCompiler {
     static final String REPLICATE = "REPLICATE";
     static final String EXPORT = "EXPORT";
     static final String ROLE = "ROLE";
+    static final String DR = "DR";
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
@@ -381,7 +381,7 @@ public class DDLCompiler {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, PARTITION, ROLE, or EXPORT
+        // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
@@ -720,6 +720,27 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches if it is DR TABLE <table-name> [DISABLE]
+        // group 1 -- table name
+        // group 2 -- NULL: enable dr
+        //            NOT NULL: disable dr
+        // TODO: maybe I should write one fit all regex for this.
+        statementMatcher = SQLParser.matchDRTable(statement);
+        if (statementMatcher.matches()) {
+            String tableName;
+            if (statementMatcher.group(1).equalsIgnoreCase("*")) {
+                tableName = "*";
+            } else {
+                tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            }
+            if (statementMatcher.group(2) != null) {
+                m_tracker.addDRedTable(tableName, "DISABLE");
+            } else {
+                m_tracker.addDRedTable(tableName, "ENABLE");
+            }
+            return true;
+        }
+
         /*
          * if no correct syntax regex matched above then at this juncture
          * the statement is syntax incorrect
@@ -761,6 +782,13 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid EXPORT TABLE statement: \"%s\", " +
                     "expected syntax: EXPORT TABLE <table>",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if (DR.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid DR TABLE statement: \"%s\", " +
+                    "expected syntax: DR TABLE <table> [DISABLE]",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
@@ -1262,7 +1290,7 @@ public class DDLCompiler {
             }
         }
 
-        table.setSignature(VoltTypeUtil.getSignatureForTable(name, columnTypes));
+        table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
 
         /*
          * Validate that the total size

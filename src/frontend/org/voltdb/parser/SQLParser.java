@@ -320,13 +320,25 @@ public class SQLParser extends SQLPatternFactory
      *      | -- or
      *      \\A -- beginning of statement
      *      EXPORT -- token
+     *      | -- or
+     *      \\A -- beginning of statement
+     *      DR -- token
      * \\s -- one space
      * </pre>
      */
     private static final Pattern PAT_ALL_VOLTDB_STATEMENT_PREAMBLES = Pattern.compile(
             "(?i)((?<=\\ACREATE\\s{0,1024})" +
             "(?:PROCEDURE|ROLE)|" +
-            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
+            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT|\\ADR)\\s"
+            );
+
+    private static final Pattern PAT_DR_TABLE = Pattern.compile(
+            "(?i)" +                                // (ignore case)
+            "\\A"  +                                // start statement
+            "DR\\s+TABLE\\s+" +                     // DR TABLE
+            "([\\w.$|\\\\*]+)" +                    // (1) <table name>
+            "(?:\\s+(DISABLE))?" +                  //     (2) optional DISABLE argument
+            "\\s*;\\z"                              // (end statement)
             );
 
     //========== Patterns from SQLCommand ==========
@@ -431,6 +443,16 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchExportTable(String statement)
     {
         return PAT_EXPORT_TABLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against DR table pattern
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDRTable(String statement)
+    {
+        return PAT_DR_TABLE.matcher(statement);
     }
 
     /**

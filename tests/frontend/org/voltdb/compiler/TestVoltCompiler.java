@@ -3704,6 +3704,66 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
+    public void testGoodDRTable() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer not null, f1 varchar(16));",
+                "partition table e1 on column id;",
+                "dr table e1;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+
+        String schema = "create table e1 (id integer not null, f1 varchar(16));\n" +
+                        "create table e2 (id integer not null, f1 varchar(16));\n" +
+                        "partition table e1 on column id;";
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e1;",
+                "DR TABLE E2;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        // DR statement is order sensitive
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e2;",
+                "dr table e2 disable;"
+                );
+        assertFalse(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e2 disable;",
+                "dr table e2;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+    }
+
+    public void testBadDRTable() throws Exception {
+        badDDLAgainstSimpleSchema(".+\\sdr, table non_existant was not present in the catalog.*",
+                "dr table non_existant;"
+                );
+
+        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
+                "dr table 1table_name_not_valid;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table one, two, three;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr dr table one;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table table one;"
+                );
+    }
+
     public void testCompileFromDDL() throws IOException {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +

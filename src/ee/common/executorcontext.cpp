@@ -39,11 +39,13 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 VoltDBEngine* engine,
                 std::string hostname,
                 CatalogId hostId,
-                DRTupleStream *drStream) :
+                DRTupleStream *drStream,
+                DRTupleStream *drReplicatedStream) :
     m_topEnd(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
     m_drStream(drStream),
+    m_drReplicatedStream(drReplicatedStream),
     m_engine(engine),
     m_txnId(0),
     m_spHandle(0),
@@ -82,4 +84,3 @@ ExecutorContext* ExecutorContext::getExecutorContext() {
     return static_cast<ExecutorContext*>(pthread_getspecific( static_key));
 }
 }
-

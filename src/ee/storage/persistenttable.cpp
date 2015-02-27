@@ -88,7 +88,7 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit) :
+PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
     m_allowNulls(),
@@ -99,7 +99,8 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
-    m_isMaterialized(isMaterialized)
+    m_isMaterialized(isMaterialized),
+    m_drEnabled(drEnabled)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -271,7 +272,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 }
 
 
-void PersistentTable::truncateTable(VoltDBEngine* engine) {
+void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
 
@@ -315,16 +316,39 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
 
     engine->rebuildTableCollections();
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        drMark = drStream->m_uso;
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
+    }
+
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
     if (uq) {
+        if (!fallible) {
+            throwFatalException("Attempted to truncate table %s when there was an "
+                                "active undo quantum, and presumably an active transaction that should be there",
+                                m_name.c_str());
+        }
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
-        return;
-    }
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable, &m_surgeon, drMark));
+    } else {
+        if (fallible) {
+            throwFatalException("Attempted to truncate table %s when there was no "
+                                "active undo quantum even though one was expected", m_name.c_str());
+        }
 
-    this->decrementRefcount();
+        //Skip the undo log and "commit" immediately by asking the new emptyTable to perform
+        //the truncate table release work rather then having it invoked by PersistentTableUndoTruncateTableAction
+        emptyTable->truncateTableRelease(this);
+    }
 }
 
 
@@ -409,14 +433,16 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = ec->drStream();
-    size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized && shouldDRStream) {
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
+        drMark = drStream->m_uso;
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DR_RECORD_INSERT);
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -578,15 +604,17 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = ec->drStream();
-    size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized) {
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        drMark = drStream->m_uso;
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, targetTupleToUpdate, DR_RECORD_DELETE);
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, sourceTupleWithNewValues, DR_RECORD_INSERT);
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
     }
 
     if (uq) {
@@ -705,13 +733,15 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = ec->drStream();
-    size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized) {
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        drMark = drStream->m_uso;
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, target, DR_RECORD_DELETE);
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE);
     }
 
     if (fallible) {
