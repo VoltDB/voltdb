@@ -282,7 +282,7 @@ public class TestSqlCmdInterface
         String fileCmd = "file ./tests/frontend/org/voltdb/utils/localQry.txt";
         final FileInfo fileInfo = SQLParser.parseFileStatement(fileCmd);
         final File sqlFile = fileInfo.getFile();
-        List<QueryInfo> queryBatchInfo = SQLCommand.readScriptFile(fileInfo);
+        List<QueryInfo> queryBatchInfo = SQLCommand.readScriptFile(fileInfo, null);
         String raw = QueryInfo.convertToString(queryBatchInfo);
 
         int numOfQueries = -1;

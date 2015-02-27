@@ -1,3 +1,8 @@
+
+-- Tell sqlcmd to batch the following commands together,
+-- so that the schema loads quickly.
+file -inlinebatch END_OF_BATCH
+
 -- contestants table holds the contestants numbers (for voting) and names
 CREATE TABLE contestants
 (
@@ -60,8 +65,15 @@ AS
         , state
 ;
 
--- Update classes from jar to that server will know about classes but not procedures yet.
+END_OF_BATCH
+
+-- Update classes from jar so that the server will know about classes
+-- but not procedures yet.
+-- This command cannot be part of a DDL batch.
 LOAD CLASSES voter-procs.jar;
+
+-- The following CREATE PROCEDURE statements can all be batched.
+file -inlinebatch END_OF_2ND_BATCH
 
 -- stored procedures
 CREATE PROCEDURE FROM CLASS voter.Initialize;
@@ -69,3 +81,5 @@ CREATE PROCEDURE FROM CLASS voter.Results;
 CREATE PROCEDURE PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.Vote;
 CREATE PROCEDURE FROM CLASS voter.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.GetStateHeatmap;
+
+END_OF_2ND_BATCH
