@@ -277,8 +277,10 @@ public class ExportBenchmark {
     /**
      * Inserts values into the export table for the test. First it does warmup
      * inserts, then tracked inserts.
+     * @throws InterruptedException
+     * @throws NoConnectionsException
      */
-    public void doInserts() {
+    public void doInserts(Client client) throws NoConnectionsException, InterruptedException {
 
         // Don't track warmup inserts
         System.out.println("Warming up...");
@@ -317,6 +319,7 @@ public class ExportBenchmark {
                 System.exit(1);
             }
         }
+        client.drain();
         System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
     }
@@ -343,10 +346,9 @@ public class ExportBenchmark {
         benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
 
         // Do the inserts
-        doInserts();
+        doInserts(client);
 
         timer.cancel();
-        client.drain();
         System.out.println("Client flushed; waiting for export to finish");
 
         // Wait until export is done
