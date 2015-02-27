@@ -596,34 +596,45 @@ public class SQLCommand
      */
     public static List<QueryInfo> readScriptFile(FileInfo fileInfo, SQLCommandLineReader currentLineReader)
     {
-        BufferedReader script = null;
+        BufferedReader bufferedReader = null;
         List<QueryInfo> statements = null;
 
         try {
+            SQLCommandLineReader reader = null;
+
             if (fileInfo.getOption() != FileOption.INLINEBATCH) {
-                script = new BufferedReader(new FileReader(fileInfo.getFile()));
-                statements = readScriptFromReader(fileInfo, new LineReaderAdapter(script));
+
+                try {
+                    bufferedReader = new BufferedReader(new FileReader(fileInfo.getFile()));
+                    reader = new LineReaderAdapter(bufferedReader);
+                }
+                catch (FileNotFoundException e) {
+                    System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
+                    stopOrContinue(e);
+                    return null; // continue to the next line after the FILE command
+                }
             }
             else {
                 // File command is a "here document" so pass in the current
                 // input stream.
-                statements = readScriptFromReader(fileInfo, currentLineReader);
+                reader = currentLineReader;
+            }
+
+            try {
+                statements = readScriptFromReader(fileInfo, reader);
+            }
+            catch (Exception x) {
+                stopOrContinue(x);
+                return null;
             }
         }
-        catch (FileNotFoundException e) {
-            System.err.println("Script file '" + fileInfo.getFile().getName() + "' could not be found.");
-            stopOrContinue(e);
-            return null; // continue to the next line after the FILE command
-        }
-        catch (Exception x) {
-            stopOrContinue(x);
-            return null;
-        }
         finally {
-            if (script != null) {
+            if (bufferedReader != null) {
                 try {
-                    script.close();
-                } catch (IOException e) { }
+                    bufferedReader.close();
+                }
+                catch (IOException e) {
+                }
             }
         }
 
