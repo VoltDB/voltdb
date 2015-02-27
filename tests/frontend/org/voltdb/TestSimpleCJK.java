@@ -93,7 +93,7 @@ public class TestSimpleCJK {
         builder.addPartitionInfo("cjk", "sval1");
         builder.addStmtProcedure("Insert", "insert into cjk values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from cjk;");
-        builder.setHTTPDPort(10777);
+        builder.setHTTPDPort(8095);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0);
         assertTrue(success);
 
