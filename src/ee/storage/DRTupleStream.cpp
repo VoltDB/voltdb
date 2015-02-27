@@ -61,8 +61,6 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                     int64_t txnId,
                                     int64_t spHandle,
                                     int64_t uniqueId) {
-    assert(UniqueId::pid(spHandle) == m_partitionId);
-    assert(UniqueId::pid(lastCommittedSpHandle) == m_partitionId);
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
