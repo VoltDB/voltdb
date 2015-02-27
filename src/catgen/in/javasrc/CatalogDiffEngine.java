@@ -714,6 +714,10 @@ public class CatalogDiffEngine {
                 }
                 return null;
             }
+            // allow export connector property changes
+            if (parent instanceof Connector && suspect instanceof ConnectorProperty) {
+                return null;
+            }
 
             if (isTableLimitDeleteStmt(parent)) {
                 return null;
