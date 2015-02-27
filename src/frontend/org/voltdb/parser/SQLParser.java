@@ -1095,7 +1095,9 @@ public class SQLParser extends SQLPatternFactory
         if (filenameMatcher.matches()) {
             filename = filenameMatcher.group(1);
         }
-        else {
+
+        // If no filename, or a filename of only spaces, then throw an error.
+        if (filename == null || filename.trim().length() == 0) {
             String msg = String.format("Did not find valid file name in \"file%s\" command.",
                     option == FileOption.BATCH ? " -batch" : "");
             throw new SQLParser.Exception(msg);
@@ -1422,12 +1424,17 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Make sure that a batch starts with a DDL statement by checking the first keyword.
+     * Make sure that the batch starts with an appropriate DDL verb.  We do not
+     * look further than the first token of the first non-comment and non-whitespace line.
+     *
+     * Empty batches are considered to be trivially valid.
+     *
      * @param batch  A SQL string containing multiple statements separated by semicolons
      * @return true if the first keyword of the first statement is a DDL verb
-     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT
+     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT, or if the
+     *     batch is empty.
      */
-    public static boolean batchBeginsWithDDLKeyword(String batch) {
+    public static boolean appearsToBeValidDDLBatch(String batch) {
 
         BufferedReader reader = new BufferedReader(new StringReader(batch));
         String line;
@@ -1449,7 +1456,7 @@ public class SQLParser extends SQLPatternFactory
         }
 
 
-        // degenerate batch: no lines are non-blank or non-comment
-        return false;
+        // trivial empty batch: no lines are non-blank or non-comments
+        return true;
     }
 }

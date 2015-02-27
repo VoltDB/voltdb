@@ -29,42 +29,42 @@ import junit.framework.TestCase;
 
 public class TestSQLParser extends TestCase {
 
-    public void testBatchBeginsWithDDLKeywordPositive() {
+    public void testAppearsToBeValidDDLBatchPositive() {
 
         // alter create drop export partition
         // (and sometimes import?)
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "create table t (i integer);"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "alter table t add column j double;"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "drop index idx;"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "partition table t on column i;"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "export table ex_tbl;"));
 
         // Seems to be considered DDL.  Is that what we want?
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "import table ex_tbl;"));
 
         // Now test multiple statements and comments...
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "create table t (i integer);\n"
                 + "create index idx on t (i);"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "-- Here's some DDL...\n"
                 + "create table t (i integer);\n"
                 + "create index idx on t (i);"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "-- Here's some DDL...\n"
                 + "create table t (i integer); -- let's not forget the index...\n"
                 + "create index idx on t (i);"));
@@ -75,63 +75,69 @@ public class TestSQLParser extends TestCase {
         //                + "create table t (i integer); -- let's not forget the index...\n"
         //                + "create index idx on t (i);"));
 
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "// here's some DDL; check it out!\n"
                 + "create table t (i integer); -- let's not forget the index...\n"
                 + "create index idx on t (i);"));
 
         // leading whitespace
-        assertTrue(SQLParser.batchBeginsWithDDLKeyword(
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "  \n"
                 + "// here's some DDL; check it out!\n"
                 + "  \n"
                 + "create table t (i integer); -- let's not forget the index...\n"
                 + "create index idx on t (i);"));
 
+        // batches with no semantic content are considered trivially valid.
+        assertTrue(SQLParser.appearsToBeValidDDLBatch(""));
+        assertTrue(SQLParser.appearsToBeValidDDLBatch("  "));
+        assertTrue(SQLParser.appearsToBeValidDDLBatch("-- hello  "));
+
+
     }
 
-    public void testBatchBeginsWithDDLKeywordNegative() {
+    public void testAppearsToBeValidDDLBatchNegative() {
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "insert into t values (47);\n"
                 + "partition table t on z;"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "delete from t where i = 9;"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "upsert into t values (32);\n"
                 + "alter table t add column j bigint;"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "update t set i = 70 where i > 69;"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "update t set i = 70 where i > 69;\n"
                 + "create table mytable (i integer);"));
 
         // Now some comments
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "-- create table was done earlier...\n"
                 + "update t set i = 70 where i > 69;"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "// create table was done earlier...\n"
                 + "update t set i = 70 where i > 69;"));
 
         // This passes only because the C-style comment
         // doesn't look like DDL--it isn't stripped out.
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "/* create table was done earlier... */\n"
                 + "update t set i = 70 where i > 69;"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "  \n"
                 + "select * from foo;"
                 + "create table catdog (dogcat bigint);"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "  \n"
                 + "  -- hello world!!"
                 + "     \t\n"
@@ -142,16 +148,16 @@ public class TestSQLParser extends TestCase {
         // Near misses that might appear in a ddl.sql file
         // but that cannot be batched
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "load classes foo-bar.jar"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "remove classes foo-bar.jar"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "exec SelectAllRowsWithKey 10;"));
 
-        assertFalse(SQLParser.batchBeginsWithDDLKeyword(
+        assertFalse(SQLParser.appearsToBeValidDDLBatch(
                 "file \"mysqlcommands.sql\";"));
     }
 
@@ -185,12 +191,6 @@ public class TestSQLParser extends TestCase {
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertFalse(fi.isBatch());
         assertEquals("foo.sql  ", fi.getFile().getName());
-
-        // Similar to above.  This makes the filename a single space.
-        fi = SQLParser.parseFileStatement("file  ");
-        assertEquals(FileOption.PLAIN, fi.getOption());
-        assertFalse(fi.isBatch());
-        assertEquals(" ", fi.getFile().getName());
 
         // file -batch directive
         fi = SQLParser.parseFileStatement("file -batch myddl.sql");
@@ -257,6 +257,9 @@ public class TestSQLParser extends TestCase {
                 "file ");
 
         assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file  ");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
                 "file '");
 
         assertThrowsParseException("Did not find valid file name in \"file\" command.",
@@ -267,6 +270,9 @@ public class TestSQLParser extends TestCase {
 
         assertThrowsParseException("Did not find valid file name in \"file\" command.",
                 "file \";\"");
+
+        assertThrowsParseException("Did not find valid file name in \"file\" command.",
+                "file  ;");
 
         // This won't be regarded as a file command.
         assertEquals(null, SQLParser.parseFileStatement("filename"));

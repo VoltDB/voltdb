@@ -102,7 +102,7 @@ public class SQLCommand
         try {
             // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.getQuery().toString() + "=======\n");
 
-            if (! SQLParser.batchBeginsWithDDLKeyword(queryInfo.getQuery().toString())) {
+            if (! SQLParser.appearsToBeValidDDLBatch(queryInfo.getQuery().toString())) {
                 throw new Exception("Error: This batch begins with a non-DDL statement.  "
                         + "Currently batching is only supported for DDL.");
             }
