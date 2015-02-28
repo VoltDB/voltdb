@@ -1371,8 +1371,6 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
         writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
     } catch (const FatalException& e) {
         crashVoltDB(e);
-    } catch (const SerializableEEException &e) {
-        crashVoltDB(e);
     }
 }
 
