@@ -1158,6 +1158,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testEnableDROnEmptyTable() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
@@ -1172,6 +1174,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testDisableDROnTable() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
@@ -1187,6 +1191,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testConnectorPropertiesChanges() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final String ddl =
                 "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
