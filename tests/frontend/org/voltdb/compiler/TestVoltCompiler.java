@@ -444,7 +444,7 @@ public class TestVoltCompiler extends TestCase {
                         "cash integer default 23 not null, \n" +
                         "title varchar(10) default 'foo', \n" +
                         "PRIMARY KEY(cash));\n" +
-                "create procedure from class org.voltdb.compiler.procedures.AddBookBoxed;" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBookBoxed;\n" +
                 "";
         compileValidLiteralSchema(simpleSchema);
     }
@@ -465,7 +465,7 @@ public class TestVoltCompiler extends TestCase {
         int length = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS + 10;
         final String simpleSchema1 =
                 "create table books (cash integer default 23, " +
-                        "title varchar("+length+") default 'foo', PRIMARY KEY(cash));" +
+                        "title varchar("+length+") default 'foo', PRIMARY KEY(cash));\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
@@ -488,7 +488,7 @@ public class TestVoltCompiler extends TestCase {
         int length = VoltType.MAX_VALUE_LENGTH + 10;
         String simpleSchema1 =
                 "create table books (cash integer default 23, " +
-                        "title varbinary("+length+") , PRIMARY KEY(cash));" +
+                        "title varbinary("+length+") , PRIMARY KEY(cash));\n" +
                 "";
         String error1 = "VARBINARY column size for column BOOKS.TITLE is > "
                 + VoltType.MAX_VALUE_LENGTH+" char maximum.";
@@ -496,7 +496,7 @@ public class TestVoltCompiler extends TestCase {
 
         String simpleSchema2 =
                 "create table books (cash integer default 23, " +
-                        "title varchar("+length+") , PRIMARY KEY(cash));" +
+                        "title varchar("+length+") , PRIMARY KEY(cash));\n" +
                 "";
         String error2 = "VARCHAR column size for column BOOKS.TITLE is > "
                 + VoltType.MAX_VALUE_LENGTH+" char maximum.";
@@ -510,7 +510,7 @@ public class TestVoltCompiler extends TestCase {
                         "title varchar(10) default 'foo', \n" +
                         "PRIMARY KEY(cash));\n" +
                 "partition table books on column cash;\n" +
-                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -531,7 +531,7 @@ public class TestVoltCompiler extends TestCase {
                         "id integer default 23, \n" + // OH NO: AddBooks expects "id" to be named "cash"
                         "strval varchar(10) default 'foo', \n" + // and "strval" to be named "title"
                         "PRIMARY KEY(id));\n" +
-                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -550,7 +550,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
         final String procSchema =
-                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;" +
+                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;\n" +
                 "";
         final String procPath = MiscUtils.writeStringToTempFilePath(procSchema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -608,7 +608,7 @@ public class TestVoltCompiler extends TestCase {
         }
 
         final String procSchema =
-                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;" +
+                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;\n" +
                 "";
         final String procPath = MiscUtils.writeStringToTempFilePath(procSchema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -633,7 +633,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
         final String procSchema =
-                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;" +
+                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;\n" +
                 "";
         final String procPath = MiscUtils.writeStringToTempFilePath(procSchema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -649,7 +649,7 @@ public class TestVoltCompiler extends TestCase {
                         "cash integer default 23 not null, \n" +
                         "title varchar(10) default 'foo');\n" + // export does not like primary key.
                 "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
-                "export table books;" +
+                "export table books;\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -671,7 +671,7 @@ public class TestVoltCompiler extends TestCase {
                         "title varchar(10) default 'foo', \n" +
                         "PRIMARY KEY(cash));\n" +
                 "partition table books on column cash;\n" +
-                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final ProcInfoData info = new ProcInfoData();
@@ -700,7 +700,7 @@ public class TestVoltCompiler extends TestCase {
                         "PRIMARY KEY(cash));\n" +
                 "partition table books on column cash;\n" +
                 "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
-                "partition procedure AddBook ON TABLE books COLUMN cash;" +
+                "partition procedure AddBook ON TABLE books COLUMN cash;\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final ProcInfoData info = new ProcInfoData();
@@ -851,7 +851,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testUseInnerClassAsProc() throws Exception {
         String simpleSchema =
-                "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;" +
+                "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;\n" +
                 "";
         compileValidLiteralSchema(simpleSchema);
     }
@@ -888,7 +888,7 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure i3 as insert into books values(?, ?);" +
                 "partition procedure i3 on table books column cash;" +
                 "create procedure d1 as delete from books where title = ? and cash = ?;" +
-                "partition procedure d1 on table books column cash parameter 1;" +
+                "partition procedure d1 on table books column cash parameter 1;\n" +
                 "";
         VoltCompiler compiler = compileValidLiteralSchema(simpleSchema);
         final Catalog c1 = compiler.getCatalog();
@@ -936,7 +936,7 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "-- a valid comment\n" +
                 "- an invalid comment\n" +
-                "create table t(id integer);" +
+                "create table t(id integer);\n" +
                 "";
         VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
         //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
@@ -1052,7 +1052,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testDDLCompilerLeadingSemicolon() throws IOException {
-        final String s = "; create table t(id integer);" +
+        final String s = "; create table t(id integer);\n" +
                 "";
         VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
         //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
@@ -1062,13 +1062,13 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerMultipleStatementsOnMultipleLines() throws IOException {
         validateDefinedTables(
             "create table t(id integer); create\n" +
-            "table r(id integer); -- second table"
+            "table r(id integer); -- second table\n"
             , "t", "r");
     }
 
     public void testDDLCompilerStringLiteral() throws IOException {
         VoltCompiler compiler = validateDefinedTables(
-            "create table t(id varchar(3) default 'abc');"
+            "create table t(id varchar(3) default 'abc');\n"
             , "t");
         Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
@@ -1077,7 +1077,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerSemiColonInStringLiteral() throws IOException {
         VoltCompiler compiler = validateDefinedTables(
-            "create table t(id varchar(5) default 'a;bc');"
+            "create table t(id varchar(5) default 'a;bc');\n"
             , "t");
         Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
@@ -1086,7 +1086,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerDashDashInStringLiteral() throws IOException {
         VoltCompiler compiler = validateDefinedTables(
-            "create table t(id varchar(5) default 'a--bc');"
+            "create table t(id varchar(5) default 'a--bc');\n"
             , "t");
         Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
@@ -1095,7 +1095,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerNewlineInStringLiteral() throws IOException {
         VoltCompiler compiler = validateDefinedTables(
-            "create table t(id varchar(5) default 'a\n" + "bc');"
+            "create table t(id varchar(5) default 'a\n" + "bc');\n"
             , "t");
         Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
@@ -1109,7 +1109,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerEscapedStringLiterals() throws IOException {
         VoltCompiler compiler = validateDefinedTables(
-            "create table t(id varchar(10) default 'a''b''''c');"
+            "create table t(id varchar(10) default 'a''b''''c');\n"
             , "t");
         Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
@@ -1142,7 +1142,7 @@ public class TestVoltCompiler extends TestCase {
             String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id on t(id);\n" +
-                "create index idx_t_idnum on t(id,num);" +
+                "create index idx_t_idnum on t(id,num);\n" +
                 "";
             VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
             Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
@@ -1159,7 +1159,7 @@ public class TestVoltCompiler extends TestCase {
             final String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id_hash on t(id);\n" +
-                "create index idx_t_idnum_hash on t(id,num);" +
+                "create index idx_t_idnum_hash on t(id,num);\n" +
                 "";
             VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, can_be_hash[i]);
             if (can_be_hash[i]) {
@@ -1182,7 +1182,7 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_t_unique on t(id,num);\n" +
-                "create index idx_t on t(num);" +
+                "create index idx_t on t(num);\n" +
                 "";
         VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
         Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
@@ -1199,7 +1199,7 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_ft_unique on t(abs(id+num));\n" +
-                "create index idx_ft on t(abs(num));" +
+                "create index idx_ft on t(abs(num));\n" +
                 "";
         VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
         Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
@@ -1217,7 +1217,7 @@ public class TestVoltCompiler extends TestCase {
             final String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id_tree on t(id);\n" +
-                "create index idx_t_idnum_tree on t(id,num);" +
+                "create index idx_t_idnum_tree on t(id,num);\n" +
                 "";
             VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, can_be_tree[i]);
             Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
@@ -1233,8 +1233,8 @@ public class TestVoltCompiler extends TestCase {
         VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum1 on t(id,num);\n" +
-                "create index idx_t_idnum2 on t(id,num);"
-                , "t");
+                "create index idx_t_idnum2 on t(id,num);\n" +
+                "", "t");
         //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
         // and/or checkDDLWarningMessage
         assertTrue(compiler.hasErrorsOrWarnings());
@@ -1246,7 +1246,7 @@ public class TestVoltCompiler extends TestCase {
                 "create table t1(id integer not null, num integer not null);\n" +
                 "create table t2(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum on t1(id,num);\n" +
-                "create index idx_t_idnum on t2(id,num);" +
+                "create index idx_t_idnum on t2(id,num);\n" +
                 "";
         failToCompileLiteralDdl(s);
     }
@@ -1256,8 +1256,8 @@ public class TestVoltCompiler extends TestCase {
         validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_hash on t(id,num);\n" +
-                "create index idx_t_idnum_tree on t(id,num);"
-                , "t");
+                "create index idx_t_idnum_tree on t(id,num);\n" +
+                "", "t");
     }
 
     public void testDDLCompilerTwoSwappedOrderIndexes()
@@ -1265,21 +1265,22 @@ public class TestVoltCompiler extends TestCase {
         VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
-                "create index idx_t_idnum_b on t(id,num);"
-                , "t");
+                "create index idx_t_idnum_b on t(id,num);\n"
+                "", "t");
         assertFalse(compiler.hasErrorsOrWarnings());
     }
 
     public void testDDLCompilerDropOneOfThreeIndexes()
     {
-        //TODO: refactor to use checkDDLWarningMessage? That the table
-        // gets defined does not seem to be the critical issue under test, here.
+        //TODO: refactor to use checkDDLWarningMessage? This check that the table
+        // gets defined is optional -- it's weak and does not address the critical
+        // issue under test, here.
         VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
                 "create index idx_t_idnum_b on t(id,num);\n" +
-                "create index idx_t_idnum_c on t(id,num);\n"
-                , "t");
+                "create index idx_t_idnum_c on t(id,num);\n" +
+                "", "t");
         assertTrue(compiler.hasErrorsOrWarnings());
         int foundCount = 0;
         for (VoltCompiler.Feedback f : compiler.m_warnings) {
@@ -1295,18 +1296,17 @@ public class TestVoltCompiler extends TestCase {
         validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_t_idnum_unique on t(id,num);\n" +
-                "create index idx_t_idnum on t(id,num);"
-                , "t");
+                "create index idx_t_idnum on t(id,num);\n" +
+                "", "t");
     }
 
     public void testDDLCompilerTwoIndexesWithSameName()
     {
-        final String s =
+        failToCompileLiteralDdl(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum on t(id);\n" +
-                "create index idx_t_idnum on t(id,num);" +
-                "";
-        failToCompileLiteralDdl(s);
+                "create index idx_t_idnum on t(id,num);\n" +
+                "");
     }
 
     /**
@@ -1322,17 +1322,17 @@ public class TestVoltCompiler extends TestCase {
         String ddl = "";
         String errorIndexMsg = "Index IDX_T_TM cannot include the function NOW or CURRENT_TIMESTAMP.";
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-                "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));" +
+                "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));\n" +
                 "";
         checkDDLErrorMessage(ddl, errorIndexMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-                "create index idx_t_tm on t(since_epoch(second, NOW) - since_epoch(second, tm));" +
+                "create index idx_t_tm on t(since_epoch(second, NOW) - since_epoch(second, tm));\n" +
                 "";
         checkDDLErrorMessage(ddl, errorIndexMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-                "create index idx_t_tm on t(CURRENT_TIMESTAMP);" +
+                "create index idx_t_tm on t(CURRENT_TIMESTAMP);\n" +
                 "";
         checkDDLErrorMessage(ddl, errorIndexMsg);
 
@@ -1340,30 +1340,30 @@ public class TestVoltCompiler extends TestCase {
         String errorMatviewMsg = "Materialized view \"MY_VIEW\" cannot include the function NOW or CURRENT_TIMESTAMP.";
         ddl = "create table t(id integer not null, tm timestamp);\n" +
                 "create view my_view as select since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm), " +
-                "count(*) from t group by since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm);" +
+                "count(*) from t group by since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm);\n" +
                 "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
                 "create view my_view as select since_epoch(second, NOW) - since_epoch(second, tm), " +
-                "count(*) from t group by since_epoch(second, NOW) - since_epoch(second, tm);" +
+                "count(*) from t group by since_epoch(second, NOW) - since_epoch(second, tm);\n" +
                 "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-                "create view my_view as select tm, count(*), count(CURRENT_TIMESTAMP)  from t group by tm;" +
+                "create view my_view as select tm, count(*), count(CURRENT_TIMESTAMP)  from t group by tm;\n" +
                 "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-                "create view my_view as select tm, count(*), count(NOW)  from t group by tm;" +
+                "create view my_view as select tm, count(*), count(NOW)  from t group by tm;\n" +
                 "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
                 "create view my_view as select tm, count(*) from t " +
                 "where since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm) > 60 " +
-                "group by tm;" +
+                "group by tm;\n" +
                 "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
@@ -1456,14 +1456,14 @@ public class TestVoltCompiler extends TestCase {
 
         // unique/assumeunique constraint added via ALTER TABLE to replicated table
         schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
-                "ALTER TABLE t0 ADD UNIQUE(name);" +
+                "ALTER TABLE t0 ADD UNIQUE(name);\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, null, null);
 
         // unique/assumeunique constraint added via ALTER TABLE to partitioned table
         schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "ALTER TABLE t0 ADD UNIQUE(name);" +
+                "ALTER TABLE t0 ADD UNIQUE(name);\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
@@ -1490,7 +1490,7 @@ public class TestVoltCompiler extends TestCase {
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;" +
+                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, null, null);
 
@@ -1499,28 +1499,28 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the partitioning key ( no primary key) gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;" +
+                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
         // A unique index on the partitioning key ( also primary key) gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;" +
+                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
         // A unique compound index on the partitioning key and another column gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;" +
+                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
         // A unique index on the partitioning key and an expression like abs(age) gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;" +
+                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
@@ -1529,34 +1529,34 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the partitioning key ( no primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;" +
+                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
         // A unique index on the non-partitioning key gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;" +
+                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
         // A unique index on an unrelated expression like abs(age) gets a error.
         schema = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;" +
+                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
         // A unique index on the partitioning key ( non-primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN name;" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
                 "";
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
 
         // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;" +
+                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;\n" +
                 "";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
@@ -1564,7 +1564,7 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the non-partitioning key, non-partitioned column gets two errors.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;" +
+                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;\n" +
                 "";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
@@ -1594,7 +1594,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num order by num;" +
+                "create view my_view as select num, count(*) from t group by num order by num;\n" +
                 "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
 
@@ -1607,17 +1607,17 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num limit 1;" +
+                "create view my_view as select num, count(*) from t group by num limit 1;\n" +
                 "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num limit 1 offset 10;" +
+                "create view my_view as select num, count(*) from t group by num limit 1 offset 10;\n" +
                 "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num having count(*) > 3;" +
+                "create view my_view as select num, count(*) from t group by num having count(*) > 3;\n" +
                 "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
     }
@@ -1629,44 +1629,44 @@ public class TestVoltCompiler extends TestCase {
         // Test CREATE
         // test failed cases
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);" +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);\n" +
                 "";
         checkDDLErrorMessage(ddl, "unexpected token: XX");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 66666666666666666666666666666666);" +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 66666666666666666666666666666666);\n" +
                 "";
         checkDDLErrorMessage(ddl, "incompatible data type in operation");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS -10);" +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS -10);\n" +
                 "";
         checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);" +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);\n" +
                 "";
         checkDDLErrorMessage(ddl, "Multiple LIMIT PARTITION ROWS constraints on table T are forbidden");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);" +
+                "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);\n" +
                 "";
         checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT Rows 6);" +
+                "CONSTRAINT tblimit1 LIMIT Rows 6);\n" +
                 "";
         checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
 
 
         // Test success cases
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);\n" +
                 "";
         checkDDLErrorMessage(ddl, null);
 
         ddl = "create table t(id integer not null, num integer," +
-                "LIMIT PARTITION ROWS 6);" +
+                "LIMIT PARTITION ROWS 6);\n" +
                 "";
         checkDDLErrorMessage(ddl, null);
 
@@ -1701,14 +1701,14 @@ public class TestVoltCompiler extends TestCase {
         // Successive alter statements are okay
         ddl = createBase +
                 "alter table t add LIMIT PARTITION ROWS 6;" +
-                "alter table t add LIMIT PARTITION ROWS 7;" +
+                "alter table t add LIMIT PARTITION ROWS 7;\n" +
                 "";
         checkDDLErrorMessage(ddl, null);
 
         // Alter after constraint set in create is okay
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-                "alter table t add LIMIT PARTITION ROWS 7;" +
+                "alter table t add LIMIT PARTITION ROWS 7;\n" +
                 "";
         checkDDLErrorMessage(ddl, null);
 
@@ -1719,13 +1719,13 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-                "alter table t drop constraint tblimit2;" +
+                "alter table t drop constraint tblimit2;\n" +
                 "";
         checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
 
         ddl = createBase +
                 "alter table t add LIMIT PARTITION ROWS 6;" +
-                "alter table t drop constraint tblimit2;" +
+                "alter table t drop constraint tblimit2;\n" +
                 "";
         checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
 
@@ -1745,21 +1745,21 @@ public class TestVoltCompiler extends TestCase {
         // named drop
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-                "alter table t drop constraint tblimit1;" +
+                "alter table t drop constraint tblimit1;\n" +
                 "";
         checkDDLErrorMessage(ddl, null);
 
         // magic drop
         ddl = createBase +
                 "alter table t add LIMIT PARTITION ROWS 6;" +
-                "alter table t drop LIMIT PARTITION ROWS;" +
+                "alter table t drop LIMIT PARTITION ROWS;\n" +
                 "";
         checkDDLErrorMessage(ddl, null);
 
         // magic drop of named constraint
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-                "alter table t drop LIMIT PARTITION ROWS;" +
+                "alter table t drop LIMIT PARTITION ROWS;\n" +
                 "";
         checkDDLErrorMessage(ddl, null);
     }
@@ -1818,48 +1818,48 @@ public class TestVoltCompiler extends TestCase {
 
         // This exercises adding a limit constraint with a DELETE statement
         ddl = "create table t(id integer not null);\n" +
-                "alter table t add limit partition rows 10 execute (delete from t where id > 0);" +
+                "alter table t add limit partition rows 10 execute (delete from t where id > 0);\n" +
                 "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, "delete from t where id > 0");
 
         // This exercises making a change to the delete statement of an existing constraint
-        ddl = "create table t(id integer not null, "
-                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
-                + ");\n"
-                + "alter table t add limit partition rows 15 execute (delete from t where id between 0 and 100);" +
+        ddl = "create table t(id integer not null, " +
+                "constraint c1 limit partition rows 10 execute (delete from t where id > 0)" +
+                ");\n" +
+                "alter table t add limit partition rows 15 execute (delete from t where id between 0 and 100);\n" +
                 "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 15, "delete from t where id between 0 and 100");
 
         // test dropping a limit contraint with a delete
-        ddl = "create table t(id integer not null, "
-                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
-                + ");\n"
-                + "alter table t drop limit partition rows;" +
+        ddl = "create table t(id integer not null, " +
+                "constraint c1 limit partition rows 10 execute (delete from t where id > 0)" +
+                ");\n" +
+                "alter table t drop limit partition rows;\n" +
                 "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
 
         // test dropping constraint by referencing the constraint name
-        ddl = "create table t(id integer not null, "
-                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
-                + ");\n"
-                + "alter table t drop constraint c1;" +
+        ddl = "create table t(id integer not null, " +
+                "constraint c1 limit partition rows 10 execute (delete from t where id > 0)" +
+                ");\n" +
+                "alter table t drop constraint c1;\n" +
                 "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
 
         // test dropping constraint by referencing the constraint name
         // Negative test---got the constraint name wrong
-        ddl = "create table t(id integer not null, "
-                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
-                + ");\n"
-                + "alter table t drop constraint c34;" +
+        ddl = "create table t(id integer not null, " +
+                "constraint c1 limit partition rows 10 execute (delete from t where id > 0)" +
+                ");\n" +
+                "alter table t drop constraint c34;\n" +
                 "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, "object not found", "t", -1, null);
 
         // Alter the table by removing the LIMIT DELETE statement, but not the row limit
-        ddl = "create table t(id integer not null, "
-                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
-                + ");\n"
-                + "alter table t add limit partition rows 10;" +
+        ddl = "create table t(id integer not null, " +
+                "constraint c1 limit partition rows 10 execute (delete from t where id > 0)" +
+                ");\n" +
+                "alter table t add limit partition rows 10;\n" +
                 "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, null);
 
@@ -1869,11 +1869,11 @@ public class TestVoltCompiler extends TestCase {
 
     public void testPartitionOnBadType() {
         final String simpleSchema =
-                "create table books (\n" +
+                "create table boSoks (\n" +
                         "cash float default 0.0 not null, \n" + // OH NO: float type for partition key
                         "title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
                 "partition table books on column cash;\n" +
-                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -1923,7 +1923,7 @@ public class TestVoltCompiler extends TestCase {
                 "select id, COUNT(*), SUM(cnt)\n" +
                 " from books\n" +
                 " group by id;" +
-                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;\n" +
                 "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(schema);
         final VoltCompiler compiler = new VoltCompiler();
@@ -2450,7 +2450,7 @@ public class TestVoltCompiler extends TestCase {
                         "cash integer default 23 not null, \n" +
                         "title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
                 "PARTITION TABLE books ON COLUMN cash;\n" +
-                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;\n" +
                 "";
         compileValidLiteralSchema(simpleSchema);
 
@@ -2467,7 +2467,7 @@ public class TestVoltCompiler extends TestCase {
                         "title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
                 "PARTITION TABLE books ON COLUMN cash;" +
                 "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook;" +
-                "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;" +
+                "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;\n" +
                 "";
         compileValidLiteralSchema(simpleSchema);
         final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
