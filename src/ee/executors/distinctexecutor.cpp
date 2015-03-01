@@ -108,6 +108,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
                            " output table '%s'",
                            input_table->name().c_str(),
                            output_table->name().c_str());
+                cleanupInputTempTable(input_table);
                 return false;
             }
         }
