@@ -53,7 +53,6 @@ const int COLUMN_COUNT = 5;
 const int MAGIC_TUPLE_SIZE = 39;
 const int MAGIC_TRANSACTION_SIZE = 36;
 const int MAGIC_BEGIN_SIZE = 22;
-const int MAGIC_END_SIZE = MAGIC_TRANSACTION_SIZE - MAGIC_BEGIN_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // 1k buffer
 const int BUFFER_SIZE = 950;
@@ -438,13 +437,13 @@ TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
 {
     bool expectedException = false;
     int tuples_cant_fill = 3 * LARGE_BUFFER_SIZE / MAGIC_TUPLE_SIZE;
-    for (int i = 1; i <= tuples_cant_fill; i++)
-    {
-        try {
+    try {
+        for (int i = 1; i <= tuples_cant_fill; i++) {
             appendTuple(0, 1);
-        } catch (SQLException& e) {
-            expectedException = true;
         }
+    }
+    catch (SQLException& e) {
+        expectedException = true;
     }
     ASSERT_TRUE(expectedException);
 
@@ -523,7 +522,7 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     //The rollback emits an end transaction record spuriously, we'll just ignore it
-    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE + MAGIC_END_SIZE);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE);
 }
 
 
@@ -549,7 +548,7 @@ TEST_F(DRTupleStreamTest, RollbackMiddleTuple)
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10) + MAGIC_TRANSACTION_SIZE);
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10) + MAGIC_BEGIN_SIZE);
 }
 
 /**
