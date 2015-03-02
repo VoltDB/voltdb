@@ -77,7 +77,7 @@ public class SQLParser extends SQLPatternFactory
                 SPF.token("partition"),
                 SPF.capture(SPF.tokenAlternatives("procedure", "table")),
                 SPF.anyClause()
-            ).compile();
+            ).compile("PAT_PARTITION_ANY_PREAMBLE");
 
     /**
      * Pattern: PARTITION TABLE tablename ON COLUMN columnname
@@ -90,9 +90,9 @@ public class SQLParser extends SQLPatternFactory
      */
     private static final Pattern PAT_PARTITION_TABLE =
         SPF.statement(
-            SPF.token("partition"), SPF.token("table"), SPF.capture(SPF.ddlName()),
-            SPF.token("on"), SPF.token("column"), SPF.capture(SPF.ddlName())
-        ).compile();
+            SPF.token("partition"), SPF.token("table"), SPF.capture(SPF.databaseObjectName()),
+            SPF.token("on"), SPF.token("column"), SPF.capture(SPF.databaseObjectName())
+        ).compile("PAT_PARTITION_TABLE");
 
     /**
      * PARTITION PROCEDURE procname ON TABLE tablename COLUMN columnname [PARAMETER paramnum]
@@ -107,88 +107,92 @@ public class SQLParser extends SQLPatternFactory
      */
     private static final Pattern PAT_PARTITION_PROCEDURE =
         SPF.statement(
-            SPF.token("partition"), SPF.token("procedure"), SPF.capture(SPF.ddlName()),
-            SPF.token("on"), SPF.token("table"), SPF.capture(SPF.ddlName()),
-            SPF.token("column"), SPF.capture(SPF.ddlName()),
+            SPF.token("partition"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
+            SPF.token("on"), SPF.token("table"), SPF.capture(SPF.databaseObjectName()),
+            SPF.token("column"), SPF.capture(SPF.databaseObjectName()),
             SPF.optional(SPF.clause(SPF.token("parameter"), SPF.capture(SPF.integer())))
-        ).compile();
+        ).compile("PAT_PARTITION_PROCEDURE");
 
     //TODO: Convert to pattern factory usage below this point.
     //TODO: Consider implementing FIXME/TODO comments -- and TESTING --
     // prior to conversion to pattern factory.
 
-    /**
-     * CREATE PROCEDURE from Java class statement regex
+    /*
+     * CREATE PROCEDURE [ <MODIFIER_CLAUSE> ... ] FROM <JAVA_CLASS>
+     *
+     * CREATE PROCEDURE from Java class statement pattern.
      * NB supports only unquoted table and column names
+     *
      * Capture groups:
-     *  (1) ALLOW/PARTITION clauses - needs further parsing
+     *  (1) ALLOW/PARTITION clauses full text - needs further parsing
      *  (2) Class name
      */
-    private static final Pattern PAT_CREATE_PROCEDURE_FROM_CLASS = Pattern.compile(String.format(
-            "(?i)" +                  // ignore case instruction
-            "\\A" +                   // beginning of statement
-            "CREATE\\s+PROCEDURE" +   // CREATE PROCEDURE tokens with whitespace separator
-            "((?:\\s+%s)*)" +         // (group 1) optional ALLOW and or PARTITION clause(s)
-            "\\s+FROM\\s+CLASS\\s+" + // FROM CLASS tokens with whitespace terminators
-            "([\\w$.]+)" +            // (group 2) class name
-            "\\s*" +                  // trailing whitespace
-            ";\\z",                   // required semicolon at end of statement
-            formatCreateProcedureClause(true)));
+    private static final Pattern PAT_CREATE_PROCEDURE_FROM_CLASS =
+        SPF.statement(
+            SPF.token("create"), SPF.token("procedure"),
+            unparsedProcedureModifierClauses(),
+            SPF.token("from"), SPF.token("class"), SPF.capture(SPF.className())
+        ).compile("PAT_CREATE_PROCEDURE_FROM_CLASS");
 
-    /**
-     * CREATE PROCEDURE with single SELECT or DML statement regex
+    /*
+     * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS <SQL_STATEMENT>
+     *
+     * CREATE PROCEDURE with single SELECT or DML statement pattern
      * NB supports only unquoted table and column names
+     *
      * Capture groups:
      *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses - needs further parsing
+     *  (2) ALLOW/PARTITION clauses full text - needs further parsing
      *  (3) SELECT or DML statement
      */
-    private static final Pattern PAT_CREATE_PROCEDURE_FROM_SQL = Pattern.compile(String.format(
-            "(?i)" +                    // ignore case instruction
-            "\\A" +                     // beginning of statement
-            "CREATE\\s+PROCEDURE\\s+" + // CREATE PROCEDURE tokens with whitespace terminators
-            "([\\w.$]+)" +              // (group 1) procedure name
-            "((?:\\s+%s)*)" +           // (group 2) optional ALLOW and or PARTITION clause(s)
-            "\\s+AS\\s+" +              // AS token with surrounding whitespace
-            "(.+)" +                    // (group 3) SELECT or DML statement
-            ";\\z",                     // required semicolon at end of statement
-            formatCreateProcedureClause(true)));
+    private static final Pattern PAT_CREATE_PROCEDURE_FROM_SQL =
+        SPF.statement(
+            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
+            unparsedProcedureModifierClauses(),
+            SPF.token("as"), SPF.capture(SPF.anyClause())
+        ).compile("PAT_CREATE_PROCEDURE_FROM_SQL");
 
-    /**
+    /*
+     * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS ### <PROCEDURE_CODE> ### LANGUAGE <LANGUAGE_NAME>
+     *
      * CREATE PROCEDURE with inline implementation script, e.g. Groovy, statement regex
      * NB supports only unquoted table and column names
+     * The only supported language is GROOVY for now, but to avoid confusing with the
+     * other CREATE PROCEDURE ... AS variant match anything that has the block delimiters.
+     *
      * Capture groups:
      *  (1) Procedure name
      *  (2) ALLOW/PARTITION clauses - needs further parsing
      *  (3) Code block content
      *  (4) Language name
      */
-    private static final Pattern PAT_CREATE_PROCEDURE_AS_SCRIPT = Pattern.compile(
-            String.format(
-                //FIXME: ignore case instruction is redundant w/ Pattern.CASE_INSENSITIVE below
-                "(?i)" +                    // ignore case instruction
-                "\\A" +                     // beginning of statement
-                "CREATE\\s+PROCEDURE\\s+" + // CREATE PROCEDURE tokens with whitespace terminators
-                "([\\w.$]+)" +              // (group 1) procedure name
-                "((?:\\s+%s)*)" +           // (group 2) optional ALLOW and or PARTITION clause(s)
-                "\\s+AS\\s+" +              // AS token with surrounding whitespace
-                "%s" +                      // leading block delimiter ###
-                "(.+)" +                    // (group 3) code block content
-                "%s" +                      // trailing block delimiter ###
-                "\\s+LANGUAGE\\s+" +        // LANGUAGE token with surrounding whitespace
-                "(GROOVY)" +                // (group 4) language name
-                "\\S*" +                    // optional trailing whitespace BUG? should be \\s*?
-                ";\\z",                     // required semicolon at end of statement
-                formatCreateProcedureClause(true), SQLLexer.BLOCK_DELIMITER, SQLLexer.BLOCK_DELIMITER),
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+    private static final Pattern PAT_CREATE_PROCEDURE_AS_SCRIPT =
+        SPF.statement(
+            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
+            unparsedProcedureModifierClauses(),
+            SPF.token("as"),
+            SPF.delimitedCaptureBlock(SQLLexer.BLOCK_DELIMITER, null),
+            // Match anything after the last delimiter to get a good error for a bad language clause.
+            SPF.oneOf(
+                SPF.clause(SPF.token("language"), SPF.capture(SPF.languageName())),
+                SPF.anyClause()
+            )
+        ).compile("PAT_CREATE_PROCEDURE_AS_SCRIPT");
 
     /**
-     * Pattern for parsing the ALLOW and PARTITION clauses inside CREATE PROCEDURE statements.
-     * Capture groups are enabled.
+     * Pattern for parsing a single ALLOW or PARTITION clauses within a CREATE PROCEDURE statement.
+     *
+     * Capture groups:
+     *  (1) ALLOW clause: entire role list with commas and internal whitespace
+     *  (2) PARTITION clause: procedure name
+     *  (3) PARTITION clause: table name
+     *  (4) PARTITION clause: column name
+     *
+     *  An ALLOW clause will have (1) be non-null and (2,3,4) be null.
+     *  A PARTITION clause will have (1) be null and (2,3,4) be non-null.
      */
-    private static final Pattern PAT_ANY_CREATE_PROCEDURE_STATEMENT_CLAUSE = Pattern.compile(
-            formatCreateProcedureClause(false),
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
+    private static final Pattern PAT_ANY_CREATE_PROCEDURE_STATEMENT_CLAUSE =
+        parsedProcedureModifierClause().compile("PAT_ANY_CREATE_PROCEDURE_STATEMENT_CLAUSE");
 
     /**
      * DROP PROCEDURE  statement regex
@@ -297,7 +301,16 @@ public class SQLParser extends SQLPatternFactory
             "\\AEXPORT|" +
             "\\AIMPORT" +
             ")" +                                  // end (group 1)
-            "\\s"                                  // one required whitespace to terminate keyword
+            "\\s" +                                // one required whitespace to terminate keyword
+            "");
+
+    private static final Pattern PAT_DR_TABLE = Pattern.compile(
+            "(?i)" +                                // (ignore case)
+            "\\A"  +                                // start statement
+            "DR\\s+TABLE\\s+" +                     // DR TABLE
+            "([\\w.$|\\\\*]+)" +                    // (1) <table name>
+            "(?:\\s+(DISABLE))?" +                  //     (2) optional DISABLE argument
+            "\\s*;\\z"                              // (end statement)
             );
 
     //========== Patterns from SQLCommand ==========
@@ -316,7 +329,7 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
 
     /**
-     * Matches a command followed by an SQL CRUD statement verb
+     * Matches a command followed by and SQL CRUD statement verb
      */
     private static final Pattern ParserStringKeywords = Pattern.compile(
             "\\s*" +                                          // 0 or more spaces
@@ -416,9 +429,30 @@ public class SQLParser extends SQLPatternFactory
             ";*" +         // optional semicolons
             "\\s*$",       // optional terminating whitespace
             Pattern.CASE_INSENSITIVE);
+
+    // SQLCommand's FILE command.  If this pattern matches, we
+    // assume that the user meant to enter a file command, and
+    // produce appropriate error messages.
     private static final Pattern FileToken = Pattern.compile(
-            "^\\s*" +      // optional indent at start of line
-            "file\\s+" +   // required FILE command token, whitespace terminated
+            "^\\s*" +          // optional indent at start of line
+            "file" +           // FILE keyword
+            "(?:(?=\\s|;)|$)", // Must be either followed by whitespace or semicolon
+                               //   (zero-width consumed)
+                               // or the end of the line
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern DashBatchToken = Pattern.compile(
+            "\\s+" +   // required preceding whitespace
+            "-batch",  // -batch option, whitespace terminated
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern DashInlineBatchToken = Pattern.compile(
+            "\\s+" +        // required preceding whitespace
+            "-inlinebatch",  // -inlinebatch option, whitespace terminated
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern FilenameToken = Pattern.compile(
+            "\\s+" +        // required preceding whitespace
             "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
             "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
             "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
@@ -427,17 +461,11 @@ public class SQLParser extends SQLPatternFactory
             ";*" +         // optional semicolons
             "\\s*",        // more optional whitespace
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern FileBatchToken = Pattern.compile(
-            "^\\s*" +      // optional indent at start of line
-            "file\\s+" +   // required FILE command token, whitespace terminated
-            "-batch\\s+" + // required -batch option token, whitespace terminated
-            "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
-            "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
-            "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
-            "\\s*" +       // optional whitespace
-            //FIXME: strangely allowing more than one strictly adjacent semicolon.
-            ";*" +         // optional semicolons
-            "\\s*",        // more optional whitespace
+
+    private static final Pattern DelimiterToken = Pattern.compile(
+            "\\s+" +        // required preceding whitespace
+            "([^\\s;]+)" +  // a string of characters not containing semis or spaces
+            "\\s*;?\\s*",   // an optional semicolon surrounded by whitespace
             Pattern.CASE_INSENSITIVE);
 
     // Query Execution
@@ -518,6 +546,16 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchExportTable(String statement)
     {
         return PAT_EXPORT_TABLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against DR table pattern
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDRTable(String statement)
+    {
+        return PAT_DR_TABLE.matcher(statement);
     }
 
     /**
@@ -623,95 +661,72 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Build an ALLOW clause that can be used to assign roles in CREATE PROCEDURE statements.
-     * @param nonCapturing the regex group doesn't capture
-     * @return pattern string
+     * Build a pattern segment to accept a single optional ALLOW or PARTITION clause
+     * to modify CREATE PROCEDURE statements.
      *
-     * Regex Description:
-     * <pre>
-     *  ALLOW\\s+                   -- ALLOW token and trailing whitespace
-     *  ( or (?:                    -- begin group (1 if capturing)
-     *    [\\w.$]+                  -- first role name
-     *    (?:                       -- begin non-capturing group for additional role names
-     *      \\s*,\\s*               -- comma and optional surrounding whitespace
-     *      [\\w.$]+                -- additional role name
-     *    )*                        -- end non-capturing group for additional role names with repetition
-     *  )                           -- end group
-     * </pre>
+     * @param captureTokens  Capture individual tokens if true
+     * @return               Inner pattern to be wrapped by the caller as appropriate
      *
-     * Capture groups (if not non-capturing):
-     *  (1) Entire role list with commas and internal whitespace
+     * Capture groups (when captureTokens is true):
+     *  (1) ALLOW clause: entire role list with commas and internal whitespace
+     *  (2) PARTITION clause: procedure name
+     *  (3) PARTITION clause: table name
+     *  (4) PARTITION clause: column name
      */
-    private static String formatProcedureAllowClause(boolean nonCapturing)
+    private static SQLPatternPart makeInnerProcedureModifierClausePattern(boolean captureTokens)
     {
-        final String groupPrefix = nonCapturing ? "(?:" : "(";
-        return String.format("ALLOW\\s+%s[\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)", groupPrefix);
+        return
+            SPF.oneOf(
+                SPF.clause(
+                    SPF.token("allow"),
+                    SPF.group(captureTokens, SPF.commaList(SPF.userName()))
+                ),
+                SPF.clause(
+                    SPF.token("partition"), SPF.token("on"), SPF.token("table"),
+                    SPF.group(captureTokens, SPF.databaseObjectName()),
+                    SPF.token("column"),
+                    SPF.group(captureTokens, SPF.databaseObjectName()),
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("parameter"),
+                            SPF.group(captureTokens, SPF.integer())
+                        )
+                    )
+                )
+            );
     }
 
     /**
-     * Build a PARTITION clause for a CREATE PROCEDURE statement.
-     * NB supports only unquoted table and column names
+     * Build a pattern segment to accept and parse a single optional ALLOW or PARTITION
+     * clause used to modify a CREATE PROCEDURE statement.
      *
-     * @param nonCapturing the regex group doesn't capture
-     * @return pattern string
+     * @return ALLOW/PARTITION modifier clause parsing pattern.
      *
-     * Regex Description:
-     * <pre>
-     *  PARTITION\\s+               -- PARTITION token plus whitespace
-     *  ON\\s+TABLE\\s+             -- ON TABLE tokens plus whitespace
-     *  ([\\w$]+) or (?:[\\w$]+)    -- table name group (1 if capturing)
-     *  \\s+COLUMN\\s+              -- COLUMN token and whitespace
-     *  ([\\w$]+) or (?:[\\w$]+)    -- column name group (2 if capturing)
-     *  (?:                         -- begin optional non-capturing parameter group
-     *    \\s+PARAMETER\\s+         -- PARAMETER token and whitespace
-     *    (\\d+)                    -- parameter number group (3 if capturing)
-     *  )?                          -- end optional non-capturing parameter group
-     * </pre>
-     *
-     * Capture groups (if not non-capturing):
-     *  (1) Table name
-     *  (2) Column name
-     *  (3) Parameter index
+     * Capture groups:
+     *  (1) ALLOW clause: entire role list with commas and internal whitespace
+     *  (2) PARTITION clause: procedure name
+     *  (3) PARTITION clause: table name
+     *  (4) PARTITION clause: column name
      */
-    private static final String formatProcedurePartitionClause(boolean nonCapturing)
+    static SQLPatternPart parsedProcedureModifierClause()
     {
-        final String groupPrefix = nonCapturing ? "(?:" : "(";
-        return String.format(
-            "PARTITION\\s+ON\\s+TABLE\\s+%s[\\w$]+)\\s+COLUMN\\s+%s[\\w$]+)(?:\\s+PARAMETER\\s+%s\\d+))?",
-            groupPrefix, groupPrefix, groupPrefix);
+        return SPF.clause(makeInnerProcedureModifierClausePattern(true));
+
     }
 
     /**
-     * Optional ALLOW or PARTITION clause that can modify CREATE PROCEDURE statements.
-     * Capture must be enabled to distinguish which clause (ALLOW or PARTITION)
-     * was matched based on whether group 1 (roles for ALLOW) or 2
-     * (table for PARTITION) is non-empty.
-     * The caller should try to match any number of repetitions to
-     * support any number of ALLOW clauses and up to one PARTITION clause.
-     * Used this way, the patterns will match all possible clause orderings
-     * BUT will also allow a false positive match on two or more PARTITION
-     * clauses. The caller is responsible for detecting that invalid case.
+     * Build a pattern segment to recognize all the ALLOW or PARTITION modifier clauses
+     * of a CREATE PROCEDURE statement.
      *
-     * Regex Description:
-     * <pre>
-     *  (?:"                        -- begin OR group with both possible clauses (non-capturing)
-     *    (?:<allow-clause>)        -- ALLOW clause group (non-capturing)
-     *    |                         -- OR operator
-     *    (?:<partition-clause>)    -- PARTITION clause group (non-capturing)
-     *  )                           -- end OR group with both possible clauses
-     * </pre>
+     * @return Pattern to be used by the caller inside a CREATE PROCEDURE pattern.
      *
-     * Capture groups (if not non-capturing):
-     *  (1) Entire role list with commas and internal whitespace
-     *  (2) Partitioning table name
-     *  (3) Partitioning column name
-     *  (4) Partitioning parameter index
+     * Capture groups:
+     *  (1) All ALLOW/PARTITION modifier clauses as one string
      */
-    private static final String formatCreateProcedureClause(boolean nonCapturing)
+    static SQLPatternPart unparsedProcedureModifierClauses()
     {
-        return String.format("(?:(?:%s)|(?:%s))",
-                             formatProcedureAllowClause(nonCapturing),
-                             formatProcedurePartitionClause(nonCapturing));
+        // Force the leading space to go inside the repeat block.
+        return SPF.capture(SPF.repeat(makeInnerProcedureModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
     }
 
     //========== Other utilities from or for SQLCommand ==========
@@ -992,21 +1007,65 @@ public class SQLParser extends SQLPatternFactory
         return null;
     }
 
-    public static final class FileInfo {
-        private final File m_file;
-        private final boolean m_batch;
+    /**
+     * An enum that describes the options that can be applied
+     * to sqlcmd's "file" command
+     */
+    static public enum FileOption {
+        PLAIN,
+        BATCH,
+        INLINEBATCH
+    }
 
-        FileInfo(String fileName, boolean b) {
-            m_file = new File(fileName);
-            m_batch = b;
+    /**
+     * This class encapsulates information produced by
+     * parsing sqlcmd's "file" command.
+     */
+    public static final class FileInfo {
+        private final FileOption m_option;
+        private final File m_file;
+        private final String m_delimiter;
+
+        FileInfo(FileOption option, String filenameOrDelimiter) {
+            m_option = option;
+            switch (option) {
+            case PLAIN:
+            case BATCH:
+                m_file = new File(filenameOrDelimiter);
+                m_delimiter = null;
+                break;
+            case INLINEBATCH:
+            default:
+                assert(option == FileOption.INLINEBATCH);
+                m_file = null;
+                m_delimiter = filenameOrDelimiter;
+                break;
+            }
         }
 
         public File getFile() {
             return m_file;
         }
 
+        public String getDelimiter() {
+            assert (m_option == FileOption.INLINEBATCH);
+            return m_delimiter;
+        }
+
         public boolean isBatch() {
-            return m_batch;
+            return m_option == FileOption.BATCH
+                    || m_option == FileOption.INLINEBATCH;
+        }
+
+        public FileOption getOption() {
+            return m_option;
+        }
+
+        @Override
+        public String toString() {
+            return "FILE command: " + m_option.name() +
+                    ", file: \"" + m_file.getName() +
+                    "\", delimiter: " + m_delimiter;
         }
     }
 
@@ -1017,16 +1076,62 @@ public class SQLParser extends SQLPatternFactory
      */
     public static FileInfo parseFileStatement(String statement)
     {
-        Matcher batchMatcher = FileBatchToken.matcher(statement);
-        if (batchMatcher.matches()) {
-            return new FileInfo(batchMatcher.group(1), true);
-        }
-        Matcher matcher = FileToken.matcher(statement);
-        if (matcher.matches()) {
-            return new FileInfo(matcher.group(1), false);
+        Matcher fileMatcher = FileToken.matcher(statement);
+
+        if (! fileMatcher.lookingAt()) {
+            // This input does not start with FILE,
+            // so it's not a file command, it's something else.
+            // Return to caller a null and no errors.
+            return null;
         }
 
-        return null;
+        String remainder = statement.substring(fileMatcher.end(), statement.length());
+
+        Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
+        if (inlineBatchMatcher.lookingAt()) {
+            remainder = remainder.substring(inlineBatchMatcher.end(), remainder.length());
+            Matcher delimiterMatcher = DelimiterToken.matcher(remainder);
+
+            // use matches here (not lookingAt) because we want to match
+            // all of the remainder, not just beginning
+            if (delimiterMatcher.matches()) {
+                String delimiter = delimiterMatcher.group(1);
+                return new FileInfo(FileOption.INLINEBATCH, delimiter);
+            }
+
+            throw new SQLParser.Exception(
+                    "Did not find valid delimiter for \"file -inlinebatch\" command.");
+        }
+
+        // It is either a plain or a -batch file command.
+        FileOption option = FileOption.PLAIN;
+        Matcher batchMatcher = DashBatchToken.matcher(remainder);
+        if (batchMatcher.lookingAt()) {
+            option = FileOption.BATCH;
+            remainder = remainder.substring(batchMatcher.end(), remainder.length());
+        }
+
+        Matcher filenameMatcher = FilenameToken.matcher(remainder);
+        String filename = null;
+
+        // Use matches to match all input, not just beginning
+        if (filenameMatcher.matches()) {
+            filename = filenameMatcher.group(1);
+
+            // Trim whitespace from beginning and end of the file name.
+            // User may have wanted quoted whitespace at the beginning or end
+            // of the file name, but that seems very unlikely.
+            filename = filename.trim();
+        }
+
+        // If no filename, or a filename of only spaces, then throw an error.
+        if (filename == null || filename.length() == 0) {
+            String msg = String.format("Did not find valid file name in \"file%s\" command.",
+                    option == FileOption.BATCH ? " -batch" : "");
+            throw new SQLParser.Exception(msg);
+        }
+
+        return new FileInfo(option, filename);
     }
 
     /**
@@ -1347,12 +1452,17 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Make sure that a batch starts with a DDL statement by checking the first keyword.
+     * Make sure that the batch starts with an appropriate DDL verb.  We do not
+     * look further than the first token of the first non-comment and non-whitespace line.
+     *
+     * Empty batches are considered to be trivially valid.
+     *
      * @param batch  A SQL string containing multiple statements separated by semicolons
      * @return true if the first keyword of the first statement is a DDL verb
-     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT
+     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT, or if the
+     *     batch is empty.
      */
-    public static boolean batchBeginsWithDDLKeyword(String batch) {
+    public static boolean appearsToBeValidDDLBatch(String batch) {
 
         BufferedReader reader = new BufferedReader(new StringReader(batch));
         String line;
@@ -1374,7 +1484,7 @@ public class SQLParser extends SQLPatternFactory
         }
 
 
-        // degenerate batch: no lines are non-blank or non-comment
-        return false;
+        // trivial empty batch: no lines are non-blank or non-comments
+        return true;
     }
 }

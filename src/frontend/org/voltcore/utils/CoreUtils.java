@@ -34,9 +34,11 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -584,6 +586,97 @@ public class CoreUtils {
                                       new SynchronousQueue<Runnable>(), tFactory);
     }
 
+    /**
+     * Create an ExceutorService that places tasks in an existing task queue for execution. Used
+     * to create a bridge for using ListenableFutures in classes already built around a queue.
+     * @param taskQueue : place to enqueue Runnables submitted to the service
+     */
+    public static ExecutorService getQueueingExecutorService(final Queue<Runnable> taskQueue) {
+        return new ExecutorService() {
+            @Override
+            public void execute(Runnable command) {
+                taskQueue.offer(command);
+            }
+
+            @Override
+            public void shutdown() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<Runnable> shutdownNow() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean isShutdown() {
+                return false;
+            }
+
+            @Override
+            public boolean isTerminated() {
+                return false;
+            }
+
+            @Override
+            public boolean awaitTermination(long timeout, TimeUnit unit)
+                    throws InterruptedException {
+                return true;
+            }
+
+            @Override
+            public <T> Future<T> submit(Callable<T> task) {
+                Preconditions.checkNotNull(task);
+                FutureTask<T> retval = new FutureTask<T>(task);
+                taskQueue.offer(retval);
+                return retval;
+            }
+
+            @Override
+            public <T> Future<T> submit(Runnable task, T result) {
+                Preconditions.checkNotNull(task);
+                FutureTask<T> retval = new FutureTask<T>(task, result);
+                taskQueue.offer(retval);
+                return retval;
+            }
+
+            @Override
+            public Future<?> submit(Runnable task) {
+                Preconditions.checkNotNull(task);
+                ListenableFutureTask<Object> retval = ListenableFutureTask.create(task, null);
+                taskQueue.offer(retval);
+                return retval;
+            }
+
+            @Override
+            public <T> List<Future<T>> invokeAll(
+                    Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> List<Future<T>> invokeAll(
+                    Collection<? extends Callable<T>> tasks, long timeout,
+                    TimeUnit unit) throws InterruptedException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException, ExecutionException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
+                    long timeout, TimeUnit unit) throws InterruptedException,
+                    ExecutionException, TimeoutException {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
     public static ThreadFactory getThreadFactory(String name) {
         return getThreadFactory(name, SMALL_STACK_SIZE);
     }
@@ -666,6 +759,37 @@ public class CoreUtils {
         final InetAddress addr = m_localAddressSupplier.get();
         if (addr == null) return "";
         return ReverseDNSCache.hostnameOrAddress(addr);
+    }
+
+    /**
+     * Return the local [hostname]/ip string, attempting a cached lookup
+     * to resolve the local hostname
+     * @return The [hostname]/ip string representation for some valid local
+     *         interface, if we can find one; the empty string otherwise
+     */
+    public static String getHostnameAndAddress() {
+        return addressToString(m_localAddressSupplier.get());
+    }
+
+    /**
+     * Return [hostname]/ip string for the given {@link InetAddress}. This
+     * simulates the value of {@link InetAddress#toString()}, except that it
+     * does a cached lookup of the hostname
+     * @param addr
+     * @return If the provided address is not null, its [hostname]/ip
+     *         string representation; the empty string otherwise
+     */
+    public static String addressToString(InetAddress addr) {
+        if (addr == null) return "";
+
+        StringBuilder hostnameAndAddress = new StringBuilder();
+        String address = addr.getHostAddress();
+        String hostnameOrAddress = ReverseDNSCache.hostnameOrAddress(addr);
+        if (!hostnameOrAddress.equals(address)) {
+            hostnameAndAddress.append(hostnameOrAddress);
+        }
+        hostnameAndAddress.append('/').append(address);
+        return hostnameAndAddress.toString();
     }
 
     private static final Supplier<InetAddress> m_localAddressSupplier =
@@ -1004,5 +1128,23 @@ public class CoreUtils {
         }
         return true;
     };
+
+    /**
+     * Utility method to sort the keys and values of a map by their value.
+     */
+    public static <K extends Comparable< ? super K>,V extends Comparable< ? super V>> List<Entry<K,V>>
+            sortKeyValuePairByValue(Map<K,V> map) {
+        List<Map.Entry<K,V>> entries = new ArrayList<Map.Entry<K,V>>(map.entrySet());
+        Collections.sort(entries, new Comparator<Map.Entry<K,V>>() {
+            @Override
+            public int compare(Entry<K,V> o1, Entry<K,V> o2) {
+                if (!o1.getValue().equals(o2.getValue())) {
+                    return (o1.getValue()).compareTo(o2.getValue());
+                }
+                return o1.getKey().compareTo(o2.getKey());
+            }
+        } );
+        return entries;
+    }
 
 }

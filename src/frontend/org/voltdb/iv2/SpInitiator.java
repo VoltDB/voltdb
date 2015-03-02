@@ -28,6 +28,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
@@ -38,6 +39,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -51,6 +53,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
     private final TickProducer m_tickProducer;
+    private ConsumerDRGateway m_consumerDRGateway = null;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -90,6 +93,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
+                          ConsumerDRGateway consumerDRGateway,
+                          boolean createMpDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
@@ -102,11 +107,18 @@ public class SpInitiator extends BaseInitiator implements Promotable
         // configure DR
         PartitionDRGateway drGateway =
                 PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway,
-                        startAction.doesRejoin());
+                        startAction);
         ((SpScheduler) m_scheduler).setDRGateway(drGateway);
+        m_consumerDRGateway = consumerDRGateway;
+
+        PartitionDRGateway mpPDRG = null;
+        if (createMpDRGateway) {
+            mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
+            ((SpScheduler) m_scheduler).setMpDRGateway(mpPDRG);
+        }
 
         super.configureCommon(backend, catalogContext,
-                csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway);
+                csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway, mpPDRG);
 
         m_tickProducer.start();
 
@@ -128,6 +140,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
+            long binaryLogDRId = Long.MIN_VALUE;
+            long binaryLogUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
@@ -145,9 +159,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
 
                 // term syslogs the start of leader promotion.
-                Long txnid = Long.MIN_VALUE;
+                long txnid = Long.MIN_VALUE;
                 try {
-                    txnid = repair.start().get();
+                    RepairResult res = repair.start().get();
+                    txnid = res.m_txnId;
+                    binaryLogDRId = res.m_binaryLogDRId;
+                    binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -177,6 +194,10 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
+            // If we are a DR replica, inform that subsystem of its new responsibilities
+            if (m_consumerDRGateway != null) {
+                m_consumerDRGateway.promotePartition(m_partitionId, binaryLogDRId, binaryLogUniqueId);
+            }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }

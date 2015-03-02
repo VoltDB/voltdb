@@ -591,7 +591,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
-            final HashinatorConfig hashinatorConfig) {
+            final HashinatorConfig hashinatorConfig,
+            final boolean createDrReplicatedStream) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -617,7 +618,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_hostId,
                 m_hostname,
                 1024 * 1024 * tempTableMemory,
-                hashinatorConfig);
+                hashinatorConfig,
+                createDrReplicatedStream);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -650,7 +652,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final long tempTableMemory,
-            final HashinatorConfig hashinatorConfig)
+            final HashinatorConfig hashinatorConfig,
+            final boolean createDrReplicatedStream)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -664,6 +667,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
+        m_data.putInt(createDrReplicatedStream ? 1 : 0);
         m_data.putInt((short)hostname.length());
         m_data.put(hostname.getBytes(Charsets.UTF_8));
         try {
@@ -921,8 +925,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
-            final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+            final long spHandle, final long lastCommittedSpHandle, final long uniqueId,
+            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -934,6 +939,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(uniqueId);
         m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
         m_data.putInt(shouldDRStream ? 1 : 0);

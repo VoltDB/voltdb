@@ -318,7 +318,7 @@ public abstract class UnsynchronizedRateLimiter {
    * The interval between two unit requests, at our stable rate. E.g., a stable rate of 5 permits
    * per second has a stable interval of 200ms.
    */
-  volatile double stableIntervalMicros;
+  double stableIntervalMicros;
 
   /**
    * The time when the next request (no matter its size) will be granted. After granting a request,
