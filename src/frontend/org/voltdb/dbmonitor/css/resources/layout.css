@@ -1029,6 +1029,8 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .deleteAddConfig a { color: #c70000;}
 #chkStreamValue { padding-left: 2px;}
 .plusAdd {background-position:-418px -61px; width: 31px; height: 17px; display: inline-block; position: relative;top: 8px;}
+.loadExport { position: relative; left: 3px; top: 5px; }
+.loadExportConfig { margin: 0 0 0 29%;}
 
 /****Export details Ends*******/
 a.changePsd {color: #0079bb;}
