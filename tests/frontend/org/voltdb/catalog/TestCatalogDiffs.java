@@ -1268,8 +1268,30 @@ public class TestCatalogDiffs extends TestCase {
         msg = CatalogUtil.compileDeployment(modPropCat, modPropDepl, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
+        final String modTypeXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='false' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "propexport4.jar");
+        Catalog modTypeCat = catalogForJar(testDir + File.separator + "propexport4.jar");
+        final File modTypeFile = VoltProjectBuilder.writeStringToTempFile(modTypeXml);
+        DeploymentType modTypeDepl = CatalogUtil.getDeployment(new FileInputStream(modTypeFile));
+
+        msg = CatalogUtil.compileDeployment(modTypeCat, modTypeDepl, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
         verifyDiff(origCat, newPropCat); // test add
         verifyDiff(newPropCat, origCat); // test delete
         verifyDiff(origCat, modPropCat); // test modification
+        verifyDiff(modPropCat, modTypeCat); // test modification
     }
 }

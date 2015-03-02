@@ -33,6 +33,7 @@ import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
+import org.voltdb.catalog.Connector;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
@@ -587,6 +588,10 @@ public class CatalogDiffEngine {
         if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
             return null;
         if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
+            return null;
+        if (suspect instanceof Connector && "enabled".equals(field))
+            return null;
+        if (suspect instanceof Connector && "loaderclass".equals(field))
             return null;
 
         // Avoid over-generalization when describing limitations that are dependent on particular
