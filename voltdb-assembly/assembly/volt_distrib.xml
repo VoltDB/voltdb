@@ -1,0 +1,50 @@
+<assembly
+    xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+    <id>complete-build</id>
+    <formats>
+        <format>dir</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <fileSets>
+        <fileSet>
+            <directory>${project.parent.basedir}/obj/release/nativelibs</directory>
+            <outputDirectory>/voltdb</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>${project.parent.basedir}/lib/python</directory>
+            <outputDirectory>/lib/python</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>${project.parent.basedir}/bin</directory>
+            <outputDirectory>/bin</outputDirectory>
+        </fileSet>
+    </fileSets>
+    <files>
+        <file>
+            <source>${project.parent.basedir}/version.txt</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
+            <source>${project.parent.basedir}/voltdb/log4j.xml</source>
+            <outputDirectory>/voltdb</outputDirectory>
+        </file>
+    </files>
+
+    <dependencySets>
+        <dependencySet>
+            <excludes>
+                <exclude>org.voltdb:*</exclude>
+            </excludes>
+            <outputDirectory>lib</outputDirectory>
+        </dependencySet>
+        <dependencySet>
+            <includes>
+                <include>org.voltdb:voltdb-server:*</include>
+            </includes>
+            <outputFileNameMapping>voltdb-5.0.jar</outputFileNameMapping>
+            <outputDirectory>voltdb</outputDirectory>
+        </dependencySet>
+    </dependencySets>
+</assembly>

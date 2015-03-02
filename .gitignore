@@ -61,3 +61,4 @@ doc/tutorials/auction/csvloader_*.csv
 /src/ee/org_voltdb_utils_PosixAdvise.h
 /src/frontend/org/voltcore/utils/DBBPool.java
 /src/frontend/org/voltcore/utils/.flagfile
+/target/

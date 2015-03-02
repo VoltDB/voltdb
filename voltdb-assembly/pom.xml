@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<parent>
+		<groupId>org.voltdb</groupId>
+		<artifactId>voltdb</artifactId>
+		<version>5.x-atratus-SNAPSHOT</version>
+	</parent>
+	<modelVersion>4.0.0</modelVersion>
+
+	<artifactId>voltdb-assembly</artifactId>
+	<packaging>pom</packaging>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>org.voltdb</groupId>
+			<artifactId>voltdb-server</artifactId>
+			<version>5.x-atratus-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+			<groupId>org.voltdb</groupId>
+			<artifactId>voltdb-client</artifactId>
+			<version>5.x-atratus-SNAPSHOT</version>
+		</dependency>
+	</dependencies>
+
+	<build>
+
+        <plugins>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>2.5.1</version>
+                <configuration>
+                    <descriptors>
+                        <descriptor>assembly/volt_distrib.xml</descriptor>
+                    </descriptors>
+                    <finalName>voltdb-distr</finalName>
+                    <appendAssemblyId>false</appendAssemblyId>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-disaster-distributive</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+
+	</build>
+
+</project>
