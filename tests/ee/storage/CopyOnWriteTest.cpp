@@ -140,7 +140,7 @@ public:
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->initialize(1,1, 0, 0, "", false, DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -204,6 +204,8 @@ public:
         m_showTuples = TUPLE_COUNT <= MAX_DETAIL_COUNT;
 
         strcpy(m_stage, "Initialize");
+
+        ExecutorContext::getExecutorContext()->setDrStreamForTest(&drStream);
     }
 
     ~CopyOnWriteTest() {

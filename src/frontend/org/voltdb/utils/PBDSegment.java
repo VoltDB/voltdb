@@ -173,6 +173,11 @@ class PBDSegment {
         return m_objectReadIndex < m_buf.b().getInt(COUNT_OFFSET);
     }
 
+    boolean isEmpty() throws IOException {
+        if (m_closed) throw new IOException("closed");
+        return m_discardCount == getNumEntries();
+    }
+
     boolean offer(BBContainer cont, boolean compress) throws IOException {
         if (m_closed) throw new IOException("closed");
         final ByteBuffer buf = cont.b();

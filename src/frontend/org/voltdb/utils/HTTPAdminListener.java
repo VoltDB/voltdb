@@ -601,6 +601,10 @@ public class HTTPAdminListener {
                 String[] splitTarget = target.split("/");
                 if (splitTarget.length == 3) {
                     user = findUser(splitTarget[2], newDeployment);
+                } else {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "User not found"));
+                    return;
                 }
                 String returnString = "User created";
                 if (user == null) {
