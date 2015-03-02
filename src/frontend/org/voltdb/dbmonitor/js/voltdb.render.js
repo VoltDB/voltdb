@@ -311,13 +311,13 @@ function alertNodeClicked(obj) {
                 getMemoryDetails(connection, systemMemory);
 
                 if (VoltDbAdminConfig.isAdmin) {
-                    onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails(),serverSettings);
+                    onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails(), serverSettings);
                     onAdminPageServerListLoaded(getAdminServerList());
                 }
 
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
-                
+
                 onInformationLoaded();
             });
 
@@ -665,40 +665,55 @@ function alertNodeClicked(obj) {
 
         var populateSystemInformation = function (connection) {
             var updatedSystemOverview = {};
+            var currentServerOverview = {};
+            var iterator = 1;
+
             if (connection.Metadata['@SystemInformation_OVERVIEW'] == null) {
                 return;
             }
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
-                var hostName = "";
-
-                if (!updatedSystemOverview.hasOwnProperty(id)) {
-                    updatedSystemOverview[id] = {};
-                }
-
+                var hostName = "";                
+                
                 if (singleData[1] == 'IPADDRESS') {
                     if (singleData[2] == VoltDBConfig.GetDefaultServerIP()) {
                         voltDbRenderer.isHost = true;
-
+                        
+                    } else { 
+                        voltDbRenderer.isHost = false;
+                        //require to initialize a nest json object only in the case if object being iterated is not a current host object
+                        if (!updatedSystemOverview.hasOwnProperty(id)) {
+                            updatedSystemOverview[id] = {};
+                        }
                     }
                 }
 
                 if (singleData[1] == 'HOSTNAME') {
                     if (voltDbRenderer.isHost) {
                         voltDbRenderer.currentHost = singleData[2];
-                        voltDbRenderer.isHost = false;
+                        
                     }
                     if ($.inArray(singleData[2], voltDbRenderer.hostNames) == -1)
                         voltDbRenderer.hostNames.push(singleData[2]);
 
                 }
 
+                //assign entry in data object to 'currentServerOverview' if object being iterated is not a current host object
+                //otherwise to a updatedSystemOverview 
+                if (voltDbRenderer.isHost)
+                    currentServerOverview[singleData[1]] = singleData[2];
+                else
+                    updatedSystemOverview[id][singleData[1]] = singleData[2];
 
-
-                updatedSystemOverview[id][singleData[1]] = singleData[2];
             });
-            systemOverview = updatedSystemOverview;
+
+            
+            systemOverview[0] = currentServerOverview;
+            $.each(updatedSystemOverview,function (key,value) {
+                systemOverview[iterator] = value;
+                iterator++;
+            });           
         };
 
         var populateTablesInformation = function (connection) {
@@ -1932,7 +1947,7 @@ function alertNodeClicked(obj) {
                 }
                 timeStamp = info[colIndex["TIMESTAMP"]];
             });
-            if (previousHostKey!="" && previousSiteId != mpiIndex[previousHost]) {
+            if (previousHostKey != "" && previousSiteId != mpiIndex[previousHost]) {
                 starvMinData[previousHostKey + '(Min)'] = minPer;
                 starvMaxData[previousHostKey + '(Max)'] = maxPer;
             }
@@ -2055,12 +2070,12 @@ function alertNodeClicked(obj) {
                         portConfigValues['zookeeperInterface'] = val['ZKINTERFACE'];
                         portConfigValues['replicationInterface'] = val['DRINTERFACE'];
                         serverSettings = true;
-                        
+
                     } else {
                         serverSettings = false;
                         return false;
                     }
-                   
+
                 }
                 return true;
             });
@@ -2078,7 +2093,7 @@ function alertNodeClicked(obj) {
 
         var validateServerSpecificSettings = function (overviewValues) {
             if (overviewValues['ADMININTERFACE'] == "" && overviewValues['HTTPINTERFACE'] == "" &&
-                overviewValues['CLIENTINTERFACE'] == "" &&  overviewValues['INTERNALINTERFACE'] == "" &&
+                overviewValues['CLIENTINTERFACE'] == "" && overviewValues['INTERNALINTERFACE'] == "" &&
                 overviewValues['ZKINTERFACE'] == "" && overviewValues['DRINTERFACE'] == "") {
                 return false;
             }
