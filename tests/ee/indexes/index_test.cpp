@@ -177,7 +177,7 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         int partitionCount = 1;
-        m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->initialize(0, 0, 0, 0, "", false, DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         table = dynamic_cast<PersistentTable*>(
             TableFactory::getPersistentTable(database_id, "test_wide_table",
@@ -314,7 +314,7 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         int partitionCount = 1;
-        m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->initialize(0, 0, 0, 0, "", false, DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames, signature, &drStream, false));
 

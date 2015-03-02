@@ -453,7 +453,6 @@ public class CommandLine extends VoltDB.Configuration
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add(javaExecutable);
-        cmdline.add("-DUSE_DR_V2=" + Boolean.getBoolean("USE_DR_V2"));
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
         cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
