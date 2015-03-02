@@ -1729,7 +1729,7 @@ function loadAdminPage() {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
 
                 if ($("#expotSaveConfigText").data("status") == "delete") {
-                    delete adminConfigurations.export.configuration[editId * 1];
+                    adminConfigurations.export.configuration.splice(editId * 1, 1);
                 }
                 else {
                     var newConfig = { };
