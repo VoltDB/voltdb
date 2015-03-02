@@ -364,6 +364,10 @@ public abstract class CatalogSchemaTools {
             sb.append(";\n");
         }
 
+        if (catalog_tbl.getIsdred()) {
+            sb.append("DR TABLE " + catalog_tbl.getTypeName() + ";\n");
+        }
+
         sb.append("\n");
         // Canonical DDL generation for this table is done, now just hand the CREATE TABLE
         // statement to whoever might be interested (DDLCompiler, I'm looking in your direction)

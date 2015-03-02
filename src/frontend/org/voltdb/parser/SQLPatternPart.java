@@ -22,7 +22,17 @@ import java.util.regex.Pattern;
 public abstract class SQLPatternPart
 {
     int m_flags = 0;
+    Integer m_minCount = null;
+    Integer m_maxCount = null;
+
     abstract String generateExpression(int flagsAdd);
     abstract void setCaptureLabel(String captureLabel);
-    abstract Pattern compile();
+    abstract Pattern compile(String label);
+
+    // Chainable methods for tweaking after construction.
+    public SQLPatternPart withFlags(int flags)
+    {
+        m_flags |= flags;
+        return this;
+    }
 }

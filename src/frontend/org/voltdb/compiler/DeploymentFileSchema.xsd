@@ -40,7 +40,6 @@
       <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
-      <xs:element name="replication" minOccurs="0" maxOccurs="1" type="replicationType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
@@ -48,6 +47,7 @@
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
                   type="systemSettingsType" />
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
+      <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
     </xs:all>
   </xs:complexType>
 
@@ -166,11 +166,6 @@
     <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
 
-  <!-- <replication> -->
-  <xs:complexType name="replicationType">
-    <xs:attribute name="port" type="xs:int" default="5555"/>
-  </xs:complexType>
-
   <!-- <command log> -->
   <xs:complexType name="commandLogType">
     <xs:all>
@@ -265,9 +260,9 @@
 
   <!-- <snapshot> -->
   <xs:complexType name="snapshotType">
-    <xs:attribute name="frequency" type="xs:string" use="optional" default="10m" />
-    <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="1" />
-    <xs:attribute name="prefix" type="xs:string" use="optional" default="SNAPSHOTNONCE" />
+    <xs:attribute name="frequency" type="xs:string" use="optional" default="24h" />
+    <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="2" />
+    <xs:attribute name="prefix" type="xs:string" use="optional" default="AUTOSNAP" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
@@ -337,6 +332,37 @@
     <xs:restriction base="xs:string">
         <xs:enumeration value="hash"/>
         <xs:enumeration value="kerberos"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- DR -->
+  <xs:complexType name="drType">
+    <xs:sequence>
+        <!-- Currently, only one DR data source is allowed -->
+        <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="clusterIdType" use="required"/>
+    <xs:attribute name="listen" type="xs:boolean" default="false" />
+    <xs:attribute name="port" type="xs:int" default="5555"/>
+  </xs:complexType>
+
+  <xs:complexType name="connectionType">
+    <xs:attribute name="source" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <!-- Only the most basic validation that this could possibly be a hostname -->
+          <xs:minLength value="1"/>
+          <xs:pattern value="[a-zA-Z0-9\-\.]*(:[0-9]*)?"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+  <!-- restriction on id -->
+  <xs:simpleType name="clusterIdType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="127"/>
     </xs:restriction>
   </xs:simpleType>
 
