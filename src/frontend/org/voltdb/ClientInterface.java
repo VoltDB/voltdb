@@ -150,6 +150,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
+    public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -2151,6 +2152,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         ClientResponseImpl error = null;
         if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
+                SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
+        else
+        if ((error = m_invocationValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
                 SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
             ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
             buffer.putInt(buffer.capacity() - 4);
