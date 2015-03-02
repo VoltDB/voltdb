@@ -215,14 +215,14 @@ public class Collector {
             jsonObject = new JSONObject(builder.toString());
         } catch (FileNotFoundException e) {
             System.err.println("config log file '" + configInfoPath + "' could not be found.");
-            System.exit(1);
+            System.exit(-1);
         } catch (IOException e) {
             System.err.println(e.getMessage());
-            System.exit(1);
+            System.exit(-1);
         } catch (JSONException e) {
             System.err.println("Error with config file: " + configInfoPath);
             System.err.println(e.getLocalizedMessage());
-            System.exit(1);
+            System.exit(-1);
         }
 
         return jsonObject;
