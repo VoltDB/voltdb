@@ -518,17 +518,17 @@
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
                                 </tr>
                                 <tr class="hasSubLabel parent" id="row-4">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
-                                    <td><a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" title="Add Configuration">&nbsp;</a>
+                                    <td><a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>
+                                        <div id="loadingConfiguration" class="loading-small loadExport" style="display: none"></div>
                                         <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
-                                <tbody id="exportConfiguration" style="display: none;">
+                                <tbody id="exportConfiguration" data-status="value" style="display: none;">
                                 </tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
@@ -1321,7 +1321,7 @@
             
             <div class="overlay-title icon-alert">
                 <div id="addConfigHeader" class="addConfigHeader">Add Configuration</div>
-                <div id="deleteAddConfig" class="deleteAddConfig"><a href="javascript:void(0);">Delete this Configuration</a></div>
+                <div id="deleteAddConfig" class="deleteAddConfig "><a href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this Configuration</a></div>
                 <div class="clear"></div>
             </div>
 
@@ -1337,7 +1337,7 @@
 
             <div id="saveConfigConfirmation" style="display: none;">
                 <div class="overlay-content ">
-                    <div class="confirmationInfo">Are you sure you want to save?</div>
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveConfigText">save</span>?</div>
                 </div>
                 <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
