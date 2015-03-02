@@ -68,6 +68,7 @@ public interface SiteProcedureConnection {
     public byte[] loadTable(
             long txnId,
             long spHandle,
+            long uniqueId,
             String clusterName,
             String databaseName,
             String tableName,
@@ -83,6 +84,7 @@ public interface SiteProcedureConnection {
     public byte[] loadTable(
             long txnId,
             long spHandle,
+            long uniqueId,
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
@@ -159,9 +161,14 @@ public interface SiteProcedureConnection {
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
+
+    public TupleStreamStateInfo getDRTupleStreamStateInfo();
+
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber);
 
     public void toggleProfiler(int toggle);
 

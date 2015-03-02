@@ -14,6 +14,10 @@ begin Cluster                      "A set of connected hosts running one or more
   CommandLog* logconfig            "Command log configuration"
   int heartbeatTimeout             "How long to wait, in seconds, between messages before deciding a host is dead"
   bool useddlschema                "Manage the database schemas via catalog updates or live DDL"
+  bool drProducerEnabled           "Manage whether this cluster will log and distribute local DR transactions"
+  int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
+  int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
+  string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
 end
 
 begin Deployment javaonly         "Run-time deployment settings"
@@ -127,6 +131,7 @@ begin Table                        "A table (relation) in the database"
   Table? materializer              "If this is a materialized view, this field stores the source table"
   string signature                 "Catalog version independent signature of the table consisting of name and schema"
   int tuplelimit                   "A maximum number of rows in a table"
+  bool isDRed                      "Is this table DRed?"
   Statement* tuplelimitDeleteStmt  "Delete statement to execute if tuple limit will be exceeded"
 end
 

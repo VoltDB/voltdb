@@ -28,11 +28,13 @@
 namespace voltdb {
 class StreamBlock;
 
+const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
+
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
-    //Version(1), type(1), txnid(8), sphandle(8), checksum(4)
+    //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
-    //Version(1), type(1), sphandle(8), checksum(4)
+    //Version(1), type(1), drId(8), checksum(4)
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
@@ -47,6 +49,9 @@ public:
         m_partitionId = partitionId;
     }
 
+    // for test purpose
+    virtual void setSecondaryCapacity(size_t capacity);
+
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
     /** write a tuple to the stream */
@@ -54,17 +59,33 @@ public:
                        char *tableHandle,
                        int64_t txnId,
                        int64_t spHandle,
+                       int64_t uniqueId,
                        TableTuple &tuple,
                        DRRecordType type);
 
+    virtual size_t truncateTable(int64_t lastCommittedSpHandle,
+                       char *tableHandle,
+                       std::string tableName,
+                       int64_t txnId,
+                       int64_t spHandle,
+                       int64_t uniqueId);
+
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    void beginTransaction(int64_t txnId, int64_t spHandle);
-    void endTransaction(int64_t spHandle);
+    void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    void endTransaction(int64_t sequenceNumber, int64_t uniqueId);
+
+    bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn);
+
+    std::pair<int64_t, int64_t> getLastCommittedSequenceNumberAndUniqueId() { return std::pair<int64_t, int64_t>(m_committedSequenceNumber, m_committedUniqueId); }
+    void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
     bool m_enabled;
+
+    static int32_t getTestDRBuffer(char *out);
 private:
     CatalogId m_partitionId;
+    size_t m_secondaryCapacity;
 };
 
 class MockDRTupleStream : public DRTupleStream {
@@ -74,6 +95,7 @@ public:
                            char *tableHandle,
                            int64_t txnId,
                            int64_t spHandle,
+                           int64_t uniqueId,
                            TableTuple &tuple,
                            DRRecordType type) {
         return 0;
@@ -82,6 +104,28 @@ public:
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
 
     void rollbackTo(size_t mark) {}
+
+    size_t truncateTable(int64_t lastCommittedSpHandle,
+                       char *tableHandle,
+                       std::string tableName,
+                       int64_t txnId,
+                       int64_t spHandle,
+                       int64_t uniqueId) {
+        return 0;
+    }
+};
+
+class DRTupleStreamDisableGuard {
+public:
+    DRTupleStreamDisableGuard(DRTupleStream *stream) : m_stream(stream), m_oldValue(stream->m_enabled) {
+        stream->m_enabled = false;
+    }
+    ~DRTupleStreamDisableGuard() {
+        m_stream->m_enabled = m_oldValue;
+    }
+private:
+    DRTupleStream *m_stream;
+    const bool m_oldValue;
 };
 
 }

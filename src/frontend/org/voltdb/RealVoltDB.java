@@ -231,6 +231,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
+    private ConsumerDRGateway m_consumerDRGateway = null;
 
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
@@ -265,7 +266,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     RestoreAgent m_restoreAgent = null;
 
-    private ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
+    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
 
     private volatile boolean m_isRunning = false;
 
@@ -357,6 +358,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
             m_startMode = null;
+            m_consumerDRGateway = new ConsumerDRGateway.DummyConsumerDRGateway();
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
@@ -636,18 +638,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
             // DR overflow directory
-            File drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    if (Boolean.getBoolean("USE_DR_V2")) {
-                        ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
-                    } else {
-                        ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
-                    }
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
+                    File drOverflowDir;
+                    drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
+                    ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
-                                                                                   m_replicationActive);
+                                                                                   m_replicationActive,
+                                                                                   m_configuredNumberOfPartitions,
+                                                                                   m_catalogContext.getDeployment().getCluster().getHostcount());
+                    m_nodeDRGateway.start();
+                    m_nodeDRGateway.blockOnDRStateConvergence();
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -714,48 +717,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
-            /*
-             * Configure and start all the IV2 sites
-             */
-            boolean usingCommandLog = false;
-            try {
-                usingCommandLog = m_config.m_isEnterprise &&
-                    m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
-
-                for (Initiator iv2init : m_iv2Initiators) {
-                    iv2init.configure(
-                            getBackendTargetType(),
-                            m_catalogContext,
-                            m_catalogContext.getDeployment().getCluster().getKfactor(),
-                            csp,
-                            m_configuredNumberOfPartitions,
-                            m_config.m_startAction,
-                            getStatsAgent(),
-                            m_memoryStats,
-                            m_commandLog,
-                            m_nodeDRGateway,
-                            m_config.m_executionCoreBindings.poll());
-                }
-
-                // LeaderAppointer startup blocks if the initiators are not initialized.
-                // So create the LeaderAppointer after the initiators.
-                m_leaderAppointer = new LeaderAppointer(
-                        m_messenger,
-                        m_configuredNumberOfPartitions,
-                        m_catalogContext.getDeployment().getCluster().getKfactor(),
-                        m_catalogContext.cluster.getNetworkpartition(),
-                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
-                        usingCommandLog,
-                        topo, m_MPI, kSafetyStats);
-                m_globalServiceElector.registerService(m_leaderAppointer);
-            } catch (Exception e) {
-                Throwable toLog = e;
-                if (e instanceof ExecutionException) {
-                    toLog = ((ExecutionException)e).getCause();
-                }
-                VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
-            }
-
             // Need to register the OpsAgents right before we turn on the client interface
             m_opsRegistrar.setDummyMode(false);
 
@@ -785,6 +746,89 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         m_config.m_timestampTestingSalt);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+
+            boolean usingCommandLog = m_config.m_isEnterprise &&
+                    m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
+            String clSnapshotPath = null;
+            if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
+                clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath();
+            }
+
+            // Configure consumer-side DR if relevant
+            if (m_config.m_isEnterprise && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+                String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
+                byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
+                if (drProducerHost == null || drProducerHost.isEmpty()) {
+                    VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
+                }
+                try {
+                    Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
+                    Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                            String.class,
+                            ClientInterface.class,
+                            byte.class,
+                            boolean.class,
+                            String.class);
+                    m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
+                            drProducerHost,
+                            m_clientInterface,
+                            drConsumerClusterId,
+                            usingCommandLog,
+                            clSnapshotPath);
+                    m_globalServiceElector.registerService(m_consumerDRGateway);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
+                }
+            }
+
+            /*
+             * Configure and start all the IV2 sites
+             */
+            try {
+                boolean createMpDRGateway = true;
+                for (Initiator iv2init : m_iv2Initiators) {
+                    iv2init.configure(
+                            getBackendTargetType(),
+                            m_catalogContext,
+                            m_catalogContext.getDeployment().getCluster().getKfactor(),
+                            csp,
+                            m_configuredNumberOfPartitions,
+                            m_config.m_startAction,
+                            getStatsAgent(),
+                            m_memoryStats,
+                            m_commandLog,
+                            m_nodeDRGateway,
+                            m_consumerDRGateway,
+                            iv2init != m_MPI && createMpDRGateway, // first SPI gets it
+                            m_config.m_executionCoreBindings.poll());
+
+                    if (iv2init != m_MPI) {
+                        createMpDRGateway = false;
+                    }
+                }
+
+                // LeaderAppointer startup blocks if the initiators are not initialized.
+                // So create the LeaderAppointer after the initiators.
+                // arogers: The leader appointer should
+                // expect a sync snapshot. This needs to change when the replica supports different
+                // start actions
+                boolean expectSyncSnapshot = m_config.m_replicationRole == ReplicationRole.REPLICA;
+                m_leaderAppointer = new LeaderAppointer(
+                        m_messenger,
+                        m_configuredNumberOfPartitions,
+                        m_catalogContext.getDeployment().getCluster().getKfactor(),
+                        m_catalogContext.cluster.getNetworkpartition(),
+                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
+                        usingCommandLog,
+                        topo, m_MPI, kSafetyStats, expectSyncSnapshot);
+                m_globalServiceElector.registerService(m_leaderAppointer);
+            } catch (Exception e) {
+                Throwable toLog = e;
+                if (e instanceof ExecutionException) {
+                    toLog = ((ExecutionException)e).getCause();
+                }
+                VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
             }
 
             // Create the statistics manager and register it to JMX registry
@@ -883,11 +927,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // Start elastic join service
             try {
-                String clSnapshotPath = null;
-                if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
-                    clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath();
-                }
-
                 if (m_config.m_isEnterprise && TheHashinator.getCurrentConfig().type == HashinatorType.ELASTIC) {
                     Class<?> elasticServiceClass = MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator",
                                                                           "Elastic join", false);
@@ -1924,6 +1963,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     }
                 }
 
+                shutdownReplicationConsumerRole();
+
                 if (m_snapshotIOAgent != null) {
                     m_snapshotIOAgent.shutdown();
                 }
@@ -1964,8 +2005,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 AdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
-                // probably unnecessary
+                PartitionDRGateway.gateways.clear();
+
+                // probably unnecessary, but for tests it's nice because it
+                // will do the memory checking and run finalizers
                 System.gc();
+                System.runFinalization();
+
                 m_isRunning = false;
             }
             return did_it;
@@ -2129,6 +2175,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
 
+            // 6. If we are a DR replica, we may care about a
+            // deployment update
+            if (m_consumerDRGateway != null) {
+                m_consumerDRGateway.updateCatalog(m_catalogContext);
+            }
+            // 6.1. If we are a DR master, update the DR table signature hash
+            if (m_nodeDRGateway != null) {
+                m_nodeDRGateway.updateCatalog(m_catalogContext);
+            }
+
             new ConfigLogging().logCatalogAndDeployment();
 
             // log system setting information if the deployment config has changed
@@ -2281,6 +2337,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         e);
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
+            if (m_nodeDRGateway != null && !m_nodeDRGateway.isStarted()) {
+                // Start listening on the DR ports
+                prepareReplication();
+            }
         }
 
         try {
@@ -2370,10 +2430,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             consoleLog.info("Promoting replication role from replica to master.");
+            shutdownReplicationConsumerRole();
         }
         m_config.m_replicationRole = role;
         if (m_clientInterface != null) {
             m_clientInterface.setReplicationRole(m_config.m_replicationRole);
+        }
+    }
+
+    private void shutdownReplicationConsumerRole() {
+        if (m_consumerDRGateway != null) {
+            try {
+                m_consumerDRGateway.shutdown(true);
+            } catch (InterruptedException e) {
+                hostLog.warn("Interrupted shutting down dr replication", e);
+            }
         }
     }
 
@@ -2439,6 +2510,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
                 }
             }
+
+            // Start listening on the DR ports
+            prepareReplication();
         }
 
         try {
@@ -2449,9 +2523,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
-
-        // Start listening on the DR ports
-        prepareReplication();
 
         if (m_startMode != null) {
             m_mode = m_startMode;
@@ -2530,8 +2601,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private void prepareReplication() {
         try {
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.start();
-                m_nodeDRGateway.bindPorts();
+                m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled());
+            }
+            if (m_consumerDRGateway != null) {
+                // TODO: don't always request a snapshot
+                m_consumerDRGateway.initialize(false);
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
@@ -2572,6 +2646,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     public boolean getReplicationActive()
     {
         return m_replicationActive;
+    }
+
+    @Override
+    public NodeDRGateway getNodeDRGateway()
+    {
+        return m_nodeDRGateway;
+    }
+
+    @Override
+    public ConsumerDRGateway getConsumerDRGateway() {
+        return m_consumerDRGateway;
+    }
+
+    @Override
+    public void onSyncSnapshotCompletion() {
+        m_leaderAppointer.onSyncSnapshotCompletion();
     }
 
     @Override

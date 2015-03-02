@@ -37,20 +37,20 @@ public class HSQLLexer extends SQLPatternFactory
     private static final Pattern HSQL_DDL_PREPROCESSOR =
         SPF.statementLeader(
             SPF.capture("verb", SPF.tokenAlternatives("create", "drop", "alter")),
-            SPF.capture("unique", SPF.optional(SPF.tokenAlternatives("unique", "assumeunique"))),
+            SPF.optional(SPF.capture("unique", SPF.tokenAlternatives("unique", "assumeunique"))),
             SPF.capture("object", SPF.tokenAlternatives("table", "view", "index")),
-            SPF.capture("name", SPF.symbol()),  // table/view/index name
+            SPF.capture("name", SPF.databaseObjectName()),  // table/view/index name
             SPF.optional(SPF.clause(
                     SPF.token("on"),
-                    SPF.capture("subject", SPF.symbol())))
-        ).compile();
+                    SPF.capture("subject", SPF.databaseObjectName())))
+        ).compile("HSQL_DDL_PREPROCESSOR");
 
     // Does the ddl statement end with cascade or have if exists in the right place?
     private static final Pattern DDL_IFEXISTS_OR_CASCADE_CHECK =
         SPF.statementTrailer(
-            SPF.capture("ie", SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exists")))),
-            SPF.capture("c", SPF.optional(SPF.clause(SPF.token("cascade"))))
-        ).compile();
+            SPF.optional(SPF.capture("exists", SPF.clause(SPF.token("if"), SPF.token("exists")))),
+            SPF.optional(SPF.capture("cascade", SPF.token("cascade")))
+        ).compile("DDL_IFEXISTS_OR_CASCADE_CHECK");
 
     //===== Public interface
 
@@ -90,8 +90,12 @@ public class HSQLLexer extends SQLPatternFactory
             if (verb != HSQLDDLInfo.Verb.CREATE) {
                 matcher = DDL_IFEXISTS_OR_CASCADE_CHECK.matcher(ddl);
                 if (matcher.matches()) {
-                    ifexists = matcher.group("ie") != null;
-                    cascade = matcher.group("c") != null;
+                    // Don't be too sensitive to regex specifics by assuming null always
+                    // indicates a missing clause. Look for empty too.
+                    String existsClause = matcher.group("exists");
+                    String cascadeClause = matcher.group("cascade");
+                    ifexists = existsClause != null && !existsClause.isEmpty();
+                    cascade = cascadeClause != null && !cascadeClause.isEmpty();
                 }
             }
 
