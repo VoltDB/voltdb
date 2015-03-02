@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.hsqldb_voltpatches.VoltToken;
+import org.hsqldb_voltpatches.VoltTokenStream;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -335,25 +337,8 @@ public class SQLParser extends SQLPatternFactory
 
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
-    private static final Pattern MidlineComments = Pattern.compile("(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
-
-    /**
-     * Matches a command followed by and SQL CRUD statement verb
-     */
-    private static final Pattern ParserStringKeywords = Pattern.compile(
-            "\\s*" + // 0 or more spaces
-            "(" + // start group 1
-              "exec|execute|explain|explainproc" + // command
-            ")" +  // end group 1
-            "\\s+" + // one or more spaces
-            "(" + // start group 2
-              "select|insert|update|upsert|delete|truncate" + // SQL CRUD statement verb
-            ")" + // end group 2
-            "\\s+", // one or more spaces
-            Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
-    );
 
     // HELP can support sub-commands someday. Capture group 1 is the sub-command.
     private static final Pattern HelpToken = Pattern.compile("^\\s*help\\s*(.*)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
@@ -701,69 +686,32 @@ public class SQLParser extends SQLPatternFactory
             return null;
         }
 
-        //* enable to debug */ System.err.println("Parsing command queue:\n" + query);
-        /*
-         * Mark any parser string keyword matches by interposing the #SQL_PARSER_STRING_KEYWORD#
-         * tag. Which is later stripped at the end of this procedure. This tag is here to
-         * aide the evaluation of SetOp and AutoSplit REGEXPs, meaning that an
-         * 'explain select foo from bar will cause SetOp and AutoSplit match on the select as
-         * is prefixed with the #SQL_PARSER_STRING_KEYWORD#
-         *
-         * For example
-         *     'explain select foo from bar'
-         *  becomes
-         *     'explain #SQL_PARSER_STRING_KEYWORD#select foo from bar'
-         */
-        query = ParserStringKeywords.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-        /*
-         * strip out single line comments
-         */
-        query = SingleLineComments.matcher(query).replaceAll("");
-        /*
-         * replace all escaped single quotes with the #(SQL_PARSER_ESCAPE_SINGLE_QUOTE) tag
-         */
-        query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
+        List<String> queries = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        VoltTokenStream tokenStream = new VoltTokenStream(query);
+        boolean firstToken = true;
+        for (VoltToken token : tokenStream) {
 
-        /*
-         * move all single quoted strings into the string fragments list, and do in place
-         * replacements with numbered instances of the #(SQL_PARSER_STRING_FRAGMENT#[n]) tag
-         *
-         */
-        Matcher stringFragmentMatcher = Extract.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
-        int i = 0;
-        while (stringFragmentMatcher.find()) {
-            stringFragments.add(stringFragmentMatcher.group());
-            query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
-            stringFragmentMatcher = Extract.matcher(query);
-            i++;
+            if (! firstToken) {
+                sb.append(" ");
+            }
+
+            if (token.kind() == VoltToken.Kind.SEMICOLON) {
+                queries.add(sb.toString());
+                sb.setLength(0);
+                firstToken = true;
+            }
+            else {
+                sb.append(token.toSqlText());
+                firstToken = false;
+            }
         }
 
-        // strip out inline comments
-        // At the point, all the quoted strings have been pulled out of the code because they may contain semicolons
-        // and they will not be restored until after the split. So any user's quoted string will be safe here.
-        query = MidlineComments.matcher(query).replaceAll("");
+        if (sb.length() > 0)
+            queries.add(sb.toString());
 
-        String[] sqlFragments = query.split("\\s*;+\\s*");
+        System.out.println(queries);
 
-        ArrayList<String> queries = new ArrayList<String>();
-        for (String fragment : sqlFragments) {
-            fragment = SingleLineComments.matcher(fragment).replaceAll("");
-            fragment = fragment.trim();
-            if (fragment.isEmpty()) {
-                continue;
-            }
-            if (fragment.indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                int k = 0;
-                for (String strFrag : stringFragments) {
-                    fragment = fragment.replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", strFrag);
-                    k++;
-                }
-            }
-            fragment = fragment.replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
-            fragment = fragment.replace("#SQL_PARSER_STRING_KEYWORD#","");
-            queries.add(fragment);
-        }
         return queries;
     }
 
@@ -800,6 +748,9 @@ public class SQLParser extends SQLPatternFactory
                 queries.add(sqlFragments[j]);
             }
         }
+
+        System.out.println("Parameters are: " + queries);
+
         return queries;
     }
 

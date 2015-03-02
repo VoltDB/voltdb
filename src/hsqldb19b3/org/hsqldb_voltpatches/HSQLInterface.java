@@ -95,7 +95,7 @@ public class HSQLInterface {
 
     Session sessionProxy;
     // Keep track of the previous XML for each table in the schema
-    Map<String, VoltXMLElement> lastSchema = new TreeMap<>();
+    Map<String, VoltXMLElement> lastSchema = new TreeMap<String, VoltXMLElement>();
     // empty schema for cloning and for null diffs
     final VoltXMLElement emptySchema = new VoltXMLElement(XML_SCHEMA_NAME);
     static int instanceId = 0;
@@ -471,7 +471,7 @@ public class HSQLInterface {
      * @return The set of all table/view names in the schema.
      */
     private Set<String> getTableNames() {
-        Set<String> names = new HashSet<>();
+        Set<String> names = new HashSet<String>();
 
         // load all the tables
         HashMappedList hsqlTables = getHSQLTables();

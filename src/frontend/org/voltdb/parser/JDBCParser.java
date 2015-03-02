@@ -62,9 +62,8 @@ public class JDBCParser
      * Parse call statements for JDBC.
      * @param jdbcCall  statement to parse
      * @return          object with parsed data or null if it didn't parse
-     * @throws SQLParser.Exception
      */
-    public static ParsedCall parseJDBCCall(String jdbcCall) throws SQLParser.Exception
+    public static ParsedCall parseJDBCCall(String jdbcCall)
     {
         Matcher m = PAT_CALL_WITH_PARAMETERS.matcher(jdbcCall);
         if (m.matches()) {

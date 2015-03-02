@@ -503,7 +503,8 @@ public class TestSqlCmdInterface
         assertNotNull(msg + "SQLCommand.parseQuery returned a NULL obj!!", parsed);
         assertEquals(msg, numOfQry, parsed.size());
         String parsedString = Joiner.on(" ").join(parsed);
-        assertTrue(msg, qryStr.equalsIgnoreCase(parsedString));
+        assertTrue(msg + ": expected: \"" + qryStr + "\", actual: \"" + parsedString + "\"",
+                qryStr.equalsIgnoreCase(parsedString));
     }
 
     private void assertThis(String qryStr, String cleanQryStr, int numOfQry, int testID) {
