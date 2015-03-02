@@ -1547,7 +1547,8 @@ function loadAdminPage() {
                 $("#addConfigHeader").text("Edit Configuration");
                 $("#deleteAddConfig").show();
             }
-
+            $("#expotSaveConfigText").text("save").data("status", "save");
+            
             var contents = '' +
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
@@ -1703,6 +1704,7 @@ function loadAdminPage() {
                     e.stopPropagation();
                 } else {
                     $("#addConfigControls").hide();
+                    $("#deleteAddConfig").hide();
                     $("#saveConfigConfirmation").show();
                 }
             });
@@ -1713,43 +1715,55 @@ function loadAdminPage() {
                 //Close the popup
                 popup.close();
             });
+            
+            $("#deleteAddConfig").on("click", function () {
+                $("#addConfigControls").hide();
+                $("#deleteAddConfig").hide();
+                $("#expotSaveConfigText").text("delete").data("status", "delete");
+                $("#saveConfigConfirmation").show();
+            });
 
             $("#btnSaveConfigOk").unbind("click");
             $("#btnSaveConfigOk").on("click", function () {
                 
-                var newConfig = {};
-                newConfig["property"] = [];
-                
-                var newStreamProperties = $(".newStreamProperty");
-                for (var i = 0; i < newStreamProperties.length; i += 2) {
-                    newConfig["property"].push({
-                        "name": $(newStreamProperties[i]).val(),
-                        "value": $(newStreamProperties[i + 1]).val(),
-                    });
-                }
-                
-                newConfig["stream"] = $("#txtStream").val();
-                newConfig["type"] = $("#txtType").val();
-                newConfig["enabled"] = $("#chkStream").is(':checked');
-                newConfig["exportconnectorclass"] = "";
-                
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
-                
-                if (!adminConfigurations.export) {
-                    adminConfigurations.export = {};
-                    adminConfigurations.export["configuration"] = [];
-                }
 
-                //For editing an existing configuration
-                if (editId == "-1") {
-                    adminConfigurations.export.configuration.push(newConfig);
-                } else {
-                    var updatedConfig = adminConfigurations.export.configuration[editId * 1];
-                    
-                    updatedConfig.stream = newConfig.stream;
-                    updatedConfig.type = newConfig.type;
-                    updatedConfig.enabled = newConfig.enabled;
-                    updatedConfig.property = newConfig.property;
+                if ($("#expotSaveConfigText").data("status") == "delete") {
+                    delete adminConfigurations.export.configuration[editId * 1];
+                }
+                else {
+                    var newConfig = { };
+                    newConfig["property"] = [];
+
+                    var newStreamProperties = $(".newStreamProperty");
+                    for (var i = 0; i < newStreamProperties.length; i += 2) {
+                        newConfig["property"].push({
+                            "name": $(newStreamProperties[i]).val(),
+                            "value": $(newStreamProperties[i + 1]).val(),
+                        });
+                    }
+
+                    newConfig["stream"] = $("#txtStream").val();
+                    newConfig["type"] = $("#txtType").val();
+                    newConfig["enabled"] = $("#chkStream").is(':checked');
+                    newConfig["exportconnectorclass"] = "";
+
+                    if (!adminConfigurations.export) {
+                        adminConfigurations.export = { };
+                        adminConfigurations.export["configuration"] = [];
+                    }
+
+                    //For editing an existing configuration
+                    if (editId == "-1") {
+                        adminConfigurations.export.configuration.push(newConfig);
+                    } else {
+                        var updatedConfig = adminConfigurations.export.configuration[editId * 1];
+
+                        updatedConfig.stream = newConfig.stream;
+                        updatedConfig.type = newConfig.type;
+                        updatedConfig.enabled = newConfig.enabled;
+                        updatedConfig.property = newConfig.property;
+                    }
                 }
 
                 var currentConfig = adminEditObjects.exportConfiguration.html();
@@ -1806,6 +1820,11 @@ function loadAdminPage() {
 
                 $("#saveConfigConfirmation").hide();
                 $("#addConfigControls").show();
+                $("#expotSaveConfigText").text("save").data("status", "save");
+
+                if (editId != "-1") {
+                    $("#deleteAddConfig").show();
+                }
             });
         }
     });
