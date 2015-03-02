@@ -397,6 +397,10 @@ public class SQLCommand
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
 
+            if (executesAsSimpleDirective(line)) {
+                continue;
+            }
+
             // handle statements that are converted to regular database commands
             line = handleTranslatedCommands(line);
             if (line == null) {

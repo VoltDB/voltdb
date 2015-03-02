@@ -10,5 +10,4 @@ EOF
 -- We shouldn't get here...
 select * from t;
 Command succeeded.
-Command succeeded.
 
