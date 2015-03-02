@@ -233,6 +233,16 @@ public class ZKUtil {
         return zk;
     }
 
+    public static boolean addIfMissing(ZooKeeper zk, String absolutePath, CreateMode createMode, byte[] data)
+            throws KeeperException, InterruptedException {
+        try {
+            zk.create(absolutePath, data, Ids.OPEN_ACL_UNSAFE, createMode);
+        } catch (KeeperException.NodeExistsException e) {
+            return false;
+        }
+        return true;
+    }
+
     public static final void mkdirs(ZooKeeper zk, String dirDN) {
         ZKUtil.StringCallback callback = asyncMkdirs(zk, dirDN );
         try {
