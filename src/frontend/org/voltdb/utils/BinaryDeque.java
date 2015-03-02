@@ -17,8 +17,8 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
-
 import java.nio.ByteBuffer;
+
 import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
@@ -43,7 +43,17 @@ public interface BinaryDeque {
      * @param object
      * @throws IOException
      */
-    public void offer(BBContainer object) throws IOException;
+    void offer(BBContainer object) throws IOException;
+
+    /**
+     * Store a buffer chain as a single object in the deque. IOException may be thrown if the object
+     * is larger then the implementation defined max. 64 megabytes in the case of PersistentBinaryDeque.
+     * If there is an exception attempting to write the buffers then all the buffers will be discarded
+     * @param object
+     * @param allowCompression
+     * @throws IOException
+     */
+    void offer(BBContainer object, boolean allowCompression) throws IOException;
 
     /**
      * A push creates a new file each time to be "the head" so it is more efficient to pass
@@ -79,6 +89,8 @@ public interface BinaryDeque {
 
     public boolean isEmpty() throws IOException;
 
+    public boolean initializedFromExistingFiles();
+
     public long sizeInBytes();
     public int getNumObjects();
 
@@ -98,7 +110,7 @@ public interface BinaryDeque {
          * then the last object passed to parse will be truncated out of the deque. Part of the object
          * or a new object can be returned to replace it.
          */
-        public ByteBuffer parse(ByteBuffer b);
+        public ByteBuffer parse(BBContainer bb);
     }
 
     public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;

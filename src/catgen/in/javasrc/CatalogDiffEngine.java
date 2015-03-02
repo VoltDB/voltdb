@@ -29,6 +29,8 @@ import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogType;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.expressions.AbstractExpression;
@@ -584,17 +586,45 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
             return null;
-        if (suspect instanceof Constraint && field.equals("index"))
+        if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
             return null;
-        if (suspect instanceof Table) {
-            if (field.equals("signature") || field.equals("tuplelimit"))
-                return null;
-        }
-
 
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
+
+        if (suspect instanceof Cluster && field.equals("drClusterId") ||
+                suspect instanceof Cluster && field.equals("drProducerPort")) {
+            // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
+            if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
+                restrictionQualifier = " while DR is enabled";
+            }
+            else {
+                return null;
+            }
+        }
+        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
+            if ((Boolean)suspect.getField("drProducerEnabled")) {
+                restrictionQualifier = " active-active and daisy-chained DR unsupported";
+            }
+            else {
+                return null;
+            }
+        }
+        if (suspect instanceof Constraint && field.equals("index"))
+            return null;
+        if (suspect instanceof Table) {
+            if (field.equals("signature") ||
+                field.equals("tuplelimit"))
+                return null;
+
+            // Always allow disabling DR on table
+            if (field.equalsIgnoreCase("isdred")) {
+                Boolean isDRed = (Boolean) suspect.getField(field);
+                assert isDRed != null;
+                if (!isDRed) return null;
+            }
+        }
 
         // whitelist certain column changes
         if (suspect instanceof Column) {
@@ -655,14 +685,14 @@ public class CatalogDiffEngine {
                 }
                 if (oldTypeInt == newTypeInt) {
                     if (oldType == VoltType.STRING && oldInBytes == false && newInBytes == true) {
-                        restrictionQualifier = "narrowing from " + oldSize + "CHARACTERS to "
+                        restrictionQualifier = " narrowing from " + oldSize + "CHARACTERS to "
                     + newSize * CatalogSizing.MAX_BYTES_PER_UTF8_CHARACTER + " BYTES";
                     } else {
-                        restrictionQualifier = "narrowing from " + oldSize + " to " + newSize;
+                        restrictionQualifier = " narrowing from " + oldSize + " to " + newSize;
                     }
                 }
                 else {
-                    restrictionQualifier = "from " + oldType.toSQLString() +
+                    restrictionQualifier = " from " + oldType.toSQLString() +
                                            " to " + newType.toSQLString();
                 }
             }
@@ -761,6 +791,13 @@ public class CatalogDiffEngine {
                 // error message
                 retval[1] = String.format(
                         "Unable to change the partition column of table %s because it is not empty.",
+                        retval[0]);
+                return retval;
+            }
+            if (field.equalsIgnoreCase("isdred")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to enable DR on table %s because it is not empty.",
                         retval[0]);
                 return retval;
             }

@@ -793,7 +793,7 @@ public class ProcedureRunner {
             return null;
         }
         try {
-            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle,
+            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle, m_txnState.uniqueId,
                              clusterName, databaseName,
                              tableName, data, returnUniqueViolations, shouldDRStream, false);
         }
