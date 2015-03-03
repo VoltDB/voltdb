@@ -26,8 +26,6 @@ package org.voltdb.fullddlfeatures;
 import java.net.URL;
 import java.net.URLDecoder;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB.Configuration;
@@ -37,6 +35,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
     @Override
@@ -271,6 +270,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testExportTable() throws Exception
     {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         assertTrue(findTableInSystemCatalogResults("T25"));
         assertEquals(getTableType("T25"), "EXPORT");
         //Export table created with STREAM syntax

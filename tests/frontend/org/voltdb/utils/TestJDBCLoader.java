@@ -171,7 +171,6 @@ public class TestJDBCLoader {
             "--quotechar=\"",
             "--escape=\\",
             "--skip=1",
-            "--limitrows=100",
             "BlAh"
         };
 
@@ -184,7 +183,6 @@ public class TestJDBCLoader {
             "--user=",
             "--password=",
             "--port=",
-            "--limitrows=100",
             "JBlAh"
         };
 
@@ -215,7 +213,6 @@ public class TestJDBCLoader {
             "--quotechar=\"",
             "--escape=\\",
             "--skip=1",
-            "--limitrows=100",
             "BlAh"
         };
 
@@ -228,7 +225,6 @@ public class TestJDBCLoader {
             "--user=",
             "--password=",
             "--port=",
-            "--limitrows=100",
             "JBlAh"
         };
 
