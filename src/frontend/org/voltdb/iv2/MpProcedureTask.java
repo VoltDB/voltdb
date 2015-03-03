@@ -103,11 +103,13 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
         String spName = txn.m_initiationMsg.getStoredProcedureName();
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + spName + this);
+        }
 
         // certain system procs can and can't be restarted
         // Right now this is adhoc and catalog update. Since these are treated specially
@@ -173,11 +175,15 @@ public class MpProcedureTask extends ProcedureTask
             response.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(response);
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-            hostLog.debug("COMPLETE: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("COMPLETE: " + spName + this);
+            }
         }
         else {
             restartTransaction();
-            hostLog.debug("RESTART: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("RESTART: " + spName + this);
+            }
         }
     }
 

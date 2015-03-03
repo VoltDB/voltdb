@@ -48,6 +48,10 @@
         <level value="INFO"/>
     </logger -->
 
+    <!-- logger name="DBBPOOL">
+        <level value="INFO"/>
+    </logger -->
+
     <!-- logger name="SQL">
         <level value="INFO"/>
     </logger -->
