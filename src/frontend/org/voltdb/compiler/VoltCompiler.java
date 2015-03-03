@@ -139,6 +139,8 @@ public class VoltCompiler {
     // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
     public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
+    // Turn off warning about DRing replicated tables
+    public static final boolean DISABLE_DR_WARNING = Boolean.getBoolean("DISABLE_DR_WARNING");
 
     String m_projectFileURL = null;
     String m_currentFilename = null;
@@ -1191,6 +1193,11 @@ public class VoltCompiler {
             compileExport(export, db);
         }
 
+        // process DRed tables
+        for (Entry<String, String> drNode: voltDdlTracker.getDRedTables().entrySet()) {
+            compileDRTable(drNode, db);
+        }
+
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             CatalogMap<Procedure> previousProcsIfAny = null;
@@ -1653,6 +1660,27 @@ public class VoltCompiler {
                     ));
         }
 
+    }
+
+    void compileDRTable(final Entry<String, String> drNode, final Database db)
+            throws VoltCompilerException
+    {
+        String tableName = drNode.getKey();
+        String action = drNode.getValue();
+
+        org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
+        if (tableref == null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
+        } else if (tableref.getMaterializer() != null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
+                                            " DR does not support materialized view.");
+        }
+
+        if (action.equalsIgnoreCase("DISABLE")) {
+            tableref.setIsdred(false);
+        } else {
+            tableref.setIsdred(true);
+        }
     }
 
     // Usage messages for new and legacy syntax.

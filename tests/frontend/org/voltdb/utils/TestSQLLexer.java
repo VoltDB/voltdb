@@ -78,6 +78,20 @@ public class TestSQLLexer {
         checkDDL("-- export table pants", null);
         checkDDL("exprot table pants", null);
 
+        checkDDL("dr table pants", "dr");
+        checkDDL("DR table pants", "dr");
+        checkDDL("Dr table pants", "dr");
+        checkDDL("   dr table pants    ", "dr");
+        checkDDL("drtable pants", null);
+        checkDDL("-- dr table pants", null);
+
+        checkDDL("dr table pants disable", "dr");
+        checkDDL("DR table pants DISABLE", "dr");
+        checkDDL("Dr table pants DiSaBlE", "dr");
+        checkDDL("   dr table pants disable    ", "dr");
+        checkDDL("drtable pants disable", null);
+        checkDDL("-- dr table pants disable", null);
+
         checkDDL("import class org.dont.exist", "import");
         checkDDL("IMPORT class org.dont.exist", "import");
         checkDDL("ImPoRt class org.dont.exist", "import");

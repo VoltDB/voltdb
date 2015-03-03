@@ -556,10 +556,9 @@ public class Inits {
         @Override
         public void run() {
             int replicationPort = VoltDB.DEFAULT_DR_PORT;
-
-            if (m_deployment.getReplication() != null) {
+            if (m_deployment.getDr() != null) {
                 // set the replication port from the deployment file
-                replicationPort = m_deployment.getReplication().getPort();
+                replicationPort = m_deployment.getDr().getPort();
             }
 
             // allow command line override
