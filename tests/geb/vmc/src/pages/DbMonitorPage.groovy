@@ -54,31 +54,47 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         showHideData    { $('#ShowHideBlock') }
         dataArea        { $('.menu_body') }
 
-		serverCpu			{ $("#chartServerCPU") }
-		serverRam			{ $("#chartServerRAM") }
-		clusterLatency		{ $("#chartClusterLatency") }
-		clusterTransactions	{ $("#chartClusterTransactions") }
-		partitionIdleTime	{ $("#chartPartitionIdleTime") }
-		storedProcedures 	{ $("#tblStoredProcedures") }
-		dataTables			{ $("#tblDataTables") }
+        serverCpu			{ $("#chartServerCPU") }
+        serverRam			{ $("#chartServerRAM") }
+        clusterLatency		{ $("#chartClusterLatency") }
+        clusterTransactions	{ $("#chartClusterTransactions") }
+        partitionIdleTime	{ $("#chartPartitionIdleTime") }
+        storedProcedures 	{ $("#tblStoredProcedures") }
+        dataTables			{ $("#tblDataTables") }
 
-		serverCpuCheckbox				{ $("#ServerCPU") }
-		serverRamCheckbox				{ $("#ServerRAM") }
-		clusterLatencyCheckbox			{ $("#ClusterLatency") }
-		clusterTransactionsCheckbox		{ $("#ClusterTransactions") }
-		partitionIdleTimeCheckbox		{ $("#PartitionIdleTime") }
-		storedProceduresCheckbox		{ $("#StoredProcedures") }
-		dataTablesCheckbox				{ $("#DatabaseTables") }
+        serverCpuCheckbox				{ $("#ServerCPU") }
+        serverRamCheckbox				{ $("#ServerRAM") }
+        clusterLatencyCheckbox			{ $("#ClusterLatency") }
+        clusterTransactionsCheckbox		{ $("#ClusterTransactions") }
+        partitionIdleTimeCheckbox		{ $("#PartitionIdleTime") }
+        storedProceduresCheckbox		{ $("#StoredProcedures") }
+        dataTablesCheckbox				{ $("#DatabaseTables") }
 
-	    displayPreference           { $("#showMyPreference") }
-		graphView		{ $('#graphView') }
-		timeOne			{ $(class:"nv-axisMaxMin", transform:"translate(0,0)") }
+        filterStoredProcedure			{ $("#filterStoredProc") }
+        filterDatabaseTable				{ $("#filterDatabaseTable") }
 
-		preferencesTitle	{ $(class:"overlay-title", text:"Graph/Data Preferences") }
-		savePreferencesBtn		{ $("#savePreference") }
-		popupClose		{ $(class:"popup_close") }
-        header          { module Header }
-        footer          { module Footer }
+        databaseTableCurrentPage		{ $("#lblPreviousTable") }
+        databaseTableTotalPage		    { $("#lblTotalPagesofTables") }
+
+        displayPreference           { $("#showMyPreference") }
+        graphView					{ $('#graphView') }
+        timeOne						{ $(class:"nv-axisMaxMin", transform:"translate(0,0)") }
+
+        table			{ $("#TABLE_NAME") }
+        rowcount		{ $("#TUPLE_COUNT") }
+        maxrows			{ $("#MAX_ROWS") }
+        minrows			{ $("#MIN_ROWS") }
+        avgrows			{ $("#AVG_ROWS") }
+        tabletype		{ $("#TABLE_TYPE") }
+
+        ascending		{ $(class:"sorttable_sorted") }
+        descending		{ $(class:"sorttable_sorted_reverse") }
+
+        preferencesTitle		{ $(class:"overlay-title", text:"Graph/Data Preferences") }
+        savePreferencesBtn		{ $("#savePreference") }
+        popupClose				{ $(class:"popup_close") }
+        header          		{ module Header }
+        footer          		{ module Footer }
     }
     static at = {
         dbMonitorTab.displayed
@@ -551,5 +567,120 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 		return hourInt
 	}
 
-	
+    /*
+     * click SQL Query to go to SqlQueryPage
+     */
+    def boolean gotoSqlQuery() {
+        header.tabSQLQuery.click()
+    }
+
+    /*
+     * get query to create a table
+     */
+    def String getQueryToCreateTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#create") {
+        }
+
+        while ((line = br.readLine()) != "#delete") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * get query to delete a table
+     */
+    def String getQueryToDeleteTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != null) {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+
+    /*
+     *	search the tablename in Database Tables
+     */
+    def boolean searchDatabaseTable(String tablename) {
+        filterDatabaseTable.value(tablename)
+    }
+
+    /*
+     *	return true if table is in ascending order
+     *  to check ascending order, check the class "sorttable_sorted" displayed
+     */
+    def boolean tableInAscendingOrder() {
+        if ( ascending.displayed )
+            return true
+        else
+            return false
+    }
+
+    /*
+     *	return true if table is in ascending order
+     *  to check ascending order, check the class "sorttable_sorted" displayed
+     */
+    def boolean tableInDescendingOrder() {
+        if ( descending.displayed )
+            return true
+        else
+            return false
+    }
+
+    /*
+     *	click the table column in database table
+     */
+    def boolean clickTable() {
+        table.click()
+    }
+
+    /*
+     *	click the row count column in database table
+     */
+    def boolean clickRowcount() {
+        rowcount.click()
+    }
+
+    /*
+     *	click the max rows column in database table
+     */
+    def boolean clickMaxRows() {
+        maxrows.click()
+    }
+
+    /*
+     *	click the min rows column in database table
+     */
+    def boolean clickMinRows() {
+        minrows.click()
+    }
+
+    /*
+     *	click the avg rows column in database table
+     */
+    def boolean clickAvgRows() {
+        avgrows.click()
+    }
+
+    /*
+     *	click the type column in database table
+     */
+    def boolean clickTabletype() {
+        tabletype.click()
+    }
 }

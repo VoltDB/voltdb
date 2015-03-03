@@ -1775,9 +1775,13 @@ function loadAdminPage() {
                 adminEditObjects.addNewConfigLink.hide();
                 adminEditObjects.exportConfiguration.html(loadingConfig);
                 adminEditObjects.loadingConfiguration.show();
-                adminEditObjects.exportConfiguration.data("status","loading");
+                adminEditObjects.exportConfiguration.data("status", "loading");
+                
+                //Close the popup
+                popup.close();
 
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    
                     if (result.status == "1") {
 
                         //Reload Admin configurations for displaying the updated value
@@ -1790,29 +1794,27 @@ function loadAdminPage() {
                         });
 
                     } else {
-                        adminEditObjects.loadingConfiguration.hide();
-                        adminEditObjects.addNewConfigLink.show();
-                        adminEditObjects.exportConfiguration.data("status","value");
-                        adminEditObjects.exportConfiguration.html(currentConfig);
+                        setTimeout(function() {
+                            adminEditObjects.loadingConfiguration.hide();
+                            adminEditObjects.addNewConfigLink.show();
+                            adminEditObjects.exportConfiguration.data("status", "value");
+                            adminEditObjects.exportConfiguration.html(currentConfig);
 
-                        var msg = '"Export Configuration". ';
-                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
-                        }
-                        else if(result.statusstring != ""){
-                            msg += result.statusstring;
-                        }
-                        else {
-                            msg += "Please try again later.";
-                        }
+                            var msg = '"Export Configuration". ';
+                            if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                                msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            } else if (result.statusstring != "") {
+                                msg += result.statusstring;
+                            } else {
+                                msg += "Please try again later.";
+                            }
 
-                        adminEditObjects.updateErrorFieldMsg.text(msg);
-                        $("#updateErrorPopupLink").trigger("click");
+                            adminEditObjects.updateErrorFieldMsg.text(msg);
+
+                            $("#updateErrorPopupLink").trigger("click");
+                        }, 3000);
                     }
                 });
-
-                //Close the popup
-                popup.close();
             });
             
             $("#btnSaveConfigCancel").unbind("click");
