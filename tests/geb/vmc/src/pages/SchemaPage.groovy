@@ -43,6 +43,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
         voltDbDocumentationLink { $('a#iconDoc') }
         schema              { module schemaTab}
     }
+
     static at = {
         schemaTab.displayed
         schemaTab.attr('class') == 'active'
