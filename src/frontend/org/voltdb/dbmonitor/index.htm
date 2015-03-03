@@ -386,7 +386,7 @@
                                             <div class="loading-small loadingSecurity" ></div>
                                         </div>
                                         <div class="securWrapper" id="UsersList">
-                                            <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                           <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
                                                 <tr>
                                                     <th>Username</th>
                                                     <th>Password</th>
@@ -1368,6 +1368,38 @@
         </div>
     </div>
     <!-- Query error because of Paused Database Popup-->
+    
+    <a href="#addUserPopup" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
+    <div id="addUserPopup" style="display: none">
+        <div id="addUserInnerPopup" data-isupdate="" data-username="" data-role="">
+            
+            <div class="overlay-title icon-alert">
+                <div id="addUserHeader" class="addConfigHeader">Add User</div>
+                <div id="deleteUser" class="deleteAddConfig"><a id="deleteSecUser" href="javascript:void(0);">Delete this User</a></div>
+                <div class="clear"></div>
+            </div>
+
+            <div id="addUserControl">
+                <div class="clear"></div>
+                <form id="frmAddUser" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addUserWrapper" class="configWrapper">
+                        
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnSaveUser" class="btn">Save</a> <a id="btnCancelUser" class="btn btn-gray">Cancel</a></div>
+            </div>
+
+            <div id="saveUserControl" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to save?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveSecUser" class="btn closeBtn">Yes</a> <a id="btnCancelSaveSecUser" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+
+        </div>
+    </div>
+    
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>

@@ -175,7 +175,33 @@
                         } else {
                             VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                         }
-                        jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        if (!shortApiCallDetails.hasOwnProperty("requestType")) {
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else if (shortApiCallDetails.requestType.toLowerCase() == "put") {
+                            //jQuery.putJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                            var formData = shortApiCallDetails.updatedData;
+                            formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
+                            var authorization = ah;
+                            jQuery.ajax({
+                                type: 'PUT',
+                                url: uri,
+                                data: formData,
+                                dataType: 'json',
+                                beforeSend: function (request) {
+                                    if (authorization != null) {
+                                        request.setRequestHeader("Authorization", authorization);
+                                    }
+                                },
+                                success: callback,
+                                error: function (e) {
+                                    console.log(e.message);
+                                }
+                            });
+                        } else if (shortApiCallDetails.requestType.toLowerCase() == "delete") {
+                            jQuery.deleteJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else {
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        }
                     }
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
@@ -589,7 +615,6 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization) {
-        
         if (VoltDBCore.hostIP == "") {
 
             jQuery.ajax({
@@ -675,3 +700,86 @@ jQuery.extend({
 
 });
 
+jQuery.extend({
+    putJSON: function (url, formData, callback, authorization) {
+        
+        if (VoltDBCore.hostIP == "") {
+            jQuery.ajax({
+                type: 'PUT',
+                url: url,
+                data: formData,
+                dataType: 'json',
+                beforeSend: function (request) {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: function (data, textStatus, request) {
+                    var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
+                    callback(data, host);
+                },
+                error: function (e) {
+                    console.log(e);
+                }
+            });
+        } else {
+            jQuery.ajax({
+                type: 'PUT',
+                url: url,
+                data: formData,
+                dataType: 'json',
+                beforeSend: function (request) {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: callback,
+                error: function (e) {
+                    console.log(e.message);
+                }
+            });
+        }
+    }
+});
+
+jQuery.extend({
+    deleteJSON: function (url, formData, callback, authorization) {
+        
+        if (VoltDBCore.hostIP == "") {
+            jQuery.ajax({
+                type: 'DELETE',
+                url: url,
+                data: formData,
+                dataType: 'json',
+                beforeSend: function (request) {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: function (data, textStatus, request) {
+                    var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
+                    callback(data, host);
+                },
+                error: function (e) {
+                    console.log(e);
+                }
+            });
+        } else {
+            jQuery.ajax({
+                type: 'DELETE',
+                url: url,
+                //data: formData,
+                dataType: 'json',
+                beforeSend: function (request) {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: callback,
+                error: function (e) {
+                    console.log(e.message);
+                }
+            });
+        }
+    }
+});
