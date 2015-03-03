@@ -8,3 +8,4 @@ CREATE TABLE lina (
 
 #delete
 DROP TABLE lina
+

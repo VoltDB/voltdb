@@ -612,6 +612,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return query
     }
 
+
     /*
      *	search the tablename in Database Tables
      */

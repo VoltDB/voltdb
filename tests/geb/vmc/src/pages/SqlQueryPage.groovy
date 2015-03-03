@@ -503,4 +503,5 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def boolean gotoDbMonitor() {
         header.tabDBMonitor.click()
     }
+
 }

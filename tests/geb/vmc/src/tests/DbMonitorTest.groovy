@@ -759,6 +759,7 @@ class DbMonitorTest extends TestBase {
         page.dataTablesDisplayed()
     }
 
+
     def "Add a table in Tables and check it"() {
         String createQuery = page.getQueryToCreateTable()
         String deleteQuery = page.getQueryToDeleteTable()
