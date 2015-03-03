@@ -207,6 +207,9 @@ public class SQLCommand
                 // RECALL command
                 ParseRecallResults recallParseResults = SQLParser.parseRecallStatement(line, RecallableSessionLines.size() - 1);
                 if (recallParseResults != null) {
+                    // Trying to use accessors like getError() and getLine() here in place
+                    // of the direct attribute access gets a mysterious NoSuchMethodError.
+                    // At least the attributes are declared final.
                     if (recallParseResults.error == null) {
                         line = RecallableSessionLines.get(recallParseResults.line);
                         m_lineInputReader.putString(line);
@@ -214,7 +217,7 @@ public class SQLCommand
                         isRecall = true;
                     }
                     else {
-                        System.out.printf("%d> %s\n%d", RecallableSessionLines.size(), recallParseResults.error);
+                        System.out.println(recallParseResults.error);
                     }
                     executeImmediate = false; // let user edit the recalled line.
                     continue;
@@ -312,7 +315,7 @@ public class SQLCommand
             return SQLParser.translateStatement(lineIn);
         }
         catch(SQLParser.Exception e) {
-            System.out.printf("%d> %s\n", RecallableSessionLines.size(), e.getMessage());
+            System.out.println(e.getMessage());
         }
 
         //* enable to debug */ if (lineOut != null && !lineOut.equals(lineIn)) System.err.printf("Translated: %s -> %s\n", lineIn, lineOut);
@@ -440,7 +443,11 @@ public class SQLCommand
                 execListClasses();
             }
             else {
-                System.out.printf("%d> Bad SHOW target: %s\n%d", RecallableSessionLines.size(), subcommand);
+                String errorCase = subcommand.equals("") ?
+                        ("Incomplete SHOW command.\n") :
+                        ("Invalid SHOW command completion: '" + subcommand + "'.\n");
+                System.out.println(errorCase +
+                        "The valid SHOW command completions are proc, procedure, tables, or classes.");
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
             return true;
