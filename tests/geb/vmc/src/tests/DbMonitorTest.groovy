@@ -758,4 +758,56 @@ class DbMonitorTest extends TestBase {
         page.storedProceduresDisplayed()
         page.dataTablesDisplayed()
     }
+
+    def "Add a table in Tables and check it"() {
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+
+        when: 'sql query tab is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'Db Monitor tab is clicked'
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
+
+        when:
+        page.searchDatabaseTable("lina")
+        then:
+        String number = page.databaseTableCurrentPage.text()
+        String numbers = page.databaseTableTotalPage.text()
+
+        when: 'sql query tab is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set query in the box'
+        page.setQueryText(deleteQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'Db Monitor tab is clicked'
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
+
+        when:
+        page.searchDatabaseTable("lina")
+        then:
+        String number1 = page.databaseTableCurrentPage.text()
+        String numbers1 = page.databaseTableTotalPage.text()
+
+        !number.equals("0")
+        !numbers.equals("0")
+        number1.equals("0")
+        numbers1.equals("0")
+    }
 }

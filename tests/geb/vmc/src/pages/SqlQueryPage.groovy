@@ -496,4 +496,11 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def String getQueryDuration() {
         return queryDurHtml.text()
     }
+
+    /*
+	 * click DbMonitor tab to go to Db Monitor
+	 */
+    def boolean gotoDbMonitor() {
+        header.tabDBMonitor.click()
+    }
 }

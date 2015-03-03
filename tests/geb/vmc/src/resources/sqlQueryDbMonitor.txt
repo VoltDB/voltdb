@@ -1,0 +1,10 @@
+#create
+CREATE TABLE lina (
+  AREA_CODE smallint NOT NULL,
+  STATE varchar(2) NOT NULL,
+  CONSTRAINT PK_AREA_CODE_STATE_TEST PRIMARY KEY (AREA_CODE)
+);
+
+
+#delete
+DROP TABLE lina
