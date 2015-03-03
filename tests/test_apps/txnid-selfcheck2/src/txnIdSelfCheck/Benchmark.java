@@ -629,7 +629,7 @@ public class Benchmark {
         InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
         idpt.start();
         DdlThread ddlt = new DdlThread(client);
-        ddlt.start();
+        // XXX/PSR ddlt.start();
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
@@ -674,8 +674,8 @@ public class Benchmark {
             exitcode = reportDeadThread(adHocMayhemThread);
         if (! idpt.isAlive())
             exitcode = reportDeadThread(idpt);
-        if (! ddlt.isAlive())
-            exitcode = reportDeadThread(ddlt);
+        /* XXX if (! ddlt.isAlive())
+            exitcode = reportDeadThread(ddlt);*/
         for (ClientThread ct : clientThreads) {
             if (! ct.isAlive()) {
                 exitcode = reportDeadThread(ct);

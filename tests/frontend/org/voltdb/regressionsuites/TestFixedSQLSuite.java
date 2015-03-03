@@ -2095,6 +2095,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 "Array / Scalar parameter mismatch"));
     }
 
+    public void testENG7724() throws Exception {
+        Client client = getClient();
+        VoltTable vt = client.callProcedure("voltdbSelectProductChanges", 1, 1).getResults()[0];
+        assertEquals(13, vt.getColumnCount());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
