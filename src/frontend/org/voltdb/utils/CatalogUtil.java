@@ -34,9 +34,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Properties;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -48,6 +53,8 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -68,7 +75,9 @@ import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
@@ -76,7 +85,6 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
@@ -85,28 +93,27 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.ReplicationType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
-import org.voltdb.compilereport.IndexAnnotation;
-import org.voltdb.compilereport.ProcedureAnnotation;
-import org.voltdb.compilereport.StatementAnnotation;
-import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -114,11 +121,9 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import java.io.StringWriter;
-import javax.xml.bind.Marshaller;
-import javax.xml.namespace.QName;
-
-import org.xml.sax.SAXException;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  *
@@ -129,6 +134,9 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
+
+    public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
+    public static final String SIGNATURE_DELIMITER = ",";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -383,6 +391,26 @@ public abstract class CatalogUtil {
         return (columns);
     }
 
+    public static NavigableSet<Table> getExportTables(Database db) {
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : db.getConnectors()) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                exportTables.add(tinfo.getTable());
+            }
+        }
+        return exportTables.build();
+    }
+
+    public static NavigableSet<String> getExportTableNames(Database db) {
+        ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
+        for (Connector connector : db.getConnectors()) {
+            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
+                exportTables.add(tinfo.getTable().getTypeName());
+            }
+        }
+        return exportTables.build();
+    }
+
     /**
      * Return true if a table is a streamed / export table
      * This function is duplicated in CatalogUtil.h
@@ -393,24 +421,35 @@ public abstract class CatalogUtil {
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table)
     {
-        // no export, no export only tables
-        if (database.getConnectors().size() == 0) {
-            return false;
-        }
-
-        // there is one well-known-named connector
-        org.voltdb.catalog.Connector connector = database.getConnectors().get("0");
-
-        // iterate the connector tableinfo list looking for tableIndex
-        // tableInfo has a reference to a table - can compare the reference
-        // to the desired table by looking at the relative index. ick.
-        for (org.voltdb.catalog.ConnectorTableInfo tableInfo : connector.getTableinfo()) {
-            if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
-                return tableInfo.getAppendonly();
+        for (Connector connector : database.getConnectors()) {
+            // iterate the connector tableinfo list looking for tableIndex
+            // tableInfo has a reference to a table - can compare the reference
+            // to the desired table by looking at the relative index. ick.
+            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                    return true;
+                }
             }
         }
         return false;
     }
+
+    public static String getExportTargetIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
+                                                                    org.voltdb.catalog.Table table)
+    {
+        for (Connector connector : database.getConnectors()) {
+            // iterate the connector tableinfo list looking for tableIndex
+            // tableInfo has a reference to a table - can compare the reference
+            // to the desired table by looking at the relative index. ick.
+            for (ConnectorTableInfo tableInfo : connector.getTableinfo()) {
+                if (tableInfo.getTable().getRelativeIndex() == table.getRelativeIndex()) {
+                    return connector.getTypeName();
+                }
+            }
+        }
+        return null;
+    }
+
 
     /**
      * Return true if a table is the source table for a materialized view.
@@ -563,6 +602,7 @@ public abstract class CatalogUtil {
                 setExportInfo(catalog, deployment.getExport());
             }
             setCommandLogInfo(catalog, deployment.getCommandlog());
+            setDrInfo(catalog, deployment.getDr());
             return null;
         }
         catch (Exception e) {
@@ -664,6 +704,32 @@ public abstract class CatalogUtil {
             JAXBElement<DeploymentType> result =
                 (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
             DeploymentType deployment = result.getValue();
+            // move any deprecated standalone export elements to the default target
+            ExportType export = deployment.getExport();
+            if (export != null && export.getTarget() != null) {
+                if (export.getConfiguration().size() > 1) {
+                    hostLog.error("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
+                    return null;
+                }
+                //OLD syntax use target as type.
+                if (export.getConfiguration().isEmpty()) {
+                    // this code is for RestRoundtripTest
+                    export.getConfiguration().add(new ExportConfigurationType());
+                }
+                ExportConfigurationType exportConfig = export.getConfiguration().get(0);
+                if (export.isEnabled() != null) {
+                    exportConfig.setEnabled(export.isEnabled());
+                }
+                if (export.getTarget() != null) {
+                    exportConfig.setType(export.getTarget());
+                }
+                if (export.getExportconnectorclass() != null) {
+                    exportConfig.setExportconnectorclass(export.getExportconnectorclass());
+                }
+                //Set target to default name.
+                exportConfig.setStream(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            }
+
             populateDefaultDeployment(deployment);
             return deployment;
         } catch (JAXBException e) {
@@ -714,11 +780,6 @@ public abstract class CatalogUtil {
             if (jsonApi == null) {
                 jsonApi = new HttpdType.Jsonapi();
                 httpd.setJsonapi(jsonApi);
-            }
-            //replication
-            if (deployment.getReplication() == null) {
-                ReplicationType repl = new ReplicationType();
-                deployment.setReplication(repl);
             }
             //snapshot
             if (deployment.getSnapshot() == null) {
@@ -965,6 +1026,98 @@ public abstract class CatalogUtil {
         }
     }
 
+    private static Properties checkExportProcessorConfiguration(ExportConfigurationType exportConfiguration) {
+        // on-server export always uses the guest processor
+        String exportClientClassName = null;
+
+        switch(exportConfiguration.getType()) {
+            case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
+            case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
+            case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
+            case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
+            //Validate that we can load the class.
+            case CUSTOM:
+                exportClientClassName = exportConfiguration.getExportconnectorclass();
+                if (exportConfiguration.isEnabled()) {
+                    try {
+                        CatalogUtil.class.getClassLoader().loadClass(exportClientClassName);
+                    }
+                    catch (ClassNotFoundException ex) {
+                        String msg =
+                                "Custom Export failed to configure, failed to load" +
+                                " export plugin class: " + exportConfiguration.getExportconnectorclass() +
+                                " Disabling export.";
+                        hostLog.error(msg);
+                        throw new DeploymentCheckException(msg);
+                    }
+                }
+            break;
+        }
+
+        Properties processorProperties = new Properties();
+
+        if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
+            String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            //Override for tests
+            if (dexportClientClassName != null && dexportClientClassName.trim().length() > 0 &&
+                    exportConfiguration.getType().equals(ServerExportEnum.CUSTOM)) {
+                processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, dexportClientClassName);
+            } else {
+                processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            }
+        }
+
+        if (exportConfiguration != null) {
+            List<PropertyType> configProperties = exportConfiguration.getProperty();
+            if (configProperties != null && ! configProperties.isEmpty()) {
+
+                for( PropertyType configProp: configProperties) {
+                    String key = configProp.getName();
+                    String value = configProp.getValue();
+                    if (!key.toLowerCase().contains("passw")) {
+                        processorProperties.setProperty(key, value.trim());
+                    } else {
+                        //Dont trim passwords
+                        processorProperties.setProperty(key, value);
+                    }
+                }
+            }
+        }
+
+        if (!exportConfiguration.isEnabled()) {
+            return processorProperties;
+        }
+
+        // Instantiate the Guest Processor
+        Class<?> processorClazz = null;
+        try {
+            processorClazz = Class.forName(ExportManager.PROCESSOR_CLASS);
+        } catch (ClassNotFoundException e) {
+            throw new DeploymentCheckException("Export is a PRO version only feature");
+        }
+        ExportDataProcessor processor = null;
+        try {
+            processor = (ExportDataProcessor)processorClazz.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            hostLog.error("Unable to instantiate export processor", e);
+            throw new DeploymentCheckException("Unable to instantiate export processor", e);
+        }
+        try {
+            processor.addLogger(hostLog);
+
+            processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
+            processor.checkProcessorConfig(processorProperties);
+            processor.shutdown();
+        } catch (Exception e) {
+            hostLog.error("Export processor failed its configuration check", e);
+            throw new DeploymentCheckException("Export processor failed its configuration check: " + e.getMessage(), e);
+        }
+
+        processorProperties.remove(ExportManager.CONFIG_CHECK_ONLY);
+        return processorProperties;
+    }
+
     /**
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
@@ -974,89 +1127,87 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
+        List<String> streamList = new ArrayList<String>();
+        boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
+        for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
-        boolean adminstate = exportType.isEnabled();
-
-        Database db = getDatabase(catalog);
-        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
-        if (catconn == null) {
-            if (adminstate) {
-                hostLog.info("Export configuration enabled in deployment file however no export " +
-                        "tables are present in the project file. Export disabled.");
+            boolean connectorEnabled = exportConfiguration.isEnabled();
+            // Get the stream name from the xml attribute "stream"
+            // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
+            String streamName = exportConfiguration.getStream();
+            if (noEmptyTarget && (streamName == null || streamName.trim().isEmpty()) ) {
+                    throw new RuntimeException("stream must be specified along with type in export configuration.");
             }
-            return;
-        }
 
-        // on-server export always uses the guest processor
-        String connector = "org.voltdb.export.processors.GuestProcessor";
-        catconn.setLoaderclass(connector);
-        catconn.setEnabled(adminstate);
-
-        String exportClientClassName = null;
-
-        switch(exportType.getTarget()) {
-            case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
-            case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
-            case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
-            case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
-            case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
-            //Validate that we can load the class.
-            case CUSTOM:
-                try {
-                    CatalogUtil.class.getClassLoader().loadClass(exportType.getExportconnectorclass());
-                    exportClientClassName = exportType.getExportconnectorclass();
+            if (connectorEnabled) {
+                if (streamList.contains(streamName)) {
+                    throw new RuntimeException("Multiple connectors can not be assigned to single export stream: " +
+                            streamName + ".");
                 }
-                catch (ClassNotFoundException ex) {
-                    hostLog.error(
-                            "Custom Export failed to configure, failed to load " +
-                            " export plugin class: " + exportType.getExportconnectorclass() +
-                            " Disabling export.");
-                exportType.setEnabled(false);
-                return;
+                else {
+                    streamList.add(streamName);
+                }
             }
-            break;
-        }
+            boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-        // this is OK as the deployment file XML schema does not allow for
-        // export configuration property names that begin with underscores
-        if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-            ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
-            prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
-            //Override for tests
-            String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
-            prop.setValue(dexportClientClassName);
-        }
-
-        ExportConfigurationType exportConfiguration = exportType.getConfiguration();
-        if (exportConfiguration != null) {
-
-            List<PropertyType> configProperties = exportConfiguration.getProperty();
-            if (configProperties != null && ! configProperties.isEmpty()) {
-
-                for( PropertyType configProp: configProperties) {
-                    ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
-                    prop.setName(configProp.getName());
-                    if (!configProp.getName().toLowerCase().contains("password")) {
-                        prop.setValue(configProp.getValue().trim());
-                    } else {
-                        //Dont trim passwords
-                        prop.setValue(configProp.getValue());
+            Database db = getDatabase(catalog);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
+            if (catconn == null) {
+                if (connectorEnabled) {
+                    if (defaultConnector) {
+                        hostLog.info("Export configuration enabled and provided for the default export " +
+                                     "stream in deployment file, however, no export " +
+                                     "tables are assigned to the default stream. " +
+                                     "Export stream will be disabled.");
+                    }
+                    else {
+                        hostLog.info("Export configuration enabled and provided for export stream " +
+                                     streamName +
+                                     " in deployment file however no export " +
+                                     "tables are assigned to the this stream. " +
+                                     "Export stream " + streamName + " will be disabled.");
                     }
                 }
+                continue;
             }
-        }
-        //Set class back in deployment for display
-        exportType.setExportconnectorclass(exportClientClassName);
-        if (!adminstate) {
-            hostLog.info("Export configuration is present and is " +
-               "configured to be disabled. Export will be disabled.");
-        } else {
-            hostLog.info("Export is configured and enabled with type=" + exportType.getTarget());
-            if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
-                hostLog.info("Export configuration properties are: ");
-                for (PropertyType configProp : exportConfiguration.getProperty()) {
-                    if (!configProp.getName().toLowerCase().contains("password")) {
-                        hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
+            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
+            for (String name: processorProperties.stringPropertyNames()) {
+                ConnectorProperty prop = catconn.getConfig().add(name);
+                prop.setName(name);
+                prop.setValue(processorProperties.getProperty(name));
+            }
+
+            // on-server export always uses the guest processor
+            catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
+            catconn.setEnabled(connectorEnabled);
+
+            if (!connectorEnabled) {
+                if (defaultConnector) {
+                    hostLog.info("Export configuration for the default export stream is present and is " +
+                            "configured to be disabled. The default export stream will be disabled.");
+                }
+                else {
+                    hostLog.info("Export configuration for export stream " + streamName + " is present and is " +
+                                 "configured to be disabled. Export stream " + streamName + " will be disabled.");
+                }
+            } else {
+                if (defaultConnector) {
+                    hostLog.info("Default export stream is configured and enabled with type=" + exportConfiguration.getType());
+                }
+                else {
+                    hostLog.info("Export stream " + streamName + " is configured and enabled with type=" + exportConfiguration.getType());
+                }
+                if (exportConfiguration.getProperty() != null) {
+                    if (defaultConnector) {
+                        hostLog.info("Default export stream configuration properties are: ");
+                    }
+                    else {
+                        hostLog.info("Export stream " + streamName + " configuration properties are: ");
+                    }
+                    for (PropertyType configProp : exportConfiguration.getProperty()) {
+                        if (!configProp.getName().toLowerCase().contains("password")) {
+                            hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
+                        }
                     }
                 }
             }
@@ -1390,6 +1541,21 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
+    private static void setDrInfo(Catalog catalog, DrType dr) {
+        if (dr != null) {
+            Cluster cluster = catalog.getClusters().get("cluster");
+            ConnectionType drConnection = dr.getConnection();
+            cluster.setDrproducerenabled(dr.isListen());
+            cluster.setDrclusterid(dr.getId());
+            cluster.setDrproducerport(dr.getPort());
+            if (drConnection != null) {
+                String drSource = drConnection.getSource();
+                cluster.setDrmasterhost(drSource);
+                hostLog.info("Configured connection for DR replica role to host " + drSource);
+            }
+        }
+    }
+
     /** Read a hashed password from password.
      *  SHA-1 hash it once to match what we will get from the wire protocol
      *  and then hex encode it
@@ -1588,16 +1754,20 @@ public abstract class CatalogUtil {
             bottomPlan.getTablesAndIndexes(tablesRead, indexes);
         }
 
-        String updated = null;
+        String updated = "";
         if ( ! stmt.getReadonly()) {
             updated = topPlan.getUpdatedTable();
             if (updated == null) {
                 updated = bottomPlan.getUpdatedTable();
             }
-            assert(updated != null);
+            assert(updated.length() > 0);
         }
 
         Set<String> readTableNames = tablesRead.keySet();
+        stmt.setTablesread(StringUtils.join(readTableNames, ","));
+        stmt.setTablesupdated(updated);
+
+        Set<String> tableDotIndexNames = new TreeSet<>();
 
         for (Table table : db.getTables()) {
             if (readTableNames.contains(table.getTypeName())) {
@@ -1605,113 +1775,16 @@ public abstract class CatalogUtil {
                 for (String indexName : indexes) {
                     Index index = table.getIndexes().get(indexName);
                     if (index != null) {
-                        updateIndexUsageAnnotation(index, stmt);
+                        tableDotIndexNames.add(table.getTypeName() + "." + index.getTypeName());
                     }
                 }
-                if (updated != null && updated.equals(table.getTypeName())) {
-                    // make useage only in either read or updated, not both
-                    updateTableUsageAnnotation(table, stmt, false);
-                    updated = null;
-                    continue;
-                }
-                updateTableUsageAnnotation(table, stmt, true);
-            }
-            else if (updated != null && updated.equals(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, false);
-                updated = null;
             }
         }
+
+        String indexString = StringUtils.join(tableDotIndexNames, ",");
+        stmt.setIndexesused(indexString);
 
         assert(tablesRead.size() == 0);
-        assert(updated == null);
-    }
-
-    private static void updateIndexUsageAnnotation(Index index, Statement stmt) {
-        // LIMIT EXECUTE DELETE statements are parented by tables,
-        // not stored procedures.
-        CatalogType parent = stmt.getParent();
-        if (!(parent instanceof Procedure))
-                return;
-
-        Procedure proc = (Procedure) parent;
-        // skip CRUD generated procs
-        if (proc.getDefaultproc()) {
-            return;
-        }
-
-        IndexAnnotation ia = (IndexAnnotation) index.getAnnotation();
-        if (ia == null) {
-            ia = new IndexAnnotation();
-            index.setAnnotation(ia);
-        }
-        ia.statementsThatUseThis.add(stmt);
-        ia.proceduresThatUseThis.add(proc);
-
-        ProcedureAnnotation pa = (ProcedureAnnotation) proc.getAnnotation();
-        if (pa == null) {
-            pa = new ProcedureAnnotation();
-            proc.setAnnotation(pa);
-        }
-        pa.indexesUsed.add(index);
-
-        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
-        if (sa == null) {
-            sa = new StatementAnnotation();
-            stmt.setAnnotation(sa);
-        }
-        sa.indexesUsed.add(index);
-    }
-
-    private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
-        if (!(stmt.getParent() instanceof Procedure)) {
-            // if parent of statement is not a procedure
-            // it could be a table with a LIMIT ROWS DELETE
-            return;
-        }
-
-        Procedure proc = (Procedure)stmt.getParent();
-        // skip CRUD generated procs
-        if (proc.getDefaultproc()) {
-            return;
-        }
-
-        TableAnnotation ta = (TableAnnotation) table.getAnnotation();
-        if (ta == null) {
-            ta = new TableAnnotation();
-            table.setAnnotation(ta);
-        }
-        if (read) {
-            ta.statementsThatReadThis.add(stmt);
-            ta.proceduresThatReadThis.add(proc);
-        }
-        else {
-            ta.statementsThatUpdateThis.add(stmt);
-            ta.proceduresThatUpdateThis.add(proc);
-        }
-
-        ProcedureAnnotation pa = (ProcedureAnnotation) proc.getAnnotation();
-        if (pa == null) {
-            pa = new ProcedureAnnotation();
-            proc.setAnnotation(pa);
-        }
-        if (read) {
-            pa.tablesRead.add(table);
-        }
-        else {
-            pa.tablesUpdated.add(table);
-        }
-
-        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
-        if (sa == null) {
-            sa = new StatementAnnotation();
-            stmt.setAnnotation(sa);
-        }
-        if (read) {
-            sa.tablesRead.add(table);
-        }
-        else {
-            sa.tablesUpdated.add(table);
-        }
     }
 
     /**
@@ -1815,4 +1888,80 @@ public abstract class CatalogUtil {
         return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
+    /**
+     * Get a string signature for the table represented by the args
+     * @param name The name of the table
+     * @param schema A sorted map of the columns in the table, keyed by column index
+     * @return The table signature string.
+     */
+    public static String getSignatureForTable(String name, SortedMap<Integer, VoltType> schema) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(name).append(SIGNATURE_TABLE_NAME_SEPARATOR);
+        for (VoltType t : schema.values()) {
+            sb.append(t.getSignatureChar());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Deterministically serializes all DR table signatures into a string and calculates the CRC checksum.
+     * @param catalog    The catalog
+     * @return A pair of CRC checksum and the serialized signature string.
+     */
+    public static Pair<Long, String> calculateDrTableSignatureAndCrc(Database catalog) {
+        SortedSet<Table> tables = Sets.newTreeSet();
+        tables.addAll(getNormalTables(catalog, true));
+        tables.addAll(getNormalTables(catalog, false));
+
+        final PureJavaCrc32 crc = new PureJavaCrc32();
+        final StringBuilder sb = new StringBuilder();
+        String delimiter = "";
+        for (Table t : tables) {
+            if (t.getIsdred()) {
+                crc.update(t.getSignature().getBytes(Charsets.UTF_8));
+                sb.append(delimiter).append(t.getSignature());
+                delimiter = SIGNATURE_DELIMITER;
+            }
+        }
+
+        return Pair.of(crc.getValue(), sb.toString());
+    }
+
+    /**
+     * Deserializes a catalog DR table signature string into a map of table signatures.
+     * @param signature    The signature string that includes multiple DR table signatures
+     * @return A map of signatures from table names to table signatures.
+     */
+    public static Map<String, String> deserializeCatalogSignature(String signature) {
+        Map<String, String> tableSignatures = Maps.newHashMap();
+        for (String oneSig : signature.split(Pattern.quote(SIGNATURE_DELIMITER))) {
+            if (!oneSig.isEmpty()) {
+                final String[] parts = oneSig.split(Pattern.quote(SIGNATURE_TABLE_NAME_SEPARATOR), 2);
+                tableSignatures.put(parts[0], parts[1]);
+            }
+        }
+        return tableSignatures;
+    }
+
+    public static class DeploymentCheckException extends RuntimeException {
+
+        private static final long serialVersionUID = 6741313621335268608L;
+
+        public DeploymentCheckException() {
+            super();
+        }
+
+        public DeploymentCheckException(String message, Throwable cause) {
+            super(message, cause);
+        }
+
+        public DeploymentCheckException(String message) {
+            super(message);
+        }
+
+        public DeploymentCheckException(Throwable cause) {
+            super(cause);
+        }
+
+    }
 }

@@ -71,6 +71,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create view View2 (Column2, num) as select Column2, count(*) from Table1 group by Column2;" +
             "create table Export1 (Column1 integer);" +
             "export table Export1;" +
+            "create table Export2 (Column1 integer);" +
+            "export table Export2 to stream foo;" +
             "create procedure sample as select * from Table1;";
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
@@ -79,7 +81,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltTable tables = dut.getMetaData("tables");
         System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
-        assertEquals(5, tables.getRowCount());
+        assertEquals(6, tables.getRowCount());
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("TABLE"));
         assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\"}"));
@@ -93,6 +95,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
         assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}"));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export1"));
+        assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("EXPORT"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export2"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("EXPORT"));
         assertFalse(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "NotATable"));
     }

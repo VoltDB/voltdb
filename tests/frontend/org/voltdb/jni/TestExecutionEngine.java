@@ -110,10 +110,10 @@ public class TestExecutionEngine extends TestCase {
 
         System.out.println(warehousedata.toString());
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
 
         //Check that we can detect and handle the dups when loading the data twice
-        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, true, false, Long.MAX_VALUE);
+        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
 
@@ -143,7 +143,7 @@ public class TestExecutionEngine extends TestCase {
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, false, false, Long.MAX_VALUE);
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
     }
 
     public void testLoadTable() throws Exception {
@@ -171,7 +171,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 "",
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
         destEEThread.start();
@@ -270,7 +270,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 "",
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
         destEEThread.start();
@@ -329,7 +329,8 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         "",
                         100,
-                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0));
+                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0),
+                        false);
     }
 
     @Override

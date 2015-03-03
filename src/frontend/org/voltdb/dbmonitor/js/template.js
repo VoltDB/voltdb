@@ -69,10 +69,6 @@ $(document).ready(function () {
         $('ul.catalogNav').children().removeClass('active');
         $("#" + hash + "-nav").addClass('active');
     }
-    
-    $('body').bind('touchmove', function (e) {
-        e.preventDefault();
-    });
 
     $(window).bind('hashchange', function () {
         
@@ -181,7 +177,11 @@ $(document).ready(function () {
             filter_reset: ".reset",
             filter_hideFilters: true
         },
-        cssChildRow: "tablesorter-childRow"
+        cssChildRow: "tablesorter-childRow",
+        textExtraction: function (elem) {
+            var $input = $("input[type=text]", elem);
+            return $input.val() || $(elem).text();
+        }
     });
 
     $('.tableL3').delegate('.togglex', 'click', function () {
@@ -419,4 +419,7 @@ function sizes_update_all() {
         sizes_update_row(nrow);
     }
     sizes_update_summary();
+    
+    //Update the table for sorting.
+    $("#sizetable").trigger("update");
 }

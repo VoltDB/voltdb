@@ -20,6 +20,8 @@ package org.voltdb.compiler;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
@@ -31,10 +33,13 @@ import javax.xml.bind.Marshaller;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -54,6 +59,7 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -135,9 +141,7 @@ public class DeploymentBuilder {
 
     private Integer m_maxTempTableMemory = 100;
 
-    private boolean m_elenabled;      // true if enabled; false if disabled
-    private Properties m_elConfig;
-    private String m_elExportTarget;
+    private final List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<>();
     String m_elloader;
 
     // whether to allow DDL over adhoc or use full catalog updates
@@ -146,6 +150,10 @@ public class DeploymentBuilder {
     private Integer m_elasticDuration;
     private Integer m_elasticThroughput;
     private Integer m_queryTimeout;
+
+    private String m_drMasterHost;
+    private Boolean m_drProducerEnabled = null;
+    private Integer m_drProducerClusterId = null;
 
     static final org.voltdb.compiler.deploymentfile.ObjectFactory m_factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
@@ -328,8 +336,14 @@ public class DeploymentBuilder {
     }
 
     public DeploymentBuilder addExport(boolean enabled, String exportTarget, Properties config) {
-        m_elloader = "org.voltdb.export.processors.GuestProcessor";
-        m_elenabled = enabled;
+        return addExport(enabled, exportTarget, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    }
+
+    public DeploymentBuilder addExport(boolean enabled, String exportTarget,
+            Properties config, String target) {
+        HashMap<String, Object> exportConnector = new HashMap<>();
+        exportConnector.put("elLoader", "org.voltdb.export.processors.GuestProcessor");
+        exportConnector.put("elEnabled", enabled);
 
         if (config == null) {
             config = new Properties();
@@ -337,17 +351,41 @@ public class DeploymentBuilder {
                     "type","tsv", "batched","true", "with-schema","true", "nonce","zorag", "outdir","exportdata"
                     ));
         }
-        m_elConfig = config;
+        exportConnector.put("elConfig", config);
 
         if ((exportTarget != null) && !exportTarget.trim().isEmpty()) {
-            m_elExportTarget = exportTarget;
+            exportConnector.put("elExportTarget", exportTarget);
         }
+        else {
+            exportConnector.put("elExportTarget", "file");
+        }
+        exportConnector.put("elGroup", target);
+        m_elExportConnectors.add(exportConnector);
         return this;
     }
 
     public DeploymentBuilder setMaxTempTableMemory(int max)
     {
         m_maxTempTableMemory = max;
+        return this;
+    }
+
+    public DeploymentBuilder setDRMasterHost(String drMasterHost) {
+        m_drMasterHost = drMasterHost;
+        return this;
+    }
+
+    public DeploymentBuilder setDRProducerEnabled(int clusterId)
+    {
+        m_drProducerEnabled = true;
+        m_drProducerClusterId = new Integer(clusterId);
+        return this;
+    }
+
+    public DeploymentBuilder setDRProducerDisabled(int clusterId)
+    {
+        m_drProducerEnabled = false;
+        m_drProducerClusterId = new Integer(clusterId);
         return this;
     }
 
@@ -506,25 +544,48 @@ public class DeploymentBuilder {
         // <export>
         ExportType export = m_factory.createExportType();
         deployment.setExport(export);
-        export.setEnabled(m_elenabled);
 
-        if (m_elenabled) {
-            if (m_elExportTarget != null) {
-                ServerExportEnum exportTarget = ServerExportEnum.fromValue(m_elExportTarget.toLowerCase());
-                export.setTarget(exportTarget);
+        for (HashMap<String,Object> exportConnector : m_elExportConnectors) {
+            ExportConfigurationType exportConfig = m_factory.createExportConfigurationType();
+            exportConfig.setEnabled((boolean)exportConnector.get("elEnabled") && exportConnector.get("elLoader") != null &&
+                    !((String)exportConnector.get("elLoader")).trim().isEmpty());
+
+            ServerExportEnum exportTarget = ServerExportEnum.fromValue(((String)exportConnector.get("elExportTarget")).toLowerCase());
+            exportConfig.setType(exportTarget);
+            if (exportTarget.equals(ServerExportEnum.CUSTOM)) {
+                exportConfig.setExportconnectorclass(System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE));
             }
-            if ((m_elConfig != null) && (m_elConfig.size() > 0)) {
-                ExportConfigurationType exportConfig = m_factory.createExportConfigurationType();
+
+            exportConfig.setStream((String)exportConnector.get("elGroup"));
+
+            Properties config = (Properties)exportConnector.get("elConfig");
+            if((config != null) && (config.size() > 0)) {
                 List<PropertyType> configProperties = exportConfig.getProperty();
 
-                for ( Object nameObj: m_elConfig.keySet()) {
-                    PropertyType prop = m_factory.createPropertyType();
+                for( Object nameObj: config.keySet()) {
                     String name = String.class.cast(nameObj);
+
+                    PropertyType prop = m_factory.createPropertyType();
                     prop.setName(name);
-                    prop.setValue(m_elConfig.getProperty(name));
+                    prop.setValue(config.getProperty(name));
+
                     configProperties.add(prop);
                 }
-                export.setConfiguration(exportConfig);
+            }
+            export.getConfiguration().add(exportConfig);
+        }
+
+        if (m_drProducerClusterId != null || (m_drMasterHost != null && !m_drMasterHost.isEmpty())) {
+            DrType dr = m_factory.createDrType();
+            deployment.setDr(dr);
+            if (m_drProducerClusterId != null) {
+                dr.setListen(m_drProducerEnabled);
+                dr.setId(m_drProducerClusterId);
+            }
+            if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
+                ConnectionType conn = m_factory.createConnectionType();
+                dr.setConnection(conn);
+                conn.setSource(m_drMasterHost);
             }
         }
 

@@ -397,13 +397,6 @@ public class QueryPlanner {
             fragmentize(bestPlan, recvNode);
         }
 
-        // add the list of affected tables to the plan
-        bestPlan.touchedTables = new String[parsedStmt.m_tableList.size()];
-        int i = 0;
-        for (Table table : parsedStmt.m_tableList) {
-            bestPlan.touchedTables[i++] = table.getTypeName();
-        }
-
         return bestPlan;
     }
 

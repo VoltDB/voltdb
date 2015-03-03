@@ -35,25 +35,22 @@ import junit.framework.TestCase;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDDLCompiler extends TestCase {
 
     public void untestSimpleDDLCompiler() throws HSQLParseException {
         String ddl1 =
-            "CREATE TABLE \"warehouse\" ( " +
-            "\"w_id\" integer default '0' NOT NULL, " +
-            "\"w_name\" varchar(16) default NULL, " +
-            "\"w_street_1\" varchar(32) default NULL, " +
-            "\"w_street_2\" varchar(32) default NULL, " +
-            "\"w_city\" varchar(32) default NULL, " +
-            "\"w_state\" varchar(2) default NULL, " +
-            "\"w_zip\" varchar(9) default NULL, " +
-            "\"w_tax\" float default NULL, " +
-            "PRIMARY KEY  (\"w_id\") " +
+            "CREATE TABLE warehouse ( " +
+            "w_id integer default '0' NOT NULL, " +
+            "w_name varchar(16) default NULL, " +
+            "w_street_1 varchar(32) default NULL, " +
+            "w_street_2 varchar(32) default NULL, " +
+            "w_city varchar(32) default NULL, " +
+            "w_state varchar(2) default NULL, " +
+            "w_zip varchar(9) default NULL, " +
+            "w_tax float default NULL, " +
+            "PRIMARY KEY  (w_id) " +
             ");";
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -68,8 +65,8 @@ public class TestDDLCompiler extends TestCase {
 
     public void untestCharIsNotAllowed() {
         String ddl1 =
-            "CREATE TABLE \"warehouse\" ( " +
-            "\"w_street_1\" char(32) default NULL, " +
+            "CREATE TABLE warehouse ( " +
+            "w_street_1 char(32) default NULL, " +
             ");";
 
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -371,14 +368,83 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
-    //FIXME: restore this when createTPCCSchemaOriginalDatabase gets re-implemented more directly
-    // -- through a CatalogBuilder/VoltCompiler fast path that preserves DDLCompiler annotations.
-    //public void testNullAnnotation() throws IOException {
-    //    Database catalog_db = TPCCProjectBuilder.createTPCCSchemaOriginalDatabase();
-    //    for (Table t : catalog_db.getTables()) {
-    //        TableAnnotation annotation = (TableAnnotation)t.getAnnotation();
-    //        assertNotNull(annotation);
-    //        assertNotNull(annotation.ddl);
-    //    }
-    //}
+    public void testExportTables() {
+        File jarOut = new File("exportTables.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // export table w/o group
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "EXPORT TABLE T;",
+
+                // export table w/ group
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "EXPORT TABLE T TO STREAM FOO;",
+
+                // export table w/ and w/o group
+                "CREATE TABLE T (T_D1 INTEGER, T_D2 INTEGER, T_D3 INTEGER, T_VAL1 INTEGER, T_VAL2 INTEGER, T_VAL3 INTEGER);\n" +
+                "CREATE TABLE S (S_D1 INTEGER, S_D2 INTEGER, S_D3 INTEGER, S_VAL1 INTEGER, S_VAL2 INTEGER, S_VAL3 INTEGER);\n" +
+                "EXPORT TABLE T;\n" +
+                "EXPORT TABLE S TO STREAM FOO;"
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = MiscUtils.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = false;
+            try {
+                success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            }
+            catch (Exception e) {
+                // do nothing
+            }
+            assertTrue(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
+    ////FIXME: restore this when createTPCCSchemaOriginalDatabase gets re-implemented more directly
+    //// -- through a CatalogBuilder/VoltCompiler fast path that preserves DDLCompiler annotations.
+    ////public void testNullAnnotation() throws IOException {
+    ////    Database catalog_db = TPCCProjectBuilder.createTPCCSchemaOriginalDatabase();
+    ////    for (Table t : catalog_db.getTables()) {
+    ////        TableAnnotation annotation = (TableAnnotation)t.getAnnotation();
+    ////        assertNotNull(annotation);
+    ////        assertNotNull(annotation.ddl);
+    ////    }
+    ////}
+
+    public void testQuotedNameIsNotAllowed() {
+        class Tester {
+            HSQLInterface hsql = HSQLInterface.loadHsqldb();
+            void testSuccess(String ddl) {
+                try {
+                    hsql.runDDLCommand(ddl);
+                }
+                catch (HSQLParseException e) {
+                    fail(String.format("Expected DDL to succeed: %s", ddl));
+                }
+            }
+            void testFailure(String ddl) {
+                try {
+                    hsql.runDDLCommand(ddl);
+                }
+                catch (HSQLParseException e) {
+                    return;
+                }
+                fail(String.format("Expected DDL to fail: %s", ddl));
+            }
+        }
+        Tester tester = new Tester();
+        tester.testFailure("create table \"a_quoted_table_without_spaces\" (an_unquoted_column integer)");
+        tester.testFailure("create table \"a quoted table with spaces\" (an_unquoted_column integer)");
+        tester.testFailure("create table an_unquoted_table (\"a_quoted_column_without_spaces\" integer)");
+        tester.testFailure("create table an_unquoted_table (\"a quoted column with spaces\" integer)");
+        tester.testSuccess("create table an_unquoted_table (an_unquoted_column integer)");
+    }
 }

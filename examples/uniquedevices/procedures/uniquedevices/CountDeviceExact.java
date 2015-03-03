@@ -36,21 +36,24 @@ public class CountDeviceExact extends VoltProcedure {
     final static SQLStmt exactUpsert = new SQLStmt("upsert into exact (appid, deviceid) values (?, ?);");
     final static SQLStmt exactCardinality = new SQLStmt("select count(*) from exact where appid = ?;");
 
-    public long run(long appId, long hashedDeviceId) throws IOException {
+    public VoltTable[] run(long appId, long hashedDeviceId) throws IOException {
 
-        long current = 0;
-
+        // get the current cardinality
         voltQueueSQL(estimatesSelect, EXPECT_ZERO_OR_ONE_ROW, appId);
+        // upsert this appid,deviceid pair into the "exact" table
         voltQueueSQL(exactUpsert, EXPECT_ZERO_OR_ONE_ROW, appId, hashedDeviceId);
-        voltQueueSQL(exactCardinality, EXPECT_ONE_ROW, appId);
+        // count rows in the "exact" table for this appId
+        voltQueueSQL(exactCardinality, EXPECT_SCALAR_LONG, appId);
         VoltTable[] results = voltExecuteSQL();
 
+        // get the previous cardinality (if any)
+        long current = 0;
         VoltTable estimatesTable = results[0];
         if (estimatesTable.advanceRow()) {
-            estimatesTable.advanceRow();
             current = estimatesTable.getLong("devicecount");
         }
 
+        // get the new cardinality
         long newCardinality = results[2].asScalarLong();
 
         // if the estimates row needs updating, upsert it
@@ -58,7 +61,6 @@ public class CountDeviceExact extends VoltProcedure {
             voltQueueSQL(estimatesUpsert, EXPECT_SCALAR_MATCH(1), appId, newCardinality);
             voltExecuteSQL(true);
         }
-
-        return newCardinality;
+        return null;
     }
 }

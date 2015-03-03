@@ -37,6 +37,201 @@ public class VoltProjectBuilder {
     private DeploymentBuilder m_db = new DeploymentBuilder();
 
     private String m_pathToDeployment = null;
+/*
+    final LinkedHashSet<String> m_schemas = new LinkedHashSet<String>();
+    private StringBuffer transformer = new StringBuffer();
+
+    public static final class ProcedureInfo {
+        private final String roles[];
+        private final Class<?> cls;
+        private final String name;
+        private final String sql;
+        private final String partitionInfo;
+
+        public ProcedureInfo(final String roles[], final Class<?> cls) {
+            this.roles = roles;
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionInfo = null;
+            assert(this.name != null);
+        }
+
+        public ProcedureInfo(
+                final String roles[],
+                final String name,
+                final String sql,
+                final String partitionInfo) {
+            assert(name != null);
+            this.roles = roles;
+            this.cls = null;
+            this.name = name;
+            if (sql.endsWith(";")) {
+                this.sql = sql;
+            }
+            else {
+                this.sql = sql + ";";
+            }
+            this.partitionInfo = partitionInfo;
+            assert(this.name != null);
+        }
+
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
+
+        @Override
+        public boolean equals(final Object o) {
+            if (o instanceof ProcedureInfo) {
+                final ProcedureInfo oInfo = (ProcedureInfo)o;
+                return name.equals(oInfo.name);
+            }
+            return false;
+        }
+    }
+
+    public static final class UserInfo {
+        public final String name;
+        public String password;
+        private final String roles[];
+
+        public UserInfo (final String name, final String password, final String roles[]){
+            this.name = name;
+            this.password = password;
+            this.roles = roles;
+        }
+
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
+
+        @Override
+        public boolean equals(final Object o) {
+            if (o instanceof UserInfo) {
+                final UserInfo oInfo = (UserInfo)o;
+                return name.equals(oInfo.name);
+            }
+            return false;
+        }
+    }
+
+    public static final class RoleInfo {
+        private final String name;
+        private final boolean sql;
+        private final boolean sqlread;
+        private final boolean admin;
+        private final boolean defaultproc;
+        private final boolean defaultprocread;
+        private final boolean allproc;
+
+        public RoleInfo(final String name, final boolean sql, final boolean sqlread, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
+            this.name = name;
+            this.sql = sql;
+            this.sqlread = sqlread;
+            this.admin = admin;
+            this.defaultproc = defaultproc;
+            this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
+        }
+
+        public static RoleInfo[] fromTemplate(final RoleInfo other, final String... names) {
+            RoleInfo[] roles = new RoleInfo[names.length];
+            for (int i = 0; i < names.length; ++i) {
+                roles[i] = new RoleInfo(names[i], other.sql, other.sqlread, other.admin,
+                                other.defaultproc, other.defaultprocread, other.allproc);
+            }
+            return roles;
+        }
+
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
+
+        @Override
+        public boolean equals(final Object o) {
+            if (o instanceof RoleInfo) {
+                final RoleInfo oInfo = (RoleInfo)o;
+                return name.equals(oInfo.name);
+            }
+            return false;
+        }
+    }
+
+    private static final class DeploymentInfo {
+        final int hostCount;
+        final int sitesPerHost;
+        final int replication;
+        final boolean useCustomAdmin;
+        final int adminPort;
+        final boolean adminOnStartup;
+
+        public DeploymentInfo(int hostCount, int sitesPerHost, int replication,
+                boolean useCustomAdmin, int adminPort, boolean adminOnStartup) {
+            this.hostCount = hostCount;
+            this.sitesPerHost = sitesPerHost;
+            this.replication = replication;
+            this.useCustomAdmin = useCustomAdmin;
+            this.adminPort = adminPort;
+            this.adminOnStartup = adminOnStartup;
+        }
+    }
+
+    final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
+    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
+
+    // zero defaults to first open port >= 8080.
+    // negative one means disabled in the deployment file.
+    int m_httpdPortNo = -1;
+    boolean m_jsonApiEnabled = true;
+
+    BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
+    PrintStream m_compilerDebugPrintStream = null;
+    boolean m_securityEnabled = false;
+    String m_securityProvider = SecurityProviderString.HASH.value();
+
+    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<String, ProcInfoData>();
+
+    private String m_snapshotPath = null;
+    private int m_snapshotRetain = 0;
+    private String m_snapshotPrefix = null;
+    private String m_snapshotFrequency = null;
+    private String m_pathToDeployment = null;
+    private String m_voltRootPath = null;
+
+    private boolean m_ppdEnabled = false;
+    private String m_ppdPrefix = "none";
+
+    private String m_internalSnapshotPath;
+    private String m_commandLogPath;
+    private Boolean m_commandLogSync;
+    private boolean m_commandLogEnabled = false;
+    private Integer m_commandLogSize;
+    private Integer m_commandLogFsyncInterval;
+    private Integer m_commandLogMaxTxnsBeforeFsync;
+
+    private Integer m_snapshotPriority;
+
+    private Integer m_maxTempTableMemory = 100;
+
+    private List<String> m_diagnostics;
+
+    private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<HashMap<String, Object>>();
+
+    private Integer m_deadHostTimeout = null;
+
+    private Integer m_elasticThroughput = null;
+    private Integer m_elasticDuration = null;
+    private Integer m_queryTimeout = null;
+
+    private boolean m_useDDLSchema = false;
+
+    private String m_drMasterHost;
+    private Boolean m_drProducerEnabled = null;
+    private Integer m_drProducerClusterId = null;
+*/
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_db.setQueryTimeout(target);
@@ -72,6 +267,43 @@ public class VoltProjectBuilder {
 
     public void addRoles(final RoleInfo roles[]) {
         m_cb.addRoles(roles);
+/*
+=======
+        for (final RoleInfo info : roles) {
+            transformer.append("CREATE ROLE " + info.name);
+            if(info.sql || info.sqlread || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
+                transformer.append(" WITH ");
+                if(info.sql) {
+                    transformer.append("sql,");
+                }
+                if(info.sqlread) {
+                    transformer.append("sqlread,");
+                }
+                if(info.defaultproc) {
+                    transformer.append("defaultproc,");
+                }
+                if(info.admin) {
+                    transformer.append("admin,");
+                }
+                if(info.defaultprocread) {
+                    transformer.append("defaultprocread,");
+                }
+                if(info.allproc) {
+                    transformer.append("allproc,");
+                }
+                transformer.replace(transformer.length() - 1, transformer.length(), ";");
+            }
+            else {
+                transformer.append(";");
+            }
+        }
+    }
+
+    public void addSchema(final URL schemaURL) {
+        assert(schemaURL != null);
+        addSchema(schemaURL.getPath());
+>>>>>>> master
+*/
     }
 
     /**
@@ -107,6 +339,54 @@ public class VoltProjectBuilder {
             String path,
             String prefix) {
         m_db.setSnapshotSettings(frequency, retain, path, prefix);
+/*
+=======
+        assert(frequency != null);
+        assert(prefix != null);
+        m_snapshotFrequency = frequency;
+        m_snapshotRetain = retain;
+        m_snapshotPrefix = prefix;
+        m_snapshotPath = path;
+    }
+
+    public void setPartitionDetectionSettings(final String snapshotPath, final String ppdPrefix)
+    {
+        m_ppdEnabled = true;
+        m_snapshotPath = snapshotPath;
+        m_ppdPrefix = ppdPrefix;
+    }
+
+    public void addExport(boolean enabled, String exportTarget, Properties config) {
+        addExport(enabled, exportTarget, config, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    }
+/*
+    public void addExport(boolean enabled, String exportTarget, Properties config, String target) {
+        HashMap<String, Object> exportConnector = new HashMap<String, Object>();
+        exportConnector.put("elLoader", "org.voltdb.export.processors.GuestProcessor");
+        exportConnector.put("elEnabled", enabled);
+
+        if (config == null) {
+            config = new Properties();
+            config.putAll(ImmutableMap.<String, String>of(
+                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag", "outdir","exportdata"
+                    ));
+        }
+        exportConnector.put("elConfig", config);
+
+        if ((exportTarget != null) && !exportTarget.trim().isEmpty()) {
+            exportConnector.put("elExportTarget", exportTarget);
+        }
+        else {
+            exportConnector.put("elExportTarget", "file");
+        }
+        exportConnector.put("elGroup", target);
+        m_elExportConnectors.add(exportConnector);
+    }
+*-/
+    public void addExport(boolean enabled) {
+        addExport(enabled, null, null);
+>>>>>>> master
+*/
     }
 
     public void setTableAsExportOnly(String name) {

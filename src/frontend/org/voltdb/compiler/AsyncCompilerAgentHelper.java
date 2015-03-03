@@ -110,7 +110,7 @@ public class AsyncCompilerAgentHelper
                 }
                 catch (IOException ioe) {
                     retval.errorMsg = "Unexpected exception applying DDL statements to " +
-                        " original catalog: " + ioe.getMessage();
+                        "original catalog: " + ioe.getMessage();
                     return retval;
                 }
                 if (newCatalogBytes == null) {

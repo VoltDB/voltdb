@@ -56,7 +56,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
-        APPLY_BINARY_LOG(1);
+        APPLY_BINARY_LOG(1),
+        GET_DR_TUPLESTREAM_STATE(2),
+        SET_DR_SEQUENCE_NUMBERS(3);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -334,7 +336,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         TIME_OUT_MILLIS = newLatency;
     }
 
-    public long fragmentProgressUpdate(int batchIndex,
+    public long fragmentProgressUpdate(int indexFromFragmentTask,
             String planNodeName,
             String lastAccessedTable,
             long lastAccessedTableSize,
@@ -355,7 +357,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long latency = currentTime - m_startTime;
 
         if (m_readOnly && TIME_OUT_MILLIS > 0 && latency > TIME_OUT_MILLIS) {
-            String msg = getLongRunningQueriesMessage(latency, planNodeName, true);
+            String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, true);
             log.info(msg);
 
             // timing out the long running queries
@@ -380,7 +382,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // future callbacks per log entry, ideally so that one callback arrives just in time to log.
             return LONG_OP_THRESHOLD;
         }
-        String msg = getLongRunningQueriesMessage(latency, planNodeName, false);
+        String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, false);
         log.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
@@ -391,7 +393,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return LONG_OP_THRESHOLD;
     }
 
-    private String getLongRunningQueriesMessage(long latency, String planNodeName, boolean timeout) {
+    private String getLongRunningQueriesMessage(int indexFromFragmentTask,
+            long latency, String planNodeName, boolean timeout) {
         String status = timeout ? "timed out at" : "taking a long time to execute -- at least";
         String msg = String.format(
                 "Procedure %s is %s " +
@@ -411,8 +414,38 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         CoreUtils.hsIdToString(m_siteId),
                         m_currMemoryInBytes,
                         m_peakMemoryInBytes);
-        if (m_sqlTexts != null) {
-            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
+
+        if (m_sqlTexts != null
+                && indexFromFragmentTask >= 0
+                && indexFromFragmentTask < m_sqlTexts.length) {
+            msg += "  Executing SQL statement is \"" + m_sqlTexts[indexFromFragmentTask] + "\".";
+        }
+        else if (m_sqlTexts == null) {
+            // Can this happen?
+            msg += "  SQL statement text is not available.";
+        }
+        else {
+            // For some reason, the current index in the fragment task message isn't a valid
+            // index into the m_sqlTexts array.  We don't expect this to happen,
+            // but let's dump something useful if it does.  (See ENG-7610)
+            StringBuffer sb = new StringBuffer();
+            sb.append("  Unable to report specific SQL statement text for "
+                    + "fragment task message index " + indexFromFragmentTask + ".  ");
+            sb.append("It MAY be one of these " + m_sqlTexts.length + " items: ");
+            for (int i = 0; i < m_sqlTexts.length; ++i) {
+                if (m_sqlTexts[i] != null) {
+                    sb.append("\"" + m_sqlTexts[i] + "\"");
+                }
+                else {
+                    sb.append("[null]");
+                }
+
+                if (i != m_sqlTexts.length - 1) {
+                    sb.append(", ");
+                }
+            }
+
+            msg += sb.toString();
         }
 
         return msg;
@@ -537,7 +570,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -638,7 +671,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task);
+    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException;
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
@@ -684,6 +717,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int hostId,
             byte hostname[],
             long tempTableMemory,
+            boolean createDrReplicatedStream,
             int compactionThreshold);
 
     /**
@@ -733,7 +767,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
             long undoToken);
 
     /**
@@ -749,7 +783,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoToken);
 
     /**
      * Serialize the result temporary table.
@@ -886,8 +923,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * This is a generic entry point into the EE that doesn't need to be updated in the IPC
      * client every time you add a new task
      * @param pointer
+     * @return error code
      */
-    protected native void nativeExecuteTask(long pointer);
+    protected native int nativeExecuteTask(long pointer);
 
     /**
      * Perform an export poll or ack action. Poll data will be returned via the usual
@@ -919,6 +957,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
+
+    public native static byte[] getTestDRBuffer();
 
     /**
      * Start collecting statistics (starts timer).

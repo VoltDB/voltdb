@@ -49,7 +49,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
         Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
         CatalogContext context = CatalogContext.simpleForTest(0, catalog, bytes);
-        m_pt = new PlannerTool(context.cluster, context.database, 0);
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
     }
 
     @Override

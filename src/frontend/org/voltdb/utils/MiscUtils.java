@@ -29,7 +29,6 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
@@ -702,148 +701,6 @@ public class MiscUtils {
     }
 
     /**
-     * Split SQL statements on semi-colons with quoted string and comment support.
-     *
-     * Degenerate formats such as escape as the last character or unclosed strings are ignored and
-     * left to the SQL parser to complain about. This is a simple string splitter that errs on the
-     * side of not splitting.
-     *
-     * Regexes are avoided.
-     *
-     * Handle single and double quoted strings and backslash escapes. Backslashes escape a single
-     * character.
-     *
-     * Handle double-dash (single line) and C-style (muli-line) comments. Nested C-style comments
-     * are not supported.
-     *
-     * @param sql raw SQL text to split
-     * @return list of individual SQL statements
-     */
-    public static List<String> splitSQLStatements(final String sql) {
-        List<String> statements = new ArrayList<String>();
-        // Use a character array for efficient character-at-a-time scanning.
-        char[] buf = sql.toCharArray();
-        // Set to null outside of quoted segments or the quote character inside them.
-        Character cQuote = null;
-        // Set to null outside of comments or to the string that ends the comment.
-        String sCommentEnd = null;
-        // Index to start of current statement.
-        int iStart = 0;
-        // Index to current character.
-        // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
-        // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
-        boolean statementIsComment = false;
-        boolean inStatement = false;
-        int iCur = 0;
-        while (iCur < buf.length) {
-            // Eat up whitespace outside of a statement
-            if (!inStatement) {
-                if (Character.isWhitespace(buf[iCur])) {
-                    iCur++;
-                    iStart = iCur;
-                }
-                else {
-                    inStatement = true;
-                }
-            }
-            else if (sCommentEnd != null) {
-                // Processing the interior of a comment. Check if at the comment or buffer end.
-                if (iCur >= buf.length - sCommentEnd.length()) {
-                    // Exit
-                    iCur = buf.length;
-                } else if (String.copyValueOf(buf, iCur, sCommentEnd.length()).equals(sCommentEnd)) {
-                    // Move past the comment end.
-                    iCur += sCommentEnd.length();
-                    sCommentEnd = null;
-                    // If the comment is the whole of the statement so far, terminate it
-                    if (statementIsComment) {
-                        String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-                        if (!statement.isEmpty()) {
-                            statements.add(statement);
-                        }
-                        iStart = iCur;
-                        statementIsComment = false;
-                        inStatement = false;
-                    }
-                } else {
-                    // Keep going inside the comment.
-                    iCur++;
-                }
-            } else if (cQuote != null) {
-                // Processing the interior of a quoted string.
-                if (buf[iCur] == '\\') {
-                    // Skip the '\' escape and the trailing single escaped character.
-                    // Doesn't matter if iCur is beyond the end, it won't be used in that case.
-                    iCur += 2;
-                } else if (buf[iCur] == cQuote) {
-                    // Look at the next character to distinguish a double escaped quote
-                    // from the end of the quoted string.
-                    iCur++;
-                    if (iCur < buf.length) {
-                        if (buf[iCur] != cQuote) {
-                            // Not a double escaped quote - end of quoted string.
-                            cQuote = null;
-                        } else {
-                            // Move past the double escaped quote.
-                            iCur++;
-                        }
-                    }
-                } else {
-                    // Move past an ordinary character.
-                    iCur++;
-                }
-            } else {
-                // Outside of a quoted string - watch for the next separator, quote or comment.
-                if (buf[iCur] == ';') {
-                    // Add terminated statement (if not empty after trimming).
-                    String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-                    if (!statement.isEmpty()) {
-                        statements.add(statement);
-                    }
-                    iStart = iCur + 1;
-                    iCur = iStart;
-                    inStatement = false;
-                } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
-                    // Start of quoted string.
-                    cQuote = buf[iCur];
-                    iCur++;
-                } else if (iCur <= buf.length - 2) {
-                    // Comment (double-dash or C-style)?
-                    if (buf[iCur] == '-' && buf[iCur+1] == '-') {
-                        // One line double-dash comment start.
-                        sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
-                        if (iCur == iStart) {
-                            statementIsComment = true;
-                        }
-                        iCur += 2;
-                    } else if (buf[iCur] == '/' && buf[iCur+1] == '*') {
-                        // Multi-line C-style comment start.
-                        sCommentEnd = "*/";
-                        if (iCur == iStart) {
-                            statementIsComment = true;
-                        }
-                        iCur += 2;
-                    } else {
-                        // Not a comment start, move past this character.
-                        iCur++;
-                    }
-                } else {
-                    // Move past a non-quote/non-separator character.
-                    iCur++;
-                }
-            }
-        }
-        // Get the last statement, if any.
-        if (iStart < buf.length) {
-            String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-            if (!statement.isEmpty()) {
-                statements.add(statement);
-            }
-        }
-        return statements;
-    }
-
-    /**
      * Concatenate an list of arrays of typed-objects
      * @param empty An empty array of the right type used for cloning
      * @param arrayList A list of arrays to concatenate.
@@ -1072,4 +929,56 @@ public class MiscUtils {
                 days, hours, minutes, seconds, remainingMs);
     }
 
+
+    /**
+     * Delays retrieval until first use, but holds onto a boolean value to
+     * minimize overhead. The delayed retrieval allows tests to set properties
+     * dynamically and have them obeyed.
+     */
+    public static class BooleanSystemProperty
+    {
+        private final String m_key;
+        private Boolean m_value = null;
+        private final boolean m_defaultValue;
+
+        /**
+         * Construct system property retriever with default value of false
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key)
+        {
+            this(key, false);
+        }
+
+        /**
+         * Construct system property retriever with default value provided by caller
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key, boolean defaultValue)
+        {
+            m_key = key;
+            m_defaultValue = defaultValue;
+        }
+
+        /**
+         * Retrieves once and caches boolean value. Uses default if not available.
+         * @return true if value or default is true ("true" or "yes" string)
+         */
+        public boolean isTrue()
+        {
+            if (m_value == null) {
+                // First time - retrieve and convert the value or use the default value.
+                String stringValue = System.getProperty(m_key);
+                if (stringValue != null) {
+                    m_value = stringValue.equalsIgnoreCase("true") ||
+                            stringValue.equalsIgnoreCase("yes");
+                }
+                else {
+                    m_value = m_defaultValue;
+                }
+            }
+            assert m_value != null;
+            return m_value;
+        }
+    }
 }

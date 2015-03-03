@@ -52,13 +52,10 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
-    private static final Class<? extends TestCase> TESTCASECLASS = TestStatisticsSuite.class;
-
     private final static int SITES = 2;
     private final static int HOSTS = 3;
     private final static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
-    private final static boolean hasLocalServer = false;
     private static StringBuilder m_recentAnalysis = null;
 
     public TestStatisticsSuite(String name) {
@@ -160,11 +157,11 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             boolean enforceUnique)
     {
         result.resetRowPosition();
-        Set<Long> partsSeen = new HashSet<Long>();
+        Set<Integer> partsSeen = new HashSet<>();
         while (result.advanceRow()) {
             String colValFromRow = result.getString(columnName);
             if (targetValue.equalsIgnoreCase(colValFromRow)) {
-                long thisPartId = result.getLong("PARTITION_ID");
+                int thisPartId = (int) result.getLong("PARTITION_ID");
                 if (enforceUnique) {
                     assertFalse("PARTITION_ID: " + thisPartId + " seen twice in table looking for " + targetValue +
                             " in column " + columnName, partsSeen.contains(thisPartId));
@@ -172,6 +169,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 partsSeen.add(thisPartId);
             }
         }
+        // Remove the MPI in case it's in there
+        partsSeen.remove(MpInitiator.MP_INIT_PID);
         assertEquals(PARTITIONS, partsSeen.size());
     }
 
@@ -843,7 +842,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING DRPARTITION STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema1 = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema1 = new ColumnInfo[14];
         expectedSchema1[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema1[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema1[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -852,9 +851,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema1[5] = new ColumnInfo("TOTALBYTES", VoltType.BIGINT);
         expectedSchema1[6] = new ColumnInfo("TOTALBYTESINMEMORY", VoltType.BIGINT);
         expectedSchema1[7] = new ColumnInfo("TOTALBUFFERS", VoltType.BIGINT);
-        expectedSchema1[8] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.BIGINT);
-        expectedSchema1[9] = new ColumnInfo("ISSYNCED", VoltType.STRING);
-        expectedSchema1[10] = new ColumnInfo("MODE", VoltType.STRING);
+        expectedSchema1[8] = new ColumnInfo("LASTQUEUEDDRID", VoltType.BIGINT);
+        expectedSchema1[9] = new ColumnInfo("LASTACKDRID", VoltType.BIGINT);
+        expectedSchema1[10] = new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[11] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[12] = new ColumnInfo("ISSYNCED", VoltType.STRING);
+        expectedSchema1[13] = new ColumnInfo("MODE", VoltType.STRING);
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
         VoltTable[] results = null;
@@ -866,8 +868,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(1, results.length);
         System.out.println("Test DR table: " + results[0].toString());
         validateSchema(results[0], expectedTable1);
-        // One row per site, don't have HSID for ease of check, just check a bunch of stuff
-        assertEquals(HOSTS * SITES, results[0].getRowCount());
+        // One row per site (including the MPI on each host),
+        // don't have HSID for ease of check, just check a bunch of stuff
+        assertEquals(HOSTS * SITES + HOSTS, results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         results[0].advanceRow();
@@ -882,7 +885,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING DR STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema1 = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema1 = new ColumnInfo[14];
         expectedSchema1[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema1[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema1[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -891,9 +894,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema1[5] = new ColumnInfo("TOTALBYTES", VoltType.BIGINT);
         expectedSchema1[6] = new ColumnInfo("TOTALBYTESINMEMORY", VoltType.BIGINT);
         expectedSchema1[7] = new ColumnInfo("TOTALBUFFERS", VoltType.BIGINT);
-        expectedSchema1[8] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.BIGINT);
-        expectedSchema1[9] = new ColumnInfo("ISSYNCED", VoltType.STRING);
-        expectedSchema1[10] = new ColumnInfo("MODE", VoltType.STRING);
+        expectedSchema1[8] = new ColumnInfo("LASTQUEUEDDRID", VoltType.BIGINT);
+        expectedSchema1[9] = new ColumnInfo("LASTACKDRID", VoltType.BIGINT);
+        expectedSchema1[10] = new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[11] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema1[12] = new ColumnInfo("ISSYNCED", VoltType.STRING);
+        expectedSchema1[13] = new ColumnInfo("MODE", VoltType.STRING);
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
         ColumnInfo[] expectedSchema2 = new ColumnInfo[7];
@@ -917,8 +923,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("Test DR table: " + results[1].toString());
         validateSchema(results[0], expectedTable1);
         validateSchema(results[1], expectedTable2);
-        // One row per site, don't have HSID for ease of check, just check a bunch of stuff
-        assertEquals(HOSTS * SITES, results[0].getRowCount());
+        // One row per site (including the MPI on each host),
+        // don't have HSID for ease of check, just check a bunch of stuff
+        assertEquals(HOSTS * SITES + HOSTS, results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         results[0].advanceRow();
@@ -1192,11 +1199,10 @@ public class TestStatisticsSuite extends SaveRestoreBase {
          * So, these tests shouldn't rely on the usual uniqueness of host names in a cluster.
          */
         DeploymentBuilder db = new DeploymentBuilder(SITES, HOSTS, KFACTOR);
-        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, db);
+        final Class<? extends TestCase> testcaseclass = TestStatisticsSuite.class;
+        LocalCluster cluster = LocalCluster.configure(testcaseclass.getSimpleName(), cb, db);
         assertNotNull("LocalCluster failed to compile", cluster);
-        if ( ! hasLocalServer) {
-            cluster.bypassInProcessServerThread();
-        }
-        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
+        cluster.bypassInProcessServerThread();
+        return new MultiConfigSuiteBuilder(testcaseclass, cluster);
     }
 }

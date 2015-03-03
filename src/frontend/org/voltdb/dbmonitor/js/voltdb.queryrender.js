@@ -34,9 +34,12 @@
             // The intent is to avoid writing another full sql parser, here.
             // Any statement keyword that does not get listed here simply requires an explicit semicolon before
             // it to mark the end of the preceding statement.
+            // Note on            (?!\s+on) :
+            // This subpattern consumes no input itself but ensures that the next
+            // character is not 'on'.
             MatchStatementStarts =
-                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition|exec|execute|explain|explainproc)\s/gim,
-            //     ($1----------------------------------------------------------------------------------------------------------)
+                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition(?!\s+on)|exec|execute|explain|explainproc)\s/gim,
+            //     ($1--------------------------------------------------------------------------------------------------------------------)
             GenerateSplitStatements = ';$1 ',
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
@@ -241,10 +244,18 @@
 
     function executeCallback(format, target, id) {
         var Format = format;
-        var Target = target;
+        var targetHtml = target.find('#resultHtml');
+        var targetCsv = target.find('#resultCsv');
+        var targetMonospace = target.find('#resultMonospace');
         var Id = id;
+        $(targetHtml).html('');
+        $(targetCsv).html('');
+        $(targetMonospace).html('');
+
         function callback(response) {
-            processResponse(Format, Target, Id, response);
+            processResponse('HTML', targetHtml, Id + '_html', response);
+            processResponse('CSV', targetCsv, Id + '_csv', response);
+            processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
         }
         this.Callback = callback;
     }
@@ -252,15 +263,7 @@
     function executeMethod() {
         var target = $('.queryResult');
         var format = $('#exportType').val();
-        if (format == 'HTML') {
-            target = target.find('#resultHtml');
-        } else if (format == 'CSV') {
-            target = target.find('#resultCsv');
-        } else if (format == 'Monospace') {
-            target = target.find('#resultMonospace');
-        }
-        $(target).html('');
-
+        
         if (!VoltDBCore.connections.hasOwnProperty(DataSource)) {
             $(target).html('Connect to a datasource first.');
             return;
@@ -322,6 +325,7 @@
             var tables = response.results;
             for (var j = 0; j < tables.length; j++)
                 printResult(format, target, id + '_' + j, tables[j]);
+
         } else {
             target.append('<span class="errorValue">Error: ' + response.statusstring + '\r\n</span>');
         }

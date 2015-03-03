@@ -20,7 +20,6 @@ package org.voltdb.compiler;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -36,7 +35,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
@@ -126,7 +124,9 @@ public abstract class StatementCompiler {
                 catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
                 catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
                 catalogStmt.setSqltext(previousStatement.getSqltext());
-                catalogStmt.setTablestouched(previousStatement.getTablestouched());
+                catalogStmt.setTablesread(previousStatement.getTablesread());
+                catalogStmt.setTablesupdated(previousStatement.getTablesupdated());
+                catalogStmt.setIndexesused(previousStatement.getIndexesused());
 
                 for (StmtParameter oldSp : previousStatement.getParameters()) {
                     StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
@@ -247,20 +247,11 @@ public abstract class StatementCompiler {
         }
         compiler.captureDiagnosticContext(planString);
 
-        // Stuff the explain plan in an annotation for report generation.
-        // N.B. The explain plan is actually in the catalog as of 5/28/13, but
-        // plans are in place to remove it shortly.
-        StatementAnnotation annotation = new StatementAnnotation();
-        annotation.explainPlan = plan.explainedPlan;
-        catalogStmt.setAnnotation(annotation);
-        // build usage links for report generation
+        // build usage links for report generation and put them in the catalog
         CatalogUtil.updateUsageAnnotations(db, catalogStmt, plan.rootPlanGraph, plan.subPlanGraph);
 
-        // set the explain plan output into the catalog (in hex)
+        // set the explain plan output into the catalog (in hex) for reporting
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
-
-        // add the touched tables to the catalog
-        catalogStmt.setTablestouched(StringUtils.join(plan.touchedTables, ','));
 
         // compute a hash of the plan
         MessageDigest md = null;

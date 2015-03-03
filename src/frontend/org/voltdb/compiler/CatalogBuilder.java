@@ -304,14 +304,28 @@ public class CatalogBuilder {
         return this;
     }
 
-    public CatalogBuilder addPartitionInfo(final String tableName, final String partitionColumnName) {
+    public CatalogBuilder addPartitionInfo(String tableName, String partitionColumnName) {
         transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
         return this;
     }
 
     public CatalogBuilder setTableAsExportOnly(String name) {
         assert(name != null);
-        transformer.append("Export TABLE " + name + ";");
+        transformer.append("EXPORT TABLE " + name + ";");
+        return this;
+    }
+
+    public CatalogBuilder setTableAsExportOnly(String name, String stream) {
+        assert(name != null);
+        assert(stream != null);
+        transformer.append("EXPORT TABLE " + name + " TO STREAM " + stream + ";");
+        return this;
+    }
+
+    public CatalogBuilder addDRTables(String... tableNames) {
+        for (String drTable : tableNames) {
+            transformer.append("DR TABLE " + drTable + ";");
+        }
         return this;
     }
 

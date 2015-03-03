@@ -453,14 +453,23 @@ enum RecoveryMsgType {
 // ------------------------------------------------------------------
 enum TaskType {
     TASK_TYPE_VALIDATE_PARTITIONING = 0,
-    TASK_TYPE_APPLY_BINARY_LOG = 1
+    TASK_TYPE_APPLY_BINARY_LOG = 1,
+    TASK_TYPE_GET_DR_TUPLESTREAM_STATE = 2,
+    TASK_TYPE_SET_DR_SEQUENCE_NUMBERS = 3
 };
 
 
 // ------------------------------------------------------------------
 // Types of DR records
 // ------------------------------------------------------------------
-enum DRRecordType { DR_RECORD_INSERT = 0, DR_RECORD_DELETE = 1, DR_RECORD_UPDATE = 2, DR_RECORD_BEGIN_TXN = 3, DR_RECORD_END_TXN = 4 };
+enum DRRecordType {
+    DR_RECORD_INSERT = 0,
+    DR_RECORD_DELETE = 1,
+    DR_RECORD_UPDATE = 2,
+    DR_RECORD_BEGIN_TXN = 3,
+    DR_RECORD_END_TXN = 4,
+    DR_RECORD_TRUNCATE_TABLE = 5
+};
 
 // ------------------------------------------------------------------
 // Tuple serialization formats
@@ -506,7 +515,6 @@ IndexLookupType stringToIndexLookup(std::string str );
 int64_t getMaxTypeValue (ValueType type);
 
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString);
-
 }
 
 #endif

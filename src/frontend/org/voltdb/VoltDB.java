@@ -52,7 +52,7 @@ public class VoltDB {
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_ZK_PORT = 7181;
     public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";

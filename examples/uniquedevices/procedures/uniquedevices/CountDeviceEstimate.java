@@ -32,26 +32,22 @@ import org.voltdb.hll.HyperLogLog;
 
 public class CountDeviceEstimate extends VoltProcedure {
 
-    public final static long MAX_EXACT_COUNT = 1000;
-
     final static SQLStmt estimatesSelect = new SQLStmt("select devicecount, hll from estimates where appid = ?;");
     final static SQLStmt estimatesUpsert = new SQLStmt("upsert into estimates (appid, devicecount, hll) values (?, ?, ?);");
 
-    public long run(long appId, long hashedDeviceId) throws IOException {
+    public VoltTable[] run(long appId, long hashedDeviceId) throws IOException {
 
-        long current = 0;
-        HyperLogLog hll = null;
-
-        // get the HLL from the db or create one if needed
+        // get the HLL from the db
         voltQueueSQL(estimatesSelect, EXPECT_ZERO_OR_ONE_ROW, appId);
         VoltTable estimatesTable = voltExecuteSQL()[0];
 
+        HyperLogLog hll = null;
+        // if the row with the hyperloglog blob exists...
         if (estimatesTable.advanceRow()) {
-            estimatesTable.advanceRow();
-            current = estimatesTable.getLong("devicecount");
-            byte[]  hllBytes = estimatesTable.getVarbinary("hll");
+            byte[] hllBytes = estimatesTable.getVarbinary("hll");
             hll = HyperLogLog.fromBytes(hllBytes);
         }
+        // otherwise create a hyperloglog blob
         else {
             hll = new HyperLogLog(12);
         }
@@ -61,11 +57,10 @@ public class CountDeviceEstimate extends VoltProcedure {
 
         // if the estimates row needs updating, upsert it
         if (hll.getDirty()) {
-            current = Math.max(MAX_EXACT_COUNT, hll.cardinality());
-            voltQueueSQL(estimatesUpsert, EXPECT_SCALAR_MATCH(1), appId, current, hll.toBytes());
-            voltExecuteSQL(true);
+            // update the state with exact estimate and update blob for the hll
+            voltQueueSQL(estimatesUpsert, EXPECT_SCALAR_MATCH(1), appId, hll.cardinality(), hll.toBytes());
+            return voltExecuteSQL(true);
         }
-
-        return current;
+        return null;
     }
 }

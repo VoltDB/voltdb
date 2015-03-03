@@ -77,7 +77,9 @@ public class TestCatalogDiffs extends TestCase {
         return retval;
     }
 
-    private static Catalog catalogForJar(String pathToJar) throws IOException {
+    // Also used by TestCatalogUtil, consider moving this method into CatalogUtil
+    // as a test support function.
+    public static Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
         Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
         assertNotNull(catalog);
@@ -109,6 +111,7 @@ public class TestCatalogDiffs extends TestCase {
         System.out.println(commands);
         catOriginal.execute(commands);
         assertTrue(diff.supported());
+        assertEquals(0, diff.tablesThatMustBeEmpty().length);
         if (expectSnapshotIsolation != null) {
             assertEquals((boolean) expectSnapshotIsolation, diff.requiresSnapshotIsolation());
         }
@@ -867,7 +870,7 @@ public class TestCatalogDiffs extends TestCase {
 
         cb.addLiteralSchema("PARTITION TABLE A ON COLUMN C1;");
         Catalog catUpdated = catalogViaJar(cb, "addpart2");
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testChangeTableReplicationSettingOfExportTable() throws IOException {
@@ -883,4 +886,110 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
+    public void testUnchangedCatalogIsCompatibleWithElastic() throws IOException {
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "CREATE PROCEDURE the_requisite_procedure AS select * from A;" +
+                "");
+        File jar = cb.compileToTempJar();
+        Catalog catOriginal = catalogForJar(jar.getPath());
+        Catalog catUpdated = catalogForJar(jar.getPath());
+        verifyDiff(catOriginal, catUpdated, null, true);
+    }
+
+    public void testChangedCatalogNotCompatibleWithElasticAddProcedure() throws IOException {
+        String originalDDL =
+                "CREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "CREATE PROCEDURE the_requisite_procedure AS select * from A;\n" +
+                "";
+        CatalogBuilder cb = new CatalogBuilder(originalDDL);
+        File jar = cb.compileToTempJar();
+        Catalog catOriginal = catalogForJar(jar.getPath());
+
+        String moreDDL = "CREATE PROCEDURE another_procedure AS select * from A;\n";
+        CatalogBuilder cb2 = new CatalogBuilder(originalDDL + moreDDL);
+        File jar2 = cb2.compileToTempJar();
+        Catalog catUpdated = catalogForJar(jar2.getPath());
+        verifyDiff(catOriginal, catUpdated, null, false);
+    }
+
+    public void testChangesCataloNotCompatibleWithElasticAddTable() throws IOException {
+        String originalDDL =
+                "CREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "CREATE PROCEDURE the_requisite_procedure AS select * from A;\n" +
+                "";
+        CatalogBuilder cb = new CatalogBuilder(originalDDL);
+        File jar = cb.compileToTempJar();
+        Catalog catOriginal = catalogForJar(jar.getPath());
+
+        String moreDDL = "CREATE TABLE Another (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n";
+        CatalogBuilder cb2 = new CatalogBuilder(originalDDL + moreDDL);
+        File jar2 = cb2.compileToTempJar();
+        Catalog catUpdated = catalogForJar(jar2.getPath());
+        verifyDiff(catOriginal, catUpdated, null, false);
+    }
+
+    public void testEnableDROnEmptyTable() throws IOException {
+        String originalDDL =
+                "CREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "PARTITION TABLE A ON COLUMN C1;\n" +
+                "";
+        CatalogBuilder cb = new CatalogBuilder(originalDDL);
+        File jar = cb.compileToTempJar();
+        Catalog catOriginal = catalogForJar(jar.getPath());
+
+        String moreDDL = "DR TABLE A;\n";
+        CatalogBuilder cb2 = new CatalogBuilder(originalDDL + moreDDL);
+        File jar2 = cb2.compileToTempJar();
+        Catalog catUpdated = catalogForJar(jar2.getPath());
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
+
+    public void testDisableDROnTable() throws IOException {
+        String originalDDL =
+                "CREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "PARTITION TABLE A ON COLUMN C1;\n" +
+                "DR TABLE A;\n" +
+                "";
+        CatalogBuilder cb = new CatalogBuilder(originalDDL);
+        File jar = cb.compileToTempJar();
+        Catalog catOriginal = catalogForJar(jar.getPath());
+
+        // Creating a catalog that disables DR for a table by first enabling
+        // and then disabling it requires a "last DR command wins" policy.
+        // I'm not sure that this is an important aspect to test -- but this
+        // is how the original version of testDisableDROnTable was coded so
+        // I preserved it. --paul
+        String replacementDDL =
+                "CREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "PARTITION TABLE A ON COLUMN C1;\n" +
+                // leaving out this part: "DR TABLE A;\n" +
+                "";
+        CatalogBuilder cb2 = new CatalogBuilder(replacementDDL);
+        File jar2 = cb2.compileToTempJar();
+        Catalog catUpdated = catalogForJar(jar2.getPath());
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
+
+    public void testDisableDROnEmptyTable_LastDRCommandWins() throws IOException {
+        String originalDDL =
+                "CREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "PARTITION TABLE A ON COLUMN C1;\n" +
+                "DR TABLE A;\n" +
+                "";
+        CatalogBuilder cb = new CatalogBuilder(originalDDL);
+        File jar = cb.compileToTempJar();
+        Catalog catOriginal = catalogForJar(jar.getPath());
+
+        // Creating a catalog that disables DR for a table by first enabling
+        // and then disabling it requires a "last DR command wins" policy.
+        // I'm not sure that this is an important aspect to test -- but this
+        // is how the original version of testDisableDROnTable was coded so
+        // I preserved it. --paul
+        String moreDDL = "DR TABLE A DISABLE;\n";
+        CatalogBuilder cb2 = new CatalogBuilder(originalDDL + moreDDL);
+        File jar2 = cb2.compileToTempJar();
+        Catalog catUpdated = catalogForJar(jar2.getPath());
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
 }

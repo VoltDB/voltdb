@@ -51,6 +51,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
@@ -301,6 +302,7 @@ public class TestSpPromoteAlgo
         // at random points to all but one.  Validate that promotion repair
         // results in identical, correct, repair streams to all replicas.
         TxnEgo sphandle = TxnEgo.makeZero(0);
+        UniqueIdGenerator buig = new UniqueIdGenerator(0, 0);
         sphandle = sphandle.makeNext();
         RandomMsgGenerator msgGen = new RandomMsgGenerator();
         boolean[] stops = new boolean[3];
@@ -310,12 +312,14 @@ public class TestSpPromoteAlgo
             stops[i] = false;
             finalStreams.put((long)i, new ArrayList<TransactionInfoBaseMessage>());
         }
+        long maxBinaryLogUniqueId = Long.MIN_VALUE;
         for (int i = 0; i < 4000; i++) {
             // get next message, update the sphandle according to SpScheduler rules,
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             msg.setSpHandle(sphandle.getTxnId());
+            maxBinaryLogUniqueId = Math.max(maxBinaryLogUniqueId, TestRepairLog.setBinaryLogUniqueId(msg, buig));
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 if (!stops[0]) {
@@ -344,7 +348,7 @@ public class TestSpPromoteAlgo
         survivors.add(1l);
         survivors.add(2l);
         SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0);
-        Future<Long> result = dut.start();
+        Future<RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());
@@ -360,9 +364,10 @@ public class TestSpPromoteAlgo
                 }
             }
         }
-        result.get();
+        RepairResult res = result.get();
         assertFalse(result.isCancelled());
         assertTrue(result.isDone());
+        assertEquals(maxBinaryLogUniqueId, res.m_binaryLogUniqueId);
         // Unfortunately, it's painful to try to stub things to make repairSurvivors() work, so we'll
         // go and inspect the guts of SpPromoteAlgo instead.  This iteration is largely a copy of the inner loop
         // of repairSurvivors()

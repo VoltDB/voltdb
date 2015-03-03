@@ -73,14 +73,15 @@ public class CompiledPlan {
     /** Parameter values, if the planner pulled constants out of the plan */
     private ParameterSet m_extractedParamValues = ParameterSet.emptyParameterSet();
 
+    /** Compiler generated parameters for cacheble AdHoc queries */
+    private int m_generatedParameterCount = 0;
+
     /**
      * If true, divide the number of tuples changed
      * by the number of partitions, as the number will
      * be the sum of tuples changed on all replicas.
      */
     public boolean replicatedTableDML = false;
-
-    public String[] touchedTables = null;
 
     /** Does the statement write? */
     private boolean m_readOnly = false;
@@ -279,12 +280,23 @@ public class CompiledPlan {
         if (paramTypes.length > MAX_PARAM_COUNT) {
             return false;
         }
+        if (paramzInfo.paramLiteralValues != null) {
+            m_generatedParameterCount = paramzInfo.paramLiteralValues.length;
+        }
+
         m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
         return true;
     }
 
     public ParameterSet extractedParamValues() {
         return m_extractedParamValues;
+    }
+
+    public int getQuestionMarkParameterCount() {
+        if (parameters == null) {
+            return 0;
+        }
+        return parameters.length - m_generatedParameterCount;
     }
 
     public boolean getReadOnly() {

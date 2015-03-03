@@ -55,6 +55,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -80,9 +81,8 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
 
-    public static VoltCompiler checkDDLErrorMessage(String jar_out,
+    public static void checkDDLErrorMessage(VoltCompiler compiler, String jar_out,
             String literalSchema, String expectedError) {
-        final VoltCompiler compiler = new VoltCompiler();
         boolean success = compileFromLiteralSchema(jar_out, compiler, literalSchema);
         if (expectedError == null) {
             assertTrue("Expected no compilation errors but got these:\n" +
@@ -94,6 +94,12 @@ public class TestVoltCompiler extends TestCase {
                         feedbackToString(compiler.m_errors));
             }
         }
+    }
+
+    public static VoltCompiler checkDDLErrorMessage(String jar_out,
+            String literalSchema, String expectedError) {
+        final VoltCompiler compiler = new VoltCompiler();
+        checkDDLErrorMessage(compiler, jar_out, literalSchema, expectedError);
         return compiler;
     }
 
@@ -340,7 +346,8 @@ public class TestVoltCompiler extends TestCase {
             final Catalog cat =
                     VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(jarFile.getAbsolutePath());
             CatalogUtil.compileDeploymentForTest(cat, pathToDeployment);
-            Connector connector = CatalogUtil.getDatabase(cat).getConnectors().get("0");
+            Connector connector = CatalogUtil.getDatabase(cat).getConnectors()
+                    .get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertFalse(connector.getEnabled());
         } finally {
             if (jarFile != null) {
@@ -351,6 +358,10 @@ public class TestVoltCompiler extends TestCase {
 
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
+        if (!MiscUtils.isPro()) {
+            return; // not supported in community
+        }
+
         CatalogBuilder cb = new CatalogBuilder()
         .addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"))
         .addStmtProcedure("Dummy", "insert into a values (?, ?, ?);", "a.a_id", 0)
@@ -372,7 +383,8 @@ public class TestVoltCompiler extends TestCase {
             final Catalog cat =
                     VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(jarFile.getAbsolutePath());
             CatalogUtil.compileDeploymentForTest(cat, pathToDeployment);
-            Connector connector = CatalogUtil.getDatabase(cat).getConnectors().get("0");
+            Connector connector = CatalogUtil.getDatabase(cat)
+                    .getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
             assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
@@ -762,8 +774,7 @@ public class TestVoltCompiler extends TestCase {
 
             void test(String ddl, String expectedError) {
                 final String schema = String.format("%s;\n%s;", baseDDL, ddl);
-                boolean success = compileDDL(schema, compiler);
-                checkCompilerErrorMessages(expectedError, compiler, success);
+                checkDDLErrorMessage(compiler, testout_jar, schema, expectedError);
             }
         }
         Tester tester = new Tester();
@@ -1265,7 +1276,7 @@ public class TestVoltCompiler extends TestCase {
         VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
-                "create index idx_t_idnum_b on t(id,num);\n"
+                "create index idx_t_idnum_b on t(id,num);\n" +
                 "", "t");
         assertFalse(compiler.hasErrorsOrWarnings());
     }
@@ -1614,6 +1625,11 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num limit 1 offset 10;\n" +
                 "";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num offset 10;" +
+        "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
@@ -2162,13 +2178,6 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE org.kanamuri.Foo AS DELETE FROM PKEY_INTEGER;" +
-                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                , "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo");
-
-        checkDDLErrorMessage(
-                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
-                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE 7Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 , "Unknown indentifier in DDL: \""+
@@ -2299,7 +2308,7 @@ public class TestVoltCompiler extends TestCase {
                 "    }\n" +
                 "### LANGUAGE KROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                , "### LANGUAGE KROOVY\", expected syntax: \"CREATE PROCEDURE [ALLOW");
+                , "Language \"KROOVY\" is not a supported");
     }
 
     public void testValidGroovyProcedureDDL() throws Exception {
@@ -2736,7 +2745,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
-        Connector connector =  db.getConnectors().get("0");
+        Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         if( connector == null) return null;
         return connector.getTableinfo().getIgnoreCase(tableName);
     }
@@ -2799,6 +2808,66 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
+    public void testGoodDRTable() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer not null, f1 varchar(16));",
+                "partition table e1 on column id;",
+                "dr table e1;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+
+        String schema = "create table e1 (id integer not null, f1 varchar(16));\n" +
+                        "create table e2 (id integer not null, f1 varchar(16));\n" +
+                        "partition table e1 on column id;";
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e1;",
+                "DR TABLE E2;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        // DR statement is order sensitive
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e2;",
+                "dr table e2 disable;"
+                );
+        assertFalse(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e2 disable;",
+                "dr table e2;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+    }
+
+    public void testBadDRTable() throws Exception {
+        badDDLAgainstSimpleSchema(".+\\sdr, table non_existant was not present in the catalog.*",
+                "dr table non_existant;"
+                );
+
+        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
+                "dr table 1table_name_not_valid;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table one, two, three;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr dr table one;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table table one;"
+                );
+    }
+
     public void testCompileFromDDL() throws IOException {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
@@ -2824,6 +2893,13 @@ public class TestVoltCompiler extends TestCase {
         // Trivially test that VoltCompiler politely refuses to compile 0 schema files.
         // Should we care?
         assertFalse(compiler.compileFromDDL(testout_jar));
+    }
+
+    public void testDDLStmtProcNameWithDots() throws Exception
+    {
+        badDDLAgainstSimpleSchema("Invalid procedure name",
+                "create procedure a.Foo as select * from books;"
+                );
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
