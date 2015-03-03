@@ -663,6 +663,7 @@ function alertNodeClicked(obj) {
             return adminConfigValues;
         };
 
+        //method updated for vmc-119
         var populateSystemInformation = function (connection) {
             var updatedSystemOverview = {};
             var currentServerOverview = {};
