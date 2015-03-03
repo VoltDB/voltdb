@@ -130,6 +130,13 @@ public class TestJSONInterface extends TestCase {
         return s;
     }
 
+    static String getHTTPURL(Integer port, String path) {
+        if (port == null) {
+            port = VoltDB.DEFAULT_HTTP_PORT;
+        }
+        return String.format("http://localhost:%d/%s", port, path);
+    }
+
     public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
         URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
 
@@ -1235,8 +1242,8 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 404);
         } finally {
             if (server != null) {
                 server.shutdown();
@@ -1690,6 +1697,91 @@ public class TestJSONInterface extends TestCase {
             assertTrue(dep.contains("\"user\""));
             assertTrue(dep.contains("\"permissions\""));
         } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testHTTPDefault() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            // Null omits the entire <http> element, along with the <jsonapi> child.
+            builder.setHTTPDPort(null);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get profile
+            String dep = getUrlOverJSON(getHTTPURL(null, "profile"), null, null, null, 200, "application/json");
+            assertTrue(dep.contains("\"user\""));
+            assertTrue(dep.contains("\"permissions\""));
+        }
+        finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testJSONDefault() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            // Null omits the <jsonapi> element.
+            builder.setJSONAPIEnabled(null);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get profile
+            String dep = getUrlOverJSON(getHTTPURL(8095, "profile"), null, null, null, 200, "application/json");
+            assertTrue(dep.contains("\"user\""));
+            assertTrue(dep.contains("\"permissions\""));
+        }
+        finally {
             if (server != null) {
                 server.shutdown();
                 server.join();

@@ -61,6 +61,10 @@ public class VoltDB {
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
+    // Special port values to disable or trigger auto-scan.
+    public static final int PORT_DISABLED = -1;
+    public static final int PORT_AUTO = 0;
+
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
     public static boolean isThisATest()
@@ -154,7 +158,7 @@ public class VoltDB {
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
-        public int m_httpPort = Integer.MAX_VALUE;
+        public int m_httpPort = PORT_DISABLED;
         public String m_httpPortInterface = "";
 
         public String m_publicInterface = "";
