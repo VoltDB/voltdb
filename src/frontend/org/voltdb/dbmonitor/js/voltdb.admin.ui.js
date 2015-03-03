@@ -1716,6 +1716,9 @@ function loadAdminPage() {
                 popup.close();
             });
             
+            //Center align the popup
+            popup.center();
+            
             $("#deleteAddConfig").on("click", function () {
                 $("#addConfigControls").hide();
                 $("#deleteAddConfig").hide();
