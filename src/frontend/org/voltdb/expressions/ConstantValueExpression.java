@@ -382,8 +382,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             try {
                 Long.parseLong(getValue());
             } catch (NumberFormatException e) {
-                //TODO: Or DECIMAL? Either is OK for integer comparison, but math gets different results?
-                columnType = VoltType.FLOAT;
+                columnType = VoltType.DECIMAL;
             }
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();

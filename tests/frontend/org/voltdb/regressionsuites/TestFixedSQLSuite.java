@@ -1981,10 +1981,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // VoltDB produces an error in this case, but this seems wrong:
         //
         verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, (Object)stringArgs);
+                "@AdHoc", adHocQueryWithListParam, stringArgs);
 
         verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, (Object[])stringArgs);
+                "@AdHoc", adHocQueryWithListParam, stringArgs);
 
         // where desc in ?
         // scalar parameter fails
@@ -2099,6 +2099,37 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = client.callProcedure("voltdbSelectProductChanges", 1, 1).getResults()[0];
         assertEquals(13, vt.getColumnCount());
+    }
+
+    public void testENG7480() throws Exception {
+        Client client = getClient();
+
+        VoltTable vt;
+        String sql;
+        sql = "insert into R1 Values(1, 'MA', 2, 1.1);";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        // constants interpreted as DECIMAL
+        sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(1.9, vt.getDecimalAsBigDecimal(0).doubleValue());
+
+        sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(1.9, vt.getDecimalAsBigDecimal(0).doubleValue());
+
+        // operation between float and decimal
+        sql = "SELECT 0.1 + (1-0.1) * ratio FROM R1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(2.08, vt.getDouble(0));
+
+        sql = "SELECT 0.1 + ratio * (1-0.1) FROM R1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(2.08, vt.getDouble(0));
     }
 
     //
