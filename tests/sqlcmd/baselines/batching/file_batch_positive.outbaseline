@@ -12,23 +12,4 @@ insert into s values (3, 'platypii');
 select * from t order by i;
 
 select * from s order by i;
-Command succeeded.
-Command succeeded.
-Batch command succeeded.
-(Returned 1 rows in #.##s)
-(Returned 1 rows in #.##s)
-(Returned 1 rows in #.##s)
-(Returned 1 rows in #.##s)
-I  VC   
--- -----
- 0 cats 
- 1 dogs 
-
-(Returned 2 rows in #.##s)
-I  VCC       
--- ----------
- 2 aardvarks 
- 3 platypii  
-
-(Returned 2 rows in #.##s)
 

@@ -1,0 +1,1 @@
+Unexpected exception applying DDL statements to original catalog: [p]: Failed to plan for statement (sql) select * from t; Error: "user lacks privilege or object not found: T"

@@ -1,14 +1,2 @@
 file scripts/batching/file_inlinebatch_simple.in
-Command succeeded.
-Command succeeded.
-Batch command succeeded.
-EXECUTION_PLAN                 
--------------------------------
-RETURN RESULTS TO STORED PROCEDURE
- RECEIVE FROM ALL PARTITIONS
-  SEND PARTITION RESULTS TO COORDINATOR
-   SEQUENTIAL SCAN of "T"
-
-
-(Returned 1 rows in #.##s)
 
