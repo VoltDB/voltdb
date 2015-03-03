@@ -375,7 +375,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     /*
      * Test that update propagates
      */
-    TableTuple toUpdate = districtTable->lookupTuple(temp_tuple);
+    TableTuple toUpdate = districtTable->lookupTuple(temp_tuple, false);
 
     //Use a different string value for one column
     cachedStringValues.push_back(ValueFactory::getStringValue("shoopdewoop"));
@@ -405,7 +405,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
 
     //Validate the update took place
-    TableTuple toDelete = districtTable->lookupTuple(temp_tuple);
+    TableTuple toDelete = districtTable->lookupTuple(temp_tuple, false);
     EXPECT_EQ(0, toDelete.getNValue(3).compare(cachedStringValues.back()));
 
     //Prep another transaction to test propagating a delete

@@ -281,7 +281,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Lookup the address of the tuple that is identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
      */
-    voltdb::TableTuple lookupTuple(TableTuple tuple);
+    voltdb::TableTuple lookupTuple(TableTuple tuple, bool forUndo);
 
     // ------------------------------------------------------------------
     // UTILITY

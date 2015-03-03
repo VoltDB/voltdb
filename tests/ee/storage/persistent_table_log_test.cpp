@@ -156,7 +156,7 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
 
     tableutil::getRandomTuple(m_table, tuple);
 
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTuple(tuple, true).isNullTuple());
 
     voltdb::TableTuple tupleBackup(m_tableSchema);
     tupleBackup.move(new char[tupleBackup.tupleLength()]);
@@ -170,11 +170,11 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
 
     m_table->deleteTuple(tuple, true);
 
-    ASSERT_TRUE( m_table->lookupTuple(tupleBackup).isNullTuple());
+    ASSERT_TRUE( m_table->lookupTuple(tupleBackup, true).isNullTuple());
 
     m_engine->undoUndoToken(INT64_MIN + 2);
 
-    ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE(m_table->lookupTuple(tuple, true).isNullTuple());
 }
 
 TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
@@ -207,11 +207,11 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTuple(tuple, true).isNullTuple());
 
     m_engine->undoUndoToken(INT64_MIN + 3);
 
-    ASSERT_TRUE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_TRUE(m_table->lookupTuple(tuple, true).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)0);
 }
 
@@ -245,11 +245,11 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTuple(tuple, true).isNullTuple());
 
     m_engine->releaseUndoToken(INT64_MIN + 3);
 
-    ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE(m_table->lookupTuple(tuple, true).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)1000);
 }
 
@@ -261,7 +261,7 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
     tableutil::getRandomTuple(m_table, tuple);
     //std::cout << "Retrieved random tuple " << std::endl << tuple.debugNoHeader() << std::endl;
 
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTuple(tuple, true).isNullTuple());
 
     /*
      * A backup copy of what the tuple looked like before updates
@@ -294,12 +294,12 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
 
     m_table->updateTuple(tuple, tupleCopy);
 
-    ASSERT_TRUE( m_table->lookupTuple(tupleBackup).isNullTuple());
-    ASSERT_FALSE( m_table->lookupTuple(tupleCopy).isNullTuple());
+    ASSERT_TRUE( m_table->lookupTuple(tupleBackup, true).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTuple(tupleCopy, true).isNullTuple());
     m_engine->undoUndoToken(INT64_MIN + 2);
 
-    ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
-    ASSERT_TRUE( m_table->lookupTuple(tupleCopy).isNullTuple());
+    ASSERT_FALSE(m_table->lookupTuple(tuple, true).isNullTuple());
+    ASSERT_TRUE( m_table->lookupTuple(tupleCopy, true).isNullTuple());
     tupleBackup.freeObjectColumns();
     tupleCopy.freeObjectColumns();
     delete [] tupleBackup.address();
