@@ -112,7 +112,7 @@ public class Inits {
 
     Inits(RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
-        m_config = rvdb.m_config;
+        m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
         if (m_config.m_startAction.doesRejoin()) {
@@ -556,10 +556,9 @@ public class Inits {
         @Override
         public void run() {
             int replicationPort = VoltDB.DEFAULT_DR_PORT;
-
-            if (m_deployment.getReplication() != null) {
+            if (m_deployment.getDr() != null) {
                 // set the replication port from the deployment file
-                replicationPort = m_deployment.getReplication().getPort();
+                replicationPort = m_deployment.getDr().getPort();
             }
 
             // allow command line override

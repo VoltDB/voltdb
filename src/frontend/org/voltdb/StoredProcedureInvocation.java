@@ -220,7 +220,7 @@ public class StoredProcedureInvocation implements JSONString {
         buf.putLong(clientHandle);
         if (serializedParams != null)
         {
-            if (!serializedParams.isReadOnly())
+            if (serializedParams.hasArray())
             {
                 // if position can be non-zero, then the dup/rewind logic below
                 // would be wrong?
@@ -339,8 +339,10 @@ public class StoredProcedureInvocation implements JSONString {
             js.object();
             js.key("proc_name");
             js.value(procName);
-            js.key("parameters");
-            js.value(params.get());
+            if (!procName.startsWith("@ApplyBinaryLog")) {
+                js.key("parameters");
+                js.value(params.get());
+            }
             js.endObject();
         }
         catch (Exception e) {

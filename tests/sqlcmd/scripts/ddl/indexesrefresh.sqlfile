@@ -1,0 +1,16 @@
+-- restrict the commands in this file to batchable ddl commands
+-- try index manipulations that are safe on a new table.
+drop table t if exists;
+create table t (
+ stable integer,
+ constraint pk primary key (stable),
+ altkey integer,
+ constraint altuniq unique (altkey),
+);
+
+
+alter table t drop constraint altuniq;
+alter table t drop primary key;
+
+alter table t add primary key ( altkey );
+alter table t add unique ( stable );

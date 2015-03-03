@@ -42,6 +42,8 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jline.console.CursorBuffer;
 import jline.console.KeyMap;
@@ -56,8 +58,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.parser.SQLParser.FileInfo;
+import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 
+import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class SQLCommand
@@ -75,19 +80,84 @@ public class SQLCommand
     }
 
     // Command line interaction
-    private static SQLConsoleReader lineInputReader = null;
+    private static SQLConsoleReader m_lineInputReader = null;
     private static FileHistory historyFile = null;
 
     private static List<String> RecallableSessionLines = new ArrayList<String>();
 
-   /// The main loop for interactive mode.
+
+    private static String patchErrorMessageWithFile(QueryInfo queryInfo, String message) {
+
+        Pattern errorMessageFilePrefix = Pattern.compile("\\[.*:([0-9]+)\\]");
+
+        Matcher matcher = errorMessageFilePrefix.matcher(message);
+        if (matcher.find()) {
+            // This won't work right if the filename contains a "$"...
+            message = matcher.replaceFirst("[" + queryInfo.getBatchFilename() + ":$1]");
+        }
+        return message;
+    }
+
+    private static void executeDDLBatch(QueryInfo queryInfo) {
+        try {
+            // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.getQuery().toString() + "=======\n");
+
+            if (! SQLParser.appearsToBeValidDDLBatch(queryInfo.getQuery().toString())) {
+                throw new Exception("Error: This batch begins with a non-DDL statement.  "
+                        + "Currently batching is only supported for DDL.");
+            }
+
+            ClientResponse response = VoltDB.callProcedure("@AdHoc", queryInfo.getQuery().toString());
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                throw new Exception("Execution Error: " + response.getStatusString());
+            }
+            // Assert the current DDL AdHoc batch call behavior
+            assert(response.getResults().length == 1);
+            System.out.println("Batch command succeeded.");
+        }
+        catch (ProcCallException ex) {
+            String fixedMessage = patchErrorMessageWithFile(queryInfo, ex.getMessage());
+            stopOrContinue(new Exception(fixedMessage));
+        }
+        catch (Exception ex) {
+            stopOrContinue(ex);
+        }
+    }
+
+    private static void executeQueryWithBatches(List<QueryInfo> queryBatchList) throws Exception {
+        for (QueryInfo qryInfo: queryBatchList) {
+            if (qryInfo.isBatch()) {
+                executeDDLBatch(qryInfo);
+            } else {
+                List<String> parsedQueries = SQLParser.parseQuery(qryInfo.getQuery().toString());
+                for (String parsedQuery : parsedQueries) {
+                    executeQuery(parsedQuery);
+                }
+            }
+        }
+    }
+
+    // The main loop for interactive mode.
     public static void interactWithTheUser() throws Exception
     {
-        List<String> parsedQueries = null;
-        while ((parsedQueries = getInteractiveQueries()) != null) {
-            for (String parsedQuery : parsedQueries) {
-                executeQuery(parsedQuery);
+        List<QueryInfo> queryBatchList = null;
+
+        while (true) {
+            try {
+                queryBatchList = getInteractiveQueries();
             }
+            catch (Exception ex) {
+                // If there was a parse error getting interactive
+                // commands, stop or continue depending on how we're
+                // configured.
+                stopOrContinue(ex);
+                continue;
+            }
+
+            if (queryBatchList == null)
+                break;
+
+            executeQueryWithBatches(queryBatchList);
         }
     }
 
@@ -96,7 +166,7 @@ public class SQLCommand
     // This would eliminate an extra layer of looping and needless bouncing
     // out of and back into getInteractiveQueries for some kinds of input
     // but not others.
-    public static List<String> getInteractiveQueries() throws Exception
+    public static List<QueryInfo> getInteractiveQueries() throws Exception
     {
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
@@ -106,7 +176,7 @@ public class SQLCommand
         // For now, for backward compatibility, keep this empty. This undesirably allows the
         // directives at the start of any line to temporarily interrupt statements in progress.
         List<String> multiLineStatementBuffer = new ArrayList<>();
-        List<String> parsedQueries = new ArrayList<>();
+        List<QueryInfo> queryBatchList = new ArrayList<QueryInfo>();
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
 
@@ -114,7 +184,7 @@ public class SQLCommand
         while ( ! executeImmediate) {
             String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
-            String line = lineInputReader.readLine(prompt);
+            String line = m_lineInputReader.readLine(prompt);
 
             assert(line != null);
 
@@ -137,14 +207,17 @@ public class SQLCommand
                 // RECALL command
                 ParseRecallResults recallParseResults = SQLParser.parseRecallStatement(line, RecallableSessionLines.size() - 1);
                 if (recallParseResults != null) {
+                    // Trying to use accessors like getError() and getLine() here in place
+                    // of the direct attribute access gets a mysterious NoSuchMethodError.
+                    // At least the attributes are declared final.
                     if (recallParseResults.error == null) {
                         line = RecallableSessionLines.get(recallParseResults.line);
-                        lineInputReader.putString(line);
-                        lineInputReader.flush();
+                        m_lineInputReader.putString(line);
+                        m_lineInputReader.flush();
                         isRecall = true;
                     }
                     else {
-                        System.out.printf("%d> %s\n%d", RecallableSessionLines.size(), recallParseResults.error);
+                        System.out.println(recallParseResults.error);
                     }
                     executeImmediate = false; // let user edit the recalled line.
                     continue;
@@ -179,11 +252,12 @@ public class SQLCommand
                 // If the line is a FILE command - include the content of the file into the query queue
                 //TODO: executing statements (from files) as they are read rather than queuing them
                 // would improve performance and error handling.
-                File file = SQLParser.parseFileStatement(line);
-                if (file != null) {
+                FileInfo fileInfo = SQLParser.parseFileStatement(line);
+                if (fileInfo != null) {
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if, in the recursive call, stopOrContinue decided to continue.
-                    line = readScriptFile(file);
+
+                    List<QueryInfo> contentInfo = readScriptFile(fileInfo, m_lineInputReader);
                     if (m_returningToPromptAfterError) {
                         // readScriptFile stopped because of an error. Wipe the slate clean.
                         query = new StringBuilder();
@@ -191,10 +265,19 @@ public class SQLCommand
                         // chance that errors in queued statements are still waiting to be detected,
                         // so, this reset is not 100% effective (as discovered in ENG-7335).
                         m_returningToPromptAfterError = false;
-                        executeImmediate = false; // return to prompt.
                         continue;
                     }
-                    // else treat the line(s) from the file(s) as regular database commands
+
+                    if (contentInfo == null || contentInfo.isEmpty()) {
+                        executeImmediate = true; // Execute the FILE directive immediately
+                        continue;
+                    }
+
+                    updateQueryBatch(queryBatchList, query, contentInfo);
+                    query = new StringBuilder();
+
+                    executeImmediate = true; // Execute the FILE directive immediately
+                    continue;
                 }
 
                 // else treat the input line as a regular database command
@@ -214,12 +297,16 @@ public class SQLCommand
             // in progress -- if the line(s) so far contained anything more than whitespace.
 
             // Collect lines ...
-            query.append(line);
-            query.append("\n");
+            query.append(line + "\n");
         }
-        parsedQueries = SQLParser.parseQuery(query.toString());
-        return parsedQueries;
+
+        if (query.length() > 0) {
+            queryBatchList.add(new QueryInfo(query));
+        }
+
+        return queryBatchList;
     }
+
 
     /// Returns the original command, a replacement command, or null (on error).
     private static String handleTranslatedCommands(String lineIn)
@@ -228,12 +315,60 @@ public class SQLCommand
             return SQLParser.translateStatement(lineIn);
         }
         catch(SQLParser.Exception e) {
-            System.out.printf("%d> %s\n", RecallableSessionLines.size(), e.getMessage());
+            System.out.println(e.getMessage());
         }
 
         //* enable to debug */ if (lineOut != null && !lineOut.equals(lineIn)) System.err.printf("Translated: %s -> %s\n", lineIn, lineOut);
 
         return lineIn;
+    }
+
+    /**
+     * A class that encapsulates one statement or batch of statements
+     * that will be sent to the server.
+     */
+    public static final class QueryInfo {
+        private final StringBuilder m_query;
+        private final Optional<FileInfo> m_fileInfo;
+
+        QueryInfo(StringBuilder sb) {
+            m_query = sb;
+            m_fileInfo = Optional.absent();
+        }
+
+        QueryInfo(StringBuilder sb, FileInfo fileInfo) {
+            m_query = sb;
+            m_fileInfo = Optional.of(fileInfo);
+        }
+
+        public StringBuilder getQuery() {
+            return m_query;
+        }
+
+        public boolean isBatch() {
+            return m_fileInfo.isPresent() && m_fileInfo.get().isBatch();
+        }
+
+        public String getBatchFilename() {
+            if (m_fileInfo.get().getOption() == FileOption.INLINEBATCH) {
+                return "Inline batch input";
+            }
+
+            // Must be a regular file-based batch
+            return m_fileInfo.get().getFile().getName();
+        }
+
+        public static StringBuilder convertToStringBuilder(List<QueryInfo> queryBatchInfo) {
+            StringBuilder queryString = new StringBuilder();
+            for (QueryInfo qryInfo: queryBatchInfo) {
+                queryString.append(qryInfo.getQuery());
+            }
+            return queryString;
+        }
+
+        public static String convertToString(List<QueryInfo> queryBatchInfo) {
+            return convertToStringBuilder(queryBatchInfo).toString();
+        }
     }
 
     /// A stripped down variant of the processing in "interactWithTheUser" suitable for
@@ -244,15 +379,20 @@ public class SQLCommand
         // and the processing of explicitly opened files in readScriptFile.
         // Both of these methods should be using more of an execute-as-you-go approach rather than
         // so much statement queueing.
+        List<QueryInfo> queryBatchList = new ArrayList<QueryInfo>();
         StringBuilder query = new StringBuilder();
         while (true) {
-            String line = lineInputReader.readLine();
+            // No more lines.  Execute whatever we got.
+            String line = m_lineInputReader.readLine();
             if (line == null) {
                 //* enable to debug */     System.err.println("Read null batch line.");
-                List<String> parsedQueries = SQLParser.parseQuery(query.toString());
-                for (String parsedQuery : parsedQueries) {
-                    executeQuery(parsedQuery);
+                if (query.length() > 0) {
+                    // flush the buffered query
+                    queryBatchList.add(new QueryInfo(query));
                 }
+
+                executeQueryWithBatches(queryBatchList);
+
                 return;
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
@@ -264,21 +404,22 @@ public class SQLCommand
             }
 
             // If the line is a FILE command - include the content of the file into the query queue
-            File file = SQLParser.parseFileStatement(line);
-            if (file != null) {
+            FileInfo fileInfo = SQLParser.parseFileStatement(line);
+            if (fileInfo != null) {
+
                 // Get the line(s) from the file(s) to queue as regular database commands,
                 // or get back a null if in the recursive call, stopOrContinue decided to continue.
-                line = readScriptFile(file);
-                if (line == null) {
+                List<QueryInfo> contentInfo = readScriptFile(fileInfo, m_lineInputReader);
+                if (contentInfo == null || contentInfo.isEmpty()) {
                     continue;
                 }
+
+                updateQueryBatch(queryBatchList, query, contentInfo);
+                query = new StringBuilder();
+            } else {
+                // else treat the input line as a regular database command
+                query.append(line + "\n");
             }
-
-            // else treat the input line as a regular database command
-
-            // Collect the lines ...
-            query.append(line);
-            query.append("\n");
         }
     }
 
@@ -302,7 +443,11 @@ public class SQLCommand
                 execListClasses();
             }
             else {
-                System.out.printf("%d> Bad SHOW target: %s\n%d", RecallableSessionLines.size(), subcommand);
+                String errorCase = subcommand.equals("") ?
+                        ("Incomplete SHOW command.\n") :
+                        ("Invalid SHOW command completion: '" + subcommand + "'.\n");
+                System.out.println(errorCase +
+                        "The valid SHOW command completions are proc, procedure, tables, or classes.");
             }
             // Consider it handled here, whether or not it was a good SHOW statement.
             return true;
@@ -434,85 +579,199 @@ public class SQLCommand
         System.out.println();
     }
 
-    public static String readScriptFile(File file)
+    // function update the queryBatchList and query
+    private static void updateQueryBatch(List<QueryInfo> queryBatchList,
+            StringBuilder previousQuery,
+            List<QueryInfo> fileContents) {
+
+        // found contents for FILE cmd, flush the previous lines into a batch
+        if (previousQuery.length() > 0) {
+            queryBatchList.add(new QueryInfo(previousQuery));
+        }
+
+        queryBatchList.addAll(fileContents);
+    }
+
+    /** Adapt BufferedReader into a SQLCommandLineReader */
+    private static class LineReaderAdapter implements SQLCommandLineReader {
+        private final BufferedReader m_reader;
+
+        LineReaderAdapter(BufferedReader reader) {
+            m_reader = reader;
+        }
+
+        @Override
+        public String readLine(String prompt) throws IOException {
+            return m_reader.readLine();
+        }
+    }
+
+    /**
+     * Reads a script file and produces the list of commands that need
+     * to be processed.  Note that the "script file" could be an inline
+     * batch, i.e., a "here document" that is coming from the same input stream
+     * as the "file" directive.
+     *
+     * @param fileInfo    Info on the file directive being processed
+     * @param currentLineReader  The current input stream, to be used for "here documents".
+     * @return A list of QueryInfo objects to send to the database
+     */
+    public static List<QueryInfo> readScriptFile(FileInfo fileInfo, SQLCommandLineReader currentLineReader)
     {
-        BufferedReader script = null;
+        BufferedReader bufferedReader = null;
+        List<QueryInfo> statements = null;
+
         try {
-            script = new BufferedReader(new FileReader(file));
-        }
-        catch (FileNotFoundException e) {
-            System.err.println("Script file '" + file + "' could not be found.");
-            stopOrContinue(e);
-            return null; // continue to the next line after the FILE command
-        }
-        try {
-            StringBuilder query = new StringBuilder();
-            String line;
-            while ((line = script.readLine()) != null) {
-                // Strip out RECALL, EXIT and GO commands
-                //TODO: There is inconsistent handling of other "interactive mode" commands
-                // between batch commands in a file and batch commands from stdin or "--query=".
-                // The LIST commands are not covered here in particular, causing them to get
-                // piled onto the query string to mix with any statements or statement fragments
-                // currently being queued there. We COULD add them to this filter.
-                // But if INSTEAD we removed the filter completely both here and in the other input
-                // reader in "non-interactive" mode, then the user would soon learn not to
-                // put these garbage lines uselessly into their batch inputs.
-                // This would have the advantage of simplicity and would avoid possible
-                // edge case confusion when one of these "commands" like EXIT or GO happened to be
-                // a name in the user's schema that fell on a line of its own in the input and so
-                // got ignored.
-                // Maybe we should bypass these potential snafus in non-interactive mode by
-                // taking all of the user's command input more "literally".
-                // FILE is arguably the only useful one -- it could be improved by giving it a name
-                // less likely to be accidentally used in database commands like @File or #include.
-                if (SQLParser.parseRecallStatement(line, RecallableSessionLines.size() - 1) != null ||
-                    SQLParser.isExitCommand(line) ||
-                    SQLParser.isGoCommand(line)) {
-                    continue;
-                }
+            SQLCommandLineReader reader = null;
 
-                // handle statements that are converted to regular database commands
-                line = handleTranslatedCommands(line);
-                if (line == null) {
-                    continue;
-                }
+            if (fileInfo.getOption() != FileOption.INLINEBATCH) {
 
-                // Recursively process FILE commands, any failure will cause a recursive failure
-                File nestedFile = SQLParser.parseFileStatement(line);
-                if (nestedFile != null) {
-                    // Get the line(s) from the file(s) to queue as regular database commands
-                    // or get back a null if in the recursive call, stopOrContinue decided to continue.
-                    line = readScriptFile(nestedFile);
-                    if (line == null) {
-                        if (m_returningToPromptAfterError) {
-                            // The recursive readScriptFile stopped because of an error.
-                            // Escape to the outermost readScriptFile caller so it can exit or
-                            // return to the interactive prompt.
-                            return null;
-                        }
-                        // Continue after a bad nested file command by processing the next line
-                        // in the current file.
-                        continue;
-                    }
+                try {
+                    bufferedReader = new BufferedReader(new FileReader(fileInfo.getFile()));
+                    reader = new LineReaderAdapter(bufferedReader);
                 }
-
-                query.append(line);
-                query.append("\n");
+                catch (FileNotFoundException e) {
+                    System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
+                    stopOrContinue(e);
+                    return null; // continue to the next line after the FILE command
+                }
             }
-            return query.toString().trim();
-        }
-        catch (Exception x) {
-            stopOrContinue(x);
-            return null;
+            else {
+                // File command is a "here document" so pass in the current
+                // input stream.
+                reader = currentLineReader;
+            }
+
+            try {
+                statements = readScriptFromReader(fileInfo, reader);
+            }
+            catch (Exception x) {
+                stopOrContinue(x);
+                return null;
+            }
         }
         finally {
-            if (script != null) {
+            if (bufferedReader != null) {
                 try {
-                    script.close();
-                } catch (IOException e) { }
+                    bufferedReader.close();
+                }
+                catch (IOException e) {
+                }
             }
         }
+
+        return statements;
+    }
+
+    /**
+     *
+     * @param fileInfo  The FileInfo object describing the file command
+     * @param script    The line reader object to read from
+     * @return          a list of QueryInfo objects from the line reader
+     * @throws Exception
+     */
+    private static List<QueryInfo> readScriptFromReader(FileInfo fileInfo, SQLCommandLineReader script)
+            throws Exception {
+
+        List<QueryInfo> queryBatchList = new ArrayList<SQLCommand.QueryInfo>();
+        StringBuilder query = new StringBuilder();
+        String line = null;
+
+        String delimiter = (fileInfo.getOption() == FileOption.INLINEBATCH) ?
+                fileInfo.getDelimiter() : null;
+
+        String prompt = m_interactive ? "batch> " : "";
+        while ((line = script.readLine(prompt)) != null) {
+
+            if (delimiter != null && line.equals(delimiter)) {
+                break;
+            }
+
+            // Strip out RECALL, EXIT and GO commands
+            //TODO: There is inconsistent handling of other "interactive mode" commands
+            // between batch commands in a file and batch commands from stdin or "--query=".
+            // The LIST commands are not covered here in particular, causing them to get
+            // piled onto the query string to mix with any statements or statement fragments
+            // currently being queued there. We COULD add them to this filter.
+            // But if INSTEAD we removed the filter completely both here and in the other input
+            // reader in "non-interactive" mode, then the user would soon learn not to
+            // put these garbage lines uselessly into their batch inputs.
+            // This would have the advantage of simplicity and would avoid possible
+            // edge case confusion when one of these "commands" like EXIT or GO happened to be
+            // a name in the user's schema that fell on a line of its own in the input and so
+            // got ignored.
+            // Maybe we should bypass these potential snafus in non-interactive mode by
+            // taking all of the user's command input more "literally".
+            // FILE is arguably the only useful one -- it could be improved by giving it a name
+            // less likely to be accidentally used in database commands like @File or #include.
+            if (SQLParser.parseRecallStatement(line, RecallableSessionLines.size() - 1) != null ||
+                    SQLParser.isExitCommand(line) ||
+                    SQLParser.isGoCommand(line)) {
+                continue;
+            }
+
+            // handle statements that are converted to regular database commands
+            line = handleTranslatedCommands(line);
+            if (line == null) {
+                // I believe this to be unreachable code:
+                //   handleTranslatedCommands will never return null.
+                //   If there was an error, SQLParser.Exception is thrown instead.
+                continue;
+            }
+
+            // Recursively process FILE commands, any failure will cause a recursive failure
+            FileInfo nestedFileInfo = SQLParser.parseFileStatement(line);
+            if (nestedFileInfo != null) {
+                // Guards must be added for FILE Batch containing batches.
+                if (fileInfo.isBatch()) {
+                    stopOrContinue(new RuntimeException("Not supported nested FILE command in a batch"));
+                    return null; // continue to the next line after the FILE command
+                }
+
+                // Get the line(s) from the file(s) to queue as regular database commands
+                // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                List<QueryInfo> contentInfo = readScriptFile(nestedFileInfo, script);
+                if (contentInfo == null || contentInfo.isEmpty()) {
+                    if (m_returningToPromptAfterError) {
+                        // The recursive readScriptFile stopped because of an error.
+                        // Escape to the outermost readScriptFile caller so it can exit or
+                        // return to the interactive prompt.
+                        return null;
+                    }
+                    // Continue after a bad nested file command by processing the next line
+                    // in the current file.
+                    continue;
+                }
+
+                updateQueryBatch(queryBatchList, query, contentInfo);
+                query = new StringBuilder();
+
+            } else {
+                // normal commands other than FILE
+                query.append(line + "\n");
+            }
+        } // end while we are reading input
+
+        if (delimiter != null && line == null) {
+            // We only print this nice message if the inline batch is being executed non-interactively.
+            // For an inline batch entered from the command line, SQLConsoleReader catches ctrl-D
+            // and exits the process before this code can execute, even if this code is in a "finally" block.
+            throw new Exception("ERROR: Failed to find delimiter \""
+                    + delimiter + "\" indicating end of inline batch.  No batched statements were executed.");
+        }
+
+        // flush the query batch
+        if (query.length() > 0) {
+            if (fileInfo.isBatch()) {
+                assert(queryBatchList.isEmpty());
+                queryBatchList.add(new QueryInfo(query, fileInfo));
+            }
+            else {
+                queryBatchList.add(new QueryInfo(query));
+            }
+        }
+
+        return queryBatchList;
     }
 
     private static long m_startTime;
@@ -714,7 +973,9 @@ public class SQLCommand
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@ApplyBinaryLogSP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varbinary", "varbinary")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
+        Procedures.put("@ApplyBinaryLogMP",
+                       ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
     }
 
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
@@ -936,8 +1197,11 @@ public class SQLCommand
     {
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
-            lineInputReader = reader;
-            return getInteractiveQueries();
+            m_lineInputReader = reader;
+
+            List<QueryInfo> queryBatchList = getInteractiveQueries();
+            return SQLParser.parseQuery(QueryInfo.convertToString(queryBatchList));
+
         } catch (Exception ioe) {}
         return null;
     }
@@ -1085,27 +1349,27 @@ public class SQLCommand
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;
-            lineInputReader = new SQLConsoleReader(in, out);
+            m_lineInputReader = new SQLConsoleReader(in, out);
 
-            lineInputReader.setBellEnabled(false);
+            m_lineInputReader.setBellEnabled(false);
 
             // Maintain persistent history in ~/.sqlcmd_history.
             historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
-            lineInputReader.setHistory(historyFile);
+            m_lineInputReader.setHistory(historyFile);
 
             // Make Ctrl-D (EOF) exit if on an empty line, otherwise delete the next character.
-            KeyMap keyMap = lineInputReader.getKeys();
+            KeyMap keyMap = m_lineInputReader.getKeys();
             keyMap.bind(new Character(KeyMap.CTRL_D).toString(), new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e)
                 {
-                    CursorBuffer cursorBuffer = lineInputReader.getCursorBuffer();
+                    CursorBuffer cursorBuffer = m_lineInputReader.getCursorBuffer();
                     if (cursorBuffer.length() == 0) {
                         System.exit(m_exitCode);
                     }
                     else {
                         try {
-                            lineInputReader.delete();
+                            m_lineInputReader.delete();
                         }
                         catch (IOException e1) {}
                     }
@@ -1155,8 +1419,8 @@ public class SQLCommand
                 }
             }
             // Clean up jline2 resources.
-            if (lineInputReader != null) {
-                lineInputReader.shutdown();
+            if (m_lineInputReader != null) {
+                m_lineInputReader.shutdown();
             }
         }
         // Processing may have been continued after one or more errors.
