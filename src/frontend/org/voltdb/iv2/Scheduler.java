@@ -25,7 +25,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
@@ -199,6 +198,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     @Override
     abstract public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
 
+    @Override
     abstract public void deliver(VoltMessage message);
 
     abstract public void enableWritingIv2FaultLog();

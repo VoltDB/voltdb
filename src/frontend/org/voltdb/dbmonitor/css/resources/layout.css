@@ -40,7 +40,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring, 
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu 
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig 
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 ul.servers-list li.pauseActiveMonitoring{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;background-color: #f0f3f4}
 
@@ -1025,10 +1025,13 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .addConfigProperTbl tr td { padding-left:10px}
 .addConfigProperTbl tr td label.error { line-height:12px;height: auto;}
 .addConfigHeader { float: left;}
-.deleteAddConfig { float: right;padding: 8px 20px 0 0;font-size: 12px;font-weight: bold;position: relative;top: 6px;}
+.deleteAddConfig {float: right;padding: 8px 20px 0 20px; font-size: 12px; font-weight: bold; position: relative; top: 6px;}
 .deleteAddConfig a { color: #c70000;}
 #chkStreamValue { padding-left: 2px;}
 .plusAdd {background-position:-418px -61px; width: 31px; height: 17px; display: inline-block; position: relative;top: 8px;}
+.loadExport { position: relative; left: 3px; top: 5px; }
+.loadExportConfig { margin: 0 0 0 29%;}
+.iconDeleteAddConfig {background-position:0px -1570px; width:20px; height:20px; float:left; position:relative; top:6px;}
 
 /****Export details Ends*******/
 a.changePsd {color: #0079bb;}
@@ -1105,8 +1108,8 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 
 .documentation span { float:left; padding-bottom:20px} 
 
-.objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
-.queryInput { float:none; width:100%;}
+/*.objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
+.queryInput { float:none; width:100%;}*/
 .tblScroll {overflow:auto; width:100%}
 .adminContentLeft { width:100%}
 .adminPorts { margin-top:10px;}
@@ -1257,7 +1260,8 @@ top: 3px;}
     .resizeRestore {
         width: 90%;
     }
-	
+	.popup_close {right:10px;}
+	.refreshBtn { margin-bottom:10px;}
 	
 }
 	 
@@ -1270,6 +1274,11 @@ top: 3px;}
 		
 		 
  }
+@media (max-width: 980px) { 
+ 
+ .objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
+ .queryInput { float:none; width:100%;}
+ }
 
 @media (width: 320px) {
 
@@ -1279,7 +1288,8 @@ top: 3px;}
   .restoreCont {overflow:auto; height:146px}
    .adminServer { }	
   .adminLeft { float:none; width:100%}
-
+  
+  
  
  }
 @media screen and (orientation:landscape) {

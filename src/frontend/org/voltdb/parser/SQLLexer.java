@@ -54,6 +54,7 @@ public class SQLLexer extends SQLPatternFactory
         new VerbToken("drop", true),
         new VerbToken("export", true),
         new VerbToken("partition", true),
+        new VerbToken("dr", true),
         // Unsupported verbs
         new VerbToken("import", false)
     };
@@ -85,7 +86,7 @@ public class SQLLexer extends SQLPatternFactory
         "assumeunique", "unique"
     };
 
-    static final char   BLOCK_DELIMITER_CHAR = '#';
+    static final char BLOCK_DELIMITER_CHAR = '#';
     static final String BLOCK_DELIMITER = "###";
 
     //===== Special non-DDL/DML/SQL patterns
@@ -116,14 +117,14 @@ public class SQLLexer extends SQLPatternFactory
         SPF.statementLeader(
             SPF.capture(SPF.tokenAlternatives("create", "drop")),   // DDL commands we're looking for
             SPF.token("table"),                                     // target is table
-            SPF.capture(SPF.symbol())                               // table name (captured)
-        ).compile();
+            SPF.capture(SPF.databaseObjectName())                        // table name (captured)
+        ).compile("PAT_TABLE_DDL_PREAMBLE");
 
     // Matches the start of a SELECT statement
     private static final Pattern PAT_SELECT_STATEMENT_PREAMBLE =
         SPF.statementLeader(
             SPF.token("select")
-        ).compile();
+        ).compile("PAT_SELECT_STATEMENT_PREAMBLE");
 
     // Pattern for plausible ALTER...RENAME statements.
     // Keep the matching loose in order to support clear messaging.
@@ -131,16 +132,16 @@ public class SQLLexer extends SQLPatternFactory
         SPF.statementLeader(
             SPF.token("alter"),
             SPF.capture("parenttype", SPF.databaseObjectTypeName()),
-            SPF.capture("parentname", SPF.symbol()),
+            SPF.capture("parentname", SPF.databaseObjectName()),
             SPF.optional(
                 SPF.clause(
                     SPF.token("alter"),
                     SPF.capture("childtype", SPF.databaseObjectTypeName()),
-                    SPF.capture("childname", SPF.symbol())
+                    SPF.capture("childname", SPF.databaseObjectName())
                 )
             ),
             SPF.token("rename"), SPF.token("to")
-        ).compile();
+        ).compile("PAT_ALTER_RENAME");
 
     //========== Public Methods ==========
 
@@ -449,7 +450,7 @@ public class SQLLexer extends SQLPatternFactory
             SPF.statementLeader(
                 SPF.capture(SPF.tokenAlternatives(verbsAll)),
                 SPF.anyClause()
-            ).compile();
+            ).compile("PAT_ANY_DDL_FIRST_TOKEN");
 
         // Whitelists for acceptable statement preambles.
         WHITELISTS = new CheckedPattern[] {
@@ -547,9 +548,7 @@ public class SQLLexer extends SQLPatternFactory
      */
     private static class WhitelistSupportedPreamblePattern extends CheckedPattern
     {
-        private static Pattern whitelistPattern = null;
-
-        static
+        private static Pattern initPattern()
         {
             // All handled (white-listed) patterns.
             String[] secondTokens = new String[OBJECT_TOKENS.length + MODIFIER_TOKENS.length];
@@ -581,18 +580,19 @@ public class SQLLexer extends SQLPatternFactory
                     verbsSupported[supportedVerbCount++] = VERB_TOKENS[i].token;
                 }
             }
-            whitelistPattern =
+            Pattern whitelistPattern =
                 SPF.statementLeader(
                     SPF.clause(
                         SPF.tokenAlternatives(verbsSupported),
                         SPF.tokenAlternatives(secondTokens)
                     )
-                ).compile();
+                ).compile("PAT_WHITELISTS-PREAMBLES");
+            return whitelistPattern;
         }
 
         WhitelistSupportedPreamblePattern()
         {
-            super(whitelistPattern);
+            super(initPattern());
         }
 
         // Whitelist match provides no explanation.
@@ -608,9 +608,7 @@ public class SQLLexer extends SQLPatternFactory
      */
     private static class BlacklistUnsupportedPreamblePattern extends CheckedPattern
     {
-        private static Pattern blacklistPattern = null;
-
-        static
+        private static Pattern initPattern()
         {
             int unsupportedVerbCount = 0;
             for (int i = 0; i < VERB_TOKENS.length; ++i) {
@@ -625,15 +623,16 @@ public class SQLLexer extends SQLPatternFactory
                     verbsNotSupported[unsupportedVerbCount++] = VERB_TOKENS[i].token;
                 }
             }
-            blacklistPattern =
+            Pattern blacklistPattern =
                 SPF.statementLeader(
                     SPF.capture(SPF.tokenAlternatives(verbsNotSupported))
-                ).compile();
+                ).compile("PAT_BLACKLISTS-PREAMBLES");
+            return blacklistPattern;
         }
 
         BlacklistUnsupportedPreamblePattern()
         {
-            super(blacklistPattern);
+            super(initPattern());
         }
 
         /**

@@ -142,7 +142,9 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+        Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
         Map<Integer, Long> partitionTransactionIds,
+        Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
         InstanceId instanceId,
         long timestamp,
         int newPartitionCount)
@@ -199,6 +201,32 @@ public class SnapshotUtil {
 
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+
+                stringer.key("remoteDCLastIds");
+                stringer.object();
+                for (Map.Entry<Integer, Map<Integer, Pair<Long, Long>>> e : remoteDCLastIds.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    for (Map.Entry<Integer, Pair<Long, Long>> e2 : e.getValue().entrySet()) {
+                        stringer.key(e2.getKey().toString());
+                        stringer.object();
+                        stringer.key("drId").value(e2.getValue().getFirst());
+                        stringer.key("uniqueId").value(e2.getValue().getSecond());
+                        stringer.endObject();
+                    }
+                    stringer.endObject();
+                }
+                stringer.endObject();
+                stringer.key("drTupleStreamStateInfo");
+                stringer.object();
+                for (Map.Entry<Integer, Pair<Long, Long>> e : drTupleStreamInfo.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    stringer.key("sequenceNumber").value(e.getValue().getFirst());
+                    stringer.key("uniqueId").value(e.getValue().getSecond());
+                    stringer.endObject();
+                }
+                stringer.endObject();
                 stringer.endObject();
             } catch (JSONException e) {
                 throw new IOException(e);

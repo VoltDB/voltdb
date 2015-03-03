@@ -22,9 +22,9 @@ $(document).ready(function () {
             }, 10);
         }
 
-        //IE 11 is just a preview release. 
-        //Hence validation expressions may differs after the full version is released 
-        //In such case, below validation has to be updated
+            //IE 11 is just a preview release. 
+            //Hence validation expressions may differs after the full version is released 
+            //In such case, below validation has to be updated
         else if (navigator.appName == 'Netscape') {
             var ua = navigator.userAgent;
             var re = new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})");
@@ -37,7 +37,7 @@ $(document).ready(function () {
                         window.scrollTo(0, 0);
                     }, 10);
                 }
-            }            
+            }
         }
         e.preventDefault();
     });
@@ -65,6 +65,10 @@ $(document).ready(function () {
 
             if (json["AlertThreshold"] != undefined && json["AlertThreshold"] != "")
                 saveCookie("alert-threshold", json["AlertThreshold"]);
+
+            if (json["tab"] == "admin") {
+                saveSessionCookie("current-tab", NavigationTabs.Admin);
+            }
 
             location.href = location.href.split("?")[0];
         }
@@ -298,7 +302,7 @@ var loadPage = function (serverName, portid) {
     loadSQLQueryPage(serverName, portid, userName);
     VoltDbUI.refreshSqlAndSchemaTab();
 
-    VoltDbUI.partitionGraphInterval = setInterval(function() {
+    VoltDbUI.partitionGraphInterval = setInterval(function () {
         if (getCurrentServer() != undefined) {
             window.clearInterval(VoltDbUI.partitionGraphInterval);
             voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
@@ -306,7 +310,7 @@ var loadPage = function (serverName, portid) {
             });
         }
     }, 5000);
-    
+
 
     var showAdminPage = function () {
         if (!VoltDbAdminConfig.isAdmin) {
@@ -462,7 +466,7 @@ var loadPage = function (serverName, portid) {
                     DisplayPreferences: $.cookie("user-preferences"),
                     AlertThreshold: $.cookie("alert-threshold"),
                     username: $.cookie("username"),
-                    password: $.cookie("password")
+                    password: $.cookie("password"),
                 };
 
                 var win = window.open(newUrl + '?data=' + encodeURIComponent(JSON.stringify(data)), '_parent');
@@ -474,7 +478,7 @@ var loadPage = function (serverName, portid) {
             showHideGraph(lUserPreferences);
         };
         var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues, serverSettings) {
-            VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues,serverSettings);
+            VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues, serverSettings);
         };
 
         var loadAdminServerList = function (serverList) {
@@ -502,9 +506,10 @@ var loadPage = function (serverName, portid) {
                     DisplayPreferences: $.cookie("user-preferences"),
                     AlertThreshold: $.cookie("alert-threshold"),
                     username: $.cookie("username"),
-                    password: $.cookie("password")
+                    password: $.cookie("password"),
+                    tab:'admin'
                 };
-                
+
                 var win = window.open(newUrl + '?data=' + encodeURIComponent(JSON.stringify(data)), '_parent');
                 win.focus();
             });
@@ -596,7 +601,7 @@ var loadPage = function (serverName, portid) {
             MonitorGraphUI.RefreshCpu(cpuDetails, getCurrentServer(), graphView, currentTab);
         });
 
-        voltDbRenderer.GetPartitionIdleTimeInformation(function(partitionDetail) {
+        voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
             if (getCurrentServer() != undefined)
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
@@ -1333,7 +1338,7 @@ var loadPage = function (serverName, portid) {
         }
 
     });
-    
+
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
@@ -1678,7 +1683,7 @@ var adjustGraphSpacing = function () {
             var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
             var templateJavascript = "js/template.js";
 
-            
+
             $.post(templateUrl, function (result) {
                 result = result.replace('<!--##SIZES##>', '');
                 var body = $(result).filter("#wrapper").html();
