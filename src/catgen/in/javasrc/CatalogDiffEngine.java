@@ -31,6 +31,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.ConnectorProperty;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.catalog.Connector;
@@ -320,7 +322,6 @@ public class CatalogDiffEngine {
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
-            suspect instanceof Connector ||
             suspect instanceof SnapshotSchedule ||
             // refs are safe to add drop if the thing they reference is
             suspect instanceof ConstraintRef ||
@@ -336,6 +337,28 @@ public class CatalogDiffEngine {
             // Support add/drop of the top level object.
             suspect instanceof Table)
         {
+            return null;
+        }
+
+        else if (suspect instanceof Connector) {
+            if (ChangeType.ADDITION == changeType) {
+                for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
+                    String tName = cti.getTable().getTypeName();
+                    m_tablesThatMustBeEmpty.put(tName, "Unable to change table " + tName + " to an export table because the table is not empty");
+                }
+            }
+            return null;
+        }
+
+        else if (suspect instanceof ConnectorTableInfo) {
+            if (ChangeType.ADDITION == changeType) {
+                String tName = ((ConnectorTableInfo)suspect).getTable().getTypeName();
+                m_tablesThatMustBeEmpty.put(tName, "Unable to change table " + tName + " to an export table because the table is not empty");
+            }
+            return null;
+        }
+
+        else if (suspect instanceof ConnectorProperty) {
             return null;
         }
 
