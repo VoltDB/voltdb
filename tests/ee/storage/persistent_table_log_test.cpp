@@ -366,11 +366,6 @@ TEST_F(PersistentTableLogTest, LookupTupleForUndoNoPKTest) {
     voltdb::TableTuple tuple(m_tableSchema);
     tableutil::getRandomTuple(m_table, tuple);
     ASSERT_EQ(m_table->lookupTupleForUndo(tuple).address(), tuple.address());
-
-    // assert that simple value equality doesn't find the tuple
-    voltdb::TableTuple tempTuple = m_table->tempTuple();
-    tempTuple.setNValues(0, tuple, 0, m_tableSchema->columnCount());
-    ASSERT_TRUE(m_table->lookupTupleForUndo(tempTuple).isNullTuple());
 }
 
 int main() {
