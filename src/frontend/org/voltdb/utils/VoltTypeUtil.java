@@ -146,7 +146,7 @@ public abstract class VoltTypeUtil {
         VoltType.BIGINT,
     };
 
-    private static String VoltTypeCastErrorMessage = "ERROR: Unable to determine cast type for '%s' and '%s' types";
+    public static final String VoltTypeCastErrorMessage = "ERROR: Unable to determine cast type for '%s' and '%s' types";
 
     public static VoltType determineImplicitCasting(VoltType left, VoltType right) {
         //
