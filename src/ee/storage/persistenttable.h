@@ -278,10 +278,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     /*
-     * Lookup the address of the tuple that is identical to the specified tuple.
+     * Lookup the address of the tuple whose values are identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
      */
-    voltdb::TableTuple lookupTuple(TableTuple tuple, bool forUndo);
+    voltdb::TableTuple lookupTupleByValues(TableTuple tuple);
+
+    /*
+     * Lookup the address of the tuple that is identical to the specified tuple.
+     * It is assumed that the tuple argument was first retrieved from this table.
+     * Does a primary key lookup or table scan if necessary.
+     */
+    voltdb::TableTuple lookupTupleForUndo(TableTuple tuple);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -536,6 +543,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     int32_t &serializedTupleCount,
                                     size_t &tupleCountPosition,
                                     bool shouldDRStreamRows);
+
+    TableTuple lookupTuple(TableTuple tuple, bool forUndo);
 
     TBPtr allocateNextBlock();
 
@@ -891,6 +900,13 @@ inline TBPtr PersistentTable::allocateNextBlock() {
     return block;
 }
 
+inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
+    return lookupTuple(tuple, false);
+}
+
+inline TableTuple PersistentTable::lookupTupleForUndo(TableTuple tuple) {
+    return lookupTuple(tuple, true);
+}
 
 }
 

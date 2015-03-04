@@ -678,7 +678,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     else {
         matchable.move(sourceTupleDataWithNewValues);
     }
-    TableTuple targetTupleToUpdate = lookupTuple(matchable, true);
+    TableTuple targetTupleToUpdate = lookupTupleForUndo(matchable);
     TableTuple sourceTupleWithNewValues(sourceTupleDataWithNewValues, m_schema);
 
     //If the indexes were never updated there is no need to revert them.
@@ -842,7 +842,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     if (!skipLookup) {
         // The UndoInsertAction got a pooled copy of the tupleData.
         // Relocate the original tuple actually in the table.
-        target = lookupTuple(matchable, true);
+        target = lookupTupleForUndo(matchable);
     }
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
@@ -868,23 +868,27 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
         /*
          * Do a table scan.
          */
-        size_t tuple_length = m_schema->tupleLength();
-        bool onlyInline = (m_schema->getUninlinedObjectColumnCount() == 0);
         TableTuple tableTuple(m_schema);
         TableIterator ti(this, m_data.begin());
-        while (ti.hasNext()) {
-            ti.next(tableTuple);
-            // If this is for undo, or all columns are inline, do an inline tuple byte comparison
+        if (forUndo || m_schema->getUninlinedObjectColumnCount() == 0) {
+            size_t tuple_length = m_schema->tupleLength();
+            // Do an inline tuple byte comparison
             // to avoid matching duplicate tuples with different pointers to Object storage
             // -- which would cause erroneous releases of the wrong Object storage copy.
-            if ((forUndo || onlyInline)) {
+            while (ti.hasNext()) {
+                ti.next(tableTuple);
                 char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
                 char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
                 if (::memcmp(tableTupleData, tupleData, tuple_length) == 0) {
                     return tableTuple;
                 }
-            } else if (tableTuple.equalsNoSchemaCheck(tuple)) {
-                return tableTuple;
+            }
+        } else {
+            while (ti.hasNext()) {
+                ti.next(tableTuple);
+                if (tableTuple.equalsNoSchemaCheck(tuple)) {
+                    return tableTuple;
+                }
             }
         }
         return nullTuple;

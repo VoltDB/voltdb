@@ -73,7 +73,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             tempTuple.deserializeFromDR(rowInput, pool);
 
             if (type == DR_RECORD_DELETE) {
-                TableTuple deleteTuple = table->lookupTuple(tempTuple, false);
+                TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
                 if (deleteTuple.isNullTuple()) {
                     char msg[1024 * 100];
                     snprintf(msg, 1024 * 100,
