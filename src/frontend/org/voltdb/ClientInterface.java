@@ -105,6 +105,7 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
@@ -149,6 +150,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
+    public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -1393,8 +1395,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
     ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn, AuthUser user) {
         ParameterSet params = task.getParams();
+        /*
+         * TODO: We don't actually support multiple proc names in an ExplainProc call,
+         * so I THINK that the string is always a single procname symbol and all this
+         * splitting and iterating is a no-op.
+         */
         //String procs = (String) params.toArray()[0];
-        List<String> procNames = MiscUtils.splitSQLStatements( (String)params.toArray()[0]);
+        List<String> procNames = SQLLexer.splitStatements( (String)params.toArray()[0]);
         int size = procNames.size();
         VoltTable[] vt = new VoltTable[ size ];
         for( int i=0; i<size; i++ ) {
@@ -1480,7 +1487,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn, ExplainMode explainMode,
             String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
-        List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
+        List<String> sqlStatements = SQLLexer.splitStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
         AdHocPlannerWork ahpw = new AdHocPlannerWork(
@@ -2145,6 +2152,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         ClientResponseImpl error = null;
         if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
+                SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
+        else
+        if ((error = m_invocationValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
                 SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
             ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
             buffer.putInt(buffer.capacity() - 4);

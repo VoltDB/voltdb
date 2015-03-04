@@ -29,10 +29,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLConnection;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -59,286 +57,107 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.parser.SQLParser;
+import org.voltdb.parser.SQLParser.FileInfo;
+import org.voltdb.parser.SQLParser.FileOption;
+import org.voltdb.parser.SQLParser.ParseRecallResults;
 
+import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class SQLCommand
 {
-    private static final Map<String, String> FRIENDLY_TYPE_NAMES =
-            ImmutableMap.<String, String>builder().put("tinyint", "byte numeric")
-                                                  .put("smallint", "short numeric")
-                                                  .put("int", "numeric")
-                                                  .put("integer", "numeric")
-                                                  .put("bigint", "long numeric")
-                                                  .build();
     private static boolean m_stopOnError = true;
     private static boolean m_debug = false;
     private static boolean m_interactive;
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
-    // SQL Parsing
-    private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
-    private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
-    private static final Pattern MidlineComments = Pattern.compile("(\\/\\/|--).*$", Pattern.MULTILINE);
-    private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-
-    private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
-    /**
-     * Matches a command followed by and SQL CRUD statement verb
-     */
-    private static final Pattern ParserStringKeywords = Pattern.compile(
-            "\\s*" + // 0 or more spaces
-            "(" + // start group 1
-              "exec|execute|explain|explainproc" + // command
-            ")" +  // end group 1
-            "\\s+" + // one or more spaces
-            "(" + // start group 2
-              "select|insert|update|upsert|delete|truncate" + // SQL CRUD statement verb
-            ")" + // end group 2
-            "\\s+", // one or more spaces
-            Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
-    );
     private static final String readme = "SQLCommandReadme.txt";
 
     public static String getReadme() {
         return readme;
     }
 
-    public static Pattern getExecuteCall() {
-        return ExecuteCall;
-    }
-
-    public static List<String> parseQuery(String query)
-    {
-        if (query == null) {
-            return null;
-        }
-
-        //* enable to debug */ System.err.println("Parsing command queue:\n" + query);
-        /*
-         * Mark any parser string keyword matches by interposing the #SQL_PARSER_STRING_KEYWORD#
-         * tag. Which is later stripped at the end of this procedure. This tag is here to
-         * aide the evaluation of SetOp and AutoSplit REGEXPs, meaning that an
-         * 'explain select foo from bar will cause SetOp and AutoSplit match on the select as
-         * is prefixed with the #SQL_PARSER_STRING_KEYWORD#
-         *
-         * For example
-         *     'explain select foo from bar'
-         *  becomes
-         *     'explain #SQL_PARSER_STRING_KEYWORD#select foo from bar'
-         */
-        query = ParserStringKeywords.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-        /*
-         * strip out single line comments
-         */
-        query = SingleLineComments.matcher(query).replaceAll("");
-        /*
-         * replace all escaped single quotes with the #(SQL_PARSER_ESCAPE_SINGLE_QUOTE) tag
-         */
-        query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
-
-        /*
-         * move all single quoted strings into the string fragments list, and do in place
-         * replacements with numbered instances of the #(SQL_PARSER_STRING_FRAGMENT#[n]) tag
-         *
-         */
-        Matcher stringFragmentMatcher = Extract.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
-        int i = 0;
-        while (stringFragmentMatcher.find()) {
-            stringFragments.add(stringFragmentMatcher.group());
-            query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
-            stringFragmentMatcher = Extract.matcher(query);
-            i++;
-        }
-
-        // strip out inline comments
-        // At the point, all the quoted strings have been pulled out of the code because they may contain semicolons
-        // and they will not be restored until after the split. So any user's quoted string will be safe here.
-        query = MidlineComments.matcher(query).replaceAll("");
-
-        String[] sqlFragments = query.split("\\s*;+\\s*");
-
-        ArrayList<String> queries = new ArrayList<String>();
-        for (String fragment : sqlFragments) {
-            fragment = SingleLineComments.matcher(fragment).replaceAll("");
-            fragment = fragment.trim();
-            if (fragment.isEmpty()) {
-                continue;
-            }
-            if (fragment.indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                int k = 0;
-                for (String strFrag : stringFragments) {
-                    fragment = fragment.replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", strFrag);
-                    k++;
-                }
-            }
-            fragment = fragment.replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
-            fragment = fragment.replace("#SQL_PARSER_STRING_KEYWORD#","");
-            queries.add(fragment);
-        }
-        return queries;
-    }
-
-    public static List<String> parseProcedureCallParameters(String query)
-    {
-        if (query == null) {
-            return null;
-        }
-
-        query = SingleLineComments.matcher(query).replaceAll("");
-        query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
-        Matcher stringFragmentMatcher = Extract.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
-        int i = 0;
-        while (stringFragmentMatcher.find()) {
-            stringFragments.add(stringFragmentMatcher.group());
-            query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
-            stringFragmentMatcher = Extract.matcher(query);
-            i++;
-        }
-        query = AutoSplitParameters.matcher(query).replaceAll(",");
-        String[] sqlFragments = query.split("\\s*,+\\s*");
-        ArrayList<String> queries = new ArrayList<String>();
-        for (int j = 0; j<sqlFragments.length; j++) {
-            sqlFragments[j] = sqlFragments[j].trim();
-            if (sqlFragments[j].length() != 0) {
-                if (sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                    for (int k = 0; k<stringFragments.size(); k++) {
-                        sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
-                    }
-                }
-                sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
-                sqlFragments[j] = sqlFragments[j].trim();
-                queries.add(sqlFragments[j]);
-            }
-        }
-        return queries;
-    }
-
     // Command line interaction
-    private static SQLConsoleReader lineInputReader = null;
+    private static SQLConsoleReader m_lineInputReader = null;
     private static FileHistory historyFile = null;
 
-    private static final Pattern HelpToken = Pattern.compile("^\\s*help;*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*((?:list|show)\\s+proc|(?:list|show)\\s+procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListTablesToken = Pattern.compile("^\\s*((?:list|show)\\s+tables);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListClassesToken = Pattern.compile("^\\s*((?:list|show)\\s+classes);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
     private static List<String> RecallableSessionLines = new ArrayList<String>();
 
-    @SuppressWarnings("serial")
-    private static class LocalCommandParseException extends Exception
-    {
-        final String message;
 
-        LocalCommandParseException(String format, Object... args)
-        {
-            this.message = String.format(format, args);
+    private static String patchErrorMessageWithFile(QueryInfo queryInfo, String message) {
+
+        Pattern errorMessageFilePrefix = Pattern.compile("\\[.*:([0-9]+)\\]");
+
+        Matcher matcher = errorMessageFilePrefix.matcher(message);
+        if (matcher.find()) {
+            // This won't work right if the filename contains a "$"...
+            message = matcher.replaceFirst("[" + queryInfo.getBatchFilename() + ":$1]");
+        }
+        return message;
+    }
+
+    private static void executeDDLBatch(QueryInfo queryInfo) {
+        try {
+            // System.out.println("[Batch DDL mode execution=======]:\n" + qryInfo.getQuery().toString() + "=======\n");
+
+            if (! SQLParser.appearsToBeValidDDLBatch(queryInfo.getQuery().toString())) {
+                throw new Exception("Error: This batch begins with a non-DDL statement.  "
+                        + "Currently batching is only supported for DDL.");
+            }
+
+            ClientResponse response = VoltDB.callProcedure("@AdHoc", queryInfo.getQuery().toString());
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                throw new Exception("Execution Error: " + response.getStatusString());
+            }
+            // Assert the current DDL AdHoc batch call behavior
+            assert(response.getResults().length == 1);
+            System.out.println("Batch command succeeded.");
+        }
+        catch (ProcCallException ex) {
+            String fixedMessage = patchErrorMessageWithFile(queryInfo, ex.getMessage());
+            stopOrContinue(new Exception(fixedMessage));
+        }
+        catch (Exception ex) {
+            stopOrContinue(ex);
         }
     }
 
-    /**
-     * Parses locally-interpreted commands with a prefix and a single quoted
-     * or unquoted string argument.
-     * This can be more general if the need arises, e.g. more than one argument
-     * or other argument data types.
-     */
-    private static class SingleArgumentCommandParser
-    {
-        final String prefix;
-        final Pattern patPrefix;
-        final Pattern patFull;
-        final String argName;
-
-        /**
-         * Constructor
-         * @param prefix  command prefix (blank separator is replaced with \s+)
-         */
-        SingleArgumentCommandParser(String prefix, String argName)
-        {
-            // Replace single space with flexible whitespace pattern.
-            this.prefix = prefix.toUpperCase();
-            String prefixPat = prefix.replace(" ", "\\s+");
-            this.patPrefix = Pattern.compile(String.format("^\\s*%s\\s.*$", prefixPat), Pattern.CASE_INSENSITIVE);
-            this.patFull = Pattern.compile(String.format("^\\s*%s\\s+([^;]+)[;\\s]*$", prefixPat), Pattern.CASE_INSENSITIVE);
-            this.argName = argName;
-        }
-
-        /**
-         * Parse line and return argument or null if parsing fails.
-         * @param line  input line
-         * @return      output argument or null if parsing fails
-         */
-        String parse(String line) throws LocalCommandParseException
-        {
-            // If it doesn't start with the expected command prefix return null.
-            // Allows better errors for missing or inappropriate arguments,
-            // rather than passing it along to the engine for a strange error.
-            if (line == null || !this.patPrefix.matcher(line).matches()) {
-                return null;
-            }
-            Matcher matcher = this.patFull.matcher(line);
-            String arg = null;
-            if (matcher.matches()) {
-                arg = parseOptionallyQuotedString(matcher.group(1));
-                if (arg == null) {
-                    throw new LocalCommandParseException("Bad %s argument to %s: %s", this.argName, this.prefix, arg);
+    private static void executeQueryWithBatches(List<QueryInfo> queryBatchList) throws Exception {
+        for (QueryInfo qryInfo: queryBatchList) {
+            if (qryInfo.isBatch()) {
+                executeDDLBatch(qryInfo);
+            } else {
+                List<String> parsedQueries = SQLParser.parseQuery(qryInfo.getQuery().toString());
+                for (String parsedQuery : parsedQueries) {
+                    executeQuery(parsedQuery);
                 }
             }
-            else {
-                throw new LocalCommandParseException("Missing %s argument to %s.", this.argName, this.prefix);
-            }
-
-            return arg;
-        }
-
-        private static String parseOptionallyQuotedString(String sIn) throws LocalCommandParseException
-        {
-            String sOut = null;
-            if (sIn != null) {
-                // If it starts with a quote make sure it ends with the same one.
-                if (sIn.startsWith("'") || sIn.startsWith("\"")) {
-                    if (sIn.length() > 1 && sIn.endsWith(sIn.substring(0, 1))) {
-                        sOut = sIn.substring(1, sIn.length() - 1);
-                    }
-                    else {
-                        throw new LocalCommandParseException("Quoted string is not properly closed: %s", sIn);
-                    }
-                }
-                else {
-                    // Unquoted string returned as is.
-                    sOut = sIn;
-                }
-            }
-            return sOut;
         }
     }
 
-    // The argument capture group for LOAD/REMOVE CLASSES loosely captures everything
-    // through the trailing semi-colon. It relies on post-parsing code to make sure
-    // the argument is reasonable.
-    // Capture group 1 for LOAD CLASSES is the jar file.
-    private static final SingleArgumentCommandParser loadClassesParser =
-            new SingleArgumentCommandParser("load classes", "jar file");
-    private static final SingleArgumentCommandParser removeClassesParser =
-            new SingleArgumentCommandParser("remove classes", "class selector");
-    private static final Pattern ClassSelectorToken = Pattern.compile(
-            "^[\\w*.$]+$", Pattern.CASE_INSENSITIVE);
-
-    /// The main loop for interactive mode.
+    // The main loop for interactive mode.
     public static void interactWithTheUser() throws Exception
     {
-        List<String> parsedQueries = null;
-        while ((parsedQueries = getInteractiveQueries()) != null) {
-            for (String parsedQuery : parsedQueries) {
-                executeQuery(parsedQuery);
+        List<QueryInfo> queryBatchList = null;
+
+        while (true) {
+            try {
+                queryBatchList = getInteractiveQueries();
             }
+            catch (Exception ex) {
+                // If there was a parse error getting interactive
+                // commands, stop or continue depending on how we're
+                // configured.
+                stopOrContinue(ex);
+                continue;
+            }
+
+            if (queryBatchList == null)
+                break;
+
+            executeQueryWithBatches(queryBatchList);
         }
     }
 
@@ -347,7 +166,7 @@ public class SQLCommand
     // This would eliminate an extra layer of looping and needless bouncing
     // out of and back into getInteractiveQueries for some kinds of input
     // but not others.
-    public static List<String> getInteractiveQueries() throws Exception
+    public static List<QueryInfo> getInteractiveQueries() throws Exception
     {
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
@@ -357,7 +176,7 @@ public class SQLCommand
         // For now, for backward compatibility, keep this empty. This undesirably allows the
         // directives at the start of any line to temporarily interrupt statements in progress.
         List<String> multiLineStatementBuffer = new ArrayList<>();
-        List<String> parsedQueries = new ArrayList<>();
+        List<QueryInfo> queryBatchList = new ArrayList<QueryInfo>();
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
 
@@ -365,7 +184,7 @@ public class SQLCommand
         while ( ! executeImmediate) {
             String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
-            String line = lineInputReader.readLine(prompt);
+            String line = m_lineInputReader.readLine(prompt);
 
             assert(line != null);
 
@@ -373,7 +192,7 @@ public class SQLCommand
             // This mostly matters for "non-directive" statements, but, for
             // now, for backward compatibility, it needs to be noted for FILE
             // commands prior to their processing.
-            executeImmediate = SemicolonToken.matcher(line).matches();
+            executeImmediate = SQLParser.isSemiColonTerminated(line);
 
             // When we are tracking the progress of a multi-line statement,
             // avoid coincidentally recognizing mid-statement SQL content as sqlcmd
@@ -381,22 +200,24 @@ public class SQLCommand
             if (multiLineStatementBuffer.isEmpty()) {
 
                 // EXIT command - exit immediately
-                if (ExitToken.matcher(line).matches()) {
+                if (SQLParser.isExitCommand(line)) {
                     return null;
                 }
 
                 // RECALL command
-                Matcher recallMatcher = RecallToken.matcher(line);
-                if (recallMatcher.matches()) {
-                    int recall = -1;
-                    try { recall = Integer.parseInt(recallMatcher.group(1))-1; } catch(Exception x){}
-                    if (recall > -1 && recall < RecallableSessionLines.size()) {
-                        line = RecallableSessionLines.get(recall);
-                        lineInputReader.putString(line);
-                        lineInputReader.flush();
+                ParseRecallResults recallParseResults = SQLParser.parseRecallStatement(line, RecallableSessionLines.size() - 1);
+                if (recallParseResults != null) {
+                    // Trying to use accessors like getError() and getLine() here in place
+                    // of the direct attribute access gets a mysterious NoSuchMethodError.
+                    // At least the attributes are declared final.
+                    if (recallParseResults.error == null) {
+                        line = RecallableSessionLines.get(recallParseResults.line);
+                        m_lineInputReader.putString(line);
+                        m_lineInputReader.flush();
                         isRecall = true;
-                    } else {
-                        System.out.printf("%s> Invalid RECALL reference: '" + recallMatcher.group(1) + "'.\n", RecallableSessionLines.size());
+                    }
+                    else {
+                        System.out.println(recallParseResults.error);
                     }
                     executeImmediate = false; // let user edit the recalled line.
                     continue;
@@ -415,7 +236,7 @@ public class SQLCommand
                 // GO commands - signal the end of any pending multi-line statements.
                 //TODO: to be deprecated in favor of just typing a semicolon on its own line to finalize
                 // a multi-line statement.
-                if (GoToken.matcher(line).matches()) {
+                if (SQLParser.isGoCommand(line)) {
                     executeImmediate = true;
                     line = ";";
                 }
@@ -431,11 +252,12 @@ public class SQLCommand
                 // If the line is a FILE command - include the content of the file into the query queue
                 //TODO: executing statements (from files) as they are read rather than queuing them
                 // would improve performance and error handling.
-                Matcher fileMatcher = FileToken.matcher(line);
-                if (fileMatcher.matches()) {
+                FileInfo fileInfo = SQLParser.parseFileStatement(line);
+                if (fileInfo != null) {
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if, in the recursive call, stopOrContinue decided to continue.
-                    line = readScriptFile(fileMatcher.group(1));
+
+                    List<QueryInfo> contentInfo = readScriptFile(fileInfo, m_lineInputReader);
                     if (m_returningToPromptAfterError) {
                         // readScriptFile stopped because of an error. Wipe the slate clean.
                         query = new StringBuilder();
@@ -443,10 +265,19 @@ public class SQLCommand
                         // chance that errors in queued statements are still waiting to be detected,
                         // so, this reset is not 100% effective (as discovered in ENG-7335).
                         m_returningToPromptAfterError = false;
-                        executeImmediate = false; // return to prompt.
                         continue;
                     }
-                    // else treat the line(s) from the file(s) as regular database commands
+
+                    if (contentInfo == null || contentInfo.isEmpty()) {
+                        executeImmediate = true; // Execute the FILE directive immediately
+                        continue;
+                    }
+
+                    updateQueryBatch(queryBatchList, query, contentInfo);
+                    query = new StringBuilder();
+
+                    executeImmediate = true; // Execute the FILE directive immediately
+                    continue;
                 }
 
                 // else treat the input line as a regular database command
@@ -466,51 +297,78 @@ public class SQLCommand
             // in progress -- if the line(s) so far contained anything more than whitespace.
 
             // Collect lines ...
-            query.append(line);
-            query.append("\n");
+            query.append(line + "\n");
         }
-        parsedQueries = parseQuery(query.toString());
-        return parsedQueries;
+
+        if (query.length() > 0) {
+            queryBatchList.add(new QueryInfo(query));
+        }
+
+        return queryBatchList;
     }
+
 
     /// Returns the original command, a replacement command, or null (on error).
     private static String handleTranslatedCommands(String lineIn)
     {
-        String lineOut = null;
         try {
-            // LOAD CLASS <jar>?
-            if (lineOut == null) {
-                String arg = loadClassesParser.parse(lineIn);
-                if (arg != null) {
-                    if (! new File(arg).isFile()) {
-                        throw new LocalCommandParseException("Jar file not found: %s", arg);
-                    }
-                    lineOut = String.format("exec @UpdateClasses '%s', NULL;", arg);
-                }
-            }
-            // REMOVE CLASS <class-selector>?
-            if (lineOut == null) {
-                String arg = removeClassesParser.parse(lineIn);
-                if (arg != null) {
-                    // reject obviously bad class selectors
-                    if (!ClassSelectorToken.matcher(arg).matches()) {
-                        throw new LocalCommandParseException("Bad characters in class selector: %s", arg);
-                    }
-                    lineOut = String.format("exec @UpdateClasses NULL, '%s';", arg);
-                }
-            }
-            // None of the above - return the untranslated input command.
-            if (lineOut == null) {
-                lineOut = lineIn;
-            }
+            return SQLParser.translateStatement(lineIn);
         }
-        catch(LocalCommandParseException e) {
-            System.out.printf("%d> %s\n",  RecallableSessionLines.size(), e.message);
+        catch(SQLParser.Exception e) {
+            System.out.println(e.getMessage());
         }
 
         //* enable to debug */ if (lineOut != null && !lineOut.equals(lineIn)) System.err.printf("Translated: %s -> %s\n", lineIn, lineOut);
 
-        return lineOut;
+        return lineIn;
+    }
+
+    /**
+     * A class that encapsulates one statement or batch of statements
+     * that will be sent to the server.
+     */
+    public static final class QueryInfo {
+        private final StringBuilder m_query;
+        private final Optional<FileInfo> m_fileInfo;
+
+        QueryInfo(StringBuilder sb) {
+            m_query = sb;
+            m_fileInfo = Optional.absent();
+        }
+
+        QueryInfo(StringBuilder sb, FileInfo fileInfo) {
+            m_query = sb;
+            m_fileInfo = Optional.of(fileInfo);
+        }
+
+        public StringBuilder getQuery() {
+            return m_query;
+        }
+
+        public boolean isBatch() {
+            return m_fileInfo.isPresent() && m_fileInfo.get().isBatch();
+        }
+
+        public String getBatchFilename() {
+            if (m_fileInfo.get().getOption() == FileOption.INLINEBATCH) {
+                return "Inline batch input";
+            }
+
+            // Must be a regular file-based batch
+            return m_fileInfo.get().getFile().getName();
+        }
+
+        public static StringBuilder convertToStringBuilder(List<QueryInfo> queryBatchInfo) {
+            StringBuilder queryString = new StringBuilder();
+            for (QueryInfo qryInfo: queryBatchInfo) {
+                queryString.append(qryInfo.getQuery());
+            }
+            return queryString;
+        }
+
+        public static String convertToString(List<QueryInfo> queryBatchInfo) {
+            return convertToStringBuilder(queryBatchInfo).toString();
+        }
     }
 
     /// A stripped down variant of the processing in "interactWithTheUser" suitable for
@@ -521,15 +379,20 @@ public class SQLCommand
         // and the processing of explicitly opened files in readScriptFile.
         // Both of these methods should be using more of an execute-as-you-go approach rather than
         // so much statement queueing.
+        List<QueryInfo> queryBatchList = new ArrayList<QueryInfo>();
         StringBuilder query = new StringBuilder();
         while (true) {
-            String line = lineInputReader.readLine();
+            // No more lines.  Execute whatever we got.
+            String line = m_lineInputReader.readLine();
             if (line == null) {
                 //* enable to debug */     System.err.println("Read null batch line.");
-                List<String> parsedQueries = parseQuery(query.toString());
-                for (String parsedQuery : parsedQueries) {
-                    executeQuery(parsedQuery);
+                if (query.length() > 0) {
+                    // flush the buffered query
+                    queryBatchList.add(new QueryInfo(query));
                 }
+
+                executeQueryWithBatches(queryBatchList);
+
                 return;
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
@@ -541,21 +404,22 @@ public class SQLCommand
             }
 
             // If the line is a FILE command - include the content of the file into the query queue
-            Matcher fileMatcher = FileToken.matcher(line);
-            if (fileMatcher.matches()) {
+            FileInfo fileInfo = SQLParser.parseFileStatement(line);
+            if (fileInfo != null) {
+
                 // Get the line(s) from the file(s) to queue as regular database commands,
                 // or get back a null if in the recursive call, stopOrContinue decided to continue.
-                line = readScriptFile(fileMatcher.group(1));
-                if (line == null) {
+                List<QueryInfo> contentInfo = readScriptFile(fileInfo, m_lineInputReader);
+                if (contentInfo == null || contentInfo.isEmpty()) {
                     continue;
                 }
+
+                updateQueryBatch(queryBatchList, query, contentInfo);
+                query = new StringBuilder();
+            } else {
+                // else treat the input line as a regular database command
+                query.append(line + "\n");
             }
-
-            // else treat the input line as a regular database command
-
-            // Collect the lines ...
-            query.append(line);
-            query.append("\n");
         }
     }
 
@@ -565,26 +429,44 @@ public class SQLCommand
     //TODO: There have been suggestions that some or all of these directives could be made
     // available in non-interactive contexts. This function is available to enable that.
     private static boolean executesAsSimpleDirective(String line) throws Exception {
-        // LIST PROCEDURES command
-        if (ListProceduresToken.matcher(line).matches()) {
-            execListProcedures();
+
+        // SHOW or LIST <blah> statement
+        String subcommand = SQLParser.parseShowStatementSubcommand(line);
+        if (subcommand != null) {
+            if (subcommand.equals("proc") || subcommand.equals("procedure")) {
+               execListProcedures();
+            }
+            else if (subcommand.equals("tables")) {
+                execListTables();
+            }
+            else if (subcommand.equals("classes")) {
+                execListClasses();
+            }
+            else {
+                String errorCase = subcommand.equals("") ?
+                        ("Incomplete SHOW command.\n") :
+                        ("Invalid SHOW command completion: '" + subcommand + "'.\n");
+                System.out.println(errorCase +
+                        "The valid SHOW command completions are proc, procedure, tables, or classes.");
+            }
+            // Consider it handled here, whether or not it was a good SHOW statement.
             return true;
         }
-        // LIST TABLES command
-        if (ListTablesToken.matcher(line).matches()) {
-            execListTables();
-            return true;
-        }
-        // SHOW CLASSES
-        if (ListClassesToken.matcher(line).matches()) {
-            execListClasses();
-            return true;
-        }
+
         // HELP commands - ONLY in interactive mode, close batch and parse for execution
-        if (HelpToken.matcher(line).matches()) {
+        // Parser returns null if it isn't a HELP command. If no arguments are specified
+        // the returned string will be empty.
+        String helpSubcommand = SQLParser.parseHelpStatement(line);
+        if (helpSubcommand != null) {
+            // Ignore the arguments for now.
+            if (!helpSubcommand.isEmpty()) {
+                System.out.printf("Ignoring extra HELP argument(s): %s\n", helpSubcommand);
+            }
             printHelp(System.out); // Print readme to the screen
             return true;
         }
+
+        // It wasn't a locally-interpreted directive.
         return false;
     }
 
@@ -697,196 +579,212 @@ public class SQLCommand
         System.out.println();
     }
 
-    public static String readScriptFile(String filePath)
-    {
-        BufferedReader script = null;
-        try {
-            script = new BufferedReader(new FileReader(filePath));
-        }
-        catch (FileNotFoundException e) {
-            System.err.println("Script file '" + filePath + "' could not be found.");
-            stopOrContinue(e);
-            return null; // continue to the next line after the FILE command
-        }
-        try {
-            StringBuilder query = new StringBuilder();
-            String line;
-            while ((line = script.readLine()) != null) {
-                // Strip out RECALL, EXIT and GO commands
-                //TODO: There is inconsistent handling of other "interactive mode" commands
-                // between batch commands in a file and batch commands from stdin or "--query=".
-                // The LIST commands are not covered here in particular, causing them to get
-                // piled onto the query string to mix with any statements or statement fragments
-                // currently being queued there. We COULD add them to this filter.
-                // But if INSTEAD we removed the filter completely both here and in the other input
-                // reader in "non-interactive" mode, then the user would soon learn not to
-                // put these garbage lines uselessly into their batch inputs.
-                // This would have the advantage of simplicity and would avoid possible
-                // edge case confusion when one of these "commands" like EXIT or GO happened to be
-                // a name in the user's schema that fell on a line of its own in the input and so
-                // got ignored.
-                // Maybe we should bypass these potential snafus in non-interactive mode by
-                // taking all of the user's command input more "literally".
-                // FILE is arguably the only useful one -- it could be improved by giving it a name
-                // less likely to be accidentally used in database commands like @File or #include.
-                if (RecallToken.matcher(line).matches() ||
-                      ExitToken.matcher(line).matches() ||
-                      GoToken.matcher(line).matches()) {
-                    continue;
-                }
+    // function update the queryBatchList and query
+    private static void updateQueryBatch(List<QueryInfo> queryBatchList,
+            StringBuilder previousQuery,
+            List<QueryInfo> fileContents) {
 
-                // handle statements that are converted to regular database commands
-                line = handleTranslatedCommands(line);
-                if (line == null) {
-                    continue;
-                }
-
-                // Recursively process FILE commands, any failure will cause a recursive failure
-                Matcher fileMatcher = FileToken.matcher(line);
-                if (fileMatcher.matches()) {
-                    // Get the line(s) from the file(s) to queue as regular database commands
-                    // or get back a null if in the recursive call, stopOrContinue decided to continue.
-                    line = readScriptFile(fileMatcher.group(1));
-                    if (line == null) {
-                        if (m_returningToPromptAfterError) {
-                            // The recursive readScriptFile stopped because of an error.
-                            // Escape to the outermost readScriptFile caller so it can exit or
-                            // return to the interactive prompt.
-                            return null;
-                        }
-                        // Continue after a bad nested file command by processing the next line
-                        // in the current file.
-                        continue;
-                    }
-                }
-
-                query.append(line);
-                query.append("\n");
-            }
-            return query.toString().trim();
+        // found contents for FILE cmd, flush the previous lines into a batch
+        if (previousQuery.length() > 0) {
+            queryBatchList.add(new QueryInfo(previousQuery));
         }
-        catch (Exception x) {
-            stopOrContinue(x);
-            return null;
+
+        queryBatchList.addAll(fileContents);
+    }
+
+    /** Adapt BufferedReader into a SQLCommandLineReader */
+    private static class LineReaderAdapter implements SQLCommandLineReader {
+        private final BufferedReader m_reader;
+
+        LineReaderAdapter(BufferedReader reader) {
+            m_reader = reader;
         }
-        finally {
-            if (script != null) {
-                try {
-                    script.close();
-                } catch (IOException e) { }
-            }
+
+        @Override
+        public String readLine(String prompt) throws IOException {
+            return m_reader.readLine();
         }
     }
 
-    // Query Execution
-    private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
-    private static final Pattern ExplainCall = Pattern.compile("^explain ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
-    private static final Pattern ExplainProcCall = Pattern.compile("^explainProc ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-    private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
+    /**
+     * Reads a script file and produces the list of commands that need
+     * to be processed.  Note that the "script file" could be an inline
+     * batch, i.e., a "here document" that is coming from the same input stream
+     * as the "file" directive.
+     *
+     * @param fileInfo    Info on the file directive being processed
+     * @param currentLineReader  The current input stream, to be used for "here documents".
+     * @return A list of QueryInfo objects to send to the database
+     */
+    public static List<QueryInfo> readScriptFile(FileInfo fileInfo, SQLCommandLineReader currentLineReader)
+    {
+        BufferedReader bufferedReader = null;
+        List<QueryInfo> statements = null;
+
+        try {
+            SQLCommandLineReader reader = null;
+
+            if (fileInfo.getOption() != FileOption.INLINEBATCH) {
+
+                try {
+                    bufferedReader = new BufferedReader(new FileReader(fileInfo.getFile()));
+                    reader = new LineReaderAdapter(bufferedReader);
+                }
+                catch (FileNotFoundException e) {
+                    System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
+                    stopOrContinue(e);
+                    return null; // continue to the next line after the FILE command
+                }
+            }
+            else {
+                // File command is a "here document" so pass in the current
+                // input stream.
+                reader = currentLineReader;
+            }
+
+            try {
+                statements = readScriptFromReader(fileInfo, reader);
+            }
+            catch (Exception x) {
+                stopOrContinue(x);
+                return null;
+            }
+        }
+        finally {
+            if (bufferedReader != null) {
+                try {
+                    bufferedReader.close();
+                }
+                catch (IOException e) {
+                }
+            }
+        }
+
+        return statements;
+    }
+
+    /**
+     *
+     * @param fileInfo  The FileInfo object describing the file command
+     * @param script    The line reader object to read from
+     * @return          a list of QueryInfo objects from the line reader
+     * @throws Exception
+     */
+    private static List<QueryInfo> readScriptFromReader(FileInfo fileInfo, SQLCommandLineReader script)
+            throws Exception {
+
+        List<QueryInfo> queryBatchList = new ArrayList<SQLCommand.QueryInfo>();
+        StringBuilder query = new StringBuilder();
+        String line = null;
+
+        String delimiter = (fileInfo.getOption() == FileOption.INLINEBATCH) ?
+                fileInfo.getDelimiter() : null;
+
+        String prompt = m_interactive ? "batch> " : "";
+        while ((line = script.readLine(prompt)) != null) {
+
+            if (delimiter != null && line.equals(delimiter)) {
+                break;
+            }
+
+            // Strip out RECALL, EXIT and GO commands
+            //TODO: There is inconsistent handling of other "interactive mode" commands
+            // between batch commands in a file and batch commands from stdin or "--query=".
+            // The LIST commands are not covered here in particular, causing them to get
+            // piled onto the query string to mix with any statements or statement fragments
+            // currently being queued there. We COULD add them to this filter.
+            // But if INSTEAD we removed the filter completely both here and in the other input
+            // reader in "non-interactive" mode, then the user would soon learn not to
+            // put these garbage lines uselessly into their batch inputs.
+            // This would have the advantage of simplicity and would avoid possible
+            // edge case confusion when one of these "commands" like EXIT or GO happened to be
+            // a name in the user's schema that fell on a line of its own in the input and so
+            // got ignored.
+            // Maybe we should bypass these potential snafus in non-interactive mode by
+            // taking all of the user's command input more "literally".
+            // FILE is arguably the only useful one -- it could be improved by giving it a name
+            // less likely to be accidentally used in database commands like @File or #include.
+            if (SQLParser.parseRecallStatement(line, RecallableSessionLines.size() - 1) != null ||
+                    SQLParser.isExitCommand(line) ||
+                    SQLParser.isGoCommand(line)) {
+                continue;
+            }
+
+            // handle statements that are converted to regular database commands
+            line = handleTranslatedCommands(line);
+            if (line == null) {
+                // I believe this to be unreachable code:
+                //   handleTranslatedCommands will never return null.
+                //   If there was an error, SQLParser.Exception is thrown instead.
+                continue;
+            }
+
+            // Recursively process FILE commands, any failure will cause a recursive failure
+            FileInfo nestedFileInfo = SQLParser.parseFileStatement(line);
+            if (nestedFileInfo != null) {
+                // Guards must be added for FILE Batch containing batches.
+                if (fileInfo.isBatch()) {
+                    stopOrContinue(new RuntimeException("Not supported nested FILE command in a batch"));
+                    return null; // continue to the next line after the FILE command
+                }
+
+                // Get the line(s) from the file(s) to queue as regular database commands
+                // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                List<QueryInfo> contentInfo = readScriptFile(nestedFileInfo, script);
+                if (contentInfo == null || contentInfo.isEmpty()) {
+                    if (m_returningToPromptAfterError) {
+                        // The recursive readScriptFile stopped because of an error.
+                        // Escape to the outermost readScriptFile caller so it can exit or
+                        // return to the interactive prompt.
+                        return null;
+                    }
+                    // Continue after a bad nested file command by processing the next line
+                    // in the current file.
+                    continue;
+                }
+
+                updateQueryBatch(queryBatchList, query, contentInfo);
+                query = new StringBuilder();
+
+            } else {
+                // normal commands other than FILE
+                query.append(line + "\n");
+            }
+        } // end while we are reading input
+
+        if (delimiter != null && line == null) {
+            // We only print this nice message if the inline batch is being executed non-interactively.
+            // For an inline batch entered from the command line, SQLConsoleReader catches ctrl-D
+            // and exits the process before this code can execute, even if this code is in a "finally" block.
+            throw new Exception("ERROR: Failed to find delimiter \""
+                    + delimiter + "\" indicating end of inline batch.  No batched statements were executed.");
+        }
+
+        // flush the query batch
+        if (query.length() > 0) {
+            if (fileInfo.isBatch()) {
+                assert(queryBatchList.isEmpty());
+                queryBatchList.add(new QueryInfo(query, fileInfo));
+            }
+            else {
+                queryBatchList.add(new QueryInfo(query));
+            }
+        }
+
+        return queryBatchList;
+    }
 
     private static long m_startTime;
-    private static void executeQuery(String query)
+    private static void executeQuery(String statement)
     {
         try {
+            // EXEC <procedure> <params>...
             m_startTime = System.nanoTime();
-            Matcher matcher = ExecuteCall.matcher(query);
-            if (matcher.find()) {
-                query = matcher.replaceFirst("");
-                List<String> params = parseProcedureCallParameters(query);
-                String procedure = params.remove(0);
-                Map<Integer, List<String>> signature = Procedures.get(procedure);
-                if (signature == null) {
-                    throw new Exception("Undefined procedure: " + procedure);
-                }
+            SQLParser.ExecuteCallResults execCallResults = SQLParser.parseExecuteCall(statement, Procedures);
+            if (execCallResults != null) {
+                Object[] objectParams = execCallResults.getParameterObjects();
 
-                List<String> paramTypes = signature.get(params.size());
-                if (paramTypes == null || params.size() != paramTypes.size()) {
-                    String expectedSizes = "";
-                    for (Integer expectedSize : signature.keySet()) {
-                        expectedSizes += expectedSize + ", ";
-                    }
-                    throw new Exception("Invalid parameter count for procedure: " + procedure + "(expected: " + expectedSizes + " received: " + params.size() + ")");
-                }
-                Object[] objectParams = new Object[params.size()];
-                if (procedure.equals("@SnapshotDelete")) {
-                    objectParams[0] = new String[] { Unquote.matcher(params.get(0)).replaceAll("").replace("''","'") };
-                    objectParams[1] = new String[] { Unquote.matcher(params.get(1)).replaceAll("").replace("''","'") };
-                }
-                else {
-                    int i = 0;
-                    try {
-                        for (; i < params.size(); i++) {
-                            String paramType = paramTypes.get(i);
-                            String param = params.get(i);
-                            Object objParam = null;
-                            // For simplicity, handle first the types that don't allow null as a special value.
-                            if (paramType.equals("bit")) {
-                                //TODO: upper/mixed case Yes and True should be treated as "1"?
-                                //TODO: non-0 integers besides 1 should be treated as "1"?
-                                //TODO: garbage values and null should be rejected, not accepted as "0":
-                                //      (case-insensitive) "no"/"false"/"0" should be required for "0"?
-                                if (param.equals("yes") || param.equals("true") || param.equals("1")) {
-                                    objParam = (byte)1;
-                                } else {
-                                    objParam = (byte)0;
-                                }
-                            }
-                            else if (paramType.equals("statisticscomponent") ||
-                                     paramType.equals("sysinfoselector") ||
-                                     paramType.equals("metadataselector")) {
-                                objParam = preprocessParam(param);
-                            }
-                            else if ( ! "null".equalsIgnoreCase(param)) {
-                                if (paramType.equals("tinyint")) {
-                                    objParam = Byte.parseByte(param);
-                                }
-                                else if (paramType.equals("smallint")) {
-                                    objParam = Short.parseShort(param);
-                                }
-                                else if (paramType.equals("int") || paramType.equals("integer")) {
-                                    objParam = Integer.parseInt(param);
-                                }
-                                else if (paramType.equals("bigint")) {
-                                    objParam = Long.parseLong(param);
-                                }
-                                else if (paramType.equals("float")) {
-                                    objParam = Double.parseDouble(param);
-                                }
-                                else if (paramType.equals("varchar")) {
-                                    objParam = Unquote.matcher(param).replaceAll("").replace("''","'");
-                                }
-                                else if (paramType.equals("decimal")) {
-                                    objParam = new BigDecimal(param);
-                                }
-                                else if (paramType.equals("timestamp")) {
-                                    // Remove any quotes around the timestamp value.  ENG-2623
-                                    objParam = DateParser.parse(param.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));
-                                }
-                                else if (paramType.equals("varbinary") || paramType.equals("tinyint_array")) {
-                                    String val = Unquote.matcher(param).replaceAll("");
-                                    objParam = Encoder.hexDecode(val);
-                                    // Make sure we have an even number of characters, otherwise it is an invalid byte string
-                                    if (param.length() % 2 == 1) {
-                                        throw new RuntimeException("Invalid varbinary value (" + param + ") (param " + (i+1) +
-                                                ") :  must have an even number of hex characters to be valid.");
-                                    }
-                                }
-                                else {
-                                    throw new Exception("Unsupported Data Type: " + paramType);
-                                }
-                            } // else param is keyword "null", so leave objParam as null.
-                            objectParams[i] = objParam;
-                        }
-                    } catch (NumberFormatException nfe) {
-                        throw new RuntimeException("Invalid parameter:  Expected a " +
-                                friendlyTypeDescription(paramTypes.get(i)) +
-                                " value, got '" + params.get(i) + "' (param " + (i+1) + ").", nfe);
-                    }
-                }
-                if (procedure.equals("@UpdateApplicationCatalog")) {
+                if (execCallResults.procedure.equals("@UpdateApplicationCatalog")) {
                     File catfile = null;
                     if (objectParams[0] != null) {
                         catfile = new File((String)objectParams[0]);
@@ -900,7 +798,7 @@ public class SQLCommand
                     // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
                     loadStoredProcedures(Procedures, Classlist);
                 }
-                else if (procedure.equals("@UpdateClasses")) {
+                else if (execCallResults.procedure.equals("@UpdateClasses")) {
                     File jarfile = null;
                     if (objectParams[0] != null) {
                         jarfile = new File((String)objectParams[0]);
@@ -910,36 +808,42 @@ public class SQLCommand
                     loadStoredProcedures(Procedures, Classlist);
                 }
                 else {
-                    printResponse(VoltDB.callProcedure(procedure, objectParams));
+                    // @SnapshotDelete needs array parameters.
+                    if (execCallResults.procedure.equals("@SnapshotDelete")) {
+                        objectParams[0] = new String[] { (String)objectParams[0] };
+                        objectParams[1] = new String[] { (String)objectParams[1] };
+                    }
+                    printResponse(VoltDB.callProcedure(execCallResults.procedure, objectParams));
                 }
+                return;
             }
-            else if (ExplainCall.matcher(query).find()) {
+
+            String explainQuery = SQLParser.parseExplainCall(statement);
+            if (explainQuery != null) {
                 // We've got a query that starts with "explain", send the query to
-                // @Explain (after stripping "explain").
-                // This all could probably be done more elegantly via a group extracted
-                // from a more comprehensive regexp.
-                query = query.substring("explain ".length());
-                printResponse(VoltDB.callProcedure("@Explain", query));
+                // @Explain (after parseExplainCall() strips "explain").
+                printResponse(VoltDB.callProcedure("@Explain", explainQuery));
+                return;
             }
-            else if (ExplainProcCall.matcher(query).find()) {
-                // We've got a query that starts with "explainproc", send the proc name
-                // to @ExplainPlan (after stripping "explainproc").
-                // This all could probably be done more elegantly via a group extracted
-                // from a more comprehensive regexp.
-                query = query.substring("explainProc ".length());
+
+            String explainProcQuery = SQLParser.parseExplainProcCall(statement);
+            if (explainProcQuery != null) {
+                // We've got a query that starts with "explainproc", send the query to
+                // @Explain (after parseExplainCall() strips "explainproc").
                 // Clean up any extra spaces from between explainproc and the proc name.
-                query = query.trim();
-                printResponse(VoltDB.callProcedure("@ExplainProc", query));
+                explainProcQuery = explainProcQuery.trim();
+                printResponse(VoltDB.callProcedure("@ExplainProc", explainProcQuery));
+                return;
             }
-            else { // All other commands get forwarded to @AdHoc
-                // if the query was DDL, reload the stored procedures.
-                if (SQLLexer.extractDDLToken(query) != null) {
-                    printDdlResponse(VoltDB.callProcedure("@AdHoc", query));
-                    loadStoredProcedures(Procedures, Classlist);
-                }
-                else {
-                    printResponse(VoltDB.callProcedure("@AdHoc", query));
-                }
+
+            // All other commands get forwarded to @AdHoc
+            if (SQLParser.queryIsDDL(statement)) {
+                // if the query is DDL, reload the stored procedures.
+                printDdlResponse(VoltDB.callProcedure("@AdHoc", statement));
+                loadStoredProcedures(Procedures, Classlist);
+            }
+            else {
+                printResponse(VoltDB.callProcedure("@AdHoc", statement));
             }
         } catch(Exception exc) {
             stopOrContinue(exc);
@@ -965,30 +869,6 @@ public class SQLCommand
             // would require additional exception handlers in the caller(s)
             m_returningToPromptAfterError = true;
         }
-    }
-
-    private static String friendlyTypeDescription(String paramType) {
-        String friendly = FRIENDLY_TYPE_NAMES.get(paramType);
-        if (friendly != null) {
-            return friendly;
-        }
-        return paramType;
-    }
-
-    // Uppercase param.
-    // Remove any quotes.
-    // Trim
-    private static String preprocessParam(String param)
-    {
-        if ((param.charAt(0) == '\'' && param.charAt(param.length()-1) == '\'') ||
-                (param.charAt(0) == '"' && param.charAt(param.length()-1) == '"')) {
-            // The position of the closing quote, param.length()-1 is where to end the substring
-            // to get a result with two fewer characters.
-            param = param.substring(1, param.length()-1);
-        }
-        param = param.trim();
-        param = param.toUpperCase();
-        return param;
     }
 
     // Output generation
@@ -1036,7 +916,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static Map<String,Map<Integer, List<String>>> Procedures =
+    static Map<String,Map<Integer, List<String>>> Procedures =
             Collections.synchronizedMap(new HashMap<String,Map<Integer, List<String>>>());
     private static Map<String, List<Boolean>> Classlist =
         Collections.synchronizedMap(new HashMap<String, List<Boolean>>());
@@ -1093,7 +973,9 @@ public class SQLCommand
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@ApplyBinaryLogSP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varbinary", "varbinary")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
+        Procedures.put("@ApplyBinaryLogMP",
+                       ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
     }
 
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
@@ -1315,8 +1197,11 @@ public class SQLCommand
     {
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
-            lineInputReader = reader;
-            return getInteractiveQueries();
+            m_lineInputReader = reader;
+
+            List<QueryInfo> queryBatchList = getInteractiveQueries();
+            return SQLParser.parseQuery(QueryInfo.convertToString(queryBatchList));
+
         } catch (Exception ioe) {}
         return null;
     }
@@ -1363,7 +1248,7 @@ public class SQLCommand
             } else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
             } else if (arg.startsWith("--query=")) {
-                List<String> argQueries = parseQuery(arg.substring(8));
+                List<String> argQueries = SQLParser.parseQuery(arg.substring(8));
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
                         queries = argQueries;
@@ -1433,9 +1318,6 @@ public class SQLCommand
         // Phone home to see if there is a newer version of VoltDB
         openURLAsync();
 
-        // Don't ask... Java is such a crippled language!
-        DateParser.setLenient(true);
-
         // Create connection
         ClientConfig config = new ClientConfig(user, password);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
@@ -1467,27 +1349,27 @@ public class SQLCommand
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;
-            lineInputReader = new SQLConsoleReader(in, out);
+            m_lineInputReader = new SQLConsoleReader(in, out);
 
-            lineInputReader.setBellEnabled(false);
+            m_lineInputReader.setBellEnabled(false);
 
             // Maintain persistent history in ~/.sqlcmd_history.
             historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
-            lineInputReader.setHistory(historyFile);
+            m_lineInputReader.setHistory(historyFile);
 
             // Make Ctrl-D (EOF) exit if on an empty line, otherwise delete the next character.
-            KeyMap keyMap = lineInputReader.getKeys();
+            KeyMap keyMap = m_lineInputReader.getKeys();
             keyMap.bind(new Character(KeyMap.CTRL_D).toString(), new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e)
                 {
-                    CursorBuffer cursorBuffer = lineInputReader.getCursorBuffer();
+                    CursorBuffer cursorBuffer = m_lineInputReader.getCursorBuffer();
                     if (cursorBuffer.length() == 0) {
                         System.exit(m_exitCode);
                     }
                     else {
                         try {
-                            lineInputReader.delete();
+                            m_lineInputReader.delete();
                         }
                         catch (IOException e1) {}
                     }
@@ -1537,8 +1419,8 @@ public class SQLCommand
                 }
             }
             // Clean up jline2 resources.
-            if (lineInputReader != null) {
-                lineInputReader.shutdown();
+            if (m_lineInputReader != null) {
+                m_lineInputReader.shutdown();
             }
         }
         // Processing may have been continued after one or more errors.

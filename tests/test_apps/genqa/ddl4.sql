@@ -125,6 +125,6 @@ EXPORT TABLE export_skinny_partitioned_table2;
 EXPORT TABLE export_partitioned_table2;
 EXPORT TABLE export_done_table;
 
-EXPORT TABLE export_skinny_partitioned_table2_foo TARGET foo;
-EXPORT TABLE export_partitioned_table2_foo TARGET foo;
-EXPORT TABLE export_done_table_foo TARGET foo;
+EXPORT TABLE export_skinny_partitioned_table2_foo TO STREAM foo;
+EXPORT TABLE export_partitioned_table2_foo TO STREAM foo;
+EXPORT TABLE export_done_table_foo TO STREAM foo;

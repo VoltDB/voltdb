@@ -35,9 +35,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Properties;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -48,8 +52,12 @@ import javax.xml.namespace.QName;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -91,7 +99,9 @@ import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -99,7 +109,6 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
-import org.voltdb.compiler.deploymentfile.ReplicationType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -107,6 +116,7 @@ import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -114,10 +124,6 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
-import java.util.Properties;
-
-import org.voltdb.export.ExportManager;
 
 /**
  *
@@ -128,6 +134,9 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
+
+    public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
+    public static final String SIGNATURE_DELIMITER = ",";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -560,6 +569,8 @@ public abstract class CatalogUtil {
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
+
+            setDrInfo(catalog, deployment.getDr());
         }
         catch (Exception e) {
             // Anything that goes wrong anywhere in trying to handle the deployment file
@@ -670,6 +681,10 @@ public abstract class CatalogUtil {
                     return null;
                 }
                 //OLD syntax use target as type.
+                if (export.getConfiguration().isEmpty()) {
+                    // this code is for RestRoundtripTest
+                    export.getConfiguration().add(new ExportConfigurationType());
+                }
                 ExportConfigurationType exportConfig = export.getConfiguration().get(0);
                 if (export.isEnabled() != null) {
                     exportConfig.setEnabled(export.isEnabled());
@@ -681,7 +696,7 @@ public abstract class CatalogUtil {
                     exportConfig.setExportconnectorclass(export.getExportconnectorclass());
                 }
                 //Set target to default name.
-                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                exportConfig.setStream(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             }
 
             populateDefaultDeployment(deployment);
@@ -734,11 +749,6 @@ public abstract class CatalogUtil {
             if (jsonApi == null) {
                 jsonApi = new HttpdType.Jsonapi();
                 httpd.setJsonapi(jsonApi);
-            }
-            //replication
-            if (deployment.getReplication() == null) {
-                ReplicationType repl = new ReplicationType();
-                deployment.setReplication(repl);
             }
             //snapshot
             if (deployment.getSnapshot() == null) {
@@ -1086,46 +1096,46 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        List<String> targetList = new ArrayList<String>();
+        List<String> streamList = new ArrayList<String>();
         boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            // Get the target name from the xml attribute "target"
+            // Get the stream name from the xml attribute "stream"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String targetName = exportConfiguration.getTarget();
-            if (noEmptyTarget && (targetName == null || targetName.trim().isEmpty()) ) {
-                    throw new RuntimeException("target must be specified along with type in export configuration.");
+            String streamName = exportConfiguration.getStream();
+            if (noEmptyTarget && (streamName == null || streamName.trim().isEmpty()) ) {
+                    throw new RuntimeException("stream must be specified along with type in export configuration.");
             }
 
             if (connectorEnabled) {
-                if (targetList.contains(targetName)) {
-                    throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
-                            targetName + ".");
+                if (streamList.contains(streamName)) {
+                    throw new RuntimeException("Multiple connectors can not be assigned to single export stream: " +
+                            streamName + ".");
                 }
                 else {
-                    targetList.add(targetName);
+                    streamList.add(streamName);
                 }
             }
-            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
-            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
             if (catconn == null) {
                 if (connectorEnabled) {
                     if (defaultConnector) {
                         hostLog.info("Export configuration enabled and provided for the default export " +
-                                     "target in deployment file, however, no export " +
-                                     "tables are assigned to the default target. " +
-                                     "Export target will be disabled.");
+                                     "stream in deployment file, however, no export " +
+                                     "tables are assigned to the default stream. " +
+                                     "Export stream will be disabled.");
                     }
                     else {
-                        hostLog.info("Export configuration enabled and provided for export target " +
-                                     targetName +
+                        hostLog.info("Export configuration enabled and provided for export stream " +
+                                     streamName +
                                      " in deployment file however no export " +
-                                     "tables are assigned to the this target. " +
-                                     "Export target " + targetName + " will be disabled.");
+                                     "tables are assigned to the this stream. " +
+                                     "Export stream " + streamName + " will be disabled.");
                     }
                 }
                 continue;
@@ -1143,26 +1153,26 @@ public abstract class CatalogUtil {
 
             if (!connectorEnabled) {
                 if (defaultConnector) {
-                    hostLog.info("Export configuration for the default export target is present and is " +
-                            "configured to be disabled. The default export target will be disabled.");
+                    hostLog.info("Export configuration for the default export stream is present and is " +
+                            "configured to be disabled. The default export stream will be disabled.");
                 }
                 else {
-                    hostLog.info("Export configuration for export target " + targetName + " is present and is " +
-                                 "configured to be disabled. Export target " + targetName + " will be disabled.");
+                    hostLog.info("Export configuration for export stream " + streamName + " is present and is " +
+                                 "configured to be disabled. Export stream " + streamName + " will be disabled.");
                 }
             } else {
                 if (defaultConnector) {
-                    hostLog.info("Default export target is configured and enabled with type=" + exportConfiguration.getType());
+                    hostLog.info("Default export stream is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 else {
-                    hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
+                    hostLog.info("Export stream " + streamName + " is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 if (exportConfiguration.getProperty() != null) {
                     if (defaultConnector) {
-                        hostLog.info("Default export target configuration properties are: ");
+                        hostLog.info("Default export stream configuration properties are: ");
                     }
                     else {
-                        hostLog.info("Export target " + targetName + " configuration properties are: ");
+                        hostLog.info("Export stream " + streamName + " configuration properties are: ");
                     }
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
                         if (!configProp.getName().toLowerCase().contains("password")) {
@@ -1501,6 +1511,21 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
+    private static void setDrInfo(Catalog catalog, DrType dr) {
+        if (dr != null) {
+            Cluster cluster = catalog.getClusters().get("cluster");
+            ConnectionType drConnection = dr.getConnection();
+            cluster.setDrproducerenabled(dr.isListen());
+            cluster.setDrclusterid(dr.getId());
+            cluster.setDrproducerport(dr.getPort());
+            if (drConnection != null) {
+                String drSource = drConnection.getSource();
+                cluster.setDrmasterhost(drSource);
+                hostLog.info("Configured connection for DR replica role to host " + drSource);
+            }
+        }
+    }
+
     /** Read a hashed password from password.
      *  SHA-1 hash it once to match what we will get from the wire protocol
      *  and then hex encode it
@@ -1823,6 +1848,61 @@ public abstract class CatalogUtil {
         return emptyJarFile;
     }
 
+    /**
+     * Get a string signature for the table represented by the args
+     * @param name The name of the table
+     * @param schema A sorted map of the columns in the table, keyed by column index
+     * @return The table signature string.
+     */
+    public static String getSignatureForTable(String name, SortedMap<Integer, VoltType> schema) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(name).append(SIGNATURE_TABLE_NAME_SEPARATOR);
+        for (VoltType t : schema.values()) {
+            sb.append(t.getSignatureChar());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Deterministically serializes all DR table signatures into a string and calculates the CRC checksum.
+     * @param catalog    The catalog
+     * @return A pair of CRC checksum and the serialized signature string.
+     */
+    public static Pair<Long, String> calculateDrTableSignatureAndCrc(Database catalog) {
+        SortedSet<Table> tables = Sets.newTreeSet();
+        tables.addAll(getNormalTables(catalog, true));
+        tables.addAll(getNormalTables(catalog, false));
+
+        final PureJavaCrc32 crc = new PureJavaCrc32();
+        final StringBuilder sb = new StringBuilder();
+        String delimiter = "";
+        for (Table t : tables) {
+            if (t.getIsdred()) {
+                crc.update(t.getSignature().getBytes(Charsets.UTF_8));
+                sb.append(delimiter).append(t.getSignature());
+                delimiter = SIGNATURE_DELIMITER;
+            }
+        }
+
+        return Pair.of(crc.getValue(), sb.toString());
+    }
+
+    /**
+     * Deserializes a catalog DR table signature string into a map of table signatures.
+     * @param signature    The signature string that includes multiple DR table signatures
+     * @return A map of signatures from table names to table signatures.
+     */
+    public static Map<String, String> deserializeCatalogSignature(String signature) {
+        Map<String, String> tableSignatures = Maps.newHashMap();
+        for (String oneSig : signature.split(Pattern.quote(SIGNATURE_DELIMITER))) {
+            if (!oneSig.isEmpty()) {
+                final String[] parts = oneSig.split(Pattern.quote(SIGNATURE_TABLE_NAME_SEPARATOR), 2);
+                tableSignatures.put(parts[0], parts[1]);
+            }
+        }
+        return tableSignatures;
+    }
+
     public static class DeploymentCheckException extends RuntimeException {
 
         private static final long serialVersionUID = 6741313621335268608L;
@@ -1844,5 +1924,4 @@ public abstract class CatalogUtil {
         }
 
     }
-
 }

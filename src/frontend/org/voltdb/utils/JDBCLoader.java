@@ -188,9 +188,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
         String procedure = "";
 
-        @Option(desc = "maximum rows to be read from the CSV file")
-        int limitrows = Integer.MAX_VALUE;
-
         @Option(shortOpt = "r", desc = "directory path for report files")
         String reportdir = System.getProperty("user.dir");
 
@@ -461,10 +458,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
             totalRowCnt = JDBCStatementReader.m_totalRowCount.get();
 
-            if (config.limitrows == -1) {
-                out_reportfile.write("Input stopped after "
-                        + totalRowCnt + " rows read" + "\n");
-            }
+            out_reportfile.write("Input stopped after "
+                    + totalRowCnt + " rows read" + "\n");
             out_reportfile.write("Number of rows read from source: "
                     + totalRowCnt + "\n");
             out_reportfile.write("Number of rows successfully inserted: "

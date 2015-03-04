@@ -21,12 +21,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
@@ -162,6 +162,12 @@ public interface VoltDBInterface
     public void setReplicationActive(boolean active);
 
     public boolean getReplicationActive();
+
+    public NodeDRGateway getNodeDRGateway();
+
+    public ConsumerDRGateway getConsumerDRGateway();
+
+    public void onSyncSnapshotCompletion();
 
     /**
      * Set the operation mode of this server.

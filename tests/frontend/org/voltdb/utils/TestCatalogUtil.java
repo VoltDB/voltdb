@@ -25,11 +25,14 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedSet;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -42,6 +45,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TestCatalogDiffs;
 import org.voltdb.catalog.User;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -627,7 +631,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='default' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
+                + "        <configuration stream='default' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -639,7 +643,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='default' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration stream='default' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -651,7 +655,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='default' enabled='true' type='file'>"
+                + "        <configuration stream='default' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -751,12 +755,12 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='foo' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
+                + "        <configuration stream='foo' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration target='bar' enabled='true' type='file'>"
+                + "        <configuration stream='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -768,14 +772,14 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='foo' enabled='true' type='file'>"
+                + "        <configuration stream='foo' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration target='foo' enabled='true' type='kafka'>"
+                + "        <configuration stream='foo' enabled='true' type='kafka'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -789,14 +793,14 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='default' enabled='true' type='file'>"
+                + "        <configuration stream='default' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration target='default' enabled='true' type='kafka'>"
+                + "        <configuration stream='default' enabled='true' type='kafka'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -809,13 +813,13 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='file'>"
-                + "        <configuration target='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "    <export enabled='true' stream='file'>"
+                + "        <configuration stream='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration target='bar' enabled='true' type='file'>"
+                + "        <configuration stream='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -827,21 +831,21 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='foo' enabled='true' type='file'>"
+                + "        <configuration stream='foo' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration target='bar' enabled='true' type='file'>"
+                + "        <configuration stream='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration target='unused' enabled='true' type='file'>"
+                + "        <configuration stream='unused' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -855,12 +859,12 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration target='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration stream='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration target='bar' enabled='true' type='file'>"
+                + "        <configuration stream='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -871,9 +875,9 @@ public class TestCatalogUtil extends TestCase {
                 + "</deployment>";
         final String ddl =
                 "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data TARGET foo;\n"
+                + "EXPORT TABLE export_data TO STREAM foo;\n"
                 + "CREATE TABLE export_more_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_more_data TARGET bar;";
+                + "EXPORT TABLE export_more_data TO STREAM bar;";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
@@ -892,26 +896,26 @@ public class TestCatalogUtil extends TestCase {
             assertTrue(msg.contains("Custom Export failed to configure, failed to load export plugin class:"));
         }
 
-        //This is a bad deployment with the same export target defined multiple times
+        //This is a bad deployment with the same export stream defined multiple times
         final File tmpBadGrp = VoltProjectBuilder.writeStringToTempFile(withBadRepeatGroup);
         DeploymentType bad_grp_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBadGrp));
 
         Catalog cat2 = compiler.compileCatalogFromDDL(x);
         if ((msg = CatalogUtil.compileDeployment(cat2, bad_grp_deployment, false)) == null) {
-            fail("Should not accept a deployment file containing multiple connectors for the same target.");
+            fail("Should not accept a deployment file containing multiple connectors for the same stream.");
         } else {
-            assertTrue(msg.contains("Multiple connectors can not be assigned to single export target:"));
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export stream:"));
         }
 
-        //This is a bad deployment with the same default export target defined multiple times
+        //This is a bad deployment with the same default export stream defined multiple times
         final File tmpBadGrpDef = VoltProjectBuilder.writeStringToTempFile(withBadRepeatGroupDefault);
         DeploymentType bad_grp_deployment_def = CatalogUtil.getDeployment(new FileInputStream(tmpBadGrpDef));
 
         Catalog cat2Def = compiler.compileCatalogFromDDL(x);
         if ((msg = CatalogUtil.compileDeployment(cat2Def, bad_grp_deployment_def, false)) == null) {
-            fail("Should not accept a deployment file containing multiple connectors for the same target.");
+            fail("Should not accept a deployment file containing multiple connectors for the same stream.");
         } else {
-            assertTrue(msg.contains("Multiple connectors can not be assigned to single export target:"));
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export stream:"));
         }
 
         //This is a bad deployment that uses both the old and new syntax
@@ -1115,5 +1119,275 @@ public class TestCatalogUtil extends TestCase {
             }
         }
         return containsTable;
+    }
+
+    public void testDRConnection() throws Exception {
+        final String multipleConnections =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1'>"
+                + "        <connection source='master'/>"
+                + "        <connection source='imposter'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String oneConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String oneEnabledConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String drDisabled =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1' listen='false'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String clusterIdTooSmall =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='-1'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String clusterIdTooLarge =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='128'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String drEnabledNoConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='0' listen='true'>"
+                + "    </dr>"
+                + "</deployment>";
+        final String drEnabledWithEnabledConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1' listen='true'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String drEnabledWithPort =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1' listen='true' port='100'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+
+        final File tmpInvalidMultiple = VoltProjectBuilder.writeStringToTempFile(multipleConnections);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpInvalidMultiple)));
+
+        final File tmpLowClusterId = VoltProjectBuilder.writeStringToTempFile(clusterIdTooSmall);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpLowClusterId)));
+
+        final File tmpHighClusterId = VoltProjectBuilder.writeStringToTempFile(clusterIdTooLarge);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpHighClusterId)));
+
+        assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
+
+        final File tmpDefault = VoltProjectBuilder.writeStringToTempFile(oneConnection);
+        DeploymentType valid_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
+        assertNotNull(valid_deployment);
+
+        String msg = CatalogUtil.compileDeployment(catalog, valid_deployment, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+
+        final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
+        DeploymentType valid_deployment_enabled = CatalogUtil.getDeployment(new FileInputStream(tmpEnabled));
+        assertNotNull(valid_deployment_enabled);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_enabled, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+
+        final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(drDisabled);
+        DeploymentType valid_deployment_disabled = CatalogUtil.getDeployment(new FileInputStream(tmpDisabled));
+        assertNotNull(valid_deployment_disabled);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_disabled, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertFalse(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+
+        final File tmpEnabledNoConn = VoltProjectBuilder.writeStringToTempFile(drEnabledNoConnection);
+        DeploymentType valid_deployment_enabledNoConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledNoConn));
+        assertNotNull(valid_deployment_enabledNoConn);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_enabledNoConn, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
+
+        final File tmpEnabledWithConn = VoltProjectBuilder.writeStringToTempFile(drEnabledWithEnabledConnection);
+        DeploymentType valid_deployment_enabledWithConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithConn));
+        assertNotNull(valid_deployment_enabledWithConn);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_enabledWithConn, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+
+        final File tmpEnabledWithPort = VoltProjectBuilder.writeStringToTempFile(drEnabledWithPort);
+        DeploymentType valid_deployment_port = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithPort));
+        assertNotNull(valid_deployment_port);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_port, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertFalse(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerport() == 100);
+    }
+
+    public void testDRTableSignatureCrc() throws IOException
+    {
+        // No DR tables, CRC should be 0
+        assertEquals(Pair.of(0l, ""), CatalogUtil.calculateDrTableSignatureAndCrc(catalog_db));
+
+        // Replicated tables cannot be DRed for now, so they are always skipped in the catalog compilation.
+        // Add replicated tables to the test once we start supporting them.
+
+        // Different order should match
+        verifyDrTableSignature(true,
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "DR TABLE A; DR TABLE B; DR TABLE C;\n",
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "DR TABLE A; DR TABLE B; DR TABLE C;\n");
+
+        // Missing one table
+        verifyDrTableSignature(false,
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "DR TABLE A; DR TABLE B; DR TABLE C;\n",
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "DR TABLE A; DR TABLE B;\n");
+
+        // Different column type
+        verifyDrTableSignature(false,
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 FLOAT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "DR TABLE A; DR TABLE B; DR TABLE C;\n",
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "DR TABLE A; DR TABLE B; DR TABLE C;\n");
+    }
+
+    private void verifyDrTableSignature(boolean shouldEqual, String schemaA, String schemaB) throws IOException
+    {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final File fileA = VoltFile.createTempFile("catA", ".jar", new File(testDir));
+        final File fileB = VoltFile.createTempFile("catB", ".jar", new File(testDir));
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schemaA);
+        builder.compile(fileA.getPath());
+        Catalog catA = TestCatalogDiffs.catalogForJar(fileA.getPath());
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schemaB);
+        builder.compile(fileB.getPath());
+        Catalog catB = TestCatalogDiffs.catalogForJar(fileB.getPath());
+
+        fileA.delete();
+        fileB.delete();
+
+        final Pair<Long, String> sigA = CatalogUtil.calculateDrTableSignatureAndCrc(catA.getClusters().get("cluster").getDatabases().get("database"));
+        final Pair<Long, String> sigB = CatalogUtil.calculateDrTableSignatureAndCrc(catB.getClusters().get("cluster").getDatabases().get("database"));
+
+        assertFalse(sigA.getFirst() == 0);
+        assertFalse(sigA.getSecond().isEmpty());
+        assertEquals(shouldEqual, sigA.equals(sigB));
+    }
+
+    public void testDRTableSignatureDeserialization() throws IOException
+    {
+        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n");
+
+        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                                           "DR TABLE B;\n",
+                                           Pair.of("B", "bs"));
+
+        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                                           "DR TABLE A; DR TABLE B; DR TABLE C;\n",
+                                           Pair.of("A", "ip"),
+                                           Pair.of("B", "bs"),
+                                           Pair.of("C", "tv"));
+    }
+
+    @SafeVarargs
+    private final void verifyDeserializedDRTableSignature(String schema, Pair<String, String>... signatures) throws IOException
+    {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final File file = VoltFile.createTempFile("deserializeCat", ".jar", new File(testDir));
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schema);
+        builder.compile(file.getPath());
+        Catalog cat = TestCatalogDiffs.catalogForJar(file.getPath());
+
+        file.delete();
+
+        final Map<String, String> sig = CatalogUtil.deserializeCatalogSignature(CatalogUtil.calculateDrTableSignatureAndCrc(
+            cat.getClusters().get("cluster").getDatabases().get("database")).getSecond());
+
+        assertEquals(signatures.length, sig.size());
+        for (Pair<String, String> expected : signatures) {
+            assertEquals(expected.getSecond(), sig.get(expected.getFirst()));
+        }
     }
 }
