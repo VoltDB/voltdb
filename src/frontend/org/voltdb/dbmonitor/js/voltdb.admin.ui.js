@@ -1828,7 +1828,7 @@ function loadAdminPage() {
             var content = '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                             '<tbody>'+
                                 '<tr>' +
-                                    '<td>User</td>' +    
+                                    '<td width="30%">User</td>' +    
                                     '<td width="10%">' +  
                                         '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +         
                                         '<label id="errorUser" for="txtUser" class="error" style="display:none">This field is required</label>' +

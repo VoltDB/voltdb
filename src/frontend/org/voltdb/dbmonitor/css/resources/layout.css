@@ -928,6 +928,7 @@ div.userSecurity{ position: relative;height: 38px;}
 td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px;left:1px;*/}
 .customCheckbox{display:inline-block !important;}
 .loadingSecurity { left: 300px;top: 9px;}
+.editUserWrapper {width: 350px;padding: 20px; overflow: auto;}
 
 .btnSave { background-color: #aa1f2f;
 			cursor: pointer;
