@@ -49,22 +49,24 @@
 	 *
 	 * @param {Object} settings
 	 */
+    var counter = 0;
 	$.Popup = function(settings) {
 
+	    counter++; //For creating unique classes.
 	    var p = this,
 	        defaults = {
 	            // Markup
 	            backClass: 'popup_back',
 	            backOpacity: 0.7,
-	            containerClass: 'popup_cont',
+	            containerClass: 'popup_cont ' + counter,
 	            closeContent: '<div class="popup_close">&times;</div>',
-	            markup: '<div class="popup"><div class="popup_content"/></div>',
-	            contentClass: 'popup_content',
+	            markup: '<div class="popup"><div class="popup_content' + counter + '"/></div>',
+	            contentClass: 'popup_content' + counter,
 	            preloaderContent: '<p class="preloader">Loading</p>',
 	            activeClass: 'popup_active',
 	            hideFlash: false,
 	            speed: 200,
-	            popupPlaceholderClass: 'popup_placeholder',
+	            popupPlaceholderClass: 'popup_placeholder' + counter,
 	            keepInlineChanges: true,
 
 	            // Content
@@ -395,7 +397,7 @@
 				}
 
 			}
-
+		    
 			// If we're not open already
 			if( $back === undefined ) {
 				// Create back and fade in
@@ -672,7 +674,6 @@
 		 * @return {Object}
 		 */
 		p.close = function(){
-
 			p.o.beforeClose.call(p);
 
 			// If we got some inline content, cache it
@@ -737,7 +738,8 @@
 			var $popupPlaceholder = $('.'+p.o.popupPlaceholderClass);
 
 			// If we got inline content
-			// put it back
+		    // put it back
+		    
 			if(
 				type == 'inline' &&
 				$popupPlaceholder.length
