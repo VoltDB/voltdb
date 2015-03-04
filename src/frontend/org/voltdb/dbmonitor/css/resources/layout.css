@@ -651,7 +651,7 @@ display:block;
  margin:0; padding:0; float:left; font:16px/10px Arial, Helvetica, sans-serif; height:42px;
 }
 #nav ul li a {
-  display:block; margin:0; padding:28px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px; text-decoration: none;
+  display:block; margin:0; padding:28px 15px 0 15px; color:#000000; border-right:1px solid #CCCCCC; height:42px; text-decoration: none;
 }
 #nav ul li a:hover {background:#AA1F2F; color:#FFFFFF;}
 #nav ul li a.active { background:#76bd1d;color:#FFFFFF;}
@@ -928,6 +928,7 @@ div.userSecurity{ position: relative;height: 38px;}
 td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px;left:1px;*/}
 .customCheckbox{display:inline-block !important;}
 .loadingSecurity { left: 300px;top: 9px;}
+.editUserWrapper {width: 350px;padding: 20px; overflow: auto;}
 
 .btnSave { background-color: #aa1f2f;
 			cursor: pointer;
@@ -1274,6 +1275,10 @@ top: 3px;}
 		
 		 
  }
+
+@media (width: 768px) {
+	 #nav { left:180px;}
+	  }
 @media (max-width: 980px) { 
  
  .objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}

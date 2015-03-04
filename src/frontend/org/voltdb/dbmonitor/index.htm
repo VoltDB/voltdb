@@ -1375,14 +1375,14 @@
             
             <div class="overlay-title icon-alert">
                 <div id="addUserHeader" class="addConfigHeader">Add User</div>
-                <div id="deleteUser" class="deleteAddConfig"><a id="deleteSecUser" href="javascript:void(0);">Delete this User</a></div>
+                <div id="deleteUser" class="deleteAddConfig"><a id="deleteSecUser" href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this User</a></div>
                 <div class="clear"></div>
             </div>
 
             <div id="addUserControl">
                 <div class="clear"></div>
                 <form id="frmAddUser" method="get" action="" novalidate style="overflow:auto;">
-                    <div id="addUserWrapper" class="configWrapper">
+                    <div id="addUserWrapper" class="editUserWrapper">
                         
                     </div>
                 </form>
@@ -1392,7 +1392,7 @@
 
             <div id="saveUserControl" style="display: none;">
                 <div class="overlay-content ">
-                    <div class="confirmationInfo">Are you sure you want to save?</div>
+                    <div class="confirmationInfo">Are you sure you want to <span id="userSaveDelete" data-status=""></span>?</div>
                 </div>
                 <div class="overlay-btns"><a id="btnSaveSecUser" class="btn closeBtn">Yes</a> <a id="btnCancelSaveSecUser" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
