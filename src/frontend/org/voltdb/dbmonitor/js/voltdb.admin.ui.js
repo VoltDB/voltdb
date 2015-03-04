@@ -1962,6 +1962,7 @@ function loadAdminPage() {
                     toggleSecurityEdit(editStates.ShowLoading);
                     voltDbRenderer.UpdateUserConfiguration(null, function (result) {
                         if (result.status == "1") {
+                            toggleSecurityEdit(editStates.ShowEdit);
                             //Reload Admin configurations for displaying the updated value
                             voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
                                 //TODO: Hide loading image
