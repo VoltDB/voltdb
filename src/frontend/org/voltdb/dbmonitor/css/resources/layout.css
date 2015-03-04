@@ -1275,6 +1275,10 @@ top: 3px;}
 		
 		 
  }
+
+@media (width: 768px) {
+	 #nav { left:180px;}
+	  }
 @media (max-width: 980px) { 
  
  .objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
