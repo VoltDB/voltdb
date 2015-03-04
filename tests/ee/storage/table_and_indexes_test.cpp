@@ -595,7 +595,8 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     temp_tuple.setNValue(17, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
     temp_tuple.setNValue(18, ValueFactory::getIntegerValue(static_cast<int32_t>(0)));
     temp_tuple.setNValue(19, ValueFactory::getIntegerValue(static_cast<int32_t>(15)));
-    temp_tuple.setNValue(20, ValueFactory::getStringValue("Some histories are longer than others; long long long long long"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("Some histories are longer than others; long long long long long"));
+    temp_tuple.setNValue(20, cachedStringValues.back());
 
     /*
      * Test that insert propagates
@@ -632,7 +633,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     ASSERT_TRUE(iterator.hasNext());
     TableTuple nextTuple(customerTableReplica->schema());
     iterator.next(nextTuple);
-    EXPECT_EQ(nextTuple.getNValue(13).compare(cachedStringValues.back()), 0);
+    EXPECT_EQ(nextTuple.getNValue(20).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
     engine->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
