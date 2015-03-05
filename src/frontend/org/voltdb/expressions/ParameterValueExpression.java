@@ -183,12 +183,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
-
-        // Typically BIGINT or DECIMAL as the exact number constants.
-        VoltType fallbackType = VoltType.DECIMAL;
+        // BigInt or Float, Decimal is not selected here because of its range is smaller
+        VoltType fallbackType = VoltType.FLOAT;
         if (m_originalValue != null) {
             m_originalValue.refineOperandType(VoltType.BIGINT);
-            fallbackType = m_originalValue.getValueType();
+            fallbackType = m_originalValue.getValueType(); // Typically BIGINT or FLOAT.
         }
         m_valueType = fallbackType;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();

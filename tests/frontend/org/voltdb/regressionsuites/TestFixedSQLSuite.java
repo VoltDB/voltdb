@@ -2101,19 +2101,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(13, vt.getColumnCount());
     }
 
-    private void runQueryTestUtil(Client client, String sql, boolean isGetDouble, double value) throws Exception {
+    private void runQueryGetDecimal(Client client, String sql, double value) throws Exception {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTrue(vt.advanceRow());
-        double delta = 0.0001;
-        if (isGetDouble) {
-            assertEquals(value, vt.getDouble(0), delta);
-        } else {
-            assertEquals(value, vt.getDecimalAsBigDecimal(0).doubleValue(), delta);
-        }
+        assertEquals(value, vt.getDecimalAsBigDecimal(0).doubleValue(), 0.0001);
     }
 
-    private void runQueryTestUtil(Client client, String sql, double value) throws Exception {
-        runQueryTestUtil(client, sql, false, value);
+    private void runQueryGetDouble(Client client, String sql, double value) throws Exception {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(value, vt.getDouble(0), 0.0001);
     }
 
     public void testENG7480() throws Exception {
@@ -2125,60 +2122,66 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // query constants interpreted as DECIMAL
 
         //
-        // operation between decimal and integer
-        //
-        sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
-        runQueryTestUtil(client, sql, 3.0);
-
-        sql = "SELECT 0.1 + (1-0.1) - NUM FROM R1";
-        runQueryTestUtil(client, sql, -1.0);
-
-        sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
-        runQueryTestUtil(client, sql, 0.55);
-
-        sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
-        runQueryTestUtil(client, sql, 1.9);
-
-        // reverse order
-        sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, 3.0);
-
-        sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, 1.2);
-
-        sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, 2.322222222222);
-
-        sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, 1.9);
-
-        //
         // operation between float and decimal
         //
         sql = "SELECT 0.1 + (1-0.1) + ratio FROM R1";
-        runQueryTestUtil(client, sql, true, 3.2);
+        runQueryGetDouble(client, sql, 3.2);
 
         sql = "SELECT 0.1 + (1-0.1) - ratio FROM R1";
-        runQueryTestUtil(client, sql, true, -1.2);
+        runQueryGetDouble(client, sql, -1.2);
 
         sql = "SELECT 0.1 + (1-0.1) / ratio FROM R1";
-        runQueryTestUtil(client, sql, true, 0.509090909091);
+        runQueryGetDouble(client, sql, 0.509090909091);
 
         sql = "SELECT 0.1 + (1-0.1) * ratio FROM R1";
-        runQueryTestUtil(client, sql, true, 2.08);
+        runQueryGetDouble(client, sql, 2.08);
 
         // reverse order
         sql = "SELECT 0.1 + ratio + (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, true, 3.2);
+        runQueryGetDouble(client, sql, 3.2);
 
         sql = "SELECT 0.1 + ratio - (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, true, 1.4);
+        runQueryGetDouble(client, sql, 1.4);
 
         sql = "SELECT 0.1 + ratio / (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, true, 2.544444444444);
+        runQueryGetDouble(client, sql, 2.544444444444);
 
         sql = "SELECT 0.1 + ratio * (1-0.1) FROM R1";
-        runQueryTestUtil(client, sql, true, 2.08);
+        runQueryGetDouble(client, sql, 2.08);
+
+
+        //
+        // operation between decimal and integer
+        //
+        if (isHSQL()) {
+            // not compatible with Hsql
+            return;
+        }
+
+        sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
+        runQueryGetDecimal(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + (1-0.1) - NUM FROM R1";
+        runQueryGetDecimal(client, sql, -1.0);
+
+        sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
+        runQueryGetDouble(client, sql, 0.55);
+
+        sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
+        runQueryGetDouble(client, sql, 1.9);
+
+        // reverse order
+        sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.2);
+
+        sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.322222222222);
+
+        sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.9);
     }
 
     //

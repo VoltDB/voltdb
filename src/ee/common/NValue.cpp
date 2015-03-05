@@ -211,7 +211,8 @@ std::string NValue::createStringFromDecimal() const {
 }
 
 /**
- *   set a decimal value from a serialized representation
+ *   Set a decimal value from a serialized representation
+ *   This function does not handle scientific notation string, Java planner should convert that to plan string first.
  */
 void NValue::createDecimalFromString(const std::string &txt) {
     if (txt.length() == 0) {

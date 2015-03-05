@@ -382,7 +382,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             try {
                 Long.parseLong(getValue());
             } catch (NumberFormatException e) {
-                columnType = VoltType.DECIMAL;
+                // DECIMAL is not OK, because the value may be bigger/smaller than our decimal range.
+                columnType = VoltType.FLOAT;
             }
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
@@ -397,6 +398,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (m_valueType != VoltType.NUMERIC) {
             return;
         }
+        // By default, constants should be treated as DECIMAL other than FLOAT to preserve the precision
+        // However, the range of DECIMAL of our implementation is small
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
