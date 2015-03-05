@@ -71,11 +71,11 @@ public class CatalogDiffEngine {
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
 
-    private SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
+    private final SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
 
     //Track new tables to help determine which export table is new or
     //modified
-    private SortedSet<String> m_newTablesForExport = new TreeSet<>();
+    private final SortedSet<String> m_newTablesForExport = new TreeSet<>();
 
     //A very rough guess at whether only deployment changes are in the catalog update
     //Can be improved as more deployment things are going to be allowed to conflict
