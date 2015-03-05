@@ -1911,10 +1911,8 @@ public class VoltCompiler {
             if (m_reportPath != null) {
                 outputStream.println("------------------------------------------\n");
                 outputStream.println(String.format(
-                        "Full catalog report can be found at file://%s\n"
-                        + "\tor can be viewed at \"http://localhost:%d\" "
-                        + "when the server is running.\n",
-                        m_reportPath, VoltDB.DEFAULT_HTTP_PORT));
+                        "Full catalog report can be found at file://%s.\n",
+                        m_reportPath));
             }
             outputStream.println("------------------------------------------\n");
         }

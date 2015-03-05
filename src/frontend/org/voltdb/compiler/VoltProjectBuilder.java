@@ -230,8 +230,8 @@ public class VoltProjectBuilder {
     // negative one means disabled in the deployment file.
     // a null HTTP port or json flag indicates that the corresponding element should
     // be omitted from the deployment XML.
-    Integer m_httpdPortNo = -1;
-    Boolean m_jsonApiEnabled = true;
+    int m_httpdPortNo = -1;
+    boolean m_jsonApiEnabled = true;
 
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
     PrintStream m_compilerDebugPrintStream = null;
@@ -517,19 +517,11 @@ public class VoltProjectBuilder {
         transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
     }
 
-    /**
-     * Specify the HTTP port # or null to omit the XML element.
-     * @param port  port # or null to omit
-     */
-    public void setHTTPDPort(Integer port) {
+    public void setHTTPDPort(int port) {
         m_httpdPortNo = port;
     }
 
-    /**
-     * Specify whether or not the JSON API is enabled or null to omit the XML element.
-     * @param enabled   true to enable, false to disable, or null to omit
-     */
-    public void setJSONAPIEnabled(final Boolean enabled) {
+    public void setJSONAPIEnabled(final boolean enabled) {
         m_jsonApiEnabled = enabled;
     }
 
@@ -1022,16 +1014,12 @@ public class VoltProjectBuilder {
         // <httpd>. Disabled unless port # is configured by a testcase
         // Omit element(s) when null.
         HttpdType httpd = factory.createHttpdType();
-        if (m_httpdPortNo != null) {
-            deployment.setHttpd(httpd);
-            httpd.setEnabled(m_httpdPortNo != -1);
-            httpd.setPort(m_httpdPortNo);
-            if (m_jsonApiEnabled != null) {
-                Jsonapi json = factory.createHttpdTypeJsonapi();
-                httpd.setJsonapi(json);
-                json.setEnabled(m_jsonApiEnabled);
-            }
-        }
+        deployment.setHttpd(httpd);
+        httpd.setEnabled(m_httpdPortNo != -1);
+        httpd.setPort(m_httpdPortNo);
+        Jsonapi json = factory.createHttpdTypeJsonapi();
+        httpd.setJsonapi(json);
+        json.setEnabled(m_jsonApiEnabled);
 
         // <export>
         ExportType export = factory.createExportType();

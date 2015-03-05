@@ -741,7 +741,7 @@ public abstract class CatalogUtil {
             if (httpd == null) {
                 httpd = new HttpdType();
                 // Find next available port starting with the default
-                httpd.setPort(VoltDB.PORT_AUTO);
+                httpd.setPort(Constants.HTTP_PORT_AUTO);
                 deployment.setHttpd(httpd);
             }
             //jsonApi
