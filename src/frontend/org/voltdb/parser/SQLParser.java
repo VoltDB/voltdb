@@ -316,15 +316,16 @@ public class SQLParser extends SQLPatternFactory
 
     //========== Patterns from SQLCommand ==========
 
+    private static final Pattern OneWhitespace = Pattern.compile("\\s");
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile(
-            "^\\s*" +       // ignore whitespace indent prior to comment
-            "(\\/\\/|--)" + // (group 1 -- not used?) '--' or even C++-style '//' comment starter
-            ".*$",          // commented out text continues to end of line
+            "^\\s*" +         // optional whitespace indent prior to comment
+            "(?:\\/\\/|--)" + //  '--' or even C++-style '//' comment starter
+            ".*$",            // commented out text continues to end of line
             Pattern.MULTILINE);
     private static final Pattern MidlineComments = Pattern.compile(
-            "(\\/\\/|--)" + //  (group 1 -- not used?) '--' or even C++-style '//' comment starter
-            ".*$",          // commented out text continues to end of line
+            "(?:\\/\\/|--)" + // '--' or even C++-style '//' comment starter
+            ".*$",            // commented out text continues to end of line
             Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
@@ -375,36 +376,18 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern ShowToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
             "(?:list|show)" + // keyword alternatives, synonymous so don't bother capturing
-            "\\s+" +          // one or more spaces
-            "(proc|procedure|tables|classes)" + // subcommand (group 1) over-specified, see ***Note***
-            "\\s*" + // optional whitespace before semicolon
-            // long-term, move + outside '[]'s for "([a-z]+)" +
-            //FIXME: strangely allowing more than one strictly adjacent semicolon.
-            ";*" +            // optional semicolons
-            "\\s*$",          // optional terminating whitespace
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that list/show
+            // command diagnostics can "own" any line starting with the word
+            // list or show.
+            "\\s*" +          // extra spaces
+            "([^;\\s]*)" +    // non-space non-semicolon subcommand (group 2)
+            "\\s*" +          // spaces
+            "([^;\\s]*)" +    // non-space non-semicolon garbage word (group 3)
+            "[;\\s]*" +       // trailing spaces and semicolons
+            "(.*)" +          // trailing garbage (group 4)
+            "$",
             Pattern.CASE_INSENSITIVE);
-    // ***Note***
-    // TODO: It would be better to be very forgiving initially about subcommands as in:
-    // "([a-z]*)" + // alphabetic subcommand (group 1)
-    // or even
-    // "([^;\\s]*)" + // non-space non-semicolon subcommand (group 1)
-    // That would allow list/show command processing to be "locked in" here even if the
-    // subcommand was later found to be garbage -- or missing or followed by garbage.
-    // A custom error message could usefully explain the correct list/show command options.
-    // For now, with a strict match for only valid list/show subcommands, invalid or
-    // missing subcommands or directives with extra garbage sharacters fail
-    // through to the generic @AdHoc sql statement processor which unhelpfully
-    // claims that show or list is some kind of syntax error.
-    // The reason NOT to fix this right away is that sqlcmd has a bug so that it
-    // tries to parse things like list and show commands on each new line of input
-    // EVEN when it is processing the middle of a multi-line sql statement. So, it could
-    // legitimately encounter the line "list integer" (in the middle of a create
-    // table statement) and must correctly pass it on to @AdHoc.
-    // It should NOT treat this case as an invalid list subcommand.
-    // Once that bug is fixed, we can shift to very general subcommand and
-    // end-of-directive matching here and for other directives.
-    // For now (as before) look for only the specific valid subcommands and let @AdHoc
-    // give its misleading error messages for any invalid usage.
     private static final Pattern SemicolonToken = Pattern.compile(
             "^.*" +           // match anything
             //FIXME: simplify -- a prior .* starves out this next optional pattern
@@ -414,21 +397,17 @@ public class SQLParser extends SQLPatternFactory
             Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile(
             "^\\s*" +      // optional indent at start of line
-            "recall\\s+" + // required RECALL command token, whitespace terminated
-            //TODO: For now, at least until the directive processor is fixed,
-            // avoid false positives on uses of "recall" as a schema name by
-            // completely failing to recognize a recall directive that does
-            // not have its expected integer argument.
-            // When the directive processing is fixed,
-            // this pattern match can be generalized to something like
-            // "([^;]+)" +    // required non-whitespace non-semicolon parameter (group 1)
-            // leaving it to ParseRecallResults to produce a more precise
-            // error message than the @AdHoc fallback could give.
-            "([0-9]+)" +   // required integer parameter (group 1)
-            "\\s*" +       // optional whitespace
-            //FIXME: strangely allowing more than one strictly adjacent semicolon.
-            ";*" +         // optional semicolons
-            "\\s*$",       // optional terminating whitespace
+            "recall" +     // required RECALL command token
+            "(\\W|$)" +    // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that recall command
+            // diagnostics can "own" any line starting with the word recall.
+            "\\s*" +          // extra spaces
+            "([^;\\s]*)" +    // non-space non-semicolon "line number" (group 2)
+            "\\s*" +          // spaces
+            "([^;\\s]*)" +    // non-space non-semicolon garbage word (group 3)
+            "[;\\s]*" +       // trailing spaces and semicolons
+            "(.*)" +          // trailing garbage (group 4)
+            "$",
             Pattern.CASE_INSENSITIVE);
 
     // SQLCommand's FILE command.  If this pattern matches, we
@@ -967,43 +946,69 @@ public class SQLParser extends SQLPatternFactory
      */
     public static class ParseRecallResults
     {
-        // These are declared public because trying to declare them as private
-        // and force use of public accessors gets a mysterious NoSuchMethodError.
-        public final int line;
-        public final String error;
+        private final int line;
+        private final String error;
 
-        ParseRecallResults(int line, String error)
+        ParseRecallResults(int line)
         {
             this.line = line;
+            this.error = null;
+        }
+
+        ParseRecallResults(String error)
+        {
+            this.line = -1;
             this.error = error;
         }
+
         // Attempts to use these methods gets a mysterious NoSuchMethodError,
         // so keep them disabled and keep the attributes public for now.
-        // public int getLine() { return line; }
-        // public String getError() { return error; }
+        public int getLine() { return line; }
+        public String getError() { return error; }
     }
 
     /**
      * Parse RECALL statement for sqlcmd.
      * @param statement  statement to parse
-     * @param lineMax    maximum line # (0-n)
+     * @param lineMax    maximum line # + 1
      * @return           results object or NULL if statement wasn't recognized
      */
     public static ParseRecallResults parseRecallStatement(String statement, int lineMax)
     {
         Matcher matcher = RecallToken.matcher(statement);
         if (matcher.matches()) {
-            try {
-                int line = Integer.parseInt(matcher.group(1)) - 1;
-                if (line < 0 || line > lineMax) {
-                    throw new NumberFormatException();
+            String commandWordTerminator = matcher.group(1);
+            String lineNumberText = matcher.group(2);
+            String error;
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                String trailings = matcher.group(3) + ";" + matcher.group(4);
+                // In a valid command, both "trailings" groups should be empty.
+                if (trailings.equals(";")) {
+                    try {
+                        int line = Integer.parseInt(lineNumberText) - 1;
+                        if (line < 0 || line > lineMax) {
+                            throw new NumberFormatException();
+                        }
+                        // Return the recall line number.
+                        return new ParseRecallResults(line);
+                    }
+                    catch (NumberFormatException e) {
+                        error = "Invalid RECALL line number argument: '" + lineNumberText + "'";
+                    }
                 }
-                return new ParseRecallResults(line, null);
+                // For an invalid form of the command,
+                // return an approximation of the garbage input.
+                else {
+                    error = "Invalid RECALL line number argument: '" +
+                            lineNumberText + " " + trailings + "'";
+                }
             }
-            catch(NumberFormatException e)
-            {
-                return new ParseRecallResults(-1, String.format("Invalid RECALL reference: '%s'", matcher.group(1)));
+            else if (commandWordTerminator.equals("") || commandWordTerminator.equals(";")) {
+                error = "Incomplete RECALL command. RECALL expects a line number argument.";
+            } else {
+                error = "Invalid RECALL command: a space and line number are required after 'recall'";
             }
+            return new ParseRecallResults(error);
         }
         return null;
     }
@@ -1043,6 +1048,10 @@ public class SQLParser extends SQLPatternFactory
                 break;
             }
         }
+
+        /** @return a dummy FileInfo instance to describe System.in **/
+        public static FileInfo forSystemIn()
+        { return new FileInfo(FileOption.PLAIN, "Standard Input"); }
 
         public File getFile() {
             return m_file;
@@ -1144,7 +1153,21 @@ public class SQLParser extends SQLPatternFactory
     {
         Matcher matcher = ShowToken.matcher(statement);
         if (matcher.matches()) {
-            return matcher.group(1);
+            String commandWordTerminator = matcher.group(1);
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                String trailings = matcher.group(3) + ";" + matcher.group(4);
+                // In a valid command, both "trailings" groups should be empty.
+                if (trailings.equals(";")) {
+                    // Return the subcommand keyword -- possibly a valid one.
+                    return matcher.group(2);
+                }
+                // For an invalid form of the command,
+                // return an approximation of the garbage input.
+                return matcher.group(2) + " " + trailings;
+            }
+            if (commandWordTerminator.equals("") || commandWordTerminator.equals(";")) {
+                return commandWordTerminator; // EOL or ; reached before subcommand
+            }
         }
         return null;
     }
@@ -1450,6 +1473,10 @@ public class SQLParser extends SQLPatternFactory
 
         // None of the above - return the untranslated input command.
         return statement;
+    }
+
+    public static boolean parseWholeLineComment(String line) {
+        return SingleLineComments.matcher(line).matches();
     }
 
     /**

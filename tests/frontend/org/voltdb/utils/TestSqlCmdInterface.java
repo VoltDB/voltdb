@@ -47,7 +47,6 @@ import org.junit.Test;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileInfo;
-import org.voltdb.utils.SQLCommand.QueryInfo;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -273,21 +272,23 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 1, ID);
     }
 
-    // to get queries from a local file, which contains some line comments
-    // starting with '--', and possibly block comments '/* ... *\/'
     @Test
     public void testParseQuery21() throws FileNotFoundException {
         ID = 21;
 
-        String fileCmd = "file ./tests/frontend/org/voltdb/utils/localQry.txt";
+        SQLCommand.testFrontEndOnly();
+        final String fileName = "./tests/frontend/org/voltdb/utils/localQry.txt";
+        String fileCmd = "file " + fileName;
         final FileInfo fileInfo = SQLParser.parseFileStatement(fileCmd);
         final File sqlFile = fileInfo.getFile();
-        List<QueryInfo> queryBatchInfo = SQLCommand.readScriptFile(fileInfo, null);
-        String raw = QueryInfo.convertToString(queryBatchInfo);
+        assertTrue(sqlFile.exists());
+        File matchFile = new File(fileName);
+        assertEquals("Expected equal file objects", matchFile, sqlFile);
+        SQLCommand.executeScriptFile(fileInfo, null);
+        String raw = SQLCommand.getTestResult();
 
         int numOfQueries = -1;
         String qryFrmFile = "";
-        assert(sqlFile.exists());
         String contents = null;
         try {
             Scanner scanner = new Scanner(sqlFile);
@@ -315,7 +316,10 @@ public class TestSqlCmdInterface
             System.err.println(ex.getDescription());
             System.exit(1);
         }
-        // Prepare a Scanner that will "scan" the document
+        // Simplify the script file content to simulate what the SQLCommand
+        // frontend will do to it.  This algorithm MAY not be 100% reliable
+        // on all input scripts -- input scripts checked in this way may have
+        // have to comply with certain formatting conventions.
         Scanner opnScanner = new Scanner(sqlFile);
         // Read each line in the file
         while(opnScanner.hasNext()) {
@@ -324,7 +328,7 @@ public class TestSqlCmdInterface
             // Note that currently, we only filter out the comments lines with
             // leading '--'. For instance:
             // 1) --this commenting line will be filtered out
-            if (line.matches("-{2,}.*")) {
+            if (line.matches("--.*")) {
                 // The value of numOfQueries hides in a special structured comment
                 if (line.matches("^--num=\\d+$")) {
                     numOfQueries = Integer.parseInt(line.replaceAll("\\D+", ""));
@@ -520,7 +524,7 @@ public class TestSqlCmdInterface
         List<String> parsed = SQLParser.parseQuery(qryStr);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + numOfQry + "\n";
-        err1 += "Actual # of queries: " + parsed.size() + "\n";
+        err1 += "Actual # of queries: " + parsed.size() + blockCommentCount + "\n";
         assertEquals(msg+err1, numOfQry + blockCommentCount, parsed.size());
         String parsedString = Joiner.on(" ").join(parsed);
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
