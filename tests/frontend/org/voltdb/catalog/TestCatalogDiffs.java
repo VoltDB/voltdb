@@ -24,6 +24,7 @@
 package org.voltdb.catalog;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
 import junit.framework.TestCase;
@@ -35,6 +36,7 @@ import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -1147,6 +1149,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testEnableDROnEmptyTable() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
@@ -1161,6 +1165,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testDisableDROnTable() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
@@ -1173,5 +1179,110 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
         verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testConnectorPropertiesChanges() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final String ddl =
+                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
+              + "EXPORT TABLE export_data;";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(ddl);
+
+        final String origXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">exportdata</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "propexport1.jar");
+        Catalog origCat = catalogForJar(testDir + File.separator + "propexport1.jar");
+        final File origFile = VoltProjectBuilder.writeStringToTempFile(origXml);
+        DeploymentType origDepl = CatalogUtil.getDeployment(new FileInputStream(origFile));
+
+        String msg = CatalogUtil.compileDeployment(origCat, origDepl, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        final String newPropXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">exportdata</property>"
+                + "            <property name=\"iamnew\">see_me_roar</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "propexport2.jar");
+        Catalog newPropCat = catalogForJar(testDir + File.separator + "propexport2.jar");
+        final File newPropFile = VoltProjectBuilder.writeStringToTempFile(newPropXml);
+        DeploymentType newPropDepl = CatalogUtil.getDeployment(new FileInputStream(newPropFile));
+
+        msg = CatalogUtil.compileDeployment(newPropCat, newPropDepl, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        final String modPropXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "            <property name=\"type\">TSV</property>"
+                + "            <property name=\"with-schema\">true</property>"
+                + "            <property name=\"nonce\">pre-fix-other</property>"
+                + "            <property name=\"outdir\">exportdatadata</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "propexport3.jar");
+        Catalog modPropCat = catalogForJar(testDir + File.separator + "propexport3.jar");
+        final File modPropFile = VoltProjectBuilder.writeStringToTempFile(modPropXml);
+        DeploymentType modPropDepl = CatalogUtil.getDeployment(new FileInputStream(modPropFile));
+
+        msg = CatalogUtil.compileDeployment(modPropCat, modPropDepl, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        final String modTypeXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='false' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "propexport4.jar");
+        Catalog modTypeCat = catalogForJar(testDir + File.separator + "propexport4.jar");
+        final File modTypeFile = VoltProjectBuilder.writeStringToTempFile(modTypeXml);
+        DeploymentType modTypeDepl = CatalogUtil.getDeployment(new FileInputStream(modTypeFile));
+
+        msg = CatalogUtil.compileDeployment(modTypeCat, modTypeDepl, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        verifyDiff(origCat, newPropCat); // test add
+        verifyDiff(newPropCat, origCat); // test delete
+        verifyDiff(origCat, modPropCat); // test modification
+        verifyDiff(modPropCat, modTypeCat); // test modification
     }
 }

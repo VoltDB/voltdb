@@ -17,7 +17,10 @@
 
 package org.voltdb.parser;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -111,6 +114,8 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_PARTITION_PROCEDURE");
 
     //TODO: Convert to pattern factory usage below this point.
+    //TODO: Consider implementing FIXME/TODO comments -- and TESTING --
+    // prior to conversion to pattern factory.
 
     /*
      * CREATE PROCEDURE [ <MODIFIER_CLAUSE> ... ] FROM <JAVA_CLASS>
@@ -249,25 +254,16 @@ public class SQLParser extends SQLPatternFactory
             );
 
     /**
-     * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * REPLICATE -- token
-     * \\s+ -- one or more spaces
-     * TABLE -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$.]+) -- [table name capture group 1]
-     *    [\\w$]+ -- one or more identifier character (letters, numbers, dollar sign ($) or underscore (_))
-     * \\s* -- 0 or more spaces
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
+     * NB supports only unquoted table names
+     * Captures 1 group, the table name.
      */
     private static final Pattern PAT_REPLICATE_TABLE = Pattern.compile(
-            "(?i)\\AREPLICATE\\s+TABLE\\s+([\\w$]+)\\s*;\\z"
+            "(?i)" +                    // ignore case instruction
+            "\\A" +                     // beginning of statement
+            "REPLICATE\\s+TABLE\\s+" +  // REPLICATE TABLE tokens with whitespace terminators
+            "([\\w$]+)" +               // (group 1) table name
+            "\\s*" +                    // optional whitespace
+            ";\\z"                      // semicolon at end of statement
             );
 
     /**
@@ -279,48 +275,35 @@ public class SQLParser extends SQLPatternFactory
             "(?i)" +                            // (ignore case)
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
-            "([\\w.$]+)" +                      // (1) <table name>
-            "(?:\\s+TO\\s+STREAM\\s+" +         // begin optional TO STREAM clause
-            "([\\w.$]+)" +                      // (2) <export target>
-            ")?" +                              // end optional STREAM clause
+            "([\\w.$]+)" +                      // (group 1) <table name>
+            "(?:\\s+TO\\s+STREAM\\s+" +         // begin optional TO STREAM <export target> clause
+            "([\\w.$]+)" +                      // (group 2) <export target>
+            ")?" +                              // end optional TO STREAM <export target> clause
             "\\s*;\\z"                          // (end statement)
             );
     /**
-     * Regex Description:
-     *
-     *  if the statement starts with either create procedure, partition,
-     *  replicate, or role the first match group is set to respectively procedure,
-     *  partition, replicate, or role.
-     * <pre>
-     * (?i) -- ignore case
-     * ((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE\\AEXPORT) -- voltdb ddl
-     *    [capture group 1]
-     *      (?<=\\ACREATE\\s{1,1024})(?:PROCEDURE|ROLE) -- create procedure or role ddl
-     *          (?<=\\ACREATE\\s{0,1024}) -- CREATE zero-width positive lookbehind
-     *              \\A -- beginning of statement
-     *              CREATE -- token
-     *              \\s{1,1024} -- one or up to 1024 spaces
-     *              (?:PROCEDURE|ROLE) -- procedure or role token
-     *      | -- or
-     *      \\A -- beginning of statement
-     *      -- PARTITION token
-     *      | -- or
-     *      \\A -- beginning of statement
-     *      REPLICATE -- token
-     *      | -- or
-     *      \\A -- beginning of statement
-     *      EXPORT -- token
-     *      | -- or
-     *      \\A -- beginning of statement
-     *      DR -- token
-     * \\s -- one space
-     * </pre>
+     *  If the statement starts with either create procedure, create role, drop, partition,
+     *  replicate, export, import, or dr, the first match group is set to respectively procedure,
+     *  role, drop, partition, replicate, export, or import, or dr.
      */
     private static final Pattern PAT_ALL_VOLTDB_STATEMENT_PREAMBLES = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})" +
-            "(?:PROCEDURE|ROLE)|" +
-            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT|\\ADR)\\s"
-            );
+            "(?i)" +                               // ignore case instruction
+            //TODO: why not factor \\A out of the group -- it's common to all options
+            "(" +                                  // start (group 1)
+            // <= means zero-width positive lookbehind.
+            // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
+            "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
+            "(?:PROCEDURE|ROLE)|" +                // token options after CREATE
+            // the rest are stand-alone token options
+            "\\ADROP|" +
+            "\\APARTITION|" +
+            "\\AREPLICATE|" +
+            "\\AEXPORT|" +
+            "\\AIMPORT|" +
+            "\\ADR" +
+            ")" +                                  // end (group 1)
+            "\\s" +                                // one required whitespace to terminate keyword
+            "");
 
     private static final Pattern PAT_DR_TABLE = Pattern.compile(
             "(?i)" +                                // (ignore case)
@@ -334,8 +317,15 @@ public class SQLParser extends SQLPatternFactory
     //========== Patterns from SQLCommand ==========
 
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
-    private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
-    private static final Pattern MidlineComments = Pattern.compile("(\\/\\/|--).*$", Pattern.MULTILINE);
+    private static final Pattern SingleLineComments = Pattern.compile(
+            "^\\s*" +       // ignore whitespace indent prior to comment
+            "(\\/\\/|--)" + // (group 1 -- not used?) '--' or even C++-style '//' comment starter
+            ".*$",          // commented out text continues to end of line
+            Pattern.MULTILINE);
+    private static final Pattern MidlineComments = Pattern.compile(
+            "(\\/\\/|--)" + //  (group 1 -- not used?) '--' or even C++-style '//' comment starter
+            ".*$",          // commented out text continues to end of line
+            Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
 
@@ -343,34 +333,158 @@ public class SQLParser extends SQLPatternFactory
      * Matches a command followed by and SQL CRUD statement verb
      */
     private static final Pattern ParserStringKeywords = Pattern.compile(
-            "\\s*" + // 0 or more spaces
-            "(" + // start group 1
-              "exec|execute|explain|explainproc" + // command
-            ")" +  // end group 1
-            "\\s+" + // one or more spaces
-            "(" + // start group 2
+            "\\s*" +                                          // 0 or more spaces
+            "(" +                                             // start group 1
+              "exec|execute|explain|explainproc" +            // command
+            ")" +                                             // end group 1
+            "\\s+" +                                          // one or more spaces
+            "(" +                                             // start group 2
               "select|insert|update|upsert|delete|truncate" + // SQL CRUD statement verb
-            ")" + // end group 2
+            ")" +                                             // end group 2
             "\\s+", // one or more spaces
-            Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
-    );
+            Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     // HELP can support sub-commands someday. Capture group 1 is the sub-command.
-    private static final Pattern HelpToken = Pattern.compile("^\\s*help\\s*(.*)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HelpToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "help" +          // required HELP command token
+            "\\s*" +          // optional whitespace
+            "(.*)" +          // optional subcommand (group 1) BUG: subcommand should require prior whitespace.
+            //FIXME: simplify -- a prior .* starves out all of these optional patterns
+            "\\s*" +          // optional whitespace before semicolon
+            //FIXME: strangely allowing more than one strictly adjacent semicolon.
+            ";*" +            // optional semicolons
+            "\\s*$",          // optional terminating whitespace
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern GoToken = Pattern.compile(
+            "^\\s*" +              // optional indent at start of line
+            "go" +                 // required GO command token
+            //TODO: allow "\\s*" + // optional whitespace before semicolon
+            //FIXME: strangely allowing more than one strictly adjacent semicolon.
+            ";*" +                 // optional semicolons
+            "\\s*$",               // optional terminating whitespace
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern ExitToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "(exit|quit)" +   // required command (group 1 -- probably not used)
+            "\\s*" +          // optional whitespace before semicolon
+            //FIXME: strangely allowing more than one strictly adjacent semicolon.
+            ";*" +            // optional semicolons
+            "\\s*$",          // optional terminating whitespace
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern ShowToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "(?:list|show)" + // keyword alternatives, synonymous so don't bother capturing
+            "\\s+" +          // one or more spaces
+            "(proc|procedure|tables|classes)" + // subcommand (group 1) over-specified, see ***Note***
+            "\\s*" + // optional whitespace before semicolon
+            // long-term, move + outside '[]'s for "([a-z]+)" +
+            //FIXME: strangely allowing more than one strictly adjacent semicolon.
+            ";*" +            // optional semicolons
+            "\\s*$",          // optional terminating whitespace
+            Pattern.CASE_INSENSITIVE);
+    // ***Note***
+    // TODO: It would be better to be very forgiving initially about subcommands as in:
+    // "([a-z]*)" + // alphabetic subcommand (group 1)
+    // or even
+    // "([^;\\s]*)" + // non-space non-semicolon subcommand (group 1)
+    // That would allow list/show command processing to be "locked in" here even if the
+    // subcommand was later found to be garbage -- or missing or followed by garbage.
+    // A custom error message could usefully explain the correct list/show command options.
+    // For now, with a strict match for only valid list/show subcommands, invalid or
+    // missing subcommands or directives with extra garbage sharacters fail
+    // through to the generic @AdHoc sql statement processor which unhelpfully
+    // claims that show or list is some kind of syntax error.
+    // The reason NOT to fix this right away is that sqlcmd has a bug so that it
+    // tries to parse things like list and show commands on each new line of input
+    // EVEN when it is processing the middle of a multi-line sql statement. So, it could
+    // legitimately encounter the line "list integer" (in the middle of a create
+    // table statement) and must correctly pass it on to @AdHoc.
+    // It should NOT treat this case as an invalid list subcommand.
+    // Once that bug is fixed, we can shift to very general subcommand and
+    // end-of-directive matching here and for other directives.
+    // For now (as before) look for only the specific valid subcommands and let @AdHoc
+    // give its misleading error messages for any invalid usage.
+    private static final Pattern SemicolonToken = Pattern.compile(
+            "^.*" +           // match anything
+            //FIXME: simplify -- a prior .* starves out this next optional pattern
+            "\\s*" +          // optional whitespace
+            ";+" +            // one required semicolon at end except for
+            "\\s*$",          // optional terminating whitespace
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern RecallToken = Pattern.compile(
+            "^\\s*" +      // optional indent at start of line
+            "recall\\s+" + // required RECALL command token, whitespace terminated
+            //TODO: For now, at least until the directive processor is fixed,
+            // avoid false positives on uses of "recall" as a schema name by
+            // completely failing to recognize a recall directive that does
+            // not have its expected integer argument.
+            // When the directive processing is fixed,
+            // this pattern match can be generalized to something like
+            // "([^;]+)" +    // required non-whitespace non-semicolon parameter (group 1)
+            // leaving it to ParseRecallResults to produce a more precise
+            // error message than the @AdHoc fallback could give.
+            "([0-9]+)" +   // required integer parameter (group 1)
+            "\\s*" +       // optional whitespace
+            //FIXME: strangely allowing more than one strictly adjacent semicolon.
+            ";*" +         // optional semicolons
+            "\\s*$",       // optional terminating whitespace
+            Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ShowToken = Pattern.compile("^\\s*list|show\\s+([a-z+])\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s+([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FileToken = Pattern.compile("^\\s*file\\s+['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
+    // SQLCommand's FILE command.  If this pattern matches, we
+    // assume that the user meant to enter a file command, and
+    // produce appropriate error messages.
+    private static final Pattern FileToken = Pattern.compile(
+            "^\\s*" +          // optional indent at start of line
+            "file" +           // FILE keyword
+            "(?:(?=\\s|;)|$)", // Must be either followed by whitespace or semicolon
+                               //   (zero-width consumed)
+                               // or the end of the line
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern DashBatchToken = Pattern.compile(
+            "\\s+" +   // required preceding whitespace
+            "-batch",  // -batch option, whitespace terminated
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern DashInlineBatchToken = Pattern.compile(
+            "\\s+" +        // required preceding whitespace
+            "-inlinebatch",  // -inlinebatch option, whitespace terminated
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern FilenameToken = Pattern.compile(
+            "\\s+" +        // required preceding whitespace
+            "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
+            "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
+            "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
+            "\\s*" +       // optional whitespace
+            //FIXME: strangely allowing more than one strictly adjacent semicolon.
+            ";*" +         // optional semicolons
+            "\\s*",        // more optional whitespace
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern DelimiterToken = Pattern.compile(
+            "\\s+" +        // required preceding whitespace
+            "([^\\s;]+)" +  // a string of characters not containing semis or spaces
+            "\\s*;?\\s*",   // an optional semicolon surrounded by whitespace
+            Pattern.CASE_INSENSITIVE);
 
     // Query Execution
-    private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern ExecuteCall = Pattern.compile(
+            "^" +                   //TODO: allow indent at start of line -- or is input always trimmed?
+            "(?:exec|execute)\\s+", // required command or alias whitespace terminated non-grouping
+            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
-    private static final Pattern ExplainCall = Pattern.compile("^explain ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern ExplainCall = Pattern.compile(
+            "^" +           //TODO: allow indent at start of line -- or is input always trimmed?
+            "explain\\s+",  // required command, whitespace terminated
+            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
-    private static final Pattern ExplainProcCall = Pattern.compile("^explainProc ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern ExplainProcCall = Pattern.compile(
+            "^" +              //TODO: allow indent at start of line -- or is input always trimmed?
+            "explainProc\\s+", // required command, whitespace terminated
+            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
 
@@ -640,8 +754,23 @@ public class SQLParser extends SQLPatternFactory
             // Replace single space with flexible whitespace pattern.
             this.prefix = prefix.toUpperCase();
             String prefixPat = prefix.replace(" ", "\\s+");
-            this.patPrefix = Pattern.compile(String.format("^\\s*%s\\s.*$", prefixPat), Pattern.CASE_INSENSITIVE);
-            this.patFull = Pattern.compile(String.format("^\\s*%s\\s+([^;]+)[;\\s]*$", prefixPat), Pattern.CASE_INSENSITIVE);
+            this.patPrefix = Pattern.compile(
+                    String.format(
+                        "^\\s*" + // optional indent at start of line
+                        "%s" +    // modified prefix
+                        "\\s" +   // a required whitespace
+                        ".*$",    // arbitrary end matter?
+                        prefixPat),
+                    Pattern.CASE_INSENSITIVE);
+            this.patFull = Pattern.compile(
+                    String.format(
+                        "^\\s*" +   // optional indent at start of line
+                        "%s" +      // modified prefix
+                        "\\s+" +    // a required whitespace
+                        "([^;]+)" + // at least one other non-semicolon character (?)
+                        "[;\\s]*$", // optional trailing semicolons or whitespace
+                        prefixPat),
+                    Pattern.CASE_INSENSITIVE);
             this.argName = argName;
         }
 
@@ -838,14 +967,20 @@ public class SQLParser extends SQLPatternFactory
      */
     public static class ParseRecallResults
     {
-        public int line;
-        public String error;
+        // These are declared public because trying to declare them as private
+        // and force use of public accessors gets a mysterious NoSuchMethodError.
+        public final int line;
+        public final String error;
 
         ParseRecallResults(int line, String error)
         {
             this.line = line;
             this.error = error;
         }
+        // Attempts to use these methods gets a mysterious NoSuchMethodError,
+        // so keep them disabled and keep the attributes public for now.
+        // public int getLine() { return line; }
+        // public String getError() { return error; }
     }
 
     /**
@@ -874,17 +1009,130 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * An enum that describes the options that can be applied
+     * to sqlcmd's "file" command
+     */
+    static public enum FileOption {
+        PLAIN,
+        BATCH,
+        INLINEBATCH
+    }
+
+    /**
+     * This class encapsulates information produced by
+     * parsing sqlcmd's "file" command.
+     */
+    public static final class FileInfo {
+        private final FileOption m_option;
+        private final File m_file;
+        private final String m_delimiter;
+
+        FileInfo(FileOption option, String filenameOrDelimiter) {
+            m_option = option;
+            switch (option) {
+            case PLAIN:
+            case BATCH:
+                m_file = new File(filenameOrDelimiter);
+                m_delimiter = null;
+                break;
+            case INLINEBATCH:
+            default:
+                assert(option == FileOption.INLINEBATCH);
+                m_file = null;
+                m_delimiter = filenameOrDelimiter;
+                break;
+            }
+        }
+
+        public File getFile() {
+            return m_file;
+        }
+
+        public String getDelimiter() {
+            assert (m_option == FileOption.INLINEBATCH);
+            return m_delimiter;
+        }
+
+        public boolean isBatch() {
+            return m_option == FileOption.BATCH
+                    || m_option == FileOption.INLINEBATCH;
+        }
+
+        public FileOption getOption() {
+            return m_option;
+        }
+
+        @Override
+        public String toString() {
+            return "FILE command: " + m_option.name() +
+                    ", file: \"" + m_file.getName() +
+                    "\", delimiter: " + m_delimiter;
+        }
+    }
+
+    /**
      * Parse FILE statement for sqlcmd.
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static File parseFileStatement(String statement)
+    public static FileInfo parseFileStatement(String statement)
     {
-        Matcher matcher = FileToken.matcher(statement);
-        if (matcher.matches()) {
-            return new File(matcher.group(1));
+        Matcher fileMatcher = FileToken.matcher(statement);
+
+        if (! fileMatcher.lookingAt()) {
+            // This input does not start with FILE,
+            // so it's not a file command, it's something else.
+            // Return to caller a null and no errors.
+            return null;
         }
-        return null;
+
+        String remainder = statement.substring(fileMatcher.end(), statement.length());
+
+        Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
+        if (inlineBatchMatcher.lookingAt()) {
+            remainder = remainder.substring(inlineBatchMatcher.end(), remainder.length());
+            Matcher delimiterMatcher = DelimiterToken.matcher(remainder);
+
+            // use matches here (not lookingAt) because we want to match
+            // all of the remainder, not just beginning
+            if (delimiterMatcher.matches()) {
+                String delimiter = delimiterMatcher.group(1);
+                return new FileInfo(FileOption.INLINEBATCH, delimiter);
+            }
+
+            throw new SQLParser.Exception(
+                    "Did not find valid delimiter for \"file -inlinebatch\" command.");
+        }
+
+        // It is either a plain or a -batch file command.
+        FileOption option = FileOption.PLAIN;
+        Matcher batchMatcher = DashBatchToken.matcher(remainder);
+        if (batchMatcher.lookingAt()) {
+            option = FileOption.BATCH;
+            remainder = remainder.substring(batchMatcher.end(), remainder.length());
+        }
+
+        Matcher filenameMatcher = FilenameToken.matcher(remainder);
+        String filename = null;
+
+        // Use matches to match all input, not just beginning
+        if (filenameMatcher.matches()) {
+            filename = filenameMatcher.group(1);
+
+            // Trim whitespace from beginning and end of the file name.
+            // User may have wanted quoted whitespace at the beginning or end
+            // of the file name, but that seems very unlikely.
+            filename = filename.trim();
+        }
+
+        // If no filename, or a filename of only spaces, then throw an error.
+        if (filename == null || filename.length() == 0) {
+            String msg = String.format("Did not find valid file name in \"file%s\" command.",
+                    option == FileOption.BATCH ? " -batch" : "");
+            throw new SQLParser.Exception(msg);
+        }
+
+        return new FileInfo(option, filename);
     }
 
     /**
@@ -1202,5 +1450,42 @@ public class SQLParser extends SQLPatternFactory
 
         // None of the above - return the untranslated input command.
         return statement;
+    }
+
+    /**
+     * Make sure that the batch starts with an appropriate DDL verb.  We do not
+     * look further than the first token of the first non-comment and non-whitespace line.
+     *
+     * Empty batches are considered to be trivially valid.
+     *
+     * @param batch  A SQL string containing multiple statements separated by semicolons
+     * @return true if the first keyword of the first statement is a DDL verb
+     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT, or if the
+     *     batch is empty.
+     */
+    public static boolean appearsToBeValidDDLBatch(String batch) {
+
+        BufferedReader reader = new BufferedReader(new StringReader(batch));
+        String line;
+        try {
+            while ((line = reader.readLine()) != null) {
+
+                line = SingleLineComments.matcher(line).replaceAll("");
+                line = line.trim();
+                if (line.equals(""))
+                    continue;
+
+                // we have a non-blank line that contains more than just a comment.
+                return queryIsDDL(line);
+            }
+        }
+        catch (IOException e) {
+            // This should never happen for a StringReader
+            assert(false);
+        }
+
+
+        // trivial empty batch: no lines are non-blank or non-comments
+        return true;
     }
 }
