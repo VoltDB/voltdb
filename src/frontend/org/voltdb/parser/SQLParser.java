@@ -283,8 +283,8 @@ public class SQLParser extends SQLPatternFactory
             );
     /**
      *  If the statement starts with either create procedure, create role, drop, partition,
-     *  replicate, export, or import, the first match group is set to respectively procedure,
-     *  role, drop, partition, replicate, export, or import.
+     *  replicate, export, import, or dr, the first match group is set to respectively procedure,
+     *  role, drop, partition, replicate, export, or import, or dr.
      */
     private static final Pattern PAT_ALL_VOLTDB_STATEMENT_PREAMBLES = Pattern.compile(
             "(?i)" +                               // ignore case instruction
@@ -299,7 +299,8 @@ public class SQLParser extends SQLPatternFactory
             "\\APARTITION|" +
             "\\AREPLICATE|" +
             "\\AEXPORT|" +
-            "\\AIMPORT" +
+            "\\AIMPORT|" +
+            "\\ADR" +
             ")" +                                  // end (group 1)
             "\\s" +                                // one required whitespace to terminate keyword
             "");
