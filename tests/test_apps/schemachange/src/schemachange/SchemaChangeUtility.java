@@ -105,9 +105,8 @@ public class SchemaChangeUtility
                     log.error(((ClientResponseImpl)cr).toJSONString());
                     // for starters, I'm assuming these errors can't happen for reads in a sound system
                     if (retry < 3) {
-                        // Cluster might not have come back get, retry after a delay
+                        // Cluster might not have come back get, retry
                         retry++;
-                        try{ Thread.sleep(5 * 1000); } catch (InterruptedException ignore) {}
                         break;
                     } else {
                         assert(false);
