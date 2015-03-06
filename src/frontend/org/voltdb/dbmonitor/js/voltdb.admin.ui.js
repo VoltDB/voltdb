@@ -1817,15 +1817,15 @@ function loadAdminPage() {
         }
     });
 
-    var editUserId = -1;
+    var editUserState = -1;
     var orguser = '';
     $("#addNewUserLink").popup({
         open: function (event, ui, ele) {
             $("#addUserControl").show();
             $("#deleteSecUser").show();
             $("#saveUserControl").hide();
-            editUserId = $('#addUserInnerPopup').data('isupdate');
-            if (editUserId == 1) {
+            editUserState = $('#addUserInnerPopup').data('isupdate');
+            if (editUserState == 1) {
                 $("#deleteUser").css('display', 'block');
             } else {
                 $("#deleteUser").css('display', 'none');
@@ -1833,7 +1833,7 @@ function loadAdminPage() {
             var content = '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                             '<tbody>'+
                                 '<tr>' +
-                                    '<td width="30%">User</td>' +    
+                                    '<td width="30%">Username</td>' +    
                                     '<td width="10%">' +  
                                         '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +         
                                         '<label id="errorUser" for="txtUser" class="error" style="display:none">This field is required</label>' +
@@ -1845,7 +1845,7 @@ function loadAdminPage() {
                                 '<tr>' +  
                                     '<td><span id="labelPassword"></span> </td> ' +     
                                     '<td>' +  
-                                        '<input id="txtPassword" name="txtPassword" type="text" size="30" aria-required="true" class="error"/> ' +        
+                                        '<input id="txtPassword" name="txtPassword" type="password" size="30" aria-required="true" class="error"/> ' +        
                                         '<label id="errorPassword" for="txtPassword" class="error" style="display:none">This field is required</label> ' +     
                                     '</td>' +      
                                     '<td>&nbsp;</td> ' +     
@@ -1855,7 +1855,7 @@ function loadAdminPage() {
                                     '<td>Roles </td> ' +     
                                     '<td>' +  
                                         '<select id="selectRole">' +  
-                                            '<option value="administrator" selected="selected">Admin</option>' +  
+                                            '<option value="administrator" selected="selected">Administrator</option>' +  
                                             '<option value="user">User</option>' +  
                                         '</select>  ' +  
                                     '</td> ' +     
@@ -1881,11 +1881,11 @@ function loadAdminPage() {
         },
         afterOpen: function () {
             var popup = $(this)[0];
-            if (editUserId == -1) {
-                $('#labelPassword').html('New Password');
+            if (editUserState == -1) {
+                $('#labelPassword').html('Password');
                 $('#addUserHeader').html('Add User');
             } else {
-                $('#labelPassword').html('Password');
+                $('#labelPassword').html('New Password');
                 $('#addUserHeader').html('Edit User');
                 $('#txtUser').val($('#addUserInnerPopup').data('username')); 
                 $('#txtOrgUser').val($('#addUserInnerPopup').data('username'));
@@ -1928,7 +1928,7 @@ function loadAdminPage() {
                         "password": password,
                         "plaintext": true
                     };
-                    if (editUserId == 1) {
+                    if (editUserState == 1) {
                         requestUser = username;
                     } else {
                         requestUser = newUsername;
@@ -1947,7 +1947,7 @@ function loadAdminPage() {
                             setTimeout(function() {
                                 toggleSecurityEdit(editStates.ShowEdit);
                                 var errorStatus = '';
-                                if (editUserId == 1) {
+                                if (editUserState == 1) {
                                     errorStatus = 'Could not update the user credentials. ';
                                 } else {
                                     errorStatus = 'Could not add a new user. ';
@@ -2124,7 +2124,7 @@ function loadAdminPage() {
         "checkDuplicate",
         function(value) {
             var arr = VoltDbAdminConfig.orgUserList;
-            if (editUserId == 1) {
+            if (editUserState == 1) {
                 if ($.inArray(value, arr) != -1) {
                     if (value == orguser)
                         return true;
@@ -2361,7 +2361,7 @@ function loadAdminPage() {
                     VoltDbAdminConfig.orgUserList.push(userName);
                     result += '<tr>' +
                         '<td>' + userName + '</td>' +
-                        '<td>' + role + '</td>' +
+                        '<td>' + formatDisplayName(role) + '</td>' +
                         '<td>&nbsp</td>' +
                         '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\''+userName+'\',\''+role+'\');">&nbsp;</a></td>' +
                         '</tr>';
@@ -2637,11 +2637,16 @@ var editStream = function (editId) {
     adminDOMObjects.addConfigLink.trigger("click");
 };
 
-var addUser = function (editId,username,role) {
+var addUser = function(editId, username, role) {
     $('#addUserInnerPopup').data('isupdate', editId);
     if (editId == 1) {
         $('#addUserInnerPopup').data('username', username);
         $('#addUserInnerPopup').data('role', role);
     }
     $("#addNewUserLink").trigger("click");
-}
+};
+
+var formatDisplayName = function(displayName) {
+    displayName = displayName.toLowerCase();
+    return displayName.charAt(0).toUpperCase() + displayName.slice(1);
+};
