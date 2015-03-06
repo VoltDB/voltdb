@@ -80,7 +80,7 @@
 <fileset id="vendor.src.files" dir="${vendor.src.dir}"
         includes="com/google_voltpatches/**/*.java
                   javax/annotation_voltpatches/**/*.java
-                  org/apache/cassandra_voltpatches/MurmerHash.java
+                  org/apache/cassandra_voltpatches/MurmurHash3.java
                   org/apache/commons/cli_voltpatches/**/*.java
                   org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java
                   org/apache/hadoop_voltpatches/util/PureJavaCrc*.java
@@ -99,6 +99,7 @@
                   org/voltcore/logging/VoltLogger.java
                   org/voltcore/logging/VoltUtilLoggingLogger.java
                   org/voltcore/network/*.java
+
                   org/voltcore/utils/CoreUtils.java
                   org/voltcore/utils/COWMap.java
                   org/voltcore/utils/COWNavigableSet.java
@@ -112,6 +113,9 @@
                   org/voltcore/utils/RateLimitedLogger.java
                   org/voltcore/utils/Bits.java
                   org/voltcore/utils/LatencyWatchdog.java
+                  org/voltcore/utils/CompressionStrategy.java
+                  org/voltcore/utils/VoltTypeUtil.java
+
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java
                   org/voltdb/ClientResponseImpl.java
@@ -121,15 +125,20 @@
                   org/voltdb/ParameterConverter.java
                   org/voltdb/ParameterSet.java
                   org/voltdb/PrivateVoltTableFactory.java
+                  org/voltdb/parser/JDBCParser.java
+                  org/voltdb/parser/SQL*.java
                   org/voltdb/types/TimestampType.java
                   org/voltdb/types/VoltDecimalHelper.java
                   org/voltdb/utils/Base64.java
                   org/voltdb/utils/Encoder.java
                   org/voltdb/utils/SerializationHelper.java
                   org/voltdb/utils/RowWithMetaData.java
+                  org/voltdb/utils/BulkLoaderErrorHandler.java
                   org/voltdb/utils/CSVDataLoader.java
                   org/voltdb/utils/CSVBulkDataLoader.java
                   org/voltdb/utils/CSVTupleDataLoader.java
+                  org/voltdb/utils/PosixAdvise.java
+                  org/voltdb/utils/VoltTypeUtil.java
                   org/voltdb/VoltOverflowException.java
                   org/voltdb/VoltTable.java
                   org/voltdb/VoltTableRow.java
