@@ -706,4 +706,78 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean clickTabletype() {
         tabletype.click()
     }
+	
+	// for stored procedure
+	
+	/*
+	 *	return true if stored procedures table is displayed
+	 */
+	def boolean storedProceduresTableDisplayed() {
+		waitFor		{ storedProcedures.displayed }
+	}
+
+	/*
+	 *	return true if data in stored procedures table is displayed
+	 */
+	def boolean storedProceduresDataDisplayed() {
+		waitFor(20)	{ storedProceduresNodataMsg.displayed }
+	}
+
+	/*
+	 *	return true if stored procedures table is displayed
+	 */
+	def boolean databaseTableDisplayed() {
+		waitFor		{ dataTables.displayed }
+	}
+
+	/*
+	 *	return true if data in stored procedures table is displayed
+	 */
+	def boolean sdatabaseTableDisplayed() {
+		waitFor(20)	{ databasetableNoDataMsg.displayed }
+	}
+
+	// for ascending descending in the stored procedures
+
+	/*
+	 *	click the stored procedure in database table
+	 */
+	def boolean clickStoredProcedure() {
+		storedProcedure.click()
+	}
+
+	/*
+	 *	click the row count column in database table
+	 */
+	def boolean clickInvocations() {
+		invocations.click()
+	}
+
+	/*
+	 *	click the max rows column in database table
+	 */
+	def boolean clickMinLatency() {
+		minLatency.click()
+	}
+
+	/*
+	 *	click the min rows column in database table
+	 */
+	def boolean clickMaxLatency() {
+		maxLatency.click()
+	}
+
+	/*
+	 *	click the avg rows column in database table
+	 */
+	def boolean clickAvgLatency() {
+		avgLatency.click()
+	}
+
+	/*
+	 *	click the type column in database table
+	 */
+	def boolean clickTimeOfExecution() {
+		timeOfExecution.click()
+	}
 }

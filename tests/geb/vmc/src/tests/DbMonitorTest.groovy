@@ -979,4 +979,198 @@ class DbMonitorTest extends TestBase {
 		then:
 		query.equals("zxya")
 	}
+	
+	// stored procedure ascending descending
+	
+	    def "check if stored procedure is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click stored procedure'
+			page.clickStoredProcedure()
+        then: 'check if table is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click stored procedure'
+			page.clickStoredProcedure()
+		then: 'check if table is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+
+    def "check if Invocations is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click row count'
+			page.clickInvocations()
+        then: 'check if row count is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click row count'
+			page.clickInvocations()
+		then: 'check if row count is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+
+    def "check if Min Latency is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click min latency'
+			page.clickMinLatency()
+        then: 'check if max rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click min latency'
+			page.clickMinLatency()
+		then: 'check if max rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Max Latency is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click max latency'
+			page.clickMaxLatency()
+        then: 'check if min rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click max latency'
+			page.clickMaxLatency()
+		then: 'check if min rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Avg Latency is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click avg latency'
+			page.clickAvgLatency()
+        then: 'check if avg rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click avg latency'
+			page.clickAvgLatency()
+		then: 'check if avg rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Time of Execution is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click time of execution'
+			page.clickTimeOfExecution()
+        then: 'check if type is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click time of execution'
+			page.clickTimeOfExecution()
+		then: 'check if type is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+	
+	// check if data is being displayed in the stored procedure table or not
+	// one test fails and the other passes
+	
+	def "check if any data is displayed in Stored Procedures"() {
+		when:
+			page.storedProceduresDisplayed()
+		then:
+			page.storedProceduresDataDisplayed()
+	}
+
+	def "check if no data is displayed in Stored Procedures"() {
+		when:
+			page.storedProceduresDisplayed()
+		then:
+			!page.storedProceduresDataDisplayed()
+	}
+
+	// check if data is being displayed in the database table or not
+	// one test fails and the other passes
+	
+	def "check if any data is displayed in Database Tables"() {
+		when:
+			page.databaseTableDisplayed()
+		then:
+			page.databaseTableDisplayed()
+	}
+
+	def "check if no data is displayed in Database Tables"() {
+		when:
+			page.databaseTableDisplayed()
+		then:
+			!page.databaseTableDisplayed()
+	}
 }
