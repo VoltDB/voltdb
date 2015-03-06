@@ -322,7 +322,7 @@ public class HTTPAdminListener {
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             } finally {
-                httpClientInterface.releaseClient(authResult);
+                httpClientInterface.releaseClient(authResult, false);
             }
         }
     }
@@ -480,7 +480,7 @@ public class HTTPAdminListener {
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             } finally {
-                httpClientInterface.releaseClient(authResult);
+                httpClientInterface.releaseClient(authResult, false);
             }
         }
 

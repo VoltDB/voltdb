@@ -28,6 +28,8 @@ import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.FluentIterable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Maintain a set of the last N recently used credentials and
@@ -224,10 +226,23 @@ public class AuthenticatedConnectionCache {
     /**
      * Dec-ref a client.
      * @param client The client to release.
+     * @param force this is sent true in case we just lost network and so the connection I thought this will not happen
+     * in internally connected clients but have seen it in strange/unknown/unreproducible cases.
      */
-    public synchronized void releaseClient(Client client) {
+    public synchronized void releaseClient(Client client, boolean force) {
         ClientImpl ci = (ClientImpl) client;
-
+        if (force) {
+            if (client == this.m_unauthClient) {
+                closeClient(this.m_unauthClient);
+                this.m_unauthClient = null;
+                return;
+            }
+            if (client == this.m_adminUnauthClient) {
+                closeClient(this.m_adminUnauthClient);
+                this.m_adminUnauthClient = null;
+                return;
+            }
+        }
         // if no username, this is the unauth client
         if (ci.getUsername().length() == 0) {
             return;
@@ -241,10 +256,25 @@ public class AuthenticatedConnectionCache {
         if (conn == null) {
             throw new RuntimeException("Released client not in pool.");
         }
-        conn.refCount--;
+        if (force) {
+            conn.refCount = 0;
+        } else {
+            conn.refCount--;
+        }
         attemptToShrinkPoolIfNeeded();
     }
 
+    private synchronized void closeClient(Client client)
+    {
+        try {
+            client.drain();
+            client.close();
+        } catch (Exception ex) {
+            //DONTCARE
+        }
+    }
+
+    //Close all and just clear stuff.
     public synchronized void closeAll()
     {
         if (m_unauthClient != null)
@@ -252,9 +282,10 @@ public class AuthenticatedConnectionCache {
             try {
                 m_unauthClient.drain();
                 m_unauthClient.close();
+                m_unauthClient = null;
             } catch (InterruptedException ex) {
-                throw new RuntimeException("Unable to close unauthenticated client.", ex);
             }
+            m_unauthClient = null;
         }
         if (m_adminUnauthClient != null)
         {
@@ -262,8 +293,8 @@ public class AuthenticatedConnectionCache {
                 m_adminUnauthClient.drain();
                 m_adminUnauthClient.close();
             } catch (InterruptedException ex) {
-                throw new RuntimeException("Unable to close unauthenticated admin client.", ex);
             }
+            m_adminUnauthClient = null;
         }
         for (Entry<String, Connection> e : m_connections.entrySet())
         {
@@ -271,9 +302,10 @@ public class AuthenticatedConnectionCache {
                 e.getValue().client.drain();
                 e.getValue().client.close();
             } catch (InterruptedException ex) {
-                throw new RuntimeException("Unable to close client from pool.", ex);
             }
         }
+        m_connections.clear();
+        m_connections = null;
     }
 
     /**
