@@ -226,8 +226,10 @@ public class VoltProjectBuilder {
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
 
-    // zero defaults to first open port >= 8080.
+    // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
+    // a null HTTP port or json flag indicates that the corresponding element should
+    // be omitted from the deployment XML.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
 
@@ -1010,6 +1012,7 @@ public class VoltProjectBuilder {
         }
 
         // <httpd>. Disabled unless port # is configured by a testcase
+        // Omit element(s) when null.
         HttpdType httpd = factory.createHttpdType();
         deployment.setHttpd(httpd);
         httpd.setEnabled(m_httpdPortNo != -1);
