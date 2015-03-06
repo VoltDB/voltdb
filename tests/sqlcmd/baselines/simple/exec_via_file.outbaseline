@@ -1,0 +1,33 @@
+file scripts/simple/exec_via_file.sqlfile
+Command succeeded.
+Command succeeded.
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+(Returned 1 rows in #.##s)
+C   D    
+--- -----
+  1 a    
+  2 ab   
+  3 abc  
+  4 abcd 
+ 11 a    
+ 12 ab   
+ 13 abc  
+ 14 abcd 
+ 21 a    
+ 22 ab   
+ 23 abc  
+ 24 abcd 
+
+(Returned 12 rows in #.##s)
+Command succeeded.
+

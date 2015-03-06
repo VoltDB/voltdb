@@ -1,0 +1,9 @@
+drop table t if exists;
+create table t (i integer not null);
+
+file -inlinebatch EOF
+partition table t on column i;
+create index tidx on t(i);
+EOF
+
+explain select * from t;

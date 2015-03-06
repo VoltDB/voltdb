@@ -9,3 +9,5 @@ CREATE TABLE lina (
 #delete
 DROP TABLE lina
 
+#name
+lina
