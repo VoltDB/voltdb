@@ -63,7 +63,7 @@
 	            markup: '<div class="popup"><div class="popup_content' + counter + '"/></div>',
 	            contentClass: 'popup_content' + counter,
 	            preloaderContent: '<p class="preloader">Loading</p>',
-	            activeClass: 'popup_active',
+	            activeClass: 'popup_active' + counter,
 	            hideFlash: false,
 	            speed: 200,
 	            popupPlaceholderClass: 'popup_placeholder' + counter,
