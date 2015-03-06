@@ -408,7 +408,10 @@ h2 {text-transform: uppercase}
 <table border=1>
 <tr>
 <td rowspan=2 align=center>Test Suite</td>
-<td colspan=5 align=center>Statements</td><td colspan=2 align=center>Test Failures</td></tr>
+<td colspan=5 align=center>Statements</td>
+<td colspan=2 align=center>Test Failures</td>
+<td rowspan=2 align=center>Time<br>(min:sec)</td>
+</tr>
 <tr>%s</tr>
 """ % (statistics["seed"], topLine)
 
@@ -417,10 +420,14 @@ h2 {text-transform: uppercase}
             (name, name, stats)
 
     for suiteName in sorted(statistics.iterkeys()):
-        if(suiteName != "seed"):
+        if(suiteName != "seed" and suiteName != "totals" and not suiteName.startswith("time_for_")):
             content += bullets(suiteName, statistics[suiteName])
+    content += "<tr><td>Totals</td>%s</tr>\n</table>" % statistics["totals"]
+    content += "\n<p>Time: %s for generating all SQL statements" % statistics["time_for_gensql"]
+    content += "\n<br>Time: %s for running all VoltDB (JNI) statements" % statistics["time_for_voltdb"]
+    content += "\n<br>Time: %s for running all HSqlDB statements" % statistics["time_for_hsqldb"]
+    content += "\n<br>Time: %s for comparing all DB results</p>" % statistics["time_for_compare"]
     content += """
-</table>
 </body>
 </html>
 """
