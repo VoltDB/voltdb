@@ -768,7 +768,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 	}
 
 	/*
-	 *	click the avg rows column in database table
+	 *	 click the avg rows column in database table
 	 */
 	def boolean clickAvgLatency() {
 		avgLatency.click()

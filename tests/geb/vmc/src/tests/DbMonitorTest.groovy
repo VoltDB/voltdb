@@ -1140,7 +1140,7 @@ class DbMonitorTest extends TestBase {
 				assert false
     }
 	
-	// check if data is being displayed in the stored procedure table or not
+	//  check if data is being displayed in the stored procedure table or not
 	// one test fails and the other passes
 	
 	def "check if any data is displayed in Stored Procedures"() {
