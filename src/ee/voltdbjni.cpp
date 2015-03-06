@@ -1286,6 +1286,7 @@ SHAREDLIB_JNIEXPORT jobject JNICALL Java_org_voltcore_utils_DBBPool_nativeAlloca
     char *memory = new char[size];
     jobject buffer = jniEnv->NewDirectByteBuffer( memory, size);
     if (buffer == NULL) {
+        VOLT_ERROR("Failed to get Direct Byte Buffer.");
         jniEnv->ExceptionDescribe();
         delete memory;
         throw std::exception();
