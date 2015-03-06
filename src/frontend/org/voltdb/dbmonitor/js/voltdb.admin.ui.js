@@ -166,6 +166,7 @@ function loadAdminPage() {
         queryTimeoutUpdateErrorFieldMsg: $("#queryTimeoutUpdateErrorFieldMsg"),
         snapshotLabel: $("#row-2").find("td:first-child").text(),
         queryTimeoutFieldLabel: $("#queryTimoutRow").find("td:first-child").text(),
+        securityUserErrorFieldMsg: $("#securityUserErrorFieldMsg"),
 
         //Export Settings
         addNewConfigLink: $("#addNewConfigLink"),
@@ -1945,15 +1946,25 @@ function loadAdminPage() {
                         } else {
                             setTimeout(function() {
                                 toggleSecurityEdit(editStates.ShowEdit);
-                                var msg = '"' + adminEditObjects.securityLabel + '". ';
+                                var errorStatus = '';
+                                if (editUserId == 1) {
+                                    errorStatus = 'Could not update the user credentials. ';
+                                } else {
+                                    errorStatus = 'Could not add a new user. ';
+                                }
+                                var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
                                     msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
-                                } else {
+                                }
+                                else if (result.statusstring != "") {
+                                    msg += " " + result.statusstring;
+                                }
+                                else {
                                     msg += "Please try again later.";
                                 }
-
-                                adminEditObjects.updateErrorFieldMsg.text(msg);
-                                $("#updateErrorPopupLink").trigger("click");
+                                
+                                $('#securityUserErrorFieldMsg').html(msg);
+                                $("#sercurityUserPopupLink").trigger("click");
                             }, 3000);
                         }
                     }, requestUser, requestType);
@@ -1971,15 +1982,19 @@ function loadAdminPage() {
                         } else {
                             setTimeout(function() {
                                 toggleSecurityEdit(editStates.ShowEdit);
-                                var msg = '"' + adminEditObjects.securityLabel + '". ';
+                                var errorStatus = 'Could not delete the user.';
+                                
+                                var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
                                     msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                } else if (result.statusstring != "") {
+                                    msg += " " + result.statusstring;
                                 } else {
                                     msg += "Please try again later.";
                                 }
 
-                                adminEditObjects.updateErrorFieldMsg.text(msg);
-                                $("#updateErrorPopupLink").trigger("click");
+                                $('#securityUserErrorFieldMsg').html(msg);
+                                $("#sercurityUserPopupLink").trigger("click");
                             }, 3000);
                         }
                     }, username, "DELETE");
@@ -2013,6 +2028,21 @@ function loadAdminPage() {
             var popup = $(this)[0];
             $("#btnUpdateErrorOk").unbind("click");
             $("#btnUpdateErrorOk").on("click", function () {
+
+                //Close the popup
+                popup.close();
+            });
+        }
+    });
+
+    $("#sercurityUserPopupLink").popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+
+            var popup = $(this)[0];
+            $("#btnSecurityUserErrorOk").unbind("click");
+            $("#btnSecurityUserErrorOk").on("click", function () {
 
                 //Close the popup
                 popup.close();
