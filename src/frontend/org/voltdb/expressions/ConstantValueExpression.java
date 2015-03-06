@@ -428,6 +428,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String unused) {
+        if (m_isNull) {
+            return "NULL";
+        }
         if (m_valueType == VoltType.STRING) {
             return "'" + m_value + "'";
         }
