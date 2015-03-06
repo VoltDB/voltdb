@@ -136,11 +136,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // find all empty tables
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
-            long tupleAllocatedMemory = stats.getLong("TUPLE_ALLOCATED_MEMORY");
             String tableName = stats.getString("TABLE_NAME");
             if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
-                nonEmptyTables.add(tableName);
-            } else if (tupleAllocatedMemory > 0) {
                 nonEmptyTables.add(tableName);
             }
         }
