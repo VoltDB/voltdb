@@ -255,6 +255,22 @@ void DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
          extendBufferChain(END_RECORD_SIZE);
      }
 
+     if (m_currBlock->startDRSequenceNumber() == std::numeric_limits<int64_t>::max()) {
+         throwFatalException(
+             "Appending end transaction message to a DR buffer with no matching begin transaction message."
+             " DR ID (%jd), unique ID (%jd)",
+             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
+     }
+     if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
+         m_currBlock->lastDRSequenceNumber() > sequenceNumber) {
+         throwFatalException(
+             "Appending end transaction message to a DR buffer with a greater DR ID."
+             " Buffer end DR ID (%jd), buffer end unique ID (%jd)."
+             " Current DR ID (%jd), current unique ID (%jd)",
+             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastUniqueId(),
+             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
+     }
+
      m_currBlock->recordCompletedTxnForDR(sequenceNumber, uniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
