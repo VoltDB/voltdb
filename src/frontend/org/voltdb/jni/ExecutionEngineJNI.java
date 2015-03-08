@@ -488,7 +488,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public boolean setLogLevels(final long logLevels) throws EEException {
-        return nativeSetLogLevels( pointer, logLevels);
+        return nativeSetLogLevels(pointer, logLevels);
     }
 
     @Override
@@ -563,7 +563,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long tableHashCode(int tableId) {
-        return nativeTableHashCode( pointer, tableId);
+        return nativeTableHashCode(pointer, tableId);
     }
 
     @Override
@@ -600,6 +600,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
+    }
+
+    @Override
+    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId)
+    throws EEException
+    {
+        final int errorCode = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId);
+        checkErrorCode(errorCode);
     }
 
     @Override
