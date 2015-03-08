@@ -197,6 +197,15 @@ typedef struct {
     char task[0];
 }__attribute__((packed)) execute_task;
 
+typedef struct {
+    struct ipc_command cmd;
+    int64_t txnId;
+    int64_t spHandle;
+    int64_t lastCommittedSpHandle;
+    int64_t uniqueId;
+    char log[0];
+}__attribute__((packed)) apply_binary_log;
+
 
 using namespace voltdb;
 
@@ -336,6 +345,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 28:
           executeTask(cmd);
+          result = kErrorCode_None;
+          break;
+      case 29:
+          applyBinaryLog(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -1369,6 +1382,21 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
         int32_t responseLength = m_engine->getResultsSize();
         char *resultsBuffer = m_engine->getReusedResultBuffer();
         writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
+    try {
+        apply_binary_log *params = (apply_binary_log*)cmd;
+        size_t logLen = ntohl(cmd->msgsize) - sizeof(apply_binary_log);
+        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->applyBinaryLog(ntohll(params->txnId),
+                                 ntohll(params->spHandle),
+                                 ntohll(params->lastCommittedSpHandle),
+                                 ntohll(params->uniqueId),
+                                 params->data);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }
