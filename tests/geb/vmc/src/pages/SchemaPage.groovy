@@ -44,6 +44,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
         schema              { module schemaTab}
     }
 
+
     static at = {
         schemaTab.displayed
         schemaTab.attr('class') == 'active'
