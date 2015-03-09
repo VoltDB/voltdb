@@ -316,21 +316,22 @@ public class SQLParser extends SQLPatternFactory
 
     //========== Patterns from SQLCommand ==========
 
-    private static final Pattern OneWhitespace = Pattern.compile("\\s");
-    private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final String EndOfLineCommentPatternString =
             "(?:\\/\\/|--)" + // '--' or even C++-style '//' comment starter
             ".*$";            // commented out text continues to end of line
     private static final Pattern OneWholeLineComment = Pattern.compile(
             "^\\s*" +                       // optional whitespace indent prior to comment
-            EndOfLineCommentPatternString); // commented out text continues to end of line
+            EndOfLineCommentPatternString);
     private static final Pattern AnyWholeLineComments = Pattern.compile(
-            "^\\s*" +                      // optional whitespace indent prior to comment
-            EndOfLineCommentPatternString, // commented out text continues to end of line
+            "^\\s*" +                       // optional whitespace indent prior to comment
+            EndOfLineCommentPatternString,
             Pattern.MULTILINE);
     private static final Pattern EndOfLineComment = Pattern.compile(
             EndOfLineCommentPatternString,
             Pattern.MULTILINE);
+
+    private static final Pattern OneWhitespace = Pattern.compile("\\s");
+    private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleQuotedString = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern SingleQuotedStringContainingParameterSeparators =
             Pattern.compile(
@@ -340,6 +341,7 @@ public class SQLParser extends SQLPatternFactory
             "[^']" +       // arbitrary string content
             "'",           // end of string OR start of escaped quote
             Pattern.MULTILINE);
+
     // HELP can support sub-commands someday. Capture group 1 is the sub-command.
     private static final Pattern HelpToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
@@ -351,14 +353,6 @@ public class SQLParser extends SQLPatternFactory
             //FIXME: strangely allowing more than one strictly adjacent semicolon.
             ";*" +            // optional semicolons
             "\\s*$",          // optional terminating whitespace
-            Pattern.CASE_INSENSITIVE);
-    private static final Pattern GoToken = Pattern.compile(
-            "^\\s*" +              // optional indent at start of line
-            "go" +                 // required GO command token
-            //TODO: allow "\\s*" + // optional whitespace before semicolon
-            //FIXME: strangely allowing more than one strictly adjacent semicolon.
-            ";*" +                 // optional semicolons
-            "\\s*$",               // optional terminating whitespace
             Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
@@ -460,7 +454,7 @@ public class SQLParser extends SQLPatternFactory
             // Make everything that follows optional so that explain command
             // diagnostics can "own" any line starting with the word
             // explain.
-            "\\s*",
+            "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
     private static final Pattern ExplainProcCallPreamble = Pattern.compile(
@@ -820,10 +814,10 @@ public class SQLParser extends SQLPatternFactory
 
         //* enable to debug */ System.err.println("Parsing command queue:\n" + query);
         /*
-         * Here begins the struggle between honoring comment characters and
+         * Here begins the struggle between honoring comment starters and
          * honoring single quotes and honoring semicolons as statement separators.
-         */
-        /* For example, whole-line comments are eliminated early -- assumed
+         *
+         * For example, whole-line comments are eliminated early -- assumed
          * never to be part of text literals, even though a text literal could
          * have been started on a prior line and could optionally be ended
          * with a quote on the current line and optionally followed by a
@@ -840,18 +834,23 @@ public class SQLParser extends SQLPatternFactory
          * Move all single quoted strings into the string fragments list, and do in place
          * replacements with numbered instances of the #(SQL_PARSER_STRING_FRAGMENT#[n]) tag
          *
-         * This will find a quote (perhaps an informal apostrophe) in an
-         * end-of-line comment and take it as the start of a quoted string,
-         * hiding everything between it and the next quote as literal text,
-         * including any semicolons or comment starters in between.
+         * WARNING: ENG-7594 This will find a quote (perhaps an informal
+         * apostrophe) in an end-of-line comment and take it as the start
+         * of a quoted string, hiding everything between it and the next
+         * quote as literal text, including any semicolons or comment
+         * starters in between.
          * Properly preserving semicolons and recognizing all comment
-         ^ boundaries is tricky, especially in a way that preserves
+         * boundaries is tricky, especially in a way that preserves
          * quoted literals that contain "--", even literals that may be
          * started and/or terminated on a different line from the "--".
          * I (--paul) would find it comforting to rely on some interface
          * to HSQL parser technology for this,
-         * for the sake of consistency even if not for absolute correctness.
-         * Did Steve really claim to have already solved this problem?
+         * The other possibility is to use SQLLexer.splitStatements
+         * if it has already solved this problem.
+         * And yet we don't yet know how compatible either of those is with
+         * our intended free-form syntax for "exec" commands -- that may be
+         * a bit TOO free form and may require tightening up before we can
+         * find any reasonable solution.
          */
         Matcher stringFragmentMatcher = SingleQuotedString.matcher(query);
         ArrayList<String> stringFragments = new ArrayList<String>();
@@ -870,7 +869,10 @@ public class SQLParser extends SQLPatternFactory
         // So any user's quoted string containing ';' will be safe here.
         // OTOH, this next line MAY eliminate blocks of code after any
         // end-on-line comment that contains an unbalanced quote until
-        // the following quote.
+        // the following quote. ENG-7594
+        // The reason for eliminating the comments here and now is to make sure that
+        // comment text containing a semicolon does not cause an erroneous statement
+        // split mid-comment.
         query = EndOfLineComment.matcher(query).replaceAll("");
 
         String[] sqlFragments = query.split("\\s*;+\\s*");
@@ -938,7 +940,7 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Check whether statement is terminated by semicolon.
+     * Check whether statement is terminated by a semicolon.
      * @param statement  statement to check
      * @return           true if it is terminated by a semicolon
      */
@@ -955,16 +957,6 @@ public class SQLParser extends SQLPatternFactory
     public static boolean isExitCommand(String statement)
     {
         return ExitToken.matcher(statement).matches();
-    }
-
-    /**
-     * Check for GO command.
-     * @param statement  statement to check
-     * @return           true if it is GO command
-     */
-    public static boolean isGoCommand(String statement)
-    {
-        return GoToken.matcher(statement).matches();
     }
 
     /**
@@ -1138,6 +1130,10 @@ public class SQLParser extends SQLPatternFactory
             return m_option;
         }
 
+        /**
+         * This is actually echoed back to the user so make it look
+         * more or less like their input line.
+         **/
         @Override
         public String toString() {
             return "FILE " + m_option.optionString() +
@@ -1147,7 +1143,7 @@ public class SQLParser extends SQLPatternFactory
 
     /**
      * Parse FILE statement for sqlcmd.
-     * @param fileInfo
+     * @param fileInfo   optional parent file context for better diagnostics.
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
@@ -1210,8 +1206,14 @@ public class SQLParser extends SQLPatternFactory
 
         return new FileInfo(parentContext, option, filename);
     }
+    /**
+     * Parse FILE statement for interactive sqlcmd (or simple tests).
+     * @param statement  statement to parse
+     * @return           File object or NULL if statement wasn't recognized
+     */
     public static FileInfo parseFileStatement(String statement)
     {
+        // There is no parent file context to reference.
         return parseFileStatement(null, statement);
     }
 
@@ -1484,11 +1486,10 @@ public class SQLParser extends SQLPatternFactory
     public static String parseExplainCall(String statement)
     {
         Matcher matcher = ExplainCallPreamble.matcher(statement);
-        if (matcher.lookingAt()) {
-            String query = statement.substring(matcher.end());
-            return query;
+        if ( ! matcher.lookingAt()) {
+            return null;
         }
-        return null;
+        return statement.substring(matcher.end());
     }
 
     /**
@@ -1499,15 +1500,14 @@ public class SQLParser extends SQLPatternFactory
     public static String parseExplainProcCall(String statement)
     {
         Matcher matcher = ExplainProcCallPreamble.matcher(statement);
-        if (matcher.lookingAt()) {
-            // This all could probably be done more elegantly via a group extracted
-            // from a more comprehensive regexp.
-            String procName = statement.substring(matcher.end());
-            // Clean up any extra spaces around the proc name.
-            procName = procName.trim();
-            return procName;
+        if ( ! matcher.lookingAt()) {
+            return null;
         }
-        return null;
+        // This all could probably be done more elegantly via a group extracted
+        // from a more comprehensive regexp.
+        // Clean up any extra spaces around the remainder of the line,
+        // which should be a proc name.
+        return statement.substring(matcher.end()).trim();
     }
 
     /**
