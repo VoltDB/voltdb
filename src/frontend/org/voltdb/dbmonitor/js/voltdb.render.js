@@ -717,6 +717,7 @@ function alertNodeClicked(obj) {
             systemOverview = {};
             systemOverview[0] = currentServerOverview;
             
+            //iterate through updatedSystemOverview to add remaining server to the list 'systemOverview'
             for (iterator = 0; iterator < updatedSystemOverview.length; iterator++) {
                 systemOverview[iterator+1] = updatedSystemOverview[iterator];
 
