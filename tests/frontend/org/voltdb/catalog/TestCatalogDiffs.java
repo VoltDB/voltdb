@@ -499,12 +499,24 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
         verifyDiff(catOriginal, catUpdated, true, null);
+
+        VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
+        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
+        catOriginal = getExportCatalogForTable("A", "addtablecolumn1", t1);
+        catUpdated = getExportCatalogForTable("A", "addtablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
         verifyDiff(catOriginal, catUpdated, true, null);
+
+        VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
+        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
+        catOriginal = getExportCatalogForTable("A", "droptablecolumn1", t1);
+        catUpdated = getExportCatalogForTable("A", "droptablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testModifyTableColumn() throws IOException {

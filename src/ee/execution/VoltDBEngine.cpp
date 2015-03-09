@@ -1914,15 +1914,25 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     }
 }
 
+void VoltDBEngine::applyBinaryLog(int64_t txnId,
+                                  int64_t spHandle,
+                                  int64_t lastCommittedSpHandle,
+                                  int64_t uniqueId,
+                                  const char *log) {
+    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                             txnId,
+                                             spHandle,
+                                             lastCommittedSpHandle,
+                                             uniqueId);
+
+    m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this);
+}
+
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     switch (taskType) {
     case TASK_TYPE_VALIDATE_PARTITIONING:
         dispatchValidatePartitioningTask(taskParams);
         break;
-    case TASK_TYPE_APPLY_BINARY_LOG: {
-        m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
-        break;
-    }
     case TASK_TYPE_GET_DR_TUPLESTREAM_STATE:
         collectDRTupleStreamStateInfo();
         break;
