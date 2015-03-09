@@ -127,8 +127,6 @@ public class AsyncCompilerAgentHelper
                     work.invocationName;
                 return retval;
             }
-            retval.catalogBytes = newCatalogBytes;
-            retval.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(newCatalogBytes);
 
             // get the diff between catalogs
             // try to get the new catalog from the params
@@ -142,6 +140,9 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = ioe.getMessage();
                 return retval;
             }
+            newCatalogBytes = loadResults.getFirst().getFullJarBytes();
+            retval.catalogBytes = newCatalogBytes;
+            retval.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(newCatalogBytes);
             String newCatalogCommands =
                 CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();
