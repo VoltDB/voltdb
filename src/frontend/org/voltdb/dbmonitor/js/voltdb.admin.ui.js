@@ -1917,7 +1917,6 @@ function loadAdminPage() {
                             toggleSecurityEdit(editStates.ShowEdit);
                             //Reload Admin configurations for displaying the updated value
                             voltDbRenderer.GetAdminDeploymentInformation(false, function(adminConfigValues, rawConfigValues) {
-                                //TODO: Hide loading image
                                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
                             });
                         } else {
@@ -1949,15 +1948,20 @@ function loadAdminPage() {
                 } else if ($("#userSaveDelete").data('status') == 'delete') {
                     toggleSecurityEdit(editStates.ShowLoading);
                     voltDbRenderer.UpdateUserConfiguration(null, function (result) {
+                        
+                        if (!result.status) { //Handle the condition when the user deletes himself.
+                            return;
+                        }
+
                         if (result.status == "1") {
                             toggleSecurityEdit(editStates.ShowEdit);
                             //Reload Admin configurations for displaying the updated value
                             voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
-                                //TODO: Hide loading image
                                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
                             });
                         } else {
-                            setTimeout(function() {
+                            setTimeout(function () {
+                                
                                 toggleSecurityEdit(editStates.ShowEdit);
                                 var errorStatus = 'Could not delete the user.';
                                 
