@@ -2422,6 +2422,18 @@ function alertNodeClicked(obj) {
 
         //end admin configuration
 
+        this.UpdateUserConfiguration = function (updatedData, onInformationLoaded, userId, requestType) {
+            VoltDBService.UpdateUserConfiguration(updatedData, function (connection) {
+                var result = {};
+
+                if (connection != null && connection.Metadata['SHORTAPI_USERUPDATEDEPLOYMENT'] != null) {
+                    result = connection.Metadata['SHORTAPI_USERUPDATEDEPLOYMENT'];
+                }
+
+                onInformationLoaded(result);
+            }, userId, requestType);
+        };
+
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
             if (processName == "TABLE_INFORMATION") {

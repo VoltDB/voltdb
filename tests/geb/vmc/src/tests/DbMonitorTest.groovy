@@ -761,54 +761,416 @@ class DbMonitorTest extends TestBase {
 
 
     def "Add a table in Tables and check it"() {
-        String createQuery = page.getQueryToCreateTable()
+		
+		String createQuery = page.getQueryToCreateTable()
         String deleteQuery = page.getQueryToDeleteTable()
+		String tablename = page.getTablename()
+
+		when: 'sql query tab is clicked'
+			page.gotoSqlQuery()
+		then: 'at sql query'
+			at SqlQueryPage
+
+		when: 'set query in the box'
+			page.setQueryText(createQuery)
+		then: 'run the query'
+			page.runQuery()
+
+		when: 'Db Monitor tab is clicked'
+			page.gotoDbMonitor()
+		then: 'at DbMonitor Page'
+			at DbMonitorPage
+
+		when:
+			page.searchDatabaseTable(tablename)	
+        then:    
+			String number = page.databaseTableCurrentPage.text()
+            String numbers = page.databaseTableTotalPage.text()
 
         when: 'sql query tab is clicked'
-        page.gotoSqlQuery()
-        then: 'at sql query'
-        at SqlQueryPage
+			page.gotoSqlQuery()
+		then: 'at sql query'
+			at SqlQueryPage
 
-        when: 'set query in the box'
-        page.setQueryText(createQuery)
-        then: 'run the query'
-        page.runQuery()
-
+		when: 'set query in the box'
+			page.setQueryText(deleteQuery)
+		then: 'run the query'
+			page.runQuery()
+            
         when: 'Db Monitor tab is clicked'
-        page.gotoDbMonitor()
-        then: 'at DbMonitor Page'
-        at DbMonitorPage
+			page.gotoDbMonitor()
+		then: 'at DbMonitor Page'
+			at DbMonitorPage
+		
+		when: 
+			page.searchDatabaseTable(tablename)	
+		then:
+			String number1 = page.databaseTableCurrentPage.text()
+            String numbers1 = page.databaseTableTotalPage.text()
 
-        when:
-        page.searchDatabaseTable("lina")
-        then:
-        String number = page.databaseTableCurrentPage.text()
-        String numbers = page.databaseTableTotalPage.text()
+			!number.equals("0")
+			!numbers.equals("0")
+            number1.equals("0")
+            numbers1.equals("0")
+	}
 
-        when: 'sql query tab is clicked'
-        page.gotoSqlQuery()
-        then: 'at sql query'
-        at SqlQueryPage
 
-        when: 'set query in the box'
-        page.setQueryText(deleteQuery)
-        then: 'run the query'
-        page.runQuery()
+    def "check if Row Count is clickable"() {
+        String before = ""
+		String after  = ""
 
-        when: 'Db Monitor tab is clicked'
-        page.gotoDbMonitor()
-        then: 'at DbMonitor Page'
-        at DbMonitorPage
+		when: 'click row count'
+			page.clickRowcount()
+        then: 'check if row count is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
 
-        when:
-        page.searchDatabaseTable("lina")
-        then:
-        String number1 = page.databaseTableCurrentPage.text()
-        String numbers1 = page.databaseTableTotalPage.text()
+		when: 'click row count'
+			page.clickRowcount()
+		then: 'check if row count is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
 
-        !number.equals("0")
-        !numbers.equals("0")
-        number1.equals("0")
-        numbers1.equals("0")
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
     }
+
+
+    def "check if Max Rows is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click max rows'
+			page.clickMaxRows()
+        then: 'check if max rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click max rows'
+			page.clickMaxRows()
+		then: 'check if max rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Min Rows is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click min rows'
+			page.clickMinRows()
+        then: 'check if min rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click min rows'
+			page.clickMinRows()
+		then: 'check if min rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Avg Rows is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click avg rows'
+			page.clickAvgRows()
+        then: 'check if avg rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click avg rows'
+			page.clickAvgRows()
+		then: 'check if avg rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Type is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click type'
+			page.clickTabletype()
+        then: 'check if type is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click type'
+			page.clickTabletype()
+		then: 'check if type is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+	def thisIsWorking() {
+		when:
+		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+		String line;
+		String query = ""
+		while ((line = br.readLine()) != null) {
+	   		// process the line.
+			query = query + line + "\n"
+		}
+		br.close();
+		then:
+		query.equals("zxya")
+	}
+
+	def checktwo() {
+		when:
+		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+		String line;
+		String query = ""
+		
+		while((line = br.readLine()) != "#create") {
+		}
+
+		while ((line = br.readLine()) != null) {
+			// process the line.
+			query = query + line + "\n"
+		}
+		
+		br.close();
+		String query = page.getQueryToCreateTable()		
+		then:
+		query.equals("zxya")
+	}
+	
+	// stored procedure ascending descending
+	
+	    def "check if stored procedure is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click stored procedure'
+			page.clickStoredProcedure()
+        then: 'check if table is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click stored procedure'
+			page.clickStoredProcedure()
+		then: 'check if table is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+
+    def "check if Invocations is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click row count'
+			page.clickInvocations()
+        then: 'check if row count is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click row count'
+			page.clickInvocations()
+		then: 'check if row count is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+
+    def "check if Min Latency is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click min latency'
+			page.clickMinLatency()
+        then: 'check if max rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click min latency'
+			page.clickMinLatency()
+		then: 'check if max rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Max Latency is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click max latency'
+			page.clickMaxLatency()
+        then: 'check if min rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click max latency'
+			page.clickMaxLatency()
+		then: 'check if min rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Avg Latency is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click avg latency'
+			page.clickAvgLatency()
+        then: 'check if avg rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click avg latency'
+			page.clickAvgLatency()
+		then: 'check if avg rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Time of Execution is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click time of execution'
+			page.clickTimeOfExecution()
+        then: 'check if type is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click time of execution'
+			page.clickTimeOfExecution()
+		then: 'check if type is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+	
+	//  check if data is being displayed in the stored procedure table or not
+	// one test fails and the other passes
+	
+	def "check if any data is displayed in Stored Procedures"() {
+		when:
+			page.storedProceduresDisplayed()
+		then:
+			page.storedProceduresDataDisplayed()
+	}
+
+	def "check if no data is displayed in Stored Procedures"() {
+		when:
+			page.storedProceduresDisplayed()
+		then:
+			!page.storedProceduresDataDisplayed()
+	}
+
+	// check if data is being displayed in the database table or not
+	// one test fails and the other passes
+	
+	def "check if any data is displayed in Database Tables"() {
+		when:
+			page.databaseTableDisplayed()
+		then:
+			page.databaseTableDisplayed()
+	}
+
+	def "check if no data is displayed in Database Tables"() {
+		when:
+			page.databaseTableDisplayed()
+		then:
+			!page.databaseTableDisplayed()
+	}
 }

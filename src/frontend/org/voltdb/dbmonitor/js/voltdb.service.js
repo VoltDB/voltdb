@@ -981,6 +981,44 @@
 
         };
         //end admin configuration
+        
+        //Update User configuration
+        this.UpdateUserConfiguration = function (updatedData, onConnectionAdded, userId, requestType) {
+            try {
+                var processName = "SHORTAPI_USERUPDATEDEPLOYMENT";
+                var procedureNames = [];
+                var parameters = [];
+                var values = [];
+                var shortApiDetails = {
+                    isShortApiCall: true,
+                    isUpdateConfiguration: true,
+                    apiPath: 'deployment/users/' + userId,
+                    updatedData: 'user=' + JSON.stringify(updatedData),
+                    requestType: requestType
+                };
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            }, shortApiDetails);
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    }, shortApiDetails);
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
 
     });
 

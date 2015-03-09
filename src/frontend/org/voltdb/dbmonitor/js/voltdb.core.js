@@ -175,7 +175,15 @@
                         } else {
                             VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                         }
-                        jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        if (!shortApiCallDetails.hasOwnProperty("requestType")) {
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else if (shortApiCallDetails.requestType.toLowerCase() == "put") {
+                            jQuery.putJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else if (shortApiCallDetails.requestType.toLowerCase() == "delete") {
+                            jQuery.deleteJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else {
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        }
                     }
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
@@ -589,9 +597,7 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization) {
-        
         if (VoltDBCore.hostIP == "") {
-
             jQuery.ajax({
                 type: 'POST',
                 url: url,
@@ -633,7 +639,6 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-        
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',
@@ -675,3 +680,42 @@ jQuery.extend({
 
 });
 
+jQuery.extend({
+    putJSON: function (url, formData, callback, authorization) {
+        jQuery.ajax({
+            type: 'PUT',
+            url: url,
+            data: formData,
+            dataType: 'json',
+            beforeSend: function (request) {
+                if (authorization != null) {
+                    request.setRequestHeader("Authorization", authorization);
+                }
+            },
+            success: callback,
+            error: function (e) {
+                console.log(e.message);
+            }
+        });
+    }
+});
+
+jQuery.extend({
+    deleteJSON: function (url, formData, callback, authorization) {
+        jQuery.ajax({
+            type: 'DELETE',
+            url: url,
+            //data: formData,
+            dataType: 'json',
+            beforeSend: function (request) {
+                if (authorization != null) {
+                    request.setRequestHeader("Authorization", authorization);
+                }
+            },
+            success: callback,
+            error: function (e) {
+                console.log(e.message);
+            }
+        });
+    }
+});

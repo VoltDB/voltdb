@@ -90,6 +90,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         ascending		{ $(class:"sorttable_sorted") }
         descending		{ $(class:"sorttable_sorted_reverse") }
 
+		alertThreshold	{ $("#threshold") }
+		saveThreshold	{ $("#saveThreshold") }
+
+		storedProceduresNodataMsg	{ $("html body div.page-wrap div#wrapper div.contents div#containerMain.container div.data div#firstpane.menu_list div.menu_body div#tblStoredProcedures.storedProcWrapper div.tblScroll table.storeTbl tbody#storeProcedureBody tr td") }
+		databasetableNoDataMsg		{ $("html body div.page-wrap div#wrapper div.contents div#containerMain.container div.data div#firstpane.menu_list div.menu_body div#tblDataTables.dataTablesWrapper div.tblScroll table.storeTbl tbody#tablesBody tr td") }
+
         preferencesTitle		{ $(class:"overlay-title", text:"Graph/Data Preferences") }
         savePreferencesBtn		{ $("#savePreference") }
         popupClose				{ $(class:"popup_close") }
@@ -593,25 +599,42 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return query
     }
 
-    /*
-     * get query to delete a table
-     */
-    def String getQueryToDeleteTable() {
-        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
-        String line;
-        String query = ""
+    	/*
+	 * get query to delete a table
+	 */
+	def String getQueryToDeleteTable() {
+		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+		String line;
+		String query = ""
+		
+		while((line = br.readLine()) != "#delete") {
+		}
 
-        while((line = br.readLine()) != "#delete") {
-        }
+		while ((line = br.readLine()) != "#name") {
+			// process the line.
+			query = query + line + "\n"
+		}
+		
+		return query
+	}
 
-        while ((line = br.readLine()) != null) {
-            // process the line.
-            query = query + line + "\n"
-        }
+	/*
+	 * get tablename that is created and deleted
+	 */
+	def String getTablename() {
+		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+		String line;
+		String query = ""
+		
+		while((line = br.readLine()) != "#name") {
+		}
 
-        return query
-    }
-
+		while ((line = br.readLine()) != null) {
+			query = query + line + "\n"
+		}
+		
+		return query
+	}
 
     /*
      *	search the tablename in Database Tables
@@ -683,4 +706,78 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean clickTabletype() {
         tabletype.click()
     }
+	
+	// for stored procedure
+	
+	/*
+	 *	return true if stored procedures table is displayed
+	 */
+	def boolean storedProceduresTableDisplayed() {
+		waitFor		{ storedProcedures.displayed }
+	}
+
+	/*
+	 *	return true if data in stored procedures table is displayed
+	 */
+	def boolean storedProceduresDataDisplayed() {
+		waitFor(20)	{ storedProceduresNodataMsg.displayed }
+	}
+
+	/*
+	 *	return true if stored procedures table is displayed
+	 */
+	def boolean databaseTableDisplayed() {
+		waitFor		{ dataTables.displayed }
+	}
+
+	/*
+	 *	return true if data in stored procedures table is displayed
+	 */
+	def boolean sdatabaseTableDisplayed() {
+		waitFor(20)	{ databasetableNoDataMsg.displayed }
+	}
+
+	// for ascending descending in the stored procedures
+
+	/*
+	 *	click the stored procedure in database table
+	 */
+	def boolean clickStoredProcedure() {
+		storedProcedure.click()
+	}
+
+	/*
+	 *	click the row count column in database table
+	 */
+	def boolean clickInvocations() {
+		invocations.click()
+	}
+
+	/*
+	 *	click the max rows column in database table
+	 */
+	def boolean clickMinLatency() {
+		minLatency.click()
+	}
+
+	/*
+	 *	click the min rows column in database table
+	 */
+	def boolean clickMaxLatency() {
+		maxLatency.click()
+	}
+
+	/*
+	 *	 click the avg rows column in database table
+	 */
+	def boolean clickAvgLatency() {
+		avgLatency.click()
+	}
+
+	/*
+	 *	click the type column in database table
+	 */
+	def boolean clickTimeOfExecution() {
+		timeOfExecution.click()
+	}
 }
