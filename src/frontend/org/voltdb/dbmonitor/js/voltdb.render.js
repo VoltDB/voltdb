@@ -668,10 +668,20 @@ function alertNodeClicked(obj) {
             var updatedSystemOverview = {};
             var currentServerOverview = {};
             var iterator = 1;
-
-            if (connection.Metadata['@SystemInformation_OVERVIEW'] == null) {
+            
+            //Error: "Authentication rejected(-3)"
+            if (connection.Metadata['@SystemInformation_OVERVIEW_status'] == -3) {
+                VoltDbUI.hasPermissionToView = false;
+                
+                if (!$("#loginWarningPopup").is(":visible")) {
+                    $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view this page.");
+                    $("#loginWarnPopup").click();
+                }
+                return;
+            } else if (connection.Metadata['@SystemInformation_OVERVIEW'] == null) {
                 return;
             }
+            
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
