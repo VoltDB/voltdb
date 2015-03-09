@@ -62,6 +62,7 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
 SchemaColumn::~SchemaColumn()
 {
     delete m_expression;
+    m_expression = NULL;
 }
 
 string

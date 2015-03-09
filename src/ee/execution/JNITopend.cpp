@@ -386,6 +386,7 @@ void JNITopend::pushExportBuffer(
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
+            m_jniEnv->DeleteLocalRef(signatureString);
             m_jniEnv->ExceptionDescribe();
             throw std::exception();
         }
