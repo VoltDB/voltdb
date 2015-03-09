@@ -142,7 +142,7 @@
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 }
                 if (typeof (params) == 'string') {
-                    if (VoltDBCore.isServerConnected) {
+                    if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
                         if (this.authorization != null) {
                             ah = this.authorization;
@@ -168,7 +168,7 @@
 
                     uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
 
-                    if (VoltDBCore.isServerConnected) {
+                    if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
                         if (this.authorization != null) {
                             ah = this.authorization;
@@ -190,7 +190,7 @@
 
                     var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                     if (typeof (params) == 'string') {
-                        if (VoltDBCore.isServerConnected) {
+                        if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                             var ah = null;
                             if (this.authorization != null) {
                                 ah = this.authorization;
@@ -533,8 +533,10 @@
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
                         }
-                        else
+                        else {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
+                            connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
+                        }
                     });
                 });
             }
@@ -705,7 +707,6 @@ jQuery.extend({
         jQuery.ajax({
             type: 'DELETE',
             url: url,
-            //data: formData,
             dataType: 'json',
             beforeSend: function (request) {
                 if (authorization != null) {

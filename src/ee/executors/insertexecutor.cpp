@@ -280,7 +280,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         } else {
             // upsert execution logic
             assert(persistentTable->primaryKeyIndex() != NULL);
-            TableTuple existsTuple = persistentTable->lookupTuple(templateTuple);
+            TableTuple existsTuple = persistentTable->lookupTupleByValues(templateTuple);
 
             if (existsTuple.isNullTuple()) {
                 // try to put the tuple into the target table

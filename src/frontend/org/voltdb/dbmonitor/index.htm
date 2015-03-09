@@ -1082,7 +1082,7 @@
         </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
-            <p>Security settings has been changed. You no longer have permission to view Admin Tab.</p>
+            <p id="loginWarningPopupMsg">Security settings has been changed. You no longer have permission to view this page.</p>
             <br />
             <div class="overlay-btns"><a class="btn" id="btnLoginWarningOk">Ok</a></div>
         </div>
@@ -1302,6 +1302,27 @@
         </div>
     </div>
     <!--Update error Popup-->
+    
+    <!--Update error Security User-->
+    <div style="display: none"><a href="#securityUserErrorPopup" id="sercurityUserPopupLink">Update Error</a></div>
+    <div id="securityUserErrorPopup" style="display: none">
+        <div id="securityUserInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                   <span id="securityUserErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSecurityUserErrorOk">Ok</a></div>
+
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
 
     <!-- POPUP StopServerErrorPopup-->
     <div id="divStopServerError" style="display: none;">

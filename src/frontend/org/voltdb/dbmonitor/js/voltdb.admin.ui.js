@@ -166,6 +166,7 @@ function loadAdminPage() {
         queryTimeoutUpdateErrorFieldMsg: $("#queryTimeoutUpdateErrorFieldMsg"),
         snapshotLabel: $("#row-2").find("td:first-child").text(),
         queryTimeoutFieldLabel: $("#queryTimoutRow").find("td:first-child").text(),
+        securityUserErrorFieldMsg: $("#securityUserErrorFieldMsg"),
 
         //Export Settings
         addNewConfigLink: $("#addNewConfigLink"),
@@ -226,14 +227,17 @@ function loadAdminPage() {
         
         userNameRule: {
             required: true,
-            regex: /^[a-zA-Z0-9_.]+$/
+            regex: /^[a-zA-Z0-9_.]+$/,
+            checkDuplicate: []
         },
         userNameMessage: {
             required: "This field is required",
-            regex: 'Only alphabets, numbers, _ and . are allowed.'
+            regex: 'Only alphabets, numbers, _ and . are allowed.',
+            checkDuplicate:'This username already exists.'
         },
         passwordRule: {
             required: true
+            
         },
         passwordMessage: {
             required: "This field is required",
@@ -599,30 +603,7 @@ function loadAdminPage() {
             });
         }
     });
-
-
-    $("#loginWarnPopup").popup({
-        afterOpen: function (event, ui, ele) {
-            var popup = $(this)[0];
-
-            $("#btnLoginWarningOk").unbind("click");
-            $("#btnLoginWarningOk").on('click', function () {
-                if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
-                    location.reload(true);
-                }
-
-                if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-                    $("#navDbmonitor").click();
-                }
-
-                $("#navAdmin").hide();
-                popup.close();
-            });
-        },
-        closeContent: '',
-        modal: true
-    });
-
+    
     var showUpdateMessage = function (msg) {
         adminClusterObjects.updateMessageBar.html(msg);
         adminClusterObjects.updateMessageBar.css('display', 'block');
@@ -1813,14 +1794,15 @@ function loadAdminPage() {
         }
     });
 
-    var editUserId = -1;
+    var editUserState = -1;
+    var orguser = '';
     $("#addNewUserLink").popup({
         open: function (event, ui, ele) {
             $("#addUserControl").show();
             $("#deleteSecUser").show();
             $("#saveUserControl").hide();
-            editUserId = $('#addUserInnerPopup').data('isupdate');
-            if (editUserId == 1) {
+            editUserState = $('#addUserInnerPopup').data('isupdate');
+            if (editUserState == 1) {
                 $("#deleteUser").css('display', 'block');
             } else {
                 $("#deleteUser").css('display', 'none');
@@ -1828,7 +1810,7 @@ function loadAdminPage() {
             var content = '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                             '<tbody>'+
                                 '<tr>' +
-                                    '<td width="30%">User</td>' +    
+                                    '<td width="30%">Username</td>' +    
                                     '<td width="10%">' +  
                                         '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +         
                                         '<label id="errorUser" for="txtUser" class="error" style="display:none">This field is required</label>' +
@@ -1840,7 +1822,7 @@ function loadAdminPage() {
                                 '<tr>' +  
                                     '<td><span id="labelPassword"></span> </td> ' +     
                                     '<td>' +  
-                                        '<input id="txtPassword" name="txtPassword" type="text" size="30" aria-required="true" class="error"/> ' +        
+                                        '<input id="txtPassword" name="txtPassword" type="password" size="30" aria-required="true" class="error"/> ' +        
                                         '<label id="errorPassword" for="txtPassword" class="error" style="display:none">This field is required</label> ' +     
                                     '</td>' +      
                                     '<td>&nbsp;</td> ' +     
@@ -1850,7 +1832,7 @@ function loadAdminPage() {
                                     '<td>Roles </td> ' +     
                                     '<td>' +  
                                         '<select id="selectRole">' +  
-                                            '<option value="administrator" selected="selected">Admin</option>' +  
+                                            '<option value="administrator" selected="selected">Administrator</option>' +  
                                             '<option value="user">User</option>' +  
                                         '</select>  ' +  
                                     '</td> ' +     
@@ -1860,28 +1842,31 @@ function loadAdminPage() {
                             '</tbody>' +
                         '</table>';
             $('#addUserWrapper').html(content);
-            
+
+
             $("#frmAddUser").validate({
                 rules: {
                     txtUser: adminValidationRules.userNameRule,
-                    txtPassword:adminValidationRules.passwordRule
+                    txtPassword: adminValidationRules.passwordRule
                 },
                 messages: {
                     txtUser: adminValidationRules.userNameMessage,
-                    txtPassword:adminValidationRules.passwordMessage
+                    txtPassword: adminValidationRules.passwordMessage
                 }
             });
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
-            if (editUserId == -1) {
-                $('#labelPassword').html('New Password');
+            if (editUserState == -1) {
+                $('#labelPassword').html('Password');
                 $('#addUserHeader').html('Add User');
             } else {
-                $('#labelPassword').html('Password');
+                $('#labelPassword').html('New Password');
                 $('#addUserHeader').html('Edit User');
                 $('#txtUser').val($('#addUserInnerPopup').data('username')); 
                 $('#txtOrgUser').val($('#addUserInnerPopup').data('username'));
+                orguser = $('#addUserInnerPopup').data('username');
                 $('#selectRole').val($('#addUserInnerPopup').data('role').toLowerCase());
             }
 
@@ -1920,7 +1905,7 @@ function loadAdminPage() {
                         "password": password,
                         "plaintext": true
                     };
-                    if (editUserId == 1) {
+                    if (editUserState == 1) {
                         requestUser = username;
                     } else {
                         requestUser = newUsername;
@@ -1938,15 +1923,25 @@ function loadAdminPage() {
                         } else {
                             setTimeout(function() {
                                 toggleSecurityEdit(editStates.ShowEdit);
-                                var msg = '"' + adminEditObjects.securityLabel + '". ';
+                                var errorStatus = '';
+                                if (editUserState == 1) {
+                                    errorStatus = 'Could not update the user credentials. ';
+                                } else {
+                                    errorStatus = 'Could not add a new user. ';
+                                }
+                                var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
                                     msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
-                                } else {
+                                }
+                                else if (result.statusstring != "") {
+                                    msg += " " + result.statusstring;
+                                }
+                                else {
                                     msg += "Please try again later.";
                                 }
-
-                                adminEditObjects.updateErrorFieldMsg.text(msg);
-                                $("#updateErrorPopupLink").trigger("click");
+                                
+                                $('#securityUserErrorFieldMsg').html(msg);
+                                $("#sercurityUserPopupLink").trigger("click");
                             }, 3000);
                         }
                     }, requestUser, requestType);
@@ -1955,6 +1950,7 @@ function loadAdminPage() {
                     toggleSecurityEdit(editStates.ShowLoading);
                     voltDbRenderer.UpdateUserConfiguration(null, function (result) {
                         if (result.status == "1") {
+                            toggleSecurityEdit(editStates.ShowEdit);
                             //Reload Admin configurations for displaying the updated value
                             voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
                                 //TODO: Hide loading image
@@ -1963,15 +1959,19 @@ function loadAdminPage() {
                         } else {
                             setTimeout(function() {
                                 toggleSecurityEdit(editStates.ShowEdit);
-                                var msg = '"' + adminEditObjects.securityLabel + '". ';
+                                var errorStatus = 'Could not delete the user.';
+                                
+                                var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
                                     msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                } else if (result.statusstring != "") {
+                                    msg += " " + result.statusstring;
                                 } else {
                                     msg += "Please try again later.";
                                 }
 
-                                adminEditObjects.updateErrorFieldMsg.text(msg);
-                                $("#updateErrorPopupLink").trigger("click");
+                                $('#securityUserErrorFieldMsg').html(msg);
+                                $("#sercurityUserPopupLink").trigger("click");
                             }, 3000);
                         }
                     }, username, "DELETE");
@@ -2005,6 +2005,21 @@ function loadAdminPage() {
             var popup = $(this)[0];
             $("#btnUpdateErrorOk").unbind("click");
             $("#btnUpdateErrorOk").on("click", function () {
+
+                //Close the popup
+                popup.close();
+            });
+        }
+    });
+
+    $("#sercurityUserPopupLink").popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+
+            var popup = $(this)[0];
+            $("#btnSecurityUserErrorOk").unbind("click");
+            $("#btnSecurityUserErrorOk").on("click", function () {
 
                 //Close the popup
                 popup.close();
@@ -2081,6 +2096,31 @@ function loadAdminPage() {
         },
         "Please enter only valid characters."
     );
+
+    $.validator.addMethod(
+        "checkDuplicate",
+        function(value) {
+            var arr = VoltDbAdminConfig.orgUserList;
+            if (editUserState == 1) {
+                if ($.inArray(value, arr) != -1) {
+                    if (value == orguser)
+                        return true;
+                    return false;
+                } else {
+                    return true;
+                }
+            } else {
+                if ($.inArray(value, arr) != -1) {
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+
+        },
+        "Username already exists."
+    );
+
 }
 
 (function (window) {
@@ -2282,6 +2322,7 @@ function loadAdminPage() {
 
         var getUserList = function (userData) {
             var result = "";
+            VoltDbAdminConfig.orgUserList = [];
             var tableHeader = '<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">' +
                 '<tr>' +
                 '<th>Username</th>' +
@@ -2294,9 +2335,10 @@ function loadAdminPage() {
                 for (var i = 0; i < userData.length; i++) {
                     var userName = userData[i].name;
                     var role = userData[i].roles;
+                    VoltDbAdminConfig.orgUserList.push(userName);
                     result += '<tr>' +
                         '<td>' + userName + '</td>' +
-                        '<td>' + role + '</td>' +
+                        '<td>' + formatDisplayName(role) + '</td>' +
                         '<td>&nbsp</td>' +
                         '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\''+userName+'\',\''+role+'\');">&nbsp;</a></td>' +
                         '</tr>';
@@ -2316,11 +2358,11 @@ function loadAdminPage() {
                 '<th>Delete</th>' +
                 '</tr>';
             var tableFooter = '</table>';
-            VoltDbAdminConfig.orgUserList = [];
+            var userList = [];
             if (userData != undefined) {
                 for (var i = 0; i < userData.length; i++) {
                     var userName = userData[i].name;
-                    VoltDbAdminConfig.orgUserList.push(userName);
+                    userList.push(userName);
                     var role = userData[i].roles;
                     result += '<tr class="old_row">' +
                         '<td id="latbox" class="username">' +
@@ -2351,6 +2393,7 @@ function loadAdminPage() {
                 }
                 $('#editUserList').html(tableHeader + result + tableFooter);
             }
+            VoltDbAdminConfig.orgUserList = userList;
         };
 
         var setSnapShotUnit = function (unit) {
@@ -2571,11 +2614,16 @@ var editStream = function (editId) {
     adminDOMObjects.addConfigLink.trigger("click");
 };
 
-var addUser = function (editId,username,role) {
+var addUser = function(editId, username, role) {
     $('#addUserInnerPopup').data('isupdate', editId);
     if (editId == 1) {
         $('#addUserInnerPopup').data('username', username);
         $('#addUserInnerPopup').data('role', role);
     }
     $("#addNewUserLink").trigger("click");
-}
+};
+
+var formatDisplayName = function(displayName) {
+    displayName = displayName.toLowerCase();
+    return displayName.charAt(0).toUpperCase() + displayName.slice(1);
+};

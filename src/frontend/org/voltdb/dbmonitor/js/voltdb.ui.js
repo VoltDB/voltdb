@@ -384,6 +384,29 @@ var loadPage = function (serverName, portid) {
 
         retainCurrentTab();
     });
+    
+    $("#loginWarnPopup").popup({
+        afterOpen: function (event, ui, ele) {
+            var popup = $(this)[0];
+
+            $("#btnLoginWarningOk").unbind("click");
+            $("#btnLoginWarningOk").on('click', function () {
+                
+                if (!VoltDbUI.hasPermissionToView) {
+                    location.reload(true);
+                } else {
+                    if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
+                        $("#navDbmonitor").click();
+                    }
+                    
+                    $("#navAdmin").hide();
+                }
+                popup.close();
+            });
+        },
+        closeContent: '',
+        modal: true
+    });
 
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
@@ -575,10 +598,27 @@ var loadPage = function (serverName, portid) {
 
         //Load Admin configurations                
         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+            
+            if (!VoltDbUI.hasPermissionToView)
+                return;
+
             if (rawConfigValues.status == -3 && VoltDbAdminConfig.isAdmin) {
                 VoltDbAdminConfig.isAdmin = false;
-                $("#loginWarnPopup").click();
+                setTimeout(function() {
+                    var checkPermission = function() {
 
+                        if (!VoltDbUI.hasPermissionToView)
+                            return;
+                        else
+                            $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view Admin Tab.");
+
+                        if (!$("#loginWarningPopup").is(":visible")) {
+                            $("#loginWarnPopup").trigger("click");
+                        }
+
+                    };
+                    voltDbRenderer.GetSystemInformation(checkPermission, function (portAndOverviewValues, serverSettings) { }, function (data) { });
+                }, 2000);
             } else
                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
         });
@@ -1646,6 +1686,7 @@ var adjustGraphSpacing = function () {
             this.loadSchemaTab();
             SQLQueryRender.populateTablesAndViews();
         };
+        this.hasPermissionToView = true;
 
         this.refreshConnectionTime = function (seconds) {
             if (VoltDbUI.connectionTimeInterval != null)
