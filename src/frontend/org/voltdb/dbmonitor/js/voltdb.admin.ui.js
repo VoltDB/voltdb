@@ -616,7 +616,7 @@ function loadAdminPage() {
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
                     if (success) {
                         if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
-                            showUpdateMessage('Snapshot saved successfully.');
+                            showUpdateMessage('Snapshot queued successfully.');
                         } else {
                             $('#saveSnapshotStatus').html('Failed to save snapshot');
                             $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
