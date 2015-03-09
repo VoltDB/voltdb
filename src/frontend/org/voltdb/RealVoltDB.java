@@ -1307,7 +1307,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     //We will ignore the supplied or default deployment anyways.
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
                         byte[] deploymentHashHere =
-                            CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
+                            CatalogUtil.makeDeploymentHash(deploymentBytes);
                         if (!(Arrays.equals(deploymentHashHere, catalogStuff.getDeploymentHash())))
                         {
                             hostLog.warn("The locally provided deployment configuration did not " +
@@ -1457,7 +1457,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.fatal("Error validating deployment file");
                 VoltDB.crashLocalVoltDB("Error validating deployment file");
             }
-            byte[] deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
+            byte[] deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
 
             m_catalogContext = new CatalogContext(
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
