@@ -907,7 +907,7 @@ public class SQLParser extends SQLPatternFactory
         paramText = paramText.trim();
         // Mask out strings that contain whitespace or commas
         // that must not be confused with parameter separators.
-        ArrayList<String> originalString = new ArrayList<>();
+        ArrayList<String> originalString = new ArrayList<String>();
         Matcher stringMatcher = SingleQuotedStringContainingParameterSeparators.matcher(paramText);
         while (stringMatcher.find()) {
             originalString.add(stringMatcher.group());
