@@ -1173,4 +1173,28 @@ class DbMonitorTest extends TestBase {
 		then:
 			!page.databaseTableDisplayed()
 	}
+
+    // ALERT
+
+	def "set alert and check missing"() {
+		when: 'set alert threshold to zero'
+			page.setAlertThreshold(00)
+		then: 'check at least one alert'
+			waitFor(40, 2) { page.alertCount.isDisplayed() }
+			int alert = page.getAlert()
+
+			if ( alert != 0 ) {
+				println("PASS:There is at least one server on alert")
+			}
+			else {
+				println("FAIL:There are no server on alert")
+				assert false
+			}
+
+		when: 'set alert threshold to hundred'
+			page.setAlertThreshold(100)
+		then: 'check no alert'
+			waitFor(40,20) { !page.alertCount.isDisplayed() }
+	}
+
 }

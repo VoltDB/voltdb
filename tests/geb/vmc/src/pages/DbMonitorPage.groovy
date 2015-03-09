@@ -780,4 +780,22 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 	def boolean clickTimeOfExecution() {
 		timeOfExecution.click()
 	}
+
+    /*
+	 *	set value in alert threshold and save
+	 */
+    def boolean setAlertThreshold(int threshold) {
+        serverButton.click()
+
+        if (threshold < 0 && threshold >100) {
+            println("the set value for threshold is not valid")
+            return false
+        }
+
+        waitFor		{ alertThreshold.displayed }
+        waitFor		{ saveThreshold.displayed }
+
+        alertThreshold.value(threshold)
+        saveThreshold.click()
+    }
 }
