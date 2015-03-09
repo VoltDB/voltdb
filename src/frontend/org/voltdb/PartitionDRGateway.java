@@ -187,10 +187,6 @@ public class PartitionDRGateway {
                     log.trace("Version " + version + " type DELETE table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
                     break;
                 }
-                case UPDATE:
-                    //Update
-                    //log.trace("Version " + version + " type UPDATE " + checksum " + checksum);
-                    break;
                 case BEGIN_TXN: {
                     //Begin txn
                     final long txnId = buf.getLong();
