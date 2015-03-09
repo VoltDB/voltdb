@@ -663,11 +663,13 @@ function alertNodeClicked(obj) {
             return adminConfigValues;
         };
 
-        //method updated for vmc-119
+       
         var populateSystemInformation = function (connection) {
-            var updatedSystemOverview = {};
+            var updatedSystemOverview = [];
             var currentServerOverview = {};
-            var iterator = 1;
+            var serverOverview = {};
+            var iterator = 0;
+            var ipAddress = "";
             
             //Error: "Authentication rejected(-3)"
             if (connection.Metadata['@SystemInformation_OVERVIEW_status'] == -3) {
@@ -685,25 +687,22 @@ function alertNodeClicked(obj) {
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
-                var hostName = "";                
-                
+
                 if (singleData[1] == 'IPADDRESS') {
                     if (singleData[2] == VoltDBConfig.GetDefaultServerIP()) {
                         voltDbRenderer.isHost = true;
-                        
-                    } else { 
+
+                    } else {
                         voltDbRenderer.isHost = false;
-                        //require to initialize a nest json object only in the case if object being iterated is not a current host object
-                        if (!updatedSystemOverview.hasOwnProperty(id)) {
-                            updatedSystemOverview[id] = {};
-                        }
+                        serverOverview[id] = {};
+                        ipAddress = singleData[2];
                     }
                 }
 
                 if (singleData[1] == 'HOSTNAME') {
                     if (voltDbRenderer.isHost) {
                         voltDbRenderer.currentHost = singleData[2];
-                        
+
                     }
                     if ($.inArray(singleData[2], voltDbRenderer.hostNames) == -1)
                         voltDbRenderer.hostNames.push(singleData[2]);
@@ -714,17 +713,26 @@ function alertNodeClicked(obj) {
                 //otherwise to a updatedSystemOverview 
                 if (voltDbRenderer.isHost)
                     currentServerOverview[singleData[1]] = singleData[2];
-                else
-                    updatedSystemOverview[id][singleData[1]] = singleData[2];
+                else {
+                    serverOverview[id][singleData[1]] = singleData[2];
 
+                    if (singleData[1] == "LOG4JPORT") {
+                        serverOverview[id]["NODEID"] = id;
+                        updatedSystemOverview[iterator] = serverOverview[id];
+                        iterator++;
+                    }
+                }
             });
 
-            
+            systemOverview = {};
             systemOverview[0] = currentServerOverview;
-            $.each(updatedSystemOverview,function (key,value) {
-                systemOverview[iterator] = value;
-                iterator++;
-            });           
+            
+            //iterate through updatedSystemOverview to add remaining server to the list 'systemOverview'
+            for (iterator = 0; iterator < updatedSystemOverview.length; iterator++) {
+                systemOverview[iterator+1] = updatedSystemOverview[iterator];
+
+            };
+
         };
 
         var populateTablesInformation = function (connection) {
@@ -1674,7 +1682,7 @@ function alertNodeClicked(obj) {
         this.getServerIP = function (hostId) {
             var serverAddress;
             $.each(systemOverview, function (key, val) {
-                if (key == hostId) {
+                if (val.NODEID == hostId) {
                     serverAddress = val["IPADDRESS"];
                     return false;
                 }
@@ -2198,7 +2206,7 @@ function alertNodeClicked(obj) {
             } else {
                 if (systemOverview != null || systemOverview != undefined) {
                     $.each(systemOverview, function (id, val) {
-                        setServerDetails(id, val, val['CLUSTERSTATE']);
+                        setServerDetails(val.NODEID, val, val['CLUSTERSTATE']);
                     });
                 }
 

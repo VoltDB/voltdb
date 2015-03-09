@@ -125,7 +125,6 @@ class schemaTab extends Module{
         tupleinput{$("#schematable > thead > tr.tablesorter-filter-row.hideme > td:nth-child(7) > input")}
 
 
-
         //for writing query
         clicksqlquery{$("#navSqlQuery > a")}
 
