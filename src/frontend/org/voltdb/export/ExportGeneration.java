@@ -438,7 +438,7 @@ public class ExportGeneration {
 
                     final ExportDataSource eds = partitionSources.get(signature);
                     if (eds == null) {
-                        exportLog.error("Received an export ack for partition " + partition +
+                        exportLog.warn("Received an export ack for partition " + partition +
                                 " source signature " + signature + " which does not exist on this node");
                         return;
                     }

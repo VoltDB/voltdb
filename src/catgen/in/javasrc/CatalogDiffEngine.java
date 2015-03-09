@@ -25,12 +25,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.ConnectorProperty;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.catalog.Column;
@@ -68,7 +72,11 @@ public class CatalogDiffEngine {
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
 
-    private SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
+    private final SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
+
+    //Track new tables to help determine which export table is new or
+    //modified
+    private final SortedSet<String> m_newTablesForExport = new TreeSet<>();
 
     //A very rough guess at whether only deployment changes are in the catalog update
     //Can be improved as more deployment things are going to be allowed to conflict
@@ -307,6 +315,23 @@ public class CatalogDiffEngine {
     }
 
     /**
+     * If it is not a new table make sure that the soon to be exported
+     * table is empty or has no tuple allocated memory associated with it
+     *
+     * @param tName table name
+     */
+    private void trackExportOfAlreadyExistingTables(String tName) {
+        if (tName == null || tName.trim().isEmpty()) return;
+        if (!m_newTablesForExport.contains(tName)) {
+            String errorMessage = String.format(
+                    "Unable to change table %s to an export table because the table is not empty",
+                    tName
+                    );
+            m_tablesThatMustBeEmpty.put(tName, errorMessage);
+        }
+    }
+
+    /**
      * @return null if the CatalogType can be dynamically added or removed
      * from a running system. Return an error string if it can't be changed on
      * a non-empty table. There will be a subsequent check for empty table
@@ -322,7 +347,6 @@ public class CatalogDiffEngine {
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
-            suspect instanceof Connector ||
             suspect instanceof SnapshotSchedule ||
             // refs are safe to add drop if the thing they reference is
             suspect instanceof ConstraintRef ||
@@ -334,10 +358,39 @@ public class CatalogDiffEngine {
             // So, in short, all of these constraints will pass or fail tests of other catalog differences
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
-            suspect instanceof Constraint ||
-            // Support add/drop of the top level object.
-            suspect instanceof Table)
+            suspect instanceof Constraint)
         {
+            return null;
+        }
+
+        else if (suspect instanceof Table) {
+            Table tbl = (Table)suspect;
+            if (   ChangeType.ADDITION == changeType
+                && CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)
+            ) {
+                m_newTablesForExport.add(tbl.getTypeName());
+            }
+            // Support add/drop of the top level object.
+            return null;
+        }
+
+        else if (suspect instanceof Connector) {
+            if (ChangeType.ADDITION == changeType) {
+                for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
+                    trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
+                }
+            }
+            return null;
+        }
+
+        else if (suspect instanceof ConnectorTableInfo) {
+            if (ChangeType.ADDITION == changeType) {
+                trackExportOfAlreadyExistingTables(((ConnectorTableInfo)suspect).getTable().getTypeName());
+            }
+            return null;
+        }
+
+        else if (suspect instanceof ConnectorProperty) {
             return null;
         }
 
