@@ -1369,6 +1369,64 @@ public class TestCatalogUtil extends TestCase {
                                            Pair.of("C", "tv"));
     }
 
+    public void testJSONAPIFlag() throws Exception
+    {
+        final String noHTTPElement =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "   <cluster hostcount='3' kfactor='1' sitesperhost='2' />" +
+                "</deployment>";
+
+        final String noJSONAPIElement =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "   <cluster hostcount='3' kfactor='1' sitesperhost='2' />" +
+                "   <httpd port='0' />" +
+                "</deployment>";
+
+        final String jsonAPITrue =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "   <cluster hostcount='3' kfactor='1' sitesperhost='2' />" +
+                "   <httpd port='0'>" +
+                "      <jsonapi enabled='true' />" +
+                "   </httpd>" +
+                "</deployment>";
+
+        final String jsonAPIFalse =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "   <cluster hostcount='3' kfactor='1' sitesperhost='2' />" +
+                "   <httpd port='0'>" +
+                "      <jsonapi enabled='false' />" +
+                "   </httpd>" +
+                "</deployment>";
+
+        File tmp = VoltProjectBuilder.writeStringToTempFile(noHTTPElement);
+        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        assertTrue(cluster.getJsonapi());
+
+        setUp();
+        tmp = VoltProjectBuilder.writeStringToTempFile(noJSONAPIElement);
+        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertTrue(cluster.getJsonapi());
+
+        setUp();
+        tmp = VoltProjectBuilder.writeStringToTempFile(jsonAPITrue);
+        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertTrue(cluster.getJsonapi());
+
+        setUp();
+        tmp = VoltProjectBuilder.writeStringToTempFile(jsonAPIFalse);
+        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getJsonapi());
+    }
+
+
     @SafeVarargs
     private final void verifyDeserializedDRTableSignature(String schema, Pair<String, String>... signatures) throws IOException
     {
