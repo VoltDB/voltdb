@@ -33,7 +33,9 @@ import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
@@ -363,8 +365,13 @@ public class CatalogDiffEngine {
             // overrides the grandfathering-in of added/dropped Column-typed
             // sub-components of Procedure, Connector, etc. as checked in the loop, below.
             // Is this safe/correct?
+            Column column = (Column) suspect;
+            Table table = (Table) column.getParent();
             if (m_inStrictMatViewDiffMode) {
                 return "May not dynamically add, drop, or rename materialized view columns.";
+            }
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+                return "May not dynamically add, drop, or rename export table columns.";
             }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
@@ -472,6 +479,10 @@ public class CatalogDiffEngine {
 
         if ((suspect instanceof Column) && (parent instanceof Table) && (changeType == ChangeType.ADDITION)) {
             Column column = (Column)suspect;
+            Table table = (Table)column.getParent();
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+                return null;
+            }
             retval[0] = parent.getTypeName();
             retval[1] = String.format(
                     "Unable to add NOT NULL column %s because table %s is not empty and no default value was specified.",
@@ -480,35 +491,6 @@ public class CatalogDiffEngine {
         }
 
         return null;
-    }
-
-    private boolean areTableColumnsMutable(Table table) {
-        //WARNING: There used to be a test here that the table's list of views was empty,
-        // but what it actually appeared to be testing was whether the table HAD views prior
-        // to any redefinition in the current catalog.
-        // This means that dropping mat views and changing the underlying columns in one "live"
-        // catalog change would not be an option -- they would have to be broken up into separate
-        // steps.
-        // Fortunately, for now, all the allowed "live column changes" seem to be supported without
-        // disrupting materialized views.
-        // In the future it MAY be required that column mutability gets re-checked after all of the
-        // mat view definitions (drops and adds) have been processed, in case certain kinds of
-        // underlying column change might cause special problems for certain specific cases of
-        // materialized view definition.
-
-        // no export tables
-        Database db = (Database) table.getParent();
-        for (Connector connector : db.getConnectors()) {
-            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
-                if (tinfo.getTable() == table) {
-                    m_errors.append("May not change the columns of export table " +
-                            table.getTypeName() + ".\n");
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
     /**
@@ -643,13 +625,9 @@ public class CatalogDiffEngine {
             m_requiresSnapshotIsolation = true;
 
             // now assume parent is a Table
-            Table parentTable = (Table) parent;
-            if ( ! areTableColumnsMutable(parentTable)) {
-                // Note: "return false;" vs. fall through, here
-                // overrides the grandfathering-in of modified fields of
-                // Column-typed sub-components of Procedure and ColumnRef.
-                // Is this safe/correct?
-                return ""; // error msg already appended
+            Table table = (Table) parent;
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+                return "May not dynamically change the columns of export tables.";
             }
 
             if (field.equals("index")) {
@@ -920,7 +898,7 @@ public class CatalogDiffEngine {
         // if no tablename, then it's just not possible
         if (response == null) {
             m_supported = false;
-            m_errors.append(errorMessage);
+            m_errors.append(errorMessage + "\n");
         }
         // otherwise, it's possible if a specific table is empty
         // collect the error message(s) and decide if it can be done inside @UAC
