@@ -23,5 +23,17 @@ class voltDBclusterserver extends Module {
 
         deerwalkserver4stopbutton   {$("#stopServer_deerwalk4")}
 
+        //DBmonitor part for server
+        dbmonitorbutton{$("#navDbmonitor > a")}
+        clusterserverbutton{$("#btnPopServerList")}
+        servernamefourthbtn{$("#serversList > li:nth-child(1) > a")}
+        servernamesecondbtn{$("#serversList > li:nth-child(2) > a")}
+        servernamethirdbtn{$("#serversList > li:nth-child(3) > a")}
+        serveractivechk    {$("#serversList > li.active.monitoring > a")}
+        serversearch{$("input", type: "text", id: "popServerSearch")}
+        checkserverTitle{$("#popServerList > div > div.slide-pop-title > div.icon-server.searchLeft")}
+        setthreshhold{$("#threshold")}
+        clickthreshholdset{$("#saveThreshold")}
+
     }
 }

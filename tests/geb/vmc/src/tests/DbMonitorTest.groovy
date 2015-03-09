@@ -23,6 +23,7 @@
 
 package vmcTest.tests
 
+
 import vmcTest.pages.*
 import java.io.*;
 import java.util.Date;
@@ -1173,4 +1174,97 @@ class DbMonitorTest extends TestBase {
 		then:
 			!page.databaseTableDisplayed()
 	}
+
+    // ALERT
+
+	def "set alert and check missing"() {
+		when: 'set alert threshold to zero'
+			page.setAlertThreshold(00)
+		then: 'check at least one alert'
+			waitFor(40, 2) { page.alertCount.isDisplayed() }
+			int alert = page.getAlert()
+
+			if ( alert != 0 ) {
+				println("PASS:There is at least one server on alert")
+			}
+			else {
+				println("FAIL:There are no server on alert")
+				assert false
+			}
+
+		when: 'set alert threshold to hundred'
+			page.setAlertThreshold(100)
+		then: 'check no alert'
+			waitFor(40,20) { !page.alertCount.isDisplayed() }
+	}
+
+
+    // server search
+    def "check server search on dbmonitor matched"(){
+
+        def $line
+        def $line1
+        def $line2
+        def $line3
+        def $lineunused, $lineunused1
+        new File("src/resources/serversearch.txt").withReader {
+            $lineunused = it.readLine()
+            $lineunused1 = it.readLine()
+            $line = it.readLine()
+            $line1 = it.readLine()
+            $line2 = it.readLine()
+            $line3 = it.readLine()
+        }
+        when:'clicked server button'
+        at DbMonitorPage
+        server.clusterserverbutton.click()
+        server.serversearch.value($line)
+
+        then:
+        at DbMonitorPage
+        server.clusterserverbutton.click()
+    }
+
+
+    def "check server search on dbmonitor not matched"(){
+
+
+
+        def $line
+        def $line1
+        def $line2
+        def $line3
+        def $lineunused, $lineunused1
+        new File("src/resources/serversearch.txt").withReader {
+            $lineunused = it.readLine()
+            $lineunused1 = it.readLine()
+            $line = it.readLine()
+            $line1 = it.readLine()
+            $line2 = it.readLine()
+            $line3 = it.readLine()
+        }
+        when:'clicked server button'
+        at DbMonitorPage
+        server.clusterserverbutton.click()
+        server.serversearch.value($line3)
+
+        then:
+        at DbMonitorPage
+        server.clusterserverbutton.click()
+    }
+
+
+    def "check server title on dbmonitor"(){
+        when:
+        at DbMonitorPage
+        server.clusterserverbutton.isDisplayed()
+        server.clusterserverbutton.click()
+        then:
+        at DbMonitorPage
+        server.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
+        server.clusterserverbutton.click()
+    }
+
+
+
 }
