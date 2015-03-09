@@ -104,7 +104,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("Specific error code") != -1);
+            assertTrue(msg.indexOf("Type FLOAT can't be cast as BIGINT") != -1);
             caught = true;
         }
         assertTrue(caught);

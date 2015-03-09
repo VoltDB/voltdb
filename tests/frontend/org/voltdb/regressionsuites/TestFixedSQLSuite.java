@@ -1973,18 +1973,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         VoltTable vt;
 
-        // where desc in ?
-        //
-        // Cast parameter as an Object (not Object[]),
-        // and it's treated as a single array-typed parameter in the callee.
-        //
-        // VoltDB produces an error in this case, but this seems wrong:
-        //
         verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, (Object)stringArgs);
-
-        verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, (Object[])stringArgs);
+                "@AdHoc", adHocQueryWithListParam, stringArgs);
 
         // where desc in ?
         // scalar parameter fails
@@ -2099,6 +2089,89 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = client.callProcedure("voltdbSelectProductChanges", 1, 1).getResults()[0];
         assertEquals(13, vt.getColumnCount());
+    }
+
+    private void runQueryGetDecimal(Client client, String sql, double value) throws Exception {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(value, vt.getDecimalAsBigDecimal(0).doubleValue(), 0.0001);
+    }
+
+    private void runQueryGetDouble(Client client, String sql, double value) throws Exception {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(value, vt.getDouble(0), 0.0001);
+    }
+
+    public void testENG7480() throws Exception {
+        Client client = getClient();
+
+        String sql;
+        sql = "insert into R1 Values(1, 'MA', 2, 2.2);";
+        client.callProcedure("@AdHoc", sql);
+        // query constants interpreted as DECIMAL
+
+        //
+        // operation between float and decimal
+        //
+        sql = "SELECT 0.1 + (1-0.1) + ratio FROM R1";
+        runQueryGetDouble(client, sql, 3.2);
+
+        sql = "SELECT 0.1 + (1-0.1) - ratio FROM R1";
+        runQueryGetDouble(client, sql, -1.2);
+
+        sql = "SELECT 0.1 + (1-0.1) / ratio FROM R1";
+        runQueryGetDouble(client, sql, 0.509090909091);
+
+        sql = "SELECT 0.1 + (1-0.1) * ratio FROM R1";
+        runQueryGetDouble(client, sql, 2.08);
+
+        // reverse order
+        sql = "SELECT 0.1 + ratio + (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 3.2);
+
+        sql = "SELECT 0.1 + ratio - (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.4);
+
+        sql = "SELECT 0.1 + ratio / (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.544444444444);
+
+        sql = "SELECT 0.1 + ratio * (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.08);
+
+
+        //
+        // operation between decimal and integer
+        //
+        if (isHSQL()) {
+            // not compatible with Hsql
+            return;
+        }
+
+        sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
+        runQueryGetDecimal(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + (1-0.1) - NUM FROM R1";
+        runQueryGetDecimal(client, sql, -1.0);
+
+        sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
+        runQueryGetDouble(client, sql, 0.55);
+
+        sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
+        runQueryGetDouble(client, sql, 1.9);
+
+        // reverse order
+        sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.2);
+
+        sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.322222222222);
+
+        sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.9);
     }
 
     //
