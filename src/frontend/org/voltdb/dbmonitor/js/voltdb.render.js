@@ -663,7 +663,7 @@ function alertNodeClicked(obj) {
             return adminConfigValues;
         };
 
-       
+
         var populateSystemInformation = function (connection) {
             var updatedSystemOverview = [];
             var currentServerOverview = {};
@@ -701,8 +701,13 @@ function alertNodeClicked(obj) {
 
                 //assign entry in data object to 'currentServerOverview' if object being iterated is not a current host object
                 //otherwise to a updatedSystemOverview 
-                if (voltDbRenderer.isHost)
+                if (voltDbRenderer.isHost) {
                     currentServerOverview[singleData[1]] = singleData[2];
+
+                    if (singleData[1] == "LOG4JPORT") {
+                        currentServerOverview["NODEID"] = id;
+                    }
+                }
                 else {
                     serverOverview[id][singleData[1]] = singleData[2];
 
@@ -716,10 +721,10 @@ function alertNodeClicked(obj) {
 
             systemOverview = {};
             systemOverview[0] = currentServerOverview;
-            
+
             //iterate through updatedSystemOverview to add remaining server to the list 'systemOverview'
             for (iterator = 0; iterator < updatedSystemOverview.length; iterator++) {
-                systemOverview[iterator+1] = updatedSystemOverview[iterator];
+                systemOverview[iterator + 1] = updatedSystemOverview[iterator];
 
             };
 
@@ -2127,16 +2132,19 @@ function alertNodeClicked(obj) {
             var className;
             var currentServerRowClass;
             var currentServerColumnClass;
+            var count = 0;
 
-            this.setServerDetails = function (hostId, serverInfo, clusterState) {
+            this.setServerDetails = function (hostId, serverInfo, clusterState,iteratorCount) {
                 var count = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
                     && VoltDbAdminConfig.servers.length > 0) {
+
                     $.each(VoltDbAdminConfig.servers, function (id, value) {
                         {
                             if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
                                 serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
-                                VoltDbAdminConfig.servers.push(serverDetails);
+                                //VoltDbAdminConfig.servers.push(serverDetails);
+                                VoltDbAdminConfig.servers[iteratorCount] = serverDetails;
 
                             }
                             else if (value.serverName == serverInfo['HOSTNAME']) {
@@ -2151,7 +2159,8 @@ function alertNodeClicked(obj) {
 
                 } else {
                     serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
-                    VoltDbAdminConfig.servers.push(serverDetails);
+                    //VoltDbAdminConfig.servers.push(serverDetails);
+                    VoltDbAdminConfig.servers[count] = serverDetails;
 
                 }
             };
@@ -2195,8 +2204,10 @@ function alertNodeClicked(obj) {
 
             } else {
                 if (systemOverview != null || systemOverview != undefined) {
+                    VoltDbAdminConfig.servers = [];
                     $.each(systemOverview, function (id, val) {
-                        setServerDetails(val.NODEID, val, val['CLUSTERSTATE']);
+                        setServerDetails(val.NODEID, val, val['CLUSTERSTATE'], count);
+                        count++;
                     });
                 }
 
