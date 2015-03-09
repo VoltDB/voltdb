@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,8 +42,52 @@ import org.voltdb.utils.VoltTypeUtil;
 
 /**
  * Set of utility methods to make writing test code with VoltTables easier.
+ *
+ * The static methods provide general table access and manipulation.
+ *
+ * The instance methods can do configurable deterministic mutations. The optional
+ * Configuration object has properties that control schema generation and
+ * mutation behavior, including an optional user-supplied randomizer.
+ *
+ * Static methods may become instance methods to support configuration options.
  */
 public class TableHelper {
+
+    private final Configuration m_config;
+    private final Random m_rand;
+
+    public TableHelper(Configuration config) {
+        m_config = config != null ? config : new Configuration();
+        m_rand = m_config.rand != null ? m_config.rand : new Random(m_config.seed);
+    }
+
+    public TableHelper() {
+        m_config = new Configuration();
+        m_rand = new Random(m_config.seed);
+    }
+
+    public enum RandomPartitioning {
+        // 50% partitioned if a table is flagged partitionable
+        RANDOM,
+        // Caller handles partitioning, but informs when a table is partitioned
+        CALLER
+    }
+
+    /**
+     * Configuration properties to modify TableHelper instance behavior.
+     */
+    public static class Configuration {
+        // Optional caller-supplied randomizer.
+        public Random rand = null;
+        // Random seed for locally-created Random object if no randomizer is provided.
+        public int seed = 0;
+        // Number of extra columns, e.g. to receive unique data and support unique indexes.
+        public int numExtraColumns = 0;
+        // Prefix given to extra columns.
+        public String extraColumnPrefix = "CX";
+        // Randomly partition in getTotallyRandomTable()
+        public RandomPartitioning randomPartitioning = RandomPartitioning.RANDOM;
+    }
 
     /** Used for unique constraint checking, mostly pkeys */
     static class Tuple {
@@ -85,48 +129,6 @@ public class TableHelper {
             this.sumColName = sumColName;
             this.groupColName = groupColName;
             this.srcTableName = srcTableName;
-        }
-
-        /**
-         * Create a random view based on a given table, or return null if no
-         * good view is possible to create.
-         */
-        public static ViewRep viewRepForTable(String name, VoltTable table, Random rand) {
-            String sumColName = null;
-            String groupColName = null;
-
-            // pick a sum column
-            for (int colIndex = 0; colIndex < table.getColumnCount(); colIndex++) {
-                VoltType type = table.getColumnType(colIndex);
-                if ((type == VoltType.TINYINT) || (type == VoltType.SMALLINT) || (type == VoltType.INTEGER)) {
-                    sumColName = table.getColumnName(colIndex);
-                }
-            }
-            if (sumColName == null) {
-                return null;
-            }
-
-            // find all potential group by columns
-            List<String> potentialGroupByCols = new ArrayList<String>();
-            for (int colIndex = 0; colIndex < table.getColumnCount(); colIndex++) {
-                String colName = table.getColumnName(colIndex);
-                // skip the sum col
-                if (colName.equals(sumColName)) {
-                    continue;
-                }
-                potentialGroupByCols.add(colName);
-            }
-
-            // no potential group by cols
-            if (potentialGroupByCols.size() == 0) {
-                return null;
-            }
-
-            // pick a random non-summing col to group on
-            // could pick more than one to make this better in the future
-            groupColName = potentialGroupByCols.get(rand.nextInt(potentialGroupByCols.size()));
-
-            return new ViewRep(name, sumColName, groupColName, getTableName(table));
         }
 
         public String ddlForView() {
@@ -176,6 +178,48 @@ public class TableHelper {
                 return false;
             }
         }
+    }
+
+    /**
+     * Create a random view based on a given table, or return null if no
+     * good view is possible to create.
+     */
+    public ViewRep viewRepForTable(String name, VoltTable table) {
+        String sumColName = null;
+        String groupColName = null;
+
+        // pick a sum column
+        for (int colIndex = 0; colIndex < table.getColumnCount(); colIndex++) {
+            VoltType type = table.getColumnType(colIndex);
+            if ((type == VoltType.TINYINT) || (type == VoltType.SMALLINT) || (type == VoltType.INTEGER)) {
+                sumColName = table.getColumnName(colIndex);
+            }
+        }
+        if (sumColName == null) {
+            return null;
+        }
+
+        // find all potential group by columns
+        List<String> potentialGroupByCols = new ArrayList<String>();
+        for (int colIndex = 0; colIndex < table.getColumnCount(); colIndex++) {
+            String colName = table.getColumnName(colIndex);
+            // skip the sum col
+            if (colName.equals(sumColName)) {
+                continue;
+            }
+            potentialGroupByCols.add(colName);
+        }
+
+        // no potential group by cols
+        if (potentialGroupByCols.size() == 0) {
+            return null;
+        }
+
+        // pick a random non-summing col to group on
+        // could pick more than one to make this better in the future
+        groupColName = potentialGroupByCols.get(m_rand.nextInt(potentialGroupByCols.size()));
+
+        return new ViewRep(name, sumColName, groupColName, getTableName(table));
     }
 
     /**
@@ -443,38 +487,38 @@ public class TableHelper {
     /**
      * Helper function for getTotallyRandomTable that makes random columns.
      */
-    protected static VoltTable.ColumnInfo getRandomColumn(String name, Random rand) {
+    protected VoltTable.ColumnInfo getRandomColumn(String name) {
         VoltType[] allTypes = { VoltType.BIGINT, VoltType.DECIMAL, VoltType.FLOAT,
                 VoltType.INTEGER, VoltType.SMALLINT, VoltType.STRING,
                 VoltType.TIMESTAMP, VoltType.TINYINT, VoltType.VARBINARY };
 
         // random type
-        VoltType type = allTypes[rand.nextInt(allTypes.length)];
+        VoltType type = allTypes[m_rand.nextInt(allTypes.length)];
 
         // random sizes
         int size = 0;
         if ((type == VoltType.VARBINARY) || (type == VoltType.STRING)) {
             // pick a column size with 50% inline and 50% out of line
-            if (rand.nextBoolean()) {
+            if (m_rand.nextBoolean()) {
                 // pick a random number between 1 and 63 inclusive
-                size = rand.nextInt(63) + 1;
+                size = m_rand.nextInt(63) + 1;
             }
             else {
                 // gaussian with stddev on 1024 (though offset by 64) and max of 1mb
-                size = Math.min(64 + (int) (Math.abs(rand.nextGaussian()) * (1024 - 64)), 1024 * 1024);
+                size = Math.min(64 + (int) (Math.abs(m_rand.nextGaussian()) * (1024 - 64)), 1024 * 1024);
             }
         }
 
         // nullable or default valued?
         Object defaultValue = null;
         boolean nullable = false;
-        if (rand.nextBoolean()) {
+        if (m_rand.nextBoolean()) {
             nullable = true;
-            defaultValue = VoltTypeUtil.getRandomValue(type, Math.max(size % 128, 1), 0.8, rand);
+            defaultValue = VoltTypeUtil.getRandomValue(type, Math.max(size % 128, 1), 0.8, m_rand);
         }
         else {
             nullable = false;
-            defaultValue = VoltTypeUtil.getRandomValue(type, Math.max(size % 128, 1), 0.0, rand);
+            defaultValue = VoltTypeUtil.getRandomValue(type, Math.max(size % 128, 1), 0.0, m_rand);
             // no uniques for now, as the random fill becomes too slow
             //column.unique = (r.nextDouble() > 0.3); // 30% of non-nullable cols unique (15% total)
         }
@@ -501,53 +545,124 @@ public class TableHelper {
     }
 
     /**
-     * Generate a totally random (valid) schema.
-     * One constraint is that it will have a single bigint pkey somewhere.
-     * For now, no non-pkey unique columns.
-     * 50% chance of partitioned or replicated.
+     * Generated table with extra information to help with testing against the table.
      */
-    public static VoltTable getTotallyRandomTable(String name, Random rand) {
-        return getTotallyRandomTable(name, rand, true);
+    public static class RandomTable {
+
+        public VoltTable table;
+        // the PK bigint column is randomly chosen from set of random columns
+        public int bigintPrimaryKey;
+        public int numRandomColumns;
+        // the extra columns immediately follow the random/PK columns
+        public int numExtraColumns;
+
+        public RandomTable() {
+            this.table = null;
+            this.bigintPrimaryKey = -1;
+            this.numRandomColumns = 0;
+            this.numExtraColumns = 0;
+        }
+
+        public RandomTable(VoltTable table, int bigintPrimaryKey, int numRandomColumns, int numExtraColumns) {
+            this.table = table;
+            this.bigintPrimaryKey = bigintPrimaryKey;
+            this.numRandomColumns = numRandomColumns;
+            this.numExtraColumns = numExtraColumns;
+        }
+
+        public RandomTable(final RandomTable other) {
+            this.table = other.table;
+            this.bigintPrimaryKey = other.bigintPrimaryKey;
+            this.numRandomColumns = other.numRandomColumns;
+            this.numExtraColumns = other.numExtraColumns;
+        }
+
+        public String getTableName() {
+            return this.table.m_extraMetadata.name;
+        }
     }
 
     /**
      * Generate a totally random (valid) schema.
      * One constraint is that it will have a single bigint pkey somewhere.
-     * For now, no non-pkey unique columns.
-     * Parameter determines if it's possible to return a 50% chance of partitioned table.
+     * Generates extra BIGINT column(s) if enabled on non-partitioned tables.
+     * See overloaded getTotallyRandomTable() for more info on partitioning.
      */
-    public static VoltTable getTotallyRandomTable(String name, Random rand, boolean partitionable) {
+    public RandomTable getTotallyRandomTable(String name) {
+        return getTotallyRandomTable(name, true);
+    }
+
+    /**
+     * Generate a totally random (valid) schema.
+     * One constraint is that it will have a single bigint pkey somewhere.
+     * Generates extra BIGINT column(s) if enabled on non-partitioned tables.
+     *
+     * The partitioning logic has a couple of variations. It can be a 50%
+     * random chance of being partitioned or decided by the caller. Randomly
+     * partitioned VoltTable's are fully initialized based on the partitioning
+     * choice. Caller-partitioned tables are set up as replicated tables,
+     * which can be changed by the caller later. It does make sure to only add
+     * extra unique columns when the table isn't or won't be partitioned.
+     */
+    public RandomTable getTotallyRandomTable(String name, boolean partition) {
+
         // pick a number of cols between 1 and 1000, with most tables < 25 cols
-        int numColumns = Math.max(1, Math.min(Math.abs((int) (rand.nextGaussian() * 25)), 1000));
+        int numRandomColumns = Math.max(1, Math.min(Math.abs((int) (m_rand.nextGaussian() * 25)), 1000));
+
+        // partitioning is either random or handled by the caller (e.g. SchemaChangeClient)
+        boolean partitioned = false;
+        boolean partitionMetadata = true;
+        if (partition) {
+            switch(m_config.randomPartitioning) {
+            case CALLER:
+                partitioned = true;
+                partitionMetadata = false;
+                break;
+            case RANDOM:
+                partitioned = m_rand.nextBoolean();
+                break;
+            }
+        }
+
+        /*
+         * Only add more column(s) if requested and the table is not partitioned,
+         * because unique columns are complicated by partitioned tables.
+         */
+        int numExtraColumns = partitioned ? 0 : m_config.numExtraColumns;
 
         // make random columns
-        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-            columns[i] = getRandomColumn(String.format("C%d", i), rand);
+        int numColumnsTotal = numRandomColumns + numExtraColumns;
+        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[numColumnsTotal];
+        for (int i = 0; i < numRandomColumns; i++) {
+            columns[i] = getRandomColumn(String.format("C%d", i));
+        }
+
+        // add optional extra column(s) (only BIGINT for now) for possible use as alternate keys.
+        for (int i = 0; i < numExtraColumns; i++) {
+            columns[numRandomColumns+i] = new VoltTable.ColumnInfo(
+                    String.format("%s%d", m_config.extraColumnPrefix, i), VoltType.BIGINT, 20, false, false, null);
         }
 
         // pick pkey and make it a bigint
-        int pkeyIndex = rand.nextInt(numColumns);
-        columns[pkeyIndex] = new VoltTable.ColumnInfo("PKEY",
-                                                      VoltType.BIGINT,
-                                                      0,
-                                                      false,
-                                                      true,
-                                                      "0");
-        int[] pkeyIndexes = new int[] { pkeyIndex };
+        int bigintPrimaryKey = m_rand.nextInt(numRandomColumns);
+        columns[bigintPrimaryKey] = new VoltTable.ColumnInfo("PKEY",
+                                                             VoltType.BIGINT,
+                                                             0,
+                                                             false,
+                                                             true,
+                                                             "0");
+        int[] pkeyIndexes = new int[] { bigintPrimaryKey };
 
-        // if partitionable, flip a coin
-        boolean partitioned = partitionable ? rand.nextBoolean() : false;
-        int partitionColumn = partitioned ? pkeyIndexes[0] : -1;
+        // if partitionable and random partitioning is enabled, flip a coin
+        int partitionColumn = partitioned && partitionMetadata ? pkeyIndexes[0] : -1;
 
-        // return the table from the columns
+        // return the table wrapped in a TableRep from the columns
         VoltTable.ExtraMetadata extraMetadata = new VoltTable.ExtraMetadata(name,
                                                                             partitionColumn,
                                                                             pkeyIndexes,
                                                                             columns);
-
-        VoltTable t = new VoltTable(extraMetadata, columns, columns.length);
-        return t;
+        VoltTable table = new VoltTable(extraMetadata, columns, columns.length);
+        return new RandomTable(table, bigintPrimaryKey, numRandomColumns, numExtraColumns);
     }
 
     /**
@@ -678,6 +793,11 @@ public class TableHelper {
         return false;
     }
 
+    /** Is this an extra column possibly used for alternate keys? */
+    boolean isAnExtraColumn(VoltTable table, VoltTable.ColumnInfo column) {
+        return column.name.startsWith(m_config.extraColumnPrefix);
+    }
+
     /** Check if a unique column should be ASSUMEUNIQUE or UNIQUE */
     static boolean needsAssumeUnique(VoltTable table, VoltTable.ColumnInfo column) {
         // stupid safety
@@ -731,7 +851,7 @@ public class TableHelper {
      * 3. Widening columns.
      * 4. Re-ordering columns.
      */
-    public static VoltTable mutateTable(VoltTable table, boolean allowIdenty, Random rand) {
+    public VoltTable mutateTable(VoltTable table, boolean allowIdenty) {
         int totalMutations = 0;
         int columnDrops;
         int columnAdds;
@@ -743,9 +863,9 @@ public class TableHelper {
         // pick values for the various kinds of mutations
         // don't allow all zeros unless allowIdentidy == true
         do {
-            columnDrops =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-            columnAdds =     Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-            columnGrows =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
+            columnDrops =    Math.min((int) (Math.abs(m_rand.nextGaussian()) * 1.5), table.m_colCount);
+            columnAdds =     Math.min((int) (Math.abs(m_rand.nextGaussian()) * 1.5), table.m_colCount);
+            columnGrows =    Math.min((int) (Math.abs(m_rand.nextGaussian()) * 1.5), table.m_colCount);
             totalMutations = columnDrops + columnAdds + columnGrows;
         }
         while ((allowIdenty == false) && (totalMutations == 0));
@@ -763,19 +883,21 @@ public class TableHelper {
         // limit tries to prevent looping forever
         int tries = columns.size() * 2;
         while ((columnDrops > 0) && (tries-- > 0)) {
-            int indexToRemove = rand.nextInt(columns.size());
+            // don't drop extra columns because they're used differently
+            int indexToRemove = m_rand.nextInt(columns.size());
             VoltTable.ColumnInfo toRemove = columns.get(indexToRemove);
-            if (!isAPkeyColumn(table, toRemove)) {
-                columnDrops--;
-                columns.remove(indexToRemove);
+            if (isAPkeyColumn(table, toRemove)) continue;
+            // don't drop extra columns used as alternate keys
+            if (isAnExtraColumn(table, toRemove)) continue;
+            columnDrops--;
+            columns.remove(indexToRemove);
 
-                if ((partitionColIndex >= 0) && (partitionColIndex > indexToRemove)) {
-                    partitionColIndex--;
-                }
-                for (int i = 0; i < pkeyIndexes.length; i++) {
-                    if (pkeyIndexes[i] > indexToRemove) {
-                        pkeyIndexes[i]--;
-                    }
+            if ((partitionColIndex >= 0) && (partitionColIndex > indexToRemove)) {
+                partitionColIndex--;
+            }
+            for (int i = 0; i < pkeyIndexes.length; i++) {
+                if (pkeyIndexes[i] > indexToRemove) {
+                    pkeyIndexes[i]--;
                 }
             }
         }
@@ -785,8 +907,8 @@ public class TableHelper {
 
         int newColIndex = getNextColumnIndex(table);
         while (columnAdds > 0) {
-            int indexToAdd = rand.nextInt(columns.size());
-            VoltTable.ColumnInfo toAdd = getRandomColumn(String.format("NEW%d", newColIndex++), rand);
+            int indexToAdd = m_rand.nextInt(columns.size());
+            VoltTable.ColumnInfo toAdd = getRandomColumn(String.format("NEW%d", newColIndex++));
             columnAdds--;
             columns.add(indexToAdd, toAdd);
 
@@ -806,9 +928,11 @@ public class TableHelper {
         // limit tries to prevent looping forever
         tries = columns.size() * 2;
         while ((columnGrows > 0) && (tries-- > 0)) {
-            int indexToGrow = rand.nextInt(columns.size());
+            int indexToGrow = m_rand.nextInt(columns.size());
             VoltTable.ColumnInfo toGrow = columns.get(indexToGrow);
             if (isAPkeyColumn(table, toGrow)) continue;
+            // don't change extra columns used as alternate keys
+            if (isAnExtraColumn(table, toGrow)) continue;
             toGrow = growColumn(toGrow);
             if (toGrow != null) {
                 columns.remove(indexToGrow);
@@ -904,19 +1028,174 @@ public class TableHelper {
         return s;
     }
 
+    public RandomRowMaker createRandomRowMaker(
+                VoltTable table,
+                int maxStringSize,
+                boolean loadPrimaryKeys,
+                boolean loadUniqueColumns) {
+        String extraColumnPrefix = m_config.numExtraColumns > 0 ? m_config.extraColumnPrefix : null;
+        return new RandomRowMaker(table, maxStringSize, m_rand, loadPrimaryKeys, loadUniqueColumns, extraColumnPrefix);
+    }
+
     /**
-     * Helper method for RandomFill
+     * Object to generate random row data that optionally satisfies uniqueness constraints.
      */
-    public static Object[] randomRow(VoltTable table, int maxStringSize, Random rand) {
-        Object[] row = new Object[table.getColumnCount()];
-        for (int col = 0; col < table.getColumnCount(); col++) {
-            boolean allowNulls = table.getColumnNullable(col);
-            int size = table.getColumnMaxSize(col);
-            if (size > maxStringSize) size = maxStringSize;
-            double nullFraction = allowNulls ? 0.05 : 0.0;
-            row[col] = VoltTypeUtil.getRandomValue(table.getColumnType(col), size, nullFraction, rand);
+    public static class RandomRowMaker {
+        final VoltTable table;
+        final int maxStringSize;
+        final Random rand;
+        final int[] pkeyIndexes;
+        final Set<Tuple> pkeyValues;
+        final Map<Integer, Set<Object>> uniqueValues;
+
+        /**
+         * Row maker constructor
+         * @param table provides column metadata
+         * @param maxStringSize limit to string size
+         * @param rand pre-seeded random number generator
+         * @param loadPrimaryKeys if true handles PK uniqueness constraints
+         * @param loadUniqueColumns if true handles other unique columns' uniqueness constraints
+         */
+        RandomRowMaker(
+                VoltTable table,
+                int maxStringSize,
+                Random rand,
+                boolean loadPrimaryKeys,
+                boolean loadUniqueColumns,
+                String extraColumnPrefix) {
+
+            this.table = table;
+            this.maxStringSize = maxStringSize;
+            this.rand = rand;
+
+            if (loadPrimaryKeys) {
+                this.pkeyIndexes = this.table.getPkeyColumnIndexes();
+                this.pkeyValues = new HashSet<Tuple>();
+            }
+            else {
+                this.pkeyIndexes = null;
+                this.pkeyValues = null;
+            }
+
+            // figure out which columns must have unique values
+            if (loadUniqueColumns) {
+                this.uniqueValues = new TreeMap<Integer, Set<Object>>();
+                for (int col = 0; col < this.table.getColumnCount(); col++) {
+                    // treat extra columns as unique for loading since they become alternate keys
+                    if (this.table.getColumnUniqueness(col) ||
+                        (extraColumnPrefix != null && this.table.getColumnName(col).startsWith(extraColumnPrefix))) {
+                        this.uniqueValues.put(col, new HashSet<Object>());
+                    }
+                }
+            }
+            else {
+                this.uniqueValues = null;
+            }
         }
-        return row;
+
+        /**
+         * Generate purely random row data without accounting for uniqueness requirements.
+         * @return row data
+         */
+        private Object[] randomRowData() {
+            Object[] row = new Object[this.table.getColumnCount()];
+            for (int col = 0; col < this.table.getColumnCount(); col++) {
+                boolean allowNulls = this.table.getColumnNullable(col);
+                int size = this.table.getColumnMaxSize(col);
+                if (size > this.maxStringSize) {
+                    size = this.maxStringSize;
+                }
+                double nullFraction = allowNulls ? 0.05 : 0.0;
+                row[col] = VoltTypeUtil.getRandomValue(this.table.getColumnType(col), size, nullFraction, this.rand);
+            }
+            return row;
+        }
+
+        /**
+         * Attempt to unique-ify the primary key if the feature is enabled.
+         * @param row row data
+         * @return true if successful or false if the key is not unique
+         */
+        private boolean handlePrimaryKey(Object[] row) {
+
+            if (this.pkeyIndexes != null) {
+
+                Tuple pkey = new Tuple(this.pkeyIndexes.length);
+
+                for (int col = 0; col < this.table.getColumnCount(); col++) {
+                    int pkeyIndex = ArrayUtils.indexOf(this.pkeyIndexes, col);
+                    if (pkeyIndex != -1) {
+                        pkey.values[pkeyIndex] = row[col];
+                    }
+                }
+
+                // check pkey
+                if (this.pkeyIndexes.length > 0) {
+                    if (this.pkeyValues.contains(pkey)) {
+                        //System.err.println("RandomRowFiller.handlePrimaryKey: skipping tuple because of pkey violation");
+                        return false;
+                    }
+                }
+
+                // update pkey
+                if (this.pkeyIndexes.length > 0) {
+                    this.pkeyValues.add(pkey);
+                }
+            }
+
+            return true;
+        }
+
+        /**
+         * Attempt to unique-ify the unique columns if the feature is enabled.
+         * @param row row data
+         * @return true if successful or false if a value is not unique
+         */
+        private boolean handleUniqueColumns(Object[] row) {
+
+            if (this.uniqueValues != null) {
+
+                // check unique cols
+                for (int col = 0; col < this.table.getColumnCount(); col++) {
+                    Set<Object> uniqueColValues = this.uniqueValues.get(col);
+                    if (uniqueColValues != null) {
+                        if (uniqueColValues.contains(row[col])) {
+                            //System.err.println("RandomRowFiller.handleUniqueColumns: skipping tuple because of unique col violation");
+                            return false;
+                        }
+                    }
+                }
+
+                // update unique cols
+                for (int col = 0; col < this.table.getColumnCount(); col++) {
+                    Set<Object> uniqueColValues = this.uniqueValues.get(col);
+                    if (uniqueColValues != null) {
+                        uniqueColValues.add(row[col]);
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /**
+         * Fill a Java VoltTable row with random values.
+         * If created with TableHelper.quickTable(..), then it will respect
+         * unique columns, pkey uniqueness, column widths and nullability
+         * The caller may handle loading the primary key.
+         */
+        public Object[] randomRow() {
+            // build the row and retry until the PK and other unique columns have unique values
+            while (true) {
+                // create a candidate row.
+                Object[] row = this.randomRowData();
+                // make sure the PK and unique columns are satisfied
+                if (this.handlePrimaryKey(row) && this.handleUniqueColumns(row)) {
+                    // success
+                    return row;
+                }
+            }
+        }
     }
 
     /**
@@ -925,73 +1204,11 @@ public class TableHelper {
      * unique columns, pkey uniqueness, column widths and nullability
      *
      */
-    public static void randomFill(VoltTable table, int rowCount, int maxStringSize, Random rand) {
-        int[] pkeyIndexes = table.getPkeyColumnIndexes();
-
-        Set<Tuple> pkeyValues = new HashSet<Tuple>();
-
-        // figure out which columns must have unique values
-        Map<Integer, Set<Object>> uniqueValues = new TreeMap<Integer, Set<Object>>();
-        for (int col = 0; col < table.getColumnCount(); col++) {
-            if (table.getColumnUniqueness(col)) {
-                uniqueValues.put(col, new HashSet<Object>());
-            }
-        }
-
+    public void randomFill(VoltTable table, int rowCount, int maxStringSize) {
+        // add the requested number of random rows generated using a filler
+        RandomRowMaker filler = createRandomRowMaker(table, maxStringSize, true, true);
         for (int i = 0; i < rowCount; i++) {
-            Object[] row;
-            Tuple pkey = new Tuple(pkeyIndexes.length);
-            // build the row
-            boolean success = false;
-            trynewrow:
-            while (!success) {
-                // create a candidate row
-                row = randomRow(table, maxStringSize, rand);
-
-                // store pkey values for row
-                for (int col = 0; col < table.getColumnCount(); col++) {
-                    int pkeyIndex = ArrayUtils.indexOf(pkeyIndexes, col);
-                    if (pkeyIndex != -1) {
-                        pkey.values[pkeyIndex] = row[col];
-                    }
-                }
-
-                // check pkey
-                if (pkeyIndexes.length > 0) {
-                    if (pkeyValues.contains(pkey)) {
-                        //System.err.println("randomFill: skipping tuple because of pkey violation");
-                        continue trynewrow;
-                    }
-                }
-
-                // check unique cols
-                for (int col = 0; col < table.getColumnCount(); col++) {
-                    Set<Object> uniqueColValues = uniqueValues.get(col);
-                    if (uniqueColValues != null) {
-                        if (uniqueColValues.contains(row[col])) {
-                            //System.err.println("randomFill: skipping tuple because of uniqe col violation");
-                            continue trynewrow;
-                        }
-                    }
-                }
-
-                // update pkey
-                if (pkeyIndexes.length > 0) {
-                    pkeyValues.add(pkey);
-                }
-
-                // update unique cols
-                for (int col = 0; col < table.getColumnCount(); col++) {
-                    Set<Object> uniqueColValues = uniqueValues.get(col);
-                    if (uniqueColValues != null) {
-                        uniqueColValues.add(row[col]);
-                    }
-                }
-
-                // add the row
-                table.addRow(row);
-                success = true;
-            }
+            table.addRow(filler.randomRow());
         }
     }
 
@@ -1084,7 +1301,7 @@ public class TableHelper {
     }
 
     /**
-     * Load random data into a partitioned table in VoltDB that has a biging pkey.
+     * Load random data into a partitioned table in VoltDB that has a bigint pkey.
      *
      * If the VoltTable indicates which column is its pkey, then it will use it, but otherwise it will
      * assume the first column is the bigint pkey. Note, this works with other integer keys, but
@@ -1096,13 +1313,12 @@ public class TableHelper {
      * @param mb Target RSS (approximate)
      * @param maxRows Target maximum rows
      * @param client To load with.
-     * @param rand To generate random data with.
      * @param offset Generated pkey values start here.
      * @param jump Generated pkey values increment by this value.
      * @throws Exception
      */
-    public static void fillTableWithBigintPkey(VoltTable table, int mb,
-            long maxRows, final Client client, Random rand,
+    public void fillTableWithBigintPkey(VoltTable table, int mb,
+            long maxRows, final Client client,
             long offset, long jump) throws Exception
     {
         // make sure some kind of limit is set
@@ -1165,8 +1381,9 @@ public class TableHelper {
         long rows = 0;
         rssThread.start();
         final String insertProcName = table.m_extraMetadata.name.toUpperCase() + ".insert";
+        RandomRowMaker filler = createRandomRowMaker(table, Integer.MAX_VALUE, false, false);
         while (rss.get() < mbTarget) {
-            Object[] row = randomRow(table, Integer.MAX_VALUE, rand);
+            Object[] row = filler.randomRow();
             row[pkeyColIndex] = i;
             client.callProcedure(insertCallback, insertProcName, row);
             rows++;

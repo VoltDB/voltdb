@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -127,10 +127,10 @@ class SumAgg : public Agg
         }
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         ifDistinct.clear();
-        return m_value;
+        return Agg::finalize(type);
     }
 
 private:
@@ -159,15 +159,15 @@ public:
         ++m_count;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         if (m_count == 0)
         {
-            return ValueFactory::getNullValue();
+            return ValueFactory::getNullValue().castAs(type);;
         }
         ifDistinct.clear();
-        const NValue finalizeResult = m_value.op_divide(ValueFactory::getBigIntValue(m_count));
-        return finalizeResult;
+
+        return m_value.op_divide(ValueFactory::getBigIntValue(m_count)).castAs(type);
     }
 
     virtual void resetAgg()
@@ -197,10 +197,10 @@ public:
         m_count++;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         ifDistinct.clear();
-        return ValueFactory::getBigIntValue(m_count);
+        return ValueFactory::getBigIntValue(m_count).castAs(type);
     }
 
     virtual void resetAgg()
@@ -224,9 +224,9 @@ public:
         ++m_count;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
-        return ValueFactory::getBigIntValue(m_count);
+        return ValueFactory::getBigIntValue(m_count).castAs(type);
     }
 
     virtual void resetAgg()
@@ -267,6 +267,7 @@ public:
                 // avoid this, un-inline the incoming NValue to its
                 // own storage.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_inlineCopiedToOutline = true;
             }
             m_haveAdvanced = true;
         }
@@ -277,6 +278,15 @@ public:
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
             }
         }
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
+        return m_value;
     }
 
 private:
@@ -304,6 +314,7 @@ public:
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_inlineCopiedToOutline = true;
             }
             m_haveAdvanced = true;
         }
@@ -314,6 +325,15 @@ public:
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
             }
         }
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
+        return m_value;
     }
 
 private:
@@ -480,7 +500,8 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        tempTuple.setNValue(columnIndex, aggs[ii]->finalize().castAs(tempTuple.getSchema()->columnType(columnIndex)));
+        NValue result = aggs[ii]->finalize(tempTuple.getSchema()->columnType(columnIndex));
+        tempTuple.setNValue(columnIndex, result);
     }
 
     VOLT_TRACE("Setting passthrough columns");
@@ -644,6 +665,7 @@ bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         VOLT_TRACE("hash aggregate: new group..");
         aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
         m_hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
+
         initAggInstances(aggregateRow);
 
         char* storage = reinterpret_cast<char*>(
@@ -654,6 +676,11 @@ bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         // The map is referencing the current key tuple for use by the new group,
         // so force a new tuple allocation to hold the next candidate key.
         nextGroupByKeyTuple.move(NULL);
+
+        if (m_aggTypes.size() == 0) {
+            insertOutputTuple(aggregateRow);
+            return false;
+        }
     } else {
         // otherwise, the agg row is the second item of the pair...
         aggregateRow = keyIter->second;
@@ -669,12 +696,16 @@ bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
 void AggregateHashExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
-    for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
-        AggregateRow *aggregateRow = iter->second;
-        if (insertOutputTuple(aggregateRow)) {
-            m_pmp->countdownProgress();
+
+    // If there is no aggregation, results are already inserted already
+    if (m_aggTypes.size() != 0) {
+        for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
+            AggregateRow *aggregateRow = iter->second;
+            if (insertOutputTuple(aggregateRow)) {
+                m_pmp->countdownProgress();
+            }
+            delete aggregateRow;
         }
-        delete aggregateRow;
     }
 
     // Clean up

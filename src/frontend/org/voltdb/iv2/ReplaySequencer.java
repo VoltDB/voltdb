@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -197,7 +197,7 @@ public class ReplaySequencer
         public String toString()
         {
             return String.format("(SENTINEL TXNID: %d (%s), %d BLOCKED MESSAGES, %s)\n%s",
-                                 m_sentinalTxnId, TxnEgo.txnIdToString(m_sentinalTxnId),
+                                 m_sentinalTxnId, m_sentinalTxnId != null ? TxnEgo.txnIdToString(m_sentinalTxnId) : "",
                                  m_blockedMessages.size(),
                                  m_servedFragment ? "SERVED FRAGMENT" : "",
                                  m_firstFragment);

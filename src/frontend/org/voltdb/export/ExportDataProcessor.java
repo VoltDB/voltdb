@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,12 @@
 
 package org.voltdb.export;
 
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -63,5 +66,12 @@ public interface ExportDataProcessor  {
      * Pass processor specific processor configuration properties
      * @param config an instance of {@linkplain Properties}
      */
-    public void setProcessorConfig( Properties config);
+    public void setProcessorConfig(Map<String, Pair<Properties, Set<String>>> config);
+
+    /**
+     * Pass processor specific processor configuration properties for checking
+     * @param config an instance of {@linkplain Properties}
+     */
+    public void checkProcessorConfig(Properties config);
+
 }

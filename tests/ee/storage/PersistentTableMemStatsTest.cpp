@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,7 +46,7 @@ public:
     PersistentTableMemStatsTest() {
         m_engine = new VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->initialize(1,1, 0, 0, "", false, DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("0");

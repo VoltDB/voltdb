@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -375,7 +375,8 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
             // join inner table
             tableName = " inner";
         }
-        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table", columnIndex, tableName.c_str());
+        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table",
+                columnIndex, tableName.c_str());
 
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                 std::string(message));

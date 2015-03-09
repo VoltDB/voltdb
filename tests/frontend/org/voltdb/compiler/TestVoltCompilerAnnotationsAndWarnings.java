@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -154,7 +154,6 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertTrue(foundLineMatching(lines, ".*\\[READ].*DeterministicRONonSeqProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[READ].*DeterministicROSeqProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*Insert.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*BLAH.insert.*"));
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[TABLE SCAN].*select ival, sval from indexed_replicated_blah.*"));

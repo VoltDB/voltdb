@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.Promotable;
@@ -36,6 +37,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -47,6 +49,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
+    private ConsumerDRGateway m_consumerDRGateway = null;
 
     public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
     {
@@ -72,7 +75,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway drGateway,
-                          String coreBindIds)
+                          ConsumerDRGateway consumerDRGateway,
+                          boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
@@ -80,8 +84,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
             backend = BackendTarget.NATIVE_EE_JNI;
         }
 
+        m_consumerDRGateway = consumerDRGateway;
+
         super.configureCommon(backend, catalogContext,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
@@ -114,9 +120,14 @@ public class MpInitiator extends BaseInitiator implements Promotable
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
                 // term syslogs the start of leader promotion.
-                Long txnid = Long.MIN_VALUE;
+                long txnid = Long.MIN_VALUE;
+                long binaryLogDRId = Long.MIN_VALUE;
+                long binaryLogUniqueId = Long.MIN_VALUE;
                 try {
-                    txnid = repair.start().get();
+                    RepairResult res = repair.start().get();
+                    txnid = res.m_txnId;
+                    binaryLogDRId = res.m_binaryLogDRId;
+                    binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -152,6 +163,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    if (m_consumerDRGateway != null) {
+                        m_consumerDRGateway.promotePartition(m_partitionId, binaryLogDRId, binaryLogUniqueId);
+                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during

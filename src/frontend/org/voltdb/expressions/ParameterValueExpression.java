@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -198,6 +198,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
+        // BigInt or Float, Decimal is not selected here because of its range is smaller
         VoltType fallbackType = VoltType.FLOAT;
         if (m_originalValue != null) {
             m_originalValue.refineOperandType(VoltType.BIGINT);

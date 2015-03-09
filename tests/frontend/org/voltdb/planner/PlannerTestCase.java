@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -229,4 +229,35 @@ public class PlannerTestCase extends TestCase {
         return explain;
     }
 
+    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
+        String explainStr1, explainStr2;
+        List<AbstractPlanNode> pns = compileToFragments(sql1);
+        explainStr1 = buildExplainPlan(pns);
+        pns = compileToFragments(sql2);
+        explainStr2 = buildExplainPlan(pns);
+
+        assertEquals(explainStr1, explainStr2);
+    }
+
+    /** Given a list of Class objects for plan node subclasses, asserts
+     * if the given plan doesn't contain instances of those classes.
+     */
+    static protected void assertClassesMatchNodeChain(
+            List<Class<? extends AbstractPlanNode>> expectedClasses,
+            AbstractPlanNode actualPlan) {
+        AbstractPlanNode pn = actualPlan;
+        for (Class<? extends AbstractPlanNode> c : expectedClasses) {
+            assertFalse("Actual plan shorter than expected",
+                    pn == null);
+            assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
+                    + "instead found " + pn.getClass().getSimpleName(),
+                    c.isInstance(pn));
+            if (pn.getChildCount() > 0)
+                pn = pn.getChild(0);
+            else
+                pn = null;
+        }
+
+        assertTrue("Actual plan longer than expected", pn == null);
+    }
 }

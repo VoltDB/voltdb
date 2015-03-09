@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,12 +21,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
@@ -99,15 +99,25 @@ public interface VoltDBInterface
      * Updates the catalog context stored by this VoltDB without destroying the old one,
      * in case anything still links to it.
      *
-     * @param newCatalogBytes The catalog bytes.
      * @param diffCommands The commands to update the current catalog to the new one.
+     * @param newCatalogBytes The catalog bytes.
+     * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
+     * @param currentTxnId
+     * @param currentTxnTimestamp
      * @param currentTxnId  The transaction ID at which this method is called
+     * @param deploymentBytes  The deployment file bytes
      * @param deploymentHash The SHA-1 hash of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
-            byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash);
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
+            String diffCommands,
+            byte[] newCatalogBytes,
+            byte[] catalogBytesHash,
+            int expectedCatalogVersion,
+            long currentTxnId,
+            long currentTxnTimestamp,
+            byte[] deploymentBytes,
+            byte[] deploymentHash);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
@@ -152,6 +162,12 @@ public interface VoltDBInterface
     public void setReplicationActive(boolean active);
 
     public boolean getReplicationActive();
+
+    public NodeDRGateway getNodeDRGateway();
+
+    public ConsumerDRGateway getConsumerDRGateway();
+
+    public void onSyncSnapshotCompletion();
 
     /**
      * Set the operation mode of this server.

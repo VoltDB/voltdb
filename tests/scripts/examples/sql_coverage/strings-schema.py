@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@
 {
     "P1": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC_INLINE_MAX", FastSerializer.VOLTTYPE_STRING),
                     ("DESC_INLINE", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -33,6 +34,7 @@
         },
     "R1": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC_INLINE_MAX", FastSerializer.VOLTTYPE_STRING),
                     ("DESC_INLINE", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),

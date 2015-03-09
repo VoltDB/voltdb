@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -214,35 +214,25 @@ public class AggregationBenchmark {
         int counter = config.invocations;
         String procName = "Q" + config.proc;
         List<Long> m = new ArrayList<Long>();
+        System.out.println(String.format("Running procedure %s for the %d times...", procName, counter));
+        queryStartTS = System.nanoTime();
+        VoltTable vt = null;
         for (int i = 1; i <= counter; i++) {
-            System.out.println(String.format("Running procedure %s for the %d times", procName, i));
 
-            queryStartTS = System.nanoTime();
-
-            VoltTable vt = client.callProcedure(procName).getResults()[0];
-
-            queryElapse =  System.nanoTime() - queryStartTS;
+            vt = client.callProcedure(procName).getResults()[0];
 
             if (vt.getRowCount() <= 0) {
                 System.err.println("ERROR Query %d empty result set");
                 System.exit(-1);
             }
 
-            m.add(queryElapse);
-
-            System.out.printf("\n\n(Returned %d rows in %.3fs)\n",
-                    vt.getRowCount(), queryElapse / 1000000000.0);
         }
 
+        double avg =  (double)(System.nanoTime() - queryStartTS) / counter;
+        System.out.printf("\n\n(Returned %d rows in average %f us)\n",
+                vt.getRowCount(), avg);
         // block until all outstanding txns return
         client.drain();
-
-        Collections.sort(m);
-        if (m.size() > 4)
-            m = m.subList(1, m.size()-1);
-        double sum = 0.;
-        for (long d : m) { sum += d; }
-        double avg = sum / m.size() - 2;
 
         //retrieve stats
         ClientStats stats = fullStatsContext.fetch().getStats();

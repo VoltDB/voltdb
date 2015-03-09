@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -203,16 +203,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
-        if (m_drGateway != null) {
+        scheduleDrTask(gateway);
+    }
+
+    private void scheduleDrTask(final PartitionDRGateway gateway)
+    {
+        if (gateway != null) {
             // Schedules to be fired every 5ms
             VoltDB.instance().schedulePriorityWork(new Runnable() {
                 @Override
                 public void run() {
                     // Send a DR task to the site
-                    m_tasks.offer(new DRTask(m_drGateway));
+                    m_tasks.offer(new DRTask(gateway));
                 }
             }, 0, 5, TimeUnit.MILLISECONDS);
         }
+    }
+
+    public void setMpDRGateway(final PartitionDRGateway mpGateway)
+    {
+        scheduleDrTask(mpGateway);
     }
 
     @Override
@@ -761,6 +771,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             } else {
                 newSpHandle = getMaxTaskedSpHandle();
             }
+
             msg.setSpHandle(newSpHandle);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -124,7 +124,8 @@ public abstract class BaseInitiator implements Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          PartitionDRGateway drGateway)
+                          PartitionDRGateway drGateway,
+                          PartitionDRGateway mpDrGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -155,7 +156,8 @@ public abstract class BaseInitiator implements Initiator
                                        memStats,
                                        coreBindIds,
                                        taskLog,
-                                       drGateway);
+                                       drGateway,
+                                       mpDrGateway);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 

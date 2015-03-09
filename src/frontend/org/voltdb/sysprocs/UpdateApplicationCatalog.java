@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -137,7 +137,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
-            if (tupleCount > 0) {
+            if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
                 nonEmptyTables.add(tableName);
             }
         }
@@ -236,12 +236,13 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         expectedCatalogVersion,
                         getVoltPrivateRealTransactionIdDontUseMe(),
                         getUniqueId(),
+                        catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
 
-                log.info(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
+                log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                         CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                         Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
                         Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
@@ -364,8 +365,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
          */
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         if (worksWithElastic == 0 &&
-            !zk.getChildren(VoltZK.elasticJoinActiveBlockers, false).isEmpty()) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
         }
 
         // Pull the current catalog and deployment version and hash info.  Validate that we're either:

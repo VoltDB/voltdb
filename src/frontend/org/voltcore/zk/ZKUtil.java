@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -231,6 +231,16 @@ public class ZKUtil {
             return null;
         }
         return zk;
+    }
+
+    public static boolean addIfMissing(ZooKeeper zk, String absolutePath, CreateMode createMode, byte[] data)
+            throws KeeperException, InterruptedException {
+        try {
+            zk.create(absolutePath, data, Ids.OPEN_ACL_UNSAFE, createMode);
+        } catch (KeeperException.NodeExistsException e) {
+            return false;
+        }
+        return true;
     }
 
     public static final void mkdirs(ZooKeeper zk, String dirDN) {

@@ -106,6 +106,12 @@
         <appender-ref ref="console"/>
     </logger>
 
+    <!-- Always let the bulk loader and its ilk to write to the console. -->
+    <logger name="LOADER">
+        <level value="INFO"/>
+        <appender-ref ref="console"/>
+    </logger>
+
     <!-- logger to route specific informational messages to the console. -->
     <logger name="CONSOLE">
         <level value="INFO"/>

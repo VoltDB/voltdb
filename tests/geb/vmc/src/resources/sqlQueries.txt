@@ -1,0 +1,201 @@
+#
+# ROWS MARKED WITH '#' will not be read
+#
+#
+# rowid                     BIGINT        NOT NULL
+# rowid_group               TINYINT       NOT NULL
+# type_null_tinyint         TINYINT
+# type_not_null_tinyint     TINYINT       NOT NULL
+# type_null_smallint        SMALLINT
+# type_not_null_smallint    SMALLINT      NOT NULL
+# type_null_integer         INTEGER
+# type_not_null_integer     INTEGER       NOT NULL
+# type_null_bigint          BIGINT
+# type_not_null_bigint      BIGINT        NOT NULL
+# type_null_timestamp       TIMESTAMP
+# type_not_null_timestamp   TIMESTAMP     NOT NULL
+# type_null_float           FLOAT
+# type_not_null_float       FLOAT         NOT NULL
+# type_null_decimal         DECIMAL
+# type_not_null_decimal     DECIMAL       NOT NULL
+# type_null_varchar25       'VARCHAR'(32)
+# type_not_null_varchar25   'VARCHAR'(32)   NOT NULL
+# type_null_varchar128      'VARCHAR'(128)
+# type_not_null_varchar128  'VARCHAR'(128)  NOT NULL
+# type_null_varchar1024     'VARCHAR'(1024)
+# type_not_null_varchar1024 'VARCHAR'(1024) NOT NULL
+# PRIMARY KEY (rowid)
+# 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f
+#
+#
+#///////////////
+#//VALID INSERTS
+#///////////////
+#
+{"testName":"InsertBigInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertTinyInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 65, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertSmallInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 32760, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertInteger","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 2147483640, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertFloat","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3.402823466385e+27, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertDecimal","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.03406982457, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertTimestamp","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1374588650, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertVarchar","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertNull","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, null, 4, null, 6, null, 8, null, 10, null, 12, null, 14, null, 16, null, 'b', null, 'd', null, 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+#
+#
+#//////////////////
+#//INVALID INSERTS
+#//////////////////
+#
+{"testName":"InsertIntOutOfBounds","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertExtraVarchar","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertVarcharAsInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertVarcharAsBigInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertVarcharAsSmallInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertVarcharAsTinyInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertVarCharAsFloat","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'VARCHAR', 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertVarcharAsDecimal","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'VARCHAR', 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertVarcharAsTimestamp","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'VARCHAR', 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertBadParamCount","sqlCmd":"INSERT INTO partitioned_table VALUES(NotEnoughParameters)","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"InsertNullNotNull","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, A, null, C, null, E, null)","response":{"result":"ERROR","status":"FAILURE"}}
+#
+#
+#/////////
+#//SELECTS -----Test clears tables after each query. You must insert data prior to SELECT in the same line
+#/////////
+#
+{"testName":"SelectAll","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nSELECT * FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+{"testName":"SelectColumns","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nSELECT rowid,rowid_group,type_null_smallint,type_null_varchar128 FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_smallint":["5"],"type_null_varchar128":["c"]},"status":"SUCCESS"}}
+{"testName":"SelectBadColumn","sqlCmd":"SELECT badColumn FROM partitioned_table","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"SelectBadTable","sqlCmd":"SELECT * FROM bad_table","response":{"result":"ERROR","status":"FAILURE"}}
+#
+#
+#/////////
+#//VALID UPSERTS -----Test clears tables after each query. You must insert (and/or "upsert") data prior to SELECT in the same line
+#/////////
+#
+{"testName":"UpsertBigInt","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertTinyInt","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 65, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertSmallInt","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 32760, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertInteger","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 2147483640, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertFloat","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3.402823466385e+27, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertDecimal","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.03406982457, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertTimestamp","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1374588650, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertVarchar","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"UpsertNull","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, null, 4, null, 6, null, 8, null, 10, null, 12, null, 14, null, 16, null, 'b', null, 'd', null, 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+# UPSERT and check correct values inserted or updated:
+{"testName":"UpsertAsInsert","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nSELECT * FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+{"testName":"UpsertAsUpdate","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-01 00:00:00.000000', '2000-01-01 00:00:00.000000', 0, 0, 0, 0, '0', '0', '0', '0', '0', '0');\nUPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nSELECT * FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+#
+#
+#//////////////////
+#//INVALID UPSERTS
+#//////////////////
+#
+{"testName":"UpsertIntOutOfBounds","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertExtraVarchar","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertVarcharAsInt","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertVarcharAsBigInt","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertVarcharAsSmallInt","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertVarcharAsTinyInt","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertVarCharAsFloat","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'VARCHAR', 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertVarcharAsDecimal","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'VARCHAR', 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertVarcharAsTimestamp","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'VARCHAR', 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertBadParamCount","sqlCmd":"UPSERT INTO partitioned_table VALUES(NotEnoughParameters)","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"UpsertNullNotNull","sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, A, null, C, null, E, null)","response":{"result":"ERROR","status":"FAILURE"}}
+#
+#
+#/////////
+#//INSERT INTO SELECT -----Test clears tables after each query. You must insert data prior to SELECT in the same line
+#/////////
+#
+{"testName":"InsertIntoSelectRepl2Repl","sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nINSERT INTO replicated_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\ntype_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\ntype_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\nFROM replicated_table WHERE rowid=1 ORDER BY rowid;\nSELECT * FROM replicated_table WHERE rowid=2","response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+{"testName":"InsertIntoSelectRepl2Part","sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nINSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1 ORDER BY rowid;\nSELECT * FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+# Same Insert, without Order By, works fine (unlike UPSERT):
+{"testName":"InsertIntoSelectNoOrderBy","sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nINSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;               \nSELECT * FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+# Select from Partitioned, Insert into Replicated should fail:
+{"testName":"InsertIntoSelectPart2Repl","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nINSERT INTO replicated_table SELECT * FROM partitioned_table WHERE rowid=1 ORDER BY rowid","response":{"result":"ERROR","status":"FAILURE"}}
+# Select from Partitioned, Insert into (another) Partition should fail:
+{"testName":"InsertIntoSelectPart2Part","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nINSERT INTO partitioned_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\ntype_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\ntype_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\nFROM partitioned_table WHERE rowid=1 ORDER BY rowid","response":{"result":"ERROR","status":"FAILURE"}}
+#
+#
+#/////////
+#//UPSERT INTO SELECT -----Test clears tables after each query. You must insert data prior to SELECT in the same line
+#/////////
+#
+{"testName":"UpsertIntoSelectRepl2Repl","sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nUPSERT INTO replicated_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\ntype_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\ntype_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\nFROM replicated_table WHERE rowid=1 ORDER BY rowid;\nSELECT * FROM replicated_table WHERE rowid=2","response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+{"testName":"UpsertIntoSelectRepl2Part","sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nUPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1 ORDER BY rowid;\nSELECT * FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+# Same Upsert, without Order By, fails (DML error):
+{"testName":"UpsertIntoSelectNoOrderBy","sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nUPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;               ","response":{"result":"ERROR","status":"FAILURE"}}
+# Select from Partitioned, Upsert into Replicated should fail:
+{"testName":"UpsertIntoSelectPart2Repl","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nUPSERT INTO replicated_table SELECT * FROM partitioned_table WHERE rowid=1 ORDER BY rowid","response":{"result":"ERROR","status":"FAILURE"}}
+# Select from Partitioned, Upsert into (another) Partition should fail:
+{"testName":"UpsertIntoSelectPart2Part","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nUPSERT INTO partitioned_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\ntype_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\ntype_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\nFROM partitioned_table WHERE rowid=1 ORDER BY rowid","response":{"result":"ERROR","status":"FAILURE"}}
+#
+#
+#/////////
+#//DELETES ------ you must know how many rows will be removed -------
+#/////////
+#
+{"testName":"DeleteAll","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nINSERT INTO partitioned_table VALUES(2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nINSERT INTO partitioned_table VALUES(3, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\nDELETE FROM partitioned_table","response":{"result":{"modified_tuples":["3"]},"status":"SUCCESS"}}
+#
+#
+#//////////////////////////
+#//CRUD PROCEDURES
+#//////////////////////////
+#
+{"testName":"SysInsert","sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"SysDelete","sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f;\nexec PARTITIONED_TABLE.delete 1 ","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"SysUpdate","sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f;\nexec PARTITIONED_TABLE.update 1 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 b c d e f g 1","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"SysUpsert1","sqlCmd":"exec PARTITIONED_TABLE.upsert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"SysUpsert2","sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f;\nexec PARTITIONED_TABLE.upsert 1 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 b c d e f g","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"SysSelect","sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 '2010-07-31 16:08:11.000011' '2012-07-19 01:02:12.000012' 13 14 15 16 a b c d e f;\nexec PARTITIONED_TABLE.select 1","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+{"testName":"SysInvalid","sqlCmd":"exec PARTITIONED_TABLE.badProc","response":{"result":"ERROR","status":"FAILURE"}}
+#
+#
+#/////////
+#//DDL (positive tests)
+#/////////
+#
+# Table "ddl_table" is created here and dropped and recreated for subsequent tests.
+# It's finally dropped below (last test).
+{"testName":"DdlCreateTable","sqlCmd":"Create table ddl_table (i integer)","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlAlterTableDropColumn","sqlCmd":"DROP table ddl_table if exists;\nCreate table ddl_table (i integer, j tinyint);\nAlter table ddl_table drop column j;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlAlterTableAlterColumn","sqlCmd":"DROP table ddl_table if exists;\nCreate table ddl_table (i integer, j tinyint);\nAlter table ddl_table alter column j float default 3.4","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+#
+# Create view tests:
+{"testName":"DdlCreateTableForViews","sqlCmd":"DROP table ddl_table if exists; Create table ddl_table (i integer, j integer);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView1","sqlCmd":"Create view view1 (gb, ct) as select i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView2","sqlCmd":"Create view view2 \n (gb,\n ct\n) \nas \nselect i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView3","sqlCmd":"Create view view3a (gb, ct) as select i, count(*) from ddl_table group by i;\nCreate view view3b (gb, ct) as select i, count(*) from ddl_table group by i;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Worse case testing for new line character:
+{"testName":"DdlCreateView_required","sqlCmd":"Create\nview\nview_required(gb,ct)\nas\nselect\ni,count(*)\nfrom\nddl_table\ngroup\nby\ni","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView_allowed","sqlCmd":"Create\nview\nview_allowed\n(gb\n,\nct\n)\nas\nselect\ni\n,\ncount(*)\nfrom\nddl_table\ngroup\nby\ni\n","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Drop the views created above (to test Drop View, and so test is repeatable):
+{"testName":"DdlDropView1","sqlCmd":"DROP view view1;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlDropViews","sqlCmd":"DROP view view2 if exists;\nDROP view view3a if exists;\nDROP view view3b if exists;\nDROP view view_required if exists;\nDROP view view_allowed if exists;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+#
+# Create procedure tests: (there are other queries not tested here: update, truncate, upsert)
+{"testName":"DdlCreateTableForProcedures","sqlCmd":"DROP table ddl_table if exists;\nCreate table ddl_table (i integer, j integer);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure1","sqlCmd":"Create procedure p1 as\n  insert into ddl_table values(1, 1);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure2","sqlCmd":"Create procedure p2a as\n  select i \nfrom ddl_table;\nCreate procedure p2b as\n delete from ddl_table;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure3","sqlCmd":"Create procedure p3 as\n  ( select i, j-1 from ddl_table ) union (select i, j+1 from ddl_table);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Identical procedure, with lots of new line characters:
+{"testName":"DdlCreateProcedure4","sqlCmd":"Create procedure\np4\n as\n ( \nselect i, j-1 from ddl_table )\nunion \n(select i, j+1 from ddl_table);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Drop the procedures created above (to test Drop Procedure, and so test is repeatable):
+{"testName":"DdlDropProcedure1","sqlCmd":"DROP procedure p1;\n","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlDropProcedures","sqlCmd":"DROP procedure p2a if exists;\nDROP procedure p2b if exists;\nDROP procedure p3 if exists;\nDROP procedure p4 if exists;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+#
+#
+#/////////
+#//DDL (negative tests)
+#/////////
+#
+# Semicolons MUST appear between ALTER TABLE statements; VMC will not insert them, hence the following cause parse errors.
+{"testName":"DdlAlterTableDropDrop","sqlCmd":"drop table ddl_table if exists;\nCreate table ddl_table (i integer, j tinyint, k bigint);\nAlter table ddl_table drop column j alter table ddl_table drop column k","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"DdlAlterTableAddAdd","sqlCmd":"drop table ddl_table if exists;\nCreate table ddl_table (i integer);\nAlter table ddl_table add column j bigint alter table ddl_table add column k tinyint","response":{"result":"ERROR","status":"FAILURE"}}
+# try to create a view from an undefined table
+{"testName":"DdlCreateViewInvalid","sqlCmd":"create view ddl_no_table_view (gb, ct) as select i, count(*) from ddl_no_table_exists group by i","response":{"result":"ERROR","status":"FAILURE"}}
+#
+# Finally, drop ddl_table, so test is repeatable.
+{"testName":"DdlDropTable","sqlCmd":"drop table ddl_table","response":{"result":{"status":["0"]},"status":"SUCCESS"}}

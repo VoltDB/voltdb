@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -54,11 +55,12 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
 
 public class Benchmark {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    static VoltLogger log = new VoltLogger("Benchmark");
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -86,7 +88,7 @@ public class Benchmark {
     final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     // for reporting and detecting progress
-    private final AtomicLong txnCount = new AtomicLong();
+    public static AtomicLong txnCount = new AtomicLong();
     private long txnCountAtLastCheck;
     private long lastProgressTimestamp = System.currentTimeMillis();
 
@@ -156,7 +158,7 @@ public class Benchmark {
         String statsfile = "";
 
         @Option(desc = "Allow experimental in-procedure adhoc statments.")
-        boolean allowinprocadhoc = false;
+        boolean allowinprocadhoc = true;
 
         @Option(desc = "Allow set ratio of mp to sp workload.")
         float mpratio = (float)0.20;
@@ -191,7 +193,6 @@ public class Benchmark {
      * Fake an internal jstack to the log
      */
     static public void printJStack() {
-        log.info(new Date().toString() + " Full thread dump");
 
         Map<String, List<String>> deduped = new HashMap<String, List<String>>();
 
@@ -220,20 +221,70 @@ public class Benchmark {
             }
         }
 
+        String logline = "";
         for (Entry<String, List<String>> e : deduped.entrySet()) {
-            String logline = "";
             for (String header : e.getValue()) {
-                logline += header + "\n";
+                logline += "\n" + header + "\n";
             }
             logline += e.getKey();
-            log.info(logline);
+        }
+        log.info("Full thread dump:\n" + logline);
+    }
+
+    static public void hardStop(String msg) {
+        logHardStop(msg);
+        stopTheWorld();
+    }
+
+    static public void hardStop(Exception e) {
+        logHardStop("Unexpected exception", e);
+        stopTheWorld();
+    }
+
+    static public void hardStop(String msg, Exception e) {
+        logHardStop(msg, e);
+        if (e instanceof ProcCallException) {
+            ClientResponse cr = ((ProcCallException) e).getClientResponse();
+            hardStop(msg, cr);
         }
     }
 
-    /**
-     * Remove the client from the list if connection is broken.
-     */
+    static public void hardStop(String msg, ClientResponse resp) {
+        hardStop(msg, (ClientResponseImpl) resp);
+    }
+
+    static public void hardStop(String msg, ClientResponseImpl resp) {
+        logHardStop(msg);
+        log.error("[HardStop] " + resp.toJSONString());
+        stopTheWorld();
+    }
+
+    static private void logHardStop(String msg, Exception e) {
+        log.error("[HardStop] " + msg, e);
+    }
+
+    static private void logHardStop(String msg) {
+        log.error("[HardStop] " + msg);
+    }
+
+    static private void stopTheWorld() {
+        Benchmark.printJStack();
+        log.error("Terminating abnormally");
+        System.exit(-1);
+    }
+
+
     private class StatusListener extends ClientStatusListenerExt {
+
+        @Override
+        public void uncaughtException(ProcedureCallback callback, ClientResponse resp, Throwable e) {
+            hardStop("Uncaught exception in procedure callback ", new Exception(e));
+
+        }
+
+        /**
+         * Remove the client from the list if connection is broken.
+         */
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             if (shutdown.get()) {
@@ -436,6 +487,24 @@ public class Benchmark {
         return partitionCount;
     }
 
+    private byte reportDeadThread(Thread th) {
+        log.error("Thread '" + th.getName() + "' is not alive");
+        return 1;
+    }
+
+    private byte reportDeadThread(Thread th, String msg) {
+        log.error("Thread '" + th.getName() + "' is not alive, " + msg);
+        return 1;
+    }
+
+    public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
+        public void uncaughtException(Thread th, Throwable ex) {
+        log.error("Uncaught exception: " + ex.getMessage(), ex);
+        printJStack();
+        System.exit(-1);
+        }
+    };
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -443,6 +512,7 @@ public class Benchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
+        byte exitcode = 0;
         log.info(HORIZONTAL_RULE);
         log.info(" Setup & Initialization");
         log.info(HORIZONTAL_RULE);
@@ -495,8 +565,9 @@ public class Benchmark {
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                          (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
         partitionedLoader.start();
+        BigTableLoader replicatedLoader = null;
         if (config.mpratio > 0.0) {
-            BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
+            replicatedLoader = new BigTableLoader(client, "bigr",
                              (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
             replicatedLoader.start();
         }
@@ -529,8 +600,9 @@ public class Benchmark {
         TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedTruncater.start();
+        TruncateTableLoader replicatedTruncater = null;
         if (config.mpratio > 0.0) {
-            TruncateTableLoader replicatedTruncater = new TruncateTableLoader(client, "trur",
+            replicatedTruncater = new TruncateTableLoader(client, "trur",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
             replicatedTruncater.start();
         }
@@ -538,8 +610,9 @@ public class Benchmark {
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
         plt.start();
+        LoadTableLoader rlt = null;
         if (config.mpratio > 0.0) {
-        LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
+        rlt = new LoadTableLoader(client, "loadmp",
                 (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
         rlt.start();
         }
@@ -555,6 +628,8 @@ public class Benchmark {
 
         InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
         idpt.start();
+        DdlThread ddlt = new DdlThread(client);
+        // XXX/PSR ddlt.start();
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
@@ -573,6 +648,40 @@ public class Benchmark {
 
         log.info("Duration completed shutting down...");
 
+        // check if loaders are done or still working
+        int lpcc = partitionedLoader.getPercentLoadComplete();
+        if (! partitionedLoader.isAlive() && lpcc < 100) {
+            exitcode = reportDeadThread(partitionedLoader, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+        } else
+            log.info(partitionedLoader + " was at " + lpcc + "% of rows loaded");
+        lpcc = replicatedLoader.getPercentLoadComplete();
+        if (! replicatedLoader.isAlive() && lpcc < 100) {
+            exitcode = reportDeadThread(replicatedLoader, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+        } else
+            log.info(replicatedLoader + " was at " + lpcc + "% of rows loaded");
+        // check if all threads still alive
+        if (! partitionedTruncater.isAlive())
+            exitcode = reportDeadThread(partitionedTruncater);
+        if (! replicatedTruncater.isAlive())
+            exitcode = reportDeadThread(replicatedTruncater);
+        /* XXX if (! plt.isAlive())
+            exitcode = reportDeadThread(plt);
+        if (! rlt.isAlive())
+            exitcode = reportDeadThread(rlt);
+        */if (! readThread.isAlive())
+            exitcode = reportDeadThread(readThread);
+        if (! config.disableadhoc && ! adHocMayhemThread.isAlive())
+            exitcode = reportDeadThread(adHocMayhemThread);
+        if (! idpt.isAlive())
+            exitcode = reportDeadThread(idpt);
+        /* XXX if (! ddlt.isAlive())
+            exitcode = reportDeadThread(ddlt);*/
+        for (ClientThread ct : clientThreads) {
+            if (! ct.isAlive()) {
+                exitcode = reportDeadThread(ct);
+            }
+        }
+
         /* XXX/PSR
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
@@ -581,6 +690,7 @@ public class Benchmark {
         readThread.shutdown();
         adHocMayhemThread.shutdown();
         idpt.shutdown();
+        ddlt.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
@@ -589,6 +699,7 @@ public class Benchmark {
         readThread.join();
         adHocMayhemThread.join();
         idpt.join();
+        ddlt.join();
 
         //Shutdown LoadTableLoader
         rlt.shutdown();
@@ -615,7 +726,7 @@ public class Benchmark {
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
-        System.exit(0);
+        System.exit(exitcode);
     }
 
     /**

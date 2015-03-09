@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -2498,13 +2498,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals("XinJia_VoltDB", result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
-        assertTrue(result.advanceRow());
-        assertEquals("XinJia", result.getString(1));
-
-        result = client.callProcedure("OVERLAY", "Jia", 4.9, 7, 1).getResults()[0];
-        assertTrue(result.advanceRow());
-        assertEquals("XinJia", result.getString(1));
+        try {
+            result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("The provided value: (4.2) of type: java.lang.Double "
+                    + "is not a match or is out of range for the target parameter type: long"));
+        }
 
         // Test NULL results
         result = client.callProcedure("OVERLAY", null, 4, 7, 1).getResults()[0];

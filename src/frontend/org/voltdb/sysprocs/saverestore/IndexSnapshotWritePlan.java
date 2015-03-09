@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,10 +49,12 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     @Override
     public Callable<Boolean> createSetup(String file_path, String file_nonce, long txnId,
                                          Map<Integer, Long> partitionTransactionIds,
+                                         Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
                                          JSONObject jsData,
                                          SystemProcedureExecutionContext context,
                                          VoltTable result,
                                          Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                         Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
                                          SiteTracker tracker,
                                          HashinatorSnapshotData hashinatorData,
                                          long timestamp)

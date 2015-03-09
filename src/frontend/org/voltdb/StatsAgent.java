@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,7 @@ import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -283,15 +284,22 @@ public class StatsAgent extends OpsAgent
     protected void handleJSONMessage(JSONObject obj) throws Exception {
         VoltTable[] results = null;
 
-        OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
-        if (selector == OpsSelector.STATISTICS) {
-            results = collectDistributedStats(obj);
-        }
-        else {
-            hostLog.warn("StatsAgent received a non-STATISTICS OPS selector: " + selector);
-        }
+        try {
+            OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
+            if (selector == OpsSelector.STATISTICS) {
+                results = collectDistributedStats(obj);
+            }
+            else {
+                hostLog.warn("StatsAgent received a non-STATISTICS OPS selector: " + selector);
+            }
 
-        sendOpsResponse(results, obj);
+            sendOpsResponse(results, obj);
+        } catch (Exception e) {
+            hostLog.warn("Error processing stats request " + obj.toString(4), e);
+        } catch (Throwable t) {
+            //Handle throwable because otherwise the future swallows up other exceptions
+            VoltDB.crashLocalVoltDB("Error processing stats request " + obj.toString(4), true, t);
+        }
     }
 
     private void collectTopoStats(PendingOpsRequest psr)
@@ -403,6 +411,15 @@ public class StatsAgent extends OpsAgent
         case KSAFETY:
             stats = collectKSafetyStats(interval);
             break;
+        case DRCONSUMER:
+            stats = collectDRConsumerStats();
+            break;
+        case DRCONSUMERNODE:
+            stats = collectDRConsumerNodeStats();
+            break;
+        case DRCONSUMERPARTITION:
+            stats = collectDRConsumerPartitionStats();
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -451,6 +468,45 @@ public class StatsAgent extends OpsAgent
             stats = new VoltTable[1];
             stats[0] = partitionStats;
         }
+        return stats;
+    }
+
+    private VoltTable[] collectDRConsumerStats() {
+        VoltTable[] stats = null;
+
+        VoltTable[] statusStats = collectDRConsumerNodeStats();
+        VoltTable[] perfStats = collectDRConsumerPartitionStats();
+        if (statusStats != null && perfStats != null) {
+            stats = new VoltTable[2];
+            stats[0] = statusStats[0];
+            stats[1] = perfStats[0];
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectDRConsumerNodeStats() {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRCONSUMERNODE, false, now);
+        if (replicaStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = replicaStats;
+        }
+
+        return stats;
+    }
+
+    private VoltTable[] collectDRConsumerPartitionStats() {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRCONSUMERPARTITION, false, now);
+        if (replicaStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = replicaStats;
+        }
+
         return stats;
     }
 

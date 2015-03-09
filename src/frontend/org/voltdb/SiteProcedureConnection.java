@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -68,6 +68,7 @@ public interface SiteProcedureConnection {
     public byte[] loadTable(
             long txnId,
             long spHandle,
+            long uniqueId,
             String clusterName,
             String databaseName,
             String tableName,
@@ -83,6 +84,7 @@ public interface SiteProcedureConnection {
     public byte[] loadTable(
             long txnId,
             long spHandle,
+            long uniqueId,
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
@@ -159,9 +161,14 @@ public interface SiteProcedureConnection {
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
+
+    public TupleStreamStateInfo getDRTupleStreamStateInfo();
+
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber);
 
     public void toggleProfiler(int toggle);
 
@@ -186,5 +193,5 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
-    public void applyBinaryLog(byte logData[]);
+    public void applyBinaryLog(long txnId, long spHandle, long uniqueId, byte logData[]);
 }

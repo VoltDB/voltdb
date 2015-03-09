@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -148,9 +148,12 @@ public class QueryPlanner {
         AbstractPlanNode.resetPlanNodeIds();
 
         // determine the type of the query
+        //
+        // (Hmmm...  seems like this pre-processing of the SQL text
+        // and subsequent placement of UPSERT_TAG should be pushed down
+        // into getXMLCompiledStatement)
         m_sql = m_sql.trim();
-        String queryPrefix = m_sql.substring(0,6).toUpperCase();
-        if (queryPrefix.startsWith("UPSERT")) {
+        if (m_sql.length() > 6 && m_sql.substring(0,6).toUpperCase().startsWith("UPSERT")) { // ENG-7395
             m_isUpsert = true;
             m_sql = "INSERT" + m_sql.substring(6);
         }
@@ -168,6 +171,22 @@ public class QueryPlanner {
             assert(m_xmlSQL.name.equalsIgnoreCase("INSERT"));
             // for AdHoc cache distinguish purpose which is based on the XML
             m_xmlSQL.attributes.put(UPSERT_TAG, "true");
+        }
+
+        m_planSelector.outputCompiledStatement(m_xmlSQL);
+    }
+
+    /**
+     * This method behaves similarly to parse(), but allows the caller to pass in XML
+     * to avoid re-parsing SQL text that has already gone through HSQL.
+     *
+     * @param  xmlSql  XML produced by previous invocation of HSQL
+     * */
+    public void parseFromXml(VoltXMLElement xmlSQL) {
+        m_recentErrorMsg = null;
+        m_xmlSQL = xmlSQL;
+        if (m_xmlSQL.attributes.containsKey(UPSERT_TAG)) {
+            m_isUpsert = true;
         }
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);
@@ -249,6 +268,7 @@ public class QueryPlanner {
 
                 // note, expect real planning errors ignored here to be thrown again below
                 m_recentErrorMsg = null;
+                m_partitioning.resetAnalysisState();
             }
         }
 
@@ -383,6 +403,7 @@ public class QueryPlanner {
             ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }
+
         return bestPlan;
     }
 
@@ -401,7 +422,9 @@ public class QueryPlanner {
     }
 
     public static AbstractPlanNode replaceInsertPlanNodeWithUpsert(AbstractPlanNode root) {
-        if (root == null) return null;
+        if (root == null) {
+            return null;
+        }
 
         List<AbstractPlanNode> inserts = root.findAllNodesOfType(PlanNodeType.INSERT);
         if (inserts.size() == 1) {

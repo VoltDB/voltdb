@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -68,11 +68,11 @@ public:
         m_node(NULL),
         m_inputTable(NULL),
         m_partitionColumn(-1),
-        m_partitionColumnIsString(false),
         m_multiPartition(false),
         m_isStreamed(false),
         m_isUpsert(false),
-        m_engine(engine),
+        m_sourceIsPartitioned(false),
+        m_hasPurgeFragment(false),
         m_templateTuple(),
         m_memoryPool(),
         m_nowFields()
@@ -88,20 +88,32 @@ public:
         TempTable* m_inputTable;
 
         int m_partitionColumn;
-        bool m_partitionColumnIsString;
         bool m_multiPartition;
         bool m_isStreamed;
         bool m_isUpsert;
-
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
+        bool m_sourceIsPartitioned;
+        bool m_hasPurgeFragment;
 
     private:
-        /** A tuple with the target table's schema that is populated with default
-         * values for each field. */
+
+        /** If the table is at or over its tuple limit, this method
+         * executes the purge fragment for the table.  Returns true if
+         * nothing went wrong (regardless of whether the purge
+         * fragment was executed) and false otherwise.
+         *
+         * The purge fragment might perform a truncate table,
+         * in which case the persistent table object we're inserting
+         * into might change.  Passing a pointer-to-pointer allows
+         * the callee to update the persistent table pointer.
+         */
+        bool executePurgeFragmentIfNeeded(PersistentTable** table);
+
+        /** A tuple with the target table's schema that is populated
+         * with default values for each field. */
         StandAloneTupleStorage m_templateTuple;
 
-        /** A memory pool for allocating non-inlined varchar and varbinary default values */
+        /** A memory pool for allocating non-inlined varchar and
+         * varbinary default values */
         Pool m_memoryPool;
 
         /** A list of indexes of each column in the template tuple

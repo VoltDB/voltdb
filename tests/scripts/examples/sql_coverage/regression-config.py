@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -72,11 +72,6 @@
                     "ddl": "int-DDL.sql",
                     "template": "basic-int-joins.sql",
                     "normalizer": "normalizer.py"},
-    "basic-index-joins": {"schema": "index-join-schema.py",
-                    "ddl": "index-DDL.sql",
-                    "template": "basic-index-joins.sql",
-                    "normalizer": "normalizer.py"},
-
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-unions": {"schema": "union-schema.py",
                      "ddl": "DDL.sql",
@@ -168,6 +163,11 @@
                                          "ddl": "int-DDL.sql",
                                          "template": "regression-advanced-ints-cntonly.sql",
                                          "normalizer": "not-a-normalizer.py"},
+# To test advanced IN/EXISTS
+    "advanced-inexists": {"schema": "int-schema.py",
+                          "ddl": "int-DDL.sql",
+                          "template": "advanced-inexists.sql",
+                          "normalizer": "normalizer.py"},
 
 # ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
     "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",

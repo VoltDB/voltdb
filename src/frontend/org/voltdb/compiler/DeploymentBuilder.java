@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 
 import javax.xml.bind.JAXBContext;
@@ -38,7 +39,6 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
-import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.SchemaType;
@@ -54,12 +54,12 @@ public class DeploymentBuilder {
     public static final class UserInfo {
         public final String name;
         public String password;
-        private final String groups[];
+        private final String roles[];
 
-        public UserInfo (final String name, final String password, final String groups[]){
+        public UserInfo (final String name, final String password, final String roles[]){
             this.name = name;
             this.password = password;
-            this.groups = groups;
+            this.roles = roles;
         }
 
         @Override
@@ -86,7 +86,7 @@ public class DeploymentBuilder {
 
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
 
-    // zero defaults to first open port >= 8080.
+    // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
@@ -118,7 +118,7 @@ public class DeploymentBuilder {
     private boolean m_elenabled;      // true if enabled; false if disabled
 
     // whether to allow DDL over adhoc or use full catalog updates
-    private boolean m_useAdhocSchema = false;
+    private boolean m_useDDLSchema = false;
 
     public DeploymentBuilder() {
         this(1, 1, 0);
@@ -173,8 +173,8 @@ public class DeploymentBuilder {
     /**
      * whether to allow DDL over adhoc or use full catalog updates
      */
-    public void setUseAdhocSchema(boolean useIt) {
-        m_useAdhocSchema = useIt;
+    public void setUseDDLSchema(boolean useIt) {
+        m_useDDLSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -188,6 +188,11 @@ public class DeploymentBuilder {
         m_commandLogSize = logSize;
     }
 
+    public void setEnableCommandLogging(boolean value)
+    {
+        m_commandLogEnabled = value;
+    }
+
     public void setSnapshotPriority(int priority) {
         m_snapshotPriority = priority;
     }
@@ -197,6 +202,16 @@ public class DeploymentBuilder {
             final boolean added = m_users.add(info);
             if (!added) {
                 assert(added);
+            }
+        }
+    }
+
+    public void removeUser(String userName) {
+        Iterator<UserInfo> iter = m_users.iterator();
+        while (iter.hasNext()) {
+            UserInfo info = iter.next();
+            if (info.name.equals(userName)) {
+                iter.remove();
             }
         }
     }
@@ -293,7 +308,7 @@ public class DeploymentBuilder {
         cluster.setHostcount(m_hostCount);
         cluster.setSitesperhost(m_sitesPerHost);
         cluster.setKfactor(m_replication);
-        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
+        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();
@@ -303,19 +318,19 @@ public class DeploymentBuilder {
         voltdbroot.setPath(m_voltRootPath);
 
         if (m_snapshotPath != null) {
-            PathEntry snapshotPathElement = factory.createPathEntry();
+            PathsType.Snapshots snapshotPathElement = factory.createPathsTypeSnapshots();
             snapshotPathElement.setPath(m_snapshotPath);
             paths.setSnapshots(snapshotPathElement);
         }
 
         if (m_commandLogPath != null) {
-            PathEntry commandLogPathElement = factory.createPathEntry();
+            PathsType.Commandlog commandLogPathElement = factory.createPathsTypeCommandlog();
             commandLogPathElement.setPath(m_commandLogPath);
             paths.setCommandlog(commandLogPathElement);
         }
 
         if (m_internalSnapshotPath != null) {
-            PathEntry commandLogSnapshotPathElement = factory.createPathEntry();
+            PathsType.Commandlogsnapshot commandLogSnapshotPathElement = factory.createPathsTypeCommandlogsnapshot();
             commandLogSnapshotPathElement.setPath(m_internalSnapshotPath);
             paths.setCommandlogsnapshot(commandLogSnapshotPathElement);
         }
@@ -407,15 +422,15 @@ public class DeploymentBuilder {
                 user.setName(info.name);
                 user.setPassword(info.password);
 
-                // build up user/@groups.
-                if (info.groups.length > 0) {
-                    final StringBuilder groups = new StringBuilder();
-                    for (final String group : info.groups) {
-                        if (groups.length() > 0)
-                            groups.append(",");
-                        groups.append(group);
+                // build up user/roles.
+                if (info.roles.length > 0) {
+                    final StringBuilder roles = new StringBuilder();
+                    for (final String role : info.roles) {
+                        if (roles.length() > 0)
+                            roles.append(",");
+                        roles.append(role.toLowerCase());
                     }
-                    user.setGroups(groups.toString());
+                    user.setRoles(roles.toString());
                 }
             }
         }

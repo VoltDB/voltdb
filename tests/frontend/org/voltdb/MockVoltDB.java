@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -112,9 +112,8 @@ public class MockVoltDB implements VoltDBInterface
             m_localMetadata = obj.toString(4);
 
             m_catalog = new Catalog();
-            m_catalog.execute("add / clusters " + m_clusterName);
-            m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
-                    m_databaseName);
+            m_catalog.execute(String.format("add / clusters %s", m_clusterName));
+            m_catalog.execute(String.format("add /clusters#%s databases %s", m_clusterName, m_databaseName));
             Cluster cluster = m_catalog.getClusters().get(m_clusterName);
             // Set a sane default for TestMessaging (at least)
             cluster.setHeartbeattimeout(10000);
@@ -196,6 +195,12 @@ public class MockVoltDB implements VoltDBInterface
         getTable(tableName).setSignature(tableName);
     }
 
+    public void setDRProducerClusterId(int clusterId)
+    {
+        getCluster().setDrproducerenabled(true);
+        getCluster().setDrclusterid(clusterId);
+    }
+
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
@@ -248,14 +253,14 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getBuildString()
     {
-        return null;
+        return "MOCK_VOLTDB";
     }
 
     @Override
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, null, null, 0, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, new byte[] {}, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -440,7 +445,8 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash)
+            long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
+            byte[] deploymentHash)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -547,6 +553,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public NodeDRGateway getNodeDRGateway()
+    {
+        return null;
+    }
+
+    @Override
     public SiteTracker getSiteTrackerForSnapshot() {
         return m_siteTracker;
     }
@@ -623,5 +635,14 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void halt() {
         assert (true);
+    }
+
+    @Override
+    public ConsumerDRGateway getConsumerDRGateway() {
+        return null;
+    }
+
+    @Override
+    public void onSyncSnapshotCompletion() {
     }
 }

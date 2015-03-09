@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -141,6 +141,16 @@ public class StatementPartitioning implements Cloneable{
 
     private boolean m_joinValid = true;
 
+    /** Most of the time DML on a replicated table for a plan that is executed
+     * as single-partition is a bad idea, and the planner will refuse to do it.
+     * However, sometimes we want to bypass this rule; for example, when planning
+     * the DELETE statement executed when LIMIT PARTITION ROWS is about to be violated.
+     * In this special case, the statement is being planned, for simplicity, as if for
+     * single-partition execution, since it never requires a coordinator fragment,
+     * but it will only ever be executed in the context of a replicated table MP insert
+     * on ALL partitions.*/
+    private boolean m_isReplicatedDmlToRunOnAllPartitions = false;
+
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
@@ -162,6 +172,12 @@ public class StatementPartitioning implements Cloneable{
         return new StatementPartitioning(true, /* default to MP */ false);
     }
 
+    /** See comment for m_singlePartitionReplicatedDMLAllowed, above. */
+    public static StatementPartitioning partitioningForRowLimitDelete() {
+        StatementPartitioning partitioning = forceSP();
+        partitioning.m_isReplicatedDmlToRunOnAllPartitions = true;
+        return partitioning;
+    }
 
     public boolean isInferred() {
         return m_inferPartitioning;
@@ -341,6 +357,13 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
+     * Accessor
+     */
+    public boolean isReplicatedDmlToRunOnAllPartitions() {
+        return m_isReplicatedDmlToRunOnAllPartitions;
+    }
+
+    /**
      * Given the query's list of tables and its collection(s) of equality-filtered columns and their equivalents,
      * determine whether all joins involving partitioned tables can be executed locally on a single partition.
      * This is only the case when they include equality comparisons between partition key columns.
@@ -510,6 +533,30 @@ public class StatementPartitioning implements Cloneable{
         }
         // Initial guess -- as if no equality filters.
         m_countOfIndependentlyPartitionedTables = m_countOfPartitionedTables;
+    }
+
+    /**
+     * Sometimes when we fail to plan a statement, we try again with different inputs
+     * using the same StatementPartitioning object.  In this case, it's incumbent on
+     * callers to reset the cached analysis state set by calling this method.
+     *
+     * TODO: one could imagine separating this class into two classes:
+     * - One for partitioning context (such as AdHoc, stored proc, row limit delete
+     *   trigger), which is immutable
+     * - One to capture the results of partitioning analysis, which can be GC'd when no
+     *   longer needed
+     * This might avoid some of the pitfalls of reused stateful objects.
+     *   */
+    public void resetAnalysisState() {
+        m_countOfIndependentlyPartitionedTables = -1;
+        m_countOfPartitionedTables = -1;
+        m_fullColumnName = null;
+        m_inferredExpression.clear();
+        m_inferredParameterIndex = -1;
+        m_inferredValue = null;
+        m_isDML = false;
+        m_joinValid = true;
+        m_partitionColForDML = null;
     }
 
 }

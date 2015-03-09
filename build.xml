@@ -74,7 +74,7 @@
 <property name='src.testproc.dir'            location='tests/testprocs' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
-<property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
+<property name='src.dbmonitor.dir'           location='src/frontend/org/voltdb/dbmonitor' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
@@ -115,6 +115,10 @@
 </condition>
 
 <!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
+<condition property="VOLT_LOG_LEVEL" value="500">
+    <not><isset property="VOLT_LOG_LEVEL"/></not>
+</condition>
+
 <condition property="verifycatalogdebug" value="true">
     <not><isset property="verifycatalogdebug"/></not>
 </condition>
@@ -237,7 +241,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="licensecheck, compile, voltdbipc"
+    depends="licensecheck, default, voltdbipc"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -246,6 +250,7 @@ PRIMARY ENTRY POINTS
     <exec executable="ant" failonerror="true" timeout="9000000">
         <arg value="eecheck" />
         <arg value="junit" />
+        <arg value="sqlcmdtest" />
         <arg value="distcheck" />
         <arg value="pythonfser" />
         <arg value="-Dbuild=${build}" />
@@ -512,6 +517,19 @@ DISTRIBUTION
      populates the core components used by the client distribution. -->
 <target name="dist_internal" depends="dist_internal_core">
 
+	<!-- build the jars for the clients -->
+	<exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+
+    <!-- build the jars for the tutorials -->
+	<exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
@@ -536,14 +554,6 @@ DISTRIBUTION
     <dist_tools_macro distlabel="" />
 
     <antcall target="copy_pro_bin"/>
-
-    <!-- copy studio.web -->
-    <mkdir dir="${dist.dir}/tools/studio.web" />
-    <copy todir="${dist.dir}/tools/studio.web">
-        <fileset dir="${src.gpl.dir}/org/voltdb/studio" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-    </copy>
 
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
@@ -574,12 +584,6 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 
-    <!-- package up studio web trivially -->
-    <zip destfile="${raw.dist.dir}/voltdb-studio.web-${dist.version}.zip">
-        <fileset dir="${src.studio.dir}" defaultexcludes="yes">
-            <include name="**/*" />
-        </fileset>
-    </zip>
 </target>
 
 <target name="dist_client" depends="dist_internal_core"
@@ -610,6 +614,10 @@ DISTRIBUTION
             <include name="examples/voltcache/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
+            <include name="examples/json-sessions/run.sh"/>
+            <include name="examples/windowing/run.sh"/>
+            <include name="examples/windowing-with-ddl/run.sh"/>
+            <include name="examples/uniquedevices/run.sh"/>
             <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
@@ -713,10 +721,14 @@ CLEANING
 	description="Remove all compiled and generated files."
 	depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
 	         clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
-  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
@@ -970,8 +982,8 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <copy todir='${build.prod.dir}/org/voltdb/studio'>
-        <fileset dir="${src.gpl.dir}/org/voltdb/studio">
+    <copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
+        <fileset dir="${src.gpl.dir}/org/voltdb/dbmonitor">
             <include name="**"/>
         </fileset>
     </copy>
@@ -1162,6 +1174,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} test" />
     </exec>
 </target>
@@ -1171,6 +1184,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} build" />
     </exec>
 </target>
@@ -1178,6 +1192,7 @@ NATIVE EE STUFF
 <target name='voltdbipc' depends="ee"
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} voltdbipc" />
     </exec>
 </target>
@@ -1185,6 +1200,7 @@ NATIVE EE STUFF
 <target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
         <arg line="build.py ${build}" />
     </exec>
@@ -1216,6 +1232,7 @@ NATIVE EE STUFF
     description="Just make the makefile for the C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="EEONLYBUILDMAKEFILE" value="true"/>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build}" />
     </exec>
 </target>
@@ -1223,6 +1240,7 @@ NATIVE EE STUFF
 <target name='recompile_ee_nodepends'
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build}" />
     </exec>
     <copy todir='voltdb'>
@@ -1235,6 +1253,7 @@ NATIVE EE STUFF
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} profile" />
     </exec>
 </target>
@@ -1242,6 +1261,7 @@ NATIVE EE STUFF
 <target name='execplanfrag' depends="ee"
         description="Create test program that loads catalog and tables and executes a plan fragment.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py EXECPLANFRAG ${build}" />
     </exec>
 </target>
@@ -1651,6 +1671,7 @@ TEST CASES
   <!-- Generate instrumented objects -->
   <!-- Whether any work needs doing is left to the C++ makefile -->
   <exec dir='.' executable='python' failonerror='true'>
+    <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
     <arg line="build.py ${build} coverage" />
   </exec>
   <mkdir dir="${lcov.dir}" />
@@ -1712,6 +1733,7 @@ TEST CASES
     description="Run C++ unit tests from the coverage directory">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} test coverage" />
     </exec>
 </target>
@@ -1823,20 +1845,25 @@ TEST CASES
         <exec dir="${dist.examples.dir}/@{app}" executable="/usr/bin/env" failonerror='true'>
             <arg value="bash" />
             <arg value="run.sh" />
-            <arg value="srccompile" />
+            <arg value="jars" />
         </exec>
     </sequential>
 </macrodef>
 
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
-
-    <echo>checking voltcache</echo>
-    <samplecheck app="voltcache" />
     <echo>checking voltkv</echo>
     <samplecheck app="voltkv" />
     <echo>checking voter</echo>
     <samplecheck app="voter" />
+    <echo>checking json-sessions</echo>
+    <samplecheck app="json-sessions" />
+    <echo>checking windowing</echo>
+    <samplecheck app="windowing" />
+    <echo>checking windowing-with-ddl</echo>
+    <samplecheck app="windowing-with-ddl" />
+    <echo>checking uniquedevices</echo>
+    <samplecheck app="uniquedevices" />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"
@@ -1967,7 +1994,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
+         value="json,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
@@ -2026,6 +2053,45 @@ TEST CASES
           fork="true">
         <arg line="-C=${config} -sv ${explain} -r=${reportpath} -sp=${workpath} "/>
     </java>
+</target>
+
+<target name="sqlcmdtest" depends='default' description="Test sqlcmd via scripts">
+    <property name="sqlcmdtest.dir" value="tests/sqlcmd"/>
+    <echo message="Running from ${sqlcmdtest.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/sqlcmdtest/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
+
+    <exec dir='${sqlcmdtest.dir}' executable='python2.6'>
+        <arg value='sqlcmdtest.py' />
+    </exec>
+</target>
+
+<target name="sqlcmdtestrefresh" depends='default' description="Reset result baselines for sqlcmd test scripts">
+    <property name="sqlcmdtest.dir" value="tests/sqlcmd"/>
+    <echo message="Running from ${sqlcmdtest.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/sqlcmdtest/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
+
+    <exec dir='${sqlcmdtest.dir}' executable='python2.6'>
+        <arg value='sqlcmdtest.py' />
+        <arg value='--refresh' />
+    </exec>
 </target>
 
 <!--

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -215,10 +215,14 @@ public class Collector {
             jsonObject = new JSONObject(builder.toString());
         } catch (FileNotFoundException e) {
             System.err.println("config log file '" + configInfoPath + "' could not be found.");
+            System.exit(-1);
         } catch (IOException e) {
             System.err.println(e.getMessage());
+            System.exit(-1);
         } catch (JSONException e) {
-            System.err.println(e.getMessage());
+            System.err.println("Error with config file: " + configInfoPath);
+            System.err.println(e.getLocalizedMessage());
+            System.exit(-1);
         }
 
         return jsonObject;

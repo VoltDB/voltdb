@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -50,7 +51,7 @@ public class VoltDB {
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_ZK_PORT = 7181;
     public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
@@ -154,13 +155,16 @@ public class VoltDB {
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
-        public int m_httpPort = Integer.MAX_VALUE;
+        public int m_httpPort = Constants.HTTP_PORT_DISABLED;
         public String m_httpPortInterface = "";
+
+        public String m_publicInterface = "";
 
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
-        public int m_deadHostTimeoutMS = 90 * 1000;
+        public int m_deadHostTimeoutMS =
+            org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
 
         /** start up action */
         public StartAction m_startAction = null;
@@ -334,6 +338,10 @@ public class VoltDB {
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();
                     }
+                } else if (arg.equals("publicinterface")) {
+                    m_publicInterface = args[++i].trim();
+                } else if (arg.startsWith("publicinterface ")) {
+                    m_publicInterface = arg.substring("publicinterface ".length()).trim();
                 } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
@@ -463,6 +471,10 @@ public class VoltDB {
                     System.out.flush();
                     System.exit(-1);
                 }
+            }
+
+            if (!m_publicInterface.isEmpty()) {
+                m_httpPortInterface = m_publicInterface;
             }
 
             // If no action is specified, issue an error.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -40,9 +39,8 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-public class TruncateTableLoader extends Thread {
+public class TruncateTableLoader extends BenchmarkThread {
 
-    static VoltLogger log = new VoltLogger("HOST");
 
     final Client client;
     final long targetCount;
@@ -61,8 +59,6 @@ public class TruncateTableLoader extends Thread {
 
     TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
         setName("TruncateTableLoader");
-        setDaemon(true);
-
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
@@ -75,12 +71,6 @@ public class TruncateTableLoader extends Thread {
         setPriority(getPriority() + 1);
 
         log.info("TruncateTableLoader table: "+ tableName + " targetCount: " + targetCount);
-    }
-
-    long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
-        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
-        VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + tableName + ";").getResults()[0];
-        return t.asScalarLong();
     }
 
     void shutdown() {
@@ -102,11 +92,7 @@ public class TruncateTableLoader extends Thread {
             if (status == ClientResponse.GRACEFUL_FAILURE ||
                     status == ClientResponse.USER_ABORT) {
                 // log what happened
-                log.error("TruncateTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                Benchmark.printJStack();
-                // stop the world
-                System.exit(-1);
+                hardStop("TruncateTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
@@ -114,6 +100,7 @@ public class TruncateTableLoader extends Thread {
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
+                Benchmark.txnCount.incrementAndGet();
                 rowsLoaded++;
             }
             latch.countDown();
@@ -124,12 +111,17 @@ public class TruncateTableLoader extends Thread {
     public void run() {
         byte[] data = new byte[rowSize];
         byte shouldRollback = 0;
-        long currentRowCount;
+        long currentRowCount = 0;
         while (m_shouldContinue.get()) {
             r.nextBytes(data);
 
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+            } catch (Exception e) {
+                hardStop("getrowcount exception", e);
+            }
+
+            try {
                 // insert some batches...
                 int tc = batchSize * r.nextInt(99);
                 while ((currentRowCount < tc) && (m_shouldContinue.get())) {
@@ -142,7 +134,12 @@ public class TruncateTableLoader extends Thread {
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                     }
                     latch.await(10, TimeUnit.SECONDS);
-                    long nextRowCount = getRowCount();
+                    long nextRowCount = -1;
+                    try {
+                        nextRowCount = TxnId2Utils.getRowCount(client, tableName);
+                    } catch (Exception e) {
+                        hardStop("getrowcount exception", e);
+                    }
                     // if no progress, throttle a bit
                     if (nextRowCount == currentRowCount) {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
@@ -152,14 +149,19 @@ public class TruncateTableLoader extends Thread {
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a TableInsert procedure call for table " + tableName, e);
+                log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
 
 
             // truncate the table, check for zero rows
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+            } catch (Exception e) {
+                hardStop("getrowcount exception", e);
+            }
+
+            try {
                 log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
@@ -170,11 +172,7 @@ public class TruncateTableLoader extends Thread {
                 byte status = clientResponse.getStatus();
                 if (status == ClientResponse.GRACEFUL_FAILURE ||
                         (shouldRollback == 0 && status == ClientResponse.USER_ABORT)) {
-                    log.error("TruncateTableLoader gracefully failed to truncate table " + tableName + " and this shoudn't happen. Exiting.");
-                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                    Benchmark.printJStack();
-                    // stop the world
-                    System.exit(-1);
+                    hardStop("TruncateTableLoader gracefully failed to truncate table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
                 }
                 if (status != ClientResponse.SUCCESS) {
                     // log what happened
@@ -182,6 +180,7 @@ public class TruncateTableLoader extends Thread {
                     log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 }
                 else {
+                    Benchmark.txnCount.incrementAndGet();
                     nTruncates++;
                 }
                 shouldRollback = 0;
@@ -193,24 +192,28 @@ public class TruncateTableLoader extends Thread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        log.error("TruncateTableLoader failed a TruncateTable ProcCallException call for table " + tableName, e);
-                        Benchmark.printJStack();
-                        System.exit(-1);
+                        hardStop("TruncateTableLoader failed a TruncateTable ProcCallException call for table '" + tableName + "' " + e.getMessage());
                     }
                 }
             }
-            catch (InterruptedIOException e) {
-                // just need to fall through and get out
-            }
-            catch (Exception e) {
+            catch (NoConnectionsException e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a non-proc call exception for table " + tableName, e);
+                log.error("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
+            }
+            catch (IOException e) {
+                // just need to fall through and get out
+                throw new RuntimeException(e);
             }
 
             // scan-agg table
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+            } catch (Exception e) {
+                hardStop("getrowcount exception", e);
+            }
+
+            try {
                 log.debug("TruncateTableLoader scan agg table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
@@ -221,17 +224,15 @@ public class TruncateTableLoader extends Thread {
                 byte status = clientResponse.getStatus();
                 if (status == ClientResponse.GRACEFUL_FAILURE ||
                         (shouldRollback == 0 && status == ClientResponse.USER_ABORT)) {
-                    log.error("TruncateTableLoader gracefully failed to scan-agg table " + tableName + " and this shoudn't happen. Exiting.");
-                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                    Benchmark.printJStack();
-                    // stop the world
-                    System.exit(-1);
+                    hardStop("TruncateTableLoader gracefully failed to scan-agg table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
                 }
                 if (status != ClientResponse.SUCCESS) {
                     // log what happened
                     log.error("TruncateTableLoader ungracefully failed to scan-agg table " + tableName);
                     log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 }
+                else
+                    Benchmark.txnCount.incrementAndGet();
                 shouldRollback = 0;
             }
             catch (ProcCallException e) {
@@ -241,19 +242,18 @@ public class TruncateTableLoader extends Thread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        log.error("TruncateTableLoader failed a ScanAgg ProcCallException call for table " + tableName, e);
-                        Benchmark.printJStack();
-                        System.exit(-1);
+                        hardStop("TruncateTableLoader failed a ScanAgg ProcCallException call for table '" + tableName + "' " + e.getMessage());
                     }
                 }
             }
-            catch (InterruptedIOException e) {
-                // just need to fall through and get out
-            }
-            catch (Exception e) {
+            catch (NoConnectionsException e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a non-proc call exception for table " + tableName, e);
+                log.error("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
+            }
+            catch (IOException e) {
+                // just need to fall through and get out
+                throw new RuntimeException(e);
             }
         }
         log.info("TruncateTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded + " truncates: " + nTruncates);

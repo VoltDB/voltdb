@@ -33,30 +33,10 @@ for jv in jenkins_vars:
 
 
 #BRANCH is used by downstream jobs
-stored_vars_map['BRANCH'] = stored_vars_map[sv_prefix + 'git_branch'].split('/')[-1]
-
+stored_vars_map['BRANCH'] = os.getenv('BRANCH') or stored_vars_map[sv_prefix + 'git_branch'].split('/')[-1]
 
 with open (outfile,'w') as f:
     for sv in stored_vars_map:
         f.write( sv + '=' +  stored_vars_map[sv] + '\n')
 
-exit()
-if os.environ['USER'] in ['test','jenkins']:
-    try:
-        import mysql.connector as mdb
-        con = mdb.connect(host='volt2', user='test', database='qa')
-        cur = con.cursor()
-        columns = ','.join([k.replace(sv_prefix,'',1) for k in sorted(stored_vars_map)])
-        values = ','.join(['%('+ k + ')s' for k in sorted(stored_vars_map)])
-        insert_sql = ("INSERT INTO `apprunner-kits` (%s) values (%s);" 
-                      % (columns,values))
-        print insert_sql      
-        cur.execute(insert_record,stored_vars_map)
-        con.commit()
-        cur.close()
-        con.close()
-
-    except Exception as e:
-        print >>sys.stderr, "Exception raised recording kit record '%s'" % e
-        raise e
 

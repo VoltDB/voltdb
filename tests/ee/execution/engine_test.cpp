@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -97,56 +97,56 @@ class ExecutionEngineTest : public Test {
         ExecutionEngineTest() {
             srand((unsigned int)time(NULL));
             catalog_string = "add / clusters cluster"
-                "\nadd /clusters[cluster] databases database"
-                "\nset /clusters[cluster]/databases[database] schema \"435245415445205441424C452057415245484F5553452028575F494420494E54454745522044454641554C5420273027204E4F54204E554C4C2C0A575F4E414D452056415243484152283136292044454641554C54204E554C4C2C0A5052494D415259204B45592028575F4944290A293B0A20435245415445205441424C452053544F434B2028535F495F494420494E5445474552204E4F54204E554C4C2C0A535F575F494420494E5445474552204E4F54204E554C4C2C0A535F5155414E5449545920494E5445474552204E4F54204E554C4C2C0A5052494D415259204B45592028535F495F4944290A293B0A20\""
-                "\nadd /clusters[cluster]/databases[database] programs program"
-                "\nadd /clusters[cluster]/databases[database] tables WAREHOUSE"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] type 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] isreplicated false"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] partitioncolumn 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] estimatedtuplecount 0"
-                "\nadd /clusters[cluster]/databases[database]/tables[WAREHOUSE] columns W_ID"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] index 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] name \"W_ID\""
-                "\nadd /clusters[cluster]/databases[database]/tables[WAREHOUSE] columns W_NAME"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] index 1"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] type 9"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] size 16"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] nullable true"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] name \"W_NAME\""
-                "\nadd /clusters[cluster]/databases[database] tables STOCK"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] type 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] isreplicated false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] partitioncolumn 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] estimatedtuplecount 0"
-                "\nadd /clusters[cluster]/databases[database]/tables[STOCK] columns S_I_ID"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] index 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] name \"S_I_ID\""
-                "\nadd /clusters[cluster]/databases[database]/tables[STOCK] columns S_W_ID"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] index 1"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] name \"S_W_ID\""
-                "\nadd /clusters[cluster]/databases[database]/tables[STOCK] columns S_QUANTITY"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] index 2"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] name \"S_QUANTITY\"";
+                "\nadd /clusters[cluster databases database"
+                "\nset /clusters[cluster/databases[database schema \"435245415445205441424C452057415245484F5553452028575F494420494E54454745522044454641554C5420273027204E4F54204E554C4C2C0A575F4E414D452056415243484152283136292044454641554C54204E554C4C2C0A5052494D415259204B45592028575F4944290A293B0A20435245415445205441424C452053544F434B2028535F495F494420494E5445474552204E4F54204E554C4C2C0A535F575F494420494E5445474552204E4F54204E554C4C2C0A535F5155414E5449545920494E5445474552204E4F54204E554C4C2C0A5052494D415259204B45592028535F495F4944290A293B0A20\""
+                "\nadd /clusters[cluster/databases[database programs program"
+                "\nadd /clusters[cluster/databases[database tables WAREHOUSE"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE type 0"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE isreplicated false"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE partitioncolumn 0"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE estimatedtuplecount 0"
+                "\nadd /clusters[cluster/databases[database/tables[WAREHOUSE columns W_ID"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_ID index 0"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_ID type 5"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_ID size 0"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_ID nullable false"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_ID name \"W_ID\""
+                "\nadd /clusters[cluster/databases[database/tables[WAREHOUSE columns W_NAME"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_NAME index 1"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_NAME type 9"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_NAME size 16"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_NAME nullable true"
+                "\nset /clusters[cluster/databases[database/tables[WAREHOUSE/columns[W_NAME name \"W_NAME\""
+                "\nadd /clusters[cluster/databases[database tables STOCK"
+                "\nset /clusters[cluster/databases[database/tables[STOCK type 0"
+                "\nset /clusters[cluster/databases[database/tables[STOCK isreplicated false"
+                "\nset /clusters[cluster/databases[database/tables[STOCK partitioncolumn 0"
+                "\nset /clusters[cluster/databases[database/tables[STOCK estimatedtuplecount 0"
+                "\nadd /clusters[cluster/databases[database/tables[STOCK columns S_I_ID"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_I_ID index 0"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_I_ID type 5"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_I_ID size 0"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_I_ID nullable false"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_I_ID name \"S_I_ID\""
+                "\nadd /clusters[cluster/databases[database/tables[STOCK columns S_W_ID"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_W_ID index 1"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_W_ID type 5"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_W_ID size 0"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_W_ID nullable false"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_W_ID name \"S_W_ID\""
+                "\nadd /clusters[cluster/databases[database/tables[STOCK columns S_QUANTITY"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_QUANTITY index 2"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_QUANTITY type 5"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_QUANTITY size 0"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_QUANTITY nullable false"
+                "\nset /clusters[cluster/databases[database/tables[STOCK/columns[S_QUANTITY name \"S_QUANTITY\"";
 
             /*
              * Initialize the engine
              */
             engine = new VoltDBEngine();
             int partitionCount = 3;
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY));
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", false, DEFAULT_TEMP_TABLE_MEMORY));
             engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
             ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 

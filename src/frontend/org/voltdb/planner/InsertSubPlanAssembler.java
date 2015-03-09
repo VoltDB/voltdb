@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,9 +38,12 @@ import org.voltdb.types.PlanNodeType;
 public class InsertSubPlanAssembler extends SubPlanAssembler {
 
     private boolean m_bestAndOnlyPlanWasGenerated = false;
+    final private boolean m_targetIsExportTable;
+
     InsertSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
-            StatementPartitioning partitioning) {
+            StatementPartitioning partitioning, boolean targetIsExportTable) {
         super(db, parsedStmt, partitioning);
+        m_targetIsExportTable = targetIsExportTable;
     }
 
     @Override
@@ -57,7 +60,13 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
         m_bestAndOnlyPlanWasGenerated = true;
         ParsedInsertStmt insertStmt = (ParsedInsertStmt)m_parsedStmt;
         Table targetTable = insertStmt.m_tableList.get(0);
+<<<<<<< HEAD
         StmtSubqueryScan subquery = insertStmt.getSubqueryScan();
+=======
+        targetTable.getTypeName();
+        StmtSubqueryScan subquery = insertStmt.getSubqueries().get(0);
+        boolean subqueryIsMultiFragment = subquery.getBestCostPlan().rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND);
+>>>>>>> VoltDB/master
 
         if (targetTable.getIsreplicated()) {
             // must not be single-partition insert if targeting a replicated table
@@ -85,10 +94,20 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             //
             // Build the corresponding data structures for analysis by StatementPartitioning.
 
-            if (subquery.getBestCostPlan().rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
+            if (subqueryIsMultiFragment) {
                 // What is the appropriate level of detail for this message?
                 m_recentErrorMsg = getSqlType() +" INTO ... SELECT statement subquery is too complex.  " +
                     "Please either simplify the subquery or use a SELECT followed by an INSERT.";
+                return null;
+            }
+
+            Column partitioningCol = targetTable.getPartitioncolumn();
+            if (partitioningCol == null) {
+                assert (m_targetIsExportTable);
+                m_recentErrorMsg = "The target table for an INSERT INTO ... SELECT statement is an "
+                        + "export table with no partitioning column defined.  "
+                        + "This is not currently supported.  Please define a "
+                        + "partitioning column for this export table to use it with INSERT INTO ... SELECT.";
                 return null;
             }
 
@@ -102,7 +121,6 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
 
             HashMap<AbstractExpression, Set<AbstractExpression>>  valueEquivalence = new HashMap<>();
             int i = 0;
-            Column partitioningCol = targetTable.getPartitioncolumn();
             boolean setEquivalenceForPartitioningCol = false;
             for (Column col : insertStmt.m_columns.keySet()) {
                 if (partitioningCol.compareTo(col) == 0) {

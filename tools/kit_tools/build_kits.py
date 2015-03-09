@@ -78,20 +78,6 @@ def buildPro():
 ################################################
 
 def buildRabbitMQExport(version):
-    # Only compile the RabbitMQ connector if version is >= 4.5
-    parts = version.split(".")
-    skip = True
-    try:
-        if len(parts) >= 2 and \
-           int(parts[0]) >= 4 and \
-           int(parts[1][0]) >= 5:
-            skip = False
-    except Exception as e:
-        pass
-
-    if skip:
-        return
-
     with cd(builddir + "/export-rabbitmq"):
         run("pwd")
         run("git status")
@@ -133,8 +119,6 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
         "%s/%s-voltdb-%s.tar.gz" % (releaseDir, operatingsys, version))
     get("%s/voltdb/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
         "%s/voltdb-client-java-%s.tar.gz" % (releaseDir, version))
-    get("%s/voltdb/obj/release/voltdb-studio.web-%s.zip" % (builddir, version),
-        "%s/voltdb-studio.web-%s.zip" % (releaseDir, version))
     get("%s/voltdb/obj/release/voltdb-tools-%s.tar.gz" % (builddir, version),
         "%s/voltdb-tools-%s.tar.gz" % (releaseDir, version))
 

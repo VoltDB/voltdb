@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -382,7 +382,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             try {
                 Long.parseLong(getValue());
             } catch (NumberFormatException e) {
-                //TODO: Or DECIMAL? Either is OK for integer comparison, but math gets different results?
+                // DECIMAL is not OK, because the value may be bigger/smaller than our decimal range.
                 columnType = VoltType.FLOAT;
             }
             m_valueType = columnType;
@@ -398,6 +398,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (m_valueType != VoltType.NUMERIC) {
             return;
         }
+        // By default, constants should be treated as DECIMAL other than FLOAT to preserve the precision
+        // However, the range of DECIMAL of our implementation is small
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }

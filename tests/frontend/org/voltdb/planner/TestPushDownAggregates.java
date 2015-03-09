@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,7 +28,6 @@ import java.util.List;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -94,14 +93,17 @@ public class TestPushDownAggregates extends PlannerTestCase {
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
-    public void testDistinctOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT DISTINCT A1 from T1");
-        checkPushedDownDistinct(pn, true);
-    }
+    public void testDistinct() {
+        // On partitioned table
+        String sql1,sql2;
+        sql1 = "SELECT DISTINCT A1 from T1";
+        sql2 = "SELECT A1 from T1 group by A1";
+        checkQueriesPlansAreTheSame(sql1, sql2);
 
-    public void testDistinctOnReplicatedTable() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT DISTINCT D1_NAME from D1");
-        checkPushedDownDistinct(pn, false);
+        // On replicated table
+        sql1 = "SELECT DISTINCT D1_NAME from D1";
+        sql2 = "SELECT D1_NAME from D1 group by D1_NAME";
+        checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
    public void testAllPushDownAggregates() {
@@ -398,26 +400,4 @@ public class TestPushDownAggregates extends PlannerTestCase {
         }
     }
 
-    /**
-     * Check if the distinct node is pushed-down in the given plan.
-     *
-     * @param np
-     *            The generated plan
-     * @param isMultiPart
-     *            Whether or not the plan is distributed
-     */
-    private void checkPushedDownDistinct(List<AbstractPlanNode> pn, boolean isMultiPart) {
-        assertTrue(pn.size() > 0);
-
-        AbstractPlanNode p = pn.get(0).getChild(0).getChild(0);
-        assertTrue(p instanceof DistinctPlanNode);
-        assertTrue(p.toJSONString().contains("\"DISTINCT\""));
-
-        if (isMultiPart) {
-            assertTrue(pn.size() == 2);
-            p = pn.get(1).getChild(0);
-            assertTrue(p instanceof DistinctPlanNode);
-            assertTrue(p.toJSONString().contains("\"DISTINCT\""));
-        }
-    }
 }

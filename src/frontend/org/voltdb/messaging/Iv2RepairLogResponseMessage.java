@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,6 +38,13 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private long m_handle = Long.MIN_VALUE;
     private long m_txnId;
 
+    /*
+     * The largest seen original (master cluster) ids
+     * for a binary logging (DR) invocation
+     */
+    private long m_binaryLogDRId = Long.MIN_VALUE;
+    private long m_binaryLogUniqueId = Long.MIN_VALUE;
+
     // Only set when sequence is 0
     private long m_hashinatorVersion = Long.MIN_VALUE;
 
@@ -71,7 +78,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
             long spHandle, long txnId,
-            Pair<Long, byte[]> versionedHashinatorConfig)
+            Pair<Long, byte[]> versionedHashinatorConfig,
+            long binaryLogSequenceNumber, long binaryLogUniqueId)
     {
         super();
         m_requestId = requestId;
@@ -79,6 +87,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = ofTotal;
         m_handle = spHandle;
         m_txnId = txnId;
+        m_binaryLogDRId = binaryLogSequenceNumber;
+        m_binaryLogUniqueId = binaryLogUniqueId;
         m_hashinatorVersion = versionedHashinatorConfig.getFirst();
         m_hashinatorConfig = versionedHashinatorConfig.getSecond();
     }
@@ -105,6 +115,14 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public long getTxnId() {
         return m_txnId;
+    }
+
+    public long getBinaryLogSequenceNumber() {
+        return m_binaryLogDRId;
+    }
+
+    public long getBinaryLogUniqueId() {
+        return m_binaryLogUniqueId;
     }
 
     public VoltMessage getPayload()
@@ -135,6 +153,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
         msgsize += 8; // txnId
+        msgsize += 8; // binaryLogDRId
+        msgsize += 8; // binaryLogUniqueId
         if (m_payload != null) {
             msgsize += m_payload.getSerializedSize();
         }
@@ -155,6 +175,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_ofTotal);
         buf.putLong(m_handle);
         buf.putLong(m_txnId);
+        buf.putLong(m_binaryLogDRId);
+        buf.putLong(m_binaryLogUniqueId);
 
         if (m_payload != null) {
             ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
@@ -181,6 +203,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_ofTotal = buf.getInt();
         m_handle = buf.getLong();
         m_txnId = buf.getLong();
+        m_binaryLogDRId = buf.getLong();
+        m_binaryLogUniqueId = buf.getLong();
 
         // going inception.
         // The first message in the repair log response stream is always a null

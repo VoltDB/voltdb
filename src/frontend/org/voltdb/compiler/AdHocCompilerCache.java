@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import java.util.TimerTask;
 
 import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
@@ -50,23 +51,24 @@ public class AdHocCompilerCache implements Serializable {
     // STATIC CODE TO MANAGE CACHE LIFETIMES / GLOBALNESS
     //////////////////////////////////////////////////////////////////////////
 
-    // weak values should remove the object when the catalog version is no longer needed
-    private static Cache<Integer, AdHocCompilerCache> m_catalogVersionMatch =
+    // weak values should remove the object when the catalog hash is no longer needed
+    private static Cache<String, AdHocCompilerCache> m_catalogHashMatch =
             CacheBuilder.newBuilder().weakValues().build();
 
-    public static void clearVersionCache() {
-        m_catalogVersionMatch.invalidateAll();
+    public static void clearHashCache() {
+        m_catalogHashMatch.invalidateAll();
     }
 
     /**
-     * Get the global cache for a given version of the catalog. Note that there can be only
-     * one cache per catalogVersion at a time.
+     * Get the global cache for a given hash of the catalog. Note that there can be only
+     * one cache per catalogHash at a time.
      */
-    public synchronized static AdHocCompilerCache getCacheForCatalogVersion(int catalogVersion) {
-        AdHocCompilerCache cache = m_catalogVersionMatch.getIfPresent(catalogVersion);
+    public synchronized static AdHocCompilerCache getCacheForCatalogHash(byte[] catalogHash) {
+        String hashString = Encoder.hexEncode(catalogHash);
+        AdHocCompilerCache cache = m_catalogHashMatch.getIfPresent(hashString);
         if (cache == null) {
             cache = new AdHocCompilerCache();
-            m_catalogVersionMatch.put(catalogVersion, cache);
+            m_catalogHashMatch.put(hashString, cache);
         }
         return cache;
     }

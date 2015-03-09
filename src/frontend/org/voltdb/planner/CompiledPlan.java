@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -72,6 +72,9 @@ public class CompiledPlan {
 
     /** Parameter values, if the planner pulled constants out of the plan */
     private ParameterSet m_extractedParamValues = ParameterSet.emptyParameterSet();
+
+    /** Compiler generated parameters for cacheble AdHoc queries */
+    private int m_generatedParameterCount = 0;
 
     /**
      * If true, divide the number of tuples changed
@@ -280,6 +283,10 @@ public class CompiledPlan {
         if (paramTypes.length > MAX_PARAM_COUNT) {
             return false;
         }
+        if (paramzInfo.paramLiteralValues != null) {
+            m_generatedParameterCount = paramzInfo.paramLiteralValues.length;
+        }
+
         m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
         return true;
     }
@@ -288,7 +295,18 @@ public class CompiledPlan {
         return m_extractedParamValues;
     }
 
+<<<<<<< HEAD
     public boolean isReadOnly() {
+=======
+    public int getQuestionMarkParameterCount() {
+        if (parameters == null) {
+            return 0;
+        }
+        return parameters.length - m_generatedParameterCount;
+    }
+
+    public boolean getReadOnly() {
+>>>>>>> VoltDB/master
         return m_readOnly;
     }
 

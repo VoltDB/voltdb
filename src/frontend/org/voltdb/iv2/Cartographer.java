@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,17 +17,20 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -35,7 +38,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -52,11 +54,6 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import java.util.ArrayDeque;
-import java.util.Queue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -367,16 +364,7 @@ public class Cartographer extends StatsSource
      */
     static public List<Integer> sortKeysByValue(Map<Integer, Integer> map)
     {
-        List<Entry<Integer, Integer>> entries = new ArrayList<Entry<Integer, Integer>>(map.entrySet());
-        Collections.sort(entries, new Comparator<Entry<Integer, Integer>>() {
-            @Override
-            public int compare(Entry<Integer, Integer> o1, Entry<Integer, Integer> o2) {
-                if (!o1.getValue().equals(o2.getValue())) {
-                    return (o1.getValue()).compareTo(o2.getValue());
-                }
-                return o1.getKey().compareTo(o2.getKey());
-            }
-        } );
+        List<Entry<Integer, Integer>> entries = CoreUtils.sortKeyValuePairByValue(map);
         List<Integer> keys = new ArrayList<Integer>();
         for (Entry<Integer, Integer> entry : entries) {
             keys.add(entry.getKey());

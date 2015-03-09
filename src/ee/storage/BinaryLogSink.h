@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,13 +22,14 @@ namespace voltdb {
 
 class PersistentTable;
 class Pool;
+class VoltDBEngine;
 /*
  * Responsible for applying binary logs to table data
  */
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    void apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool);
+    void apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
 };

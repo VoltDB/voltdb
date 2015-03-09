@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -106,7 +106,10 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, spHandle, false, false);
+    //Most of the transaction id info and unique id info supplied to commit
+    //is nonsense since it isn't currently supplied with a transaction id
+    //but it is fine since export isn't currently using the info
+    commit(lastCommittedSpHandle, spHandle, spHandle, uniqueId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.

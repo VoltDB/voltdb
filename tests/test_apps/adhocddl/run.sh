@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
 export VOLTDB_HEAPMAX=8192
 APPNAME="adhocddl"
 
@@ -9,6 +12,9 @@ if [ -n "$(which voltdb 2> /dev/null)" ]; then
 else
     VOLTDB_BIN="$(pwd)/../../../bin"
 fi
+# move voltdb commands into path for this script
+PATH=$VOLTDB_BIN:$PATH
+
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
@@ -25,61 +31,35 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot ddl.sql
-}
-
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
-        src/adhocddl/*.java 
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# build an application catalog
-function catalog() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj Initializer \
-         --numOfTables=0 \
-         --numOfSPs=4 \
-         --numOfCols=5 \
-         --idxPercent=0.1 
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql 
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot ddl.sql src/adhocddl/*.class
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    voltdb create -d deployment.xml -H $HOST
 }
 
 # run the client that drives the example
 function client() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj AdHocDDLBenchmark \
+    javac -classpath $CLASSPATH src/adhocddl/*.java
+
+    java -classpath src:$CLASSPATH adhocddl.AdHocDDLBenchmark \
         --servers=localhost \
-        --numOfTests=5 \
-        --numOfCols=5 \
+        --numRounds=5 \
+        --numCols=20 \
+        --numTables=40 \
         --idxPercent=0.1 \
-        --numOfSPs=4 \
-        --numOfWarmup=5
+        --numProcedures=2 \
+        --statsfile=results.txt
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client}"
+    echo "Usage: ./run.sh {clean|server|client}"
 }
 
 # Run the target passed as the first arg on the command line

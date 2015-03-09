@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -235,6 +235,14 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         return m_hadBackPressure;
     }
 
+    /**
+     * Used by tests.
+     * @return
+     */
+    public long getPendingBytes() {
+        return m_pendingTxnBytes;
+    }
+
     /*
      * Invoked when queueing response bytes back to a connection. Can be invoked with positive/negative
      * values to indicate whether data is being flushed or added. The same resource pool counter is used
@@ -290,7 +298,11 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             procInfoMap.put(procedureName, info);
         }
         info.processInvocation((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos), status);
-        m_latencyInfo.recordValue(Math.max(1, Math.min(TimeUnit.NANOSECONDS.toMicros(deltaNanos), m_latencyInfo.getHighestTrackableValue())));
+        // ENG-7209 This is to not log the latency value for a snapshot restore, as this just creates
+        // a large initial value in the graph which is not actually relevant to the user.
+        if (!procedureName.equals("@SnapshotRestore")) {
+            m_latencyInfo.recordValue(Math.max(1, Math.min(TimeUnit.NANOSECONDS.toMicros(deltaNanos), m_latencyInfo.getHighestTrackableValue())));
+        }
         if (needToInsert) {
             m_connectionStates.put(connectionId, procInfoMap);
         }

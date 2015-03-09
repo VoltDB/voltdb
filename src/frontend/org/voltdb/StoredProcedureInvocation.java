@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -220,7 +220,7 @@ public class StoredProcedureInvocation implements JSONString {
         buf.putLong(clientHandle);
         if (serializedParams != null)
         {
-            if (!serializedParams.isReadOnly())
+            if (serializedParams.hasArray())
             {
                 // if position can be non-zero, then the dup/rewind logic below
                 // would be wrong?
@@ -339,8 +339,10 @@ public class StoredProcedureInvocation implements JSONString {
             js.object();
             js.key("proc_name");
             js.value(procName);
-            js.key("parameters");
-            js.value(params.get());
+            if (!procName.startsWith("@ApplyBinaryLog")) {
+                js.key("parameters");
+                js.value(params.get());
+            }
             js.endObject();
         }
         catch (Exception e) {

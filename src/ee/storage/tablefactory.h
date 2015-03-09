@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -88,7 +88,8 @@ public:
         bool exportOnly = false,
         int tableAllocationTargetSize = 0,
         int tuplelimit = INT_MAX,
-        int32_t compactionThreshold = 95);
+        int32_t compactionThreshold = 95,
+        bool drEnabled = false);
 
     /**
     * Creates an empty temp table with given name and columns.

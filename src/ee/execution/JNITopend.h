@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,6 +49,9 @@ public:
     void pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
+
+    std::string decodeBase64AndDecompress(const std::string& buffer);
+
 private:
     JNIEnv *m_jniEnv;
 
@@ -65,8 +68,10 @@ private:
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
+    jmethodID m_decodeBase64AndDecompressToBytesMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
+    jclass m_encoderClass;
 };
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,7 +51,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -86,7 +86,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             }
             assertTrue(findIndexInSystemCatalogResults("FOODEX_R"));
 
-            // Can't yet create new unique index on a table (empty tables will work at some point)
+            // Create unique index on partitioned tables
             assertFalse(findIndexInSystemCatalogResults("UNIQFOODEX"));
             boolean threw = false;
             try {
@@ -94,21 +94,21 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
                         "create assumeunique index UNIQFOODEX on FOO (VAL);");
             }
             catch (ProcCallException pce) {
-                threw = true;
+                pce.printStackTrace();
+                fail("Should be able to create a unique index on a partitioned table");
             }
-            assertTrue("Should not be able to create new unique index on table", threw);
-            assertFalse(findIndexInSystemCatalogResults("UNIQFOODEX"));
+            assertTrue(findIndexInSystemCatalogResults("UNIQFOODEX"));
             // Can create redundant unique index on a table
             try {
                 m_client.callProcedure("@AdHoc",
-                        "create unique index UNIQFOODEX on FOO (ID);");
+                        "create unique index UNIQFOODEX2 on FOO (ID);");
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to create redundant unique index");
             }
             // It's going to get dropped because it's redundant, so don't expect to see it here
-            assertFalse(findIndexInSystemCatalogResults("UNIQFOODEX"));
+            assertFalse(findIndexInSystemCatalogResults("UNIQFOODEX2"));
 
             // drop an index we added
             try {

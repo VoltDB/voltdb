@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -485,6 +485,15 @@ public enum VoltType {
         return type;
     }
 
+    public static VoltType typeFromSignature(char signature) {
+        for (VoltType type : values()) {
+            if (type.m_signatureChar == signature) {
+                return type;
+            }
+        }
+        throw new VoltTypeException("Unknown type signature: " + signature);
+    }
+
     /**
      * Return the string representation of this type. Note that
      * <tt>VoltType.typeFromString(voltTypeInstance.toString) == true</tt>.
@@ -811,6 +820,7 @@ public enum VoltType {
             case INTEGER:
             case BIGINT:
             case FLOAT:
+            case DECIMAL:
                 return true;
             default:
                 return false;

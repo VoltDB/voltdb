@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -192,11 +192,8 @@ public class TestVoltDB extends TestCase {
     }
 
     /**
-     * ENG-639: Improve deployment.xml parser error reporting
-     *
-     * This test tries to assign a user in the deployment file to a group that does not exist and asserts that
-     * deployment file compilation fails.
-     * @throws IOException
+     * ENG-7088: Validate that deployment file users that want to belong to roles which
+     * don't yet exist don't render the deployment file invalid.
      */
     public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
@@ -204,12 +201,12 @@ public class TestVoltDB extends TestCase {
         project.addDefaultPartitioning();
         project.addDefaultProcedures();
 
-        project.setSecurityEnabled(true);
-        GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false, false, false),
-                new GroupInfo("blah", false, false, false, false)
+        project.setSecurityEnabled(true, true);
+        RoleInfo groups[] = new RoleInfo[] {
+                new RoleInfo("foo", false, false, false, false, false, false),
+                new RoleInfo("blah", false, false, false, false, false, false)
         };
-        project.addGroups(groups);
+        project.addRoles(groups);
         UserInfo users[] = new UserInfo[] {
                 new UserInfo("john", "hugg", new String[] {"foo"}),
                 new UserInfo("ryan", "betts", new String[] {"foo", "bar"}),
@@ -229,46 +226,8 @@ public class TestVoltDB extends TestCase {
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
 
-        // this should fail because group "bar" does not exist
-        assertTrue("Deployment file shouldn't have been able to validate",
-                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true, true) < 0);
-    }
-
-    /**
-     * ENG-720: NullPointerException when trying to start server with no users
-     *
-     * This test makes sure deployment validation passes when there are no users.
-     * @throws IOException
-     */
-    public void testCompileDeploymentNoUsers() throws IOException {
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addDefaultProcedures();
-
-        project.setSecurityEnabled(true);
-        GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false, false, false),
-                new GroupInfo("blah", false, false, false, false)
-        };
-        project.addGroups(groups);
-        UserInfo users[] = new UserInfo[] {};
-        project.addUsers(users);
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String jarName = "compile-deployment.jar";
-        String catalogJar = testDir + File.separator + jarName;
-        assertTrue("Project failed to compile", project.compile(catalogJar));
-
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assertNotNull("Error loading catalog from jar", serializedCatalog);
-
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-
+        // this should succeed even though group "bar" does not exist
         assertTrue("Deployment file should have been able to validate",
-                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true, true) >= 0);
+                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true) == null);
     }
-
 }

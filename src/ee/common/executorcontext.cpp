@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,19 +41,30 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 Pool* tempStringPool,
                 NValueArray* params,
                 VoltDBEngine* engine,
-                bool exportEnabled,
                 std::string hostname,
                 CatalogId hostId,
-                DRTupleStream *drStream) :
-    m_topEnd(topend), m_tempStringPool(tempStringPool),
+                DRTupleStream *drStream,
+                DRTupleStream *drReplicatedStream) :
+    m_topEnd(topend),
+    m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
+<<<<<<< HEAD
     m_staticParams(params), m_executorsMap(),
     m_drStream(drStream), m_engine(engine),
     m_txnId(0), m_spHandle(0),
+=======
+    m_drStream(drStream),
+    m_drReplicatedStream(drReplicatedStream),
+    m_engine(engine),
+    m_txnId(0),
+    m_spHandle(0),
+>>>>>>> VoltDB/master
     m_lastCommittedSpHandle(0),
-    m_siteId(siteId), m_partitionId(partitionId),
-    m_hostname(hostname), m_hostId(hostId),
-    m_exportEnabled(exportEnabled), m_epoch(0) // set later
+    m_siteId(siteId),
+    m_partitionId(partitionId),
+    m_hostname(hostname),
+    m_hostId(hostId),
+    m_epoch(0) // set later
 {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);
     bindToThread();
@@ -128,5 +139,8 @@ void ExecutorContext::cleanupExecutors(int subqueryId) const
         executor->cleanupTempOutputTable();
     }
 }
+<<<<<<< HEAD
 
 } // end namespace voltdb
+=======
+>>>>>>> VoltDB/master

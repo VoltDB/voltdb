@@ -1,0 +1,11 @@
+# User Stored Procedures: (for the genqa test app)
+JiggleExportDoneTable
+JiggleExportMultiPartition
+JiggleExportSinglePartition
+JiggleMultiPartition
+JiggleMultiPartitionWithDeletionExport
+JiggleSinglePartition
+JiggleSinglePartitionWithDeletionExport
+JiggleSkinnyExportSinglePartition
+WaitMultiPartition
+WaitSinglePartition

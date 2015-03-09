@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,6 +27,7 @@ import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONObject;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 
@@ -37,23 +38,49 @@ public class AdhocDDLTestBase extends TestCase {
 
     protected void startSystem(VoltDB.Configuration config) throws Exception
     {
-        m_localServer = new ServerThread(config);
-        m_localServer.start();
-        m_localServer.waitForInitialization();
-        m_client = ClientFactory.createClient();
-        m_client.createConnection("localhost");
+        startServer(config);
+        startClient(null);
     }
 
     protected void teardownSystem() throws Exception
     {
-        if (m_client != null) { m_client.close(); }
-        m_client = null;
+        stopClient();
+        stopServer();
+    }
 
+    protected void startServer(VoltDB.Configuration config) throws Exception
+    {
+        m_localServer = new ServerThread(config);
+        m_localServer.start();
+        m_localServer.waitForInitialization();
+    }
+
+    protected void startClient(ClientConfig clientConfig) throws Exception
+    {
+        if (clientConfig != null) {
+            m_client = ClientFactory.createClient(clientConfig);
+        }
+        else {
+            m_client = ClientFactory.createClient();
+        }
+        m_client.createConnection("localhost");
+    }
+
+    protected void stopServer() throws Exception
+    {
         if (m_localServer != null) {
             m_localServer.shutdown();
             m_localServer.join();
+            m_localServer = null;
         }
-        m_localServer = null;
+    }
+
+    protected void stopClient() throws Exception
+    {
+        if (m_client != null) {
+            m_client.close();
+            m_client = null;
+        }
     }
 
     protected boolean findTableInSystemCatalogResults(String table) throws Exception
@@ -222,5 +249,15 @@ public class AdhocDDLTestBase extends TestCase {
             }
         }
         return null;
+    }
+
+    protected VoltTable getStatWaitOnRowCount(String selector, int expected) throws Exception
+    {
+        // Stats are polled out of EE, so we have to poll and wait for a change
+        VoltTable stats = null;
+        do {
+            stats = m_client.callProcedure("@Statistics", selector, 0).getResults()[0];
+        } while (stats.getRowCount() != expected);
+        return stats;
     }
 }

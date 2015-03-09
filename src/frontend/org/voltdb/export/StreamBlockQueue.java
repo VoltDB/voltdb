@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,20 +16,19 @@
  */
 package org.voltdb.export;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.PersistentBinaryDeque;
-import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.VoltFile;
-
-import org.voltcore.utils.DBBPool.BBContainer;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -58,7 +57,7 @@ public class StreamBlockQueue {
     private final String m_nonce;
 
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
-        m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path));
+        m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
         m_nonce = nonce;
     }
 
@@ -272,7 +271,8 @@ public class StreamBlockQueue {
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
         @Override
-        public ByteBuffer parse(ByteBuffer b) {
+        public ByteBuffer parse(BBContainer bbc) {
+            ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
                 b.position(b.position() + 8);//Don't need the USO

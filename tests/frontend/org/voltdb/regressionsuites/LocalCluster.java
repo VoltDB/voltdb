@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,7 +56,8 @@ public class LocalCluster implements VoltServerConfig {
     // Used to provide out-of-band HostId determination.
     // NOTE: This mechanism can't be used when m_hasLocalServer is enabled
     public static final String clusterHostIdProperty = "__VOLTDB_CLUSTER_HOSTID__";
-    VoltLogger log = new VoltLogger("HOST");
+
+    private VoltLogger log = new VoltLogger("HOST");
 
     // the timestamp salt for the TransactionIdManager
     // will vary between -3 and 3 uniformly
@@ -372,21 +373,29 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     void startLocalServer(int hostId, boolean clearLocalDataDirectories) {
+        startLocalServer(hostId, clearLocalDataDirectories, templateCmdLine.m_startAction);
+    }
+
+    void startLocalServer(int hostId, boolean clearLocalDataDirectories, StartAction action) {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
+        try {
         if (clearLocalDataDirectories) {
-            try {
                 subroot = VoltFile.initNewSubrootForThisProcess();
                 m_subRoots.add(subroot);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
         } else {
-            subroot = m_subRoots.get(0);
+            if (m_subRoots.size() <= hostId) {
+                m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
+            }
+            subroot = m_subRoots.get(hostId);
+        }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
 
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
+        cmdln.startCommand(action);
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
@@ -400,23 +409,24 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.nextZkPort());
+        cmdln.httpPort(portGenerator.nextHttp());
         // replication port and its two automatic followers.
         cmdln.drAgentStartPort(portGenerator.nextReplicationPort());
         portGenerator.nextReplicationPort();
         portGenerator.nextReplicationPort();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            EEProcess proc = m_eeProcs.get(0);
+            EEProcess proc = m_eeProcs.get(hostId);
             assert(proc != null);
             cmdln.m_ipcPort = proc.port();
         }
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
             cmdln.m_ipcPort = portGenerator.next();
         }
-        if ((m_versionOverrides != null) && (m_versionOverrides.length > 0)) {
-            assert(m_versionOverrides[0] != null);
-            assert(m_versionCheckRegexOverrides[0] != null);
-            cmdln.m_versionStringOverrideForTest = m_versionOverrides[0];
-            cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[0];
+        if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
+            assert(m_versionOverrides[hostId] != null);
+            assert(m_versionCheckRegexOverrides[hostId] != null);
+            cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
+            cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
         }
 
         // for debug, dump the command line to a unique file.
@@ -649,6 +659,7 @@ public class LocalCluster implements VoltServerConfig {
 
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
+            cmdln.httpPort(portGenerator.nextHttp());
             cmdln.replicaMode(replicaMode);
             cmdln.timestampSalt(getRandomTimestampSalt());
 
@@ -794,7 +805,6 @@ public class LocalCluster implements VoltServerConfig {
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, StartAction startAction) {
-
         // Lookup the client interface port of the rejoin host
         // I have no idea why this code ignores the user's input
         // based on other state in this class except to say that whoever wrote
@@ -804,6 +814,12 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
+
+        if (hostId == 0 && m_hasLocalServer) {
+            templateCmdLine.leaderPort(portNoToRejoin);
+            startLocalServer(rejoinHostId, false, StartAction.REJOIN);
+            return true;
+        }
 
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
@@ -836,6 +852,7 @@ public class LocalCluster implements VoltServerConfig {
 
             rejoinCmdLn.m_port = portGenerator.nextClient();
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
+            rejoinCmdLn.m_httpPort = portGenerator.nextHttp();
             rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
             rejoinCmdLn.m_internalPort = portGenerator.nextInternalPort();
             setPortsFromConfig(hostId, rejoinCmdLn);
@@ -887,6 +904,7 @@ public class LocalCluster implements VoltServerConfig {
                 m_pipes.set(hostId, ptf);
                 // replace the existing dead proc
                 m_cluster.set(hostId, proc);
+                m_cmdLines.set(hostId, rejoinCmdLn);
             }
             Thread t = new Thread(ptf);
             t.setName("ClusterPipe:" + String.valueOf(hostId));
@@ -909,13 +927,15 @@ public class LocalCluster implements VoltServerConfig {
             if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
             while (ptf.m_witnessedReady.get() != true) {
                 // if eof, then no point in waiting around
-                if (ptf.m_eof.get())
+                if (ptf.m_eof.get()) {
+                    System.out.println("PipeToFile: Reported EOF");
                     break;
-
+                }
                 // if process is dead, no point in waiting around
-                if (isProcessDead(ptf.getProcess()))
+                if (isProcessDead(ptf.getProcess())) {
+                    System.out.println("PipeToFile: Reported Dead Process");
                     break;
-
+                }
                 try {
                     // wait for explicit notification
                     ptf.wait(1000);
@@ -964,7 +984,12 @@ public class LocalCluster implements VoltServerConfig {
     public void killSingleHost(int hostNum) throws InterruptedException
     {
         log.info("Killing " + hostNum);
-        silentKillSingleHost(hostNum, false);
+        if (hostNum == 0 && m_localServer != null) {
+            m_localServer.shutdown();
+        }
+        else {
+            silentKillSingleHost(hostNum, false);
+        }
     }
 
     private void silentKillSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
@@ -1345,5 +1370,10 @@ public class LocalCluster implements VoltServerConfig {
                 pipe.setWatcher(watcher);
             }
         }
+    }
+
+    @Override
+    public int getLogicalPartitionCount() {
+        return (m_siteCount * m_hostCount) / (m_kfactor + 1);
     }
 }

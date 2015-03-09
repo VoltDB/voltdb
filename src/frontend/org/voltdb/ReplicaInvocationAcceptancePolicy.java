@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,14 +41,10 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
                 return null;
             }
 
-            // hackish way to check if an adhoc query is read-only
-            //??? What keeps @AdHoc from invoking a read/write mixed batch that starts with a 'select'?
-            //??? Or what would prevent these writes from getting missed here?
-            if (invocation.procName.equals("@AdHoc") || invocation.procName.equals("@AdHocSpForTest")) {
-                String sql = (String) invocation.getParams().toArray()[0];
-                String initial = sql.trim().substring(0, 1);
-                // Match "SELECT ... , "select ..." and the likes of "(select ... ) union ... "
-                isReadOnly = "sS(".contains(initial);
+            // This path is only executed before the AdHoc statement is run through the planner. After the
+            // Planner, the client interface will figure out what kind of statement this is.
+            if (invocation.procName.equals("@AdHoc")) {
+                return null;
             }
 
             if (isReadOnly) {
@@ -91,9 +87,17 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
                                 Procedure proc) {
         if (invocation == null || proc == null) {
             return null;
-        } else if (invocation.getType() == ProcedureInvocationType.ORIGINAL &&
-                !invocation.procName.equalsIgnoreCase("@AdHoc")) {
-            Config sysProc = SystemProcedureCatalog.listing.get(invocation.getProcName());
+        }
+
+        // Duplicate hack from ClientInterface
+        String procName = invocation.getProcName();
+        if (procName.equalsIgnoreCase("@UpdateClasses")) {
+            procName = "@UpdateApplicationCatalog";
+        }
+
+        if (invocation.getType() == ProcedureInvocationType.ORIGINAL &&
+                !procName.equalsIgnoreCase("@AdHoc")) {
+            Config sysProc = SystemProcedureCatalog.listing.get(procName);
             if (sysProc != null && sysProc.allowedInReplica) {
                 // white-listed sysprocs, adhoc is a special case
                 return null;

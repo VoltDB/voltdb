@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,7 +34,7 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -799,19 +799,18 @@ public abstract class SubPlanAssembler {
             AccessPath retval, int[] orderSpoilers,
             List<AbstractExpression> bindingsForOrder)
     {
-        // Only select statements are allowed to have ORDER BY clauses.
-        if ( ! (m_parsedStmt instanceof ParsedSelectStmt)) {
+        if (!m_parsedStmt.hasOrderByColumns()
+                || m_parsedStmt.orderByColumns().isEmpty()) {
             return 0;
         }
         int nSpoilers = 0;
-        ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
-        int countOrderBys = parsedSelectStmt.m_orderColumns.size();
+        int countOrderBys = m_parsedStmt.orderByColumns().size();
         // There need to be enough indexed expressions to provide full sort coverage.
         if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-            boolean ascending = parsedSelectStmt.m_orderColumns.get(0).ascending;
+            boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
             retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
             int jj = 0;
-            for (ParsedColInfo colInfo : parsedSelectStmt.m_orderColumns) {
+            for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
                 // This retry loop allows catching special cases that don't perfectly match the
                 // ORDER BY columns but may still be usable for ordering.
                 for ( ; jj < keyComponentCount; ++jj) {

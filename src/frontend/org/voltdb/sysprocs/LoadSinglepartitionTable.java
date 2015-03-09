@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -97,7 +97,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
 
         // find the insert statement for this table
         String insertProcName = String.format("%s.insert", tableName);
-        Procedure p = ctx.getDatabase().getProcedures().get(insertProcName);
+        Procedure p = ctx.ensureDefaultProcLoaded(insertProcName);
         if (p == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD insert statement for table %s",

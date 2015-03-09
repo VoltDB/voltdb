@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,8 +35,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.SnapshotCompletionMonitor;
-
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
@@ -50,6 +48,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;

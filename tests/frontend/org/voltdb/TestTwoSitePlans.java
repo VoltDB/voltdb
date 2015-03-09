@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,8 +53,6 @@ public class TestTwoSitePlans extends TestCase {
 
     static final String JAR = "distplanningregression.jar";
 
-    ExecutionSite site1;
-    ExecutionSite site2;
     ExecutionEngine ee1;
     ExecutionEngine ee2;
 
@@ -93,7 +91,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // update the catalog with the data from the deployment file
         String pathToDeployment = pb.getPathToDeployment();
-        assertTrue(CatalogUtil.compileDeployment(catalog, pathToDeployment, true, false) >= 0);
+        assertTrue(CatalogUtil.compileDeployment(catalog, pathToDeployment, false) == null);
 
         cluster = catalog.getClusters().get("cluster");
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
@@ -116,7 +114,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
         site1Thread.start();
@@ -134,17 +132,15 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
         site2Thread.start();
         site2Thread.join();
 
         // create two EEs
-        site1 = new ExecutionSite(0); // site 0
         ee1 = site1Reference.get();
         ee1.loadCatalog( 0, catalog.serialize());
-        site2 = new ExecutionSite(1); // site 1
         ee2 = site2Reference.get();
         ee2.loadCatalog( 0, catalog.serialize());
 
@@ -237,7 +233,6 @@ public class TestTwoSitePlans extends TestCase {
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         assertTrue(dependency1 != null);
@@ -252,7 +247,6 @@ public class TestTwoSitePlans extends TestCase {
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         assertTrue(dependency2 != null);
@@ -271,7 +265,6 @@ public class TestTwoSitePlans extends TestCase {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }

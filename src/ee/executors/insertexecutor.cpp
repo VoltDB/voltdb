@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -88,7 +88,6 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
-    m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
 
     if (m_isUpsert) {
@@ -105,14 +104,11 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
-        if (m_partitionColumn != -1) {
-            if (m_inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-                m_partitionColumnIsString = true;
-            }
-        }
     }
 
     m_multiPartition = m_node->isMultiPartition();
+
+    m_sourceIsPartitioned = m_node->sourceIsPartitioned();
 
     // allocate memory for template tuple, set defaults for all columns
     m_templateTuple.init(targetTable->schema());
@@ -126,6 +122,40 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                                        fieldsExplicitlySet,
                                        tuple,
                                        m_nowFields);
+    m_hasPurgeFragment = persistentTarget ? persistentTarget->hasPurgeFragment() : false;
+
+    return true;
+}
+
+bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) {
+    PersistentTable* table = *ptrToTable;
+    int tupleLimit = table->tupleLimit();
+    int numTuples = table->visibleTupleCount();
+
+    // Note that the number of tuples may be larger than the limit.
+    // This can happen we data is redistributed after an elastic
+    // rejoin for example.
+    if (numTuples >= tupleLimit) {
+        // Next insert will fail: run the purge fragment
+        // before trying to insert.
+        int rc = m_engine->executePurgeFragment(table);
+        if (rc != ENGINE_ERRORCODE_SUCCESS) {
+            VOLT_ERROR("Unexpected error while attempting to purge "
+                       "rows from table %s.  Row limit: %d",
+                       table->name().c_str(),
+                       tupleLimit);
+            return false;
+        }
+
+        // If the purge fragment did a truncate table, then the old
+        // table is still around for undo purposes, but there is now a
+        // new empty table we can insert into.  Update the caller's table
+        // pointer to use it.
+        //
+        // The plan node will go through the table catalog delegate to get
+        // the correct instance of PersistentTable.
+        *ptrToTable = static_cast<PersistentTable*>(m_node->getTargetTable());
+    }
 
     return true;
 }
@@ -143,11 +173,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
-    PersistentTable* upsertTable = NULL;
-    if (m_isUpsert) {
-        upsertTable = dynamic_cast<PersistentTable*>(targetTable);
-        assert(upsertTable != NULL);
-    }
+    PersistentTable* persistentTable = m_isStreamed ?
+        NULL : static_cast<PersistentTable*>(targetTable);
     TableTuple upsertTuple = TableTuple(targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
@@ -164,6 +191,11 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     for (it = m_nowFields.begin(); it != m_nowFields.end(); ++it) {
         templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
+
+    VOLT_DEBUG("This is a %s-row insert on partition with id %d",
+               m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
+               "single" : "multi", m_engine->getPartitionId());
+    VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable
@@ -214,9 +246,12 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        // for multi partition export tables,
-        //  only insert them into one place (the partition with hash(0))
-        if (m_isStreamed && m_multiPartition) {
+        // for multi partition export tables, only insert into one
+        // place (the partition with hash(0)), if the data is from a
+        // replicated source.  If the data is coming from a subquery
+        // with partitioned tables, we need to perform the insert on
+        // every partition.
+        if (m_isStreamed && m_multiPartition && !m_sourceIsPartitioned) {
             bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
             if (!isLocal) continue;
         }
@@ -224,43 +259,59 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
         if (! m_isUpsert) {
             // try to put the tuple into the target table
+
+            if (m_hasPurgeFragment) {
+                if (!executePurgeFragmentIfNeeded(&persistentTable))
+                    return false;
+                // purge fragment might have truncated the table, and
+                // refreshed the persistent table pointer.  Make sure to
+                // use it when doing the insert below.
+                targetTable = persistentTable;
+            }
+
             if (!targetTable->insertTuple(templateTuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                        " target table '%s'",
-                        m_inputTable->name().c_str(),
-                        targetTable->name().c_str());
+                           " target table '%s'",
+                           m_inputTable->name().c_str(),
+                           targetTable->name().c_str());
                 return false;
             }
 
         } else {
             // upsert execution logic
-            assert(upsertTable->primaryKeyIndex() != NULL);
-            TableTuple existsTuple = upsertTable->lookupTuple(templateTuple);
+            assert(persistentTable->primaryKeyIndex() != NULL);
+            TableTuple existsTuple = persistentTable->lookupTupleByValues(templateTuple);
 
             if (existsTuple.isNullTuple()) {
                 // try to put the tuple into the target table
-                if (!upsertTable->insertTuple(templateTuple)) {
+
+                if (m_hasPurgeFragment) {
+                    if (!executePurgeFragmentIfNeeded(&persistentTable))
+                        return false;
+                }
+
+                if (!persistentTable->insertTuple(templateTuple)) {
                     VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                            " target table '%s'",
-                            m_inputTable->name().c_str(),
-                            upsertTable->name().c_str());
+                               " target table '%s'",
+                               m_inputTable->name().c_str(),
+                               persistentTable->name().c_str());
                     return false;
                 }
             } else {
                 // tuple exists already, try to update the tuple instead
                 upsertTuple.move(templateTuple.address());
-                TableTuple &tempTuple = upsertTable->getTempTupleInlined(upsertTuple);
+                TableTuple &tempTuple = persistentTable->getTempTupleInlined(upsertTuple);
 
-                if (!upsertTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
-                        upsertTable->allIndexes())) {
+                if (!persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
+                        persistentTable->allIndexes())) {
                     VOLT_INFO("Failed to update existsTuple from table '%s'",
-                            upsertTable->name().c_str());
+                            persistentTable->name().c_str());
                     return false;
                 }
             }
         }
 
-        // successfully inserted
+        // successfully inserted or updated
         modifiedTuples++;
     }
 
@@ -276,7 +327,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     }
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += modifiedTuples;
-    VOLT_DEBUG("Finished inserting tuple");
+    m_engine->addToTuplesModified(modifiedTuples);
+    VOLT_DEBUG("Finished inserting %d tuples", modifiedTuples);
     return true;
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -54,9 +53,8 @@ import org.voltdb.client.ProcedureCallback;
  *
  * Any procedure failure will fail the test and exit.
  */
-public class LoadTableLoader extends Thread {
+public class LoadTableLoader extends BenchmarkThread {
 
-    static VoltLogger log = new VoltLogger("HOST");
 
     final Client client;
     final long targetCount;
@@ -85,8 +83,6 @@ public class LoadTableLoader extends Thread {
     LoadTableLoader(Client client, String tableName, long targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
             throws IOException, ProcCallException {
         setName("LoadTableLoader-" + tableName);
-        setDaemon(true);
-
         this.client = client;
         this.m_tableName = tableName;
         this.targetCount = targetCount;
@@ -109,12 +105,6 @@ public class LoadTableLoader extends Thread {
         log.info("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
         setPriority(getPriority() + 1);
-    }
-
-    long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
-        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
-        VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + m_tableName + ";").getResults()[0];
-        return t.asScalarLong();
     }
 
     void shutdown() {
@@ -140,10 +130,7 @@ public class LoadTableLoader extends Thread {
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.UNEXPECTED_FAILURE) {
                 // log what happened status will be logged in json error log.
-                log.error("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the world
-                System.exit(-1);
+                hardStop("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             //Connection loss node failure will come down here along with user aborts from procedure.
             if (status != ClientResponse.SUCCESS) {
@@ -153,6 +140,7 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
+            Benchmark.txnCount.incrementAndGet();
         }
     }
 
@@ -171,10 +159,7 @@ public class LoadTableLoader extends Thread {
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
-                log.error("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the world
-                System.exit(-1);
+                hardStop("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
@@ -183,6 +168,7 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
+            Benchmark.txnCount.incrementAndGet();
         }
     }
 
@@ -202,10 +188,7 @@ public class LoadTableLoader extends Thread {
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
-                log.error("LoadTableLoader gracefully failed to delete from table " + m_tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                // stop the world
-                System.exit(-1);
+                hardStop("LoadTableLoader gracefully failed to delete from table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
@@ -214,6 +197,7 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
+            Benchmark.txnCount.incrementAndGet();
             long cnt = clientResponse.getResults()[0].asScalarLong();
             if (cnt != expected_delete) {
                 log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt);
@@ -316,7 +300,11 @@ public class LoadTableLoader extends Thread {
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
                 cpDelQueue.addAll(lcpDelQueue);
-                long nextRowCount = getRowCount();
+                long nextRowCount = 0;
+                try { nextRowCount = TxnId2Utils.getRowCount(client, m_tableName);
+                } catch (Exception e) {
+                    hardStop("getrowcount exception", e);
+                }
                 // if no progress, throttle a bit
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);

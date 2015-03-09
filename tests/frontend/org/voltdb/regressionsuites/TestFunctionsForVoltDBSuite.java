@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -104,7 +104,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("Specific error code") != -1);
+            assertTrue(msg.indexOf("Type FLOAT can't be cast as BIGINT") != -1);
             caught = true;
         }
         assertTrue(caught);
@@ -1691,6 +1691,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "                                       (LOCK_TIME IS NULL OR " +
                 "                                        SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < " +
                 "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
+                ";\n" +
+
+                "CREATE INDEX ENG7792_UNUSED_INDEX_USES_CONCAT ON P3_INLINE_DESC (CONCAT(DESC, DESC2))" +
                 ";\n" +
 
                 "";

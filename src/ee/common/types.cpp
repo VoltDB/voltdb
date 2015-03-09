@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -407,9 +407,6 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_LIMIT: {
         return "LIMIT";
     }
-    case PLAN_NODE_TYPE_DISTINCT: {
-        return "DISTINCT";
-    }
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
@@ -462,8 +459,6 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZE;
     } else if (str == "LIMIT") {
         return PLAN_NODE_TYPE_LIMIT;
-    } else if (str == "DISTINCT") {
-        return PLAN_NODE_TYPE_DISTINCT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "SEMISEQSCAN") {

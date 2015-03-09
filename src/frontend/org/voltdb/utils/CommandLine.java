@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -156,6 +156,11 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine adminPort(int adminPort) {
         m_adminPort = adminPort;
+        return this;
+    }
+
+    public CommandLine httpPort(int httpPort) {
+        m_httpPort = httpPort;
         return this;
     }
 
@@ -448,7 +453,6 @@ public class CommandLine extends VoltDB.Configuration
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add(javaExecutable);
-        cmdline.add("-DUSE_DR_V2=" + Boolean.getBoolean("USE_DR_V2"));
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
         cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
@@ -549,7 +553,9 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add(m_startAction.verb());
 
         cmdline.add("host"); cmdline.add(m_leader);
-        cmdline.add("catalog"); cmdline.add(jarFileName());
+        if (jarFileName() != null) {
+            cmdline.add("catalog"); cmdline.add(jarFileName());
+        }
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
         // rejoin has no replication role

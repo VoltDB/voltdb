@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.StartAction;
@@ -46,7 +47,8 @@ public interface Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
-                          String coreBindIds)
+                          ConsumerDRGateway consumerDRGateway,
+                          boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException;
 
     /** Shutdown an Initiator and its sub-components. */

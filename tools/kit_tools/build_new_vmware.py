@@ -1,3 +1,15 @@
+#!/usr/bin/env python
+#
+# This script contains fabric tasks for making a new VMWare image for VoltDB.
+# The main task is make_new_vmimage, but many of the tasks are separately callable.
+#
+# fab -f build_new_vmware.py --list #to list all tasks
+#
+# To make a new vmware image from an existing image:
+# fab -f build_new_vmware.py make_new_vmimage:4.8,~/vmware/downloads/VoltDB-Ubuntu-x64-14.04-LTS-v4.7-Demo
+#
+# Note: vmware workstation must be installed and DISPLAY must be set for this to work
+#
 from fabric.api import hide, local, task
 import fnmatch
 import os
@@ -13,11 +25,14 @@ def _print_line():
     print "==============================================================="
 
 def _get_vmx():
+    vmxerror="""FATAL: You must set VMX in your environment
+> export VMX=<path-to-.vmx-file>)
+"""
     try:
         global vmx
         vmx = os.environ['VMX']
     except KeyError:
-        exit("FATAL: You must set VMX in your environment.\n> export VMX=<path>")
+        exit(vmxerror)
 
 
 def _find_files(pattern, path):
@@ -153,6 +168,7 @@ def vm_zerofilldisk(vmdk):
         #Clean up and zero out disk
         _print_line()
         print "Cleaning up disk"
+        print "  Ignore the failure 'cat: write error: No space left on device'"
         local('sudo cat /dev/zero > %s/zero.fill;sync;sleep 1;sync;rm -f %s/zero.fill' % (mount,mount))
     finally:
         vmdk_unmountlocal(mount)
@@ -203,12 +219,83 @@ def zip_read(path, chdir=''):
     local('%s unzip -o %s' % (cdcmd, path))
     return
 
+
 @task
-def do_it(version,oldvmdir=None):
+def clean_and_pack_vmimage():
+
+    _get_vmx()
+    #Stop
+    _print_line()
+    print "Stopping VM"
+    try:
+        vm_stop()
+    except:
+        print "This VM was already stopped"
+
+    newvmdir = os.path.dirname(vmx)
+    try:
+        vmdkfiles = _find_files('*LTS*.vmdk', newvmdir)
+        vmdk = [v for v in vmdkfiles if 's0' not in v][0]
+    except:
+        exit("FATAL: Cannot find vmdk file in %s" % newvmdir)
+
+    _print_line()
+    print "Mounting VM disk locally to zerofill before compressing"
+    print "  Ignore the failure about 'Invalid configuration file parameter'"
+    vm_zerofilldisk(vmdk)
+
+    #Shrink disk
+    _print_line()
+    print "Compressing disk"
+    local ('du -hs ' + os.path.dirname(vmx))
+    vmdk_compressdisk(vmdk)
+    local ('du -hs ' + os.path.dirname(vmx))
+
+    #Clean up files in vmdir
+    _delete_files( _find_files('*.log*', newvmdir))
+    _delete_files( _find_files('*.lck*', newvmdir))
+
+    #zip it
+    _print_line()
+    print "Zipping to %s.zip" % newvmdir
+    zip_write(os.path.basename(newvmdir),
+              newvmdir + '.zip',
+              chdir = os.path.join(newvmdir,".."))
+
+@task
+def start_from_update(version):
+    """
+    Run all the steps to update $VMX.  Usage: restart_from_update:version
+    """
+
+    _print_line()
+    print "Updating new VM with V" + version
+    vm_update(version)
+
+    clean_and_pack_vmimage()
+
+    #Start
+    _print_line()
+    print "Starting cloned VM for your inspection."
+    vm_start()
+
+    #Stop
+    #_print_line()
+    #print "Stopping VM"
+    #vm_stop()
+    #upload
+
+@task(default=True)
+def make_new_vmimage(version,oldvmdir=None):
+    """
+    Run all the steps to make a new vmware image from an old one.  Usage: make_new_vmimage:version,oldvmdirectory
+    """
+
 
     #get and unpack a vm from voltdb website, if necessary
     if not oldvmdir:
-        #TODO: I'm not sure if this works right now
+        exit("Usage: make_new_vmimage:version,oldvmdir")
+        #TODO: Make this work some day.
         import urllib
         import zipfile
         tmpdir = tempfile.mkdtemp();
@@ -253,50 +340,6 @@ def do_it(version,oldvmdir=None):
     _get_vmx()
     vm_start()
 
-    _print_line()
-    print "Updating new VM with V" + version
-    vm_update(version)
+    start_from_update(version)
 
-    #Stop
-    _print_line()
-    print "Stopping VM"
-    vm_stop()
 
-    newvmdir = os.path.dirname(vmx)
-    try:
-        vmdkfiles = _find_files('*LTS*.vmdk', newvmdir)
-        vmdk = [v for v in vmdkfiles if 's0' not in v][0]
-    except:
-        exit("FATAL: Cannot find vmdk file in %s" % newvmdir)
-
-    _print_line()
-    print "Mounting VM disk locally to zerofill before compressing"
-    vm_zerofilldisk(vmdk)
-
-    #Shrink disk
-    _print_line()
-    print "Compressing disk"
-    local ('du -hs ' + os.path.dirname(vmx))
-    vmdk_compressdisk(vmdk)
-    local ('du -hs ' + os.path.dirname(vmx))
-
-    #Clean up log files
-    _delete_files( _find_files('*.log*', newvmdir))
-
-    #zip it
-    _print_line()
-    print "Zipping to %s.zip" % newvmdir
-    zip_write(newvmdir, newvmdir + '.zip', chdir='newvmdir/..')
-
-    #Start
-    _print_line()
-    print "Starting cloned VM for your inspection."
-    os.environ['VMX'] = newvmx
-    _get_vmx()
-    vm_start()
-
-    #Stop
-    #_print_line()
-    #print "Stopping VM"
-    #vm_stop()
-    #upload

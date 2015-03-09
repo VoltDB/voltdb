@@ -1,0 +1,190 @@
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'signing'
+
+group = 'org.voltdb'
+version = file('version.txt').text[0..-2]
+description = 'VoltDB client interface libraries'
+archivesBaseName = 'voltdbclient'
+
+configurations {
+  clientArchives
+  ascSignatures
+}
+
+task clientDocJar(type:Jar) {
+  classifier = 'javadoc'
+  baseName = project.name + 'client'
+  version = project.version
+  from('doc/javadoc/java-client-api')
+  include('**/*')
+}
+
+/*
+ * This reflects the sources that are compiled in build-client.xml
+ * the client ant file is the authoritative answer of what are the
+ * client sources, and any modifcations to it should be also reflected
+ * here
+ */
+task clientSourcesJar(type:Jar) {
+  classifier = 'sources'
+  baseName = project.name + 'client'
+  version = project.version
+  from ('third_party/java/src') {
+    include 'com/google_voltpatches/**/*.java'
+    include 'javax/annotation_voltpatches/**/*.java'
+    include 'org/apache/cassandra_voltpatches/MurmerHash.java'
+    include 'org/apache/commons/cli_voltpatches/**/*.java'
+    include 'org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java'
+    include 'org/apache/hadoop_voltpatches/util/PureJavaCrc*.java'
+    include 'org/apache/jute_voltpatches/**/*.java'
+    include 'org/apache/zookeeper_voltpatches/KeeperException.java'
+    include 'org/cliffc_voltpatches/**/*.java'
+    include 'org/HdrHistogram_voltpatches/**/*.java'
+    include 'org/json_voltpatches/**/*.java'
+    include 'jsr166y/**/*.java'
+    include 'io/netty_voltpatches/NinjaKeySet.java'
+  }
+  from('src/frontend') {
+    include 'org/voltcore/logging/Level.java'
+    include 'org/voltcore/logging/VoltLogger.java'
+    include 'org/voltcore/logging/VoltUtilLoggingLogger.java'
+
+    include 'org/voltcore/network/*.java'
+
+    include 'org/voltcore/utils/CoreUtils.java'
+    include 'org/voltcore/utils/COWMap.java'
+    include 'org/voltcore/utils/COWNavigableSet.java'
+    include 'org/voltcore/utils/COWSortedMap.java'
+    include 'org/voltcore/utils/DBBPool.java'
+    include 'org/voltcore/utils/DeferredSerialization.java'
+    include 'org/voltcore/utils/EstTime.java'
+    include 'org/voltcore/utils/EstTimeUpdater.java'
+    include 'org/voltcore/utils/InstanceId.java'
+    include 'org/voltcore/utils/Pair.java'
+    include 'org/voltcore/utils/RateLimitedLogger.java'
+    include 'org/voltcore/utils/Bits.java'
+    include 'org/voltcore/utils/LatencyWatchdog.java'
+
+    include 'org/voltdb/CLIConfig.java'
+    include 'org/voltdb/client/**/*.java'
+    include 'org/voltdb/ClientResponseImpl.java'
+    include 'org/voltdb/common/Constants.java'
+    include 'org/voltdb/jdbc/**/*.java'
+    include 'org/voltdb/LatencyBucketSet.java'
+    include 'org/voltdb/ParameterConverter.java'
+    include 'org/voltdb/ParameterSet.java'
+    include 'org/voltdb/PrivateVoltTableFactory.java'
+    include 'org/voltdb/types/TimestampType.java'
+    include 'org/voltdb/types/VoltDecimalHelper.java'
+    include 'org/voltdb/utils/Base64.java'
+    include 'org/voltdb/utils/Encoder.java'
+    include 'org/voltdb/utils/SerializationHelper.java'
+    include 'org/voltdb/utils/RowWithMetaData.java'
+    include 'org/voltdb/utils/CSVDataLoader.java'
+    include 'org/voltdb/utils/CSVBulkDataLoader.java'
+    include 'org/voltdb/utils/CSVTupleDataLoader.java'
+    include 'org/voltdb/VoltOverflowException.java'
+    include 'org/voltdb/VoltTable.java'
+    include 'org/voltdb/VoltTableRow.java'
+    include 'org/voltdb/VoltType.java'
+    include 'org/voltdb/VoltTypeException.java'
+  }
+}
+
+artifacts {
+  clientArchives clientDocJar
+  clientArchives clientSourcesJar
+}
+
+artifacts.add('clientArchives', file("voltdb/voltdbclient-${version}.jar")) {
+    name = 'voltdbclient'
+    type = extension = 'jar'
+    classifier = null
+}
+
+signing {
+  sign configurations.clientArchives
+}
+
+task debug << {
+  configurations.clientArchives.artifacts.each { ca ->
+    println(['name','type','extension','classifier','file'].collect {
+      "${it}: ${ca.$/${it}/$}"
+    }.join(", "))
+  }
+}
+
+uploadClientArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment mvnd ->
+              signing.signPom(mvnd)
+              configurations.clientArchives.artifacts.each { ca ->
+                def ascfile = file(ca.file.path + '.asc')
+                def ascartf = project.artifacts.add('ascSignatures', ascfile) {
+                  classifier = ca.classifier
+                  extension = ca.extension + '.asc'
+                  type = ca.type + '.asc'
+                }
+                mvnd.addArtifact(ascartf)
+              }
+            }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+              authentication(userName: sonatypeUsername, password: sonatypePassword)
+            }
+
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+              authentication(userName: sonatypeUsername, password: sonatypePassword)
+            }
+            // repository(url: "file://localhost/Users/stefano/tmp/m2repo/")
+
+            pom.project {
+               name 'voltdbclient'
+               packaging 'jar'
+               description 'VoltDB client interface libraries'
+               url 'http://www.voltdb.com/'
+
+               scm {
+                   url 'git@github.com:VoltDB/voltdb.git'
+                   connection 'scm:git@github.com:VoltDB/voltdb.git'
+                   developerConnection 'scm:git@github.com:VoltDB/voltdb.git'
+               }
+
+               licenses {
+                   license {
+                       name 'GNU Affero General Public License Version 3'
+                       url 'http://www.gnu.org/licenses/agpl.txt'
+                       distribution 'repo'
+                   }
+               }
+
+               developers {
+                   developer {
+                       id 'jhugg'
+                       name 'John Hugg'
+                       email 'jhugg@voltdb.com'
+                       organizationUrl 'http://www.voltdb.com'
+                   }
+                   developer {
+                       id 'vtkstef'
+                       name 'Stefano Santoro'
+                       email 'ssantoro@voltdb.com'
+                       organizationUrl 'http://www.voltdb.com'
+                   }
+                   developer {
+                       id 'jpiekos'
+                       name 'John Piekos'
+                       email 'jpiekos@voltdb.com'
+                       organizationUrl 'http://www.voltdb.com'
+                   }
+               }
+            }
+        }
+    }
+}
+
+uploadClientArchives.dependsOn {
+  [signClientArchives]
+}

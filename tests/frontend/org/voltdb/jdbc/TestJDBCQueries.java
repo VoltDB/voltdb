@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,7 +37,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
-
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -124,6 +123,75 @@ public class TestJDBCQueries {
                         new String[] {""}),
     };
 
+    // Define Voter schema as well.
+    public static final String voter_schema =
+            "CREATE TABLE contestants" +
+            "(" +
+            "  contestant_number integer     NOT NULL" +
+            ", contestant_name   varchar(50) NOT NULL" +
+            ", CONSTRAINT PK_contestants PRIMARY KEY" +
+            "  (" +
+            "    contestant_number" +
+            "  )" +
+            ");" +
+            "CREATE TABLE votes" +
+            "(" +
+            "  phone_number       bigint     NOT NULL" +
+            ", state              varchar(2) NOT NULL" +
+            ", contestant_number  integer    NOT NULL" +
+            ");" +
+            "PARTITION TABLE votes ON COLUMN phone_number;" +
+            "CREATE TABLE area_code_state" +
+            "(" +
+            "  area_code smallint   NOT NULL" +
+            ", state     varchar(2) NOT NULL" +
+            ", CONSTRAINT PK_area_code_state PRIMARY KEY" +
+            "  (" +
+            "    area_code" +
+            "  )" +
+            ");" +
+            "CREATE VIEW v_votes_by_phone_number" +
+            "(" +
+            "  phone_number" +
+            ", num_votes" +
+            ")" +
+            "AS" +
+            "   SELECT phone_number" +
+            "        , COUNT(*)" +
+            "     FROM votes" +
+            " GROUP BY phone_number" +
+            ";" +
+            "CREATE VIEW v_votes_by_contestant_number_state" +
+            "(" +
+            "  contestant_number" +
+            ", state" +
+            ", num_votes" +
+            ")" +
+            "AS" +
+            "   SELECT contestant_number" +
+            "        , state" +
+            "        , COUNT(*)" +
+            "     FROM votes" +
+            " GROUP BY contestant_number" +
+            "        , state;";
+
+    public static final String drop_table =
+            "CREATE TABLE drop_table" +
+            "(" +
+            "  contestant_number integer     NOT NULL" +
+            ", contestant_name   varchar(50) NOT NULL" +
+            ");" +
+            "CREATE TABLE drop_table1" +
+            "(" +
+            "  contestant_number integer     NOT NULL" +
+            ", contestant_name   varchar(50) NOT NULL" +
+            ");" +
+            "CREATE TABLE drop_table2" +
+            "(" +
+            "  contestant_number integer     NOT NULL" +
+            ", contestant_name   varchar(50) NOT NULL" +
+            ");";
+
     @BeforeClass
     public static void setUp() throws Exception {
         // Add one T_<type> table for each data type.
@@ -132,8 +200,11 @@ public class TestJDBCQueries {
             ddl += String.format("CREATE TABLE %s(ID %s, VALUE VARCHAR(255)); ",
                                  d.tablename, d.typedecl);
         }
+        ddl += voter_schema;
+        ddl += drop_table;
 
         pb = new VoltProjectBuilder();
+        pb.setUseDDLSchema(true);
         pb.addLiteralSchema(ddl);
         boolean success = pb.compile(Configuration.getPathToCatalogForTest(TEST_JAR), 3, 1, 0);
         assert(success);
@@ -496,6 +567,404 @@ public class TestJDBCQueries {
         while (rs.next()) {
             Timestamp ts1 = rs.getTimestamp(1);
             assertEquals(ts, ts1);
+        }
+    }
+
+    @Test
+    public void testSelect() throws Exception
+    {
+        try
+        {
+            // This query does work, per ENG-7306.
+            String sql = "select * from votes;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(BASIC SELECT): " + e.getMessage());
+            fail();
+        }
+
+        try
+        {
+            // This query does work, per ENG-7306.
+            String sql = "select * from (select * from contestants C1) alias;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(SUB-SELECT with no spaces): " + e.getMessage());
+            fail();
+        }
+
+        try
+        {
+            // Add a space before the sub-select. Reported in ENG-7306
+            String sql = "select * from ( select * from contestants C1) alias;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(SUB-SELECT with spaces): " + e.getMessage());
+            fail();
+        }
+
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = "select * from contestants;";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(SELECT)): " + e.getMessage());
+            fail();
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should fail
+        try
+        {
+            String sql = "select * from contestant;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+            System.err.println("ERROR(executeUpdate(SELECT)): should have failed but did not.");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+    }
+
+
+    @Test
+    public void testAlter() throws Exception
+    {
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = "ALTER TABLE area_code_state ADD UNIQUE(state) ;";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(ALTER TABLE)): " + e.getMessage());
+            fail();
+        }
+
+        // executeQuery() - Only SELECT - should fail
+        try
+        {
+            String sql = "ALTER TABLE CONTESTANTS ADD UNIQUE(contestant_name) ;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(ALTER TABLE) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should succeed
+        try
+        {
+            String sql = "ALTER TABLE area_code_state DROP COLUMN state;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(ALTER TABLE)): " + e.getMessage());
+            fail();
+        }
+    }
+
+    @Test
+    public void testCreate() throws Exception
+    {
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = "create table t1(id integer not null, num integer not null);";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(CREATE TABLE)): " + e.getMessage());
+            fail();
+        }
+
+        // executeQuery() - Only SELECT - should fail
+        try
+        {
+            String sql = "create table t2(id integer not null, num integer not null);";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(CREATE TABLE) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should succeed
+        try
+        {
+            String sql = "create table t3(id integer not null, num integer not null);";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(CREATE TABLE)): " + e.getMessage());
+            fail();
+        }
+
+        // Try a "create unique index" statement
+        try
+        {
+            String sql = "create unique index idx_t_idnum_unique on t3(id,num);\n";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(CREATE UNIQUE INDEX): " + e.getMessage());
+            fail();
+        }
+
+        // Try a single-statement stored procedure create.  The trick here is the select within the statement,
+        // it should not be treated as a query, but instead as a create.
+        try
+        {
+            String sql = "CREATE PROCEDURE CountContestants AS SELECT COUNT(*) FROM contestants;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(CREATE PROCEDURE)): " + e.getMessage());
+            fail();
+        }
+        // Only Selects work with executeQuery(), so the CREATE PROCEDURE should fail.
+        try
+        {
+            String sql = "CREATE PROCEDURE CountContestants2 AS SELECT COUNT(*) FROM contestants;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(CREATE PROCEDURE) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+    }
+
+    @Test
+    public void testDrop() throws Exception
+    {
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = "drop table drop_table;";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(DROP)): " + e.getMessage());
+            fail();
+        }
+
+        // executeQuery() - Only SELECT - should fail
+        try
+        {
+            String sql = "drop table drop_table1;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(DROP) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should succeed
+        try
+        {
+            String sql = "drop table drop_table2;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(DROP)): " + e.getMessage());
+            fail();
+        }
+
+    }
+
+    @Test
+    public void testTruncate() throws Exception
+    {
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = "truncate table votes;";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(TRUNCATE TABLE)): " + e.getMessage());
+            fail();
+        }
+
+        // executeQuery() - Only SELECT - should fail
+        try
+        {
+            String sql = "truncate table votes;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(TRUNCATE TABLE) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should succeed
+        try
+        {
+            String sql = "truncate table votes;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(TRUNCATE TABLE)): " + e.getMessage());
+            fail();
+        }
+
+    }
+
+    @Test
+    public void testUpsert() throws Exception
+    {
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = " upsert into contestants (contestant_number, contestant_name) values (23, 'Bruce Springsteen')";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(UPSERT)): " + e.getMessage());
+            fail();
+        }
+
+        // executeQuery() - Only SELECT - should fail
+        try
+        {
+            String sql = " upsert into contestants (contestant_number, contestant_name) values (23, 'Bruce Springsteen')";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(UPSERT) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should succeed
+        try
+        {
+            String sql = " upsert into contestants (contestant_number, contestant_name) values (23, 'Bruce Springsteen')";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(UPSERT): " + e.getMessage());
+            fail();
+        }
+
+        // Should work
+        try
+        {
+            String sql = "upsert into contestants (contestant_number, contestant_name) select * from contestants where contestant_number=23 order by 1;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(UPSERT WITH SELECT): " + e.getMessage());
+            fail();
+        }
+
+    }
+
+    @Test
+    public void testUpdate() throws Exception
+    {
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = "update votes set CONTESTANT_NUMBER = 7 where PHONE_NUMBER = 2150002906;";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(UPDATE)): " + e.getMessage());
+            fail();
+        }
+
+        // executeQuery() - Only SELECT - should fail
+        try
+        {
+            String sql = "update votes set CONTESTANT_NUMBER = 7 where PHONE_NUMBER = 2150002906;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(UPDATE) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should succeed
+        try
+        {
+            String sql = "update votes set CONTESTANT_NUMBER = 7 where PHONE_NUMBER = 2150002906;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(UPDATE)): " + e.getMessage());
+            fail();
+        }
+
+    }
+
+    @Test
+    public void testDelete() throws Exception
+    {
+        // execute() - Any valid SQL/DDL statement - should succeed
+        try
+        {
+            String sql = "delete from votes where   PHONE_NUMBER = 3082086134      ";
+            java.sql.Statement query = conn.createStatement();
+            query.execute(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(execute(DELETE)): " + e.getMessage());
+            fail();
+        }
+
+        // executeQuery() - Only SELECT - should fail
+        try
+        {
+            String sql = "delete from votes where   PHONE_NUMBER = 3082086134      ";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(DELETE) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
+        // executeUpdate() - Any valid SQL/DDL statement except SELECT - should succeed
+        try
+        {
+            String sql = "delete from votes where   PHONE_NUMBER = 3082086134      ";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(DELETE)): " + e.getMessage());
+            fail();
         }
     }
 

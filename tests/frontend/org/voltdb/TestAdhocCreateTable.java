@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,7 +40,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("--dont care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -86,7 +86,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("--dont care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -129,7 +129,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("--dont care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -149,7 +149,8 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc",
                         "create table FOO (\n" +
                         "ID int default 0 not null,\n" +
-                        "VAL varchar(32 bytes)\n" +
+                        "VAL varchar(32 bytes),\n" +
+                        "VAL2 bigint not null assumeunique\n" +
                         ");\n" +
                         "partition table FOO on column ID;\n"
                         );
@@ -172,7 +173,11 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc",
                         "create table BAR (\n" +
                         "ID int default 0 not null,\n" +
-                        "VAL varchar(32 bytes)\n" +
+                        "VAL varchar(32 bytes),\n" +
+                        // check that we can create a table with assumeunique
+                        // (starts replicated) and partition it in a separate @AdHoc call
+                        "VAL2 bigint not null assumeunique,\n" +
+                        "constraint blerg assumeunique(VAL)\n" +
                         ");\n");
                 m_client.callProcedure("@AdHoc",
                         "partition table BAR on column ID;\n"

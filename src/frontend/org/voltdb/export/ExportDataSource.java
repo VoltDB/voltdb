@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -522,20 +522,30 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
-        m_es.execute((new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if (!m_es.isShutdown()) {
-                        pushExportBufferImpl(uso, buffer, sync, endOfStream);
+        if (m_es.isShutdown()) {
+           m_bufferPushPermits.release();
+           return;
+        }
+        try {
+            m_es.execute((new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (!m_es.isShutdown()) {
+                            pushExportBufferImpl(uso, buffer, sync, endOfStream);
+                        }
+                    } catch (Throwable t) {
+                        VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
+                    } finally {
+                        m_bufferPushPermits.release();
                     }
-                } catch (Throwable t) {
-                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
-                } finally {
-                    m_bufferPushPermits.release();
                 }
-            }
-        }));
+            }));
+        } catch (RejectedExecutionException rej) {
+            m_bufferPushPermits.release();
+            //We are shutting down very much rolling generation so dont passup for error reporting.
+            exportLog.info("Error pushing export  buffer: ", rej);
+        }
     }
 
     public ListenableFuture<?> closeAndDelete() {

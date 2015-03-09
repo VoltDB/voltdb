@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,13 +29,15 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
     public enum Members {
         MULTI_PARTITION,
         FIELD_MAP,
-        UPSERT
+        UPSERT,
+        SOURCE_IS_PARTITIONED
     }
 
     protected boolean m_multiPartition = false;
     private int[] m_fieldMap;
 
     private boolean m_isUpsert = false;
+    private boolean m_sourceIsPartitioned = false;
 
     public boolean isUpsert() {
         return m_isUpsert;
@@ -65,6 +67,14 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
         m_fieldMap = fieldMap;
     }
 
+    public void setSourceIsPartitioned(boolean value) {
+        m_sourceIsPartitioned = value;
+    }
+
+    public boolean getSourceIsPartitioned() {
+        return m_sourceIsPartitioned;
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.INSERT;
@@ -82,6 +92,10 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
 
         if (m_isUpsert) {
             stringer.key(Members.UPSERT.name()).value(true);
+        }
+
+        if (m_sourceIsPartitioned) {
+            stringer.key(Members.SOURCE_IS_PARTITIONED.name()).value(true);
         }
     }
 
@@ -101,6 +115,11 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
         m_isUpsert = false;
         if (jobj.has(Members.UPSERT.name())) {
             m_isUpsert = true;
+        }
+
+        m_sourceIsPartitioned = false;
+        if (jobj.has(Members.SOURCE_IS_PARTITIONED.name())) {
+            m_sourceIsPartitioned = true;
         }
     }
 

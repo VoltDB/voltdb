@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,10 +53,10 @@ class ExecutorContext {
                     Pool* tempStringPool,
                     NValueArray* params,
                     VoltDBEngine* engine,
-                    bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId,
-                    DRTupleStream *drTupleStream);
+                    DRTupleStream *drTupleStream,
+                    DRTupleStream *drReplicatedStream);
 
     ~ExecutorContext();
 
@@ -101,7 +101,11 @@ class ExecutorContext {
         m_spHandle = std::max(lastCommittedSpHandle, m_spHandle);
     }
 
-    // for test (VoltDBEngine::getExecutorContext())
+    // Used originally for test. Now also used to NULL
+    // out the UndoQuantum when it is released to make it possible
+    // to check if there currently exists an active undo quantum
+    // so that things that should only execute after the currently running
+    // transaction has committed can assert on that.
     void setupForPlanFragments(UndoQuantum *undoQuantum) {
         m_undoQuantum = undoQuantum;
     }
@@ -195,6 +199,10 @@ class ExecutorContext {
         return m_drStream;
     }
 
+    DRTupleStream* drReplicatedStream() {
+        return m_drReplicatedStream;
+    }
+
     static ExecutorContext* getExecutorContext();
 
     static Pool* getTempStringPool() {
@@ -202,6 +210,10 @@ class ExecutorContext {
         assert(singleton != NULL);
         assert(singleton->m_tempStringPool != NULL);
         return singleton->m_tempStringPool;
+    }
+
+    void setDrStreamForTest(DRTupleStream *drStream) {
+        m_drStream = drStream;
     }
 
   private:
@@ -217,6 +229,7 @@ class ExecutorContext {
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
     DRTupleStream *m_drStream;
+    DRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;
@@ -228,7 +241,6 @@ class ExecutorContext {
     CatalogId m_partitionId;
     std::string m_hostname;
     CatalogId m_hostId;
-    bool m_exportEnabled;
 
     /** local epoch for voltdb, somtime around 2008, pulled from catalog */
     int64_t m_epoch;

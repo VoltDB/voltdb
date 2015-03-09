@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,10 +28,12 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -63,6 +65,10 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         VoltTable[] results = client.callProcedure("@SystemCatalog", "TABLES").getResults();
         assertEquals(10, results[0].getColumnCount());
         System.out.println(results[0]);
+        results[0].advanceRow();
+        assertEquals("{\"partitionColumn\":\"A1\"}", results[0].get("REMARKS", VoltType.STRING));
+        results[0].advanceRow();
+        assertEquals("{\"partitionColumn\":\"A1\",\"sourceTable\":\"T\"}", results[0].get("REMARKS", VoltType.STRING));
     }
 
     public void testColumnsSelector() throws IOException, ProcCallException
@@ -130,7 +136,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
             assertEquals("T", blah.getString("TABLE_NAME"));
         }
         blah.close();
-        blah = huh.getMetaData().getTables(null, null, null, null);
+        blah = huh.getMetaData().getTables(null, null, "T", null);
         while (blah.next())
         {
             assertEquals("T", blah.getString("TABLE_NAME"));
@@ -181,7 +187,8 @@ public class TestSystemCatalogSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestSystemCatalogSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));");
+        project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+                                 "CREATE VIEW V(A1, S) AS SELECT A1, COUNT(*) FROM T GROUP BY A1;");
         project.addPartitionInfo("T", "A1");
         project.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
 

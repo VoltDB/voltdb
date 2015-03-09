@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -61,6 +61,8 @@ class TableCatalogDelegate : public CatalogDelegate {
 
     // table specific
     int init(catalog::Database const &catalogDatabase,
+             catalog::Table const &catalogTable);
+    bool evaluateExport(catalog::Database const &catalogDatabase,
              catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,

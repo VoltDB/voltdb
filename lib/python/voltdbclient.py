@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -301,13 +301,13 @@ class FastSerializer:
             print "ERROR: Connection failed. Please check that the host and port are correct."
             raise e
         except socket.timeout:
-            raise SystemExit("Authentication timed out after %d seconds."
+            raise RuntimeError("Authentication timed out after %d seconds."
                                 % self.socket.gettimeout())
         version = self.readByte()
         status = self.readByte()
 
         if status != 0:
-            raise SystemExit("Authentication failed.")
+            raise RuntimeError("Authentication failed.")
 
         self.readInt32()
         self.readInt64()

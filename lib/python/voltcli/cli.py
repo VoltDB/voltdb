@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -127,6 +127,14 @@ class IntegerOption(BaseOption):
     """
     def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
         BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
+    def postprocess_value(self, value):
+        if type(value) is not int:
+            try:
+                converted = int(value.strip())
+            except ValueError:
+                utility.abort('Bad "%s" integer value: %s' % (self.get_dest().upper(), value))
+            return converted
+        return value
 
 #===============================================================================
 class StringListOption(StringOption):
@@ -365,7 +373,9 @@ class CLIParser(ExtendedHelpOptionParser):
         # Post-process the option values, e.g. convert strings to lists as needed.
         for o in verb.iter_options():
             dest = o.get_dest()
-            setattr(opts, dest, o.postprocess_value(getattr(opts, dest)))
+            value = getattr(opts, dest)
+            if not value is None:
+                setattr(opts, dest, o.postprocess_value(value))
 
     def process_verb_arguments(self, verb, verb_args, verb_opts):
         """

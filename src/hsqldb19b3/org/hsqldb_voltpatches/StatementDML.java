@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -40,6 +42,7 @@ import org.hsqldb_voltpatches.index.IndexAVL;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.navigator.RangeIterator;
 import org.hsqldb_voltpatches.navigator.RowIterator;
@@ -1247,6 +1250,12 @@ public class StatementDML extends StatementDMQL {
 
     /************************* Volt DB Extensions *************************/
 
+    private SortAndSlice m_sortAndSlice = null;
+
+    public void setSortAndSlice(SortAndSlice sas) {
+        m_sortAndSlice = sas;
+    }
+
     private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
@@ -1282,6 +1291,51 @@ public class StatementDML extends StatementDMQL {
             xml.children.add(condition);
             condition.children.add(condExpr.voltGetXML(session));
         }
+    }
+
+    /**
+     * Appends XML for ORDER BY/LIMIT/OFFSET to this statement's XML.
+     * */
+    private void voltAppendSortAndSlice(Session session, VoltXMLElement xml) throws HSQLParseException {
+        if (m_sortAndSlice == null || m_sortAndSlice == SortAndSlice.noSort) {
+            return;
+        }
+
+        // Is target a view?
+        if (targetTable.getBaseTable() != targetTable) {
+            // This check is unreachable, but if writable views are ever supported there
+            // will be some more work to do to resolve columns in ORDER BY properly.
+            throw new HSQLParseException("DELETE with ORDER BY, LIMIT or OFFSET is currently unsupported on views.");
+        }
+
+        if (m_sortAndSlice.hasLimit() && !m_sortAndSlice.hasOrder()) {
+            throw new HSQLParseException("DELETE statement with LIMIT or OFFSET but no ORDER BY would produce "
+                    + "non-deterministic results.  Please use an ORDER BY clause.");
+        }
+        else if (m_sortAndSlice.hasOrder() && !m_sortAndSlice.hasLimit()) {
+            // This is harmless, but the order by is meaningless in this case.  Should
+            // we let this slide?
+            throw new HSQLParseException("DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.  "
+                    + "Consider removing the ORDER BY clause, as it has no effect here.");
+        }
+
+        List<VoltXMLElement> newElements = voltGetLimitOffsetXMLFromSortAndSlice(session, m_sortAndSlice);
+
+        // This code isn't shared with how SELECT's ORDER BY clauses are serialized since there's
+        // some extra work that goes on there to handle references to SELECT clauses aliases, etc.
+        HsqlArrayList exprList = m_sortAndSlice.exprList;
+        if (exprList != null) {
+            VoltXMLElement orderColumnsXml = new VoltXMLElement("ordercolumns");
+            for (int i = 0; i < exprList.size(); ++i) {
+                Expression e = (Expression)exprList.get(i);
+                VoltXMLElement elem = e.voltGetXML(session);
+                orderColumnsXml.children.add(elem);
+            }
+
+            newElements.add(orderColumnsXml);
+        }
+
+        xml.children.addAll(newElements);
     }
 
     private void voltAppendChildScans(Session session, VoltXMLElement xml)
@@ -1337,6 +1391,7 @@ public class StatementDML extends StatementDMQL {
             // DELETE has no target columns
             voltAppendChildScans(session, xml);
             voltAppendCondition(session, xml);
+            voltAppendSortAndSlice(session, xml);
             break;
 
         default:

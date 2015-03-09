@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,7 +30,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -41,9 +40,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
-public class ClientThread extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class ClientThread extends BenchmarkThread {
 
     static enum Type {
         PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID, ADHOC_MP;
@@ -80,9 +77,6 @@ public class ClientThread extends Thread {
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
-        setDaemon(true);
-
-
         m_type = Type.typeFromId(mpRatio, allowInProcAdhoc);
         m_cid = cid;
         m_client = client;
@@ -182,12 +176,9 @@ public class ClientThread extends Thread {
             m_txnsRun.incrementAndGet();
 
             if (results.length != expectedTables) {
-                log.error(String.format(
+                hardStop(String.format(
                         "Client cid %d procedure %s returned %d results instead of %d",
-                        m_cid, procName, results.length, expectedTables));
-                log.error(((ClientResponseImpl) response).toJSONString());
-                Benchmark.printJStack();
-                System.exit(-1);
+                        m_cid, procName, results.length, expectedTables), response);
             }
             VoltTable data = results[3];
             try {
@@ -221,14 +212,11 @@ public class ClientThread extends Thread {
         // this implies bad data and is fatal
         if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                 (cri.getStatus() == ClientResponse.USER_ABORT)) {
-            log.error("ClientThread had a proc-call exception that indicated bad data", e);
-            log.error(cri.toJSONString(), e);
-            Benchmark.printJStack();
-            System.exit(-1);
+            hardStop("ClientThread had a proc-call exception that indicated bad data", cri);
         }
         // other proc call exceptions are logged, but don't stop the thread
         else {
-            log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
+            log.warn("ClientThread had a proc-call exception that didn't indicate bad data: " + e.getMessage());
             log.warn(cri.toJSONString());
 
             // take a breather to avoid slamming the log (stay paused if no connections)
@@ -278,9 +266,7 @@ public class ClientThread extends Thread {
                 // just need to fall through and get out
             }
             catch (Exception e) {
-                log.error("ClientThread had a non proc-call exception", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("ClientThread had a non proc-call exception", e);
             }
         }
     }

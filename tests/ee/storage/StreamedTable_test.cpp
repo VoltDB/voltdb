@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -57,7 +57,11 @@ public:
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
 
+<<<<<<< HEAD
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, NULL, NULL, true, "", 0, NULL);
+=======
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, NULL, "", 0, NULL, NULL);
+>>>>>>> VoltDB/master
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;

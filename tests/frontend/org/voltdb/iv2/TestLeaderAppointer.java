@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -126,7 +126,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), enablePPD,
                 null, false,
-                m_config.getTopology(m_hostIds), m_mpi, stats);
+                m_config.getTopology(m_hostIds), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -275,7 +275,7 @@ public class TestLeaderAppointer extends ZKTestBase {
                                     m_config.getReplicationFactor(), false,
                                     null, false,
                                     m_config.getTopology(m_hostIds), m_mpi,
-                                    new KSafetyStats());
+                                    new KSafetyStats(), false);
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
         boolean threw = false;
@@ -537,5 +537,51 @@ public class TestLeaderAppointer extends ZKTestBase {
         while (!VoltDB.wasCrashCalled) {
             Thread.yield();
         }
+    }
+
+    @Test
+    public void testFailureDuringSyncSnapshot() throws Exception
+    {
+        configure(2, 2, 1, false);
+        Thread dutthread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    m_dut.acceptPromotion();
+                } catch (Exception e) {
+                }
+            }
+        };
+        dutthread.start();
+        // Need to sleep so we don't write to ZK before the LeaderAppointer appears or we'll crash
+        Thread.sleep(1000);
+        addReplica(0, 0L);
+        addReplica(0, 1L);
+        addReplica(1, 2L);
+        addReplica(1, 3L);
+        waitForAppointee(1);
+        registerLeader(0, m_cache.pointInTimeCache().get(0));
+        registerLeader(1, m_cache.pointInTimeCache().get(1));
+        dutthread.join();
+        // kill the appointer and delete one of the leaders
+        m_dut.shutdown();
+        deleteReplica(0, m_cache.pointInTimeCache().get(0));
+        // create a new appointer and start it up with expectSyncSnapshot=true
+        m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
+                                    m_config.getReplicationFactor(), false,
+                                    null, false,
+                                    m_config.getTopology(m_hostIds), m_mpi,
+                                    new KSafetyStats(), true);
+        m_dut.onReplayCompletion();
+        m_newAppointee.set(false);
+        VoltDB.ignoreCrash = true;
+        boolean threw = false;
+        try {
+            m_dut.acceptPromotion();
+        } catch (ExecutionException e) {
+            threw = true;
+        }
+        assertTrue(threw);
+        assertTrue(VoltDB.wasCrashCalled);
     }
 }

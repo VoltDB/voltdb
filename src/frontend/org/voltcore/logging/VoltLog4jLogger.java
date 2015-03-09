@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,6 @@
 package org.voltcore.logging;
 
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
@@ -48,7 +47,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
 
         // Make the LogManager shutdown hook the last thing to be done,
         // so that we'll get logging from any other shutdown behavior.
-        ShutdownHooks.registerShutdownHook(ShutdownHooks.VOLT_LOG4J, true,
+        ShutdownHooks.registerFinalShutdownAction(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -57,7 +56,8 @@ public class VoltLog4jLogger implements CoreVoltLogger {
                 });
     }
 
-    /*
+
+   /*
      * Encoding for various log settings that will fit in 3 bits
      */
     public static final int all = 0;
@@ -163,23 +163,13 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         return logLevels;
     }
 
-    @Override
-    public void addSimpleWriterAppender(StringWriter writer) {
-        m_logger.addAppender(new org.apache.log4j.WriterAppender(new org.apache.log4j.SimpleLayout(), writer));
-    }
-
-    @Override
-    public void setLevel(Level level) {
-        m_logger.setLevel(getPriorityForLevel(level));
-    }
-
     /**
      * Static method to change the Log4j config globally.
      * @param xmlConfig The text of a Log4j config file.
      */
     public static void configure(String xmlConfig) {
         DOMConfigurator configurator = new DOMConfigurator();
-        StringReader sr = new StringReader(xmlConfig);
+        StringReader sr = new StringReader(xmlConfig.trim());
         configurator.doConfigure(sr, LogManager.getLoggerRepository());
     }
 

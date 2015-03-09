@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,7 @@ public class SystemStatsCollector {
     static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
     static long memorysize = 256;
-    static int pid;
+    static int pid = 0;
     static boolean initialized = false;
     static GetRSSMode mode = GetRSSMode.PS;
     static Thread thread = null;
@@ -354,6 +354,11 @@ public class SystemStatsCollector {
         }
     }
 
+    public static synchronized long getRSSMB() {
+        Datum d = generateCurrentSample();
+        return d.rss;
+    }
+
     /**
      * Poll the operating system and generate a Datum
      * @return A newly created Datum instance.
@@ -378,29 +383,6 @@ public class SystemStatsCollector {
         // create a new Datum which adds java stats
         Datum d = new Datum(rss);
         return d;
-    }
-
-    /**
-     * Get a CSV string of all the values in the history,
-     * filtering for uniqueness.
-     * @return A string containing CSV memory values.
-     */
-    public static synchronized String getCSV() {
-        // build a unique set
-        HashMap<Long, Datum> all =  new HashMap<Long, Datum>();
-        for (Datum d : historyS)
-            all.put(d.timestamp, d);
-        for (Datum d : historyM)
-            all.put(d.timestamp, d);
-        for (Datum d : historyL)
-            all.put(d.timestamp, d);
-
-        // print the csv out
-        StringBuilder sb = new StringBuilder();
-        for (Datum d : all.values())
-            sb.append(d.toLine()).append("\n");
-
-        return sb.toString();
     }
 
     /**

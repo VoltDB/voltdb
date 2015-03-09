@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,11 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google_voltpatches.common.base.Preconditions;
+import java.util.HashSet;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Set;
+
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -26,10 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Set;
+import com.google_voltpatches.common.base.Preconditions;
 
 public class SnapshotRequestConfig {
     protected static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
@@ -54,14 +55,14 @@ public class SnapshotRequestConfig {
                                               Database catalogDatabase)
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(catalogDatabase);
-        final Set<Integer> tableIdsToInclude = new HashSet<Integer>();
+        final Set<String> tableNamesToInclude = new HashSet<String>();
 
         if (jsData != null) {
-            JSONArray tableIds = jsData.optJSONArray("tableIds");
-            if (tableIds != null) {
-                for (int i = 0; i < tableIds.length(); i++) {
+            JSONArray tableNames = jsData.optJSONArray("tableNames");
+            if (tableNames != null) {
+                for (int i = 0; i < tableNames.length(); i++) {
                     try {
-                        tableIdsToInclude.add(tableIds.getInt(i));
+                        tableNamesToInclude.add(tableNames.getString(i));
                     } catch (JSONException e) {
                         SNAP_LOG.warn("Unable to parse tables to include for stream snapshot", e);
                     }
@@ -72,7 +73,7 @@ public class SnapshotRequestConfig {
         ListIterator<Table> iter = tables.listIterator();
         while (iter.hasNext()) {
             Table table = iter.next();
-            if (!tableIdsToInclude.contains(table.getRelativeIndex())) {
+            if (!tableNamesToInclude.contains(table.getTypeName())) {
                 // If the table index is not in the list to include, remove it
                 iter.remove();
             }
@@ -84,10 +85,10 @@ public class SnapshotRequestConfig {
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
         if (tables != null) {
-            stringer.key("tableIds");
+            stringer.key("tableNames");
             stringer.array();
             for (Table table : tables) {
-                stringer.value(table.getRelativeIndex());
+                stringer.value(table.getTypeName());
             }
             stringer.endArray();
         }

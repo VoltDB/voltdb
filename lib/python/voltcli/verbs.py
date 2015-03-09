@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -373,7 +373,8 @@ class JavaBundle(object):
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
            cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
-           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
+           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'),
+           cli.StringOption(None, '--publicinterface', 'publicinterface', 'For hosted or cloud environments with non-public interfaces, this argument specifies a publicly-accessible alias for reaching the server. Particularly useful for remote access to the VoltDB Management Center.'))
 
     def start(self, verb, runner):
         pass
@@ -404,7 +405,8 @@ class ServerBundle(JavaBundle):
                  supports_daemon=False,
                  daemon_name=None,
                  daemon_description=None,
-                 daemon_output=None):
+                 daemon_output=None,
+                 supports_multiple_daemons=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -415,6 +417,7 @@ class ServerBundle(JavaBundle):
         self.daemon_name = daemon_name
         self.daemon_description = daemon_description
         self.daemon_output = daemon_output
+        self.supports_multiple_daemons = supports_multiple_daemons
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -442,6 +445,12 @@ class ServerBundle(JavaBundle):
             verb.add_options(
                 cli.BooleanOption('-B', '--background', 'daemon',
                                   'run the VoltDB server in the background (as a daemon process)'))
+            if self.supports_multiple_daemons:
+                # Keep the -I/--instance option hidden for now.
+                verb.add_options(
+                    cli.IntegerOption('-I', '--instance', 'instance',
+                                  #'specify an instance number for multiple servers on the same host'))
+                                  None))
 
     def go(self, verb, runner):
         if self.subcommand == 'create':
@@ -489,6 +498,8 @@ class ServerBundle(JavaBundle):
             final_args.extend(['zkport', runner.opts.zkport])
         if runner.opts.externalinterface:
             final_args.extend(['externalinterface', runner.opts.externalinterface])
+        if runner.opts.publicinterface:
+            final_args.extend(['publicinterface', runner.opts.publicinterface])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}
@@ -501,6 +512,9 @@ class ServerBundle(JavaBundle):
             runner.setup_daemon_kwargs(kwargs, name=self.daemon_name,
                                                description=daemon_description,
                                                output=self.daemon_output)
+        else:
+            # Replace the Python process.
+            kwargs['exec'] = True
         self.run_java(verb, runner, *final_args, **kwargs)
 
     def stop(self, verb, runner):

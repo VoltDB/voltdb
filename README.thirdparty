@@ -1140,6 +1140,25 @@ emma_ant
  */
 
 ================================================================================
+Gradle 1.6 (Used in the GEB automated tests of the VMC, VoltDB Management Center)
+
+/*
+ * Copyright 2007-2011 the original author or authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+================================================================================
 gradle-wrapper.jar
 
 The License is accompanied by a NOTICE
@@ -1442,13 +1461,13 @@ VoltDB Studio | Web uses the following open source components:
  * http://jquery.com/
  *
  * Copyright 2011, John Resig
- * Dual licensed under the MIT or GPL Version 2 licenses.
+ * licensed under the MIT
  * http://jquery.org/license
  *
  * Includes Sizzle.js
  * http://sizzlejs.com/
  * Copyright 2011, The Dojo Foundation
- * Released under the MIT, BSD, and GPL Licenses.
+ * Released under the MIT License.
  *
  * Date: Thu May 12 15:04:36 2011 -0400
  */
@@ -1461,7 +1480,7 @@ VoltDB Studio | Web uses the following open source components:
  * jQuery UI 1.8.13
  *
  * Copyright 2011, AUTHORS.txt (http://jqueryui.com/about)
- * Dual licensed under the MIT or GPL Version 2 licenses.
+ * licensed under the MIT license.
  * http://jquery.org/license
  *
  * http://docs.jquery.com/UI
@@ -1534,9 +1553,8 @@ VoltDB Studio | Web uses the following open source components:
  *
  * Copyright (c) 2007 Jörn Zaefferer
  *
- * Dual licensed under the MIT and GPL licenses:
+ * Licensed under the MIT:
  *   http://www.opensource.org/licenses/mit-license.php
- *   http://www.gnu.org/licenses/gpl.html
  *
  * Revision: $Id: jquery.treeview.js 5759 2008-07-01 07:50:28Z joern.zaefferer $
  *
@@ -1558,8 +1576,7 @@ VoltDB Studio | Web uses the following open source components:
 //
 // Terms of Use
 //
-// This plugin is dual-licensed under the GNU General Public License
-//   and the MIT License and is copyright A Beautiful Site, LLC.
+// This plugin is licensed under the MIT License and is copyright A Beautiful Site, LLC.
 //
 
 --------------------------------------------------------------------------------
@@ -1757,7 +1774,8 @@ Avro 1.7.7 uses the following license:
 Licenses referred to by some above package license texts
 ================================================================================
 
-Apache License Version 2.0, January 2004http://www.apache.org/licenses/
+Apache License Version 2.0, January 2004
+http://www.apache.org/licenses/
 
 TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 1. Definitions.
@@ -2379,3 +2397,116 @@ DAMAGES.
                      END OF TERMS AND CONDITIONS
 
 ================================================================================
+NVD3 (Powered by D3)
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+================================================================================
+d3.js License
+http://opensource.org/licenses/BSD-3-Clause
+
+Copyright (c) 2012, Michael Bostock All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+The name Michael Bostock may not be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL MICHAEL BOSTOCK BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+================================================================================
+jQuery Cookie Plugin v1.4.1
+Site: https://github.com/carhartl/jquery-cookie 
+License Name: MIT license
+================================================================================
+jQuery Context Menu Plugin
+License Name: MIT License
+Site: http://abeautifulsite.net/2008/09/jquery-context-menu-plugin/
+================================================================================
+Simple Popup plugin for jQuery
+Site: http://plugins.jquery.com/popup/ 
+License Name: MIT License (MIT)
+License Url: https://github.com/Toddish/Popup/blob/master/LICENSE.md 
+================================================================================
+Slim scroll plugin for jQuery
+Site: http://rocha.la 
+License Name: MIT
+License Url: http://www.opensource.org/licenses/mit-license.php
+================================================================================
+Custom tooltip jQuery plugin
+License Name: MIT License
+License Url: http://opensource.org/licenses/MIT
+================================================================================
+jQuery Crypt
+Site url: http://www.itsyndicate.ca/jquery/ 
+http://www.jquery-plugins.info/jquery-crypt-00013584.htm
+License Url: http://www.opensource.org/licenses/mit-license.php
+================================================================================
+jQuery Validation Plugin
+Site url: http://jqueryvalidation.org/ 
+License Name: MIT License
+License url: http://en.wikipedia.org/wiki/MIT_License
+================================================================================
+iCheck Plugin
+Site url: http://fronteed.com/iCheck/ 
+License Name: MIT License
+License url: http://en.wikipedia.org/wiki/MIT_License
+================================================================================
+Eric Meyer's Reset CSS v2.0
+Site: http://meyerweb.com/eric/tools/css/reset/
+License: None http://www.cssreset.com/terms/
+===============================================================================
+bootstrap.js
+/* ===================================================
+ * bootstrap-transition.js v2.3.1
+ * http://twitter.github.com/bootstrap/javascript.html#transitions
+ * ===================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+===============================================================================
+jquery.tablesorter.js
+/*!
+* TableSorter 2.10.0 - Client-side table sorting with ease!
+* @requires jQuery v1.2.6+
+*
+* Copyright (c) 2007 Christian Bach
+* Examples and docs at: http://tablesorter.com
+* Dual licensed under the MIT and GPL licenses:
+* http://www.opensource.org/licenses/mit-license.php
+* http://www.gnu.org/licenses/gpl.html
+*
+* @type jQuery
+* @name tablesorter
+* @cat Plugins/Tablesorter
+* @author Christian Bach/christian.bach@polyester.se
+* @contributor Rob Garrison/https://github.com/Mottie/tablesorter
+*/
+/*jshint browser:true, jquery:true, unused:false, expr: true */
+/*global console:false, alert:false */
+===============================================================================
+
+

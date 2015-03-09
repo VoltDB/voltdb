@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -122,7 +123,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         GetPoolAllocations(24),
         GetUSOs(25),
         updateHashinator(27),
-        executeTask(28);
+        executeTask(28),
+        applyBinaryLog(29);
         Commands(final int id) {
             m_id = id;
         }
@@ -393,6 +395,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
                     continue;
                 }
+                if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {
+                    int dataLength = m_connection.readInt();
+                    String data = m_connection.readString(dataLength);
+                    byte[] decodedDecompressedData = Encoder.decodeBase64AndDecompressToBytes(data);
+                    m_data.clear();
+                    m_data.put(decodedDecompressedData);
+                    m_data.flip();
+                    m_connection.write();
+                    continue;
+                }
 
                 try {
                     checkErrorCode(status);
@@ -580,7 +592,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
-            final HashinatorConfig hashinatorConfig) {
+            final HashinatorConfig hashinatorConfig,
+            final boolean createDrReplicatedStream) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -606,7 +619,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_hostId,
                 m_hostname,
                 1024 * 1024 * tempTableMemory,
-                hashinatorConfig);
+                hashinatorConfig,
+                createDrReplicatedStream);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -639,7 +653,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final long tempTableMemory,
-            final HashinatorConfig hashinatorConfig)
+            final HashinatorConfig hashinatorConfig,
+            final boolean createDrReplicatedStream)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -653,6 +668,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
+        m_data.putInt(createDrReplicatedStream ? 1 : 0);
         m_data.putInt((short)hostname.length());
         m_data.put(hostname.getBytes(Charsets.UTF_8));
         try {
@@ -910,8 +926,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId, final long spHandle,
-            final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+            final long spHandle, final long lastCommittedSpHandle, final long uniqueId,
+            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -923,6 +940,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(uniqueId);
         m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
         m_data.putInt(shouldDRStream ? 1 : 0);
@@ -1411,6 +1429,27 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(config.type.typeId());
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
+        try {
+            m_data.flip();
+            m_connection.write();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId)
+    throws EEException
+    {
+        m_data.clear();
+        m_data.putInt(Commands.applyBinaryLog.m_id);
+        m_data.putLong(txnId);
+        m_data.putLong(spHandle);
+        m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(uniqueId);
+        m_data.put(log.array());
+
         try {
             m_data.flip();
             m_connection.write();

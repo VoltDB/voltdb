@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -60,8 +60,10 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
-    buffer << spacer << "IndexLookupType[" << m_lookup_type << "]\n";
-    buffer << spacer << "SortDirection[" << m_sort_direction << "]\n";
+    buffer << spacer << "IndexLookupType["
+           << indexLookupToString(m_lookup_type) << "]\n";
+    buffer << spacer << "SortDirection["
+           << sortDirectionToString(m_sort_direction) << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
     for (int ctr = 0, cnt = (int)m_searchkey_expressions.size(); ctr < cnt; ctr++) {

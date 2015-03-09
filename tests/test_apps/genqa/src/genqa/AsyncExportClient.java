@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -213,6 +213,7 @@ public class AsyncExportClient
         final int latencyTarget;
         final String [] parsedServers;
         final String procedure;
+        final boolean exportGroups;
 
         ConnectionConfig( AppHelper apph) {
             displayInterval = apph.longValue("displayinterval");
@@ -225,6 +226,7 @@ public class AsyncExportClient
             latencyTarget   = apph.intValue("latencytarget");
             procedure       = apph.stringValue("procedure");
             parsedServers   = servers.split(",");
+            exportGroups    = apph.booleanValue("exportgroups");
         }
     }
 
@@ -275,7 +277,8 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "Swap catalogs from the client", "true")
+                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
+                .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .setArguments(args)
             ;
 
@@ -367,7 +370,12 @@ public class AsyncExportClient
             waitForStreamedAllocatedMemoryZero(clientRef.get());
             System.out.println("Writing export count as: " + TrackingResults.get(0));
             //Write to export table to get count to be expected on other side.
-            clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
+            if (config.exportGroups) {
+                clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
+            }
+            else {
+                clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
+            }
             writer.close(true);
 
             // Now print application results:

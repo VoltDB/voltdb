@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -174,18 +174,22 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
     }
 
-
     @Override
     public void generateOutputSchema(Database db)
     {
+        // aggregate's output schema is pre-determined
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
-            // aggregate's output schema is pre-determined, don't touch
+
+            assert(m_hasSignificantOutputSchema);
         }
+<<<<<<< HEAD
         // Possible subquery expressions
         generateSubqueryExpressionOutputSchema(m_postPredicate, db);
         generateSubqueryExpressionOutputSchema(m_prePredicate, db);
         return;
+=======
+>>>>>>> VoltDB/master
     }
 
     @Override
@@ -300,10 +304,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
     public void addGroupByExpression(AbstractExpression expr)
     {
-        if (expr != null)
-        {
-            m_groupByExpressions.add((AbstractExpression) expr.clone());
+        if (expr == null) {
+            return;
         }
+        m_groupByExpressions.add((AbstractExpression) expr.clone());
     }
 
     @Override

@@ -9,7 +9,7 @@ INSERT INTO _table VALUES(-2,  'match',        88,            88.88);
 
 INSERT INTO _table VALUES(_id, _value[string], _value[int16 null20], _value[float]);
 
-{_optionallimitoffset |= "limit 1"}
+{_optionallimitoffset |= "limit 2"}
 {_optionallimitoffset |= "limit 1 offset 1"}
 --We don't support this -- is it standard SQL?
 --{_optionallimitoffset |= "        offset 1"}

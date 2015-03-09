@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -69,9 +69,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
@@ -106,8 +108,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
             deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
+                                           remoteDCLastIds,
                                            jsData, context, result,
-                                           exportSequenceNumbers, tracker,
+                                           exportSequenceNumbers,
+                                           drTupleStreamInfo,tracker,
                                            hashinatorData,
                                            timestamp,
                                            newPartitionCount);
@@ -225,10 +229,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
     private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
                                                              Map<Integer, Long> partitionTransactionIds,
+                                                             Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
                                                              JSONObject jsData,
                                                              SystemProcedureExecutionContext context,
                                                              VoltTable result,
                                                              Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                             Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp,
@@ -236,8 +242,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
-                        jsData, context, result, exportSequenceNumbers,
+                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, remoteDCLastIds,
+                        jsData, context, result, exportSequenceNumbers, drTupleStreamInfo,
                         tracker, hashinatorData, timestamp, newPartitionCount);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 

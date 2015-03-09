@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@
 
 package org.voltdb.iv2;
 
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -111,6 +112,7 @@ public class TestReplaySequencer {
         TransactionInfoBaseMessage frag2 = makeFragment(1L);
 
         result = dut.offer(1L, sntl);
+        try { dut.dump(1); } catch (Exception e) { fail(e.getMessage()); } // toString should not throw
         result = dut.offer(1L, frag);
         Assert.assertEquals(true, result);
         Assert.assertEquals(frag, dut.poll());
@@ -135,6 +137,7 @@ public class TestReplaySequencer {
         result = dut.offer(1L, frag);
         Assert.assertEquals(true, result);
         Assert.assertEquals(null, dut.poll());
+        try { dut.dump(1); } catch (Exception e) { fail(e.getMessage()); } // toString should not throw
 
         result = dut.offer(1L, sntl);
         Assert.assertEquals(true, result);

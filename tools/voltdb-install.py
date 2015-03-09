@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -291,8 +291,8 @@ URL: http://www.voltdb.com
 Provides: %(provides)s
 Conflicts: %(conflicts)s
 Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
-Requires: java >= 1:1.7.0
-Requires: java7-devel >= 1:1.7.0
+Requires: java-1.7.0-openjdk
+Requires: java-1.7.0-openjdk-devel
 Summary: VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
 Prefix: %(prefix)s
 
@@ -338,9 +338,6 @@ chmod +x %%{__perl_requires}
 %%post
 echo "To make a copy of the VoltDB sample programs run the command: cp -r %%{prefix}/share/%%{voltdbdir}/examples <your-new-examples-directory>"
 echo "Thanks for installing VoltDB!"
-
-%%preun
-%%include preuncmd
 
 %%postun
 # remove voltdb directory tree
