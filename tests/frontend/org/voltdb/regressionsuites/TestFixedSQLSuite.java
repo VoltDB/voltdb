@@ -1973,16 +1973,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         VoltTable vt;
 
-        // where desc in ?
-        //
-        // Cast parameter as an Object (not Object[]),
-        // and it's treated as a single array-typed parameter in the callee.
-        //
-        // VoltDB produces an error in this case, but this seems wrong:
-        //
-        verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, stringArgs);
-
         verifyProcFails(client, "Array / Scalar parameter mismatch",
                 "@AdHoc", adHocQueryWithListParam, stringArgs);
 

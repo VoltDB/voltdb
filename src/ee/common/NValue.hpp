@@ -957,7 +957,7 @@ class NValue {
     }
 
     /**
-     * Non-explicitly converting function to big integer type
+     * Implicitly converting function to big integer type
      * DOUBLE, DECIMAL should not be handled here
      */
     int64_t castAsBigIntAndGetValue() const {
@@ -983,7 +983,7 @@ class NValue {
     }
 
     /**
-     * Non-explicitly converting function to big integer type
+     * Implicitly converting function to integer type
      * DOUBLE, DECIMAL should not be handled here
      */
     int32_t castAsIntegerAndGetValue() const {

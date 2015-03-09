@@ -44,7 +44,9 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
 import org.hsqldb_voltpatches.types.NumberType;
+// End of VoltDB extension
 
 /**
  * Statement implementation for DML and base DQL statements.
