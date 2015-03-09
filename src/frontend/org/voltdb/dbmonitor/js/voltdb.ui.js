@@ -510,7 +510,7 @@ var loadPage = function (serverName, portid) {
                 openPopup($(this));
             });
 
-            $('.tblshutdown  >tbody > tr.activeHost > td > a').click(function () {
+            $('.tblshutdown  >tbody > tr.activeHost > td:first-child > a').click(function () {
                 var clickedServer = $(this).html();
                 var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').find("a").attr('data-hostid'));
                 var currentUrl = window.location.href.split('?')[0];
@@ -550,6 +550,7 @@ var loadPage = function (serverName, portid) {
                 afterOpen: function () {
                     $("#StopConfirmOK").unbind("click");
                     $("#StopConfirmOK").on("click", function () {
+                        
                         //API Request
                         try {
                             voltDbRenderer.stopServer(hostId, function (success, statusString) {
