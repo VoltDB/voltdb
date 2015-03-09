@@ -99,6 +99,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         preferencesTitle		{ $(class:"overlay-title", text:"Graph/Data Preferences") }
         savePreferencesBtn		{ $("#savePreference") }
         popupClose				{ $(class:"popup_close") }
+        server                  { module voltDBclusterserver}
         header          		{ module Header }
         footer          		{ module Footer }
     }
