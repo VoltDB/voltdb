@@ -266,8 +266,14 @@ public class AuthenticatedConnectionCache {
 
     private synchronized void closeClient(Client client)
     {
+        if (client == null) return;
+
         try {
             client.drain();
+        } catch (Exception ex) {
+            //DONTCARE
+        }
+        try {
             client.close();
         } catch (Exception ex) {
             //DONTCARE
@@ -279,30 +285,17 @@ public class AuthenticatedConnectionCache {
     {
         if (m_unauthClient != null)
         {
-            try {
-                m_unauthClient.drain();
-                m_unauthClient.close();
-                m_unauthClient = null;
-            } catch (InterruptedException ex) {
-            }
+            closeClient(m_unauthClient);
             m_unauthClient = null;
         }
         if (m_adminUnauthClient != null)
         {
-            try {
-                m_adminUnauthClient.drain();
-                m_adminUnauthClient.close();
-            } catch (InterruptedException ex) {
-            }
+            closeClient(m_adminUnauthClient);
             m_adminUnauthClient = null;
         }
         for (Entry<String, Connection> e : m_connections.entrySet())
         {
-            try {
-                e.getValue().client.drain();
-                e.getValue().client.close();
-            } catch (InterruptedException ex) {
-            }
+            closeClient(e.getValue().client);
         }
         m_connections.clear();
         m_connections = null;
@@ -317,12 +310,7 @@ public class AuthenticatedConnectionCache {
             for (Entry<String, Connection> e : m_connections.entrySet()) {
                 if (e.getValue().refCount <= 0) {
                     m_connections.remove(e.getKey());
-                    try {
-                        e.getValue().client.drain();
-                        e.getValue().client.close();
-                    } catch (InterruptedException ex) {
-                        throw new RuntimeException("Unable to close client from pool.", ex);
-                    }
+                    closeClient(e.getValue().client);
                     break; // from the for to continue the while
                 }
             }
