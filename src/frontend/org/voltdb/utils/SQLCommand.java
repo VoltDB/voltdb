@@ -183,24 +183,26 @@ public class SQLCommand
         }
     }
 
-    //TODO: If we can rework the interactive mode unit test framework, we can eliminate this
-    // unit test entry point and inline this code into interactWithTheUser.
-    // This would eliminate an extra layer of looping and needless bouncing
-    // out of and back into getInteractiveQueries for some kinds of input
-    // but not others.
     public static void getInteractiveQueries(SQLConsoleReader interactiveReader) throws Exception
     {
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
         m_returningToPromptAfterError = false;
-        final StringBuilder query = new StringBuilder();
+        final StringBuilder statement = new StringBuilder();
         boolean isRecall = false;
 
         while (true) {
             String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
             String line = interactiveReader.readLine(prompt);
-            assert(line != null);
+            if (line == null) {
+                // As strange as it seems, trying to pipe an empty file into stdin has been
+                // found to lead down this "interactive mode" code path.
+                // This suggests that a more reliable test is needed for "got stdin".
+                // Unfortunately, a "1>" prompt has already been sent to stdout.
+                // Cut our losses by rigging a quick exit.
+                line = "EXIT;";
+            }
 
             // Was there a line-ending semicolon typed at the prompt?
             // This mostly matters for "non-directive" statements.
@@ -209,7 +211,13 @@ public class SQLCommand
             // When we are tracking the progress of a multi-line statement,
             // avoid coincidentally recognizing mid-statement SQL content as sqlcmd
             // "directives".
-            if (query.length() == 0) {
+            if (statement.length() == 0) {
+
+                if (line.trim().equals("") || SQLParser.isWholeLineComment(line)) {
+                    // We don't strictly have to execute or append or recall
+                    // a blank line or whole-line comment when no statement is in progress.
+                    continue;
+                }
 
                 // EXIT command - exit immediately
                 if (SQLParser.isExitCommand(line)) {
@@ -242,9 +250,6 @@ public class SQLCommand
                     continue;
                 }
 
-                // handle statements that are converted to regular database commands
-                line = handleTranslatedCommands(line);
-
                 // If the line is a FILE command - execute the content of the file
                 FileInfo fileInfo = SQLParser.parseFileStatement(line);
                 if (fileInfo != null) {
@@ -258,7 +263,7 @@ public class SQLCommand
 
                 // else treat the input line as a regular database command
                 if (executeImmediate) {
-                    executeQuery(line + "\n");
+                    executeStatements(line + "\n");
                     if (m_testFrontEndOnly) {
                         break; // test mode expects this early return before end of input.
                     }
@@ -276,39 +281,24 @@ public class SQLCommand
                 // line editing (cursor positioning).
                 RecallableSessionLines.add(line);
                 if (executeImmediate) {
-                    query.append(line + "\n");
-                    executeQuery(query.toString());
+                    statement.append(line + "\n");
+                    executeStatements(statement.toString());
                     if (m_testFrontEndOnly) {
                         break; // test mode expects this early return before end of input.
                     }
-                    query.setLength(0);
+                    statement.setLength(0);
                     continue;
                 }
             }
 
             // Collect lines ...
-            query.append(line + "\n");
+            statement.append(line + "\n");
             //TODO: Here's where we might append to a separate buffer that uses
             // a single space rather than a newline as its separator to build up
             // a recallable multi-line statement.
         }
     }
 
-
-    /// Returns the original command, a replacement command, or null (on error).
-    private static String handleTranslatedCommands(String lineIn)
-    {
-        try {
-            return SQLParser.translateStatement(lineIn);
-        }
-        catch(SQLParser.Exception e) {
-            System.out.println(e.getMessage());
-        }
-
-        //* enable to debug */ if (lineOut != null && !lineOut.equals(lineIn)) System.err.printf("Translated: %s -> %s\n", lineIn, lineOut);
-
-        return lineIn;
-    }
 
     /// A stripped down variant of the processing in "interactWithTheUser" suitable for
     /// applying to a command script. It skips all the interactive-only options.
@@ -504,13 +494,17 @@ public class SQLCommand
      * as the "file" directive.
      *
      * @param fileInfo    Info on the file directive being processed
-     * @param currentLineReader  The current input stream, to be used for "here documents".
-     * @return A list of QueryInfo objects to send to the database
+     * @param parentLineReader  The current input stream, to be used for "here documents".
      */
     static void executeScriptFile(FileInfo fileInfo, SQLCommandLineReader parentLineReader)
     {
         LineReaderAdapter adapter = null;
         SQLCommandLineReader reader = null;
+
+        if ( ! m_interactive) {
+            System.out.println();
+            System.out.println(fileInfo.toString());
+        }
 
         if (fileInfo.getOption() == FileOption.INLINEBATCH) {
             // File command is a "here document" so pass in the current
@@ -549,9 +543,9 @@ public class SQLCommand
     private static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader)
             throws Exception {
 
-        StringBuilder query = new StringBuilder();
+        StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
-        // keep from throwing off diagnostic line numbers. So "query" may be non-empty even
+        // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even
         // when a sql statement has not yet started (?)
         boolean statementStarted = false;
         StringBuilder batch = fileInfo.isBatch() ? new StringBuilder() : null;
@@ -578,25 +572,42 @@ public class SQLCommand
             }
             if (line == null) {
                 // No more lines.  Execute whatever we got.
-                if (query.length() > 0) {
+                if (statement.length() > 0) {
                     if (batch == null) {
-                        executeQuery(query.toString());
+                        String statementString = statement.toString();
+                        // Trim here avoids a "missing statement" error from adhoc in an edge case
+                        // like a blank line from stdin.
+                        if ( ! statementString.trim().isEmpty()) {
+                            //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                            executeStatements(statementString);
+                        }
                     }
                     else {
                         // This means that batch did not end with a semicolon.
                         // Maybe it ended with a comment.
                         // For now, treat the final semicolon as optional and
                         // assume that we are not just adding a partial statement to the batch.
-                        batch.append(query);
-                        executeDDLBatch(fileInfo.getFile().getPath(), batch.toString());
+                        batch.append(statement);
+                        executeDDLBatch(fileInfo.getFilePath(), batch.toString());
                     }
                 }
                 return;
             }
 
             if ( ! statementStarted) {
+                if (line.trim().equals("") || SQLParser.isWholeLineComment(line)) {
+                    // We don't strictly have to include a blank line or whole-line
+                    // comment at the start of a statement, but when we want to preserve line
+                    // numbers (in a batch), we should at least append a newline.
+                    // Whether to echo comments or blank lines from a batch is
+                    // a grey area.
+                    if (batch != null) {
+                        statement.append(line).append("\n");
+                    }
+                    continue;
+                }
                 // Recursively process FILE commands, any failure will cause a recursive failure
-                FileInfo nestedFileInfo = SQLParser.parseFileStatement(line);
+                FileInfo nestedFileInfo = SQLParser.parseFileStatement(fileInfo, line);
                 if (nestedFileInfo != null) {
                     // Guards must be added for FILE Batch containing batches.
                     if (batch != null) {
@@ -624,47 +635,57 @@ public class SQLCommand
                     continue;
                 }
 
-                // returns the original command, or a replacement command, or throws.
-                line = SQLParser.translateStatement(line);
-
                 // TODO: This would be a reasonable place to validate that the line
-                // is blank/whitespace
-                // is a comment
-                // starts with exec/execute
-                // starts with a SQL command keyword.
+                // starts with a SQL command keyword, exec/execute or one of the other
+                // known commands.
                 // According to the current parsing rules that allow multi-statement
-                // stacking on a line, this would also have to be repeated after each
+                // stacking on a line (as an undocumented feature),
+                // this work would also have to be repeated after each
                 // non-quoted non-commented statement-splitting semicolon.
+                // See executeStatements.
             }
-            //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
 
             // Process normal @AdHoc commands which may be
             // multi-line-statement continuations.
-
-            query.append(line).append("\n");
+            statement.append(line).append("\n");
 
             // Check if the current statement ends here and now.
             if (SQLParser.isSemiColonTerminated(line)) {
                 if (batch == null) {
-                    executeQuery(query.toString());
-                    query.setLength(0);
+                    String statementString = statement.toString();
+                    // Trim here avoids a "missing statement" error from adhoc in an edge case
+                    // like a blank line from stdin.
+                    if ( ! statementString.trim().isEmpty()) {
+                        //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                        executeStatements(statementString);
+                    }
+                    statement.setLength(0);
                 }
                 statementStarted = false;
             }
-            else if ( ! statementStarted) {
-                // If the "query in progress" is only whitespace so far,
-                // directives are still fair game.
-                statementStarted = ( ! line.trim().equals("")) &&
-                        ! SQLParser.parseWholeLineComment(line);
-                // We don't strictly have to append a whole-line comment to query,
-                // but if we wanted to preserve line numbers, we could at least append a newline.
-                // Whether to echo comments is another grey area.
+            else {
+                // Disable directive processing until end of statement.
+                statementStarted = true;
             }
         }
     }
 
     private static long m_startTime;
-    private static void executeQuery(String statement)
+    // executeQueuedStatements is called instead of executeStatement because
+    // multiple semicolon-separated statements are allowed on a line and because
+    // using "line ends with semicolon" is not foolproof as a means of detecting
+    // the end of a statement. It could give a false negative for something as
+    // simple as an end-of-line comment.
+    //
+    private static void executeStatements(String statements)
+    {
+        List<String> parsedStatements = SQLParser.parseQuery(statements);
+        for (String statement: parsedStatements) {
+            executeStatement(statement);
+        }
+    }
+
+    private static void executeStatement(String statement)
     {
         if (m_testFrontEndOnly) {
             m_testFrontEndResult += statement;
@@ -672,7 +693,7 @@ public class SQLCommand
         }
         if ( ! m_interactive ) {
             System.out.println();
-            System.out.println(statement);
+            System.out.println(statement + ";");
         }
         try {
             // EXEC <procedure> <params>...
@@ -715,22 +736,32 @@ public class SQLCommand
                 return;
             }
 
-            String explainQuery = SQLParser.parseExplainCall(statement);
-            if (explainQuery != null) {
-                // We've got a query that starts with "explain", send the query to
+            String explainStatement = SQLParser.parseExplainCall(statement);
+            if (explainStatement != null) {
+                // We've got a statement that starts with "explain", send the statement to
                 // @Explain (after parseExplainCall() strips "explain").
-                printResponse(m_client.callProcedure("@Explain", explainQuery));
+                printResponse(m_client.callProcedure("@Explain", explainStatement));
                 return;
             }
 
-            String explainProcQuery = SQLParser.parseExplainProcCall(statement);
-            if (explainProcQuery != null) {
-                // We've got a query that starts with "explainproc", send the query to
-                // @Explain (after parseExplainCall() strips "explainproc").
-                // Clean up any extra spaces from between explainproc and the proc name.
-                explainProcQuery = explainProcQuery.trim();
-                printResponse(m_client.callProcedure("@ExplainProc", explainProcQuery));
+            String explainProcName = SQLParser.parseExplainProcCall(statement);
+            if (explainProcName != null) {
+                // We've got a statement that starts with "explainproc", send the statement to
+                // @ExplainProc (now that parseExplainProcCall() has stripped out "explainproc").
+                printResponse(m_client.callProcedure("@ExplainProc", explainProcName));
                 return;
+            }
+
+            // LOAD CLASS <jar>?
+            String loadPath = SQLParser.parseLoadClasses(statement);
+            if (loadPath != null) {
+                printResponse(m_client.callProcedure("@UpdateClasses", loadPath, null));
+            }
+
+            // REMOVE CLASS <class-selector>?
+            String classSelector = SQLParser.parseRemoveClasses(statement);
+            if (classSelector != null) {
+                printResponse(m_client.callProcedure("@UpdateClasses", null, classSelector));
             }
 
             // All other commands get forwarded to @AdHoc
@@ -742,7 +773,7 @@ public class SQLCommand
             else {
                 printResponse(m_client.callProcedure("@AdHoc", statement));
             }
-        } catch(Exception exc) {
+        } catch (Exception exc) {
             stopOrContinue(exc);
         }
     }
@@ -1255,9 +1286,12 @@ public class SQLCommand
                 //TODO: Someday we should honor batching.
                 m_interactive = false;
                 for (String query : queries) {
-                    executeQuery(query);
+                    executeStatement(query);
                 }
             }
+            //TODO: A more reliable test is needed for "got stdin".
+            // This one fails when trying to pipe an empty file into stdin,
+            // leading down the "interactive mode" code path.
             if (System.in.available() > 0) {
                 // If Standard input comes loaded with data, run in non-interactive mode
                 m_interactive = false;

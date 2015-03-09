@@ -1,14 +1,17 @@
-file scripts/batching/file_inlinebatch_simple.in
+
+FILE scripts/batching/file_inlinebatch_simple.in
+
+drop table t if exists;
 Command succeeded.
+
+create table t (i integer not null);
 Command succeeded.
+
+FILE -inlinebatch EOF
+
+partition table t on column i;
+create index tidx on t(i);
+
 Batch command succeeded.
-EXECUTION_PLAN                 
--------------------------------
-RETURN RESULTS TO STORED PROCEDURE
- RECEIVE FROM ALL PARTITIONS
-  SEND PARTITION RESULTS TO COORDINATOR
-   SEQUENTIAL SCAN of "T"
 
-
-(Returned 1 rows in #.##s)
-
+explain select * from t;

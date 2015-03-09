@@ -279,7 +279,7 @@ public class TestSqlCmdInterface
         SQLCommand.testFrontEndOnly();
         final String fileName = "./tests/frontend/org/voltdb/utils/localQry.txt";
         String fileCmd = "file " + fileName;
-        final FileInfo fileInfo = SQLParser.parseFileStatement(fileCmd);
+        final FileInfo fileInfo = SQLParser.parseFileStatement(null, fileCmd);
         final File sqlFile = fileInfo.getFile();
         assertTrue(sqlFile.exists());
         File matchFile = new File(fileName);
@@ -366,7 +366,7 @@ public class TestSqlCmdInterface
     public void testParseQueryProcedureCallParameters22() {
         ID = 22;
         String query = "select * from dummy";
-        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures) == null);
+        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query) == null);
     }
 
     @Test
@@ -418,7 +418,7 @@ public class TestSqlCmdInterface
     public void testParseQueryProcedureCallParameters25() {
         ID = 25;
         String query = "exec,, @SystemCatalog,,,,tables";
-        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures) == null);
+        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query) == null);
     }
 
     // To assert the help page printed by SQLCommand.printHelp() is identical to the
@@ -540,7 +540,7 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis2(String query, String cleanQryStr, int num, int testID) {
-        ExecuteCallResults results = SQLParser.parseExecuteCallWithoutParameterTypes(query, SQLCommand.Procedures);
+        ExecuteCallResults results = SQLParser.parseExecuteCallWithoutParameterTypes(query);
         assertNotNull(results);
         assertNotNull(results.procedure);
         assertFalse(results.procedure.isEmpty());
@@ -561,10 +561,10 @@ public class TestSqlCmdInterface
         ID = 50;
         FileInfo fileInfo = null;
 
-        fileInfo = SQLParser.parseFileStatement("FILE  -batch haha.sql;\n");
-        assertTrue(fileInfo.isBatch());
-
-        fileInfo = SQLParser.parseFileStatement("FILE haha.sql;\n");
+        fileInfo = SQLParser.parseFileStatement(null, "FILE  haha.sql;");
         assertFalse(fileInfo.isBatch());
+
+        fileInfo = SQLParser.parseFileStatement(fileInfo, "FILE -batch heehee.sql;");
+        assertTrue(fileInfo.isBatch());
     }
 }

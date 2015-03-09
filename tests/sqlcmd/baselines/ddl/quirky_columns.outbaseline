@@ -1,5 +1,7 @@
--- try column names at the start of lines that start with sqlcmd command keywords.
+
 drop table prefixes if exists;
+Command succeeded.
+
 create table prefixes (
  help_name integer,
  goFish integer,
@@ -17,42 +19,44 @@ create table prefixes (
  truncate_from_sql integer,
  exec_like_a_proc integer,
  );
-select * from prefixes;
-drop table prefixes;
+Command succeeded.
 
--- more challenging column names at the start of lines that are just sqlcmd command keywords.
+select * from prefixes;
+HELP_NAME  GOFISH  EXITSTRATEGY  LISTLIST  RECALLRECALL  FILE_NAME  CREATE_FROM_SQL  ALTER_FROM_SQL  DROP_FROM_SQL  INSERT_FROM_SQL  SELECT_FROM_SQL  UPDATE_FROM_SQL  DELETE_FROM_SQL  TRUNCATE_FROM_SQL  EXEC_LIKE_A_PROC 
+---------- ------- ------------- --------- ------------- ---------- ---------------- --------------- -------------- ---------------- ---------------- ---------------- ---------------- ------------------ -----------------
+
+(Returned 0 rows in #.##s)
+
+drop table prefixes;
+Command succeeded.
+
 drop table raw if exists;
+Command succeeded.
+
 create table raw (
  help integer,
  go integer,
  exit integer,
  list integer,
  recall integer,
--- file integer, -- SOME DAY SOON?
--- create integer, MAYBE? some day?
+
+
  alter integer,
--- drop integer, MAYBE? some day?
+
  insert integer,
--- select integer, MAYBE? some day?
+
  update integer,
  delete integer,
  truncate integer,
  exec integer,
  );
-select * from raw;
-drop table raw;
 Command succeeded.
-Command succeeded.
-HELP_NAME  GOFISH  EXITSTRATEGY  LISTLIST  RECALLRECALL  FILE_NAME  CREATE_FROM_SQL  ALTER_FROM_SQL  DROP_FROM_SQL  INSERT_FROM_SQL  SELECT_FROM_SQL  UPDATE_FROM_SQL  DELETE_FROM_SQL  TRUNCATE_FROM_SQL  EXEC_LIKE_A_PROC 
----------- ------- ------------- --------- ------------- ---------- ---------------- --------------- -------------- ---------------- ---------------- ---------------- ---------------- ------------------ -----------------
 
-(Returned 0 rows in #.##s)
-Command succeeded.
-Command succeeded.
-Command succeeded.
+select * from raw;
 HELP  GO  EXIT  LIST  RECALL  ALTER  INSERT  UPDATE  DELETE  TRUNCATE  EXEC 
 ----- --- ----- ----- ------- ------ ------- ------- ------- --------- -----
 
 (Returned 0 rows in #.##s)
-Command succeeded.
 
+drop table raw;
+Command succeeded.

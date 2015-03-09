@@ -207,7 +207,7 @@ public class SQLParser extends SQLPatternFactory
             "([\\w$.]+)" +                          // (1) class name or procedure name
             "(\\s+IF EXISTS)?" +                    // (2) <optional IF EXISTS>
             "\\s*" +                                // zero or more spaces
-            ";" +                                   // semi-colon terminator
+            ";" +                                   // semicolon terminator
             "\\z"                                   // end of statement
             );
 
@@ -318,33 +318,28 @@ public class SQLParser extends SQLPatternFactory
 
     private static final Pattern OneWhitespace = Pattern.compile("\\s");
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
-    private static final Pattern SingleLineComments = Pattern.compile(
-            "^\\s*" +         // optional whitespace indent prior to comment
-            "(?:\\/\\/|--)" + //  '--' or even C++-style '//' comment starter
-            ".*$",            // commented out text continues to end of line
-            Pattern.MULTILINE);
-    private static final Pattern MidlineComments = Pattern.compile(
+    private static final String EndOfLineCommentPatternString =
             "(?:\\/\\/|--)" + // '--' or even C++-style '//' comment starter
-            ".*$",            // commented out text continues to end of line
+            ".*$";            // commented out text continues to end of line
+    private static final Pattern OneWholeLineComment = Pattern.compile(
+            "^\\s*" +                       // optional whitespace indent prior to comment
+            EndOfLineCommentPatternString); // commented out text continues to end of line
+    private static final Pattern AnyWholeLineComments = Pattern.compile(
+            "^\\s*" +                      // optional whitespace indent prior to comment
+            EndOfLineCommentPatternString, // commented out text continues to end of line
             Pattern.MULTILINE);
-    private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
-
-    /**
-     * Matches a command followed by and SQL CRUD statement verb
-     */
-    private static final Pattern ParserStringKeywords = Pattern.compile(
-            "\\s*" +                                          // 0 or more spaces
-            "(" +                                             // start group 1
-              "exec|execute|explain|explainproc" +            // command
-            ")" +                                             // end group 1
-            "\\s+" +                                          // one or more spaces
-            "(" +                                             // start group 2
-              "select|insert|update|upsert|delete|truncate" + // SQL CRUD statement verb
-            ")" +                                             // end group 2
-            "\\s+", // one or more spaces
-            Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
-
+    private static final Pattern EndOfLineComment = Pattern.compile(
+            EndOfLineCommentPatternString,
+            Pattern.MULTILINE);
+    private static final Pattern SingleQuotedString = Pattern.compile("'[^']*'", Pattern.MULTILINE);
+    private static final Pattern SingleQuotedStringContainingParameterSeparators =
+            Pattern.compile(
+            "'" +
+            "[^',\\s]*" +  // arbitrary string content NOT matching param separators
+            "[,\\s]" +     // the first match for a param separator
+            "[^']" +       // arbitrary string content
+            "'",           // end of string OR start of escaped quote
+            Pattern.MULTILINE);
     // HELP can support sub-commands someday. Capture group 1 is the sub-command.
     private static final Pattern HelpToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
@@ -390,10 +385,9 @@ public class SQLParser extends SQLPatternFactory
             Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile(
             "^.*" +           // match anything
-            //FIXME: simplify -- a prior .* starves out this next optional pattern
-            "\\s*" +          // optional whitespace
             ";+" +            // one required semicolon at end except for
-            "\\s*$",          // optional terminating whitespace
+            "\\s*" +          // optional whitespace
+            "(--)?$",         // and an optional end-of-line comment
             Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile(
             "^\\s*" +      // optional indent at start of line
@@ -427,12 +421,12 @@ public class SQLParser extends SQLPatternFactory
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern DashInlineBatchToken = Pattern.compile(
-            "\\s+" +        // required preceding whitespace
+            "\\s+" +         // required preceding whitespace
             "-inlinebatch",  // -inlinebatch option, whitespace terminated
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern FilenameToken = Pattern.compile(
-            "\\s+" +        // required preceding whitespace
+            "\\s+" +       // required preceding whitespace
             "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
             "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
             "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
@@ -449,19 +443,34 @@ public class SQLParser extends SQLPatternFactory
             Pattern.CASE_INSENSITIVE);
 
     // Query Execution
-    private static final Pattern ExecuteCall = Pattern.compile(
-            "^" +                   //TODO: allow indent at start of line -- or is input always trimmed?
-            "(?:exec|execute)\\s+", // required command or alias whitespace terminated non-grouping
+    private static final Pattern ExecuteCallPreamble = Pattern.compile(
+            "^\\s*" +            // optional indent at start of line
+            "(?:exec|execute)" + // required command or alias non-grouping
+            "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that exec command
+            // diagnostics can "own" any line starting with the word
+            // exec or execute.
+            "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
-    private static final Pattern ExplainCall = Pattern.compile(
-            "^" +           //TODO: allow indent at start of line -- or is input always trimmed?
-            "explain\\s+",  // required command, whitespace terminated
+    private static final Pattern ExplainCallPreamble = Pattern.compile(
+            "^\\s*" +            // optional indent at start of line
+            "explain\\s+" +      // required command, whitespace terminated
+            "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that explain command
+            // diagnostics can "own" any line starting with the word
+            // explain.
+            "\\s*",
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
-    private static final Pattern ExplainProcCall = Pattern.compile(
-            "^" +              //TODO: allow indent at start of line -- or is input always trimmed?
-            "explainProc\\s+", // required command, whitespace terminated
+    private static final Pattern ExplainProcCallPreamble = Pattern.compile(
+            "^\\s*" +            // optional indent at start of line
+            "explainProc" +      // required command, whitespace terminated
+            "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that explainproc command
+            // diagnostics can "own" any line starting with the word
+            // explainproc.
+            "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -476,7 +485,7 @@ public class SQLParser extends SQLPatternFactory
                                                   .build();
 
     // The argument capture group for LOAD/REMOVE CLASSES loosely captures everything
-    // through the trailing semi-colon. It relies on post-parsing code to make sure
+    // through the trailing semicolon. It relies on post-parsing code to make sure
     // the argument is reasonable.
     // Capture group 1 for LOAD CLASSES is the jar file.
     private static final SingleArgumentCommandParser loadClassesParser =
@@ -811,53 +820,63 @@ public class SQLParser extends SQLPatternFactory
 
         //* enable to debug */ System.err.println("Parsing command queue:\n" + query);
         /*
-         * Mark any parser string keyword matches by interposing the #SQL_PARSER_STRING_KEYWORD#
-         * tag. Which is later stripped at the end of this procedure. This tag is here to
-         * aide the evaluation of SetOp and AutoSplit REGEXPs, meaning that an
-         * 'explain select foo from bar will cause SetOp and AutoSplit match on the select as
-         * is prefixed with the #SQL_PARSER_STRING_KEYWORD#
-         *
-         * For example
-         *     'explain select foo from bar'
-         *  becomes
-         *     'explain #SQL_PARSER_STRING_KEYWORD#select foo from bar'
+         * Here begins the struggle between honoring comment characters and
+         * honoring single quotes and honoring semicolons as statement separators.
          */
-        query = ParserStringKeywords.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-        /*
-         * strip out single line comments
+        /* For example, whole-line comments are eliminated early -- assumed
+         * never to be part of text literals, even though a text literal could
+         * have been started on a prior line and could optionally be ended
+         * with a quote on the current line and optionally followed by a
+         * statement-ending semicolon all within the supposed comment line.
          */
-        query = SingleLineComments.matcher(query).replaceAll("");
+        query = AnyWholeLineComments.matcher(query).replaceAll("");
+
         /*
          * replace all escaped single quotes with the #(SQL_PARSER_ESCAPE_SINGLE_QUOTE) tag
          */
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
 
         /*
-         * move all single quoted strings into the string fragments list, and do in place
+         * Move all single quoted strings into the string fragments list, and do in place
          * replacements with numbered instances of the #(SQL_PARSER_STRING_FRAGMENT#[n]) tag
          *
+         * This will find a quote (perhaps an informal apostrophe) in an
+         * end-of-line comment and take it as the start of a quoted string,
+         * hiding everything between it and the next quote as literal text,
+         * including any semicolons or comment starters in between.
+         * Properly preserving semicolons and recognizing all comment
+         ^ boundaries is tricky, especially in a way that preserves
+         * quoted literals that contain "--", even literals that may be
+         * started and/or terminated on a different line from the "--".
+         * I (--paul) would find it comforting to rely on some interface
+         * to HSQL parser technology for this,
+         * for the sake of consistency even if not for absolute correctness.
+         * Did Steve really claim to have already solved this problem?
          */
-        Matcher stringFragmentMatcher = Extract.matcher(query);
+        Matcher stringFragmentMatcher = SingleQuotedString.matcher(query);
         ArrayList<String> stringFragments = new ArrayList<String>();
         int i = 0;
         while (stringFragmentMatcher.find()) {
             stringFragments.add(stringFragmentMatcher.group());
             query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
-            stringFragmentMatcher = Extract.matcher(query);
+            stringFragmentMatcher = SingleQuotedString.matcher(query);
             i++;
         }
 
-        // strip out inline comments
-        // At the point, all the quoted strings have been pulled out of the code because they may contain semicolons
-        // and they will not be restored until after the split. So any user's quoted string will be safe here.
-        query = MidlineComments.matcher(query).replaceAll("");
+        // Strip out inline comments
+        // At this point, all the quoted strings have been pulled out of the
+        // code mostly because they may contain semicolons.
+        // They will not be restored until after the split.
+        // So any user's quoted string containing ';' will be safe here.
+        // OTOH, this next line MAY eliminate blocks of code after any
+        // end-on-line comment that contains an unbalanced quote until
+        // the following quote.
+        query = EndOfLineComment.matcher(query).replaceAll("");
 
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
         for (String fragment : sqlFragments) {
-            fragment = SingleLineComments.matcher(fragment).replaceAll("");
-            fragment = fragment.trim();
             if (fragment.isEmpty()) {
                 continue;
             }
@@ -869,52 +888,59 @@ public class SQLParser extends SQLPatternFactory
                 }
             }
             fragment = fragment.replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
-            fragment = fragment.replace("#SQL_PARSER_STRING_KEYWORD#","");
             queries.add(fragment);
         }
         return queries;
     }
 
-    public static List<String> parseProcedureCallParameters(String query)
+    // Process the quirky syntax for "exec" arguments -- a procedure name and
+    // parameter values (optionally SINGLE-quoted) separated by arbitrary
+    // whitespace and commas.
+    // Assumes that this is the exact text between the "exec/execute" and
+    // its terminating semicolon (exclusive) and that
+    // to the extent that comments are supported they have already been stripped out.
+    private static List<String> parseExecParameters(String paramText)
     {
-        if (query == null) {
-            return null;
+        final String SafeParamStringValuePattern = "#(SQL_PARSER_SAFE_PARAMSTRING)";
+        paramText = paramText.trim();
+        // Mask out strings that contain whitespace or commas
+        // that must not be confused with parameter separators.
+        ArrayList<String> originalString = new ArrayList<>();
+        Matcher stringMatcher = SingleQuotedStringContainingParameterSeparators.matcher(paramText);
+        while (stringMatcher.find()) {
+            originalString.add(stringMatcher.group());
+            paramText = stringMatcher.replaceFirst(SafeParamStringValuePattern);
+            stringMatcher = SingleQuotedStringContainingParameterSeparators.matcher(paramText);
         }
-
-        query = SingleLineComments.matcher(query).replaceAll("");
-        query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
-        Matcher stringFragmentMatcher = Extract.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
-        int i = 0;
-        while (stringFragmentMatcher.find()) {
-            stringFragments.add(stringFragmentMatcher.group());
-            query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
-            stringFragmentMatcher = Extract.matcher(query);
-            i++;
-        }
-        query = AutoSplitParameters.matcher(query).replaceAll(",");
-        String[] sqlFragments = query.split("\\s*,+\\s*");
-        ArrayList<String> queries = new ArrayList<String>();
-        for (int j = 0; j<sqlFragments.length; j++) {
-            sqlFragments[j] = sqlFragments[j].trim();
-            if (sqlFragments[j].length() != 0) {
-                if (sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                    for (int k = 0; k<stringFragments.size(); k++) {
-                        sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
-                    }
-                }
-                sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
-                sqlFragments[j] = sqlFragments[j].trim();
-                queries.add(sqlFragments[j]);
+        ArrayList<String> params = new ArrayList<String>();
+        int subCount = 0;
+        int neededSubs = originalString.size();
+        // Split the params at the separators
+        for (String fragment : paramText.split("[\\s,]+")) {
+            if (fragment.isEmpty()) {
+                continue; // ignore effects of leading or trailing separators
             }
+            // Replace each substitution in order exactly once.
+            if (subCount < neededSubs) {
+                // Substituted strings will normally take up an entire parameter,
+                // but some cases like parameters containing escaped single quotes
+                // may require multiple serial substitutions.
+                while (fragment.indexOf(SafeParamStringValuePattern) > -1) {
+                    fragment = fragment.replace(SafeParamStringValuePattern,
+                            originalString.get(subCount));
+                    ++subCount;
+                }
+            }
+            params.add(fragment);
         }
-        return queries;
+        assert(subCount == neededSubs);
+        return params;
     }
 
     /**
-     * Check for statement terminated by semi-colon.
+     * Check whether statement is terminated by semicolon.
      * @param statement  statement to check
-     * @return           true if it is terminated by a semi-colon
+     * @return           true if it is terminated by a semicolon
      */
     public static boolean isSemiColonTerminated(String statement)
     {
@@ -1018,21 +1044,34 @@ public class SQLParser extends SQLPatternFactory
      * to sqlcmd's "file" command
      */
     static public enum FileOption {
-        PLAIN,
-        BATCH,
-        INLINEBATCH
+        PLAIN {
+            @Override
+            String optionString() { return ""; }
+        },
+        BATCH {
+            @Override
+            String optionString() { return "-batch "; }
+        },
+        INLINEBATCH {
+            @Override
+            String optionString() { return "-inlinebatch "; }
+        };
+
+        abstract String optionString();
     }
 
     /**
      * This class encapsulates information produced by
      * parsing sqlcmd's "file" command.
      */
-    public static final class FileInfo {
+    public static class FileInfo {
+        private final FileInfo m_context;
         private final FileOption m_option;
         private final File m_file;
         private final String m_delimiter;
 
-        FileInfo(FileOption option, String filenameOrDelimiter) {
+        FileInfo(FileInfo context, FileOption option, String filenameOrDelimiter) {
+            m_context = context;
             m_option = option;
             switch (option) {
             case PLAIN:
@@ -1043,18 +1082,46 @@ public class SQLParser extends SQLPatternFactory
             case INLINEBATCH:
             default:
                 assert(option == FileOption.INLINEBATCH);
+                assert(m_context != null);
                 m_file = null;
                 m_delimiter = filenameOrDelimiter;
                 break;
             }
         }
 
+        // special case constructor for System.in.
+        private FileInfo() {
+            m_context = null;
+            m_option = FileOption.PLAIN;
+            m_file = null;
+            m_delimiter = null;
+        }
+
         /** @return a dummy FileInfo instance to describe System.in **/
-        public static FileInfo forSystemIn()
-        { return new FileInfo(FileOption.PLAIN, "Standard Input"); }
+        public static FileInfo forSystemIn() {
+            return new FileInfo() {
+                @Override
+                public String getFilePath() {
+                    return "(standard input)";
+                }
+            };
+        }
 
         public File getFile() {
             return m_file;
+        }
+
+        public String getFilePath() {
+            switch (m_option) {
+            case PLAIN:
+            case BATCH:
+                return m_file.getPath();
+            case INLINEBATCH:
+            default:
+                assert(m_option == FileOption.INLINEBATCH);
+                return "(inline batch delimited by '" + m_delimiter +
+                        "' in " + m_context.getFilePath() + ")";
+            }
         }
 
         public String getDelimiter() {
@@ -1073,18 +1140,18 @@ public class SQLParser extends SQLPatternFactory
 
         @Override
         public String toString() {
-            return "FILE command: " + m_option.name() +
-                    ", file: \"" + m_file.getName() +
-                    "\", delimiter: " + m_delimiter;
+            return "FILE " + m_option.optionString() +
+                    ((m_file != null) ? m_file.toString() : m_delimiter);
         }
     }
 
     /**
      * Parse FILE statement for sqlcmd.
+     * @param fileInfo
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static FileInfo parseFileStatement(String statement)
+    public static FileInfo parseFileStatement(FileInfo parentContext, String statement)
     {
         Matcher fileMatcher = FileToken.matcher(statement);
 
@@ -1106,7 +1173,7 @@ public class SQLParser extends SQLPatternFactory
             // all of the remainder, not just beginning
             if (delimiterMatcher.matches()) {
                 String delimiter = delimiterMatcher.group(1);
-                return new FileInfo(FileOption.INLINEBATCH, delimiter);
+                return new FileInfo(parentContext, FileOption.INLINEBATCH, delimiter);
             }
 
             throw new SQLParser.Exception(
@@ -1141,7 +1208,11 @@ public class SQLParser extends SQLPatternFactory
             throw new SQLParser.Exception(msg);
         }
 
-        return new FileInfo(option, filename);
+        return new FileInfo(parentContext, option, filename);
+    }
+    public static FileInfo parseFileStatement(String statement)
+    {
+        return parseFileStatement(null, statement);
     }
 
     /**
@@ -1212,7 +1283,6 @@ public class SQLParser extends SQLPatternFactory
      */
     public static class ExecuteCallResults
     {
-        public String query = null;
         public String procedure = null;
         public List<String> params = null;
         public List<String> paramTypes = null;
@@ -1333,7 +1403,8 @@ public class SQLParser extends SQLPatternFactory
             String statement,
             Map<String,Map<Integer, List<String>>> procedures) throws SQLParser.Exception
     {
-        return parseExecuteCallInternal(statement, procedures, false);
+        assert(procedures != null);
+        return parseExecuteCallInternal(statement, procedures);
     }
 
     /**
@@ -1344,10 +1415,9 @@ public class SQLParser extends SQLPatternFactory
      * @throws SQLParser.Exception
      */
     public static ExecuteCallResults parseExecuteCallWithoutParameterTypes(
-            String statement,
-            Map<String,Map<Integer, List<String>>> procedures) throws SQLParser.Exception
+            String statement) throws SQLParser.Exception
     {
-        return parseExecuteCallInternal(statement, procedures, true);
+        return parseExecuteCallInternal(statement, null);
     }
 
     /**
@@ -1359,45 +1429,51 @@ public class SQLParser extends SQLPatternFactory
      * @throws SQLParser.Exception
      */
     private static ExecuteCallResults parseExecuteCallInternal(
-            String statement,
-            Map<String,Map<Integer, List<String>>> procedures,
-            boolean mockTypes) throws SQLParser.Exception
+            String statement, Map<String,Map<Integer, List<String>>> procedures
+            ) throws SQLParser.Exception
     {
-        Matcher matcher = ExecuteCall.matcher(statement);
-        if (matcher.find()) {
-            ExecuteCallResults results = new ExecuteCallResults();
-            results.query = matcher.replaceFirst("");
-            results.params = parseProcedureCallParameters(results.query);
-            results.procedure = results.params.remove(0);
-            // TestSqlCmdInterface doesn't need/want the param types
-            if (mockTypes) {
-                // Mock everything as integer.
-                results.paramTypes = new ArrayList<String>(results.params.size());
-                for (int i = 0; i < results.params.size(); ++i) {
-                    results.paramTypes.add("integer");
-                }
-            }
-            else {
-                Map<Integer, List<String>> signature = procedures.get(results.procedure);
-                if (signature == null) {
-                    throw new SQLParser.Exception("Undefined procedure: %s", results.procedure);
-                }
-
-                results.paramTypes = signature.get(results.params.size());
-                if (results.paramTypes == null || results.params.size() != results.paramTypes.size()) {
-                    String expectedSizes = "";
-                    for (Integer expectedSize : signature.keySet()) {
-                        expectedSizes += expectedSize + ", ";
-                    }
-                    throw new SQLParser.Exception(
-                            "Invalid parameter count for procedure: %s (expected: %s received: %d)",
-                            results.procedure, expectedSizes, results.params.size());
-                }
-            }
-
+        Matcher matcher = ExecuteCallPreamble.matcher(statement);
+        if ( ! matcher.lookingAt()) {
+            return null;
+        }
+        String commandWordTerminator = matcher.group(1);
+        if (OneWhitespace.matcher(commandWordTerminator).matches() ||
+                // Might as well accept a comma delimiter anywhere in the exec command,
+                // even near the start
+                commandWordTerminator.equals(",")) {
+        ExecuteCallResults results = new ExecuteCallResults();
+        results.params = parseExecParameters(statement.substring(matcher.end()));
+        results.procedure = results.params.remove(0);
+        // TestSqlCmdInterface passes procedures==null because it
+        // doesn't need/want the param types.
+        if (procedures == null) {
+            results.paramTypes = null;
             return results;
         }
-        return null;
+        Map<Integer, List<String>> signature = procedures.get(results.procedure);
+        if (signature == null) {
+            throw new SQLParser.Exception("Undefined procedure: %s", results.procedure);
+        }
+
+        results.paramTypes = signature.get(results.params.size());
+        if (results.paramTypes == null || results.params.size() != results.paramTypes.size()) {
+            String expectedSizes = "";
+            for (Integer expectedSize : signature.keySet()) {
+                expectedSizes += expectedSize + ", ";
+            }
+            throw new SQLParser.Exception(
+                    "Invalid parameter count for procedure: %s (expected: %s received: %d)",
+                    results.procedure, expectedSizes, results.params.size());
+            }
+            return results;
+        }
+        if (commandWordTerminator.equals(";")) {
+            // EOL or ; reached before subcommand
+            throw new SQLParser.Exception(
+                    "Incomplete EXECUTE command. EXECUTE requires a procedure name argument.");
+        }
+        throw new SQLParser.Exception(
+                "Invalid EXECUTE command. unexpected input: '" + commandWordTerminator + "'.");
     }
 
     /**
@@ -1407,10 +1483,9 @@ public class SQLParser extends SQLPatternFactory
      */
     public static String parseExplainCall(String statement)
     {
-        if (ExplainCall.matcher(statement).find()) {
-            // This all could probably be done more elegantly via a group extracted
-            // from a more comprehensive regexp.
-            String query = statement.substring("explain ".length());
+        Matcher matcher = ExplainCallPreamble.matcher(statement);
+        if (matcher.lookingAt()) {
+            String query = statement.substring(matcher.end());
             return query;
         }
         return null;
@@ -1419,17 +1494,18 @@ public class SQLParser extends SQLPatternFactory
     /**
      * Parse EXPLAINPROC <procedure>
      * @param statement  statement to parse
-     * @return           query parameter string or NULL if statement wasn't recognized
+     * @return           procedure name parameter string or NULL if statement wasn't recognized
      */
     public static String parseExplainProcCall(String statement)
     {
-        if (ExplainProcCall.matcher(statement).find()) {
+        Matcher matcher = ExplainProcCallPreamble.matcher(statement);
+        if (matcher.lookingAt()) {
             // This all could probably be done more elegantly via a group extracted
             // from a more comprehensive regexp.
-            String query = statement.substring("explainProc ".length());
-            // Clean up any extra spaces from between explainproc and the proc name.
-            query = query.trim();
-            return query;
+            String procName = statement.substring(matcher.end());
+            // Clean up any extra spaces around the proc name.
+            procName = procName.trim();
+            return procName;
         }
         return null;
     }
@@ -1445,38 +1521,46 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Handle internally translated commands.
      * @param statement  input statement
-     * @return           translated statement (may be unchanged)
-     * @throws SQLParser.Exception
+     * @return           jar file path argument, or null if statement is not "LOAD CLASSES"
+     * @throws SQLParser.Exception if the LOAD CLASSES argument is not a valid file path.
      */
-    public static String translateStatement(String statement) throws SQLParser.Exception
+    public static String parseLoadClasses(String statement) throws SQLParser.Exception
     {
-        // LOAD CLASS <jar>?
         String arg = loadClassesParser.parse(statement);
-        if (arg != null) {
-            if (! new File(arg).isFile()) {
-                throw new SQLParser.Exception("Jar file not found: %s", arg);
-            }
-            return String.format("exec @UpdateClasses '%s', NULL;", arg);
+        if (arg == null) {
+            return null;
         }
-
-        // REMOVE CLASS <class-selector>?
-        arg = removeClassesParser.parse(statement);
-        if (arg != null) {
-            // reject obviously bad class selectors
-            if (!ClassSelectorToken.matcher(arg).matches()) {
-                throw new SQLParser.Exception("Bad characters in class selector: %s", arg);
-            }
-            return String.format("exec @UpdateClasses NULL, '%s';", arg);
+        if (! new File(arg).isFile()) {
+            throw new SQLParser.Exception("Jar file not found: '" + arg + "'");
         }
-
-        // None of the above - return the untranslated input command.
-        return statement;
+        return arg;
     }
 
-    public static boolean parseWholeLineComment(String line) {
-        return SingleLineComments.matcher(line).matches();
+    /**
+     * @param statement  input statement
+     * @return           class selector argument, or null if statement is not "REMOVE CLASSES"
+     * @throws SQLParser.Exception if the REMOVE CLASSES argument is not a valid class selector.
+     */
+    public static String parseRemoveClasses(String statement) throws SQLParser.Exception
+    {
+        String arg = removeClassesParser.parse(statement);
+        if (arg == null) {
+            return null;
+        }
+        // reject obviously bad class selectors
+        if (!ClassSelectorToken.matcher(arg).matches()) {
+            throw new SQLParser.Exception("Invalid class selector: '" + arg + "'");
+        }
+        return arg;
+    }
+
+    /**
+     * @param line
+     * @return true if the input contains only a SQL line comment with optional indent.
+     */
+    public static boolean isWholeLineComment(String line) {
+        return OneWholeLineComment.matcher(line).matches();
     }
 
     /**
@@ -1487,8 +1571,10 @@ public class SQLParser extends SQLPatternFactory
      *
      * @param batch  A SQL string containing multiple statements separated by semicolons
      * @return true if the first keyword of the first statement is a DDL verb
-     *     like CREATE, ALTER, DROP, PARTITION, or EXPORT, or if the
-     *     batch is empty.
+     *     like CREATE, ALTER, DROP, PARTITION, DR, or EXPORT,
+     *     or if the batch is empty.
+     *     See the official list of DDL verbs in the "// Supported verbs" section of
+     *     the static initializer for SQLLexer.VERB_TOKENS)
      */
     public static boolean appearsToBeValidDDLBatch(String batch) {
 
@@ -1496,8 +1582,9 @@ public class SQLParser extends SQLPatternFactory
         String line;
         try {
             while ((line = reader.readLine()) != null) {
-
-                line = SingleLineComments.matcher(line).replaceAll("");
+                if (isWholeLineComment(line)) {
+                    continue;
+                }
                 line = line.trim();
                 if (line.equals(""))
                     continue;
