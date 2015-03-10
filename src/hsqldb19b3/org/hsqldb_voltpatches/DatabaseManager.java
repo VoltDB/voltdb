@@ -85,7 +85,13 @@ public class DatabaseManager {
     static final HashMap resDatabaseMap = new HashMap();
 
     /** id number to Database for Databases currently in registry */
+    // A VoltDB extension to work around ENG-6044
+    /* disable 1 line ...
     static final IntKeyHashMap databaseIDMap = new IntKeyHashMap();
+       ... disabled 1 line */
+    static final java.util.HashMap<Integer, Database> databaseIDMap =
+            new java.util.HashMap<Integer, Database>();
+    // End of VoltDB extension
 
     /**
      * Returns a vector containing the URI (type + path) for all the databases.
@@ -93,7 +99,12 @@ public class DatabaseManager {
     public static Vector getDatabaseURIs() {
 
         Vector   v  = new Vector();
+        // A VoltDB extension to work around ENG-6044
+        /* disable 1 line ...
         Iterator it = databaseIDMap.values().iterator();
+           ... disabled 1 line */
+        java.util.Iterator<Database> it = databaseIDMap.values().iterator();
+        // End of VoltDB extension
 
         while (it.hasNext()) {
             Database db = (Database) it.next();
@@ -114,7 +125,12 @@ public class DatabaseManager {
      */
     public static void closeDatabases(int mode) {
 
+        // A VoltDB extension to work around ENG-6044
+        /* disable 1 line ...
         Iterator it = databaseIDMap.values().iterator();
+           ... disabled 1 line */
+        java.util.Iterator<Database> it = databaseIDMap.values().iterator();
+        // End of VoltDB extension
 
         while (it.hasNext()) {
             Database db = (Database) it.next();
