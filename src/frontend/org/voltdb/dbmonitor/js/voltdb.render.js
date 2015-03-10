@@ -296,10 +296,10 @@ function alertNodeClicked(obj) {
 
         this.ShowUsername = function (userName) {
             if (userName != undefined && userName != 'null' && userName != '') {
-                $(".userN").html(userName);
+                $(".userN").attr("title", userName).html(userName);
                 $("#userLine").show();
             } else {
-                $(".userN").html("");
+                $(".userN").attr("title","").html("");
                 $("#userLine").hide();
             }
         };
