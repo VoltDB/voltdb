@@ -1221,4 +1221,247 @@ class SchemaPageTest extends TestBase {
         // at SchemaPage
     }
 
+
+    def "Add a table in Tables and check it"() {
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+        String tablename = page.getTablename()
+
+        when: 'sql query is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set create query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'Schema tab is clicked'
+        page.gotoSchema()
+        then: 'at Schema Page'
+        at SchemaPage
+
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'send tablename for searching'
+        page.sendTablename(tablename)
+        then: 'row is displayed'
+        waitFor(20,10) { page.test.isDisplayed() }
+        if ( page.test.isDisplayed() == false ){
+            println("VMC-108:Auto Test Code for Schema in Schema Tab FAILED")
+            assert false
+        }
+
+        when: 'sql query is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set delete query in the box'
+        page.setQueryText(deleteQuery)
+        then: 'run the query'
+        page.runQuery()
+        println("VMC-108:Auto Test Code for Schema in Schema Tab PASSED")
+    }
+
+
+    def "check ascending and descending on Name"() {
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'click on the name'
+        page.name.click()
+        then: 'check the ascending class'
+        if ( page.checkAscending() ){
+
+        }
+        else{
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Name FAILED")
+        }
+
+        when: 'click on the name'
+        page.name.click()
+        then: 'check the descending class'
+        if ( page.checkDescending() )
+            println("VMC-108:Auto Test Code for ascending and descending on Name PASSED")
+        else {
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Name FAILED")
+        }
+    }
+
+    def "check ascending and descending on Type"() {
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'click on the type'
+        page.type.click()
+        then: 'check the ascending class'
+        if ( page.checkAscending() ){
+
+        }
+        else{
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Type FAILED")
+        }
+
+        when: 'click on the type'
+        page.type.click()
+        then: 'check the descending class'
+        if ( page.checkDescending() )
+            println("VMC-108:Auto Test Code for ascending and descending on Type PASSED")
+        else {
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Type FAILED")
+        }
+    }
+
+    def "check ascending and descending on Partitioning"() {
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'click on the partitioning'
+        page.partitioning.click()
+        then: 'check the ascending class'
+        if ( page.checkAscending() ){
+
+        }
+        else{
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Partitioning FAILED")
+        }
+
+        when: 'click on the partitioning'
+        page.partitioning.click()
+        then: 'check the descending class'
+        if ( page.checkDescending() )
+            println("VMC-108:Auto Test Code for ascending and descending on Partitioning PASSED")
+        else {
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Partitioning FAILED")
+        }
+    }
+
+    def "check ascending and descending on Columns"() {
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'click on the columns'
+        page.columns.click()
+        then: 'check the ascending class'
+        if ( page.checkAscending() ){
+
+        }
+        else{
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Columns FAILED")
+        }
+
+        when: 'click on the columns'
+        page.columns.click()
+        then: 'check the descending class'
+        if ( page.checkDescending() )
+            println("VMC-108:Auto Test Code for ascending and descending on Columns PASSED")
+        else {
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Columns FAILED")
+        }
+    }
+
+    def "check ascending and descending on Indexes"() {
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'click on the indexes'
+        page.indexes.click()
+        then: 'check the ascending class'
+        if ( page.checkAscending() ){
+
+        }
+        else{
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Indexes FAILED")
+        }
+
+        when: 'click on the indexes'
+        page.indexes.click()
+        then: 'check the descending class'
+        if ( page.checkDescending() )
+            println("VMC-108:Auto Test Code for ascending and descending on Indexes PASSED")
+        else {
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on Indexes FAILED")
+        }
+    }
+
+    def "check ascending and descending on PKey"() {
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'click on the pkey'
+        page.pkey.click()
+        then: 'check the ascending class'
+        if ( page.checkAscending() ){
+
+        }
+        else{
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on PKey FAILED")
+        }
+
+        when: 'click on the pkey'
+        page.pkey.click()
+        then: 'check the descending class'
+        if ( page.checkDescending() )
+            println("VMC-108:Auto Test Code for ascending and descending on PKey PASSED")
+        else {
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on PKey FAILED")
+        }
+    }
+
+    def "check ascending and descending on TupleLimit"() {
+        when: 'click schema sub tab'
+        page.gotoSchemaSubTab()
+        then: 'at schema sub tab'
+        at SchemaPageSchemaTab
+
+        when: 'click on the tuple limit'
+        page.tuplelimit.click()
+        then: 'check the ascending class'
+        if ( page.checkAscending() ){
+
+        }
+        else{
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on TupleLimit FAILED")
+        }
+
+        when: 'click on the tuple limit'
+        page.tuplelimit.click()
+        then: 'check the descending class'
+        if ( page.checkDescending() )
+            println("VMC-108:Auto Test Code for ascending and descending on TupleLimit PASSED")
+        else {
+            assert false
+            println("VMC-108:Auto Test Code for ascending and descending on TupleLimit FAILED")
+        }
+    }
 }
