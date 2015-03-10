@@ -499,12 +499,24 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
         verifyDiff(catOriginal, catUpdated, true, null);
+
+        VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
+        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
+        catOriginal = getExportCatalogForTable("A", "addtablecolumn1", t1);
+        catUpdated = getExportCatalogForTable("A", "addtablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
         verifyDiff(catOriginal, catUpdated, true, null);
+
+        VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
+        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
+        catOriginal = getExportCatalogForTable("A", "droptablecolumn1", t1);
+        catUpdated = getExportCatalogForTable("A", "droptablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testModifyTableColumn() throws IOException {
@@ -818,6 +830,44 @@ public class TestCatalogDiffs extends TestCase {
         // remove the index
         Catalog catUpdated = get2ColumnCatalogForTable("A", "testRemoveNonUniqueIndex2");
         verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testExportRejectedIfNotEmpty() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("B", "C1");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+        catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("B", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE B;");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
+        catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testAddTableConstraintRejectedIfNotEmpty() throws IOException {

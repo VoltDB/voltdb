@@ -76,7 +76,7 @@ ValueType NValue::s_doublePromotionTable[] = {
     VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
     VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
     VALUE_TYPE_INVALID, VALUE_TYPE_INVALID,
-    VALUE_TYPE_INVALID,   // 22 decimal  (todo)
+    VALUE_TYPE_DOUBLE,    // 22 decimal
     VALUE_TYPE_INVALID,   // 23 boolean
     VALUE_TYPE_INVALID,   // 24 address
 };
@@ -92,7 +92,7 @@ ValueType NValue::s_decimalPromotionTable[] = {
     VALUE_TYPE_DECIMAL,   // 5 integer
     VALUE_TYPE_DECIMAL,   // 6 bigint
     VALUE_TYPE_INVALID,   // 7 <unused>
-    VALUE_TYPE_INVALID,   // 8 double (todo)
+    VALUE_TYPE_DOUBLE,    // 8 double
     VALUE_TYPE_INVALID,   // 9 varchar
     VALUE_TYPE_INVALID,   // 10 <unused>
     VALUE_TYPE_DECIMAL,   // 11 timestamp
@@ -211,7 +211,8 @@ std::string NValue::createStringFromDecimal() const {
 }
 
 /**
- *   set a decimal value from a serialized representation
+ *   Set a decimal value from a serialized representation
+ *   This function does not handle scientific notation string, Java planner should convert that to plan string first.
  */
 void NValue::createDecimalFromString(const std::string &txt) {
     if (txt.length() == 0) {

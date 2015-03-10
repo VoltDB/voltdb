@@ -56,9 +56,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
-        APPLY_BINARY_LOG(1),
-        GET_DR_TUPLESTREAM_STATE(2),
-        SET_DR_SEQUENCE_NUMBERS(3);
+        GET_DR_TUPLESTREAM_STATE(1),
+        SET_DR_SEQUENCE_NUMBERS(2);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -664,9 +663,29 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract void updateHashinator(HashinatorConfig config);
 
     /**
-     * Execute an arbitrary task that is described by the task id and serialized task parameters.
-     * The return value is also opaquely encoded. This means you don't have to update the IPC
-     * client when adding new task types
+     * Apply binary log data. To be able to advance the DR sequence number and
+     * regenerate binary log for chaining correctly, proper spHandle and
+     * lastCommittedSpHandle from the current transaction need to be passed in.
+     * @param log                      The binary log data
+     * @param txnId                    The txnId of the current transaction
+     * @param spHandle                 The spHandle of the current transaction
+     * @param lastCommittedSpHandle    The spHandle of the last committed transaction
+     * @param uniqueId                 The uniqueId of the current transaction
+     * @throws EEException
+     */
+    public abstract void applyBinaryLog(ByteBuffer log,
+                                        long txnId,
+                                        long spHandle,
+                                        long lastCommittedSpHandle,
+                                        long uniqueId) throws EEException;
+
+    /**
+     * Execute an arbitrary non-transactional task that is described by the task id and
+     * serialized task parameters. The return value is also opaquely encoded. This means
+     * you don't have to update the IPC client when adding new task types.
+     *
+     * This method shouldn't be used to perform transactional tasks such as mutating
+     * table data because it doesn't setup transaction context in the EE.
      * @param taskId
      * @param task
      * @return
@@ -917,6 +936,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param tableId table to calculate a hash code for
      */
     protected native long nativeTableHashCode(long pointer, int tableId);
+
+    protected native int nativeApplyBinaryLog(long pointer,
+                                              long txnId,
+                                              long spHandle,
+                                              long lastCommittedSpHandle,
+                                              long uniqueId);
 
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.

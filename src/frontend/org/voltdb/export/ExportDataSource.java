@@ -526,20 +526,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
            m_bufferPushPermits.release();
            return;
         }
-        m_es.execute((new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if (!m_es.isShutdown()) {
-                        pushExportBufferImpl(uso, buffer, sync, endOfStream);
+        try {
+            m_es.execute((new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (!m_es.isShutdown()) {
+                            pushExportBufferImpl(uso, buffer, sync, endOfStream);
+                        }
+                    } catch (Throwable t) {
+                        VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
+                    } finally {
+                        m_bufferPushPermits.release();
                     }
-                } catch (Throwable t) {
-                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
-                } finally {
-                    m_bufferPushPermits.release();
                 }
-            }
-        }));
+            }));
+        } catch (RejectedExecutionException rej) {
+            m_bufferPushPermits.release();
+            //We are shutting down very much rolling generation so dont passup for error reporting.
+            exportLog.info("Error pushing export  buffer: ", rej);
+        }
     }
 
     public ListenableFuture<?> closeAndDelete() {

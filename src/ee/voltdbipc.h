@@ -150,6 +150,8 @@ private:
 
     void threadLocalPoolAllocations();
 
+    void applyBinaryLog(struct ipc_command*);
+
     void executeTask(struct ipc_command*);
 
     void sendException( int8_t errorCode);

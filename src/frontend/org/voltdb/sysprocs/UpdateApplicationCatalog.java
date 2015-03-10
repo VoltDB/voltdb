@@ -137,7 +137,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
-            if (tupleCount > 0) {
+            if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
                 nonEmptyTables.add(tableName);
             }
         }

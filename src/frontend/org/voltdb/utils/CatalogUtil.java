@@ -52,9 +52,6 @@ import javax.xml.namespace.QName;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -124,6 +121,9 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  *
@@ -740,8 +740,8 @@ public abstract class CatalogUtil {
             HttpdType httpd = deployment.getHttpd();
             if (httpd == null) {
                 httpd = new HttpdType();
-                //-1 means find next port from 8080
-                httpd.setPort(-1);
+                // Find next available port starting with the default
+                httpd.setPort(Constants.HTTP_PORT_AUTO);
                 deployment.setHttpd(httpd);
             }
             //jsonApi
