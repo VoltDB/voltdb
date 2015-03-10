@@ -380,7 +380,7 @@ public final class DBBPool {
                 cont.discard();
             }
         }
-        new VoltLogger("HOST").warn(
+        HOST.warn(
                 "Attempted to resolve DirectByteBuffer OOM by freeing pooled buffers. " +
                 "Starting bytes was " + startingBytes + " after clearing " +
                  bytesAllocatedGlobally.get() + " change " + (startingBytes - bytesAllocatedGlobally.get()));

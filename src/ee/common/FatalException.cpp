@@ -20,7 +20,6 @@
 #include <cxxabi.h>   // for abi
 #include <execinfo.h> // for backtrace, backtrace_symbols
 
-#include <cstdlib> // for malloc/free
 #include <cstring> // for strn*
 #include <dlfcn.h>
 #include <stdio.h> // for fopen, fprintf, fclose
@@ -43,19 +42,7 @@ FatalException::FatalException(std::string message,
     FILE *bt = fopen(m_backtracepath.c_str(), "a+");
 
     if (bt) {
-        StackTrace st;
-        // write header for backtrace file
-    	int numFrames = (int)st.m_traces.size();
-    	// Ignore the stack frames specific to StackTrace object
-    	fprintf(bt, "VoltDB Backtrace (%d)\n", numFrames-2);
-        for (int ii = 2; ii < numFrames; ii++) {
-            // write original symbol to file.
-            fprintf(bt, "raw[%d]: %s\n", ii, st.m_traceSymbols[ii]);
-        }
-        for (int ii=2; ii < numFrames; ii++) {
-            const char* str = st.m_traces[ii].c_str();
-            fprintf(bt, "demangled[%d]: %s\n", ii, str);
-        }
+        StackTrace::printMangledAndUnmangledToFile(bt);
         fclose(bt);
     }
 }

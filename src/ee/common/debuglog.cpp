@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,24 +16,9 @@
  */
 #include "debuglog.h"
 #include <execinfo.h>
-#include <malloc.h>
 #include <cstring>
 #include <cxxabi.h>   // for abi
-
-//void printStackTrace_() {
-//    const size_t max_depth = 10;
-//    size_t stack_depth;
-//	void *stack_addrs[max_depth];
-//	char **stack_strings;
-//
-//	stack_depth = backtrace(stack_addrs, max_depth);
-//	stack_strings = backtrace_symbols(stack_addrs, (int)stack_depth);
-//
-//	for (size_t i = 4; i < stack_depth; i++) {
-//	    printf("    %s\n", stack_strings[i]);
-//	}
-//	free(stack_strings); // malloc()ed by backtrace_symbols (1 array starting with a set of pointers to the data area of the same array)
-//}
+#include <cstdlib> // for malloc/free
 
 namespace voltdb {
 StackTrace::StackTrace() {
@@ -63,9 +48,9 @@ StackTrace::StackTrace() {
         }
 
         if (begin && end) {
-        	begin++;
-        	::memcpy(mangledName, begin, end-begin);
-        	mangledName[end-begin] = '\0';
+            begin++;
+            ::memcpy(mangledName, begin, end-begin);
+            mangledName[end-begin] = '\0';
             int status;
             char *ret = abi::__cxa_demangle(mangledName, function, &sz, &status);
             if (ret) {
@@ -88,12 +73,5 @@ StackTrace::StackTrace() {
 StackTrace::~StackTrace() {
     ::free(m_traceSymbols);
 }
-} // namespace voltdb
 
-using namespace voltdb;
-void printStackTrace_() {
-	StackTrace st;
-    for (int ii=1; ii < st.m_traces.size(); ii++) {
-        printf("   %s\n", st.m_traces[ii].c_str());
-    }
-}
+} // namespace voltdb
