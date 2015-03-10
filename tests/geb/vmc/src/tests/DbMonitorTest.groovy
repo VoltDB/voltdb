@@ -946,40 +946,6 @@ class DbMonitorTest extends TestBase {
 			else
 				assert false
     }
-
-	def thisIsWorking() {
-		when:
-		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
-		String line;
-		String query = ""
-		while ((line = br.readLine()) != null) {
-	   		// process the line.
-			query = query + line + "\n"
-		}
-		br.close();
-		then:
-		query.equals("zxya")
-	}
-
-	def checktwo() {
-		when:
-		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
-		String line;
-		String query = ""
-		
-		while((line = br.readLine()) != "#create") {
-		}
-
-		while ((line = br.readLine()) != null) {
-			// process the line.
-			query = query + line + "\n"
-		}
-		
-		br.close();
-		String query = page.getQueryToCreateTable()		
-		then:
-		query.equals("zxya")
-	}
 	
 	// stored procedure ascending descending
 	
