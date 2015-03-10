@@ -1337,7 +1337,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     //We will ignore the supplied or default deployment anyways.
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
                         byte[] deploymentHashHere =
-                            CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
+                            CatalogUtil.makeDeploymentHash(deploymentBytes);
                         if (!(Arrays.equals(deploymentHashHere, catalogStuff.getDeploymentHash())))
                         {
                             hostLog.warn("The locally provided deployment configuration did not " +
