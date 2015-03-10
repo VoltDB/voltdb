@@ -169,7 +169,7 @@ function loadAdminPage() {
         },
         numericMessages: {
             required: "Please enter a valid positive number.",
-            min: "Please enter a positive number greater than 0.",
+            min: "Please enter a positive number. Its minimum value should be 1.",
             max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
