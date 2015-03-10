@@ -563,9 +563,6 @@ function loadAdminPage() {
                     txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
-            
-            $("#saveSnapshotConfirm").hide();
-            $("#saveSnapshot").show();
         },
         afterOpen: function (event) {
             var popup = $(this)[0];
@@ -594,29 +591,14 @@ function loadAdminPage() {
                     return;
                 }
 
-                $("#saveSnapshot").hide();
-                $("#saveSnapshotConfirm").show();
-            });
-
-            $("#btnSaveSnapshotCancel").unbind("click");
-            $("#btnSaveSnapshotCancel").on("click", function () {
-                popup.close();
-            });
-            
-            $("#btnSaveSnapshotConfirmCancel").unbind("click");
-            $("#btnSaveSnapshotConfirmCancel").on("click", function () {
-                $("#saveSnapshotConfirm").hide();
-                $("#saveSnapshot").show();
-            });
-            
-            $("#btnSaveSnapshotOk").unbind("click");
-            $("#btnSaveSnapshotOk").on("click", function (e) {
                 var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
                     if (success) {
                         if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
-                            showUpdateMessage('Snapshot saved successfully.');
+                            $('#saveSnapshotStatus').html('Snapshot queued successfully');
+                            $('#saveSnapshotMessage').html('To verify snapshot completion, please check the server logs.');
+                            $('#btnSaveSnapshotPopup').click();
                         } else {
                             $('#saveSnapshotStatus').html('Failed to save snapshot');
                             $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
@@ -627,6 +609,11 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
+                popup.close();
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function () {
                 popup.close();
             });
         }
