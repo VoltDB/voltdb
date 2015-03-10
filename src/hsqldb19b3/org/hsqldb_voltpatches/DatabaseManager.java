@@ -353,6 +353,7 @@ public class DatabaseManager {
      */
     private static synchronized void addDatabaseObject(String type,
             String path, Database db) {
+
         // A VoltDB extension to work around ENG-6044
         /* disable 15 lines ...
         Object  key = path;
