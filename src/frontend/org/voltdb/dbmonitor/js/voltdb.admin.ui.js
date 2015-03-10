@@ -163,14 +163,14 @@ function loadAdminPage() {
     var adminValidationRules = {
         numericRules: {
             required: true,
-            min: 0,
+            min: 1,
             max: INT_MAX_VALUE,
             digits: true,
         },
         numericMessages: {
             required: "Please enter a valid positive number.",
-            min: "Please enter a valid positive number.",
-            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            min: "Please enter a positive number greater than 0",
+            max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
 
