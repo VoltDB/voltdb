@@ -1312,12 +1312,12 @@ class DbMonitorTest extends TestBase {
         }
         when:'clicked server button'
         at DbMonitorPage
-        server.clusterserverbutton.click()
-        server.serversearch.value($line)
+        page.clusterserverbutton.click()
+        page.serversearch.value($line)
 
         then:
         at DbMonitorPage
-        server.clusterserverbutton.click()
+        page.clusterserverbutton.click()
     }
 
 
@@ -1340,24 +1340,24 @@ class DbMonitorTest extends TestBase {
         }
         when:'clicked server button'
         at DbMonitorPage
-        server.clusterserverbutton.click()
-        server.serversearch.value($line3)
+        page.clusterserverbutton.click()
+        page.serversearch.value($line3)
 
         then:
         at DbMonitorPage
-        server.clusterserverbutton.click()
+        page.clusterserverbutton.click()
     }
 
 
     def "check server title on dbmonitor"(){
         when:
         at DbMonitorPage
-        server.clusterserverbutton.isDisplayed()
-        server.clusterserverbutton.click()
+        page.clusterserverbutton.isDisplayed()
+        page.clusterserverbutton.click()
         then:
         at DbMonitorPage
-        server.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
-        server.clusterserverbutton.click()
+        page.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
+        page.clusterserverbutton.click()
     }
 
 
