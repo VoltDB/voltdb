@@ -86,7 +86,7 @@ public class DeploymentBuilder {
 
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
 
-    // zero defaults to first open port >= 8080.
+    // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;

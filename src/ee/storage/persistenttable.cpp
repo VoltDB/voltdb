@@ -573,6 +573,20 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        drMark = drStream->m_uso;
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
+    }
+
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
         increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
@@ -602,20 +616,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
-
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
-    if (drStream && !m_isMaterialized && m_drEnabled) {
-        drMark = drStream->m_uso;
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
-        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
-        const int64_t currentSpHandle = ec->currentSpHandle();
-        const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
-    }
 
     if (uq) {
         /*
