@@ -155,7 +155,15 @@ $(document).ready(function () {
     $('#btnlogOut').popup();
 
     //Shows Save Snapshot status
-    $('#btnSaveSnapshotPopup').popup();
+    $('#btnSaveSnapshotPopup').popup({
+        open: function(event, ui, ele) {
+            if ($('#saveSnapshotStatus').html().indexOf("Snapshot queued successfully") > -1) {
+                $("#imgSaveSnapshotStatus").hide();
+            } else {
+                $("#imgSaveSnapshotStatus").show();
+            }
+        }
+    });
 
     // Filters Stored Procedures
     $('#filterStoredProc').keyup(function () {

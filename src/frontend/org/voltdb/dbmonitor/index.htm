@@ -1110,12 +1110,6 @@
             </div>
             <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
         </div>
-        <div class="saveConfirmation" style="display: none;">
-            <div class="overlay-content ">
-                <div class="confirmationInfo">Are you sure you want to save?</div>
-            </div>
-            <div class="overlay-btns"><a class="btn closeBtn">Yes</a> <a class="btn btn-gray confirmNoSave">No</a> </div>
-        </div>
     </div>
     <!-- POPUP savePop -->
 
@@ -1211,11 +1205,11 @@
     <!-- POPUP RestoreConfirmationPopup -->
 
     <!-- POPUP SaveSnapshotPopup -->
-    <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Cluster Shutdown</a></div>
+    <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Save Snapshot</a></div>
     <div id="saveSnapShotPopup" style="display: none">
         <div id="saveSnaps">
             <div class="overlay-title ">
-                <img src="css/resources/images/Information.png" class="imgError" /><span id="saveSnapshotStatus"></span>
+                <img id="imgSaveSnapshotStatus" src="css/resources/images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError ">
