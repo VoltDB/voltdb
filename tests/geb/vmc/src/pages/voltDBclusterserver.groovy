@@ -35,5 +35,40 @@ class voltDBclusterserver extends Module {
         setthreshhold{$("#threshold")}
         clickthreshholdset{$("#saveThreshold")}
 
+        // dbmonitor graph
+        servercpudaysmin{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        servercpudaysmax{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        servercpuminutesmin{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        servercpuminutemax{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        servercpusecondmin{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        servercpusecondmax{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+
+        selecttypeindrop{$("#graphView")}
+        selecttypedays{$("#graphView > option:nth-child(3)")}
+        selecttypemin{$("#graphView > option:nth-child(2)")}
+        selecttypesec{$("#graphView > option:nth-child(1)")}
+
+        serverramdaysmin{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        serverramdaysmax{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        serverramsecondmin{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        serverramsecondmax{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        serverramminutesmin{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        serverramminutesmax{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+
+        clusterlatencydaysmin{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clusterlatencydaysmax{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clusterlatencysecondmin{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clusterlatencysecondmax{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clusterlatencyminutesmin{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clusterlatencyminutesmax{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+
+        clustertransactiondaysmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clustertransactiondaysmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clustertransactionsecondmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clustertransactionsecondmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clustertransactionminutesmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+    }
+
     }
 }
