@@ -1320,6 +1320,7 @@ function loadAdminPage() {
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
             adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.errorQueryTimeout.hide();
 
             adminEditObjects.loadingQueryTimeout.show();
         }
@@ -1336,6 +1337,7 @@ function loadAdminPage() {
             adminEditObjects.loadingQueryTimeout.hide();
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.errorQueryTimeout.hide();
             adminEditObjects.LinkQueryTimeoutEdit.show();
 
             adminEditObjects.tBoxQueryTimeout.hide();
