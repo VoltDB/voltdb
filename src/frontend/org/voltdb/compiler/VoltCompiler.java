@@ -2151,9 +2151,10 @@ public class VoltCompiler {
      * *NOTE*: Does *NOT* work with project.xml jarfiles.
      *
      * @return the compiled catalog is contained in the provided jarfile.
+     * @throws VoltCompilerException
      *
      */
-    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException
+    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException, VoltCompilerException
     {
         String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
                 Constants.UTF8ENCODING);
@@ -2189,7 +2190,7 @@ public class VoltCompiler {
                 int endtrim = errString.indexOf(" in statement starting");
                 if (endtrim < 0) { endtrim = errString.length(); }
                 String trimmed = errString.substring(0, endtrim);
-                throw new IOException(trimmed);
+                throw new VoltCompilerException(trimmed);
             }
         }
         finally {

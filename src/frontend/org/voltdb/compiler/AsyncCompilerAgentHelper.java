@@ -27,6 +27,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -106,6 +107,10 @@ public class AsyncCompilerAgentHelper
                 try {
                     newCatalogBytes = addDDLToCatalog(context.catalog, context.getCatalogJarBytes(),
                             work.adhocDDLStmts);
+                }
+                catch (VoltCompilerException vce) {
+                    retval.errorMsg = vce.getMessage();
+                    return retval;
                 }
                 catch (IOException ioe) {
                     retval.errorMsg = "Unexpected exception applying DDL statements to " +
@@ -210,9 +215,10 @@ public class AsyncCompilerAgentHelper
     /**
      * Append the supplied adhoc DDL to the current catalog's DDL and recompile the
      * jarfile
+     * @throws VoltCompilerException
      */
     private byte[] addDDLToCatalog(Catalog oldCatalog, byte[] oldCatalogBytes, String[] adhocDDLStmts)
-    throws IOException
+    throws IOException, VoltCompilerException
     {
         VoltCompilerReader ddlReader = null;
         try {

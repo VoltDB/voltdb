@@ -46,16 +46,23 @@ def mkdir_p(path):
 # kill the VoltDB server process, if any, running on the local machine.
 # The process is identified by its command line text via the ps command.
 def kill_voltdb():
+    # Works for Linux and Mac.
     # ps - find all running java commands.
-    # fgrep - filter out any headers or command lines that do not reference org.voltdb.VoltDB
-    # tr - compress multi-space delimiters to a single space.
-    # cut - extract the second space-delimited field, which is the PID.
+    # awk - finds commands ending in "/java" that refer to the org.voltdb.VoltDB class and outputs the PID(s)
     # xargs - execute a kill command on each PID (hoping there's only the 1 launched from this script).
-    killed = subprocess.call(
-            "ps -fwwC java | grep org.voltdb.VoltDB | tr -s ' ' | cut -d ' ' -f 2 | xargs /bin/kill -KILL", shell=True)
+    return subprocess.call('''\
+ps -fww | awk '
+$8 ~ "/java$" {
+    for (i = 9; i <= NF; i++) {
+        if ($i == "org.voltdb.VoltDB") {
+            print $2;
+        }
+    }
+}' | xargs /bin/kill -KILL''', shell=True)
     if killed != 0:
         print >> sys.stderr, \
                 "Failed to kill the VoltDB server process"
+
 
 # given a script_subdir somewhere within a script_dir,
 # return the path of the corresponding dir within baseline_dir.
