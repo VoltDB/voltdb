@@ -342,25 +342,34 @@ public class SQLParser extends SQLPatternFactory
             "'",           // end of string OR start of escaped quote
             Pattern.MULTILINE);
 
-    // HELP can support sub-commands someday. Capture group 1 is the sub-command.
+    // Define a common pattern to sweep up a mix of semicolons and space and
+    // meaningless garbage at the end of the simpler sqlcmd directives.
+    // The garbage parts (well, enough of them, anyway) are captured so that
+    // they can optionally be detected in a post-processing step that MAY
+    // generate a complaint about an improperly terminated command.
+    private static String InitiallyForgivingDirectiveTermination =
+            "\\s*" +          // spaces
+            "([^;\\s]*)" +    // (first) non-space non-semicolon garbage word (last group +1)
+            "[;\\s]*" +       // trailing spaces and semicolons
+            "(.*)" +          // trailing garbage (last group +2)
+            "$";
+    // HELP can support sub-commands someday. Capture group 2 is the sub-command.
     private static final Pattern HelpToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
             "help" +          // required HELP command token
-            "\\s*" +          // optional whitespace
-            "(.*)" +          // optional subcommand (group 1) BUG: subcommand should require prior whitespace.
-            //FIXME: simplify -- a prior .* starves out all of these optional patterns
-            "\\s*" +          // optional whitespace before semicolon
-            //FIXME: strangely allowing more than one strictly adjacent semicolon.
-            ";*" +            // optional semicolons
-            "\\s*$",          // optional terminating whitespace
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            "\\s*" +          // optional whitespace before subcommand
+            "([^;\\s]*)" +    // optional subcommand (group 2)
+            InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
-            "(exit|quit)" +   // required command (group 1 -- probably not used)
-            "\\s*" +          // optional whitespace before semicolon
-            //FIXME: strangely allowing more than one strictly adjacent semicolon.
-            ";*" +            // optional semicolons
-            "\\s*$",          // optional terminating whitespace
+            "(?:exit|quit)" + // keyword alternatives, synonymous so don't bother capturing
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that exit/quit
+            // command diagnostics can "own" any line starting with the word
+            // exit or quit.
+            InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
     private static final Pattern ShowToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
@@ -371,17 +380,7 @@ public class SQLParser extends SQLPatternFactory
             // list or show.
             "\\s*" +          // extra spaces
             "([^;\\s]*)" +    // non-space non-semicolon subcommand (group 2)
-            "\\s*" +          // spaces
-            "([^;\\s]*)" +    // non-space non-semicolon garbage word (group 3)
-            "[;\\s]*" +       // trailing spaces and semicolons
-            "(.*)" +          // trailing garbage (group 4)
-            "$",
-            Pattern.CASE_INSENSITIVE);
-    private static final Pattern SemicolonToken = Pattern.compile(
-            "^.*" +           // match anything
-            ";+" +            // one required semicolon at end except for
-            "\\s*" +          // optional whitespace
-            "(--)?$",         // and an optional end-of-line comment
+            InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile(
             "^\\s*" +      // optional indent at start of line
@@ -389,13 +388,14 @@ public class SQLParser extends SQLPatternFactory
             "(\\W|$)" +    // require an end to the keyword OR EOL (group 1)
             // Make everything that follows optional so that recall command
             // diagnostics can "own" any line starting with the word recall.
-            "\\s*" +          // extra spaces
-            "([^;\\s]*)" +    // non-space non-semicolon "line number" (group 2)
-            "\\s*" +          // spaces
-            "([^;\\s]*)" +    // non-space non-semicolon garbage word (group 3)
-            "[;\\s]*" +       // trailing spaces and semicolons
-            "(.*)" +          // trailing garbage (group 4)
-            "$",
+            InitiallyForgivingDirectiveTermination,
+            Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern SemicolonToken = Pattern.compile(
+            "^.*" +           // match anything
+            ";+" +            // one required semicolon at end except for
+            "\\s*" +          // optional whitespace
+            "(--)?$",         // and an optional end-of-line comment
             Pattern.CASE_INSENSITIVE);
 
     // SQLCommand's FILE command.  If this pattern matches, we
@@ -449,7 +449,7 @@ public class SQLParser extends SQLPatternFactory
     // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
     private static final Pattern ExplainCallPreamble = Pattern.compile(
             "^\\s*" +            // optional indent at start of line
-            "explain\\s+" +      // required command, whitespace terminated
+            "explain" +          // required command, whitespace terminated
             "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
             // Make everything that follows optional so that explain command
             // diagnostics can "own" any line starting with the word
@@ -956,6 +956,8 @@ public class SQLParser extends SQLPatternFactory
      */
     public static boolean isExitCommand(String statement)
     {
+        //TODO: consider processing match groups to detect and
+        // complain about garbage parameters.
         return ExitToken.matcher(statement).matches();
     }
 
@@ -1061,6 +1063,7 @@ public class SQLParser extends SQLPatternFactory
         private final FileOption m_option;
         private final File m_file;
         private final String m_delimiter;
+        private static FileInfo m_oneForSystemIn = null; // Create on demand.
 
         FileInfo(FileInfo context, FileOption option, String filenameOrDelimiter) {
             m_context = context;
@@ -1091,12 +1094,15 @@ public class SQLParser extends SQLPatternFactory
 
         /** @return a dummy FileInfo instance to describe System.in **/
         public static FileInfo forSystemIn() {
-            return new FileInfo() {
-                @Override
-                public String getFilePath() {
-                    return "(standard input)";
-                }
-            };
+            if (m_oneForSystemIn == null) {
+                m_oneForSystemIn = new FileInfo() {
+                    @Override
+                    public String getFilePath() {
+                        return "(standard input)";
+                    }
+                };
+            }
+            return m_oneForSystemIn;
         }
 
         public File getFile() {
@@ -1218,9 +1224,10 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Parse SHOW or LIST statement for sqlcmd.
+     * Parse a SHOW or LIST statement for sqlcmd.
      * @param statement  statement to parse
-     * @return           results object or NULL if statement wasn't recognized
+     * @return           String containing captured argument(s) possibly invalid,
+     *                   or null if a show/list statement wasn't recognized
      */
     public static String parseShowStatementSubcommand(String statement)
     {
@@ -1255,6 +1262,21 @@ public class SQLParser extends SQLPatternFactory
     {
         Matcher matcher = HelpToken.matcher(statement);
         if (matcher.matches()) {
+            String commandWordTerminator = matcher.group(1);
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                String trailings = matcher.group(3) + ";" + matcher.group(4);
+                // In a valid command, both "trailings" groups should be empty.
+                if (trailings.equals(";")) {
+                    // Return the subcommand keyword -- possibly a valid one.
+                    return matcher.group(2);
+                }
+                // For an invalid form of the command,
+                // return an approximation of the garbage input.
+                return matcher.group(2) + " " + trailings;
+            }
+            if (commandWordTerminator.equals("") || commandWordTerminator.equals(";")) {
+                return ""; // EOL or ; reached before subcommand
+            }
             return matcher.group(1).trim();
         }
         return null;
