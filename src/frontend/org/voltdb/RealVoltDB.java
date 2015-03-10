@@ -928,56 +928,61 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_configLogger = new Thread(new ConfigLogging());
             m_configLogger.start();
 
-            DailyRollingFileAppender dailyAppender = null;
-            Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
-            while (appenders.hasMoreElements()) {
-                Appender appender = (Appender) appenders.nextElement();
-                if (appender instanceof DailyRollingFileAppender){
-                    dailyAppender = (DailyRollingFileAppender) appender;
-                }
+            scheduleDailyLoggingWorkInNextCheckTime();
+        }
+    }
+
+    class DailyLogTask implements Runnable {
+        @Override
+        public void run() {
+            m_myHostId = m_messenger.getHostId();
+            hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
+            hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+            hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
+            logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+            // log system setting information
+            logSystemSettingFromCatalogContext();
+
+            scheduleDailyLoggingWorkInNextCheckTime();
+        }
+    }
+
+    /**
+     * Get the next check time for a private member in log4j library, which is not a reliable idea.
+     * It adds 30 seconds for the initial delay and uses a periodical thread to schedule the daily logging work
+     * with this delay.
+     * @return
+     */
+    void scheduleDailyLoggingWorkInNextCheckTime() {
+        DailyRollingFileAppender dailyAppender = null;
+        Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
+        while (appenders.hasMoreElements()) {
+            Appender appender = (Appender) appenders.nextElement();
+            if (appender instanceof DailyRollingFileAppender){
+                dailyAppender = (DailyRollingFileAppender) appender;
             }
-            final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
+        }
+        final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
 
-            Field field = null;
-            if (dailyRollingFileAppender != null) {
-                try {
-                    field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
-                    field.setAccessible(true);
-                } catch (NoSuchFieldException e) {
-                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                }
+        Field field = null;
+        if (dailyRollingFileAppender != null) {
+            try {
+                field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
+                field.setAccessible(true);
+            } catch (NoSuchFieldException e) {
+                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
             }
-            final Field nextCheckField = field;
-
-            class DailyLogTask implements Runnable {
-                @Override
-                public void run() {
-                    try {
-                        m_myHostId = m_messenger.getHostId();
-                        hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
-                        hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
-                        hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
-                        logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
-                        // log system setting information
-                        logSystemSettingFromCatalogContext();
-
-                        long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                        scheduleWork(new DailyLogTask(),
-                                nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
-                    } catch (IllegalAccessException e) {
-                        hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                    }
-                }
-            }
-
-            if (dailyRollingFileAppender != null && nextCheckField != null) {
-                try {
-                    long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                    scheduleWork(new DailyLogTask(),
-                            nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
-                } catch (IllegalAccessException e) {
-                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                }
+        }
+        final Field nextCheckField = field;
+        long nextCheck = System.currentTimeMillis();
+        // the next part may throw exception, current time is the default value
+        if (dailyRollingFileAppender != null && nextCheckField != null) {
+            try {
+                nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+                scheduleWork(new DailyLogTask(),
+                        nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
             }
         }
     }
