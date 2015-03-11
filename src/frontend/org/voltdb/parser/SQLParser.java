@@ -44,25 +44,23 @@ public class SQLParser extends SQLPatternFactory
 {
     public static class Exception extends RuntimeException
     {
-        public Exception(String message, Object... args)
+        private Exception(String message, Object... args)
         {
             super(String.format(message, args));
         }
 
-        public Exception(Throwable cause)
+        private Exception(Throwable cause)
         {
             super(cause.getMessage(), cause);
         }
 
-        public Exception(Throwable cause, String message, Object... args)
+        private Exception(Throwable cause, String message, Object... args)
         {
             super(String.format(message, args), cause);
         }
 
         private static final long serialVersionUID = -4043500523038225173L;
     }
-
-    //private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
 
     //========== Private Parsing Data ==========
 
@@ -114,8 +112,6 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_PARTITION_PROCEDURE");
 
     //TODO: Convert to pattern factory usage below this point.
-    //TODO: Consider implementing FIXME/TODO comments -- and TESTING --
-    // prior to conversion to pattern factory.
 
     /*
      * CREATE PROCEDURE [ <MODIFIER_CLAUSE> ... ] FROM <JAVA_CLASS>
@@ -282,9 +278,19 @@ public class SQLParser extends SQLPatternFactory
             "\\s*;\\z"                          // (end statement)
             );
     /**
-     *  If the statement starts with either create procedure, create role, drop, partition,
-     *  replicate, export, import, or dr, the first match group is set to respectively procedure,
-     *  role, drop, partition, replicate, export, or import, or dr.
+     *  If the statement starts with a VoltDB-specific DDL command,
+     *  one of create procedure, create role, drop procedure, drop role,
+     *  partition, replicate, export, import, or dr, the one match group
+     *  is set to the matching command EXCEPT as special (needlessly obscure)
+     *  cases, simply returns only "procedure" for "create procedure",
+     *  only "role" for "create role", and only "drop" for either
+     * "drop procedure" OR "drop role".
+     *  ALSO (less than helpfully) returns "drop" for non-VoltDB-specific
+     *  "drop" commands like "drop table".
+     *  TODO: post-processing would be much simpler if this pattern reliably
+     *  accepted VoltDB commands, rejected non-VoltDB commands, and grouped
+     *  the actual command keyword(s) with their arbitrary whitespace
+     *  separators. A wrapper function should clean up from there.
      */
     private static final Pattern PAT_ALL_VOLTDB_STATEMENT_PREAMBLES = Pattern.compile(
             "(?i)" +                               // ignore case instruction
@@ -493,6 +499,10 @@ public class SQLParser extends SQLPatternFactory
 
     /**
      * Match statement against pattern for all VoltDB-specific statement preambles
+     * TODO: Much more useful would be a String parseVoltDBSpecificDdlStatementPreamble
+     * function that used a corrected pattern and some minimal post-processing to return
+     * an upper cased single-space-separated preamble token string for ONLY VoltDB-specific
+     * commands (or null if not a match).
      * @param statement  statement to match against
      * @return           pattern matcher object
      */
