@@ -891,9 +891,10 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
-.tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 7px 4px;}
+.tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
+
 .tblRestore th {}
-.tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 7px 4px;}
+.tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
 .restoreCont {overflow:auto; height:200px}
 .restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
