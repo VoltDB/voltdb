@@ -95,7 +95,6 @@ import org.voltcore.utils.Pair;
  */
 public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 {
-    private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final Selector m_selector;
@@ -151,7 +150,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             m_interestOps = SelectionKey.OP_READ;
             m_key = m_sc.register(m_selector, m_interestOps);
         } catch (IOException ex) {
-            m_logger.fatal(null, ex);
+            networkLog.fatal(null, ex);
             throw new RuntimeException(ex);
         }
     }
@@ -203,21 +202,21 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                     e instanceof AsynchronousCloseException ||
                     e instanceof ClosedChannelException ||
                     e instanceof ClosedByInterruptException) {
-                m_logger.debug( "VoltPort died, probably of natural causes", e);
+                networkLog.debug( "VoltPort died, probably of natural causes", e);
             } else {
                 e.printStackTrace();
                 networkLog.error( "VoltPort died due to an unexpected exception", e);
             }
         } catch (Throwable ex) {
             ex.printStackTrace();
-            m_logger.error(null, ex);
+            networkLog.error(null, ex);
             m_shouldStop = true;
         } finally {
             m_verbotenThreads.remove(Thread.currentThread().getId());
             try {
                 p_shutdown();
             } catch (Throwable t) {
-                m_logger.error("Error shutting down Volt Network", t);
+                networkLog.error("Error shutting down Volt Network", t);
                 t.printStackTrace();
             }
         }
@@ -361,7 +360,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                                     m_sc.close();
                                 }
                             } catch (IOException e) {
-                                m_logger.error(null, e);
+                                networkLog.error(null, e);
                             }
                         }
                     }
