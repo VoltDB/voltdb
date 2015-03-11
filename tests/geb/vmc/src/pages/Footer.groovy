@@ -16,8 +16,7 @@ import org.openqa.selenium.JavascriptExecutor
  */
 class Footer extends Module {
     static content = {
-        banner    { $("#mainFooter") }
-        text      { $("#mainFooter > p") }
-        nofooter        { $("#nofooter") }     // For test purposes only
+        banner    	{ $("#mainFooter") }
+        text      	{ $("html body div#mainFooter.footer p") }
     }
 }

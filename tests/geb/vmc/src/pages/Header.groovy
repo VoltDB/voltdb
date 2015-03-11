@@ -16,23 +16,22 @@ import org.openqa.selenium.JavascriptExecutor
 
 class Header extends Module {
     static content = {
-        banner                    { $('#headerMain') }
-        image                     { $("#headerMain > div.headLeft > div.logo > img") }
-        tabDBMonitor              { $("#navDbmonitor > a") }
-        tabAdmin                  { $("#navAdmin > a") }
-        tabSchema                 { $("#navSchema > a") }
-        tabSQLQuery               { $("#navSqlQuery > a") }
-        username                  { $("#btnlogOut > div") }
+        banner                    { $("#headerMain") }
+        image                     { $("html body div.page-wrap div#wrapper div#headerMain.header div.headLeft div.logo img") }
+        tabDBMonitor              { $("#navDbmonitor") }
+        tabAdmin                  { $("#navAdmin") }
+        tabSchema                 { $("#navSchema") }
+        tabSQLQuery               { $("#navSqlQuery") }
+        username                  { $(class:"userN") }
         logout                    { $("#logOut > div") }
         help                      { $("#showMyHelp") }
-        popup                     { $("body > div.popup_cont > div.popup > div") }
-        popupTitle                { $("body > div.popup_cont > div.popup > div > div.overlay-title.helpIcon") }
-        popupClose                { $("body > div.popup_cont > div.popup_close") }
-        logoutPopup               { $("body > div.popup_cont") }
-        logoutPopupTitle          { $("body > div.popup_cont > div.popup > div > div.overlay-title") }
+        popup                     { $(class:"popup_content10") }
+        popupTitle                { $(class:"overlay-title helpIcon ", text:"Help") }
+        popupClose                { $(class:"popup_close") }
+        logoutPopup               { $(class:"popup_content2") }
+        logoutPopupTitle          { $("html body div.popup_cont.2 div.popup div.popup_content2 div.overlay-title img.imgError") }
         logoutPopupOkButton       { $("#A1") }
         logoutPopupCancelButton   { $("#btnCancel") }
-        noheader                        { $("#noheader") }   // This is for testing the test results
     }
 
 }

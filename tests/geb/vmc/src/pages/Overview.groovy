@@ -16,26 +16,25 @@ import org.openqa.selenium.JavascriptExecutor
 
 class Overview extends Module {
     static content = {
-    	title						{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.headerAdminContent h1") }
-		sitePerHost					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr td.configLabel") }
-		ksafety						{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr td.configLabel") }
-		partitionDetection			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr td.configLabel") }
-		security					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td.configLabel a.labelCollapsed") }
-		httpAccess					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-1.hasSubLabel.parent td.configLabel a.labelCollapsed") }
-		autoSnapshots				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td.configLabel a.labelCollapsed") }	
-		commandLogging				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-3.hasSubLabel.parent td.configLabel a.labelCollapsed") }
-		export						{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-4.hasSubLabel.parent td.configLabel a.labelCollapsed") }
-		advanced					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-5.hasSubLabel.parent td.configLabel a.labelCollapsed") }
+    	title				{ $("h1", "Overview") }
+		sitePerHost			{ $(class:"configLabel", text:"Sites Per Host") }
+		ksafety				{ $(class:"configLabel", text:"K-Safety") }
+		partitionDetection	{ $(class:"configLabel", text:"Partition Detection") }
+		security			{ $(class:"labelCollapsed", text:"Security") }
+		httpAccess			{ $(class:"labelCollapsed", text:"HTTP Access") }
+		autoSnapshots		{ $(class:"labelCollapsed", text:"Auto Snapshots") }	
+		commandLogging		{ $(class:"labelCollapsed", text:"Command Logging") }
+		export				{ $(class:"labelCollapsed", text:"Export") }
+		advanced			{ $(class:"labelCollapsed", text:"Advanced") }
 		
 
-		sitePerHostValue			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr td#sitePerHost") }
-		ksafetyValue				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr td#kSafety") }
-		partitionDetectionValue		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr td#partitionDetectionLabel") }
-		securityValue				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td span#spanSecurity") }
-		httpAccessValue				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-1.hasSubLabel.parent td#httpAccessLabel") }
-		autoSnapshotsValue			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td div#txtAutoSnapshot.SnapshotsOn") }
-		commandLoggingValue			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-3.hasSubLabel.parent td#commandLogLabel") }
-		exportValue					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-4.hasSubLabel.parent td#txtExportLabel") }
+		sitePerHostValue			{ $("#sitePerHost") }
+		ksafetyValue				{ $("#kSafety") }
+		partitionDetectionValue		{ $("#partitionDetectionLabel") }
+		securityValue				{ $("#spanSecurity") }
+		httpAccessValue				{ $("#httpAccessLabel") }
+		autoSnapshotsValue			{ $("#txtAutoSnapshot") }
+		commandLoggingValue			{ $("#commandLogLabel") }
 
 
 		securityEdit				{ $("#securityEdit") }
@@ -44,7 +43,7 @@ class Overview extends Module {
 		securityEditCancel			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td a#btnEditSecurityCancel.editCancel") }
 		
 
-		autoSnapshotsEdit			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#autoSnapshotEdit.edit") }
+		autoSnapshotsEdit			{ $("#autoSnapshotEdit") }
 		autoSnapshotsEditCheckbox1 	{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td#autoSnapshotOption.snapshottd div.icheckbox_square-aero.customCheckbox ins.iCheck-helper") }
 		autoSnapshotsEditCheckbox 	{ $(class:"icheckbox_square-aero customCheckbox") }
 
