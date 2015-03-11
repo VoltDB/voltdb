@@ -26,6 +26,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -127,8 +128,6 @@ public class AsyncCompilerAgentHelper
                     work.invocationName;
                 return retval;
             }
-            retval.catalogBytes = newCatalogBytes;
-            retval.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(newCatalogBytes);
 
             // get the diff between catalogs
             // try to get the new catalog from the params
@@ -142,6 +141,9 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = ioe.getMessage();
                 return retval;
             }
+            newCatalogBytes = loadResults.getFirst().getFullJarBytes();
+            retval.catalogBytes = newCatalogBytes;
+            retval.catalogHash = loadResults.getFirst().getSha1Hash();
             String newCatalogCommands =
                 CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();
@@ -157,7 +159,7 @@ public class AsyncCompilerAgentHelper
                 // Go get the deployment string from the current catalog context
                 byte[] deploymentBytes = context.getDeploymentBytes();
                 if (deploymentBytes != null) {
-                    deploymentString = new String(deploymentBytes, "UTF-8");
+                    deploymentString = new String(deploymentBytes, Constants.UTF8ENCODING);
                 }
                 if (deploymentBytes == null || deploymentString == null) {
                     retval.errorMsg = "No deployment file provided and unable to recover previous " +
@@ -175,7 +177,7 @@ public class AsyncCompilerAgentHelper
 
             retval.deploymentString = deploymentString;
             retval.deploymentHash =
-                CatalogUtil.makeCatalogOrDeploymentHash(deploymentString.getBytes("UTF-8"));
+                CatalogUtil.makeDeploymentHash(deploymentString.getBytes(Constants.UTF8ENCODING));
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
