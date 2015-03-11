@@ -54,8 +54,6 @@ public class TestSqlCmdInterface
 {
     private int ID = -1;
     private final String logFilename = "/tmp/logHelp.txt"; // For ENG-3440
-    private final static String[] firstKeyQryWord =
-            new String[]{"select", "insert", "delete", "update", "exec", "execute", "create", "alter", "drop"};
 
     // 1) To test a single select statement
     @Test
@@ -79,13 +77,12 @@ public class TestSqlCmdInterface
                 "create table garbled8    yes integer, limit partition rows 3 execute (delete from valid where yes = -1));" +
                 "create table garbled9  ( yes integer, limit partition rows 3 execute  delete from valid where yes = -1 );" +
                 "create table garbled10 ( yes integer,                        execute (delete from valid where yes = -1));" +
-                "create table garbled11 ( yes integer,                                 delete from valid where yes = -1 )" +
+                "create table garbled11 ( yes integer,                                 delete from valid where yes = -1 );" +
                 "";
         ID = 2;
         // Extra whitespace is just for human readability.
         raw = raw.replaceAll("\\s+", " ");
-        String expected = raw.replaceAll(";", " ").replaceAll("\\s+", " ");
-        //expected = trimKeyWordsLeadingSpaces(expected);
+        String expected = raw.replaceAll("\\s*;\\s*", ";");
         assertThis(raw, expected, 11, ID);
     }
 
@@ -96,8 +93,7 @@ public class TestSqlCmdInterface
         String raw = "   select * from Dummy where id  =    1;;;;    " +
                       "   select * from          dummy2;        ";
         ID = 3;
-        String expected = raw.replaceAll("\\;+", "");
-        expected = trimKeyWordsLeadingSpaces(expected);
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 2, ID);
     }
 
@@ -106,7 +102,7 @@ public class TestSqlCmdInterface
     public void testParseQuery5() {
         String raw = "select * fRom dummy;;;;select *";
         ID = 5;
-        String expected = raw.replaceAll("\\;+", " ");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";") + ";";
         assertThis(raw, expected, 2, ID);
     }
 
@@ -114,9 +110,9 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery6() {
         String raw = "     INSERT INTO      Dummy " +
-                      "            vALUES (value1, NULL, null, '', ...)";
+                      "            vALUES (value1, NULL, null, '', ...);";
         ID = 6;
-        String expected = trimKeyWordsLeadingSpaces(raw);
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -125,7 +121,7 @@ public class TestSqlCmdInterface
     //    So this is a negative test.
     @Test
     public void testParseQuery7() {
-        String raw = "SELECT * FROM table UNION SELECT * FROM table2";
+        String raw = "SELECT * FROM table UNION SELECT * FROM table2;";
         String expected = raw;
         ID = 7;
         assertThis(raw, expected, 1, ID);
@@ -136,9 +132,9 @@ public class TestSqlCmdInterface
     //    ENG-3354
     @Test
     public void testParseQuery8() {
-        String raw = "SELECT * FROM table --UNION SELECT * FROM table2";
+        String raw = "SELECT * FROM table --UNION SELECT * FROM table2;";
         ID = 8;
-        String expected = "SELECT * FROM table";
+        String expected = "SELECT * FROM table ;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -148,9 +144,9 @@ public class TestSqlCmdInterface
     //    is treated as a comment. This test should pass.
     @Test
     public void testParseQuery9() {
-        String raw = "SELECT * FROM table --UNION --SELECT * FROM table2";
+        String raw = "SELECT * FROM table --UNION --SELECT * FROM table2;";
         ID = 9;
-        String expected = "SELECT * FROM table";
+        String expected = "SELECT * FROM table ;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -159,9 +155,9 @@ public class TestSqlCmdInterface
     //     '--' and the 2nd select statement. In theory, this test should pass.
     @Test
     public void testParseQuery10() {
-        String raw = "SELECT * FROM table -- SELECT * FROM table2";
+        String raw = "SELECT * FROM table -- SELECT * FROM table2;";
         ID = 10;
-        String expected = "SELECT * FROM table";
+        String expected = "SELECT * FROM table ;";
         assertThis(raw, expected, 1, ID);
 
     }
@@ -173,9 +169,7 @@ public class TestSqlCmdInterface
     public void testParseQuery11() {
         String raw = "  create tAble xxx   (col1_name type(), col2_name type());";
         ID = 11;
-        String expected = raw.replaceAll("\\;+", " ");
-        expected = trimKeyWordsLeadingSpaces(expected);
-        expected = expected.replaceAll("\\;+", " ");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -186,8 +180,7 @@ public class TestSqlCmdInterface
     public void testParseQuery13() {
         String raw = " select * From dummy;   create tAble xxx  (col1_name type(), col2_name type()) ;  ";
         ID = 2;
-        String expected = raw.replaceAll("\\;+", " ");
-        expected = trimKeyWordsLeadingSpaces(expected);
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 2, ID);
     }
 
@@ -199,9 +192,7 @@ public class TestSqlCmdInterface
         ID = 14;
         String expected = raw;
         // sqlcmd always replace semicolons with ONE space
-        expected = expected.replaceAll("\\s+\\;+\\s+", " ");
-        // sqlcmd always trims the input string
-        expected = expected.trim();
+        expected = expected.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 2, ID);
     }
 
@@ -220,8 +211,7 @@ public class TestSqlCmdInterface
         String raw6 = "insert into votes vAlues (2150000000, 'PA', 6);";
         String raw = raw1 + raw2 + raw3 + raw4 + raw5 + raw6;
         String copy = raw;
-        copy = copy.replaceAll("\\s*\\;+\\s*", " ");
-        copy = trimKeyWordsLeadingSpaces(copy);
+        copy = copy.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, copy, 7, ID);
     }
 
@@ -236,8 +226,7 @@ public class TestSqlCmdInterface
         String raw3 = "   alter table xxxx rename to new_tbl_name; ";
         String raw4 = "select cOunt(*) from dummy ;";
         String raw = raw1 + raw2 + raw3 + raw4;
-        String expected = raw.replaceAll("\\s*\\;+\\s*", " ");
-        expected = trimKeyWordsLeadingSpaces(expected);
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 4, ID);
     }
 
@@ -246,8 +235,7 @@ public class TestSqlCmdInterface
     public void testParseQuery18() {
         ID = 18;
         String raw = "select * from dummy   ;    exec @SystemCatalog   tables;";
-        String expected = raw.replaceAll("\\s*\\;+\\s*", " ");
-        expected = trimKeyWordsLeadingSpaces(expected);
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 2, ID);
     }
 
@@ -255,9 +243,8 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery19() {
         ID = 19;
-        String raw = " insert into tablename (col1, col2) values ('   1st 2nd 3rd  ', '   ')";
-        //String expected = raw.replaceAll("\\s*\\;+\\s*", " ");
-        String expected = trimKeyWordsLeadingSpaces(raw);
+        String raw = " insert into tablename (col1, col2) values ('   1st 2nd 3rd  ', '   ');";
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -265,10 +252,9 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery20() {
         ID = 20;
-        String raw = " insert into votes (phone-number, state, CONTESTANT_NUMBER) ";
-        raw += "values (978-475-      0001, 'MA', null)";
-        //String expected = raw.replaceAll("\\s*\\;+\\s*", " ");
-        String expected = trimKeyWordsLeadingSpaces(raw);
+        String raw = " insert into votes (phone-number, state, CONTESTANT_NUMBER) " +
+                "values (978-475-      0001, 'MA', null);";
+        String expected = raw.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, expected, 1, ID);
     }
 
@@ -301,7 +287,7 @@ public class TestSqlCmdInterface
         }
         int blockCommentCount = 0;
         try {
-            Pattern regex = Pattern.compile("(?:/\\*.*?\\*/)", Pattern.DOTALL | Pattern.MULTILINE);
+            Pattern regex = Pattern.compile("(?:/\\*.*\\*/)", Pattern.DOTALL | Pattern.MULTILINE);
 
             Matcher regexMatcher = regex.matcher(contents);
             StringBuffer sb = new StringBuffer();
@@ -339,9 +325,7 @@ public class TestSqlCmdInterface
             }
         }
         opnScanner.close();
-        qryFrmFile = qryFrmFile.replaceAll("\\;+", " ");
-        qryFrmFile = trimKeyWordsLeadingSpaces(qryFrmFile);
-        //qryFrmFile += " #blah#"; // For testing only
+        qryFrmFile = qryFrmFile.replaceAll("\\s*;+\\s*", ";");
         assertThis(raw, qryFrmFile, numOfQueries, ID, blockCommentCount);
     }
 
@@ -353,10 +337,10 @@ public class TestSqlCmdInterface
                 + "from -- comment no semicolon\n"
                 + "table -- comment with semicolon;";
 
-        String expected = "select \n"
+        String expected = " select \n"
                 + "* \n"
                 + "from \n"
-                + "table";
+                + "table ;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -372,15 +356,15 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery23() {
         ID = 23;
-        String raw = " select -- comment no semicolon\n"
+        String raw = "select -- comment no semicolon\n"
                 + "* -- comment with this ; a semicolon inside\n"
                 + "from -- comment with this ; a semicolon inside\n"
-                + "table -- comment with semicolon;";
+                + "table-- comment with semicolon;";
 
         String expected = "select \n"
                 + "* \n"
                 + "from \n"
-                + "table";
+                + "table;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -391,8 +375,7 @@ public class TestSqlCmdInterface
         ID = 23;
         String query = "exec @SystemCatalog,     tables";
         String expected = query.replace("exec", "");
-        expected = expected.replaceAll(",", "");
-        expected = expected.replaceAll("\\s+", "");
+        expected = expected.replaceAll("[,\\s]+", " ");
         assertThis2(query, expected, 2, ID);
     }
 
@@ -404,8 +387,7 @@ public class TestSqlCmdInterface
         ID = 24;
         String query = "exec ,, @SystemCatalog,,,,tables";
         String expected = query.replace("exec", "");
-        expected = expected.replaceAll(",", "");
-        expected = expected.replaceAll("\\s+", "");
+        expected = expected.replaceAll("[,\\s]+", " ");
         assertThis2(query, expected, 2, ID);
     }
 
@@ -418,7 +400,9 @@ public class TestSqlCmdInterface
     public void testParseQueryProcedureCallParameters25() {
         ID = 25;
         String query = "exec,, @SystemCatalog,,,,tables";
-        assertTrue(SQLParser.parseExecuteCallWithoutParameterTypes(query) == null);
+        String expected = query.replace("exec", "");
+        expected = expected.replaceAll("[,\\s]+", " ");
+        assertThis2(query, expected, 2, ID);
     }
 
     // To assert the help page printed by SQLCommand.printHelp() is identical to the
@@ -463,13 +447,12 @@ public class TestSqlCmdInterface
     //     with SQL keywords
     @Test
     public void testSneakyNamedProcedure() {
-        String query = "exec selectMasterDonner, 0, 1";
+        String query = "exec selectMasterDonner, 0, 1;";
         ID = 27;
-        String expected = trimKeyWordsLeadingSpaces(query);
+        String expected = query;
         assertThis(query, expected, 1, ID);
         expected = query.replace("exec", "");
-        expected = expected.replaceAll(",", "");
-        expected = expected.replaceAll("\\s+", "");
+        expected = expected.replaceAll("[,\\s]+", " ");
         assertThis2(query, expected, 3, ID);
     }
 
@@ -477,7 +460,7 @@ public class TestSqlCmdInterface
     public void testParseCreateView()
     {
         ID = 28;
-        String create = "create view foo (bas, as) as select bar, count(*) from foo group by val";
+        String create = "create view foo (bas, as) as select bar, count(*) from foo group by val;";
         assertThis(create, create, 1, ID);
     }
 
@@ -485,26 +468,16 @@ public class TestSqlCmdInterface
     public void testParseCreateStmtProcedure()
     {
         ID = 29;
-        String create = "create procedure foo as select * from blat";
+        String create = "create procedure foo as select * from blat;";
         assertThis(create, create, 1, ID);
-        create = "create procedure foo as insert into blat values (?, ?)";
+        create = "create procedure foo as insert into blat values (?, ?);";
         assertThis(create, create, 1, ID);
-        create = "create procedure foo as update into blat values (?, ?)";
+        create = "create procedure foo as update into blat values (?, ?);";
         assertThis(create, create, 1, ID);
-        create = "create procedure foo as delete into blat values (?, ?)";
+        create = "create procedure foo as delete into blat values (?, ?);";
         assertThis(create, create, 1, ID);
-        create = "create procedure foo as SELECT * FROM table UNION SELECT * FROM table2";
+        create = "create procedure foo as SELECT * FROM table UNION SELECT * FROM table2;";
         assertThis(create, create, 1, ID);
-    }
-
-    private static String trimKeyWordsLeadingSpaces(String str) {
-        str = str.toLowerCase();
-        for(String keyWord :  firstKeyQryWord) {
-            String raw = "\\s+" + keyWord;
-            String cleaned = " " + keyWord;
-            str = str.replaceAll(raw, cleaned);
-        }
-        return str.trim();
     }
 
     private void assertThis(String qryStr, int numOfQry, int testID) {
@@ -512,7 +485,7 @@ public class TestSqlCmdInterface
         String msg = "Test ID: " + testID + ". ";
         assertNotNull(msg + "SQLCommand.parseQuery returned a NULL obj!!", parsed);
         assertEquals(msg, numOfQry, parsed.size());
-        String parsedString = Joiner.on(" ").join(parsed);
+        String parsedString = Joiner.on(";").join(parsed);
         assertTrue(msg, qryStr.equalsIgnoreCase(parsedString));
     }
 
@@ -524,9 +497,9 @@ public class TestSqlCmdInterface
         List<String> parsed = SQLParser.parseQuery(qryStr);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + numOfQry + "\n";
-        err1 += "Actual # of queries: " + parsed.size() + blockCommentCount + "\n";
+        err1 += "Actual # of queries: " + (parsed.size() - blockCommentCount) + "\n";
         assertEquals(msg+err1, numOfQry + blockCommentCount, parsed.size());
-        String parsedString = Joiner.on(" ").join(parsed);
+        String parsedString = Joiner.on(";").join(parsed) + ";";
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";
 
@@ -545,7 +518,7 @@ public class TestSqlCmdInterface
         assertNotNull(results.procedure);
         assertFalse(results.procedure.isEmpty());
         int numQueries = results.params.size() + 1;
-        String parsedString = results.procedure + Joiner.on("").join(results.params);
+        String parsedString = " " + results.procedure + " " + Joiner.on(" ").join(results.params);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + num + "\n";
         err1 += "Actual # of queries: " + numQueries + "\n";

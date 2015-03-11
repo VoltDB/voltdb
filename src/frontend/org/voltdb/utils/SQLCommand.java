@@ -688,7 +688,7 @@ public class SQLCommand
     private static void executeStatement(String statement)
     {
         if (m_testFrontEndOnly) {
-            m_testFrontEndResult += statement;
+            m_testFrontEndResult += statement + ";\n";
             return;
         }
         if ( ! m_interactive ) {
