@@ -1,3 +1,2 @@
-file -inlinebatch EOF
-EOF
 
+FILE -inlinebatch EOF

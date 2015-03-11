@@ -1,15 +1,18 @@
-drop table t if exists;
-create table t (i integer not null);
 
-file -inlinebatch EOF
+drop table t if exists;
+Command succeeded.
+
+create table t (i integer not null);
+Command succeeded.
+
+FILE -inlinebatch EOF
+
 partition table t on column i;
 create index tidx on t(i);
-EOF
+
+Batch command succeeded.
 
 explain select * from t;
-Command succeeded.
-Command succeeded.
-Batch command succeeded.
 EXECUTION_PLAN                 
 -------------------------------
 RETURN RESULTS TO STORED PROCEDURE
@@ -19,4 +22,3 @@ RETURN RESULTS TO STORED PROCEDURE
 
 
 (Returned 1 rows in #.##s)
-

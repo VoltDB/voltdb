@@ -1,15 +1,20 @@
+
 drop table t if exists;
+Command succeeded.
+
 create table t ( c integer );
+Command succeeded.
+
 insert into t values (0);
+(Returned 1 rows in #.##s)
+
 insert into t values (1);
+(Returned 1 rows in #.##s)
+
 insert into t values (2);
+(Returned 1 rows in #.##s)
+
 select * from t;
-drop table t;
-Command succeeded.
-Command succeeded.
-(Returned 1 rows in #.##s)
-(Returned 1 rows in #.##s)
-(Returned 1 rows in #.##s)
 C 
 --
  0
@@ -17,5 +22,6 @@ C
  2
 
 (Returned 3 rows in #.##s)
-Command succeeded.
 
+drop table t;
+Command succeeded.

@@ -29,5 +29,5 @@ interface SQLCommandLineReader {
      * Read the next line of input from some underlying input stream.
      * If the underlying stream is interactive, print out the prompt.
      * */
-    public String readLine(String prompt) throws IOException;
+    public String readBatchLine() throws IOException;
 }
