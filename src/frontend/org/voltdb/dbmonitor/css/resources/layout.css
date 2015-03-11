@@ -882,9 +882,12 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
-.tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 7px 4px;}
+.tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
+.tblSave tr td#tdSnapshotName input[type="text"] {position: relative; top:4px;}
+
+
 .tblRestore th {}
-.tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 7px 4px;}
+.tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
 .restoreCont {overflow:auto; height:200px}
 .restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
@@ -957,7 +960,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 
 .resizeCon {width:452px}
 .resizeRestore{width:95%}
-a.restoreBtn{cursor: default;}
+a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-align: center; color: #fff; font: 14px Arial, Helvetica, sans-serif; text-shadow: none; text-decoration: none; border-radius: 0; border: none; }
 /****Export details*******/
 .properTbl tr td:first-child
 .btnEd { cursor: pointer; background: #D0D2D2; padding: 5px; font-weight: bold; font-size: 12px;}
@@ -974,6 +977,9 @@ a.restoreBtn{cursor: default;}
 .properbtn {padding: 0 35px 0 0;}
 .adminTbl1 tr.subLabelRow td.expoStream { padding-left: 40px;font-weight: bold;cursor: pointer;}
 .expoProper {padding-left: 70px!important; font-weight: bold;}
+
+.exportList{ padding: 11px 5px 10px 23px!important;cursor: default!important; }
+h3.noExport { font-size: 14px;}
 /****Export details Ends*******/
 
 /*********************************************media Qu********************/

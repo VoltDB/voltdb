@@ -612,6 +612,7 @@
                                     <li><a href="#tab1">Tables</a></li>
                                     <li><a href="#tab2">Views</a></li>
                                     <li><a href="#tab3">Stored Procedures</a></li>
+                                    <li><a href="#tab4">Exports</a></li>
                                 </ul>
                                 <div class="tab_container">
                                     <div id="tabScroller">
@@ -623,6 +624,9 @@
                                         </div>
                                         <div id="tab3" class="tab_content">
                                             <div id="accordionProcedures"></div>
+                                        </div>
+                                        <div id="tab4" class="tab_content">
+                                            <div id="accordionExports"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -1010,12 +1014,12 @@
     <div id="savePop" style="display: none">
         <div class="overlay-title icon-alert">Save</div>
         <div class="clear"></div>
-        <div id="saveSnapshot" class="saveInfo">
+        <div id="saveSnapshot">
             <div class="overlay-content ">
                 <form id="formSaveSnapshot" method="get" action="">
                     <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
                         <tr>
-                            <td>Directory:</td>
+                            <td>Directory:<br />(absolute path)</td>
                             <td id="tdSnapshotDirectory"></td>
                         </tr>
                         <tr>
@@ -1025,7 +1029,7 @@
                     </table>
                 </form>
             </div>
-            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
         </div>
     </div>
     <!-- POPUP savePop -->
@@ -1042,7 +1046,7 @@
                             <div class="directoryRestore">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
                                     <tr>
-                                        <th align="left">Directory</th>
+                                        <th align="left">Directory <br />(absolute path)</th>
                                         <td align="left" id="tdSearchSnapshots">
                                             <!--<input id="txtSearchSnapshots" type="text">-->
                                         </td>
