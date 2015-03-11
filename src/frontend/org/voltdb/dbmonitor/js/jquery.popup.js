@@ -114,7 +114,7 @@
 						    $('body').css("height", $(window).height());
 							$('body').css("overflow", "hidden");
 							$('body').css("position", "fixed");
-							$('body').css("overflow-y", "scroll");
+							//$('body').css("overflow-y", "scroll");
 							$('body').css("width", "100%");
 							//$('body').bind('touchmove', function(e){e.preventDefault()});//mobile
 							// Call the open callback
