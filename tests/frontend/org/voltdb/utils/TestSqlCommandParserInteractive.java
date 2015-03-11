@@ -180,17 +180,11 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
-        // This is the behavior you might want, doesn't work
-        //cmd.submitText("--insert into goats values (0, 1)\n");
-        //cmd.waitOnResult();
-        //System.out.println("RESULT: " + result.get());
-        //assertEquals(0, result.get().size());
-        //result = cmd.openQuery();
 
-        cmd.submitText("--insert into goats values (0, 1)");
+        cmd.submitText("--insert into goats values (0, 1); select * from goats;\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
-        cmd.submitText("; select * from goats;\n");
+        cmd.submitText(";\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
         assertEquals(0, result.get().size());
