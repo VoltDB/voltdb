@@ -892,6 +892,8 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
 .tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
+.tblSave tr td#tdSnapshotName input[type="text"] {position: relative; top:4px;}
+
 
 .tblRestore th {}
 .tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
@@ -1008,6 +1010,7 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .properbtn {padding: 0 35px 0 0;}
 .adminTbl1 tr.subLabelRow td.expoStream { padding-left: 40px;font-weight: bold;cursor: pointer;}
 .expoProper {padding-left: 70px!important; font-weight: bold;}
+
 .streamTbl {position: relative;top: 3px;}
 .streamTbl tr th,.streamTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; /*padding:5px 0 10px 10px;*/ padding:5px 0 0 40px;}
 .streamTbl tr th:first-child,.streamTbl tr td:first-child { padding-left: 80px;}
@@ -1035,6 +1038,9 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .loadExport { position: relative; left: 3px; top: 5px; }
 .loadExportConfig { margin: 0 0 0 29%;}
 .iconDeleteAddConfig {background-position:0px -1570px; width:20px; height:20px; float:left; position:relative; top:6px;}
+
+.exportList{ padding: 11px 5px 10px 23px!important;cursor: default!important; }
+h3.noExport { font-size: 14px;}
 
 /****Export details Ends*******/
 a.changePsd {color: #0079bb;}

@@ -447,8 +447,9 @@ function alertNodeClicked(obj) {
                 var proceduresData = {};
                 var procedureColumnsData = {};
                 var sysProceduresData = {};
-                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION');
-                onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData);
+                var exportsData = {};
+                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, exportsData, 'TABLE_INFORMATION');
+                onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, exportsData);
             });
         };
 
@@ -2456,7 +2457,8 @@ function alertNodeClicked(obj) {
             }, userId, requestType);
         };
 
-        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
+        
+        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData,exportData, processName) {
             var suffix = "";
             if (processName == "TABLE_INFORMATION") {
                 suffix = "_" + processName;
@@ -2474,9 +2476,9 @@ function alertNodeClicked(obj) {
 
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
-                if (rawTables[k][6] == 'StreamedTable')
+                if (rawTables[k][6] == 'StreamedTable') {
                     exports[tableName] = { name: tableName };
-                else {
+                } else {
                     var isView = false;
                     var item = { name: tableName, key: null, indexes: null, columns: null };
                     for (var j = 0; j < rawIndexes.length; j++) {
@@ -2500,7 +2502,7 @@ function alertNodeClicked(obj) {
 
             connection.Metadata['tables'] = tables;
             connection.Metadata['views'] = views;
-
+            connection.Metadata['exports'] = exports;
             for (var i = 0; i < rawColumns.length; i++) {
                 var TableName = rawColumns[i][2].toUpperCase();
                 if (connection.Metadata['tables'][TableName] != null) {
@@ -2565,6 +2567,7 @@ function alertNodeClicked(obj) {
             proceduresData['procedures'] = procedures;
             procedureColumnsData['procedureColumns'] = procedureColumns;
             sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
+            exportData['exports'] = connection.Metadata['exports'];
         }
 
 
