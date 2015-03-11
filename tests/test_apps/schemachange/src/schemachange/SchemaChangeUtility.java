@@ -104,13 +104,15 @@ public class SchemaChangeUtility
                     log.error(String.format("Error in procedure call for: %s", procName));
                     log.error(((ClientResponseImpl)cr).toJSONString());
                     // for starters, I'm assuming these errors can't happen for reads in a sound system
-                    if (retry < 3) {
-                        // Cluster might not have come back get, retry
-                        retry++;
-                        break;
-                    } else {
-                        assert(false);
-                        System.exit(-1);
+                    if (cr.getStatusString().contains("Statement: select count(*) from")) {
+                        // We might need to retry
+                        if (retry < 3) {
+                            retry++;
+                            break;
+                        } else {
+                            assert(false);
+                            System.exit(-1);
+                        }
                     }
                 }
             }
