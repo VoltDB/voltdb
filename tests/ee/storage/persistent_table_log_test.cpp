@@ -96,6 +96,19 @@ public:
         m_primaryKeyIndexColumns.push_back(6);
         m_primaryKeyIndexColumns.push_back(7);
 
+        // Narrower table with no uninlined column
+        m_narrowColumnNames.push_back("1");
+        m_narrowColumnNames.push_back("2");
+
+        m_narrowTableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_narrowTableSchemaTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
+
+        m_narrowTableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_narrowTableSchemaColumnSizes.push_back(15);
+
+        m_narrowTableSchemaAllowNull.push_back(false);
+        m_narrowTableSchemaAllowNull.push_back(true);
+
         m_engine->setUndoToken(INT64_MIN + 1);
     }
 
@@ -126,6 +139,14 @@ public:
         m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
+    void initNarrowTable() {
+        m_tableSchema = TupleSchema::createTupleSchemaForTest(m_narrowTableSchemaTypes,
+                                                              m_narrowTableSchemaColumnSizes,
+                                                              m_narrowTableSchemaAllowNull);
+        m_table = dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_narrowColumnNames, signature, &drStream, false, 0));
+    }
+
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
     PersistentTable *m_table;
@@ -135,6 +156,12 @@ public:
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
+
+    std::vector<std::string> m_narrowColumnNames;
+    std::vector<ValueType> m_narrowTableSchemaTypes;
+    std::vector<int32_t> m_narrowTableSchemaColumnSizes;
+    std::vector<bool> m_narrowTableSchemaAllowNull;
+
     char signature[20];
 };
 
@@ -366,6 +393,57 @@ TEST_F(PersistentTableLogTest, LookupTupleForUndoNoPKTest) {
     voltdb::TableTuple tuple(m_tableSchema);
     tableutil::getRandomTuple(m_table, tuple);
     ASSERT_EQ(m_table->lookupTupleForUndo(tuple).address(), tuple.address());
+}
+
+TEST_F(PersistentTableLogTest, LookupTupleUsingTempTupleTest) {
+    initNarrowTable();
+
+    // Create three tuple with a variable length VARCHAR column, then call
+    // lookupTupleForUndo() to look each tuple up from wide to narrower column.
+    // It will use the memcmp() code path for the comparison, which should all
+    // succeed because there is no uninlined stuff.
+
+    TableTuple wideTuple(m_tableSchema);
+    wideTuple.move(new char[wideTuple.tupleLength()]);
+    ::memset(wideTuple.address(), 0, wideTuple.tupleLength());
+    wideTuple.setNValue(0, ValueFactory::getBigIntValue(1));
+    wideTuple.setNValue(1, ValueFactory::getStringValue("a long string"));
+    m_table->insertTuple(wideTuple);
+    delete[] wideTuple.address();
+
+    TableTuple narrowTuple(m_tableSchema);
+    narrowTuple.move(new char[narrowTuple.tupleLength()]);
+    ::memset(narrowTuple.address(), 0, narrowTuple.tupleLength());
+    narrowTuple.setNValue(0, ValueFactory::getBigIntValue(2));
+    narrowTuple.setNValue(1, ValueFactory::getStringValue("a"));
+    m_table->insertTuple(narrowTuple);
+    delete[] narrowTuple.address();
+
+    TableTuple nullTuple(m_tableSchema);
+    nullTuple.move(new char[nullTuple.tupleLength()]);
+    ::memset(nullTuple.address(), 0, nullTuple.tupleLength());
+    nullTuple.setNValue(0, ValueFactory::getBigIntValue(3));
+    nullTuple.setNValue(1, ValueFactory::getNullStringValue());
+    m_table->insertTuple(nullTuple);
+    delete[] nullTuple.address();
+
+    TableTuple tempTuple = m_table->tempTuple();
+    tempTuple.setNValue(0, ValueFactory::getBigIntValue(1));
+    tempTuple.setNValue(1, ValueFactory::getStringValue("a long string"));
+    TableTuple result = m_table->lookupTupleForUndo(tempTuple);
+    ASSERT_FALSE(result.isNullTuple());
+
+    tempTuple = m_table->tempTuple();
+    tempTuple.setNValue(0, ValueFactory::getBigIntValue(2));
+    tempTuple.setNValue(1, ValueFactory::getStringValue("a"));
+    result = m_table->lookupTupleForUndo(tempTuple);
+    ASSERT_FALSE(result.isNullTuple());
+
+    tempTuple = m_table->tempTuple();
+    tempTuple.setNValue(0, ValueFactory::getBigIntValue(3));
+    tempTuple.setNValue(1, ValueFactory::getNullStringValue());
+    result = m_table->lookupTupleForUndo(tempTuple);
+    ASSERT_FALSE(result.isNullTuple());
 }
 
 int main() {

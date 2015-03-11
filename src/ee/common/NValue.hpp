@@ -1492,6 +1492,10 @@ class NValue {
      * inline object in the provided storage area
      */
     void inlineCopyObject(void *storage, int32_t maxLength, bool isInBytes) const {
+        // Always reset all the bits regardless of the actual length of the value
+        // 1 additional byte for the length prefix
+        ::memset(storage, 0, maxLength + 1);
+
         if (isNull()) {
             /*
              * The 7th bit of the length preceding value
@@ -2801,6 +2805,9 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         // the NULL SQL string is a NULL C pointer
         if (isInlined) {
+            // Always reset the bits regardless of how long the actual value is.
+            ::memset(storage, 0, lengthLength + maxLength);
+
             setObjectLengthToLocation(length, storage);
             if (length == OBJECTLENGTH_NULL) {
                 break;
