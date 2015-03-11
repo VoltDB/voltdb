@@ -358,6 +358,11 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
             } while (rc > 0);
         } finally {
+            //Partial write and failure on next write could bring us here. We need to discard.
+            if (m_currentWriteBuffer != null) {
+                m_currentWriteBuffer.discard();
+                m_currentWriteBuffer = null;
+            }
             //We might fail after writing few bytes. make sure the ones that are written accounted for.
             //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
             if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
