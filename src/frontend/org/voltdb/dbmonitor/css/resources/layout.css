@@ -964,6 +964,10 @@ color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
 }
 
+ul.exportList {}
+.exportList{ padding: 11px 5px 10px 23px!important;cursor: default!important; }
+h3.noExport { font-size: 14px;}
+
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
