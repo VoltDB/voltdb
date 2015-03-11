@@ -288,7 +288,7 @@ try:
 except Exception as e:
     print "Coult not build LINUX kit: " + str(e)
     build_errors=True
-exit()
+
 try:
 # build kits on the mini
     with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
