@@ -883,6 +883,8 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
 .tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
+.tblSave tr td#tdSnapshotName input[type="text"] {position: relative; top:4px;}
+
 
 .tblRestore th {}
 .tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
