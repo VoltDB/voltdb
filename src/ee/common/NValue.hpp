@@ -1492,11 +1492,11 @@ class NValue {
      * inline object in the provided storage area
      */
     void inlineCopyObject(void *storage, int32_t maxLength, bool isInBytes) const {
-        // Always reset all the bits regardless of the actual length of the value
-        // 1 additional byte for the length prefix
-        ::memset(storage, 0, maxLength + 1);
-
         if (isNull()) {
+            // Always reset all the bits regardless of the actual length of the value
+            // 1 additional byte for the length prefix
+            ::memset(storage, 0, maxLength + 1);
+
             /*
              * The 7th bit of the length preceding value
              * is used to indicate that the object is null.
@@ -1507,6 +1507,10 @@ class NValue {
             const int32_t objLength = getObjectLength_withoutNull();
             const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
             checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+
+            // Always reset all the bits regardless of the actual length of the value
+            // 1 additional byte for the length prefix
+            ::memset(storage, 0, maxLength + 1);
 
             if (m_sourceInlined)
             {
