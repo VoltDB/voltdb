@@ -974,6 +974,10 @@ function loadAdminPage() {
             adminEditObjects.tBoxFilePrefix.hide();
             adminDOMObjects.retainedLabel.hide();
 
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
+
             adminEditObjects.loadingSnapshot.show();
             adminEditObjects.loadingSnapshotFrequency.show();
             adminEditObjects.loadingSnapshotPrefix.show();
@@ -1004,6 +1008,9 @@ function loadAdminPage() {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
             adminEditObjects.LinkAutoSnapshotEdit.show();
             adminEditObjects.iconAutoSnapshotOption.show();
             adminDOMObjects.autoSnapshotLabel.show();
@@ -1335,6 +1342,7 @@ function loadAdminPage() {
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
             adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.errorQueryTimeout.hide();
 
             adminEditObjects.loadingQueryTimeout.show();
         }
@@ -1351,6 +1359,7 @@ function loadAdminPage() {
             adminEditObjects.loadingQueryTimeout.hide();
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.errorQueryTimeout.hide();
             adminEditObjects.LinkQueryTimeoutEdit.show();
 
             adminEditObjects.tBoxQueryTimeout.hide();
