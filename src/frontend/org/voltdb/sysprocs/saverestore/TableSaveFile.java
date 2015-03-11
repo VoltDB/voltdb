@@ -529,17 +529,13 @@ public class TableSaveFile
          * The old method was out of hand. Going to start a new one with a different format
          * that should be easier to understand and validate.
          */
-        private void readChunksV2() {
-            //For reading the compressed input.
-            final BBContainer fileInputBufferC =
-                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
-            final ByteBuffer fileInputBuffer = fileInputBufferC.b();
+        private void readChunksV2(final ByteBuffer fileInputBuffer) {
             long sinceLastFAdvise = Long.MAX_VALUE;
             long positionAtLastFAdvise = 0;
+            VoltLogger log = new VoltLogger("SNAPSHOT");
             while (m_hasMoreChunks) {
                 if (sinceLastFAdvise > 1024 * 1024 * 48) {
                     sinceLastFAdvise = 0;
-                    VoltLogger log = new VoltLogger("SNAPSHOT");
                     try {
                         final long position = m_saveFile.position();
                         long retval = PosixAdvise.fadvise(
@@ -579,6 +575,7 @@ public class TableSaveFile
                 try {
                     m_chunkReads.acquire();
                 } catch (InterruptedException e) {
+                    log.info("Failed to aquire access for table save file.", e);
                     return;
                 }
                 boolean expectedAnotherChunk = false;
@@ -777,14 +774,9 @@ public class TableSaveFile
                     if (c != null) c.discard();
                 }
             }
-            fileInputBufferC.discard();
         }
 
-        private void readChunks() {
-            //For reading the compressed input.
-            BBContainer fileInputBufferC =
-                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
-            ByteBuffer fileInputBuffer = fileInputBufferC.b();
+        private void readChunks(final ByteBuffer fileInputBuffer) {
             while (m_hasMoreChunks) {
                 /*
                  * Limit the number of chunk materialized into memory at one time
@@ -1040,8 +1032,8 @@ public class TableSaveFile
                     if (c != null) c.discard();
                 }
             }
-            fileInputBufferC.discard();
         }
+
         private Container getOutputBuffer(final int nextChunkPartitionId) {
             BBContainer c = m_buffers.poll();
             if (c == null) {
@@ -1061,13 +1053,17 @@ public class TableSaveFile
 
         @Override
         public void run() {
+            //For reading the compressed input.
+            final BBContainer fileInputBufferC =
+                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
             try {
                 if (m_hasVersion2FormatChunks) {
-                    readChunksV2();
+                    readChunksV2(fileInputBufferC.b());
                 } else {
-                    readChunks();
+                    readChunks(fileInputBufferC.b());
                 }
             } finally {
+                fileInputBufferC.discard();
                 synchronized (TableSaveFile.this) {
                     m_hasMoreChunks = false;
                     TableSaveFile.this.notifyAll();
