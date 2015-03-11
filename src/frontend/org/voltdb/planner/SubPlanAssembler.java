@@ -286,7 +286,7 @@ public abstract class SubPlanAssembler {
                 // It is the original expression that we need to remember
                 exactMatchCoveringExprs.add(coveringExpr);
             }
-            // @TODO commeneted out the non-exact match expressions 
+            // @TODO commeneted out the non-exact match expressions
 //            // Now try to find non-exact match
 //            exprsToCover = removeCoveredExpressions(tableScan, coveringExpr, exprsToCover);
 //
@@ -296,7 +296,7 @@ public abstract class SubPlanAssembler {
 //            }
         }
 
-        // Handle remaining NOT NULL index predicate expressions that can be covered by NULL rejecting expressions
+        // Handle the remaining NOT NULL index predicate expressions that can be covered by NULL rejecting expressions
         exprsToCover = removeNotNullCoveredExpressions(tableScan, coveringExprs, exprsToCover);
 
         // All index predicate expressions must be covered for index to be selected
@@ -1209,6 +1209,7 @@ public abstract class SubPlanAssembler {
             if (coveringExpr.bindingToIndexedExpression(exprToCover) != null) {
                 iter.remove();
                 hasMatch = true;
+                // need to keep going to remove all matches
             }
         }
         return hasMatch;
@@ -1235,7 +1236,7 @@ public abstract class SubPlanAssembler {
         ExpressionType[] comparators = ExpressionType.getCoveringPartialIndexComparators(coveringExprType);
         if (comparators != null) {
             // Find the expressions that can potentially be covered by the leftCoveringExpr expression.
-            // The expressions are separated into two lists:
+            // The returned candidate expressions are placed into two lists:
             // - The first one contains the expressions with their left child covered
             // - The second one contains the expressions with their right child covered (reversed expressions)
             List<List<AbstractExpression>> coveredCandidateExprs = getCoveredCandidateExpressionFromFilters(
@@ -1245,7 +1246,7 @@ public abstract class SubPlanAssembler {
             assert(coveredCandidateExprs.size() == 2);
 
             // Filter out the expressions from the previous step that are actually covered
-            List<AbstractExpression> nonExactMatchCoveredExprs = getCoveredExpressionFromFilters(
+            List<AbstractExpression> nonExactMatchCoveredExprs = getCoveredExpressionFromCandidateFilters(
                     coveringExprType, otherExpr, coveredCandidateExprs.get(0), coveredCandidateExprs.get(1));
             // Remove covered expressions from the list
             exprsToCover.removeAll(nonExactMatchCoveredExprs);
@@ -1268,20 +1269,23 @@ public abstract class SubPlanAssembler {
     private static List<List<AbstractExpression>> getCoveredCandidateExpressionFromFilters(
             ExpressionType[] targetComparators,
             AbstractExpression coveringExpr, StmtTableScan tableScan,
-            List<AbstractExpression> filtersToCover)
-            {
+            List<AbstractExpression> filtersToCover) {
+        List<List<AbstractExpression>> retval = new ArrayList<List<AbstractExpression>>();
+        retval.add(new ArrayList<AbstractExpression>());
+        retval.add(new ArrayList<AbstractExpression>());
         if (targetComparators == null) {
-            return new ArrayList<List<AbstractExpression>>();
+            return retval;
         }
-        List<AbstractExpression> coveredExprs = new ArrayList<AbstractExpression>();
-        List<AbstractExpression> reversedCoveredExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> coveredExprs = retval.get(0);
+        List<AbstractExpression> reversedCoveredExprs = retval.get(1);
         AbstractExpression coveredFilterExpr = null;
         AbstractExpression otherFilterExpr = null;
         for (AbstractExpression filter : filtersToCover) {
             // Filter expression type must correspond to the covering expression type
+            ExpressionType filterExprType = filter.getExpressionType();
             boolean exprTypeMatch = false;
             for(ExpressionType targetComparator : targetComparators) {
-                exprTypeMatch = (targetComparator == filter.getExpressionType());
+                exprTypeMatch = (targetComparator == filterExprType);
                 if (exprTypeMatch) {
                     break;
                 }
@@ -1296,8 +1300,9 @@ public abstract class SubPlanAssembler {
             }
             // Reverse the filter
             boolean reverseExprTypeMatch = false;
+            ExpressionType reversedFilerExprType = ComparisonExpression.reverses.get(filter.getExpressionType());
             for(ExpressionType targetComparator : targetComparators) {
-                reverseExprTypeMatch = (targetComparator == ComparisonExpression.reverses.get(filter.getExpressionType()));
+                reverseExprTypeMatch = (targetComparator == reversedFilerExprType);
                 if (reverseExprTypeMatch) {
                     break;
                 }
@@ -1312,9 +1317,6 @@ public abstract class SubPlanAssembler {
             }
 
         }
-        List<List<AbstractExpression>> retval = new ArrayList<List<AbstractExpression>>();
-        retval.add(coveredExprs);
-        retval.add(reversedCoveredExprs);
         return retval;
     }
 
@@ -1327,9 +1329,9 @@ public abstract class SubPlanAssembler {
      * @param otherCoveringExpr
      * @param coveredCandidateExprs
      * @param reversedCoveredCandidateExprs
-     * @return
+     * @return List<AbstractExpression> list of the covered expressions
      */
-    private static List<AbstractExpression> getCoveredExpressionFromFilters(
+    private static List<AbstractExpression> getCoveredExpressionFromCandidateFilters(
             ExpressionType coveringExprType, AbstractExpression otherCoveringExpr,
             List<AbstractExpression> coveredCandidateExprs,
             List<AbstractExpression> reversedCoveredCandidateExprs) {
@@ -1356,7 +1358,7 @@ public abstract class SubPlanAssembler {
                 coveringTves.addAll(ExpressionUtil.getTupleValueExpressions(coveringExpr));
             }
         }
-        // For each NOT NULL expression to cover extract the TVE expressions. If all them are also part
+        // For each NOT NULL expression to cover extract the TVE expressions. If all of them are also part
         // of the covering NULL-rejecting collection then this NOT NULL expression is covered
         Iterator<AbstractExpression> iter = exprsToCover.iterator();
         while (iter.hasNext()) {

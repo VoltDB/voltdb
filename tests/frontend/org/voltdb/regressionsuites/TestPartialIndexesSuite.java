@@ -80,12 +80,14 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                 try {
                     // Fail the r1_pidx_1 index
                     client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(2, 3, 3, 3, 4);");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
                 try {
                     // Fail the r1_pidx_hash_1 index
                     client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(3, 3, 2, 3, 5);");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
@@ -113,6 +115,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 try {
                     client.callProcedure("@AdHoc","UPDATE " + tb + " SET A = 4 WHERE A = 1 AND B = 1;");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
@@ -121,6 +124,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 try {
                     client.callProcedure("@AdHoc","UPDATE " + tb + " SET C = 4 WHERE C = 1 AND B = 1;");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
@@ -134,6 +138,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 try {
                     client.callProcedure("@AdHoc","UPDATE " + tb + " SET A = 5, B = 5, C = 5 WHERE A = 2 AND B IS NULL;");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
@@ -148,6 +153,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 try {
                     client.callProcedure("@AdHoc","UPDATE " + tb + " SET A = 7, C = 7, B = 7 WHERE C = 2 AND B IS NULL;");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
@@ -202,6 +208,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                 cr = client.callProcedure("@AdHoc","UPSERT INTO " + tb + " VALUES(6,1,3,3,11);");
                 try {
                     client.callProcedure("@AdHoc","UPSERT INTO " + tb + " VALUES(6,1,3,3,12);");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
@@ -227,6 +234,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 try {
                     client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(2, 3, 3, 3);");
+                    fail("Shouldn't reach there");
                 } catch (ProcCallException e) {
                    assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
                 }
