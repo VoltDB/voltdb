@@ -427,19 +427,19 @@ TEST_F(PersistentTableLogTest, LookupTupleUsingTempTupleTest) {
     m_table->insertTuple(nullTuple);
     delete[] nullTuple.address();
 
-    TableTuple tempTuple = m_table->tempTuple();
+    TableTuple tempTuple = m_table->tempTupleWithZeroedBits();
     tempTuple.setNValue(0, ValueFactory::getBigIntValue(1));
     tempTuple.setNValue(1, ValueFactory::getStringValue("a long string"));
     TableTuple result = m_table->lookupTupleForUndo(tempTuple);
     ASSERT_FALSE(result.isNullTuple());
 
-    tempTuple = m_table->tempTuple();
+    tempTuple = m_table->tempTupleWithZeroedBits();
     tempTuple.setNValue(0, ValueFactory::getBigIntValue(2));
     tempTuple.setNValue(1, ValueFactory::getStringValue("a"));
     result = m_table->lookupTupleForUndo(tempTuple);
     ASSERT_FALSE(result.isNullTuple());
 
-    tempTuple = m_table->tempTuple();
+    tempTuple = m_table->tempTupleWithZeroedBits();
     tempTuple.setNValue(0, ValueFactory::getBigIntValue(3));
     tempTuple.setNValue(1, ValueFactory::getNullStringValue());
     result = m_table->lookupTupleForUndo(tempTuple);

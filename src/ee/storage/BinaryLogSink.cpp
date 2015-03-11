@@ -67,7 +67,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             PersistentTable *table = tableIter->second;
 
-            TableTuple tempTuple = table->tempTuple();
+            TableTuple tempTuple = table->tempTupleWithZeroedBits();
 
             ReferenceSerializeInputLE rowInput(rowData,  rowLength);
             tempTuple.deserializeFromDR(rowInput, pool);
