@@ -481,12 +481,14 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("snapshotenabled", snap_enabled);
 
-        Connector export_conn = database.getConnectors().get("0");
         String export_enabled = "false";
-        if (export_conn != null && export_conn.getEnabled())
-        {
-            export_enabled = "true";
-            results.addRow("exportoverflowpath", cluster.getExportoverflow());
+        for (Connector export_conn : database.getConnectors()) {
+            if (export_conn != null && export_conn.getEnabled())
+            {
+                export_enabled = "true";
+                results.addRow("exportoverflowpath", cluster.getExportoverflow());
+                break;
+            }
         }
         results.addRow("export", export_enabled);
 

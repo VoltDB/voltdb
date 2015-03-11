@@ -46,6 +46,7 @@
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
+<property name='build.clientsrc.dir'         location='${build.dir}/clientsrc' />
 <property name='build.test.dir'              location='${build.dir}/test' />
 <property name='build.admin.dir'             location='${build.dir}/admin' />
 <property name='raw.dist.dir'                location='${build.dir}' />
@@ -75,6 +76,76 @@
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
+
+<fileset id="vendor.src.files" dir="${vendor.src.dir}"
+        includes="com/google_voltpatches/**/*.java
+                  javax/annotation_voltpatches/**/*.java
+                  org/apache/cassandra_voltpatches/MurmurHash3.java
+                  org/apache/commons/cli_voltpatches/**/*.java
+                  org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java
+                  org/apache/hadoop_voltpatches/util/PureJavaCrc*.java
+                  org/apache/jute_voltpatches/**/*.java
+                  org/apache/zookeeper_voltpatches/KeeperException.java
+                  org/cliffc_voltpatches/**/*.java
+                  org/HdrHistogram_voltpatches/**/*.java
+                  org/json_voltpatches/**/*.java
+                  jsr166y/**/*.java
+                  io/netty_voltpatches/NinjaKeySet.java
+                  "
+/>
+
+<fileset id="client.src.files" dir="${src.gpl.dir}"
+        includes="org/voltcore/logging/Level.java
+                  org/voltcore/logging/VoltLogger.java
+                  org/voltcore/logging/VoltUtilLoggingLogger.java
+                  org/voltcore/network/*.java
+
+                  org/voltcore/utils/CoreUtils.java
+                  org/voltcore/utils/COWMap.java
+                  org/voltcore/utils/COWNavigableSet.java
+                  org/voltcore/utils/COWSortedMap.java
+                  org/voltcore/utils/DBBPool.java
+                  org/voltcore/utils/DeferredSerialization.java
+                  org/voltcore/utils/EstTime.java
+                  org/voltcore/utils/EstTimeUpdater.java
+                  org/voltcore/utils/InstanceId.java
+                  org/voltcore/utils/Pair.java
+                  org/voltcore/utils/RateLimitedLogger.java
+                  org/voltcore/utils/Bits.java
+                  org/voltcore/utils/LatencyWatchdog.java
+                  org/voltcore/utils/CompressionStrategy.java
+                  org/voltcore/utils/VoltTypeUtil.java
+
+                  org/voltdb/CLIConfig.java
+                  org/voltdb/client/**/*.java
+                  org/voltdb/ClientResponseImpl.java
+                  org/voltdb/common/Constants.java
+                  org/voltdb/jdbc/**/*.java
+                  org/voltdb/LatencyBucketSet.java
+                  org/voltdb/ParameterConverter.java
+                  org/voltdb/ParameterSet.java
+                  org/voltdb/PrivateVoltTableFactory.java
+                  org/voltdb/parser/JDBCParser.java
+                  org/voltdb/parser/SQL*.java
+                  org/voltdb/types/TimestampType.java
+                  org/voltdb/types/VoltDecimalHelper.java
+                  org/voltdb/utils/Base64.java
+                  org/voltdb/utils/Encoder.java
+                  org/voltdb/utils/SerializationHelper.java
+                  org/voltdb/utils/RowWithMetaData.java
+                  org/voltdb/utils/BulkLoaderErrorHandler.java
+                  org/voltdb/utils/CSVDataLoader.java
+                  org/voltdb/utils/CSVBulkDataLoader.java
+                  org/voltdb/utils/CSVTupleDataLoader.java
+                  org/voltdb/utils/PosixAdvise.java
+                  org/voltdb/utils/VoltTypeUtil.java
+                  org/voltdb/VoltOverflowException.java
+                  org/voltdb/VoltTable.java
+                  org/voltdb/VoltTableRow.java
+                  org/voltdb/VoltType.java
+                  org/voltdb/VoltTypeException.java
+                  "
+/>
 
 <!--
 ***************************************
@@ -150,9 +221,26 @@ CLEANING
 
 <!--
 ***************************************
+STAGING SOURCE FILES
+***************************************
+-->
+
+<target name="stage_src" >
+  <mkdir dir='${build.client.dir}' />
+  <!-- copy source files -->
+  <copy todir="${build.clientsrc.dir}">
+    <fileset refid="vendor.src.files"/>
+    <fileset refid="client.src.files"/>
+  </copy>
+</target>
+
+
+<!--
+***************************************
 JAR BUILDING
 ***************************************
 -->
+
 
 <target name="buildinfo">
   <loadfile property='dist.version' srcFile='version.txt'>
@@ -189,14 +277,14 @@ JAR BUILDING
     </jar>
 </target>
 
+
 <!--
 ***************************************
 JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" description="Compile all Java client source">
-    <mkdir dir='${build.client.dir}' />
+<target name="compile" description="Compile all Java client source" depends="stage_src">
 
     <!-- copy resources needed -->
     <copy todir="${build.client.dir}">
@@ -205,65 +293,9 @@ JAVA COMPILATION
         <fileset dir="${src.gpl.dir}" includes="org/voltdb/*.properties"/>
     </copy>
 
-    <invoke-javac16
-        srcdir="${src.gpl.dir}:${vendor.src.dir}"
-        includes="com/google_voltpatches/**/*.java
-                  javax/annotation_voltpatches/**/*.java
-                  org/apache/cassandra_voltpatches/MurmerHash.java
-                  org/apache/commons/cli_voltpatches/**/*.java
-                  org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java
-                  org/apache/hadoop_voltpatches/util/PureJavaCrc*.java
-                  org/apache/jute_voltpatches/**/*.java
-                  org/apache/zookeeper_voltpatches/KeeperException.java
-                  org/cliffc_voltpatches/**/*.java
-                  org/HdrHistogram_voltpatches/**/*.java
-                  org/json_voltpatches/**/*.java
-                  jsr166y/**/*.java
-                  io/netty_voltpatches/NinjaKeySet.java
+    <invoke-javac16 srcdir="${build.clientsrc.dir}">
+    </invoke-javac16>
 
-                  org/voltcore/logging/Level.java
-                  org/voltcore/logging/VoltLogger.java
-                  org/voltcore/logging/VoltUtilLoggingLogger.java
-
-                  org/voltcore/network/*.java
-
-                  org/voltcore/utils/CoreUtils.java
-                  org/voltcore/utils/COWMap.java
-                  org/voltcore/utils/COWNavigableSet.java
-                  org/voltcore/utils/COWSortedMap.java
-                  org/voltcore/utils/DBBPool.java
-                  org/voltcore/utils/DeferredSerialization.java
-                  org/voltcore/utils/EstTime.java
-                  org/voltcore/utils/EstTimeUpdater.java
-                  org/voltcore/utils/InstanceId.java
-                  org/voltcore/utils/Pair.java
-                  org/voltcore/utils/RateLimitedLogger.java
-                  org/voltcore/utils/Bits.java
-                  org/voltcore/utils/LatencyWatchdog.java
-
-                  org/voltdb/CLIConfig.java
-                  org/voltdb/client/**/*.java
-                  org/voltdb/ClientResponseImpl.java
-                  org/voltdb/common/Constants.java
-                  org/voltdb/jdbc/**/*.java
-                  org/voltdb/LatencyBucketSet.java
-                  org/voltdb/ParameterConverter.java
-                  org/voltdb/ParameterSet.java
-                  org/voltdb/PrivateVoltTableFactory.java
-                  org/voltdb/types/TimestampType.java
-                  org/voltdb/types/VoltDecimalHelper.java
-                  org/voltdb/utils/Base64.java
-                  org/voltdb/utils/Encoder.java
-                  org/voltdb/utils/SerializationHelper.java
-                  org/voltdb/utils/RowWithMetaData.java
-                  org/voltdb/utils/CSVDataLoader.java
-                  org/voltdb/utils/CSVBulkDataLoader.java
-                  org/voltdb/utils/CSVTupleDataLoader.java
-                  org/voltdb/VoltOverflowException.java
-                  org/voltdb/VoltTable.java
-                  org/voltdb/VoltTableRow.java
-                  org/voltdb/VoltType.java
-                  org/voltdb/VoltTypeException.java"/>
 </target>
 
 <!-- END PROJECT -->

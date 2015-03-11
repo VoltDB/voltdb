@@ -33,6 +33,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Connector;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -239,12 +240,15 @@ public class JdbcDatabaseMetaDataGenerator
         {
             type = "VIEW";
         }
-        else if (m_database.getConnectors() != null &&
-                 m_database.getConnectors().get("0") != null &&
-                 m_database.getConnectors().get("0").getTableinfo() != null &&
-                 m_database.getConnectors().get("0").getTableinfo().getIgnoreCase(table.getTypeName()) != null)
+        else if (m_database.getConnectors() != null)
         {
-            type = "EXPORT";
+            for (Connector conn : m_database.getConnectors()) {
+                 if (conn.getTableinfo() != null &&
+                         conn.getTableinfo().getIgnoreCase(table.getTypeName()) != null) {
+                     type = "EXPORT";
+                     break;
+                 }
+            }
         }
         return type;
     }

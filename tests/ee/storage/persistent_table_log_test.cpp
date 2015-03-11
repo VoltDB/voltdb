@@ -44,7 +44,7 @@ public:
     PersistentTableLogTest() {
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->initialize(1,1, 0, 0, "", false, DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -156,7 +156,7 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
 
     tableutil::getRandomTuple(m_table, tuple);
 
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
     voltdb::TableTuple tupleBackup(m_tableSchema);
     tupleBackup.move(new char[tupleBackup.tupleLength()]);
@@ -170,11 +170,11 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
 
     m_table->deleteTuple(tuple, true);
 
-    ASSERT_TRUE( m_table->lookupTuple(tupleBackup).isNullTuple());
+    ASSERT_TRUE( m_table->lookupTupleForUndo(tupleBackup).isNullTuple());
 
     m_engine->undoUndoToken(INT64_MIN + 2);
 
-    ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE(m_table->lookupTupleForUndo(tuple).isNullTuple());
 }
 
 TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
@@ -207,11 +207,11 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
     m_engine->undoUndoToken(INT64_MIN + 3);
 
-    ASSERT_TRUE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_TRUE(m_table->lookupTupleForUndo(tuple).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)0);
 }
 
@@ -245,11 +245,11 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
     m_engine->releaseUndoToken(INT64_MIN + 3);
 
-    ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE(m_table->lookupTupleForUndo(tuple).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)1000);
 }
 
@@ -261,7 +261,7 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
     tableutil::getRandomTuple(m_table, tuple);
     //std::cout << "Retrieved random tuple " << std::endl << tuple.debugNoHeader() << std::endl;
 
-    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
     /*
      * A backup copy of what the tuple looked like before updates
@@ -294,12 +294,12 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
 
     m_table->updateTuple(tuple, tupleCopy);
 
-    ASSERT_TRUE( m_table->lookupTuple(tupleBackup).isNullTuple());
-    ASSERT_FALSE( m_table->lookupTuple(tupleCopy).isNullTuple());
+    ASSERT_TRUE( m_table->lookupTupleForUndo(tupleBackup).isNullTuple());
+    ASSERT_FALSE( m_table->lookupTupleForUndo(tupleCopy).isNullTuple());
     m_engine->undoUndoToken(INT64_MIN + 2);
 
-    ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
-    ASSERT_TRUE( m_table->lookupTuple(tupleCopy).isNullTuple());
+    ASSERT_FALSE(m_table->lookupTupleForUndo(tuple).isNullTuple());
+    ASSERT_TRUE( m_table->lookupTupleForUndo(tupleCopy).isNullTuple());
     tupleBackup.freeObjectColumns();
     tupleCopy.freeObjectColumns();
     delete [] tupleBackup.address();
@@ -355,6 +355,17 @@ TEST_F(PersistentTableLogTest, FindBlockTest) {
               block1->address());
     ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 4 - 1, blocks, blockSize)->address(),
               block3->address());
+}
+
+TEST_F(PersistentTableLogTest, LookupTupleForUndoNoPKTest) {
+    initTable(false);
+    tableutil::addDuplicateRandomTuples(m_table, 2);
+    tableutil::addDuplicateRandomTuples(m_table, 3);
+
+    // assert that lookupTupleForUndo finds the correct tuple
+    voltdb::TableTuple tuple(m_tableSchema);
+    tableutil::getRandomTuple(m_table, tuple);
+    ASSERT_EQ(m_table->lookupTupleForUndo(tuple).address(), tuple.address());
 }
 
 int main() {

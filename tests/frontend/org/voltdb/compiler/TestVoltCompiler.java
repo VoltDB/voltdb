@@ -55,6 +55,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
@@ -430,7 +431,7 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
 
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertFalse(connector.getEnabled());
 
         } finally {
@@ -465,7 +466,7 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
             CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
             assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
@@ -2299,6 +2300,10 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num offset 10;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
     }
@@ -2942,15 +2947,6 @@ public class TestVoltCompiler extends TestCase {
         fbs = checkInvalidProcedureDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE org.kanamuri.Foo AS DELETE FROM PKEY_INTEGER;" +
-                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
-
-        fbs = checkInvalidProcedureDDL(
-                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
-                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE 7Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
@@ -3099,7 +3095,7 @@ public class TestVoltCompiler extends TestCase {
                 "### LANGUAGE KROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "### LANGUAGE KROOVY\", expected syntax: \"CREATE PROCEDURE [ALLOW";
+        expectedError = "Language \"KROOVY\" is not a supported";
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
@@ -3636,7 +3632,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
-        Connector connector =  db.getConnectors().get("0");
+        Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         if( connector == null) return null;
         return connector.getTableinfo().getIgnoreCase(tableName);
     }
@@ -3699,6 +3695,66 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
+    public void testGoodDRTable() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer not null, f1 varchar(16));",
+                "partition table e1 on column id;",
+                "dr table e1;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+
+        String schema = "create table e1 (id integer not null, f1 varchar(16));\n" +
+                        "create table e2 (id integer not null, f1 varchar(16));\n" +
+                        "partition table e1 on column id;";
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e1;",
+                "DR TABLE E2;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        // DR statement is order sensitive
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e2;",
+                "dr table e2 disable;"
+                );
+        assertFalse(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table e2 disable;",
+                "dr table e2;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+    }
+
+    public void testBadDRTable() throws Exception {
+        badDDLAgainstSimpleSchema(".+\\sdr, table non_existant was not present in the catalog.*",
+                "dr table non_existant;"
+                );
+
+        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
+                "dr table 1table_name_not_valid;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table one, two, three;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr dr table one;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table table one;"
+                );
+    }
+
     public void testCompileFromDDL() throws IOException {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
@@ -3726,6 +3782,20 @@ public class TestVoltCompiler extends TestCase {
 
         success = compileFromDDL(compiler, testout_jar);
         assertFalse(success);
+    }
+
+    public void testDDLStmtProcNameWithDots() throws Exception
+    {
+        final File ddlFile = VoltProjectBuilder.writeStringToTempFile(StringUtils.join(new String[] {
+            "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));",
+            "create procedure a.Foo as select * from books;"
+        }, "\n"));
+
+        final VoltCompiler compiler = new VoltCompiler();
+        assertFalse("Compile with dotted proc name should fail",
+                    compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
+        assertTrue("Compile with dotted proc name did not have the expected error message",
+                   isFeedbackPresent("Invalid procedure name", compiler.m_errors));
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

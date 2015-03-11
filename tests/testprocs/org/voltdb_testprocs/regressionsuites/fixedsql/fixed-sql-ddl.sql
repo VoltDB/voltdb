@@ -265,3 +265,72 @@ create table sm_idx_tbl(
 create index sm_idx on sm_idx_tbl(ti1, ti2);
 -- End table for ENG-7349    --
 -- ************************* --
+
+-- ****************************** --
+-- Stored procedures for ENG-7354 --
+create procedure one_list_param as
+       select id from P1 where ID in ?
+       order by id;
+
+create procedure one_string_list_param as
+       select id from P1 where desc in ?
+       order by id;
+
+create procedure one_scalar_param as
+       select id from P1 where ID in (?)
+       order by id;
+
+create procedure one_string_scalar_param as
+       select id from P1 where desc in (?)
+       order by id;
+-- End stored procedures for ENG-7354 --
+-- ********************************** --
+
+-- ********************************** --
+-- Stored procedure for ENG-7724      --
+CREATE TABLE product_changes (
+  location              VARCHAR(12) NOT NULL, 
+  product_id               VARCHAR(18) NOT NULL, 
+  start_date               TIMESTAMP,  
+  safety_time_promo        SMALLINT,
+  safety_time_base         SMALLINT,
+  POQ                      SMALLINT,
+  case_size                INTEGER,
+  multiple                 INTEGER,
+  lead_time                SMALLINT,
+  supplier                 VARCHAR(12), 
+  facings                  INTEGER,
+  minimum_deep             FLOAT, 
+  maximum_deep             INTEGER,
+  backroom_sfty_stck       INTEGER,
+  cost                     FLOAT, 
+  selling_price            FLOAT,
+  model                    VARCHAR(12), 
+  assortment_adj           FLOAT,
+  safety_stock_days        SMALLINT
+);
+PARTITION TABLE product_changes ON COLUMN location;
+CREATE INDEX product_changes_sku ON product_changes (location, product_id);
+
+
+CREATE PROCEDURE voltdbSelectProductChanges AS
+SELECT
+  location,
+  product_id,
+  start_date,
+  facings,
+  minimum_deep,
+  maximum_deep,
+  backroom_sfty_stck,
+  supplier,
+  safety_time_base,
+  selling_price,
+  cost,
+  supplier,
+  safety_stock_days
+FROM product_changes
+WHERE location = ? 
+AND product_id = ? 
+ORDER by location, product_id, start_date;
+PARTITION PROCEDURE voltdbSelectProductChanges ON TABLE product_changes COLUMN location PARAMETER 0;
+-- ********************************** --

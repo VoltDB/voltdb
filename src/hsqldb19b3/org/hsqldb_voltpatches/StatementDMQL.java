@@ -44,6 +44,9 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
+import org.hsqldb_voltpatches.types.NumberType;
+// End of VoltDB extension
 
 /**
  * Statement implementation for DML and base DQL statements.
@@ -964,8 +967,9 @@ public abstract class StatementDMQL extends Statement {
             try {
                 // read offset. it may be a parameter token.
                 VoltXMLElement offset = new VoltXMLElement("offset");
-                if (limitCondition.nodes[0].isParam == false) {
-                    Integer offsetValue = (Integer)limitCondition.nodes[0].getValue(session);
+                Expression offsetExpr = limitCondition.getLeftNode();
+                if (offsetExpr.isParam == false) {
+                    Integer offsetValue = (Integer)offsetExpr.getValue(session);
                     if (offsetValue > 0) {
                         Expression expr = new ExpressionValue(offsetValue,
                                 org.hsqldb_voltpatches.types.Type.SQL_BIGINT);
@@ -973,22 +977,26 @@ public abstract class StatementDMQL extends Statement {
                         offset.attributes.put("offset", offsetValue.toString());
                     }
                 } else {
-                    offset.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
+                    offset.attributes.put("offset_paramid", offsetExpr.getUniqueId(session));
                 }
                 result.add(offset);
 
-                // read limit. it may be a parameter token.
-                VoltXMLElement limit = new VoltXMLElement("limit");
-                if (limitCondition.nodes[1].isParam == false) {
-                    Integer limitValue = (Integer)limitCondition.nodes[1].getValue(session);
-                    Expression expr = new ExpressionValue(limitValue,
-                            org.hsqldb_voltpatches.types.Type.SQL_BIGINT);
-                    limit.children.add(expr.voltGetXML(session));
-                    limit.attributes.put("limit", limitValue.toString());
-                } else {
-                    limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
+                // Limit may be null (offset with no limit), or
+                // it may be a parameter
+                Expression limitExpr = limitCondition.getRightNode();
+                if (limitExpr != null) {
+                    VoltXMLElement limit = new VoltXMLElement("limit");
+                    if (limitExpr.isParam == false) {
+                        Integer limitValue = (Integer)limitExpr.getValue(session);
+                        Expression expr = new ExpressionValue(limitValue,
+                                org.hsqldb_voltpatches.types.Type.SQL_BIGINT);
+                        limit.children.add(expr.voltGetXML(session));
+                        limit.attributes.put("limit", limitValue.toString());
+                    } else {
+                        limit.attributes.put("limit_paramid", limitExpr.getUniqueId(session));
+                    }
+                    result.add(limit);
                 }
-                result.add(limit);
 
             } catch (HsqlException ex) {
                 // XXX really?
@@ -1301,7 +1309,11 @@ public abstract class StatementDMQL extends Statement {
             parameter.attributes.put("index", String.valueOf(index));
             ++index;
             parameter.attributes.put("id", expr.getUniqueId(session));
-            parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
+            if (paramType == NumberType.SQL_NUMERIC_DEFAULT_INT) {
+                parameter.attributes.put("valuetype", "BIGINT");
+            } else {
+                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
+            }
             // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
             // that values passed to parameters such as the one in "col in ?" must be vectors.
             // So, it can just be forwarded as a boolean.

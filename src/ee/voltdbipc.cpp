@@ -97,6 +97,7 @@ typedef struct {
     int64_t txnId;
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
+    int64_t uniqueId;
     int64_t undoToken;
     int32_t undo;
     int32_t shouldDRStream;
@@ -195,6 +196,15 @@ typedef struct {
     int64_t taskId;
     char task[0];
 }__attribute__((packed)) execute_task;
+
+typedef struct {
+    struct ipc_command cmd;
+    int64_t txnId;
+    int64_t spHandle;
+    int64_t lastCommittedSpHandle;
+    int64_t uniqueId;
+    char log[0];
+}__attribute__((packed)) apply_binary_log;
 
 
 using namespace voltdb;
@@ -337,6 +347,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           executeTask(cmd);
           result = kErrorCode_None;
           break;
+      case 29:
+          applyBinaryLog(cmd);
+          result = kErrorCode_None;
+          break;
       default:
         result = stub(cmd);
     }
@@ -421,6 +435,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
+        int32_t createDrReplicatedStream;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -434,6 +449,8 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
+    cs->createDrReplicatedStream = ntohl(cs->createDrReplicatedStream);
+    bool createDrReplicatedStream = cs->createDrReplicatedStream != 0;
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
     std::string hostname(cs->data, cs->hostnameLength);
@@ -452,7 +469,8 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 cs->tempTableMemory) == true) {
+                                 cs->tempTableMemory,
+                                 createDrReplicatedStream) == true) {
             return kErrorCode_Success;
         }
     } catch (const FatalException &e) {
@@ -641,6 +659,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t txnId = ntohll(loadTableCommand->txnId);
     const int64_t spHandle = ntohll(loadTableCommand->spHandle);
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
+    const int64_t uniqueId = ntohll(loadTableCommand->uniqueId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
     const bool undo = loadTableCommand->undo != 0;
     const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
@@ -651,7 +670,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInputBE serialize_in(offset, sz);
         m_engine->setUndoToken(undoToken);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, txnId, spHandle, lastCommittedSpHandle, undo, shouldDRStream);
+        bool success = m_engine->loadTable(tableId, serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId, undo, shouldDRStream);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -1355,13 +1374,31 @@ void VoltDBIPC::pushExportBuffer(
 }
 
 void VoltDBIPC::executeTask(struct ipc_command *cmd) {
-    execute_task *task = (execute_task*)cmd;
-    voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
-    m_engine->resetReusedResultOutputBuffer(1);
-    m_engine->executeTask(taskId, task->task);
-    int32_t responseLength = m_engine->getResultsSize();
-    char *resultsBuffer = m_engine->getReusedResultBuffer();
-    writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
+    try {
+        execute_task *task = (execute_task*)cmd;
+        voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
+        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->executeTask(taskId, task->task);
+        int32_t responseLength = m_engine->getResultsSize();
+        char *resultsBuffer = m_engine->getReusedResultBuffer();
+        writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
+    try {
+        apply_binary_log *params = (apply_binary_log*)cmd;
+        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->applyBinaryLog(ntohll(params->txnId),
+                                 ntohll(params->spHandle),
+                                 ntohll(params->lastCommittedSpHandle),
+                                 ntohll(params->uniqueId),
+                                 params->log);
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    }
 }
 
 void VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {

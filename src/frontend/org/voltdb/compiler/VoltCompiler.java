@@ -33,6 +33,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.jar.JarEntry;
@@ -109,6 +111,7 @@ public class VoltCompiler {
     /** Represents the level of severity for a Feedback message generated during compiling. */
     public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED }
     public static final int NO_LINE_NUMBER = -1;
+    private static final String NO_FILENAME = "null";
 
     // Causes the "debugoutput" folder to be generated and populated.
     // Also causes explain plans on disk to include cost.
@@ -119,10 +122,10 @@ public class VoltCompiler {
 
     // tables that change between the previous compile and this one
     // used for Live-DDL caching of plans
-    private Set<String> m_dirtyTables = new TreeSet<>();
+    private final Set<String> m_dirtyTables = new TreeSet<>();
     // A collection of statements from the previous catalog
     // used for Live-DDL caching of plans
-    private Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
+    private final Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -137,9 +140,11 @@ public class VoltCompiler {
     // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
     public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
+    // Turn off warning about DRing replicated tables
+    public static final boolean DISABLE_DR_WARNING = Boolean.getBoolean("DISABLE_DR_WARNING");
 
     String m_projectFileURL = null;
-    String m_currentFilename = null;
+    private String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
     String[] m_importLines = null;
@@ -484,7 +489,7 @@ public class VoltCompiler {
 
     private static void addBuildInfo(final InMemoryJarfile jarOutput) {
         StringBuilder buildinfo = new StringBuilder();
-        String info[] = RealVoltDB.extractBuildInfo();
+        String info[] = RealVoltDB.extractBuildInfo(compilerLog);
         buildinfo.append(info[0]).append('\n');
         buildinfo.append(info[1]).append('\n');
         buildinfo.append(System.getProperty("user.name")).append('\n');
@@ -770,8 +775,8 @@ public class VoltCompiler {
     private DatabaseType getProjectDatabase(final VoltCompilerReader projectReader)
     {
         DatabaseType database = null;
-        m_currentFilename = (projectReader != null ? projectReader.getName() : "null");
         if (projectReader != null) {
+            m_currentFilename = projectReader.getName();
             try {
                 JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.projectfile");
                 // This schema shot the sheriff.
@@ -1099,10 +1104,19 @@ public class VoltCompiler {
         m_dirtyTables.clear();
 
         for (final VoltCompilerReader schemaReader : schemaReaders) {
-            // add the file object's path to the list of files for the jar
-            m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
+            String origFilename = m_currentFilename;
+            try {
+                if (m_currentFilename == null || m_currentFilename.equals(NO_FILENAME))
+                    m_currentFilename = schemaReader.getName();
 
-            ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                // add the file object's path to the list of files for the jar
+                m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
+
+                ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+            }
+            finally {
+                m_currentFilename = origFilename;
+            }
         }
 
         ddlcompiler.compileToCatalog(db);
@@ -1173,8 +1187,12 @@ public class VoltCompiler {
         addDatabaseEstimatesInfo(m_estimates, db);
 
         // Process DDL exported tables
-        for( String exportedTableName: voltDdlTracker.getExportedTables()) {
-            addExportTableToConnector(exportedTableName, db);
+        NavigableMap<String, NavigableSet<String>> exportTables = voltDdlTracker.getExportedTables();
+        for (Entry<String, NavigableSet<String>> e : exportTables.entrySet()) {
+            String targetName = e.getKey();
+            for (String tableName : e.getValue()) {
+                addExportTableToConnector(targetName, tableName, db);
+            }
         }
 
         // Process and add exports and connectors to the catalog
@@ -1183,6 +1201,11 @@ public class VoltCompiler {
         if (export != null) {
             // currently, only a single connector is allowed
             compileExport(export, db);
+        }
+
+        // process DRed tables
+        for (Entry<String, String> drNode: voltDdlTracker.getDRedTables().entrySet()) {
+            compileDRTable(drNode, db);
         }
 
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
@@ -1393,7 +1416,7 @@ public class VoltCompiler {
             ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor, jarOutput);
         }
         // done handling files
-        m_currentFilename = null;
+        m_currentFilename = NO_FILENAME;
 
         // allow gc to reclaim any cache memory here
         m_previousCatalogStmts.clear();
@@ -1410,18 +1433,46 @@ public class VoltCompiler {
         // and its grouped columns are only locally unique but not globally unique.
         Table destTable = mvi.getDest();
         // Get the grouped columns in "index" order.
-        // This order corresponds to the iteration order of the MaterializedViewInfo's getGroupbycols.
+        // This order corresponds to the iteration order of the MaterializedViewInfo's group by columns.
         List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
         String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
-        int index = 0;
-        for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
-            Column srcCol = cref.getColumn();
-            if (srcCol.getName().equals(partitionColName)) {
-                Column destCol = destColumnArray.get(index);
-                destTable.setPartitioncolumn(destCol);
-                return;
+
+        if (mvi.getGroupbycols().size() > 0) {
+            int index = 0;
+            for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
+                Column srcCol = cref.getColumn();
+                if (srcCol.getName().equals(partitionColName)) {
+                    Column destCol = destColumnArray.get(index);
+                    destTable.setPartitioncolumn(destCol);
+                    return;
+                }
+                ++index;
             }
-            ++index;
+        } else {
+            String complexGroupbyJson = mvi.getGroupbyexpressionsjson();
+            assert(complexGroupbyJson != null && complexGroupbyJson.length() > 0);
+            if (complexGroupbyJson.length() > 0) {
+                int partitionColIndex =  partitionColumn.getIndex();
+
+                  List<AbstractExpression> mvComplexGroupbyCols = null;
+                  try {
+                      mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
+                  } catch (JSONException e) {
+                      e.printStackTrace();
+                  }
+                  int index = 0;
+                  for (AbstractExpression expr: mvComplexGroupbyCols) {
+                      if (expr instanceof TupleValueExpression) {
+                          TupleValueExpression tve = (TupleValueExpression) expr;
+                          if (tve.getColumnIndex() == partitionColIndex) {
+                              Column destCol = destColumnArray.get(index);
+                              destTable.setPartitioncolumn(destCol);
+                              return;
+                          }
+                      }
+                      ++index;
+                  }
+            }
         }
     }
 
@@ -1555,23 +1606,10 @@ public class VoltCompiler {
             return;
         }
 
-        // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        //
-        // This check is also done here to mimic the same behavior of the
-        // previous implementation of this method, where the connector is created as
-        // long as the export element is present in project XML. Now that we are
-        // deprecating project.xml, we won't be able to mimic in DDL, what an
-        // empty <export/> element currently implies.
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
-        if (catconn == null) {
-            catconn = catdb.getConnectors().add("0");
-        }
-
-        // Catalog Connector.ConnectorTableInfo
+        // This code is used for adding export tables to the default group connector
         if (export.getTables() != null) {
             for (Tables.Table xmltable : export.getTables().getTable()) {
-                addExportTableToConnector(xmltable.getName(), catdb);
+                addExportTableToConnector(Constants.DEFAULT_EXPORT_CONNECTOR_NAME, xmltable.getName(), catdb);
             }
             if (export.getTables().getTable().isEmpty()) {
                 compilerLog.warn("Export defined with an empty <tables> element");
@@ -1581,16 +1619,15 @@ public class VoltCompiler {
         }
     }
 
-    void addExportTableToConnector( final String tableName, final Database catdb)
+    void addExportTableToConnector(final String targetName, final String tableName, final Database catdb)
             throws VoltCompilerException
     {
         assert tableName != null && ! tableName.trim().isEmpty() && catdb != null;
 
         // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase(targetName);
         if (catconn == null) {
-            catconn = catdb.getConnectors().add("0");
+            catconn = catdb.getConnectors().add(targetName);
         }
         org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tableName);
         if (tableref == null) {
@@ -1633,6 +1670,27 @@ public class VoltCompiler {
                     ));
         }
 
+    }
+
+    void compileDRTable(final Entry<String, String> drNode, final Database db)
+            throws VoltCompilerException
+    {
+        String tableName = drNode.getKey();
+        String action = drNode.getValue();
+
+        org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
+        if (tableref == null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
+        } else if (tableref.getMaterializer() != null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
+                                            " DR does not support materialized view.");
+        }
+
+        if (action.equalsIgnoreCase("DISABLE")) {
+            tableref.setIsdred(false);
+        } else {
+            tableref.setIsdred(true);
+        }
     }
 
     // Usage messages for new and legacy syntax.
@@ -1862,8 +1920,9 @@ public class VoltCompiler {
             }
             if (m_reportPath != null) {
                 outputStream.println("------------------------------------------\n");
-                outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
-                            "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+                outputStream.println(String.format(
+                        "Full catalog report can be found at file://%s.\n",
+                        m_reportPath));
             }
             outputStream.println("------------------------------------------\n");
         }
@@ -2108,7 +2167,7 @@ public class VoltCompiler {
         ClassLoader originalClassLoader = m_classLoader;
         try {
             canonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
-            newDDLReader = new VoltCompilerStringReader("ADHOCDDL.sql", newDDL);
+            newDDLReader = new VoltCompilerStringReader("Ad Hoc DDL Input", newDDL);
 
             List<VoltCompilerReader> ddlList = new ArrayList<>();
             ddlList.add(newDDLReader);
@@ -2126,11 +2185,10 @@ public class VoltCompiler {
                 if (m_errors.size() > 0) {
                     errString = m_errors.get(m_errors.size() - 1).getLogString();
                 }
-                int fronttrim = errString.indexOf("DDL Error");
-                if (fronttrim < 0) { fronttrim = 0; }
+
                 int endtrim = errString.indexOf(" in statement starting");
                 if (endtrim < 0) { endtrim = errString.length(); }
-                String trimmed = errString.substring(fronttrim, endtrim);
+                String trimmed = errString.substring(0, endtrim);
                 throw new IOException(trimmed);
             }
         }
