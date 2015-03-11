@@ -16,26 +16,24 @@ import org.openqa.selenium.JavascriptExecutor
 
 class NetworkInterfaces extends Module {
     static content = {
- 	title			{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div.headerAdminContent > h1") }
-	portNameTitle		{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(1) > th:nth-child(1)") }
+	 	title			{ $("h1", text:"Network Interfaces") }
 
-	clusterSettingTitle	{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(1) > th:nth-child(2)") }
-
-	serverSettingTitle	{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(1) > th:nth-child(3)") }
-
-	clientPortTitle		{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
-	adminPortTitle		{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
-	httpPortTitle 		{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
-	internalPortTitle	{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
-	zookeeperPortTitle	{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(6) > td:nth-child(1)") }
-	replicationPortTitle	{ $("#admin > div.adminContainer > div.adminContentRight > div.adminPorts > div:nth-child(2) > table > tbody > tr:nth-child(7) > td:nth-child(1)") }
+		portNameTitle			{ $(text:"Port Name") }
+		clusterSettingTitle		{ $(text:"Cluster Settings") }
+		serverSettingTitle		{ $(text:"Server Settings") }
+		clientPortTitle			{ $(text:"Client Port") }
+		adminPortTitle			{ $(text:"Admin Port") }
+		httpPortTitle 			{ $(text:"HTTP Port") }
+		internalPortTitle		{ $(text:"Internal Port") }
+		zookeeperPortTitle		{ $(text:"Zookeeper Port") }
+		replicationPortTitle	{ $(text:"Replication Port") }
 	
-	clientPortValue		{ $("#clientport") }
-	adminPortValue		{ $("#adminport") }
-	httpPortValue		{ $("#httpport") }
-	internalPortValue	{ $("#internalPort") }
-	zookeeperPortValue	{ $("#zookeeperPort") }
-	replicationPortValue	{ $("#replicationPort") }	     
+		clusterClientPortValue			{ $("#clusterClientport") }
+		clusterAdminPortValue			{ $("#clusterAdminport") }
+		clusterHttpPortValue			{ $("#clusterHttpport") }
+		clusterInternalPortValue		{ $("#clusterInternalPort") }
+		clusterZookeeperPortValue		{ $("#clusterZookeeperPort") }
+		clusterReplicationPortValue		{ $("#clusterReplicationPort") }	     
     }
 
 }

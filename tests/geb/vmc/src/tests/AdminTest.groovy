@@ -34,7 +34,7 @@ class AdminTest extends TestBase {
         when:
 			at AdminPage
 		then:
-			header.banner.isPresent()
+			waitFor(30) { header.banner.isDisplayed() }
 	}
 
 
@@ -42,28 +42,28 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
-            header.image.isDisplayed();
+            waitFor(30) { header.image.isDisplayed() }
     }
 
     def "header username exists" () {
         when:
             at AdminPage
         then:
-            header.username.isDisplayed();
+            waitFor(30) { header.username.isDisplayed() }
     }
    
     def "header logout exists" () {
         when:
             at AdminPage
         then:
-            header.logout.isDisplayed();
+            waitFor(30) { header.logout.isDisplayed() }
     }
 
     def "header help exists" () {
         when:
             at AdminPage
         then:
-            header.help.isDisplayed();
+            waitFor(30) { header.help.isDisplayed() }
     }
 
     // HEADER TAB TESTS
@@ -72,7 +72,7 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
-            header.tabDBMonitor.isDisplayed();
+            waitFor(30) { header.tabDBMonitor.isDisplayed() }
             header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
     }
    
@@ -80,7 +80,7 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
-            header.tabAdmin.isDisplayed();
+            waitFor(30) { header.tabAdmin.isDisplayed() }
             header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
     }
    
@@ -88,15 +88,15 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
-            header.tabSchema.isDisplayed();
-            header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
+            waitFor(30) { header.tabpage.isDisplayed() }
+            header.tabpage.text().toLowerCase().equals("Schema".toLowerCase())
     }
    
     def "header tab sql query exists" ()  {
         when:
             at AdminPage
         then:
-            header.tabSQLQuery.isDisplayed();
+            waitFor(30) { header.tabSQLQuery.isDisplayed() }
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
     }
 
@@ -107,6 +107,7 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
+			waitFor(30) { header.username.isDisplayed() }
             header.username.text().equals($line);
     }
 
@@ -115,12 +116,15 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
+			waitFor(30) { header.username.isDisplayed() }
             header.username.click()
-            header.logoutPopup.isDisplayed()
-            header.logoutPopupTitle.isDisplayed()
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+			waitFor(30) { 
+		        header.logoutPopup.isDisplayed()
+		        header.logoutPopupTitle.isDisplayed()
+		        header.logoutPopupOkButton.isDisplayed()
+		        header.logoutPopupCancelButton.isDisplayed()
+		        header.popupClose.isDisplayed()
+			}
             header.popupClose.click()
     }
    
@@ -128,12 +132,15 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
+			waitFor(30) { header.username.isDisplayed() }
             header.username.click()
-            header.logoutPopup.isDisplayed()
-            header.logoutPopupTitle.isDisplayed()
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+			waitFor(30) {            
+				header.logoutPopup.isDisplayed()
+		        header.logoutPopupTitle.isDisplayed()
+		        header.logoutPopupOkButton.isDisplayed()
+		        header.logoutPopupCancelButton.isDisplayed()
+		        header.popupClose.isDisplayed()
+			}
             header.logoutPopupCancelButton.click()
     }
 
@@ -144,12 +151,15 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
+			waitFor(30) { header.logout.isDisplayed() }
             header.logout.click()
-            header.logoutPopup.isDisplayed()
-            header.logoutPopupTitle.isDisplayed()
-            header.logoutPopupOkButton.isDisplayed()
-            header.logoutPopupCancelButton.isDisplayed()
-            header.popupClose.isDisplayed()
+			waitFor(30) {            
+				header.logoutPopup.isDisplayed()
+		        header.logoutPopupTitle.isDisplayed()
+		        header.logoutPopupOkButton.isDisplayed()
+		        header.logoutPopupCancelButton.isDisplayed()
+		        header.popupClose.isDisplayed()
+			}
             header.popupClose.click()
       
     }
@@ -158,14 +168,16 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { header.logout.isDisplayed() }
         header.logout.click()
-        header.logoutPopup.isDisplayed()
-        header.logoutPopupTitle.isDisplayed()
-        header.logoutPopupOkButton.isDisplayed()
-        header.logoutPopupCancelButton.isDisplayed()
-        header.popupClose.isDisplayed()
+		waitFor(30) {
+		    header.logoutPopup.isDisplayed()
+		    header.logoutPopupTitle.isDisplayed()
+		    header.logoutPopupOkButton.isDisplayed()
+		    header.logoutPopupCancelButton.isDisplayed()
+		    header.popupClose.isDisplayed()
+		}
         header.logoutPopupCancelButton.click()
-
     }
 
     // HELP POPUP TEST
@@ -173,9 +185,14 @@ class AdminTest extends TestBase {
     def "help popup existance" () {
         when:
             at AdminPage
+			waitFor(30) { header.help.isDisplayed() }
             header.help.click()
         then:
-            header.popup.isDisplayed()
+			waitFor(30) {
+				header.popup.isDisplayed() 
+				header.popupTitle.isDisplayed()
+				header.popupClose.isDisplayed()
+			}
             header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
             header.popupClose.click()
     }
@@ -186,15 +203,18 @@ class AdminTest extends TestBase {
         when:
             at AdminPage
         then:
-            footer.banner.isDisplayed();
+			waitFor(30) { footer.banner.isDisplayed() }
     }
 
     def "footer text exists and valid"() {
 
         when:
             at AdminPage
-        then:
-            footer.banner.isDisplayed();
+        then:		
+			waitFor(30) { 
+				footer.banner.isDisplayed()
+				footer.text.isDisplayed()
+			}
             footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase());
     }
 
@@ -203,25 +223,27 @@ class AdminTest extends TestBase {
     def "when server3 is clicked"() {
         when:
         at AdminPage
-        page.serverbutton.isDisplayed()
+        waitFor(30) { server.serverbutton.isDisplayed() }
         then:
-        page.serverbutton.click()
-        page.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
-        page.deerwalkserver3stopbutton.click()
-        page.deeerwalkservercancelbutton.click()
-        //page.serverbutton.click()
+        server.serverbutton.click()
+		waitFor(30) { server.serverconfirmation.isDisplayed() }
+        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
+        server.deerwalkserver3stopbutton.click()
+        server.deeerwalkservercancelbutton.click()
+        //server.serverbutton.click()
     }
 
     def "when server4 is clicked"() {
         when:
         at AdminPage
-        serverbutton.isDisplayed()
+        waitFor(30) { serverbutton.isDisplayed() }
         then:
-        page.serverbutton.click()
-        page.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
-        page.deerwalkserver4stopbutton.click()
-        page.deeerwalkservercancelbutton.click()
-        //page.serverbutton.click()
+        server.serverbutton.click()
+		waitFor(30) { server.serverconfirmation.isDisplayed() }	
+        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
+        server.deerwalkserver4stopbutton.click()
+        server.deeerwalkservercancelbutton.click()
+        //server.serverbutton.click()
     }
 
 
@@ -231,7 +253,7 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.title.isDisplayed()
+			waitFor(30) { networkInterfaces.title.isDisplayed() }
 			networkInterfaces.title.text().toLowerCase().equals("Network Interfaces".toLowerCase())
 	}
 
@@ -239,7 +261,7 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.portNameTitle.isDisplayed()
+			waitFor(30) { networkInterfaces.portNameTitle.isDisplayed() }
 			networkInterfaces.portNameTitle.text().toLowerCase().equals("Port Name".toLowerCase())
 	}
 
@@ -248,23 +270,23 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.clusterSettingTitle.isDisplayed()
-			networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Setting".toLowerCase())
+			waitFor(30) { networkInterfaces.clusterSettingTitle.isDisplayed() }
+			networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
 	}
 
 	def "check Server Setting title"() {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.serverSettingTitle.isDisplayed()
-			networkInterfaces.serverSettingTitle.text().toLowerCase().equals("Server Setting".toLowerCase())
+			waitFor(30) { networkInterfaces.serverSettingTitle.isDisplayed() }
+			networkInterfaces.serverSettingTitle.text().toLowerCase().equals("Server Settings".toLowerCase())
 	}
 
 	def "check Client Port title"() {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.clientPortTitle.isDisplayed()
+			waitFor(30) { networkInterfaces.clientPortTitle.isDisplayed() }
 			networkInterfaces.clientPortTitle.text().toLowerCase().equals("Client Port".toLowerCase())
 	}
 
@@ -272,7 +294,7 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.adminPortTitle.isDisplayed()
+			waitFor(30) { networkInterfaces.adminPortTitle.isDisplayed() }
 			networkInterfaces.adminPortTitle.text().toLowerCase().equals("Admin Port".toLowerCase())
 	}
 
@@ -280,7 +302,7 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.httpPortTitle.isDisplayed()
+			waitFor(30) { networkInterfaces.httpPortTitle.isDisplayed() }
 			networkInterfaces.httpPortTitle.text().toLowerCase().equals("HTTP Port".toLowerCase())
 	}
 
@@ -288,7 +310,7 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.internalPortTitle.isDisplayed()
+			waitFor(30) { networkInterfaces.internalPortTitle.isDisplayed() }
 			networkInterfaces.internalPortTitle.text().toLowerCase().equals("Internal Port".toLowerCase())
 	}
 
@@ -296,7 +318,7 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.zookeeperPortTitle.isDisplayed()
+			waitFor(30) { networkInterfaces.zookeeperPortTitle.isDisplayed() }
 			networkInterfaces.zookeeperPortTitle.text().toLowerCase().equals("Zookeeper Port".toLowerCase())
 	}
 
@@ -304,7 +326,7 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.replicationPortTitle.isDisplayed()
+			waitFor(30) { networkInterfaces.replicationPortTitle.isDisplayed() }
 			networkInterfaces.replicationPortTitle.text().toLowerCase().equals("Replication Port".toLowerCase())
 	}
 
@@ -312,41 +334,35 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			waitFor(10){
-				networkInterfaces.clientPortValue.isDisplayed()
-				String string = networkInterfaces.clientPortValue.text()
-				!(string.equals(""))
-			}
+			waitFor(10){ networkInterfaces.clusterClientPortValue.isDisplayed() }
+			String string = networkInterfaces.clusterClientPortValue.text()
+			!(string.equals(""))
 	}
 
 	def "check Admin Port Value not empty"() {
 		when:
 			at AdminPage
 		then:
-			waitFor(10){
-				networkInterfaces.adminPortValue.isDisplayed()
-				String string = networkInterfaces.adminPortValue.text()
-				!(string.equals(""))
-			}
+			waitFor(10){ networkInterfaces.clusterAdminPortValue.isDisplayed() }
+			String string = networkInterfaces.clusterAdminPortValue.text()
+			!(string.equals(""))
 	}
 
 	def "check HTTP Port Value not empty"() {
 		when:
 			at AdminPage
 		then:
-			waitFor(10){
-				networkInterfaces.httpPortValue.isDisplayed()
-				String string = networkInterfaces.httpPortValue.text()
-				!(string.equals(""))
-			}
+			waitFor(10){ networkInterfaces.clusterHttpPortValue.isDisplayed() }
+			String string = networkInterfaces.clusterHttpPortValue.text()
+			!(string.equals(""))
 	}
 
 	def "check Internal Port Value not empty"() {
 		when:
 			at AdminPage
 		then:
-			networkInterfaces.internalPortValue.isDisplayed()
-			String string = networkInterfaces.internalPortValue.text()
+			waitFor(30) { networkInterfaces.clusterInternalPortValue.isDisplayed() }
+			String string = networkInterfaces.clusterInternalPortValue.text()
 			!(string.equals(""))
 	}
 
@@ -354,22 +370,18 @@ class AdminTest extends TestBase {
 		when:
 			at AdminPage
 		then:
-			waitFor(10){
-				networkInterfaces.zookeeperPortValue.isDisplayed()
-				String string = networkInterfaces.zookeeperPortValue.text()
-				!(string.equals(""))
-			}
+			waitFor(10){ networkInterfaces.clusterZookeeperPortValue.isDisplayed() }
+			String string = networkInterfaces.clusterZookeeperPortValue.text()
+			!(string.equals(""))
 	}
 
 	def "check Replication Port Value not empty"() {
 		when:
 			at AdminPage
 		then:
-			waitFor(10){
-				networkInterfaces.replicationPortValue.isDisplayed()
-				String string = networkInterfaces.replicationPortValue.text()
-				!(string.equals(""))
-			}
+			waitFor(10){ networkInterfaces.clusterReplicationPortValue.isDisplayed() }
+			String string = networkInterfaces.clusterReplicationPortValue.text()
+			!(string.equals(""))
 	}
 
 
@@ -377,7 +389,7 @@ class AdminTest extends TestBase {
     def "when download configuration is clicked"() {
         when:
         at AdminPage
-        downloadbtn.downloadconfigurationbutton.isDisplayed()
+        waitFor(30) { downloadbtn.downloadconfigurationbutton.isDisplayed() }
         then:
         downloadbtn.downloadconfigurationbutton.click()
     }
@@ -388,40 +400,38 @@ class AdminTest extends TestBase {
     def "cluster title"(){
         when:
         at AdminPage
-        cluster.clusterTitle.isDisplayed()
+        waitFor(30) { cluster.clusterTitle.isDisplayed() }
         then:
-        cluster.clusterTitle.text().equals("Cluster")}
+        cluster.clusterTitle.text().equals("Cluster")
+	}
 
 
-        def "check promote button"(){
-            when:
-            at AdminPage
-
-
-            then:
-            cluster.promotebutton.isDisplayed()
-            /* promotebutton.click()
-            promoteconfirmation.isDisplayed()
-            promoteconfirmation.isDisplayed()
-            promoteconfirmation.text().equals("Promote: Confirmation".toLowerCase())
-            promotecancel.click()*/
+    def "check promote button"(){
+        when:
+        at AdminPage
+		
+		then:
+            waitFor(30) { cluster.promotebutton.isDisplayed() }
         }
 
     def "when Resume cancel"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.resumebutton.isDisplayed() }
         cluster.resumebutton.click()
         then:
-        cluster.resumeconfirmation.isDisplayed()
+        waitFor(30) { cluster.resumeconfirmation.isDisplayed() }
         cluster.resumeconfirmation.text().toLowerCase().equals("Do you want to resume the cluster and exit admin mode?".toLowerCase());
         cluster.resumeconfirmation.resumecancel.click()
     }
+
     def "when Resume ok"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.resumebutton.isDisplayed() }
         cluster.resumebutton.click()
         then:
-        cluster.resumeconfirmation.isDisplayed()
+        waitFor(30) { cluster.resumeconfirmation.isDisplayed() }
         cluster.resumeconfirmation.text().toLowerCase().equals("Do you want to resume the cluster and exit admin mode?".toLowerCase());
         cluster.resumeconfirmation.resumeok.click()
     }
@@ -429,9 +439,10 @@ class AdminTest extends TestBase {
     def "when save for cancel"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        cluster.saveconfirmation.isDisplayed()
+        waitFor(30) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savecancel.click()
     }
@@ -439,9 +450,10 @@ class AdminTest extends TestBase {
     def "when save for yes"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        cluster.saveconfirmation.isDisplayed()
+        waitFor(30) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savedirectory.value("/var/opt/test/manual_snapshots")
         cluster.saveok.click()
@@ -452,9 +464,10 @@ class AdminTest extends TestBase {
     def "when save for No"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        cluster.saveconfirmation.isDisplayed()
+        waitFor(30) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savedirectory.value("bbb")
         cluster.saveok.click()
@@ -465,24 +478,23 @@ class AdminTest extends TestBase {
     def "when restore and ok"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.restorebutton.isDisplayed() }
         cluster.restorebutton.click()
         then:
-        waitFor(30) {
-            cluster.restoreconfirmation.isDisplayed()
-            cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
-            cluster.restoredirectory.value("/var/opt/test/manual_snapshots")
-            cluster.restoresearch.click()}
+        waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+        cluster.restoredirectory.value("/var/opt/test/manual_snapshots")
+        cluster.restoresearch.click()
         cluster.restorecancelbutton.click()
-        // restoreok.click()
-        // restoreokyes.click()
     }
 
     def "when restore and cancel"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.restorebutton.isDisplayed() }
         cluster.restorebutton.click()
         then:
-        cluster.restoreconfirmation.isDisplayed()
+        waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
         cluster.restorecancelbutton.click()
 
@@ -491,9 +503,10 @@ class AdminTest extends TestBase {
     def "when restore and close"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.restorebutton.isDisplayed() }
         cluster.restorebutton.click()
         then:
-        cluster.restoreconfirmation.isDisplayed()
+        waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
         cluster.restoreclosebutton.click()
 
@@ -502,9 +515,10 @@ class AdminTest extends TestBase {
     def "when shutdown cancel button"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.shutdownbutton.isDisplayed() }
         cluster.shutdownbutton.click()
         then:
-        cluster.shutdownconfirmation.isDisplayed()
+        waitFor(30) { cluster.shutdownconfirmation.isDisplayed() }
         cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
         cluster.shutdowncancelbutton.click()
     }
@@ -512,31 +526,32 @@ class AdminTest extends TestBase {
     def "when shutdown close button"(){
         when:
         at AdminPage
+		waitFor(30) { cluster.shutdownbutton.isDisplayed() }
         cluster.shutdownbutton.click()
         then:
-        cluster.shutdownconfirmation.isDisplayed()
+        waitFor(30) { cluster.shutdownconfirmation.isDisplayed() }
         cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
         cluster.shutdownclosebutton.click()
     }
 
     def "when cluster pause in cancel"() {
-
         when:
         at AdminPage
+		waitFor(30) { cluster.pausebutton.isDisplayed() }
         cluster.pausebutton.click()
         then:
-        cluster.pauseconfirmation.isDisplayed()
+        waitFor(30) { cluster.pauseconfirmation.isDisplayed() }
         cluster.pauseconfirmation.text().equals("Pause: Confirmation");
         cluster.pausecancel.click()
     }
 
     def "when cluster pause in ok"() {
-
         when:
         at AdminPage
+		waitFor(30) { cluster.pausebutton.isDisplayed() }
         cluster.pausebutton.click()
-        then:
-        cluster.pauseconfirmation.isDisplayed()
+        then: 
+        waitFor(30) { cluster.pauseconfirmation.isDisplayed() }
         cluster.pauseconfirmation.text().equals("Pause: Confirmation");
         cluster.pauseok.click()
     }
@@ -544,24 +559,21 @@ class AdminTest extends TestBase {
 
     //schema (SYSTEM OVERVIEW)
 
-    @Test
     def "check refresh button"(){
-
         when:
         at AdminPage
-        schema.refreshbutton.isDisplayed()
+        waitFor(30) { page.refreshbutton.isDisplayed() }
         then:
-        schema.refreshbutton.click()
+        page.refreshbutton.click()
     }
 
 
     def "check system overview title"(){
-
         when:
         at AdminPage
-        schema.systemoverviewTitle.isDisplayed()
+        waitFor(30) { page.systemoverviewTitle.isDisplayed() }
         then:
-        schema.systemoverviewTitle.text().toLowerCase().equals("System Overview".toLowerCase())
+        page.systemoverviewTitle.text().toLowerCase().equals("System Overview".toLowerCase())
     }
 
 
@@ -569,9 +581,9 @@ class AdminTest extends TestBase {
     def "check system overview content i.e, mode"(){
         when:
         at AdminPage
-        schema.modeTitle.isDisplayed()
+        waitFor(30) { page.modeTitle.isDisplayed() }
         then:
-        schema.modeTitle.text().toLowerCase().equals("Mode".toLowerCase())
+        page.modeTitle.text().toLowerCase().equals("Mode".toLowerCase())
 
     }
 
@@ -579,9 +591,9 @@ class AdminTest extends TestBase {
     def "check system overview content i.e, voltDBversion"(){
         when:
         at AdminPage
-        schema.voltdbversion.isDisplayed()
+        waitFor(30) { page.voltdbversion.isDisplayed() }
         then:
-        schema.voltdbversion.text().toLowerCase().equals("VoltDB Version".toLowerCase())
+        page.voltdbversion.text().toLowerCase().equals("VoltDB Version".toLowerCase())
 
     }
 
@@ -589,9 +601,9 @@ class AdminTest extends TestBase {
     def "check system overview content i.e, BuildString"(){
         when:
         at AdminPage
-        schema.buildstring.isDisplayed()
+        waitFor(30) { page.buildstring.isDisplayed() }
         then:
-        schema.buildstring.text().toLowerCase().equals("Buildstring".toLowerCase())
+        page.buildstring.text().toLowerCase().equals("Buildstring".toLowerCase())
 
     }
 
@@ -599,9 +611,9 @@ class AdminTest extends TestBase {
     def "check system overview content i.e, Cluster composition"(){
         when:
         at AdminPage
-        schema.clustercomposition.isDisplayed()
+        waitFor(30) { page.clustercomposition.isDisplayed() }
         then:
-        schema.clustercomposition.text().toLowerCase().equals("Cluster Composition".toLowerCase())
+        page.clustercomposition.text().toLowerCase().equals("Cluster Composition".toLowerCase())
 
     }
 
@@ -609,29 +621,28 @@ class AdminTest extends TestBase {
     def "check system overview content i.e, Running Since"(){
         when:
         at AdminPage
-        schema.runningsince.isDisplayed()
+        waitFor(30) { page.runningsince.isDisplayed() }
         then:
-        schema.runningsince.text().toLowerCase().equals("Running Since".toLowerCase())
+        page.runningsince.text().toLowerCase().equals("Running Since".toLowerCase())
 
     }
 
 
-       def "check system overview content i.e, mode-value"(){
-           when:
-           at AdminPage
-           schema.modevalue.isDisplayed()
-           then:
-           schema.modevalue.text().toLowerCase().equals("RUNNING".toLowerCase())
-
-       }
+    def "check system overview content i.e, mode-value"(){
+       when:
+       at AdminPage
+       waitFor(30) { page.modevalue.isDisplayed() }
+       then:
+       page.modevalue.text().toLowerCase().equals("RUNNING".toLowerCase())
+    }
 
 
        def "check system overview content i.e, voltDBversion-value"(){
            when:
            at AdminPage
-           schema.versionvalue.isDisplayed()
+           waitFor(30) { page.versionvalue.isDisplayed() }
            then:
-           schema.versionvalue.text().toLowerCase().equals("5.1".toLowerCase())
+           page.versionvalue.text().toLowerCase().equals("5.1".toLowerCase())
 
        }
 
@@ -639,9 +650,9 @@ class AdminTest extends TestBase {
        def "check system overview content i.e, buildstring-value"(){
            when:
            at AdminPage
-           schema.buildstringvalue.isDisplayed()
+           waitFor(30) { page.buildstringvalue.isDisplayed() }
            then:
-           schema.buildstringvalue.text().toLowerCase().equals("voltdb-4.7-2198-g23683d1-dirty-local".toLowerCase())
+           page.buildstringvalue.text().toLowerCase().equals("voltdb-4.7-2198-g23683d1-dirty-local".toLowerCase())
 
        }
 
@@ -649,9 +660,9 @@ class AdminTest extends TestBase {
        def "check system overview content i.e, clusterComposition-value"(){
            when:
            at AdminPage
-           schema.clustercompositionvalue.isDisplayed()
+           waitFor(30) { page.clustercompositionvalue.isDisplayed() }
            then:
-           schema.clustercompositionvalue.text().toLowerCase().equals("1 hosts with 8 sites (8 per host)".toLowerCase())
+           page.clustercompositionvalue.text().toLowerCase().equals("1 hosts with 8 sites (8 per host)".toLowerCase())
 
        }
 
@@ -659,10 +670,10 @@ class AdminTest extends TestBase {
      def "check system overview content i.e, RunningSince-value"(){
          when:
          at AdminPage
-         schema.runningsincevalue.isDisplayed()
+         waitFor(30) { page.runningsincevalue.isDisplayed() }
          then:
-        // schema.runningsincevalue.text().toLowerCase().equals("Tue Feb 24 08:20:31 GMT+00:00 2015 (0d 3h 56m)".toLowerCase())
-         schema.runningsincevalue.isDisplayed()
+        // page.runningsincevalue.text().toLowerCase().equals("Tue Feb 24 08:20:31 GMT+00:00 2015 (0d 3h 56m)".toLowerCase())
+         page.runningsincevalue.isDisplayed()
      }
 
     //schema CATALOG OVERVIEW STATISTICS
@@ -671,9 +682,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics title"(){
            when:
            at AdminPage
-           schema.catalogoverviewstatistic.isDisplayed()
+           waitFor(30) { page.catalogoverviewstatistic.isDisplayed() }
            then:
-           schema.catalogoverviewstatistic.text().toLowerCase().equals("Catalog Overview Statistics".toLowerCase())
+           page.catalogoverviewstatistic.text().toLowerCase().equals("Catalog Overview Statistics".toLowerCase())
 
        }
 
@@ -681,9 +692,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics content i.e, Compiled by VoltDB Version"(){
            when:
            at AdminPage
-           schema.compiledversion.isDisplayed()
+           waitFor(30) { page.compiledversion.isDisplayed() }
            then:
-           schema.compiledversion.text().toLowerCase().equals("Compiled by VoltDB Version".toLowerCase())
+           page.compiledversion.text().toLowerCase().equals("Compiled by VoltDB Version".toLowerCase())
 
        }
 
@@ -691,9 +702,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics content i.e, Compiled on"(){
            when:
            at AdminPage
-           schema.compiledonTitle.isDisplayed()
+           waitFor(30) { page.compiledonTitle.isDisplayed() }
            then:
-           schema.compiledonTitle.text().toLowerCase().equals("Compiled on".toLowerCase())
+           page.compiledonTitle.text().toLowerCase().equals("Compiled on".toLowerCase())
 
        }
 
@@ -701,9 +712,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics content i.e, Table Count"(){
            when:
            at AdminPage
-           schema.tablecount.isDisplayed()
+           waitFor(30) { page.tablecount.isDisplayed() }
            then:
-           schema.tablecount.text().toLowerCase().equals("Table Count".toLowerCase())
+           page.tablecount.text().toLowerCase().equals("Table Count".toLowerCase())
 
        }
 
@@ -711,9 +722,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics content i.e, Materialized View Count"(){
            when:
            at AdminPage
-           schema.materializedviewcount.isDisplayed()
+           waitFor(30) { page.materializedviewcount.isDisplayed() }
            then:
-           schema.materializedviewcount.text().toLowerCase().equals("Materialized View Count".toLowerCase())
+           page.materializedviewcount.text().toLowerCase().equals("Materialized View Count".toLowerCase())
 
        }
 
@@ -721,9 +732,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics content i.e, Index Count"(){
            when:
            at AdminPage
-           schema.indexcount.isDisplayed()
+           waitFor(30) { page.indexcount.isDisplayed() }
            then:
-           schema.indexcount.text().toLowerCase().equals("Index Count".toLowerCase())
+           page.indexcount.text().toLowerCase().equals("Index Count".toLowerCase())
 
        }
 
@@ -731,9 +742,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics content i.e, Procedure Count"(){
            when:
            at AdminPage
-           schema.procedurecount.isDisplayed()
+           waitFor(30) { page.procedurecount.isDisplayed() }
            then:
-           schema.procedurecount.text().toLowerCase().equals("Procedure Count".toLowerCase())
+           page.procedurecount.text().toLowerCase().equals("Procedure Count".toLowerCase())
 
        }
 
@@ -741,9 +752,9 @@ class AdminTest extends TestBase {
        def "check Catalog Overview Statistics content i.e, SQL Statement Count"(){
            when:
            at AdminPage
-           schema.sqlstatementcount.isDisplayed()
+           waitFor(30) { page.sqlstatementcount.isDisplayed() }
            then:
-           schema.sqlstatementcount.text().toLowerCase().equals("SQL Statement Count".toLowerCase())
+           page.sqlstatementcount.text().toLowerCase().equals("SQL Statement Count".toLowerCase())
 
        }
 
@@ -751,36 +762,36 @@ class AdminTest extends TestBase {
      def "check Catalog Overview Statistics content i.e, compiled by voltdb version-value"(){
          when:
          at AdminPage
-         schema.compiledversionvalue.isDisplayed()
+         waitFor(30) { page.compiledversionvalue.isDisplayed() }
          then:
-         schema.compiledversionvalue.text().toLowerCase().equals("5.1".toLowerCase())
+         page.compiledversionvalue.text().toLowerCase().equals("5.1".toLowerCase())
 
      }
 
      def "check Catalog Overview Statistics content i.e, compiled on-value"(){
          when:
          at AdminPage
-         schema.compiledonTitlevalue.isDisplayed()
+         waitFor(30) { page.compiledonTitlevalue.isDisplayed() }
          then:
-         schema.compiledonTitlevalue.text().toLowerCase().equals("Tue, 24 Feb 2015 08:20:28 GMT+00:00".toLowerCase())
+         page.compiledonTitlevalue.text().toLowerCase().equals("Tue, 24 Feb 2015 08:20:28 GMT+00:00".toLowerCase())
 
      }
 
      def "check Catalog Overview Statistics content i.e, table count-value"(){
          when:
          at AdminPage
-         schema.tablecountvalue.isDisplayed()
+         waitFor(30) { page.tablecountvalue.isDisplayed() }
          then:
-         schema.tablecountvalue.text().toLowerCase().equals("3 (1 partitioned / 2 replicated)".toLowerCase())
+         page.tablecountvalue.text().toLowerCase().equals("3 (1 partitioned / 2 replicated)".toLowerCase())
 
      }
 
      def "check Catalog Overview Statistics content i.e, materilized view count-value"(){
          when:
          at AdminPage
-         schema.materializedviewcountvalue.isDisplayed()
+         waitFor(30) { page.materializedviewcountvalue.isDisplayed() }
          then:
-         schema.materializedviewcountvalue.text().toLowerCase().equals("2".toLowerCase())
+         page.materializedviewcountvalue.text().toLowerCase().equals("2".toLowerCase())
 
      }
 
@@ -788,9 +799,9 @@ class AdminTest extends TestBase {
      def "check Catalog Overview Statistics content i.e, index count-value"(){
          when:
          at AdminPage
-         schema.indexcountvalue.isDisplayed()
+         waitFor(30) { page.indexcountvalue.isDisplayed() }
          then:
-         schema.indexcountvalue.text().toLowerCase().equals("4".toLowerCase())
+         page.indexcountvalue.text().toLowerCase().equals("4".toLowerCase())
 
      }
 
@@ -798,18 +809,18 @@ class AdminTest extends TestBase {
      def "check Catalog Overview Statistics content i.e, procedure count-value"(){
          when:
          at AdminPage
-         schema.procedurecountvalue.isDisplayed()
+         waitFor(30) { page.procedurecountvalue.isDisplayed() }
          then:
-         schema.procedurecountvalue.text().toLowerCase().equals("5 (1 partitioned / 4 replicated) (3 read-only / 2 read-write)".toLowerCase())
+         page.procedurecountvalue.text().toLowerCase().equals("5 (1 partitioned / 4 replicated) (3 read-only / 2 read-write)".toLowerCase())
 
      }
 
      def "check Catalog Overview Statistics content i.e, sql statement count-value"(){
          when:
          at AdminPage
-         schema.sqlstatementcountvalue.isDisplayed()
+         waitFor(30) { page.sqlstatementcountvalue.isDisplayed() }
          then:
-         schema.sqlstatementcountvalue.text().toLowerCase().equals("10".toLowerCase())
+         page.sqlstatementcountvalue.text().toLowerCase().equals("10".toLowerCase())
 
      }
 
@@ -819,9 +830,9 @@ class AdminTest extends TestBase {
     def "check documentation right footer"(){
         when:
         at AdminPage
-        schema.documentationrightlabel.isDisplayed()
+        waitFor(30) { page.documentationrightlabel.isDisplayed() }
         then:
-        schema.documentationrightlabel.text().toLowerCase().equals("Generated by VoltDB 5.1 on 24 Feb 2015 08:20:28 GMT+00:00".toLowerCase())
+        page.documentationrightlabel.text().toLowerCase().equals("Generated by VoltDB 5.1 on 24 Feb 2015 08:20:28 GMT+00:00".toLowerCase())
 
     }
 
@@ -829,9 +840,9 @@ class AdminTest extends TestBase {
        def "check documentation url"(){
            when:
            at AdminPage
-           schema.documentationurl.isDisplayed()
+           waitFor(30) { page.documentationurl.isDisplayed() }
            then:
-           schema.documentationurl.click()
+           page.documentationurl.click()
 
        }
 
@@ -839,27 +850,25 @@ class AdminTest extends TestBase {
     def "check DDL source Title"(){
         when:
         at AdminPage
-        schema.ddlsourceTitle.isDisplayed()
         then:
-        schema.ddlsourceTitle.isDisplayed()
+        waitFor(30) { page.ddlsourceTitle.isDisplayed() }
     }
 
 
     def "check DDL source download"() {
         when:
         at AdminPage
-        schema.ddlsourcedownload.isDisplayed()
+        waitFor(30) { page.ddlsourcedownload.isDisplayed() }
         then:
-        schema.ddlsourcedownload.click()
+        page.ddlsourcedownload.click()
     }
 
 
     def "check DDL source bunch of queries"(){
         when:
         at AdminPage
-        schema.ddlsourcequeries.isDisplayed()
         then:
-        schema.ddlsourcequeries.isDisplayed()
+        waitFor(30) { page.ddlsourcequeries.isDisplayed() }
 
     }
 
@@ -873,7 +882,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        directories.title.isDisplayed()
+        waitFor(30) { directories.title.isDisplayed() }
         directories.title.text().toLowerCase().equals("Directories".toLowerCase())
     }
 
@@ -881,7 +890,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        directories.rootTitle.isDisplayed()
+        waitFor(30) { directories.rootTitle.isDisplayed() }
         directories.rootTitle.text().toLowerCase().equals("Root (Destination)".toLowerCase())
     }
 
@@ -889,7 +898,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        directories.snapshotTitle.isDisplayed()
+        waitFor(30) { directories.snapshotTitle.isDisplayed() }
         directories.snapshotTitle.text().toLowerCase().equals("Snapshot".toLowerCase())
     }
 
@@ -897,7 +906,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        directories.exportOverflowTitle.isDisplayed()
+        waitFor(30) { directories.exportOverflowTitle.isDisplayed() }
         directories.exportOverflowTitle.text().toLowerCase().equals("Export Overflow".toLowerCase())
     }
 
@@ -905,7 +914,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        directories.commandLogsTitle.isDisplayed()
+        waitFor(30) { directories.commandLogsTitle.isDisplayed() }
         directories.commandLogsTitle.text().toLowerCase().equals("Command Logs".toLowerCase())
     }
 
@@ -913,7 +922,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        directories.commandLogSnapshotTitle.isDisplayed()
+        waitFor(30) { directories.commandLogSnapshotTitle.isDisplayed() }
         directories.commandLogSnapshotTitle.text().toLowerCase().equals("Command Log Snapshots".toLowerCase())
     }
 
@@ -921,55 +930,45 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            directories.rootValue.isDisplayed()
-            String string = directories.rootValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ directories.rootValue.isDisplayed() }
+        String string = directories.rootValue.text()
+        !(string.equals(""))
     }
 
     def "check SnapShot Value not empty"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            directories.snapshotValue.isDisplayed()
-            String string = directories.snapshotValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ directories.snapshotValue.isDisplayed() }
+        String string = directories.snapshotValue.text()
+        !(string.equals(""))
     }
 
     def "check Export Overflow Value not empty"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            directories.exportOverflowValue.isDisplayed()
-            String string = directories.exportOverflowValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ directories.exportOverflowValue.isDisplayed() }
+        String string = directories.exportOverflowValue.text()
+        !(string.equals(""))
     }
 
     def "check Command Logs Value not empty"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            directories.commandLogsValue.isDisplayed()
-            String string = directories.commandLogsValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ directories.commandLogsValue.isDisplayed() }
+        String string = directories.commandLogsValue.text()
+        !(string.equals(""))
     }
 
     def "check Log Snapshot Value not empty"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            directories.commandLogSnapshotValue.isDisplayed()
-            String string = directories.commandLogSnapshotValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ directories.commandLogSnapshotValue.isDisplayed() }
+        String string = directories.commandLogSnapshotValue.text()
+        !(string.equals(""))
     }
 
     // Overview
@@ -978,6 +977,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.title.isDisplayed() }
         overview.title.text().toLowerCase().equals("Overview".toLowerCase())
     }
 
@@ -985,6 +985,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.sitePerHost.isDisplayed() }
         overview.sitePerHost.text().toLowerCase().equals("Sites Per Host".toLowerCase())
     }
 
@@ -992,6 +993,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.ksafety.isDisplayed() }
         overview.ksafety.text().toLowerCase().equals("K-safety".toLowerCase())
     }
 
@@ -999,6 +1001,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.partitionDetection.isDisplayed() }
         overview.partitionDetection.text().toLowerCase().equals("Partition detection".toLowerCase())
     }
 
@@ -1006,6 +1009,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.security.isDisplayed() }
         overview.security.text().toLowerCase().equals("Security".toLowerCase())
     }
 
@@ -1013,6 +1017,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.httpAccess.isDisplayed() }
         overview.httpAccess.text().toLowerCase().equals("HTTP Access".toLowerCase())
     }
 
@@ -1020,6 +1025,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.autoSnapshots.isDisplayed() }
         overview.autoSnapshots.text().toLowerCase().equals("Auto Snapshots".toLowerCase())
     }
 
@@ -1027,6 +1033,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.commandLogging.isDisplayed() }
         overview.commandLogging.text().toLowerCase().equals("Command Logging".toLowerCase())
     }
 
@@ -1034,6 +1041,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.export.isDisplayed() }
         overview.export.text().toLowerCase().equals("Export".toLowerCase())
     }
 
@@ -1041,6 +1049,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
+		waitFor(30) { overview.advanced.isDisplayed() }
         overview.advanced.text().toLowerCase().equals("Advanced".toLowerCase())
     }
 
@@ -1050,47 +1059,36 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            overview.sitePerHostValue.isDisplayed()
-            String string = overview.sitePerHostValue.text()
-            !(string.equals(""))
-        }
-
+        waitFor(10){ overview.sitePerHostValue.isDisplayed() }
+        String string = overview.sitePerHostValue.text()
+        !(string.equals(""))
     }
 
     def "check K-safety value"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            overview.ksafetyValue.isDisplayed()
-            String string = overview.ksafetyValue.text()
-            !(string.equals(""))
-        }
-
+        waitFor(10){ overview.ksafetyValue.isDisplayed() }
+        String string = overview.ksafetyValue.text()
+        !(string.equals(""))
     }
 
     def "check Partition Detection value"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            overview.partitionDetectionValue.isDisplayed()
-            String string = overview.partitionDetectionValue.text()
-            !(string.equals(""))
-        }
-
+        waitFor(10){ overview.partitionDetectionValue.isDisplayed() }
+        String string = overview.partitionDetectionValue.text()
+        !(string.equals(""))
     }
 
     def "check Security value"() {
         when:
         at AdminPage
-        then:
-        waitFor(10){
-            overview.securityValue.isDisplayed()
-            String string = overview.securityValue.text()
-            !(string.equals(""))
-        }
+        then: 
+        waitFor(10){ overview.securityValue.isDisplayed() }
+        String string = overview.securityValue.text()
+        !(string.equals(""))
     }
 
 
@@ -1098,45 +1096,29 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            overview.httpAccessValue.isDisplayed()
-            String string = overview.httpAccessValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ overview.httpAccessValue.isDisplayed() }
+        String string = overview.httpAccessValue.text()
+        !(string.equals(""))
     }
 
     def "check Auto Snapshots value"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            overview.autoSnapshotsValue.isDisplayed()
-            String string = overview.autoSnapshotsValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ overview.autoSnapshotsValue.isDisplayed() }
+        String string = overview.autoSnapshotsValue.text()
+        !(string.equals(""))
     }
 
     def "check Command Logging value"() {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            overview.commandLoggingValue.isDisplayed()
-            String string = overview.commandLoggingValue.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ overview.commandLoggingValue.isDisplayed() }
+        String string = overview.commandLoggingValue.text()
+        !(string.equals(""))
     }
 
-    def "check Export value"() {
-        when:
-        at AdminPage
-        then:
-        waitFor(10){
-            overview.exportValue.isDisplayed()
-            String string = overview.exportValue.text()
-            !(string.equals(""))
-        }
-    }
     // edit
 
     //--security
@@ -1144,7 +1126,7 @@ class AdminTest extends TestBase {
     def "click security button"(){
         when:
         at AdminPage
-        overview.securityEdit.isDisplayed()
+        waitFor(30) { overview.securityEdit.isDisplayed() }
         then:
         overview.securityEdit.click()
     }
@@ -1157,7 +1139,7 @@ class AdminTest extends TestBase {
         }
         then:
         overview.securityEdit.click()
-        overview.securityEditOk.isDisplayed()
+        waitFor(30) { overview.securityEditOk.isDisplayed() }
         overview.securityEditOk.click()
         overview.securityPopupCancel.click()
     }
@@ -1170,7 +1152,7 @@ class AdminTest extends TestBase {
         }
         then:
         overview.securityEdit.click()
-        overview.securityEditOk.isDisplayed()
+        waitFor(30) { overview.securityEditOk.isDisplayed() }
         overview.securityEditOk.click()
         overview.securityPopupOk.click()
     }
@@ -1181,11 +1163,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(10){
-            overview.autoSnapshotsEdit.isDisplayed()
-            String string = overview.autoSnapshotsEdit.text()
-            !(string.equals(""))
-        }
+        waitFor(10){ overview.autoSnapshotsEdit.isDisplayed() }
+        String string = overview.autoSnapshotsEdit.text()
+        !(string.equals(""))
     }
 
     def "click edit Auto Snapshots and check"() {
@@ -1196,10 +1176,12 @@ class AdminTest extends TestBase {
             overview.autoSnapshotsEdit.isDisplayed()
         }
         overview.autoSnapshotsEdit.click()
-
-        overview.autoSnapshotsEditCheckbox.isDisplayed()
-        overview.autoSnapshotsEditOk.isDisplayed()
-        overview.autoSnapshotsEditCancel.isDisplayed()
+		
+		waitFor(30) {
+		    overview.autoSnapshotsEditCheckbox.isDisplayed()
+		    overview.autoSnapshotsEditOk.isDisplayed()
+		    overview.autoSnapshotsEditCancel.isDisplayed()
+		}
     }
 
     def "click Auto Snapshot edit and click cancel"() {
@@ -1213,14 +1195,18 @@ class AdminTest extends TestBase {
         when:
         overview.autoSnapshotsEdit.click()
         then:
-        overview.autoSnapshotsEditOk.isDisplayed()
-        overview.autoSnapshotsEditCancel.isDisplayed()
+		waitFor(30) {
+		    overview.autoSnapshotsEditOk.isDisplayed()
+		    overview.autoSnapshotsEditCancel.isDisplayed()
+		}
 
         when:
         overview.autoSnapshotsEditCancel.click()
         then:
-        !(overview.autoSnapshotsEditCancel.isDisplayed())
-        !(overview.autoSnapshotsEditOk.isDisplayed())
+		waitFor(30) {
+		    !(overview.autoSnapshotsEditCancel.isDisplayed())
+		    !(overview.autoSnapshotsEditOk.isDisplayed())
+		}
     }
 
     def "click Auto Snapshots edit and click checkbox to change on off"() {

@@ -20,15 +20,16 @@ class AdminPage extends VoltDBManagementCenterPage {
         footer              { module Footer }
         server              { module voltDBclusterserver}
         downloadbtn         { module downloadconfigbtn}
+        schema              { module schemaTab}
 
-
-        serverbutton				{ $("#serverName") }
+		serverbutton				{ $("#serverName") }
         serverconfirmation			{ $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
-        deerwalkserver3stopbutton   {$("#stopServer_deerwalk3")}
-        deeerwalkservercancelbutton {$("#StopConfirmCancel")}
-        deerwalkserverstopok        { $("#StopConfirmOK")}
+        deerwalkserver3stopbutton   { $("#stopServer_deerwalk3") }
+        deeerwalkservercancelbutton { $("#StopConfirmCancel") }
+        deerwalkserverstopok        { $("#StopConfirmOK") }
 
         deerwalkserver4stopbutton   {$("#stopServer_deerwalk4")}
+
 
         //DBmonitor part for server
         dbmonitorbutton{$("#navDbmonitor > a")}
@@ -75,8 +76,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         clustertransactionsecondmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
         clustertransactionminutesmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-
-
+        
     }
     static at = {
         adminTab.displayed

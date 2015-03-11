@@ -16,19 +16,18 @@ import org.openqa.selenium.JavascriptExecutor
 
 class Directories extends Module {
     static content = {
-        title { $("#admin > div.adminContainer > div.adminContentRight > div.adminDirectories > div.headerAdminContent > h1") }
+        title { $("h1", text:"Directories") }
 
-       	rootTitle { $("#admin > div.adminContainer > div.adminContentRight > div.adminDirectories > div.adminDirect > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
-        snapshotTitle {
-            $("#admin > div.adminContainer > div.adminContentRight > div.adminDirectories > div.adminDirect > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
-        exportOverflowTitle { $("#admin > div.adminContainer > div.adminContentRight > div.adminDirectories > div.adminDirect > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
-        commandLogsTitle { $("#admin > div.adminContainer > div.adminContentRight > div.adminDirectories > div.adminDirect > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
-        commandLogSnapshotTitle { $("#admin > div.adminContainer > div.adminContentRight > div.adminDirectories > div.adminDirect > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
+       	rootTitle 				{ $(text:"Root (Destination)") }
+        snapshotTitle 			{ $(text:"Snapshot") }
+        exportOverflowTitle 	{ $(text:"Export Overflow") }
+        commandLogsTitle 		{ $(text:"Command Log") }
+        commandLogSnapshotTitle { $(text:"Command Log Snapshots") }
 
-        rootValue { $("#voltdbroot") }
-        snapshotValue { $("#snapshotpath") }
-        exportOverflowValue { $("#exportOverflow") }
-        commandLogsValue { $("#commandlogpath") }
+        rootValue 				{ $("#voltdbroot") }
+        snapshotValue 			{ $("#snapshotpath") }
+        exportOverflowValue 	{ $("#exportOverflow") }
+        commandLogsValue 		{ $("#commandlogpath") }
         commandLogSnapshotValue { $("#commandlogsnapshotpath") }
     }
 
