@@ -4,8 +4,11 @@
                 want to use it as a starting point for a custom configuration. -->
 <deployment>
    <cluster hostcount="1" />
-   <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.NoOpExporter">
-     <configuration/>
+   <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.SocketExporter">
+     <configuration>
+       <property name="socketDest">localhost</property>
+       <property name="socketPort">5001</property>
+     </configuration>
    </export>
    <httpd enabled="true">
       <jsonapi enabled="true" />
