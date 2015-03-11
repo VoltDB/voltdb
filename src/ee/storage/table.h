@@ -145,6 +145,7 @@ class Table {
 
     TableTuple& tempTuple() {
         assert (m_tempTuple.m_data);
+        ::memset(m_tempTuple.address(), 0, m_tempTuple.tupleLength());
         return m_tempTuple;
     }
 
