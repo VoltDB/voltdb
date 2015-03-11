@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -61,7 +60,7 @@ public class TestDefaultDeployment extends TestCase {
         // the default deployment file includes an http server on port 8080.
         // do some verification without starting VoltDB, since that port
         // number conflicts with jenkins on some test servers.
-        String absolutePath = RealVoltDB.setupDefaultDeployment(new VoltLogger("HOST"));
+        String absolutePath = RealVoltDB.setupDefaultDeployment();
 
         DeploymentType dflt = CatalogUtil.parseDeployment(absolutePath);
         assertTrue(dflt != null);

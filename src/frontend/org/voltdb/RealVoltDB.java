@@ -141,8 +141,16 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
-    private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
+{
+
+    private static final boolean DISABLE_JMX;
+    static {
+        DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+    }
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -158,10 +166,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         "</deployment>"
     };
 
-    private final VoltLogger hostLog = new VoltLogger("HOST");
-    private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-
-    private VoltDB.Configuration m_config = new VoltDB.Configuration();
+    public VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -349,7 +354,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
-                    config.m_pathToDeployment = setupDefaultDeployment(hostLog);
+                    config.m_pathToDeployment = setupDefaultDeployment();
                     config.m_deploymentDefault = true;
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
@@ -1736,7 +1741,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
 
         // print out cluster membership
-        hostLog.info("About to list cluster interfaces for all nodes with format [ip1 ip2 ... ipN] client-port,admin-port,http-port");
+        hostLog.info("About to list cluster interfaces for all nodes with format [ip1 ip2 ... ipN] client-port:admin-port:http-port");
         for (int hostId : m_messenger.getLiveHostIds()) {
             if (hostId == m_messenger.getHostId()) {
                 hostLog.info(
@@ -1767,7 +1772,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
 
-    public static String[] extractBuildInfo(VoltLogger logger) {
+    public static String[] extractBuildInfo() {
         StringBuilder sb = new StringBuilder(64);
         String buildString = "VoltDB";
         String versionString = m_defaultVersionString;
@@ -1801,7 +1806,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 }
             }
             catch (Exception ignored2) {
-                logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+                hostLog.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
             }
         }
         return new String[] { versionString, buildString };
@@ -1809,7 +1814,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     @Override
     public void readBuildInfo(String editionTag) {
-        String buildInfo[] = extractBuildInfo(hostLog);
+        String buildInfo[] = extractBuildInfo();
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
         consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
@@ -2601,7 +2606,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      * @return path to default deployment file
      * @throws IOException
      */
-    static String setupDefaultDeployment(VoltLogger logger) throws IOException {
+    static String setupDefaultDeployment() throws IOException {
 
         // Since there's apparently no deployment to override the path to voltdbroot it should be
         // safe to assume it's under the working directory.
@@ -2610,7 +2615,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
         File deploymentXMLFile = new File(pathToDeployment);
 
-        logger.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+        hostLog.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
         BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
         for (String line : defaultDeploymentXML) {
             bw.write(line);

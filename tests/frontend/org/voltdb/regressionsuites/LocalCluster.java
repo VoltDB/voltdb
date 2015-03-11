@@ -56,8 +56,7 @@ public class LocalCluster implements VoltServerConfig {
     // Used to provide out-of-band HostId determination.
     // NOTE: This mechanism can't be used when m_hasLocalServer is enabled
     public static final String clusterHostIdProperty = "__VOLTDB_CLUSTER_HOSTID__";
-
-    private VoltLogger log = new VoltLogger("HOST");
+    VoltLogger log = new VoltLogger("HOST");
 
     // the timestamp salt for the TransactionIdManager
     // will vary between -3 and 3 uniformly
