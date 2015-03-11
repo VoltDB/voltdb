@@ -241,7 +241,21 @@ function loadAdminPage() {
         },
         passwordMessage: {
             required: "This field is required",
-        }
+        },
+
+        queryTimeoutRules: {
+            required: true,
+            min: 0,
+            max: INT_MAX_VALUE,
+            digits: true,
+        },
+        queryTimeoutMessages: {
+            required: "Please enter a valid positive number.",
+            min: "Please enter a positive number.",
+            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            digits: "Please enter a positive number without any decimal."
+        },
+
     };
 
     //Admin Page download link
@@ -603,7 +617,30 @@ function loadAdminPage() {
             });
         }
     });
-    
+
+
+    $("#loginWarnPopup").popup({
+        afterOpen: function (event, ui, ele) {
+            var popup = $(this)[0];
+
+            $("#btnLoginWarningOk").unbind("click");
+            $("#btnLoginWarningOk").on('click', function () {
+                if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
+                    location.reload(true);
+                }
+
+                if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
+                    $("#navDbmonitor").click();
+                }
+
+                $("#navAdmin").hide();
+                popup.close();
+            });
+        },
+        closeContent: '',
+        modal: true
+    });
+
     var showUpdateMessage = function (msg) {
         adminClusterObjects.updateMessageBar.html(msg);
         adminClusterObjects.updateMessageBar.css('display', 'block');
@@ -1153,8 +1190,16 @@ function loadAdminPage() {
             txtRetained: adminValidationRules.numericMessages
         }
     });
-    $("#frmUserList").validate();
     
+    $("#formQueryTimeout").validate({
+        rules: {
+            txtQueryTimeout: adminValidationRules.queryTimeoutRules
+        },
+        messages: {
+            txtQueryTimeout: adminValidationRules.queryTimeoutMessages
+        }
+    });
+
     adminEditObjects.btnEditAutoSnapshotOk.popup({
         open: function (event, ui, ele) {
         },
@@ -2202,7 +2247,7 @@ function loadAdminPage() {
         this.escapeHtml = function (value) {
             if (!value)
                 return "";
-            
+
             return $('<div/>').text(value).html();
         };
 
@@ -2266,7 +2311,7 @@ function loadAdminPage() {
         };
 
         var getExportProperties = function (data) {
-            
+
             var result = "";
             if (data != undefined) {
 
@@ -2274,7 +2319,7 @@ function loadAdminPage() {
                 if (adminEditObjects.exportConfiguration.data("status") == "loading"){
                     return;
                 }
-
+                
                 for (var i = 0; i < data.length; i++) {
                     var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
                     var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
@@ -2283,13 +2328,13 @@ function loadAdminPage() {
                     var rowId = 'row-4' + i;
                     var style = '';
                     var additionalCss = (VoltDbAdminConfig.toggleStates[rowId] === true) ? 'labelExpanded' : '';
-                    
+
                     if (!VoltDbAdminConfig.toggleStates.hasOwnProperty(rowId) || VoltDbAdminConfig.toggleStates[rowId] === false) {
                         VoltDbAdminConfig.toggleStates[rowId] = false;
                         style = 'style = "display:none;"';
                     }
 
-                    result +='<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
+                    result += '<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
                             '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
                             '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + type + '</a>' +
                             '   </td>' +

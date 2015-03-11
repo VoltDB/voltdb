@@ -49,8 +49,8 @@
 	 *
 	 * @param {Object} settings
 	 */
-    var popupCounter = 0;
-	$.Popup = function(settings) {
+	var popupCounter = 0;
+	$.Popup = function (settings) {
 
 	    popupCounter++; //For creating unique classes.
 	    var p = this,
@@ -335,29 +335,12 @@
 		            p.close();
 		        });
 		    }
-
-			//save cluster
-			$('.saveBtn').click(function(){
-				$('.saveInfo').hide();
-				$('.saveConfirmation').show();
-			});
-			
-			$('.confirmNoSave').click(function(){
-				$('.saveConfirmation').hide();
-				$('.saveInfo').show();
-			});
-			
-				
-			
-			
 			
 			//admin
 			var closeBtn = $(".closeBtn");
 		    if (closeBtn != undefined) {
 		        closeBtn.unbind('click');
 		        closeBtn.bind('click', function () {
-					$('.saveConfirmation').hide();
-					$('.saveInfo').show();
 					$('.restoreConfirmation').hide();
 					$('.restoreInfo').show();
 		            p.close();
