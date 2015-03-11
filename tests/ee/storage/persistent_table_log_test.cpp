@@ -403,11 +403,15 @@ TEST_F(PersistentTableLogTest, LookupTupleUsingTempTupleTest) {
     // It will use the memcmp() code path for the comparison, which should all
     // succeed because there is no uninlined stuff.
 
+    NValue wideStr = ValueFactory::getStringValue("a long string");
+    NValue narrowStr = ValueFactory::getStringValue("a");
+    NValue nullStr = ValueFactory::getNullStringValue();
+
     TableTuple wideTuple(m_tableSchema);
     wideTuple.move(new char[wideTuple.tupleLength()]);
     ::memset(wideTuple.address(), 0, wideTuple.tupleLength());
     wideTuple.setNValue(0, ValueFactory::getBigIntValue(1));
-    wideTuple.setNValue(1, ValueFactory::getStringValue("a long string"));
+    wideTuple.setNValue(1, wideStr);
     m_table->insertTuple(wideTuple);
     delete[] wideTuple.address();
 
@@ -415,7 +419,7 @@ TEST_F(PersistentTableLogTest, LookupTupleUsingTempTupleTest) {
     narrowTuple.move(new char[narrowTuple.tupleLength()]);
     ::memset(narrowTuple.address(), 0, narrowTuple.tupleLength());
     narrowTuple.setNValue(0, ValueFactory::getBigIntValue(2));
-    narrowTuple.setNValue(1, ValueFactory::getStringValue("a"));
+    narrowTuple.setNValue(1, narrowStr);
     m_table->insertTuple(narrowTuple);
     delete[] narrowTuple.address();
 
@@ -423,27 +427,31 @@ TEST_F(PersistentTableLogTest, LookupTupleUsingTempTupleTest) {
     nullTuple.move(new char[nullTuple.tupleLength()]);
     ::memset(nullTuple.address(), 0, nullTuple.tupleLength());
     nullTuple.setNValue(0, ValueFactory::getBigIntValue(3));
-    nullTuple.setNValue(1, ValueFactory::getNullStringValue());
+    nullTuple.setNValue(1, nullStr);
     m_table->insertTuple(nullTuple);
     delete[] nullTuple.address();
 
     TableTuple tempTuple = m_table->tempTuple();
     tempTuple.setNValue(0, ValueFactory::getBigIntValue(1));
-    tempTuple.setNValue(1, ValueFactory::getStringValue("a long string"));
+    tempTuple.setNValue(1, wideStr);
     TableTuple result = m_table->lookupTupleForUndo(tempTuple);
     ASSERT_FALSE(result.isNullTuple());
 
     tempTuple = m_table->tempTuple();
     tempTuple.setNValue(0, ValueFactory::getBigIntValue(2));
-    tempTuple.setNValue(1, ValueFactory::getStringValue("a"));
+    tempTuple.setNValue(1, narrowStr);
     result = m_table->lookupTupleForUndo(tempTuple);
     ASSERT_FALSE(result.isNullTuple());
 
     tempTuple = m_table->tempTuple();
     tempTuple.setNValue(0, ValueFactory::getBigIntValue(3));
-    tempTuple.setNValue(1, ValueFactory::getNullStringValue());
+    tempTuple.setNValue(1, nullStr);
     result = m_table->lookupTupleForUndo(tempTuple);
     ASSERT_FALSE(result.isNullTuple());
+
+    wideStr.free();
+    narrowStr.free();
+    nullStr.free();
 }
 
 int main() {
