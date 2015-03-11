@@ -70,5 +70,4 @@ class voltDBclusterserver extends Module {
         clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
     }
 
-    }
 }

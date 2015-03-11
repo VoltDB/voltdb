@@ -147,6 +147,135 @@ class DbMonitorTest extends TestBase {
         debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
     }
 
+
+
+    def clickGraphViewSeconds() {
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Seconds in Graph View'
+        page.chooseGraphView("Seconds")
+        then: 'display'
+
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        Date date = new Date();
+        String stringTwo = dateFormat.format(date)
+
+        String stringOne = timeOne.text()
+        int hourOne = page.changeToHour(stringOne)
+        int minuteOne = page.changeToMinute(stringOne)
+
+        int hourTwo = page.changeToHour(stringTwo)
+        int minuteTwo = page.changeToMinute(stringTwo)
+
+        int diff = minuteTwo - minuteOne
+
+        if ( hourOne == hourTwo && diff < 20 ) {
+            assert true
+        }
+        else if ( hourOne < hourTwo && minuteTwo < 20 ){
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+    def clickGraphViewMinute() {
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Seconds in Graph View'
+        page.chooseGraphView("Minutes")
+        then: 'display'
+
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        Date date = new Date();
+        String stringTwo = dateFormat.format(date)
+
+        String stringOne = timeOne.text()
+        int hourOne = page.changeToHour(stringOne)
+        int minuteOne = page.changeToMinute(stringOne)
+
+        int hourTwo = page.changeToHour(stringTwo)
+        int minuteTwo = page.changeToHour(stringTwo)
+
+        int hourDiff = hourTwo - hourOne
+
+        if ( hourDiff == 1 ) {
+            assert true
+        }
+        else if ( hourDiff > 1 && minuteTwo < 30 ){
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+    def clickGraphViewDays() {
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Seconds in Graph View'
+        page.chooseGraphView("Days")
+        then: 'display'
+
+        String stringOne = timeOne.text()
+        if ( stringOne.length() > 8 ) {
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+	 def checkActiveMissingJoining() {
+        expect: '1 Active server (at least)'
+        page.getActive() >= 1
+
+        and: '0 Missing servers (initially)'
+        page.getMissing() == 0
+
+        and: 'Joining servers not shown (for now)'
+        page.getJoining() == -1
+    }
+
+    def openAndCloseServerList() {
+        expect: 'Server list closed initially'
+        !page.isServerListOpen()
+        
+        when: 'click Server button (to open list)'
+        page.openServerList()
+        then: 'Server list is open'
+        page.isServerListOpen()
+
+        when: 'click Server button (to close list)'
+        page.closeServerList()
+        then: 'Server list is closed (again)'
+        !page.isServerListOpen()
+    }
+
+    def triggerAlert() {
+        expect: 'no Alerts shown, initially'
+        page.getAlert() == -1
+
+        // TODO: add more testing here, setting threshold
+    }
+
+    def checkServerNamesAndMemoryUsage() {
+        expect: 'Server list closed initially'
+        !page.isServerListOpen()
+
+        // TODO: make this a real test, not just printing values
+        List<String> serverNames = page.getServerNames()
+        debugPrint "Server Names            : " + serverNames
+        debugPrint "Memory Usages           : " + page.getMemoryUsages()
+        debugPrint "Memory Usage Percents   : " + page.getMemoryUsagePercents()
+        debugPrint "Memory Usage (0)        : " + page.getMemoryUsage(serverNames.get(0))
+        debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
+    }
+
     // HEADER TESTS
 
 	def "header banner exists" () {
@@ -947,40 +1076,6 @@ class DbMonitorTest extends TestBase {
 				assert false
     }
 
-	def thisIsWorking() {
-		when:
-		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
-		String line;
-		String query = ""
-		while ((line = br.readLine()) != null) {
-	   		// process the line.
-			query = query + line + "\n"
-		}
-		br.close();
-		then:
-		query.equals("zxya")
-	}
-
-	def checktwo() {
-		when:
-		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
-		String line;
-		String query = ""
-		
-		while((line = br.readLine()) != "#create") {
-		}
-
-		while ((line = br.readLine()) != null) {
-			// process the line.
-			query = query + line + "\n"
-		}
-		
-		br.close();
-		String query = page.getQueryToCreateTable()		
-		then:
-		query.equals("zxya")
-	}
-	
 	// stored procedure ascending descending
 	
 	    def "check if stored procedure is clickable"() {
@@ -1217,12 +1312,12 @@ class DbMonitorTest extends TestBase {
         }
         when:'clicked server button'
         at DbMonitorPage
-        server.clusterserverbutton.click()
-        server.serversearch.value($line)
+        page.clusterserverbutton.click()
+        page.serversearch.value($line)
 
         then:
         at DbMonitorPage
-        server.clusterserverbutton.click()
+        page.clusterserverbutton.click()
     }
 
 
@@ -1245,224 +1340,184 @@ class DbMonitorTest extends TestBase {
         }
         when:'clicked server button'
         at DbMonitorPage
-        server.clusterserverbutton.click()
-        server.serversearch.value($line3)
+        page.clusterserverbutton.click()
+        page.serversearch.value($line3)
 
         then:
         at DbMonitorPage
-        server.clusterserverbutton.click()
+        page.clusterserverbutton.click()
     }
 
 
     def "check server title on dbmonitor"(){
         when:
         at DbMonitorPage
-        server.clusterserverbutton.isDisplayed()
-        server.clusterserverbutton.click()
+        page.clusterserverbutton.isDisplayed()
+        page.clusterserverbutton.click()
         then:
         at DbMonitorPage
-        server.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
-        server.clusterserverbutton.click()
+        page.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
+        page.clusterserverbutton.click()
     }
 
 
 
     //dbmonitor graph part
-
-
     def "check min value in server cpu days"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypedays.click()
-        at DbMonitorPage
-
-
-        if(server.servercpudaysmax.text()-server.servercpudaysmin.text()<="7:00:00") {
-            println("Min Time for cpu days is:"+server.servercpudaysmin.text());
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
+        
+		then:
+        if(page.servercpudaysmax.text()-page.servercpudaysmin.text()<="7:00:00") {
+            println("Min Time for cpu days is:"+page.servercpudaysmin.text());
         }
 
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
-
 
     def "check max value in server cpu days"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypedays.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
 
-
-        if(server.servercpudaysmax.text()-server.servercpudaysmin.text()<="7:00:00") {
-            println("Max Time  for cpu days is:"+server.servercpudaysmax.text());
+        then:
+        if(page.servercpudaysmax.text()-page.servercpudaysmin.text()<="7:00:00") {
+            println("Max Time  for cpu days is:"+page.servercpudaysmax.text());
         }
 
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
 
     def "check min value in server cpu minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
 
-        if(server.servercpuminutemax.text()-server.servercpuminutesmin.text()<="1:00:06") {
-            println("Min Time for cpu minutes is:"+server.servercpuminutesmin.text());
+        then:
+        if(page.servercpuminutemax.text()-page.servercpuminutesmin.text()<="1:00:06") {
+            println("Min Time for cpu minutes is:"+page.servercpuminutesmin.text());
         }
 
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check max value in server cpu minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
-
-        if(server.servercpuminutemax.text()-server.servercpuminutesmin.text()<="1:00:06") {
-            println("Max Time for cpu minutes is:"+server.servercpuminutemax.text());
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
+    
+        then:
+        if(page.servercpuminutemax.text()-page.servercpuminutesmin.text()<="1:00:06") {
+            println("Max Time for cpu minutes is:"+page.servercpuminutemax.text());
         }
 
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check min value in server cpu seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-
-        if(server.servercpusecondmax.text()-server.servercpusecondmin.text()<="00:11:06") {
-            println("Min Time for cpu seconds is:"+server.servercpusecondmin.text());
+        then:
+        if(page.servercpusecondmax.text()-page.servercpusecondmin.text()<="00:11:06") {
+            println("Min Time for cpu seconds is:"+page.servercpusecondmin.text());
         }
 
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check max value in server cpu seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-        if(server.servercpusecondmax.text()-server.servercpusecondmin.text()<="00:11:06") {
-            println("Max Time for cpu seconds is:"+server.servercpusecondmax.text());
+        then:
+        if(page.servercpusecondmax.text()-page.servercpusecondmin.text()<="00:11:06") {
+            println("Max Time for cpu seconds is:"+page.servercpusecondmax.text());
         }
 
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
 
-       def "check min value in server ram days"(){
-           when:
-           at DbMonitorPage
-           server.selecttypeindrop.click()
-           server.selecttypedays.click()
-           at DbMonitorPage
+    def "check min value in server ram days"(){
+        when:
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
 
-           if(server.serverramdaysmax.text()-server.serverramdaysmin.text()<="7:00:00") {
-               println("Min Time for RAM days is:"+server.serverramdaysmin.text());
-           }
+        then:
+        if(page.serverramdaysmax.text()-page.serverramdaysmin.text()<="7:00:00") {
+            println("Min Time for RAM days is:"+page.serverramdaysmin.text());
+        }
+        else {
+            println("doesn't match")
+        }
+    }
 
-           else {
-               println("doesn't match")
-           }
-           then:
-           at DbMonitorPage
+
+   def "check max value in server ram days"(){
+       when:
+       page.selecttypeindrop.click()
+       page.selecttypedays.click()
+
+       then:
+       if(page.serverramdaysmax.text()-page.serverramdaysmin.text()<="7:00:00") {
+          println("Max Time for RAM days is:"+page.serverramdaysmax.text());
        }
-
-
-       def "check max value in server ram days"(){
-           when:
-           at DbMonitorPage
-           server.selecttypeindrop.click()
-           server.selecttypedays.click()
-           at DbMonitorPage
-
-           if(server.serverramdaysmax.text()-server.serverramdaysmin.text()<="7:00:00") {
-               println("Max Time for RAM days is:"+server.serverramdaysmax.text());
-           }
-
-           else {
-               println("doesn't match")
-           }
-           then:
-           at DbMonitorPage
+       else {
+           println("doesn't match")
        }
+   }
 
 
     def "check min value in server ram minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
 
-        if(server.serverramminutesmax.text()-server.serverramminutesmin.text()<="1:00:06") {
-            println("Min Time for RAM minutes is:"+server.serverramminutesmin.text());
+        then:
+        if(page.serverramminutesmax.text()-page.serverramminutesmin.text()<="1:00:06") {
+            println("Min Time for RAM minutes is:"+page.serverramminutesmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
 
     def "check max value in server ram minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
 
-        if(server.serverramminutesmax.text()-server.serverramminutesmin.text()<="1:00:06") {
-            println("Max Time for RAM minutes is:"+server.serverramminutesmax.text());
+        then:
+        if(page.serverramminutesmax.text()-page.serverramminutesmin.text()<="1:00:06") {
+            println("Max Time for RAM minutes is:"+page.serverramminutesmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
@@ -1470,155 +1525,123 @@ class DbMonitorTest extends TestBase {
 
     def "check min value in server ram seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-        if(server.serverramsecondmax.text()-server.serverramsecondmin.text()<="00:11:06") {
-            println("Min Time for RAM seconds is:"+server.serverramsecondmin.text());
+        then:
+        if(page.serverramsecondmax.text()-page.serverramsecondmin.text()<="00:11:06") {
+            println("Min Time for RAM seconds is:"+page.serverramsecondmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check max value in server ram seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-        if(server.serverramsecondmax.text()-server.serverramsecondmin.text()<="00:11:06") {
-            println("Max Time for RAM seconds is:"+server.serverramsecondmax.text());
+        then:
+        if(page.serverramsecondmax.text()-page.serverramsecondmin.text()<="00:11:06") {
+            println("Max Time for RAM seconds is:"+page.serverramsecondmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
 
     def "check min value in cluster latency days"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypedays.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
 
-        if(server.clusterlatencydaysmax.text()-server.clusterlatencydaysmin.text()<="7:00:00") {
-            println("Min Time for cluster latency days is:"+server.clusterlatencydaysmin.text());
+        then:
+        if(page.clusterlatencydaysmax.text()-page.clusterlatencydaysmin.text()<="7:00:00") {
+            println("Min Time for cluster latency days is:"+page.clusterlatencydaysmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check max value in cluster latency days"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypedays.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
 
-        if(server.clusterlatencydaysmax.text()-server.clusterlatencydaysmin.text()<="7:00:00") {
-            println("Max Time for cluster latency days is:"+server.clusterlatencydaysmax.text());
+        then:
+        if(page.clusterlatencydaysmax.text()-page.clusterlatencydaysmin.text()<="7:00:00") {
+            println("Max Time for cluster latency days is:"+page.clusterlatencydaysmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check min value in cluster latency minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
 
-        if(server.clusterlatencyminutesmax.text()-server.clusterlatencyminutesmin.text()<="1:00:06") {
-            println("Min Time for cluster latency minutes is:"+server.clusterlatencyminutesmin.text());
+        then:
+        if(page.clusterlatencyminutesmax.text()-page.clusterlatencyminutesmin.text()<="1:00:06") {
+            println("Min Time for cluster latency minutes is:"+page.clusterlatencyminutesmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check max value in cluster latency minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
 
-        if(server.clusterlatencyminutesmax.text()-server.clusterlatencyminutesmin.text()<="1:00:06") {
-            println("Max Time for cluster latency minutes is:"+server.clusterlatencyminutesmax.text());
+        then:
+        if(page.clusterlatencyminutesmax.text()-page.clusterlatencyminutesmin.text()<="1:00:06") {
+            println("Max Time for cluster latency minutes is:"+page.clusterlatencyminutesmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check min value in cluster latency seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-        if(server.clusterlatencysecondmax.text()-server.clusterlatencysecondmin.text()<="00:11:06") {
-            println("Min Time for cluster latency seconds is:"+server.clusterlatencysecondmin.text());
+        then:
+        if(page.clusterlatencysecondmax.text()-page.clusterlatencysecondmin.text()<="00:11:06") {
+            println("Min Time for cluster latency seconds is:"+page.clusterlatencysecondmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
 
     def "check max value in cluster latency seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-        if(server.clusterlatencysecondmax.text()-server.clusterlatencysecondmin.text()<="00:11:06") {
-            println("Max Time for cluster latency seconds is:"+server.clusterlatencysecondmax.text());
+        then:
+        if(page.clusterlatencysecondmax.text()-page.clusterlatencysecondmin.text()<="00:11:06") {
+            println("Max Time for cluster latency seconds is:"+page.clusterlatencysecondmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
@@ -1626,116 +1649,91 @@ class DbMonitorTest extends TestBase {
 
     def "check min value in cluster transaction days"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypedays.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
 
-        if(server.clustertransactiondaysmax.text()-server.clustertransactiondaysmin.text()<="7:00:00") {
-            println("Min Time for cluster transaction days is:"+server.clustertransactiondaysmin.text());
+        then:
+        if(page.clustertransactiondaysmax.text()-page.clustertransactiondaysmin.text()<="7:00:00") {
+            println("Min Time for cluster transaction days is:"+page.clustertransactiondaysmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check max value in cluster transaction days"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypedays.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
 
-        if(server.clustertransactiondaysmax.text()-server.clustertransactiondaysmin.text()<="7:00:00") {
-            println("Max Time for cluster transaction days is:"+server.clustertransactiondaysmax.text());
+        then:
+        if(page.clustertransactiondaysmax.text()-page.clustertransactiondaysmin.text()<="7:00:00") {
+            println("Max Time for cluster transaction days is:"+page.clustertransactiondaysmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check min value in cluster transaction minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
 
-        if(server.clustertransactionminutesmax.text()-server.clustertransactionminutesmin.text()<="1:00:06") {
-            println("Min Time for cluster transaction minutes is:"+server.clustertransactionminutesmin.text());
+        then:
+        if(page.clustertransactionminutesmax.text()-page.clustertransactionminutesmin.text()<="1:00:06") {
+            println("Min Time for cluster transaction minutes is:"+page.clustertransactionminutesmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
     def "check max value in cluster transaction minutes"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypemin.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypemin.click()
 
-        if(server.clustertransactionminutesmax.text()-server.clustertransactionminutesmin.text()<="1:00:06") {
-            println("Max Time for cluster transaction minutes is:"+server.clustertransactionminutesmax.text());
+        then:
+        if(page.clustertransactionminutesmax.text()-page.clustertransactionminutesmin.text()<="1:00:06") {
+            println("Max Time for cluster transaction minutes is:"+page.clustertransactionminutesmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
 
 
     def "check min value in cluster transaction seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-        if(server.clustertransactionsecondmax.text()-server.clustertransactionsecondmin.text()<="00:11:06") {
-            println("Min Time for cluster transaction seconds is:"+server.clustertransactionsecondmin.text());
+        then:
+        if(page.clustertransactionsecondmax.text()-page.clustertransactionsecondmin.text()<="00:11:06") {
+            println("Min Time for cluster transaction seconds is:"+page.clustertransactionsecondmin.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
 
     def "check max value in cluster transaction seconds"(){
         when:
-        at DbMonitorPage
-        server.selecttypeindrop.click()
-        server.selecttypesec.click()
-        at DbMonitorPage
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
 
-        if(server.clustertransactionsecondmax.text()-server.clustertransactionsecondmin.text()<="00:11:06") {
-            println("Max Time for cluster transaction seconds is:"+server.clustertransactionsecondmax.text());
+        then:
+        if(page.clustertransactionsecondmax.text()-page.clustertransactionsecondmin.text()<="00:11:06") {
+            println("Max Time for cluster transaction seconds is:"+page.clustertransactionsecondmax.text());
         }
-
         else {
             println("doesn't match")
         }
-        then:
-        at DbMonitorPage
     }
-
 
 }

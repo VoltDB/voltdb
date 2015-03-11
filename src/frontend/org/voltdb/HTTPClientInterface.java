@@ -36,6 +36,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
@@ -108,6 +109,7 @@ public class HTTPClientInterface {
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
         boolean suspended = false;
+        boolean forceClose = false;
         Continuation continuation = ContinuationSupport.getContinuation(request);
         if (m_timeout > 0) {
             continuation.setTimeout(m_timeout);
@@ -210,6 +212,9 @@ public class HTTPClientInterface {
             request.setAttribute("SQLSUBMITTED", Boolean.TRUE);
         } catch (Exception e) {
             String msg = e.getMessage();
+            if (e instanceof IOException || e instanceof NoConnectionsException) {
+                forceClose = true;
+            }
             m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             msg = rimpl.toJSONString();
@@ -225,7 +230,7 @@ public class HTTPClientInterface {
                 }
             } catch (IOException e1) {} // Ignore this as browser must have closed.
         } finally {
-            releaseClient(authResult);
+            releaseClient(authResult, forceClose);
         }
     }
 
@@ -356,10 +361,10 @@ public class HTTPClientInterface {
     }
 
     //Must be called by all who call authenticate.
-    public void releaseClient(AuthenticationResult authResult) {
+    public void releaseClient(AuthenticationResult authResult, boolean force) {
         if (authResult != null && authResult.m_client != null) {
             assert(m_connections != null);
-            m_connections.releaseClient(authResult.m_client);
+            m_connections.releaseClient(authResult.m_client, force);
         }
     }
 

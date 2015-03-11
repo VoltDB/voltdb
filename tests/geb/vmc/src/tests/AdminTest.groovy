@@ -203,13 +203,13 @@ class AdminTest extends TestBase {
     def "when server3 is clicked"() {
         when:
         at AdminPage
-        server.serverbutton.isDisplayed()
+        page.serverbutton.isDisplayed()
         then:
-        server.serverbutton.click()
-        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
-        server.deerwalkserver3stopbutton.click()
-        server.deeerwalkservercancelbutton.click()
-        //server.serverbutton.click()
+        page.serverbutton.click()
+        page.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
+        page.deerwalkserver3stopbutton.click()
+        page.deeerwalkservercancelbutton.click()
+        //page.serverbutton.click()
     }
 
     def "when server4 is clicked"() {
@@ -217,11 +217,11 @@ class AdminTest extends TestBase {
         at AdminPage
         serverbutton.isDisplayed()
         then:
-        server.serverbutton.click()
-        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
-        server.deerwalkserver4stopbutton.click()
-        server.deeerwalkservercancelbutton.click()
-        //server.serverbutton.click()
+        page.serverbutton.click()
+        page.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
+        page.deerwalkserver4stopbutton.click()
+        page.deeerwalkservercancelbutton.click()
+        //page.serverbutton.click()
     }
 
 
@@ -376,7 +376,7 @@ class AdminTest extends TestBase {
     //download automation test
     def "when download configuration is clicked"() {
         when:
-        at voltDBadmin
+        at AdminPage
         downloadbtn.downloadconfigurationbutton.isDisplayed()
         then:
         downloadbtn.downloadconfigurationbutton.click()
@@ -548,7 +548,7 @@ class AdminTest extends TestBase {
     def "check refresh button"(){
 
         when:
-        at voltDBadmin
+        at AdminPage
         schema.refreshbutton.isDisplayed()
         then:
         schema.refreshbutton.click()
@@ -558,7 +558,7 @@ class AdminTest extends TestBase {
     def "check system overview title"(){
 
         when:
-        at voltDBadmin
+        at AdminPage
         schema.systemoverviewTitle.isDisplayed()
         then:
         schema.systemoverviewTitle.text().toLowerCase().equals("System Overview".toLowerCase())
@@ -568,7 +568,7 @@ class AdminTest extends TestBase {
 
     def "check system overview content i.e, mode"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.modeTitle.isDisplayed()
         then:
         schema.modeTitle.text().toLowerCase().equals("Mode".toLowerCase())
@@ -578,7 +578,7 @@ class AdminTest extends TestBase {
 
     def "check system overview content i.e, voltDBversion"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.voltdbversion.isDisplayed()
         then:
         schema.voltdbversion.text().toLowerCase().equals("VoltDB Version".toLowerCase())
@@ -588,7 +588,7 @@ class AdminTest extends TestBase {
 
     def "check system overview content i.e, BuildString"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.buildstring.isDisplayed()
         then:
         schema.buildstring.text().toLowerCase().equals("Buildstring".toLowerCase())
@@ -598,7 +598,7 @@ class AdminTest extends TestBase {
 
     def "check system overview content i.e, Cluster composition"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.clustercomposition.isDisplayed()
         then:
         schema.clustercomposition.text().toLowerCase().equals("Cluster Composition".toLowerCase())
@@ -608,7 +608,7 @@ class AdminTest extends TestBase {
 
     def "check system overview content i.e, Running Since"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.runningsince.isDisplayed()
         then:
         schema.runningsince.text().toLowerCase().equals("Running Since".toLowerCase())
@@ -618,7 +618,7 @@ class AdminTest extends TestBase {
 
        def "check system overview content i.e, mode-value"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.modevalue.isDisplayed()
            then:
            schema.modevalue.text().toLowerCase().equals("RUNNING".toLowerCase())
@@ -628,7 +628,7 @@ class AdminTest extends TestBase {
 
        def "check system overview content i.e, voltDBversion-value"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.versionvalue.isDisplayed()
            then:
            schema.versionvalue.text().toLowerCase().equals("5.1".toLowerCase())
@@ -638,7 +638,7 @@ class AdminTest extends TestBase {
 
        def "check system overview content i.e, buildstring-value"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.buildstringvalue.isDisplayed()
            then:
            schema.buildstringvalue.text().toLowerCase().equals("voltdb-4.7-2198-g23683d1-dirty-local".toLowerCase())
@@ -648,7 +648,7 @@ class AdminTest extends TestBase {
 
        def "check system overview content i.e, clusterComposition-value"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.clustercompositionvalue.isDisplayed()
            then:
            schema.clustercompositionvalue.text().toLowerCase().equals("1 hosts with 8 sites (8 per host)".toLowerCase())
@@ -658,7 +658,7 @@ class AdminTest extends TestBase {
 
      def "check system overview content i.e, RunningSince-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.runningsincevalue.isDisplayed()
          then:
         // schema.runningsincevalue.text().toLowerCase().equals("Tue Feb 24 08:20:31 GMT+00:00 2015 (0d 3h 56m)".toLowerCase())
@@ -670,7 +670,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics title"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.catalogoverviewstatistic.isDisplayed()
            then:
            schema.catalogoverviewstatistic.text().toLowerCase().equals("Catalog Overview Statistics".toLowerCase())
@@ -680,7 +680,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics content i.e, Compiled by VoltDB Version"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.compiledversion.isDisplayed()
            then:
            schema.compiledversion.text().toLowerCase().equals("Compiled by VoltDB Version".toLowerCase())
@@ -690,7 +690,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics content i.e, Compiled on"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.compiledonTitle.isDisplayed()
            then:
            schema.compiledonTitle.text().toLowerCase().equals("Compiled on".toLowerCase())
@@ -700,7 +700,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics content i.e, Table Count"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.tablecount.isDisplayed()
            then:
            schema.tablecount.text().toLowerCase().equals("Table Count".toLowerCase())
@@ -710,7 +710,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics content i.e, Materialized View Count"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.materializedviewcount.isDisplayed()
            then:
            schema.materializedviewcount.text().toLowerCase().equals("Materialized View Count".toLowerCase())
@@ -720,7 +720,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics content i.e, Index Count"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.indexcount.isDisplayed()
            then:
            schema.indexcount.text().toLowerCase().equals("Index Count".toLowerCase())
@@ -730,7 +730,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics content i.e, Procedure Count"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.procedurecount.isDisplayed()
            then:
            schema.procedurecount.text().toLowerCase().equals("Procedure Count".toLowerCase())
@@ -740,7 +740,7 @@ class AdminTest extends TestBase {
 
        def "check Catalog Overview Statistics content i.e, SQL Statement Count"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.sqlstatementcount.isDisplayed()
            then:
            schema.sqlstatementcount.text().toLowerCase().equals("SQL Statement Count".toLowerCase())
@@ -750,7 +750,7 @@ class AdminTest extends TestBase {
 
      def "check Catalog Overview Statistics content i.e, compiled by voltdb version-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.compiledversionvalue.isDisplayed()
          then:
          schema.compiledversionvalue.text().toLowerCase().equals("5.1".toLowerCase())
@@ -759,7 +759,7 @@ class AdminTest extends TestBase {
 
      def "check Catalog Overview Statistics content i.e, compiled on-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.compiledonTitlevalue.isDisplayed()
          then:
          schema.compiledonTitlevalue.text().toLowerCase().equals("Tue, 24 Feb 2015 08:20:28 GMT+00:00".toLowerCase())
@@ -768,7 +768,7 @@ class AdminTest extends TestBase {
 
      def "check Catalog Overview Statistics content i.e, table count-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.tablecountvalue.isDisplayed()
          then:
          schema.tablecountvalue.text().toLowerCase().equals("3 (1 partitioned / 2 replicated)".toLowerCase())
@@ -777,7 +777,7 @@ class AdminTest extends TestBase {
 
      def "check Catalog Overview Statistics content i.e, materilized view count-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.materializedviewcountvalue.isDisplayed()
          then:
          schema.materializedviewcountvalue.text().toLowerCase().equals("2".toLowerCase())
@@ -787,7 +787,7 @@ class AdminTest extends TestBase {
 
      def "check Catalog Overview Statistics content i.e, index count-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.indexcountvalue.isDisplayed()
          then:
          schema.indexcountvalue.text().toLowerCase().equals("4".toLowerCase())
@@ -797,7 +797,7 @@ class AdminTest extends TestBase {
 
      def "check Catalog Overview Statistics content i.e, procedure count-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.procedurecountvalue.isDisplayed()
          then:
          schema.procedurecountvalue.text().toLowerCase().equals("5 (1 partitioned / 4 replicated) (3 read-only / 2 read-write)".toLowerCase())
@@ -806,7 +806,7 @@ class AdminTest extends TestBase {
 
      def "check Catalog Overview Statistics content i.e, sql statement count-value"(){
          when:
-         at voltDBadmin
+         at AdminPage
          schema.sqlstatementcountvalue.isDisplayed()
          then:
          schema.sqlstatementcountvalue.text().toLowerCase().equals("10".toLowerCase())
@@ -818,7 +818,7 @@ class AdminTest extends TestBase {
 
     def "check documentation right footer"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.documentationrightlabel.isDisplayed()
         then:
         schema.documentationrightlabel.text().toLowerCase().equals("Generated by VoltDB 5.1 on 24 Feb 2015 08:20:28 GMT+00:00".toLowerCase())
@@ -828,7 +828,7 @@ class AdminTest extends TestBase {
 
        def "check documentation url"(){
            when:
-           at voltDBadmin
+           at AdminPage
            schema.documentationurl.isDisplayed()
            then:
            schema.documentationurl.click()
@@ -838,7 +838,7 @@ class AdminTest extends TestBase {
 
     def "check DDL source Title"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.ddlsourceTitle.isDisplayed()
         then:
         schema.ddlsourceTitle.isDisplayed()
@@ -847,7 +847,7 @@ class AdminTest extends TestBase {
 
     def "check DDL source download"() {
         when:
-        at voltDBadmin
+        at AdminPage
         schema.ddlsourcedownload.isDisplayed()
         then:
         schema.ddlsourcedownload.click()
@@ -856,7 +856,7 @@ class AdminTest extends TestBase {
 
     def "check DDL source bunch of queries"(){
         when:
-        at voltDBadmin
+        at AdminPage
         schema.ddlsourcequeries.isDisplayed()
         then:
         schema.ddlsourcequeries.isDisplayed()

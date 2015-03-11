@@ -75,8 +75,10 @@ import java.util.Map;
 import java.util.Vector;
 
 /// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
+import java.math.BigDecimal;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.TimestampData;
+import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
 
@@ -1691,6 +1693,11 @@ public class Expression {
             }
 
             // Otherwise just string format the value.
+            if (dataType instanceof NumberType && ! dataType.isIntegralType()) {
+                // remove the scentific exponent notation
+                exp.attributes.put("value", new BigDecimal(valueData.toString()).toPlainString());
+                return exp;
+            }
             exp.attributes.put("value", valueData.toString());
             return exp;
 

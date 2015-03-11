@@ -178,14 +178,14 @@ function loadAdminPage() {
     var adminValidationRules = {
         numericRules: {
             required: true,
-            min: 0,
+            min: 1,
             max: INT_MAX_VALUE,
             digits: true,
         },
         numericMessages: {
             required: "Please enter a valid positive number.",
-            min: "Please enter a valid positive number.",
-            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            min: "Please enter a positive number. Its minimum value should be 1.",
+            max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
 
@@ -662,7 +662,9 @@ function loadAdminPage() {
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
                     if (success) {
                         if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
-                            showUpdateMessage('Snapshot saved successfully.');
+                            $('#saveSnapshotStatus').html('Snapshot queued successfully');
+                            $('#saveSnapshotMessage').html('To verify snapshot completion, please check the server logs.');
+                            $('#btnSaveSnapshotPopup').click();
                         } else {
                             $('#saveSnapshotStatus').html('Failed to save snapshot');
                             $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
@@ -675,6 +677,11 @@ function loadAdminPage() {
                 //Close the popup
                 popup.close();
 
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function () {
+                popup.close();
             });
 
             $("#btnSaveSnapshotCancel").unbind("click");
@@ -1024,6 +1031,10 @@ function loadAdminPage() {
             adminEditObjects.tBoxFilePrefix.hide();
             adminDOMObjects.retainedLabel.hide();
 
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
+
             adminEditObjects.loadingSnapshot.show();
             adminEditObjects.loadingSnapshotFrequency.show();
             adminEditObjects.loadingSnapshotPrefix.show();
@@ -1054,6 +1065,9 @@ function loadAdminPage() {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
             adminEditObjects.LinkAutoSnapshotEdit.show();
             adminEditObjects.iconAutoSnapshotOption.show();
             adminDOMObjects.autoSnapshotLabel.show();
@@ -1379,6 +1393,7 @@ function loadAdminPage() {
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
             adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.errorQueryTimeout.hide();
 
             adminEditObjects.loadingQueryTimeout.show();
         }
@@ -1395,6 +1410,7 @@ function loadAdminPage() {
             adminEditObjects.loadingQueryTimeout.hide();
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.errorQueryTimeout.hide();
             adminEditObjects.LinkQueryTimeoutEdit.show();
 
             adminEditObjects.tBoxQueryTimeout.hide();
