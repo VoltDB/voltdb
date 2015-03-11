@@ -39,7 +39,7 @@ create table raw (
  exit integer,
  list integer,
  recall integer,
-
+ file integer, 
 
  alter integer,
 
@@ -53,8 +53,8 @@ create table raw (
 Command succeeded.
 
 select * from raw;
-HELP  GO  EXIT  LIST  RECALL  ALTER  INSERT  UPDATE  DELETE  TRUNCATE  EXEC 
------ --- ----- ----- ------- ------ ------- ------- ------- --------- -----
+HELP  GO  EXIT  LIST  RECALL  FILE  ALTER  INSERT  UPDATE  DELETE  TRUNCATE  EXEC 
+----- --- ----- ----- ------- ----- ------ ------- ------- ------- --------- -----
 
 (Returned 0 rows in #.##s)
 

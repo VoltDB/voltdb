@@ -196,11 +196,11 @@ public class SQLCommand
             isRecall = false;
             String line = interactiveReader.readLine(prompt);
             if (line == null) {
-                // As strange as it seems, trying to pipe an empty file into stdin has been
-                // found to lead down this "interactive mode" code path.
-                // This suggests that a more reliable test is needed for "got stdin".
-                // Unfortunately, a "1>" prompt has already been sent to stdout.
-                // Cut our losses by rigging a quick exit.
+                // This used to occur in an edge case when trying to pipe an
+                // empty file into stdin and ending up in interactive mode by
+                // mistake. That case works differently now, so this code path
+                // MAY be dead. If not, cut our losses by rigging a quick exit.
+                statement.setLength(0);
                 line = "EXIT;";
             }
 
@@ -1289,11 +1289,20 @@ public class SQLCommand
                     executeStatement(query);
                 }
             }
-            //TODO: A more reliable test is needed for "got stdin".
-            // This one fails when trying to pipe an empty file into stdin,
-            // leading down the "interactive mode" code path.
-            if (System.in.available() > 0) {
-                // If Standard input comes loaded with data, run in non-interactive mode
+            // This test for an interactive environment is mostly
+            // reliable. See stackoverflow.com/questions/1403772.
+            // It accurately detects when data is piped into the program
+            // but it fails to distinguish the case when data is ONLY piped
+            // OUT of the command -- that's a possible but very strange way
+            // to run an interactive session, so it's OK that we don't support
+            // it. Instead, in that edge case, we fall back to non-interactive
+            // mode but IN THAT MODE, we wait on and process user input as if
+            // from a slow pipe. Strange, but acceptable, and preferable to the
+            // check used here in the past (System.in.available() > 0)
+            // which would fail in the opposite direction, when a 0-length
+            // file was piped in, showing an interactive greeting and prompt
+            // before quitting.
+            if (System.console() == null) {
                 m_interactive = false;
                 executeNoninteractive();
             }

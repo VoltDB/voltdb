@@ -28,12 +28,12 @@ create table raw (
  exit integer,
  list integer,
  recall integer,
--- file integer, -- SOME DAY SOON?
--- create integer, MAYBE? some day?
+ file integer, -- SOME DAY SOON?
+-- create integer, -- MAYBE? some day?
  alter integer,
--- drop integer, MAYBE? some day?
+-- drop integer, -- MAYBE? some day?
  insert integer,
--- select integer, MAYBE? some day?
+-- select integer, -- MAYBE? some day?
  update integer,
  delete integer,
  truncate integer,

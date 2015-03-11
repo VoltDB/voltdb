@@ -15,3 +15,12 @@ create index tidx on t(i);
 Batch command succeeded.
 
 explain select * from t;
+EXECUTION_PLAN                 
+-------------------------------
+RETURN RESULTS TO STORED PROCEDURE
+ RECEIVE FROM ALL PARTITIONS
+  SEND PARTITION RESULTS TO COORDINATOR
+   SEQUENTIAL SCAN of "T"
+
+
+(Returned 1 rows in #.##s)
