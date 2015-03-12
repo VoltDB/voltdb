@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,7 +47,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
 
         // Make the LogManager shutdown hook the last thing to be done,
         // so that we'll get logging from any other shutdown behavior.
-        ShutdownHooks.registerShutdownHook(ShutdownHooks.VOLT_LOG4J, true,
+        ShutdownHooks.registerFinalShutdownAction(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -56,7 +56,8 @@ public class VoltLog4jLogger implements CoreVoltLogger {
                 });
     }
 
-    /*
+
+   /*
      * Encoding for various log settings that will fit in 3 bits
      */
     public static final int all = 0;
