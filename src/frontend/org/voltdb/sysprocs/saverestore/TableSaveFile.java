@@ -76,6 +76,7 @@ public class TableSaveFile
             checkDoubleFree();
             discarded = true;
             if (m_hasMoreChunks == false) {
+                System.out.println("Really discarding the container.");
                 m_origin.discard();
             } else {
                 m_buffers.add(m_origin);
@@ -386,34 +387,39 @@ public class TableSaveFile
     }
 
     public void close() throws IOException {
-        Thread chunkReader;
-        synchronized (this) {
-            m_hasMoreChunks = false;
-            chunkReader = m_chunkReaderThread;
-        }
-
-        if (chunkReader != null) {
-            chunkReader.interrupt();
-            try {
-                chunkReader.join();
-            } catch (InterruptedException e) {
-                throw new IOException(e);
+        VoltLogger log = new VoltLogger("SNAPSHOT");
+        try {
+            Thread chunkReader;
+            synchronized (this) {
+                m_hasMoreChunks = false;
+                chunkReader = m_chunkReaderThread;
             }
-        }
 
-        synchronized (this) {
-            while (!m_availableChunks.isEmpty()) {
-                m_availableChunks.poll().discard();
+            if (chunkReader != null) {
+                chunkReader.interrupt();
+                try {
+                    chunkReader.join();
+                } catch (InterruptedException e) {
+                    log.debug("Failed to stop Chunk Reader.");
+                    throw new IOException(e);
+                }
             }
-            notifyAll();
-        }
 
-        /*
-         * Free buffers used to pull snapshot data in process
-         */
-        BBContainer cont;
-        while ((cont = m_buffers.poll()) != null) {
-            cont.discard();
+        } finally {
+            synchronized (this) {
+                while (!m_availableChunks.isEmpty()) {
+                    m_availableChunks.poll().discard();
+                }
+                notifyAll();
+            }
+            /*
+             * Free buffers used to pull snapshot data in process
+             */
+            log.debug("Freeing Chunk container count: " + m_buffers.size());
+            BBContainer cont;
+            while ((cont = m_buffers.poll()) != null) {
+                cont.discard();
+            }
         }
     }
 
@@ -529,13 +535,17 @@ public class TableSaveFile
          * The old method was out of hand. Going to start a new one with a different format
          * that should be easier to understand and validate.
          */
-        private void readChunksV2(final ByteBuffer fileInputBuffer) {
+        private void readChunksV2() {
+            //For reading the compressed input.
+            final BBContainer fileInputBufferC =
+                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
+            final ByteBuffer fileInputBuffer = fileInputBufferC.b();
             long sinceLastFAdvise = Long.MAX_VALUE;
             long positionAtLastFAdvise = 0;
-            VoltLogger log = new VoltLogger("SNAPSHOT");
             while (m_hasMoreChunks) {
                 if (sinceLastFAdvise > 1024 * 1024 * 48) {
                     sinceLastFAdvise = 0;
+                    VoltLogger log = new VoltLogger("SNAPSHOT");
                     try {
                         final long position = m_saveFile.position();
                         long retval = PosixAdvise.fadvise(
@@ -575,7 +585,6 @@ public class TableSaveFile
                 try {
                     m_chunkReads.acquire();
                 } catch (InterruptedException e) {
-                    log.info("Failed to aquire access for table save file.", e);
                     return;
                 }
                 boolean expectedAnotherChunk = false;
@@ -774,9 +783,14 @@ public class TableSaveFile
                     if (c != null) c.discard();
                 }
             }
+            fileInputBufferC.discard();
         }
 
-        private void readChunks(final ByteBuffer fileInputBuffer) {
+        private void readChunks() {
+            //For reading the compressed input.
+            BBContainer fileInputBufferC =
+                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
+            ByteBuffer fileInputBuffer = fileInputBufferC.b();
             while (m_hasMoreChunks) {
                 /*
                  * Limit the number of chunk materialized into memory at one time
@@ -1032,8 +1046,8 @@ public class TableSaveFile
                     if (c != null) c.discard();
                 }
             }
+            fileInputBufferC.discard();
         }
-
         private Container getOutputBuffer(final int nextChunkPartitionId) {
             BBContainer c = m_buffers.poll();
             if (c == null) {
@@ -1053,17 +1067,13 @@ public class TableSaveFile
 
         @Override
         public void run() {
-            //For reading the compressed input.
-            final BBContainer fileInputBufferC =
-                    DBBPool.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
             try {
                 if (m_hasVersion2FormatChunks) {
-                    readChunksV2(fileInputBufferC.b());
+                    readChunksV2();
                 } else {
-                    readChunks(fileInputBufferC.b());
+                    readChunks();
                 }
             } finally {
-                fileInputBufferC.discard();
                 synchronized (TableSaveFile.this) {
                     m_hasMoreChunks = false;
                     TableSaveFile.this.notifyAll();
@@ -1077,3 +1087,4 @@ public class TableSaveFile
 
     }
 }
+
