@@ -83,7 +83,7 @@ void AbstractJoinPlanNode::getOutputColumnExpressions(
 std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "JoinType[" << m_joinType << "]\n";
+    buffer << spacer << "JoinType[" << joinToString(m_joinType) << "]\n";
     if (m_preJoinPredicate != NULL)
     {
         buffer << spacer << "Pre-Join Predicate\n";

@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
@@ -32,8 +33,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -190,26 +189,15 @@ public class PlanAssembler {
      * Return true if tableList includes at least one export table.
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
-        // the single well-known connector
-        Connector connector = m_catalogDb.getConnectors().get("0");
-
-        // no export tables with out a connector
-        if (connector == null) {
-            return false;
-        }
-
-        CatalogMap<ConnectorTableInfo> tableinfo = connector.getTableinfo();
+        // list of all export tables (assume uppercase)
+        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
 
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            for (ConnectorTableInfo ti : tableinfo) {
-                if (ti.getAppendonly() &&
-                    ti.getTable().getTypeName().equalsIgnoreCase(table.getTypeName()))
-                {
-                    return true;
-                }
+            if (exportTables.contains(table.getTypeName())) {
+                return true;
             }
         }
 
@@ -354,10 +342,21 @@ public class PlanAssembler {
         }
 
         if (parsedStmt instanceof ParsedInsertStmt  && !plan.isOrderDeterministic()) {
+            ParsedInsertStmt parsedInsert = (ParsedInsertStmt)parsedStmt;
+            boolean targetHasLimitRowsTrigger = parsedInsert.targetTableHasLimitRowsTrigger();
+
             if (parsedStmt.m_isUpsert) {
                 throw new PlanningErrorException(
                         "UPSERT statement manipulates data in a non-deterministic way.  "
                         + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
+            }
+            else if (targetHasLimitRowsTrigger) {
+                throw new PlanningErrorException(
+                        "Order of rows produced by SELECT statement in INSERT INTO ... SELECT is "
+                        + "non-deterministic.  Since the table being inserted into has a row limit "
+                        + "trigger, the SELECT output must be ordered.  Add an ORDER BY clause "
+                        + "to address this issue."
+                        );
             }
             else if (plan.hasLimitOrOffset()) {
                 throw new PlanningErrorException(
@@ -1153,8 +1152,10 @@ public class PlanAssembler {
 
             }
 
+            boolean targetIsExportTable = tableListIncludesExportOnly(m_parsedInsert.m_tableList);
             InsertSubPlanAssembler subPlanAssembler =
-                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning);
+                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning,
+                            targetIsExportTable);
             AbstractPlanNode subplan = subPlanAssembler.nextPlan();
             if (subplan == null) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
@@ -1232,6 +1233,9 @@ public class PlanAssembler {
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
+        if (subquery != null) {
+            insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());
+        }
 
         // The field map tells the insert node
         // where to put values produced by child into the row to be inserted.

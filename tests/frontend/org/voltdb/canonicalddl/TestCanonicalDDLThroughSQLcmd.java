@@ -85,12 +85,18 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         m_client.callProcedure("@AdHoc", firstCanonicalDDL);
 
-        assertEquals(compiler.getCanonicalDDL(), firstCanonicalDDL);
+        // First line of canonical DDL differs thanks to creation time.  Avoid
+        // it in the comparison
+        // Sanity check that we're not trimming the entire fullddl.sql file away
+        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
+        String secondDDL = compiler.getCanonicalDDL();
+        assertEquals(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')),
+                secondDDL.substring(secondDDL.indexOf('\n')));
 
         teardownSystem();
     }
 
-    private void secondCanonicalDDLFromSQLcmd() throws Exception {
+    private void secondCanonicalDDLFromSQLcmd(boolean fastModeDDL) throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
@@ -116,25 +122,30 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         if ( ! triedSqlcmdDryRun) {
             assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
-                    0, callSQLcmd("\n"));
+                    0, callSQLcmd("\n", fastModeDDL));
             triedSqlcmdDryRun = true;
         }
 
-        assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, callSQLcmd(firstCanonicalDDL));
+        assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, callSQLcmd(firstCanonicalDDL, fastModeDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
-        assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
+        // Sanity check that we're not trimming the entire fullddl.sql file away
+        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
+        assertEquals(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')).toLowerCase(),
+                roundtripDDL.substring(roundtripDDL.indexOf('\n')).toLowerCase());
 
-        assertEquals("sqlcmd failed on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
+        assertEquals("sqlcmd failed on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n", fastModeDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
-        assertFalse(firstCanonicalDDL.equals(roundtripDDL));
+        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
+        assertFalse(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')).toLowerCase().equals(
+                roundtripDDL.substring(roundtripDDL.indexOf('\n')).toLowerCase()));
 
         teardownSystem();
     }
 
-    private int callSQLcmd(String ddl) throws Exception {
-        final String commandPath = "bin/sqlcmd";
-        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
+    private int callSQLcmd(String ddl, boolean fastModeDDL) throws Exception {
+        String commandPath = "bin/sqlcmd";
+        final long timeout = 300000; // 300,000 millis -- give up after 5 minutes of trying.
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
@@ -143,11 +154,16 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         fos.close();
 
         File out = new File("out.log");
-
         File error = new File("error.log");
 
-        ProcessBuilder pb = new ProcessBuilder(commandPath);
-        pb.redirectInput(f);
+        ProcessBuilder pb = null;
+        if (fastModeDDL) {
+            pb = new ProcessBuilder(commandPath, "--ddl-file=" + f.getPath());
+        } else {
+            pb = new ProcessBuilder(commandPath);
+            pb.redirectInput(f);
+        }
+
         pb.redirectOutput(out);
         pb.redirectError(error);
         Process process = pb.start();
@@ -167,6 +183,10 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
                     System.err.println("External process (" + commandPath + ") exited after being polled " +
                             pollcount + " times over " + elapsedtime + "ms");
                 }
+
+                // Debug the SQLCMD output if needed
+                // System.out.println(new Scanner(out).useDelimiter("\\Z").next());
+
                 return exitValue;
             }
             catch (Exception e) {
@@ -177,7 +197,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         } while (elapsedtime < timeout);
 
         fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + ddl);
-        return 0;
+        return -1;
     }
 
     private String getDDLFromHTTP(int httpdPort) throws Exception {
@@ -214,8 +234,20 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
         firstCanonicalDDL = getFirstCanonicalDDL();
-
+        long starttime = System.currentTimeMillis();
         secondCanonicalDDLFromAdhoc();
-        secondCanonicalDDLFromSQLcmd();
+        long adHocTime = System.currentTimeMillis() - starttime;
+
+        starttime = System.currentTimeMillis();
+        secondCanonicalDDLFromSQLcmd(false);
+        long sqlcmdTime = System.currentTimeMillis() - starttime;
+
+        starttime = System.currentTimeMillis();
+        secondCanonicalDDLFromSQLcmd(true);
+        long sqlcmdTimeDDLmode = System.currentTimeMillis() - starttime;
+
+        System.out.println(String.format("AdHoc elapsed %d ms", adHocTime));
+        System.out.println(String.format("SQLcmd elapsed %d ms", sqlcmdTime));
+        System.out.println(String.format("SQLcmd fast DDL mode elapsed %d ms", sqlcmdTimeDDLmode));
     }
 }

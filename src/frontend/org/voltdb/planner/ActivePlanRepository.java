@@ -85,6 +85,10 @@ public abstract class ActivePlanRepository {
             frag = m_plansByHash.get(key);
         }
         assert(frag != null);
+        // SQL statement text is not stored in the repository for ad hoc statements
+        // -- it may be inaccurate because we parameterize the statement on its constants.
+        // Callers know if they are asking about ad hoc or pre-planned fragments,
+        // and shouldn't call this method for the ad hoc case.
         assert(frag.stmtText != null);
         return frag.stmtText;
     }
@@ -105,6 +109,15 @@ public abstract class ActivePlanRepository {
                     evictLRUfragment();
                 }
             }
+
+            // Bit of a hack to work around an issue where a statement-less adhoc
+            // fragment could be identical to a statement-needing regular procedure.
+            // This doesn't really address the broader issue that fragment hashes
+            // are not 1-1 with SQL statements.
+            if (frag.stmtText == null) {
+                frag.stmtText = stmtText;
+            }
+
             // The fragment MAY be in the LRU map.
             // An incremented refCount is a lazy way to keep it safe from eviction
             // without having to update the map.

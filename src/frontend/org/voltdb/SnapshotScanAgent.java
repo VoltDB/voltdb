@@ -22,12 +22,15 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -35,6 +38,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.StatsProcInputTable.ProcInputRow;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -152,11 +156,41 @@ public class SnapshotScanAgent extends OpsAgent
             }
         }
 
-        VoltTable clientResults = constructClientResultsTable();
+        List<ClientResultRow> clientResults = new ArrayList<ClientResultRow>();
         for (Snapshot s : aggregates.values()) {
-            clientResults.addRow(s.asRow());
+            clientResults.add(new ClientResultRow(
+                    (String)s.asRow()[0],
+                    (String)s.asRow()[1],
+                    (long)s.asRow()[2],
+                    (long)s.asRow()[3],
+                    (long)s.asRow()[4],
+                    (String)s.asRow()[5],
+                    (String)s.asRow()[6],
+                    (String)s.asRow()[7],
+                    (String)s.asRow()[8]
+                    ));
         }
-        request.aggregateTables[0] = clientResults;
+        Collections.sort(clientResults, new Comparator<ClientResultRow>() {
+            @Override
+            public int compare(ClientResultRow r1, ClientResultRow r2) {
+                return r1.compareTo(r2);
+            }
+        });
+        VoltTable clientSortedResults = constructClientResultsTable();
+        for (ClientResultRow row : clientResults) {
+            clientSortedResults.addRow(
+                    row.path,
+                    row.nonce,
+                    row.txnid,
+                    row.created,
+                    row.size,
+                    row.tablesRequired,
+                    row.tablesMissing,
+                    row.tablesIncomplete,
+                    row.complete
+                    );
+        }
+        request.aggregateTables[0] = clientSortedResults;
     }
 
     @Override
@@ -194,10 +228,11 @@ public class SnapshotScanAgent extends OpsAgent
 
     private VoltTable getSnapshotScanResults(String path)
     {
-        VoltTable results = constructFragmentResultsTable();
+        List<SnapshotResultRow> results = new ArrayList<SnapshotResultRow>();
+
         List<File> relevantFiles = retrieveRelevantFiles(path);
         if (relevantFiles == null) {
-            results.addRow(
+            results.add(new SnapshotResultRow(
                     m_messenger.getHostId(),
                     m_hostname,
                     "",
@@ -212,7 +247,7 @@ public class SnapshotScanAgent extends OpsAgent
                     0,
                     "",
                     "FAILURE",
-                    m_errorString);
+                    m_errorString));
         } else {
             for (final File f : relevantFiles) {
                 if (f.getName().endsWith(".digest")) {
@@ -237,14 +272,13 @@ public class SnapshotScanAgent extends OpsAgent
                                 partitions = partitions.substring(1);
                             }
 
-                            results.addRow(
+                            results.add(new SnapshotResultRow(
                                     m_messenger.getHostId(),
                                     m_hostname,
                                     f.getParent(),
                                     f.getName(),
                                     savefile.getTxnId(),
-                                    org.voltdb.TransactionIdManager.getTimestampFromTransactionId(
-                                        savefile.getTxnId()),
+                                    savefile.getTimestamp(),
                                     savefile.getTableName(),
                                     savefile.getCompleted() ? "TRUE" : "FALSE",
                                     f.length(),
@@ -254,7 +288,7 @@ public class SnapshotScanAgent extends OpsAgent
                                     f.canRead() ? "TRUE" : "FALSE",
                                     "SUCCESS",
                                     ""
-                                    );
+                                    ));
                         } catch (IOException e) {
                             SNAP_LOG.warn(e);
                         } finally {
@@ -264,7 +298,7 @@ public class SnapshotScanAgent extends OpsAgent
                         SNAP_LOG.warn(e);
                     }
                 } else {
-                    results.addRow(
+                    results.add(new SnapshotResultRow(
                             m_messenger.getHostId(),
                             m_hostname,
                             f.getParent(),
@@ -280,11 +314,37 @@ public class SnapshotScanAgent extends OpsAgent
                             f.canRead() ? "TRUE" : "FALSE",
                             "SUCCESS",
                             ""
-                            );
+                            ));
                 }
             }
         }
-        return results;
+        Collections.sort(results, new Comparator<SnapshotResultRow>() {
+            @Override
+            public int compare(SnapshotResultRow r1, SnapshotResultRow r2) {
+                return r1.compareTo(r2);
+            }
+        });
+        VoltTable sortedResults = constructFragmentResultsTable();
+        for (SnapshotResultRow row : results) {
+            sortedResults.addRow(
+                    row.hostId,
+                    row.hostName,
+                    row.path,
+                    row.name,
+                    row.txnid,
+                    row.created,
+                    row.table,
+                    row.completed,
+                    row.size,
+                    row.isReplicated,
+                    row.partitions,
+                    row.totalPartitions,
+                    row.readable,
+                    row.result,
+                    row.errMsg
+                    );
+        }
+        return sortedResults;
     }
 
     private VoltTable getSnapshotDigestScanResults(String path)
@@ -423,6 +483,101 @@ public class SnapshotScanAgent extends OpsAgent
             }
         }
         return retvals;
+    }
+
+    static class ClientResultRow implements Comparable<ClientResultRow>
+    {
+        String path;
+        String nonce;
+        long txnid;
+        long created;
+        long size;
+        String tablesRequired;
+        String tablesMissing;
+        String tablesIncomplete;
+        String complete;
+
+        public ClientResultRow(String path, String nonce, long txnid, long created,
+                long size, String tablesRequired, String tablesMissing, String tablesIncomplete,
+                String complete)
+        {
+            this.path = path;
+            this.nonce = nonce;
+            this.txnid = txnid;
+            this.created = created;
+            this.size = size;
+            this.tablesRequired = tablesRequired;
+            this.tablesMissing = tablesMissing;
+            this.tablesIncomplete = tablesIncomplete;
+            this.complete = complete;
+        }
+
+        @Override
+        public int compareTo(ClientResultRow other) {
+            if (created > other.created) {
+                return -1;
+            }
+            else if (created < other.created) {
+                return 1;
+            }
+            else {
+                return 0;
+            }
+        }
+    }
+
+    static class SnapshotResultRow implements Comparable<SnapshotResultRow>
+    {
+        int hostId;
+        String hostName;
+        String path;
+        String name;
+        long txnid;
+        long created;
+        String table;
+        String completed;
+        long size;
+        String isReplicated;
+        String partitions;
+        int totalPartitions;
+        String readable;
+        String result;
+        String errMsg;
+
+        public SnapshotResultRow(int hostId, String hostName, String path, String name,
+                long txnid, long created, String table, String completed, long size,
+                String isReplicated, String partitions, int totalPartitions, String readable,
+                String result, String errMsg)
+        {
+            this.hostId = hostId;
+            this.hostName = hostName;
+            this.path = path;
+            this.name = name;
+            this.txnid = txnid;
+            this.created = created;
+            this.table = table;
+            this.completed = completed;
+            this.size = size;
+            this.isReplicated = isReplicated;
+            this.partitions = partitions;
+            this.totalPartitions = totalPartitions;
+            this.readable = readable;
+            this.result = result;
+            this.errMsg = errMsg;
+        }
+
+        @Override
+        public int compareTo(SnapshotResultRow other) {
+            if (created > other.created) {
+                return -1;
+            }
+            else if (created < other.created) {
+                return 1;
+            }
+            else {
+                return table.compareTo(other.table);
+            }
+        }
     }
 
     private VoltTable constructFragmentResultsTable() {

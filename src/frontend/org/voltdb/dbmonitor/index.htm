@@ -8,13 +8,12 @@
     <meta name="description" content="">
     <meta name="author" content="">
     <link href="css/resources/layout.css" rel="stylesheet" />
+    <link href="css/resources/aero.css" rel="stylesheet" />
     <link href="css/resources/nv.d3.css" rel="stylesheet" />
     <link href="css/resources/tablesorter.css" rel="stylesheet" />
-
     <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled="disabled" rel="stylesheet">
     <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled="disabled" rel="stylesheet">
     <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled" rel="stylesheet">
-
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
@@ -24,34 +23,37 @@
     <script type="text/javascript" src="js/voltdb.config.js"></script>
     <script type="application/javascript" src="js/jquery.crypt.js"></script>
     <script type="application/javascript" src="js/jquery-ui.js"></script>
-
     <script type="text/javascript" src="js/voltdb.core.js"></script>
     <script type="text/javascript" src="js/voltdb.service.js"></script>
     <script type="text/javascript" src="js/voltdb.render.js"></script>
     <script type="text/javascript" src="js/voltdb.ui.js"></script>
     <script type="text/javascript" src="js/voltdb.graph.js"></script>
-
     <script type="text/javascript" src="js/jquery.tooltipster.js"></script>
     <script type="text/javascript" src="js/voltdb.sqlquery.ui.js"></script>
     <script type="text/javascript" src="js/voltdb.queryrender.js"></script>
     <script type="text/javascript" src="js/sorttable.js"></script>
     <script type="text/javascript" src="js/shortcut.js"></script>
     <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
+    <script type="text/javascript" src="js/icheck.js"></script>
+    <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
+    <script type="text/javascript" src="js/jquery.validate.min.js"></script>
 </head>
-
 <body>
-    <iframe name="versioncheck" id="versioncheck" style="display:none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
+    <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
     <div class="page-wrap">
+        <div class="snapshotStatusBar" style="display: none" id="snapshotBar">Snapshot saved successfully.</div>
         <div id="wrapper">
             <div class="header" id="headerMain">
                 <div class="headLeft">
                     <div class="logo">
-                        <img src="css/resources/images/voltdb-logo.png" alt="VoltDB" /></div>
+                        <img src="css/resources/images/voltdb-logo.png" alt="VoltDB" />
+                    </div>
                     <div class="menu" id="toggle">
                         <div class="toggleMenu" id="toggleMenu">Menu</div>
                         <nav id="nav">
                             <ul>
                                 <li id="navDbmonitor" class="active"><a href="#" class="linkFirst">DB Monitor</a></li>
+                                <li id="navAdmin" style="display: none;"><a href="#">Admin</a></li>
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                             </ul>
@@ -78,27 +80,21 @@
                 <div class="container" id="containerMain">
                     <div class="clusterDetailsWrapper" id="clusterDetails">
                         <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
-
                             <h1 class="headText clusterIcon">Cluster</h1>
                             <ul class="clusterStat" id="clusterHealth">
                                 <li class="activeIcon">Active <span>()</span></li>
-                               <!-- <li class="joiningIcon">Joining <span>()</span></li>-->
+                                <li class="joiningIcon">Joining <span>()</span></li>
                                 <li class="missingIcon">Missing <span>()</span></li>
                                 <li style="display: none;" class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>()</span></a></li>
                             </ul>
                             <div class="clear"></div>
-
-
                         </div>
                         <div class="clusterDetailsContRight" id="clusterDetailsRight">
                             <ul class="serverStat" id="serverStatSection">
                                 <li>Monitoring</li>
                                 <li class="activeServerName" id="activeServerName" title=""></li>
-
                             </ul>
-
                             <div style="float: right; padding: 0 0 0 10px;"><a href="#" id="btnPopServerList" class="btn showServers">Server</a></div>
-
                             <div class="clear"></div>
                         </div>
                         <div class="clear"></div>
@@ -108,15 +104,14 @@
                             <div class="slide-pop-wrapper">
                                 <div class="slide-pop-title">
                                     <div class="icon-server searchLeft">Servers</div>
-
                                     <div class="searchRight">
                                         <div class="search">
                                             <input type="text" id="popServerSearch" class="icon-search" onclick="this.value = '';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
                                         </div>
                                         <div class="thresholdVal">
                                             Alert Threshold
-                                    <input type="text" id="threshold" class="theVal" maxlength="3" />%
-                                    <a href="#" id="saveThreshold" class="setVal">Set</a>
+                                            <input type="text" id="threshold" class="theVal" maxlength="3" />
+                                            % <a href="#" id="saveThreshold" class="setVal">Set</a>
                                         </div>
                                         <div class="clear"></div>
                                     </div>
@@ -124,10 +119,8 @@
                                 </div>
                                 <div class="slide-pop-content">
                                     <div class="server-info-heading">
-                                        <span class="server">Server Name</span>
-                                        <span class="memory-use">Memory Usage</span>
+                                        <span class="server">Server Name</span> <span class="memory-use">Memory Usage</span>
                                         <div class="clear"></div>
-
                                     </div>
                                     <div id="serverListWrapper">
                                         <ul class="servers-list" id="serversList">
@@ -154,46 +147,35 @@
                                     </select>
                                 </li>
                             </ul>
-                            <div class="preBtn">
-                                <a href="#myPreference" class="btn" id="showMyPreference">Display Preference</a>
-                            </div>
+                            <div class="preBtn"><a href="#myPreference" class="btn" id="showMyPreference">Display Preference</a> </div>
                         </div>
                         <div class="clear"></div>
                     </div>
-                    <div id="graphBlock">
+                    <div id="mainGraphBlock">
                         <div class="graphChart" id="graphChart">
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
                                     <h1>Server CPU <span class="activeServerName" title=""></span></h1>
                                 </div>
-
                                 <svg id="visualisationCpu" width="100%" height="350"></svg>
-
                             </div>
                             <div id="chartServerRAM" class="chart">
                                 <div class="chartHeader" id="chartRamHeader">
                                     <h1>Server RAM<span class="activeServerName" title=""></span></h1>
                                 </div>
-
                                 <svg id="visualisationRam" width="100%" height="400"></svg>
-
                             </div>
                             <div id="chartClusterLatency" class="chart">
                                 <div class="chartHeader">
                                     <h1>Cluster Latency (99th percentile, ms)</h1>
                                 </div>
-
                                 <svg id="visualisationLatency" width="100%" height="400"></svg>
-
-
                             </div>
                             <div id="chartClusterTransactions" class="chart">
                                 <div class="chartHeader">
                                     <h1>Cluster Transactions (tps)</h1>
                                 </div>
-
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
-
                             </div>
                             <div class="clear"></div>
                         </div>
@@ -209,11 +191,15 @@
                                     <div class="tabs-filter-wrapper">
                                         <div class="tableTitle icon-procedures">Stored Procedures (Cluster)</div>
                                         <div class="filter">
-                                            <input name="filter" id="filterStoredProc" type="text" class="search-box" onblur="this.value=!this.value?'Search Stored Procedures':this.value;" value="Search Stored Procedures" placeholder="Search Stored Procedures" /><a id="searchStoredProc" href="javascript:void(0)" class="icon-search" title="Search">search</a></div>
+                                            <input name="filter" id="filterStoredProc" type="text" class="search-box" onblur="this.value=!this.value?'Search Stored Procedures':this.value;" value="Search Stored Procedures" placeholder="Search Stored Procedures" />
+                                            <a id="searchStoredProc" href="javascript:void(0)" class="icon-search" title="Search">search</a>
+                                        </div>
                                         <div class="pagination">
                                             <a id="previousProcedures" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
                                             <label id="lblPrevious"></label>
-                                            of<label id="lblTotalPages"></label><a id="nextProcedures" href="javascript:void(0)" class="next" title="Next Page">Next</a>
+                                            of
+                                            <label id="lblTotalPages"></label>
+                                            <a id="nextProcedures" href="javascript:void(0)" class="next" title="Next Page">Next</a>
                                         </div>
                                         <div class="clear"></div>
                                     </div>
@@ -234,14 +220,19 @@
                                         </table>
                                     </div>
                                 </div>
-
                                 <div id="tblDataTables" class="dataTablesWrapper">
                                     <div class="tabs-filter-wrapper">
                                         <div class="tableTitle icon-tables">Database Tables</div>
                                         <div class="filter">
-                                            <input name="filter" id="filterDatabaseTable" type="text" class="search-box" onblur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" /><a id="searchDataTable" href="javascript:void(0)" class="icon-search" title="Search">search</a></div>
+                                            <input name="filter" id="filterDatabaseTable" type="text" class="search-box" onblur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" />
+                                            <a id="searchDataTable" href="javascript:void(0)" class="icon-search" title="Search">search</a>
+                                        </div>
                                         <div class="pagination">
-                                            <a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page<label id="lblPreviousTable"></label> of<label id="lblTotalPagesofTables"></label><a id="nextTables" href="javascript:void(0)" class="next" title="Next Page">Next</a>
+                                            <a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
+                                            <label id="lblPreviousTable"></label>
+                                            of
+                                            <label id="lblTotalPagesofTables"></label>
+                                            <a id="nextTables" href="javascript:void(0)" class="next" title="Next Page">Next</a>
                                         </div>
                                         <div class="clear"></div>
                                     </div>
@@ -268,9 +259,347 @@
                 </div>
             </div>
 
-            <!--Schema Tab-->
-            <div id="schema" class="contents">
+            <!--Admin-->
+
+            <div id="admin" class="container contents">
+                <div class="adminWrapper">
+                    <div class="adminLeft">
+                        <h1 class="headText clusterIcon">Cluster</h1>
+                        <div class="adminClusterProperties">
+                            <ul class="adminClusterList">
+                                <li><a href="#pauseConfirmationPop" class="resume" id="pauseConfirmation">Pause</a> <a href="#resumeConfirmationPop" class="pause" id="resumeConfirmation" style="display: none;">Resume</a> </li>
+                                <li><a href="#promoteConfirmationPop" class="promote-disabled" id="promoteConfirmation">Promote</a></li>
+                                <li><a href="#savePop" id="saveConfirmation" class="saveme">Save</a></li>
+                                <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
+                                <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
+                            </ul>
+
+
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="adminRight">
+                        <div class="downloadConfig">
+                            <a id="downloadAdminConfigurations" href="javascript:void(0)" download="deployment.xml" class="btnDown">Download Configuration</a>
+                        </div>
+                        <div class="adminServer">
+                            <div class="serverName" id="serverName">Server<span class="setServer adminIcons"></span></div>
+                            <!-- <div class="setServer adminIcons" id="btnServerConfigAdmin"></div>-->
+                            <!-- server list -->
+                            <div id="serverConfigAdmin" style="display: none;">
+                                <div class="slide-pop-wrapper">
+                                    <div class="slide-pop-title ">
+                                        <div class="icon-server searchLeft searchLeftAdmin">Servers</div>
+                                        <div class="searchRight">
+                                            <div class="search">
+                                                <!-- <input type="text" id="popServerSearchAdmin" class="icon-search icoSS" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" placeholder="Search Server"> -->
+                                            </div>
+                                        </div>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="slide-pop-content" style="padding: 0 0 15px 0;">
+                                        <div id="serverListWrapperAdmin">
+                                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                                                <tbody>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- server list -->
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div class="adminContainer">
+                    <div class="adminContentLeft">
+                        <div class="headerAdminContent">
+                            <h1>Overview</h1>
+                        </div>
+                        <div class="overviewTbl">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
+                                <tr>
+                                    <td width="62%" class="configLabel">Sites Per Host</td>
+                                    <td id="sitePerHost" width="20%" align="right"></td>
+                                    <td width="2%">&nbsp;</td>
+                                    <td width="16%">&nbsp;</td>
+                                </tr>
+                                <tr>
+                                    <td class="configLabel">K-Safety </td>
+                                    <td id="kSafety" align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr>
+                                    <td class="configLabel">Partition Detection </td>
+                                    <td align="right">
+                                        <div id="partitionDetectionIcon" class="onIcon"></div>
+                                    </td>
+                                    <td id="partitionDetectionLabel"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="security" id="securityRow">
+                                    <td class="configLabel">Security</td>
+                                    <td align="right" class="securitytd">
+                                        <div id="securityOptionIcon" class="offIcon"></div>
+                                        <input type="checkbox" id="chkSecurity" class="chkSecurity" />
+                                        <div id="loadingSecurity" class="loading-small" style="display: none"></div>
+                                    </td>
+                                    <td><span id="spanSecurity" style="display: inline"></span></td>
+                                    <td>
+                                        <a id="btnEditSecurityOk" href="#securityPop" class="editOk" title="Save" style="">Ok</a>
+                                        <a id="btnEditSecurityCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                        <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-1">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">HTTP Access</a></td>
+                                    <td align="right">
+                                        <div id="httpAccessIcon" class="onIcon"></div>
+                                    </td>
+                                    <td id="httpAccessLabel"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-1 subLabelRow">
+                                    <td class="configLabel">JSON API</td>
+                                    <td align="right">
+                                        <div id="jsonAPIIcon" class="onIcon"></div>
+                                    </td>
+                                    <td id="txtJsonAPI"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-2">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Auto Snapshots</a></td>
+                                    <td align="right" id="autoSnapshotOption" class="snapshottd">
+                                        <div id="autoSnapshotIcon" class="onIcon"></div>
+                                        <input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot" />
+                                        <div id="loadingSnapshot" class="loading-small" style="display: none"></div>
+                                    </td>
+                                    <td>
+                                        <div id="txtAutoSnapshot" class="SnapshotsOn"></div>
+                                    </td>
+                                    <td><a id="btnEditAutoSnapshotOk" href="#autoSnapshotPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditAutoSnapshotCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="autoSnapshotEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="child-row-2 subLabelRow" id="snapshotPrefixRow">
+                                    <td class="configLabel">File Prefix </td>
+                                    <td align="right" class="tdSnapshotPrefix">
+                                        <form id="frmSnapshotFilePrefix" method="get" action="">
+                                            <div id="loadingSnapshotPrefix" class="loading-small" style="display: none;"></div>
+                                            <span id="prefixSpan"></span>
+                                            <input id="txtPrefix" name="txtPrefix" class="exitableTxtBx exitableFilePrefix" type="text" style="display: none" />
+                                            <label id="errorSnapshotFilePrefix" for="txtPrefix" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-2 subLabelRow" id="snapshotFrequencyRow">
+                                    <td class="configLabel">Frequency </td>
+                                    <td align="right" class="tdSnapshotFrequency">
+                                        <form id="frmSnapshotFrequency" method="get" action="">
+                                            <div id="loadingSnapshotFrequency" class="loading-small" style="display: none;"></div>
+                                            <span id="frequencySpan"></span>
+                                            <input id="txtFrequency" name="txtFrequency" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="spanFrequencyUnit"></span>
+                                            <select id="ddlfrequencyUnit" style="display: none;">
+                                                <option>Hrs</option>
+                                                <option>Min</option>
+                                                <option>Sec</option>
+                                            </select>
+                                            <label id="errorSnapshotFrequency" for="txtFrequency" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-2 subLabelRow" id="snapshotRetainedRow">
+                                    <td class="configLabel">Retained </td>
+                                    <td align="right" class="tdSnapshotRetained">
+                                        <form id="frmSnapshotRetained" method="get" action="">
+                                            <div id="loadingSnapshotRetained" class="loading-small" style="display: none;"></div>
+                                            <span id="retainedSpan"></span>
+                                            <input id="txtRetained" name="txtRetained" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="retainedSpanUnit"></span>
+                                            <label id="errorSnapshotRetained" for="txtRetained" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-3">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Command Logging</a></td>
+                                    <td align="right">
+                                        <div id="commandLogIcon" class="offIcon"></div>
+                                    </td>
+                                    <td id="commandLogLabel"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-3 subLabelRow">
+                                    <td class="configLabel">Log Frequency Time </td>
+                                    <td align="right">
+                                        <span id="commandLogFrequencyTime"></span>
+                                        <span id="commandLogFrequencyUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-3 subLabelRow">
+                                    <td class="configLabel">Log Frequency Transactions </td>
+                                    <td id="commandLogFrequencyTxns" align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-3 subLabelRow">
+                                    <td class="configLabel">Log Size</td>
+                                    <td align="right">
+                                        <span id="commandLogSegmentSize"></span>
+                                        <span id="commandLogSegmentSizeUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-4">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
+                                    <td align="right"></td>
+                                    <td></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tbody id="exportConfiguration" style="display: none;">
+                                </tbody>
+                                <tr class="hasSubLabel parent" id="row-5">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-5 subLabelRow">
+                                    <td class="configLabel">Max Java Heap </td>
+                                    <td align="right">
+                                        <span id="maxJavaHeap"></span>
+                                        <span id="maxJavaHeapUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-5 subLabelRow" id="heartbeatTimeoutRow">
+                                    <td class="configLabel">Heartbeat Timeout </td>
+                                    <td align="right" class="heartbeattd">
+                                        <form id="formHeartbeatTimeout" method="get" action="">
+                                            <div id="loadingHeartbeatTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="hrtTimeOutSpan"></span>
+                                            <input id="txtHrtTimeOut" name="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="hrtTimeOutUnitSpan"></span>
+                                            <label id="errorHeartbeatTimeout" for="txtHrtTimeOut" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="child-row-5 subLabelRow" id="queryTimoutRow">
+                                    <td class="configLabel">Query Timeout</td>
+                                    <td align="right" class="queryTimeOut">
+                                        <form id="formQueryTimeout" method="get" action="">
+                                            <div id="loadingQueryTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="queryTimeOutSpan"></span>
+                                            <input id="txtQueryTimeout" name="txtQueryTimeout" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="queryTimeOutUnitSpan"></span>
+                                            <label id="errorQueryTimeout" for="txtQueryTimeout" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="child-row-5 subLabelRow">
+                                    <td class="configLabel">Max Temp Table Memory</td>
+                                    <td align="right">
+                                        <span id="temptablesmaxsize"></span>
+                                        <span id="temptablesmaxsizeUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-5 subLabelRow">
+                                    <td class="configLabel">Snapshot Priority</td>
+                                    <td id="snapshotpriority" align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="adminContentRight">
+                        <div class="adminPorts">
+                            <div class="headerAdminContent">
+                                <h1>Network Interfaces</h1>
+                            </div>
+
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
+                                <tr>
+                                    <td width="76%">Client Port</td>
+                                    <td id="clientport" width="24%"></td>
+                                </tr>
+                                <tr>
+                                    <td>Admin Port</td>
+                                    <td id="adminport"></td>
+                                </tr>
+                                <tr>
+                                    <td>HTTP Port</td>
+                                    <td id="httpport"></td>
+                                </tr>
+                                <tr>
+                                    <td>Internal Port</td>
+                                    <td id="internalPort"></td>
+                                </tr>
+                                <tr>
+                                    <td>Zookeeper Port</td>
+                                    <td id="zookeeperPort"></td>
+                                </tr>
+                                <tr>
+                                    <td>Replication Port</td>
+                                    <td id="replicationPort"></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="adminDirectories">
+                            <div class="headerAdminContent">
+                                <h1>Directories</h1>
+                            </div>
+                            <div class="adminDirect">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
+                                    <tr>
+                                        <td width="76%">Root (Destination)</td>
+                                        <td id="voltdbroot" width="24%"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Snapshot</td>
+                                        <td id="snapshotpath"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Export Overflow</td>
+                                        <td id="exportOverflow"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Command Log</td>
+                                        <td id="commandlogpath"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Command Log Snapshots</td>
+                                        <td id="commandlogsnapshotpath"></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="clear"></div>
+                </div>
             </div>
+
+            <!--Schema Tab-->
+            <div id="schema" class="contents"></div>
 
             <!--Sql Query Tab-->
             <div id="sqlQuery" class="containerStudio contents">
@@ -287,16 +616,13 @@
                                 <div class="tab_container">
                                     <div id="tabScroller">
                                         <div id="tab1" class="tab_content">
-                                            <div id="accordionTable">
-                                            </div>
+                                            <div id="accordionTable"></div>
                                         </div>
                                         <div id="tab2" class="tab_content">
-                                            <div id="accordionViews">
-                                            </div>
+                                            <div id="accordionViews"></div>
                                         </div>
                                         <div id="tab3" class="tab_content">
-                                            <div id="accordionProcedures">
-                                            </div>
+                                            <div id="accordionProcedures"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -346,36 +672,41 @@
                     <div id="queryResults" class="queryStatus"></div>
                 </div>
             </div>
-
         </div>
     </div>
     <div class="footer" id="mainFooter">
-        <p>Copyright © 2014 VoltDB. All rights reserved. </p>
+        <p>Copyright © 2015 VoltDB. All rights reserved. </p>
     </div>
     <!-- POPUP Saved Preferences -->
     <div id="myPreference" style="display: none">
         <div class="overlay-title">Graph/Data Preferences</div>
         <div class="clear"></div>
-        <div class="overlay-content">
+        <div class="overlay-content graphPop">
             <form name="popupForm" id="formPopup" method="post">
                 <ul class="user-preferences" id="userPreferences">
                     <li class="pref-graph">Server CPU
-                        <input type="checkbox" id="ServerCPU" name="" value="cpu" checked="checked" /></li>
+          <input type="checkbox" id="ServerCPU" name="" value="cpu" checked="checked" />
+                    </li>
                     <li class="pref-graph">Server RAM
-                        <input type="checkbox" id="ServerRAM" name="" value="ram" checked="checked" /></li>
+          <input type="checkbox" id="ServerRAM" name="" value="ram" checked="checked" />
+                    </li>
                     <li class="pref-graph">Cluster Latency
-                        <input type="checkbox" id="ClusterLatency" name="" value="latency" checked="checked" /></li>
+          <input type="checkbox" id="ClusterLatency" name="" value="latency" checked="checked" />
+                    </li>
                     <li class="pref-graph">Cluster Transactions
-                        <input type="checkbox" id="ClusterTransactions" name="" value="transaction" checked="checked" /></li>
+          <input type="checkbox" id="ClusterTransactions" name="" value="transaction" checked="checked" />
+                    </li>
                     <li class="pref-storedProc">Stored Procedures
-                        <input type="checkbox" id="StoredProcedures" name="" value="stored_proc" checked="checked" /></li>
+          <input type="checkbox" id="StoredProcedures" name="" value="stored_proc" checked="checked" />
+                    </li>
                     <li class="last pref-tables">Database Tables
-                        <input type="checkbox" id="DatabaseTables" name="" value="table" checked="checked" /></li>
+          <input type="checkbox" id="DatabaseTables" name="" value="table" checked="checked" />
+                    </li>
                 </ul>
                 <input type="submit" name="account_details" id="account_details" value="Save" class="input-submit left" hidden="hidden" style="display: none;" />
             </form>
         </div>
-        <div class="overlay-btns"><a href="#" class="btn" id="savePreference" title="save">Save</a></div>
+        <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
     <!-- POPUP Saved Preferences -->
 
@@ -393,20 +724,33 @@
 
     <div style="display: none"><a href="#error" id="errorPopup">Error</a></div>
 
+    <!--Error popup-->
+    <div id="error" style="display: none">
+        <div class="overlay-title errorIcon ">Error</div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+            <p id="errorMessage"></p>
+            <br />
+            <div class="overlay-btns" style="padding: 0"><a href="#" class="btn" id="btnOk">Ok</a></div>
+        </div>
+    </div>
+    <!--Error popup-->
+
     <!--Logout popup-->
     <div id="logoutPopup" style="display: none">
         <div class="overlay-title ">
-            <img src="css/resources/images/Information.png" class="imgError" />Logout</div>
+            <img src="css/resources/images/Information.png" class="imgError" />Logout
+        </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
             <p>Do you want to logout?</p>
             <br />
             <ul class="btnList" id="Ul1">
                 <li>
-                    <div class="overlay-btns" style="padding: 0"><a href="javascript:void(0)" class="btn" id="btnLogout" onclick="logout();" title="Ok">Ok</a></div>
+                    <div class="overlay-btns" style="padding: 0"><a href="javascript:void(0)" class="btn" id="A1" onclick="logout();">Ok</a></div>
                 </li>
                 <li>
-                    <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnCancel" title="Cancel">Cancel</a></div>
+                    <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnCancel">Cancel</a></div>
                 </li>
             </ul>
         </div>
@@ -415,34 +759,53 @@
 
     <!--Connection popup-->
     <div style="display: none"><a href="#connectionPopup" id="conPopup">Connection Error</a></div>
-
     <div id="connectionPopup" style="display: none">
         <div id="conpop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
                 <p>Lost connection to Database. Please click ok when the database is back online. </p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnConOk" title="save">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnConOk">Ok</a></div>
             </div>
         </div>
     </div>
     <!--Connection popup-->
 
+    <!--Server Shutdown Information-->
+    <div style="display: none"><a href="#shutdownInfoPopup" id="serverShutdownPopup">Cluster Shutdown</a></div>
+    <div id="shutdownInfoPopup" style="display: none">
+        <div id="shutdownPop">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>Database has been shutdown. Please click ok when the server is back online. </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnServerShutdownOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Server Shutdown Information-->
+
     <!--Server not available popup-->
     <div style="display: none"><a href="#serverUnavailablePopup" id="serUnavailablePopup">Connection Error</a></div>
-
     <div id="serverUnavailablePopup" style="display: none">
         <div id="servUnavailablePop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
-                <p>Could not establish connection to Database. The service is either down, very slow to respond or the server refused connection.
-                    Please click ok when the database is back online. </p>
+                <p>
+                    Could not establish connection to Database. The service is either down, very slow to respond or the server refused connection.
+        Please click ok when the server is back online.
+                </p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn" title="Ok">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn">Ok</a></div>
             </div>
         </div>
     </div>
@@ -452,79 +815,418 @@
     <div id="help" style="display: none">
         <div class="overlay-title helpIcon ">Help</div>
         <div class="clear"></div>
-    <div class="overlay-contentHelp">
-        <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
-        <div class="VDBMonitorHelp" id="VDBMonHelp">
-        <p>
-        The <span class="helpStyleTitle">VoltDB Management Center DB Monitor</span> lets you track the performance and health of your cluster. The monitor is divided into three parts:
-        </p>
-        <ul class="helpList">
-        <li>Cluster health at-a-glance</li>
-        <li>Performance Graphs</li>
-        <li>Performance Data</li>
-        </ul>
-        <br />
-
-        <h2 class="help">Cluster Health At-a-Glance</h2>
-        <p>The cluster health bar provides a quick look at the current health of the database cluster, including:</p>
-        <ul class="helpList">
-        <li>How many servers are in the cluster</li>
-        <li>How many are joining</li>
-        <li>How many are missing (that is, servers that have stopped either intentionally or by accident)</li>
-        <li>If any servers are running low on memory</li>
-        </ul>
-
-        <P>The cluster health bar also indicates which server you are currently connected to and contains a pulldown menu (from the <span class="helpStyleButton">&raquo;&nbsp;Server</span> button on the right) that lists all of the servers in the cluster and their current memory usage. Click on a server name in the list to switch to view statistics from that server. You can also use the input field and the <span class="helpStyleButton">Set</span> button to set the threashold for out-of-memory alerts. Any servers using more than the threshold percent of total memory will be highlighted with an alert status.
-
-        <h2 class="help">Performance Graphs</h2>
-        <p>The second section of the monitor shows graphs for CPU and memory usage of the current server and 99th percentile query latency and transactions per sectond for the entire cluster. You can use the pull down "View" menu to change the scale and update rate of the graphs between seconds, minutes, and days.</p>
-
-        <h2 class="help">Performance Data</h2>
-        <p>The third and last section of the monitor shows data charts of performance metrics for each stored procedure and the number of rows for each table and view. You can sort by any of the columns in the charts by clicking on the column heading. Or you can filter by the procedure names using the search box above the chart. </p>
-
-        <h2 class="help">Additional Controls</h2>
-        <p>To quckly hide or show either the graphs or the charts, you can click on the "Show/Hide" triangle above each section. You can also choose to display or hide specific charts and graphs using the <span class="helpStyleButton">Display&nbsp;Preference</span> button above the graphs. Clear the checkbox next to the graphs and/or charts you want to hide and press "Save". This setting is saved as a browser cookie so will be retained across sessions.
-        </p>
-
-
+        <div class="overlay-contentHelp">
+            <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
+            <div class="VDBMonitorHelp" id="VDBMonHelp">
+                <p>The <span class="helpStyleTitle">VoltDB Management Center </span> lets you track the performance and health of your cluster. The monitor is divided into three parts: </p>
+                <ul class="helpList">
+                    <li>Cluster health at-a-glance</li>
+                    <li>Performance Graphs</li>
+                    <li>Performance Data</li>
+                </ul>
+                <br />
+                <h2 class="help">Cluster Health At-a-Glance</h2>
+                <p>The cluster health bar provides a quick look at the current health of the database cluster, including:</p>
+                <ul class="helpList">
+                    <li>How many servers are in the cluster</li>
+                    <li>How many are joining</li>
+                    <li>How many are missing (that is, servers that have stopped either intentionally or by accident)</li>
+                    <li>If any servers are running low on memory</li>
+                </ul>
+                <p>
+                    The cluster health bar also indicates which server you are currently connected to and contains a pulldown menu (from the <span class="helpStyleButton">&raquo;&nbsp;Server</span> button on the right) that lists all of the servers in the cluster and their current memory usage. Click on a server name in the list to switch to view statistics from that server. You can also use the input field and the <span class="helpStyleButton">Set</span> button to set the threashold for out-of-memory alerts. Any servers using more than the threshold percent of total memory will be highlighted with an alert status.
+                <h2 class="help">Performance Graphs</h2>
+                    <p>The second section of the monitor shows graphs for CPU and memory usage of the current server and 99th percentile query latency and transactions per sectond for the entire cluster. You can use the pull down "View" menu to change the scale and update rate of the graphs between seconds, minutes, and days.</p>
+                <h2 class="help">Performance Data</h2>
+                <p>The third and last section of the monitor shows data charts of performance metrics for each stored procedure and the number of rows for each table and view. You can sort by any of the columns in the charts by clicking on the column heading. Or you can filter by the procedure names using the search box above the chart. </p>
+                <h2 class="help">Additional Controls</h2>
+                <p>To quckly hide or show either the graphs or the charts, you can click on the "Show/Hide" triangle above each section. You can also choose to display or hide specific charts and graphs using the <span class="helpStyleButton">Display&nbsp;Preference</span> button above the graphs. Clear the checkbox next to the graphs and/or charts you want to hide and press "Save". This setting is saved as a browser cookie so will be retained across sessions. </p>
+            </div>
+            <div class="VDBSchemaHelp" id="VDBSchHelp" style="display: none;">
+                <p>The <strong class="helpStyleTitle">VoltDB Management Center Schema</strong> viewer lets you examine the logical definition of your database, including the tables, views, indexes, and stored procedures. Five tabs along the top of the viewer let you choose between: </p>
+                <ul class="helpSchemaList">
+                    <li><span class="helpStyleTitle">Overview</span> &mdash; A summary of the software version, database schema, and its contents.</li>
+                    <li><span class="helpStyleTitle">Schema</span> &mdash; Detailed description of all the tables and views, including indexes and constraints. Click on a table or view's name to expand it and see the details. Click on the column headings to sort the list.</li>
+                    <li><span class="helpStyleTitle">Procedures &amp; SQL</span> &mdash; A list of all of the user-defined stored procedures and their attributes. Click on a procedure name to view the SQL statements it contains. Click on the SQL statements to see their execution plans.</li>
+                    <li><span class="helpStyleTitle">Size Worksheet</span> &mdash; An interactive worksheet that helps you estimate the amount of memory required based on the current schema and estimated row counts you enter.all of the user-defined stored procedures and their attributes. Click on a procedure name to view the SQL statements it contains. Click on the SQL statements to see their execution plans.</li>
+                    <li><span class="helpStyleTitle">DDL Source</span> &mdash; A complete listing of the DDL source statements for the current schema.</li>
+                </ul>
+                <br />
+            </div>
+            <div class="VDBQueryHelp" id="VDBQHelp" style="display: none;">
+                <p>The <strong class="helpStyleTitle">VoltDB Management Center SQL Query</strong> page lets you execute SQL queries interactively. Simply type your query into the box on the right and click "Run". A list of database tables, views, and stored procedures are provided to the left for reference. Click on a table or view to expand it and see the columns. Click on a stored procedure to see the datatypes of its input parameters and return value. </p>
+                <p>You can enter individual queries or multiple queries separated by semi-colons. If there are several queries in the input box, you can execute selected queries by highlighting the queries you want to execute before clicking <span class="helpStyleButton">Run </span>.</p>
+                <p>In addition to SQL queries, you can invoke stored procedures using the EXEC (or EXECUTE) directive:</p>
+                <blockquote>EXEC {procedure-name} [parameter] ... </blockquote>
+                <p>Finally, you can change the format of the output using the pull-down menu above and to the right of the query results pane. The results can be displayed as a formatted (HTML) table, comma-separated value (CSV) lines, or as monospaced text.</p>
+            </div>
         </div>
-        <div class="VDBSchemaHelp" id="VDBSchHelp"  style="display:none;">
-        <p>
-        The <strong class="helpStyleTitle">VoltDB Management Center Schema</strong> viewer lets you examine the logical definition of your database, including the tables, views, indexes, and stored procedures. Five tabs along the top of the viewer let you choose between:
-        </p>
-        <ul class="helpSchemaList">
-        <li><span class="helpStyleTitle">Overview</span> &mdash; A summary of the software version, database schema, and its contents.</li>
-        <li><span class="helpStyleTitle">Schema</span> &mdash; Detailed description of all the tables and views, including indexes and constraints. Click on a table or view's name to expand it and see the details. Click on the column headings to sort the list.</li>
-        <li><span class="helpStyleTitle">Procedures &amp; SQL</span> &mdash; A list of all of the user-defined stored procedures and their attributes. Click on a procedure name to view the SQL statements it contains. Click on the SQL statements to see their execution plans.</li>
-        <li><span class="helpStyleTitle">Size Worksheet</span> &mdash; An interactive worksheet that helps you estimate the amount of memory required based on the current schema and estimated row counts you enter.all of the user-defined stored procedures and their attributes. Click on a procedure name to view the SQL statements it contains. Click on the SQL statements to see their execution plans.</li>
-        <li><span class="helpStyleTitle">DDL Source</span> &mdash; A complete listing of the DDL source statements for the current schema.</li>
-
-
-        </ul>
-        <br/>
-
-        </div>
-        <div class="VDBQueryHelp" id="VDBQHelp"  style="display:none;"  >
-
-        <p>
-        The <strong class="helpStyleTitle">VoltDB Management Center SQL Query</strong> page lets you execute SQL queries interactively. Simply type your query into the box on the right and click "Run". A list of database tables, views, and stored procedures are provided to the left for reference. Click on a table or view to expand it and see the columns. Click on a stored procedure to see the datatypes of its input parameters and return value.
-        </p>
-        <p>
-        You can enter individual queries or multiple queries separated by semi-colons. If there are several queries in the input box, you can execute selected queries by highlighting the queries you want to execute before clicking <span class="helpStyleButton"> Run </span>.</p>
-        <p>
-        In addition to SQL queries, you can invoke stored procedures using the EXEC (or EXECUTE) directive:</p>
-        <blockquote>
-        EXEC {procedure-name} [parameter] ...
-        </blockquote>
-        <p>Finally, you can change the format of the output using the pull-down menu above and to the right of the query results pane. The results can be displayed as a formatted (HTML) table, comma-separated value (CSV) lines, or as monospaced text.</p>
-
-        </div>
-
-
     </div>
 
-    </div>
+
     <!--help popup ends-->
+
+    <!-- POPUP shutDownConfirmationPop -->
+    <div id="shutDownConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <p>Any data not saved to a snapshot or command log will be lost.</p>
+            <p>Continue with the shutdown?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnShutdownConfirmationOk" class="btn">Ok</a> <a id="btnShutdownConfirmationCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP shutDownConfirmationPop -->
+    <!-- POPUP stopConfirmationPop -->
+    <div id="stopConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Stop: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to stop the Server?</p>
+        </div>
+        <div class="overlay-btns"><a id="StopConfirmOK" class="btn closeBtn">Ok</a> <a id="StopConfirmCancel" class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP stopConfirmationPop -->
+
+    <!-- POPUP stopConfirmationPop -->
+    <div id="startConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Start: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to start the Server?</p>
+        </div>
+        <div class="overlay-btns"><a id="startConfirmOk" class="btn">Ok</a> <a id="startConfirmCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP stopConfirmationPop -->
+
+    <!-- POPUP promoteConfirmationPop -->
+    <div id="promoteConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Promote: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to promote the cluster?</p>
+        </div>
+        <div class="overlay-btns"><a id="promoteConfirmOk" class="btn">Ok</a> <a id="promoteConfirmCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP promoteConfirmationPop -->
+
+    <!-- POPUP pauseConfirmationPop 1 -->
+    <div id="pauseConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Pause: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to pause the cluster and enter admin mode?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnPauseConfirmationOk" class="btn">Ok</a> <a id="btnPauseConfirmationCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP pauseConfirmationPop -->
+
+    <!-- POPUP shutdownPopupPop 2 -->
+    <div id="shutdownPopupPop" style="display: none">
+        <div class="overlay-title icon-alert">Server</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to stop this node?</p>
+            <p>Continue with the shutdown?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+    <!-- POPUP shutdownPopupPop -->
+    <div id="shutdownPopupPop1" style="display: none">
+        <div class="overlay-title icon-alert">Server</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to enable this node?</p>
+            <p>Continue with the enable?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+
+    <!-- POPUP shutdownClusterPopupPop -->
+    <div id="shutdownClusterPopupPop" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <p>Any data not saved to a snapshot or command log will be lost.</p>
+            <p>Continue with the shutdown?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+
+    <!-- POPUP resumeConfirmationPop -->
+    <div id="resumeConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Resume: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to resume the cluster and exit admin mode?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnResumeConfirmationOk" class="btn">Ok</a> <a id="btnResumeConfirmationCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP resumeConfirmationPop -->
+
+    <!-- POPUP autoSnapshotyPop -->
+    <div id="autoSnapshotPop" style="display: none">
+        <div class="overlay-title icon-alert">Auto Snapshots</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value(s)?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP autoSnapshotyPop -->
+
+    <!-- POPUP securityPop -->
+    <div id="securityPop" style="display: none">
+        <div class="overlay-title icon-alert">Security: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to change Security?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnSecurityOk">Ok</a> <a id="btnPopupSecurityCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP securityPop -->
+
+    <!-- POPUP securityWarningPop -->
+    <div style="display: none"><a id="loginWarnPopup" href="#loginWarningPopup">login error</a></div>
+    <div id="loginWarningPopup" style="display: none">
+        <div class="overlay-title ">
+            <img src="css/resources/images/error.png" class="imgError" />Error
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+            <p>Security settings has been changed. You no longer have permission to view Admin Tab.</p>
+            <br />
+            <div class="overlay-btns"><a class="btn" id="btnLoginWarningOk">Ok</a></div>
+        </div>
+    </div>
+    <!-- POPUP securityWarningPop -->
+
+    <!-- POPUP savePop -->
+    <div id="savePop" style="display: none">
+        <div class="overlay-title icon-alert">Save</div>
+        <div class="clear"></div>
+        <div id="saveSnapshot">
+            <div class="overlay-content ">
+                <form id="formSaveSnapshot" method="get" action="">
+                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
+                        <tr>
+                            <td>Directory:<br />(absolute path)</td>
+                            <td id="tdSnapshotDirectory"></td>
+                        </tr>
+                        <tr>
+                            <td>Snapshot Name:</td>
+                            <td id="tdSnapshotName"></td>
+                        </tr>
+                    </table>
+                </form>
+            </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
+        </div>
+    </div>
+    <!-- POPUP savePop -->
+
+    <!-- POPUP restorePop -->
+    <div id="restorePop" style="display: none">
+        <div id="restoredPopup">
+            <div class="overlay-title icon-alert">Restore</div>
+            <div class="clear"></div>
+            <div class="restoreInfo">
+                <div class="overlay-content">
+                    <div class="restoreCont">
+                        <form id="formSearchSnapshot" method="get" action="">
+                            <div class="directoryRestore">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+                                    <tr>
+                                        <th align="left">Directory <br />(absolute path)</th>
+                                        <td align="left" id="tdSearchSnapshots">
+                                            <!--<input id="txtSearchSnapshots" type="text">-->
+                                        </td>
+                                        <td align="left" id="tdSearchSnapshotsBtn">
+                                            <!--<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>-->
+                                        </td>
+                                    </tr>
+
+                                </table>
+
+                            </div>
+                        </form>
+                        <form id="formRestoreSnapshot" method="get" action="">
+                            <div class="restoreSnapshot">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList">
+                                </table>
+
+                            </div>
+                            <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>
+                        </form>
+
+                    </div>
+
+                </div>
+                <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn">Restore</a> <a id="btnRestoreCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="restoreConfirm" class="restoreConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to Restore?</div>
+                </div>
+                <div id="divConfirm" class="overlay-btns"><a id="btnRestoreSnapshotOk" class="btn">Yes</a> <a class="btn btn-gray confirmNoRestore">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!-- POPUP restorePop -->
+    <!-- POPUP restorePop -->
+    <div id="HrtTimeOutPopup" style="display: none">
+        <div class="overlay-title icon-alert">Heartbeat Timeout</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupHeartbeatTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupHeartbeatTimeoutCancel">Cancel</a> </div>
+    </div>
+    <!-- POPUP restorePop -->
+
+    <!-- POPUP Query timeout Popup -->
+    <div id="QueryTimeOutPopup" style="display: none">
+        <div class="overlay-title icon-alert">Query Timeout</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
+    </div>
+    <!-- POPUP Query timeout Popup -->
+    <!-- POPUP saveConfirmationPopup -->
+    <div id="Div2" style="display: none">
+        <div class="overlay-title icon-alert">Save Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP saveConfirmationPopup -->
+
+    <!-- POPUP RestoreConfirmationPopup -->
+    <div id="Div3" style="display: none">
+        <div class="overlay-title icon-alert">Restore Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A4">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP RestoreConfirmationPopup -->
+
+    <!-- POPUP SaveSnapshotPopup -->
+    <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Save Snapshot</a></div>
+    <div id="saveSnapShotPopup" style="display: none">
+        <div id="saveSnaps">
+            <div class="overlay-title ">
+                <img id="imgSaveSnapshotStatus" src="css/resources/images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError ">
+                <p id="saveSnapshotMessage" class="snapshotErrorMsg"></p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSaveSnapshotStatus">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- POPUP SaveSnapshotPopup -->
+
+    <!-- Error Promote Popup-->
+    <div style="display: none"><a href="#errorPromotePopup" id="btnErrorPromotePopup">Cluster Promote Error</a></div>
+    <div id="errorPromotePopup" style="display: none">
+        <div id="errorPromote">
+            <div class="overlay-title ">
+                <img src="css/resources/images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError ">
+                <p id="promoteErrorMessage" class="snapshotErrorMsg"></p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnPromoteErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- Error Promote Popupp -->
+
+    <!--Update error Popup-->
+    <div style="display: none"><a href="#updateErrorPopup" id="updateErrorPopupLink">Update Error</a></div>
+    <div id="updateErrorPopup" style="display: none">
+        <div id="updateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
+
+    <!--Update error Auto Snapshot Popup-->
+    <div style="display: none"><a href="#updateSnapshotErrorPopup" id="updateErrorSnapshotPopupLink">Update Error</a></div>
+    <div id="updateSnapshotErrorPopup" style="display: none">
+        <div id="updateInnerSnapshotErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateSnapshotErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateSnapshotErrorOk">Ok</a></div>
+
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
+    <!--Update Query Timeout error Popup-->
+    <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
+    <div id="queryTimeoutUpdateErrorPopup" style="display: none">
+        <div id="queryTimeoutUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="queryTimeoutUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryTimeoutUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
+    <!-- POPUP StopServerErrorPopup-->
+    <div id="divStopServerError" style="display: none;">
+        <div class="overlay-title icon-alert">Stop Error</div>
+        <div class="clear"></div>
+        <div class="overlay-content resizeCon">
+            <p id="errorLabel" class="txt-bold resizeRestore">Server could not be stopped at the moment</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
+    </div>
+
+    <!-- POPUP StopServerErrorPopup-->
+
+
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">
@@ -532,10 +1234,17 @@
     </div>
     <!-- Loading -->
 
+
+    <!-- Loading -->
+    <div id="adminActionOverlay" style="display: none;">
+        <div class="loading"></div>
+    </div>
+    <!-- Loading -->
+
     <!-- Placed at the end of the document so the pages load faster -->
-    <script type="text/javascript" src="js/bootstrap.js"></script>
-    <script type="text/javascript" src="js/jquery.tablesorter.js"></script>
-    <script type="text/javascript" src="js/jquery.tablesorter.widgets.js"></script>
+    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
+    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
+    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
     <!-- Placed at the end of the document so the pages load faster -->
 </body>
 </html>

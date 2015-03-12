@@ -377,7 +377,9 @@ for arg in sys.argv[1:]:
 testLicenses =   [basepath + 'tools/approved_licenses/mit_x11_hstore_and_voltdb.txt',
                   basepath + 'tools/approved_licenses/mit_x11_evanjones_and_voltdb.txt',
                   basepath + 'tools/approved_licenses/mit_x11_michaelmccanna_and_voltdb.txt',
-                  basepath + 'tools/approved_licenses/mit_x11_voltdb.txt']
+                  basepath + 'tools/approved_licenses/mit_x11_voltdb.txt',
+                  basepath + 'tools/approved_licenses/mit_x11_voltdb_and_clearspring.txt',
+                  basepath + 'tools/approved_licenses/mit_x11_voltdb_and_apache.txt']
 
 srcLicenses =    [basepath + 'tools/approved_licenses/gpl3_hstore_and_voltdb.txt',
                   basepath + 'tools/approved_licenses/gpl3_evanjones_and_voltdb.txt',

@@ -217,4 +217,8 @@ public class AdHocPlannedStatement {
     public VoltType getPartitioningParameterType() {
         return core.getPartitioningParamType();
     }
+
+    int getQuestionMarkParameterCount() {
+        return core.getQuestionMarkParameterCount();
+    }
 }

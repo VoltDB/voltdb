@@ -31,7 +31,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -40,9 +39,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-public class BigTableLoader extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class BigTableLoader extends BenchmarkThread {
 
     final Client client;
     final long targetCount;
@@ -58,9 +55,7 @@ public class BigTableLoader extends Thread {
     long nTruncates = 0;
 
     BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
-        setName("BigTableLoader");
-        setDaemon(true);
-
+        setName("BigTableLoader-"+tableName);
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
@@ -74,17 +69,17 @@ public class BigTableLoader extends Thread {
         log.info("BigTableLoader table: "+ tableName + " targetCount: " + targetCount + " storage required: " + targetCount*rowSize + " bytes");
     }
 
-    long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
-        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
-        VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + tableName + ";").getResults()[0];
-        return t.asScalarLong();
-    }
-
     void shutdown() {
         m_shouldContinue.set(false);
         log.info("BigTableLoader " + tableName + " shutdown: inserts tried " + insertsTried + " rows loaded " + rowsLoaded +
                     " truncates " + nTruncates);
         this.interrupt();
+    }
+
+    public int getPercentLoadComplete() {
+        Double d = ((double)rowsLoaded / targetCount) * 100.;
+        return d.intValue();
+
     }
 
     class InsertCallback implements ProcedureCallback {
@@ -101,11 +96,7 @@ public class BigTableLoader extends Thread {
             if (status == ClientResponse.GRACEFUL_FAILURE ||
                     status == ClientResponse.USER_ABORT) {
                 // log what happened
-                log.error("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
-                Benchmark.printJStack();
-                // stop the world
-                System.exit(-1);
+                hardStop("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
@@ -113,6 +104,7 @@ public class BigTableLoader extends Thread {
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
+                Benchmark.txnCount.incrementAndGet();
                 rowsLoaded++;
             }
             latch.countDown();
@@ -127,7 +119,7 @@ public class BigTableLoader extends Thread {
             r.nextBytes(data);
 
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
                 // insert some batches...
                 while ((currentRowCount < targetCount) && (m_shouldContinue.get())) {
                     CountDownLatch latch = new CountDownLatch(batchSize);
@@ -140,7 +132,7 @@ public class BigTableLoader extends Thread {
                             if (!m_shouldContinue.get()) {
                                 return;
                             }
-                            log.error("BigTableLoader thread interrupted while waiting for permit.", e);
+                            log.error("BigTableLoader thread interrupted while waiting for permit. " + e.getMessage());
                         }
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
@@ -151,9 +143,9 @@ public class BigTableLoader extends Thread {
                         if (!m_shouldContinue.get()) {
                             return;
                         }
-                        log.error("BigTableLoader thread interrupted while waiting.", e);
+                        log.error("BigTableLoader thread interrupted while waiting." + e.getMessage());
                     }
-                    long nextRowCount = getRowCount();
+                    long nextRowCount = TxnId2Utils.getRowCount(client, tableName);
                     // if no progress, throttle a bit
                     if (nextRowCount == currentRowCount) {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
@@ -167,7 +159,7 @@ public class BigTableLoader extends Thread {
                     continue;
                 }
                 // on exception, log and end the thread, but don't kill the process
-                log.error("BigTableLoader failed a TableInsert procedure call for table " + tableName, e);
+                log.error("BigTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }

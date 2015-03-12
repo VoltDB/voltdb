@@ -67,25 +67,35 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
-    static void compile(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor,
-            InMemoryJarfile jarOutput)
-    throws VoltCompiler.VoltCompilerException {
+    static void compile(VoltCompiler compiler,
+                        HSQLInterface hsql,
+                        DatabaseEstimates estimates,
+                        Catalog catalog,
+                        Database db,
+                        ProcedureDescriptor procedureDescriptor,
+                        InMemoryJarfile jarOutput)
+                                throws VoltCompiler.VoltCompilerException
+    {
 
         assert(compiler != null);
         assert(hsql != null);
         assert(estimates != null);
 
-        if (procedureDescriptor.m_singleStmt == null)
+        if (procedureDescriptor.m_singleStmt == null) {
             compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, jarOutput);
-        else
+        }
+        else {
             compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
+        }
     }
 
-    public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler, String procName, Class<?> procClass, Object procInstance, boolean withPrivate)
-            throws VoltCompilerException {
-
+    public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler,
+                                                        String procName,
+                                                        Class<?> procClass,
+                                                        Object procInstance,
+                                                        boolean withPrivate)
+                                                                throws VoltCompilerException
+    {
         Map<String, SQLStmt> retval = new HashMap<String, SQLStmt>();
 
         Field[] fields = procClass.getDeclaredFields();
@@ -265,11 +275,15 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
     }
 
 
-    static void compileJavaProcedure(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor,
-            InMemoryJarfile jarOutput)
-    throws VoltCompiler.VoltCompilerException {
+    static void compileJavaProcedure(VoltCompiler compiler,
+                                     HSQLInterface hsql,
+                                     DatabaseEstimates estimates,
+                                     Catalog catalog,
+                                     Database db,
+                                     ProcedureDescriptor procedureDescriptor,
+                                     InMemoryJarfile jarOutput)
+                                             throws VoltCompiler.VoltCompilerException
+    {
 
         final String className = procedureDescriptor.m_className;
         final Language lang = procedureDescriptor.m_language;
@@ -285,7 +299,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
+                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
             }
             final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
             groupRef.setGroup(group);
@@ -396,11 +410,12 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             StatementPartitioning partitioning =
                 info.singlePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
-            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
+            boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
-            if (partitioning.wasSpecifiedAsSingle()) {
+            // if this was a cache hit or specified single, don't worry about figuring out more partitioning
+            if (partitioning.wasSpecifiedAsSingle() || cacheHit) {
                 procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
                 // The planner does not currently attempt to second-guess a plan declared as single-partition, maybe some day.
                 // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
@@ -622,11 +637,14 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         compiler.addClassToJar(jarOutput, ancestor);
     }
 
-    static void compileSingleStmtProcedure(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor)
-    throws VoltCompiler.VoltCompilerException {
-
+    static void compileSingleStmtProcedure(VoltCompiler compiler,
+                                           HSQLInterface hsql,
+                                           DatabaseEstimates estimates,
+                                           Catalog catalog,
+                                           Database db,
+                                           ProcedureDescriptor procedureDescriptor)
+                                                   throws VoltCompiler.VoltCompilerException
+    {
         final String className = procedureDescriptor.m_className;
         if (className.indexOf('@') != -1) {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
@@ -645,7 +663,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
+                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
             }
             final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
             groupRef.setGroup(group);

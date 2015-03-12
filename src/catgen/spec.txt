@@ -14,6 +14,10 @@ begin Cluster                      "A set of connected hosts running one or more
   CommandLog* logconfig            "Command log configuration"
   int heartbeatTimeout             "How long to wait, in seconds, between messages before deciding a host is dead"
   bool useddlschema                "Manage the database schemas via catalog updates or live DDL"
+  bool drProducerEnabled           "Manage whether this cluster will log and distribute local DR transactions"
+  int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
+  int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
+  string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
 end
 
 begin Deployment javaonly         "Run-time deployment settings"
@@ -127,6 +131,7 @@ begin Table                        "A table (relation) in the database"
   Table? materializer              "If this is a materialized view, this field stores the source table"
   string signature                 "Catalog version independent signature of the table consisting of name and schema"
   int tuplelimit                   "A maximum number of rows in a table"
+  bool isDRed                      "Is this table DRed?"
   Statement* tuplelimitDeleteStmt  "Delete statement to execute if tuple limit will be exceeded"
 end
 
@@ -157,13 +162,15 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   bool iscontentdeterministic "Is the result of this statement deterministic not accounting for row order"
   bool isorderdeterministic "Is the result of this statement deterministic even accounting for row order"
   string nondeterminismdetail "Explanation for any non-determinism in the statement result"
-  bool batched              ""
-  int paramnum              ""
   StmtParameter* parameters "The set of parameters to this SQL statement"
   PlanFragment* fragments   "The set of plan fragments used to execute this statement"
   int cost                  "The cost of this plan measured in arbitrary units"
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
+  string tablesread         "A CSV list of tables this statement reads"
+  string tablesupdated      "A CSV list of tables this statement may update"
+  string indexesused        "A CSV list of indexes this statement may use”
+  string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
 end
 
 begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
@@ -171,7 +178,6 @@ begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
   int javatype                 "The Java class of the parameter (int/float/date/etc)"
   bool isarray                 "Is the parameter an array of value"
   int index                    "The index of the parameter in the set of statement parameters"
-  ProcParameter? procparameter "Reference back to original input parameter"
 end
 
 begin PlanFragment               "Instructions to the executor to execute part of an execution plan"

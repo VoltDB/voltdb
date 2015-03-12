@@ -33,6 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
@@ -299,37 +300,6 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "DELETE FROM CAPPED3_LIMIT_ROWS_EXEC");
     }
 
-    public void testTableLimitPartitionRowsExecMultiRow() throws IOException, ProcCallException {
-
-        if (isHSQL())
-                return;
-
-        Client client = getClient();
-
-        // For multi-row insert, the insert trigger should not fire.
-        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 10, 20);
-        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 20, 40);
-        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 30, 60);
-
-        verifyStmtFails(client,
-                        "INSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
-                        + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20",
-                        "exceeds table maximum row count 3");
-
-        String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
-        VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1, 10, 20}, {1, 20, 40}, {1, 30, 60}});
-
-        // Upsert fails too.
-        verifyStmtFails(client,
-                        "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
-                        + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20 "
-                        + "ORDER BY 1, 2, 3",
-                        "exceeds table maximum row count 3");
-        vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1, 10, 20}, {1, 20, 40}, {1, 30, 60}});
-    }
-
     public void testTableLimitPartitionRowsExecUpsert() throws Exception {
 
         if (isHSQL())
@@ -497,53 +467,29 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
     }
 
-    // DELETE .. LIMIT <n> is intended to support the row limit trigger
-    // so let's test it here.
-    public void testLimitPartitionRowsDeleteWithLimit() throws Exception {
-        if (isHSQL())
-            return;
 
-        final long partitionRowLimit = 5; // from DDL
-        final long numPartitions = getLogicalPartitionCount();
-
-        Client client = getClient();
-
-        // The table EVENTS is capped at 5 rows/partition.  Inserts that
-        // would cause the constraint to fail trigger a delete of
-        // the oldest row.
-
-        VoltTable vt;
-        for (int i = 0; i < 50; ++i) {
-            String uuid = UUID.randomUUID().toString();
-            vt = client.callProcedure("@AdHoc",
-                    "INSERT INTO events_capped VALUES ('" + uuid + "', NOW, " + i + ")")
-                    .getResults()[0];
-
-            // Note: this should be *one*, even if insert triggered a delete
-            validateTableOfScalarLongs(vt, new long[] {1});
-        }
-
-        // Check the contents
-
+    private void checkMultiPartitionCappedTableContents(Client client, String tableName, long partitionRowLimit)
+            throws NoConnectionsException, IOException, ProcCallException {
+        long numPartitions = getLogicalPartitionCount();
         if (numPartitions > 1) {
+            VoltTable vt = null;
             // For multi-partition tables, it's possible that just one partition
             // got all the rows, or that rows were evenly distributed (all partitions full).
             final long minRows = partitionRowLimit;
             final long maxRows = partitionRowLimit * numPartitions;
             vt = client.callProcedure("@AdHoc",
-                    "select count(*) from events_capped")
+                    "select count(*) from " + tableName)
                     .getResults()[0];
             long numRows = vt.asScalarLong();
             assertTrue ("Too many rows in target table: ", numRows <= maxRows);
             assertTrue ("Too few rows in target table: ", numRows >= minRows);
 
-            // Get all rows in descending order, skipping the 5 most recent rows
-            // (we check the 5 most recent below)
+            // Get all rows in descending order
             vt = client.callProcedure("@AdHoc",
-                    "SELECT info FROM events_capped "
-                    + "ORDER BY when_occurred desc, info desc "
-                    + "LIMIT 50 OFFSET 5")
-                    .getResults()[0];
+                    "SELECT info FROM " + tableName + " "
+                            + "ORDER BY when_occurred desc, info desc "
+                            + "LIMIT 50 OFFSET 5")
+                            .getResults()[0];
             long prevValue = 50;
             while (vt.advanceRow()) {
                 long curValue = vt.getLong(0);
@@ -556,12 +502,371 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
                 // not sure what else we could assert here?
             }
         }
+    }
 
-        // Should have all of the most recent 5 rows.
-        vt = client.callProcedure("@AdHoc",
-                "select info from events_capped order by when_occurred desc, info desc limit 5")
+    // DELETE .. LIMIT <n> is intended to support the row limit trigger
+    // so let's test it here.
+    public void testLimitPartitionRowsDeleteWithLimit() throws Exception {
+        if (isHSQL())
+            return;
+
+        final long partitionRowLimit = 5; // from DDL
+
+        Client client = getClient();
+
+        // The following test runs twice and does a truncate table
+        // in between, to ensure that the trigger will still work.
+        for (int j = 0; j < 2; ++j) {
+
+            // The table EVENTS is capped at 5 rows/partition.  Inserts that
+            // would cause the constraint to fail trigger a delete of
+            // the oldest row.
+            VoltTable vt;
+            for (int i = 0; i < 50; ++i) {
+                String uuid = UUID.randomUUID().toString();
+                vt = client.callProcedure("@AdHoc",
+                        "INSERT INTO events_capped VALUES ('" + uuid + "', NOW, " + i + ")")
+                        .getResults()[0];
+
+                // Note: this should be *one*, even if insert triggered a delete
+                validateTableOfScalarLongs(vt, new long[] {1});
+
+                // ensure that the events are inserted have a unique timestamp so we
+                // can sort by it.
+                client.drain();
+                Thread.sleep(1);
+            }
+
+            // Check the contents
+            checkMultiPartitionCappedTableContents(client, "events_capped", partitionRowLimit);
+
+            // Should have all of the most recent 5 rows, regardless of how the table is partitioned.
+            vt = client.callProcedure("@AdHoc",
+                    "select info from events_capped order by when_occurred desc, info desc limit 5")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {49, 48, 47, 46, 45});
+
+            if (j == 0) {
+                // Do a truncate table and run the test again,
+                // to ensure that the delete trigger still works.
+                client.callProcedure("@AdHoc", "delete from events_capped");
+            }
+        }
+    }
+
+    // Make sure that DELETE ... OFFSET <n> works in partition limit rows context
+    public void testLimitPartitionRowsDeleteWithOffset() throws Exception {
+        if (isHSQL())
+            return;
+
+        final long partitionRowLimit = 5; // from DDL
+        final long numPartitions = getLogicalPartitionCount();
+
+        Client client = getClient();
+
+        // The table EVENTS_CAPPED_OFFSET is capped at 5 rows/partition.  Inserts that
+        // would cause the constraint to fail trigger a delete of
+        // all rows except the newest.
+        //
+        // The DELETE statement looks like this:
+        //   DELETE FROM events_capped_offset
+        //   ORDER BY when_occurred DESC, event_id ASC offset 1
+        VoltTable vt;
+        for (int i = 0; i < 50; ++i) {
+
+            boolean deleteMustBeTriggered = false;
+            if (numPartitions == 1) {
+                long currNumRows = client.callProcedure("@AdHoc",
+                        "select count(*) from events_capped_offset")
+                        .getResults()[0].asScalarLong();
+                deleteMustBeTriggered = (currNumRows == partitionRowLimit);
+            }
+
+            String uuid = UUID.randomUUID().toString();
+            vt = client.callProcedure("@AdHoc",
+                    "INSERT INTO events_capped_offset VALUES ('" + uuid + "', NOW, " + i + ")")
+                    .getResults()[0];
+
+            // Note: this should be *one*, even if insert triggered a delete
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            // ensure that the events are inserted have a unique timestamp so we
+            // can sort by it.
+            client.drain();
+            Thread.sleep(1);
+
+            if (deleteMustBeTriggered) {
+                // The last insert just triggered a delete.
+                // We should have only the last 2 rows
+                validateTableOfScalarLongs(client,
+                        "select info from events_capped_offset order by info",
+                        new long[] {i - 1, i});
+            }
+        }
+
+        // Check the contents
+        checkMultiPartitionCappedTableContents(client, "events_capped_offset", partitionRowLimit);
+    }
+
+    public void testLimitRowsWithTruncatingTrigger() throws IOException, ProcCallException {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+
+        // The table capped_truncate is capped at 5 rows.
+        // The LIMIT ROWS trigger for this table just does a
+        //   DELETE FROM capped_truncate
+        // This is a tricky case since this truncates the table.
+
+        // Insert enough rows to cause the trigger to fire a few times.
+        for (int i = 0; i < 13; ++i) {
+            VoltTable vt = client.callProcedure("CAPPED_TRUNCATE.insert", i)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+
+        // Verify that we only have the last 13 % 5 rows.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT i FROM capped_truncate ORDER BY i")
                 .getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {49, 48, 47, 46, 45});
+        validateTableOfScalarLongs(vt, new long[] {10, 11, 12});
+    }
+
+    /* Test to make sure that row limit triggers still execute even when data
+     * is being inserted via INSERT INTO ... SELECT */
+    public void testLimitRowsWithInsertIntoSelect() throws Exception {
+        if (isHSQL())
+            return;
+
+        // CREATE TABLE capped3_limit_rows_exec (
+        //   purge_me TINYINT DEFAULT 0 NOT NULL,
+        //   wage INTEGER NOT NULL PRIMARY KEY,
+        //   dept INTEGER NOT NULL,
+        //   CONSTRAINT tblimit3_exec LIMIT PARTITION ROWS 3
+        //     EXECUTE (DELETE FROM capped3_limit_rows_exec WHERE purge_me <> 0)
+        //   );
+
+        Client client = getClient();
+
+        // Populate a source table
+        for (int i = 0; i < 11; ++i) {
+            VoltTable vt = client.callProcedure("NOCAPPED.insert", i, i*10, i*10)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+
+        // Insert into select into a capped table with a trigger
+        // NOTE: if target table has a cap, then the SELECT output must be
+        // strictly ordered!  Otherwise the effect is not deterministic.
+        String stmt = "INSERT INTO capped3_limit_rows_exec "
+                + "SELECT 1, wage, dept FROM nocapped";
+        verifyStmtFails(client, stmt,
+                "Since the table being inserted into has a row limit "
+                + "trigger, the SELECT output must be ordered");
+
+        // Add an order by clause to order the select
+        stmt += " ORDER BY id, wage, dept";
+        VoltTable vt = client.callProcedure("@AdHoc", stmt)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {11});
+
+        // We should only have the last 11 % 3 rows inserted.
+        validateTableOfLongs(client,
+                "SELECT purge_me, wage, dept from CAPPED3_LIMIT_ROWS_EXEC ORDER BY wage",
+                new long[][] {
+                {1, 90, 90},
+                {1, 100, 100}
+        });
+
+        validateTableOfScalarLongs(client, "delete from capped3_limit_rows_exec", new long[] {2});
+
+        // Try again but this time no rows will be purge-able.
+        stmt = "INSERT INTO capped3_limit_rows_exec "
+                + "SELECT 0, wage, dept FROM nocapped "
+                + "order by id, wage, dept";
+        verifyStmtFails(client, stmt,
+                "Table CAPPED3_LIMIT_ROWS_EXEC exceeds table maximum row count 3");
+
+        // The failure should have happened at the 4th row, but since we
+        // have atomicity, the table should be empty.
+        validateTableOfLongs(client, "select purge_me, wage, dept from capped3_limit_rows_exec",
+                new long[][] {});
+    }
+
+    /* Test to make sure that row limit triggers still execute even when data
+     * is being inserted via UPSERT INTO ... SELECT */
+    public void testLimitRowsWithUpsertIntoSelect() throws Exception {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+
+        // Populate a source table
+        for (int i = 0; i < 11; ++i) {
+            VoltTable vt = client.callProcedure("NOCAPPED.insert", i, i*10, i*10)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+
+        // the SELECT statement in UPSERT INTO ... SELECT
+        // must always be ordered.
+        String stmt = "UPSERT INTO capped3_limit_rows_exec "
+                + "SELECT 1, wage, dept FROM nocapped";
+        verifyStmtFails(client, stmt,
+                "UPSERT statement manipulates data in a non-deterministic way");
+
+        // Add an order by clause to order the select, statement can
+        // now execute.
+        //
+        // There are no rows in the table so this just inserts the rows.
+        stmt += " ORDER BY id, wage, dept";
+        VoltTable vt = client.callProcedure("@AdHoc", stmt)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {11});
+
+        validateTableOfLongs(client,
+                "SELECT purge_me, wage, dept from CAPPED3_LIMIT_ROWS_EXEC ORDER BY wage",
+                new long[][] {
+                {1, 90, 90},
+                {1, 100, 100}
+        });
+
+        // Create some rows in the source table that where the wage field
+        // overlaps with the target capped table.
+        //
+        validateTableOfScalarLongs(client,
+                "update nocapped set wage = wage + 50, dept = (wage + 50) * 10 + 1 ",
+                new long[] {11});
+
+        // Source table now has rows 50..150
+        // This overlaps where wage is 90 and 100.
+        validateTableOfScalarLongs(client, "select wage from nocapped order by wage",
+                new long[] {50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150});
+
+        // Make it so existing rows in capped table will not be purged.
+        validateTableOfScalarLongs(client,
+                "update capped3_limit_rows_exec set purge_me = 0",
+                new long[] {2});
+
+        // Upsert into the capped table where the last
+        // two rows from the select are updates.
+        validateTableOfScalarLongs(client,
+                "upsert into capped3_limit_rows_exec "
+                + "select 1, wage, dept from nocapped "
+                + "where wage < 110 "
+                + "order by id, wage, dept",
+                new long[] {6});
+
+        // Note the contents of the table:
+        // if rows 90 and 100 had been purged at the second insert,
+        // then the contents would be just 90 and 100.
+        validateTableOfLongs(client,
+                "select purge_me, wage, dept "
+                + "from capped3_limit_rows_exec "
+                + "order by wage",
+                new long[][] {
+                {1, 80, 801},
+                {1, 90, 901},
+                {1, 100, 1001}
+                });
+
+        // Leave rows 80 and 90
+        validateTableOfLongs(client,
+                "delete from capped3_limit_rows_exec where wage = 100",
+                new long[][] {{1}});
+
+        // Make the remaining rows un-purge-able
+        validateTableOfLongs(client,
+                "update capped3_limit_rows_exec set purge_me = 0",
+                new long[][] {{2}});
+
+        // upsert into the capped table
+        // two rows will be updated, and not purged,
+        // The rest of the rows will not be purged
+        //
+        // The case when is there to make sure the updated
+        // rows do no become purge-able after being updated.
+        //
+        // Set the dept field to -32 as proof that we updated the row.
+        validateTableOfScalarLongs(client,
+                "upsert into capped3_limit_rows_exec "
+                + "select case when wage in (80, 90) then 0 else 1 end, wage, -32 from nocapped "
+                + "where wage >= 80 "
+                + "order by id, wage, dept",
+                new long[] {8});
+
+        validateTableOfLongs(client,
+                "select purge_me, wage, dept "
+                + "from capped3_limit_rows_exec "
+                + "order by wage",
+                new long[][] {
+                {0, 80, -32},
+                {0, 90, -32},
+                {1, 150, -32}
+                });
+    }
+
+    /*
+     * Some tricky self-insert cases.  Doing this on a capped table
+     * is weird, especially the UPSERT case.
+     */
+    public void testTableLimitPartitionRowsExecMultiRowSelfInsert() throws Exception {
+
+        if (isHSQL())
+                return;
+
+        Client client = getClient();
+
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 10, 20);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 20, 40);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 30, 60);
+
+        // Fails determinism check
+        String stmt = "INSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
+                + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20";
+        verifyStmtFails(client, stmt,
+                        "Since the table being inserted into has a row limit "
+                        + "trigger, the SELECT output must be ordered.");
+
+        // It passes when we add an ORDER BY clause
+        stmt += " ORDER BY purge_me, wage, dept";
+        validateTableOfScalarLongs(client, stmt,
+                new long[] {1});
+
+        // Table was at its limit, and we inserted one row, which flushed out
+        // the existing rows.
+        String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
+        VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 21, 40}});
+
+        // Now let's try to do an upsert where the outcome relies both
+        // on doing an update, doing an insert and also triggering a delete.
+
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 41, 81);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 61, 121);
+        // Table now contains rows 21, 41, 61.
+
+        // Upsert with select producing
+        //   0, 21, 42  -- update, and make the row un-purge-able
+        //   1, 42, 82  -- insert, will delete all rows except the first
+        //   1, 62, 122 -- insert
+        validateTableOfScalarLongs(client,
+                        "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
+                        + "SELECT "
+                        + "  case when wage = 21 then 0 else 1 end, "
+                        + "  case wage when 21 then wage else wage + 1 end, "
+                        + "  wage * 2 "
+                        + "from CAPPED3_LIMIT_ROWS_EXEC "
+                        + "ORDER BY 1, 2, 3",
+                        new long[] {3});
+
+        vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {
+                {0, 21, 42},
+                {1, 42, 82},
+                {1, 62, 122}
+        });
     }
 
     /**

@@ -17,8 +17,8 @@
 
 package org.voltdb;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -33,6 +33,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Connector;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -184,9 +185,10 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("ACTIVE_PROC", VoltType.TINYINT)
         };
 
-    JdbcDatabaseMetaDataGenerator(Catalog catalog, InMemoryJarfile jarfile)
+    JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
+        m_defaultProcs = defaultProcs;
         m_database = m_catalog.getClusters().get("cluster").getDatabases().get("database");
         m_jarfile = jarfile;
     }
@@ -238,12 +240,15 @@ public class JdbcDatabaseMetaDataGenerator
         {
             type = "VIEW";
         }
-        else if (m_database.getConnectors() != null &&
-                 m_database.getConnectors().get("0") != null &&
-                 m_database.getConnectors().get("0").getTableinfo() != null &&
-                 m_database.getConnectors().get("0").getTableinfo().getIgnoreCase(table.getTypeName()) != null)
+        else if (m_database.getConnectors() != null)
         {
-            type = "EXPORT";
+            for (Connector conn : m_database.getConnectors()) {
+                 if (conn.getTableinfo() != null &&
+                         conn.getTableinfo().getIgnoreCase(table.getTypeName()) != null) {
+                     type = "EXPORT";
+                     break;
+                 }
+            }
         }
         return type;
     }
@@ -545,7 +550,19 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedures()
     {
         VoltTable results = new VoltTable(PROCEDURES_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
             String remark = null;
             try {
@@ -646,7 +663,19 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedureColumns()
     {
         VoltTable results = new VoltTable(PROCEDURECOLUMNS_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
             for (ProcParameter param : proc.getParameters())
             {
@@ -739,6 +768,7 @@ public class JdbcDatabaseMetaDataGenerator
     }
 
     private final Catalog m_catalog;
+    private final DefaultProcedureManager m_defaultProcs;
     private final Database m_database;
     private final InMemoryJarfile m_jarfile;
 }

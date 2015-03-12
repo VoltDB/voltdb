@@ -124,20 +124,9 @@ AS
 --    transactOn = { int key ->
 --                   voltQueueSQL(stmt,key)
 --                   voltExecuteSQL(true)
---	             }
+--                 }
 --    ### LANGUAGE GROOVY
 --;
-
-
--- CREATE PROCEDURE FROM CLASS
--- basic
-
-CREATE PROCEDURE
-ALLOW
-    admin
-FROM CLASS
-    org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
-;
 
 
 -- CREATE TABLE
@@ -246,7 +235,7 @@ CREATE TABLE T14
     )
 );
 
-CREATE TABLE T15 
+CREATE TABLE T15
 (
     C INTEGER
 ,   C2 TINYINT NOT NULL
@@ -283,7 +272,7 @@ CREATE TABLE T18
     )
 );
 
-CREATE TABLE T19 
+CREATE TABLE T19
 (
     C INTEGER
 ,   C2 TINYINT NOT NULL
@@ -303,7 +292,7 @@ CREATE TABLE T20
 
 -- both column and table constraints
 
-CREATE TABLE T21 
+CREATE TABLE T21
 (
     C1 TINYINT DEFAULT 127 NOT NULL
 ,   C2 SMALLINT DEFAULT 32767 NOT NULL
@@ -421,6 +410,12 @@ CREATE TABLE T25
 );
 EXPORT TABLE T25;
 
+CREATE TABLE T25S
+(
+    id INTEGER NOT NULL
+);
+EXPORT TABLE T25S TO STREAM imagine;
+
 
 -- IMPORT CLASS
 -- basic
@@ -429,7 +424,7 @@ EXPORT TABLE T25;
 -- CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testImportProc;
 
 
--- PARTITION PROCEDURE
+-- CREATE PROCEDURE ... PARTITION ON ...
 -- basic
 
 CREATE TABLE T26
@@ -438,32 +433,53 @@ CREATE TABLE T26
 ,   gender TINYINT
 );
 
+PARTITION TABLE T26 ON COLUMN age;
+
 CREATE PROCEDURE p4
 ALLOW
     admin
+PARTITION ON
+    TABLE
+        T26
+    COLUMN
+        age
+    PARAMETER
+        1
 AS
     SELECT COUNT(*)
     FROM T26
-    WHERE age = ?;
+    WHERE gender = ? AND age = ?;
 
-PARTITION TABLE T26 ON COLUMN age;
+-- This would not have worked before the PARTITION clause existed,
+-- e.g. a separate PARTITION PROCEDURE statement would be too late.
+CREATE PROCEDURE p4a
+ALLOW
+    admin
+PARTITION ON
+    TABLE
+        T26
+    COLUMN
+        age
+    PARAMETER
+        0
+AS
+    SELECT *
+    FROM T26
+    WHERE age = ? UNION ALL (
+        SELECT *
+        FROM T26
+        WHERE age = ?);
 
-PARTITION PROCEDURE p4
-ON
-TABLE
-    T26
-COLUMN
-    age
-PARAMETER
-    0
-;
-
-PARTITION PROCEDURE testCreateProcFromClassProc
-ON
-TABLE
-    T26
-COLUMN
-    age
+CREATE PROCEDURE
+ALLOW
+    admin
+PARTITION ON
+    TABLE
+        T26
+    COLUMN
+        age
+FROM CLASS
+    org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
 
@@ -476,6 +492,7 @@ CREATE TABLE T27
 );
 
 PARTITION TABLE T27 ON COLUMN C;
+
 
 -- CREATE PROCEDURE
 -- Verify that the sqlcmd parsing survives two consecutive create procedures
@@ -505,17 +522,17 @@ CREATE PROCEDURE FOO2 AS SELECT COUNT(*) FROM T28;
 -- Verify that consecutive procedure/view statements survive sqlcmd parsing
 CREATE PROCEDURE FOO3 AS SELECT * FROM T28;
 
-CREATE VIEW VT3 
+CREATE VIEW VT3
 (
     C1
 ,   C2
 ,   TOTAL
-) 
-AS 
+)
+AS
     SELECT C1
         ,  C2
-        ,  COUNT(*) 
-    FROM T28 
+        ,  COUNT(*)
+    FROM T28
     GROUP BY C1
           ,  C2
 ;
@@ -523,20 +540,20 @@ AS
 CREATE PROCEDURE FOO4 AS SELECT * FROM VT3;
 
 -- Verify that create procedure with INSERT INTO SELECT
--- survives sqlcmd 
-CREATE PROCEDURE INS_T1_SELECT_T1 AS 
+-- survives sqlcmd
+CREATE PROCEDURE INS_T1_SELECT_T1 AS
     INSERT INTO T1 SELECT * FROM T1;
 
-CREATE PROCEDURE INS_T1_COLS_SELECT_T1 AS 
-    INSERT INTO T1 (WIDTH, LENGTH, VOLUME) 
+CREATE PROCEDURE INS_T1_COLS_SELECT_T1 AS
+    INSERT INTO T1 (WIDTH, LENGTH, VOLUME)
         SELECT WIDTH, LENGTH, VOLUME FROM T1;
-        
-CREATE PROCEDURE UPS_T4_SELECT_T4 AS 
+
+CREATE PROCEDURE UPS_T4_SELECT_T4 AS
     INSERT INTO T4 SELECT * FROM T4 ORDER BY C1, C9;
 
-CREATE PROCEDURE UPS_T4_COLS_SELECT_T4 AS 
-    INSERT INTO T4 (C9, C1, C4, C5, C8, C6, C7) 
-        SELECT C9, C1, C4, C5, C8, C6, C7 FROM T4;        
+CREATE PROCEDURE UPS_T4_COLS_SELECT_T4 AS
+    INSERT INTO T4 (C9, C1, C4, C5, C8, C6, C7)
+        SELECT C9, C1, C4, C5, C8, C6, C7 FROM T4;
 
 
 -- DROP VIEWS
@@ -552,12 +569,12 @@ CREATE VIEW VT30A
     C1
 ,   C2
 ,   TOTAL
-) 
-AS 
+)
+AS
     SELECT C1
         ,  C2
-        ,  COUNT(*) 
-    FROM T30A 
+        ,  COUNT(*)
+    FROM T30A
     GROUP BY C1
           ,  C2
 ;
@@ -567,11 +584,11 @@ CREATE VIEW VT30B
     C2
 ,   C1
 ,   TOTAL
-) 
-AS 
+)
+AS
     SELECT C2
         ,  C1
-        ,  COUNT(*) 
+        ,  COUNT(*)
     FROM T30A
     GROUP BY C2
           ,  C1
@@ -610,17 +627,14 @@ CREATE TABLE T32 (
 
 PARTITION TABLE T32 ON COLUMN C3;
 
-CREATE PROCEDURE T32A AS SELECT * FROM T32 WHERE C3 = ?;
-CREATE PROCEDURE T32B AS SELECT COUNT(*) FROM T32 WHERE C3 = ?;
-
-PARTITION PROCEDURE T32A ON TABLE T32 COLUMN C3;
-PARTITION PROCEDURE T32B ON TABLE T32 COLUMN C3;
+CREATE PROCEDURE T32A PARTITION ON TABLE T32 COLUMN C3 AS SELECT * FROM T32 WHERE C3 = ?;
+CREATE PROCEDURE T32B PARTITION ON TABLE T32 COLUMN C3 AS SELECT COUNT(*) FROM T32 WHERE C3 = ?;
 
 DROP PROCEDURE T32A;
 DROP PROCEDURE T32B;
 
 -- DROP TABLE
--- basic 
+-- basic
 CREATE TABLE T33 (
    C1 VARCHAR(15),
 );
@@ -637,11 +651,11 @@ CREATE VIEW VT34A
     C1
 ,   C2
 ,   TOTAL
-) 
-AS 
+)
+AS
     SELECT C1
         ,  C2
-        ,  COUNT(*) 
+        ,  COUNT(*)
     FROM T34
     GROUP BY C1
           ,  C2
@@ -807,11 +821,11 @@ CREATE VIEW VT50A
     C1
 ,   C2
 ,   TOTAL
-) 
-AS 
+)
+AS
     SELECT C1
         ,  C2
-        ,  COUNT(*) 
+        ,  COUNT(*)
     FROM T50
     GROUP BY C1
           ,  C2
@@ -830,8 +844,8 @@ CREATE TABLE T51
     C1 INTEGER NOT NULL
 ,   C2 INTEGER DEFAULT 123 NOT NULL
 );
-ALTER TABLE T51 ALTER COLUMN C1 SET DEFAULT NULL; 
-ALTER TABLE T51 ALTER COLUMN C1 SET NULL; 
+ALTER TABLE T51 ALTER COLUMN C1 SET DEFAULT NULL;
+ALTER TABLE T51 ALTER COLUMN C1 SET NULL;
 
 
 CREATE TABLE T52

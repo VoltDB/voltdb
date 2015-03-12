@@ -195,6 +195,12 @@ public class MockVoltDB implements VoltDBInterface
         getTable(tableName).setSignature(tableName);
     }
 
+    public void setDRProducerClusterId(int clusterId)
+    {
+        getCluster().setDrproducerenabled(true);
+        getCluster().setDrclusterid(clusterId);
+    }
+
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
@@ -254,7 +260,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, null, new byte[] {}, 0, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, new byte[] {}, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -547,6 +553,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public NodeDRGateway getNodeDRGateway()
+    {
+        return null;
+    }
+
+    @Override
     public SiteTracker getSiteTrackerForSnapshot() {
         return m_siteTracker;
     }
@@ -623,5 +635,14 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void halt() {
         assert (true);
+    }
+
+    @Override
+    public ConsumerDRGateway getConsumerDRGateway() {
+        return null;
+    }
+
+    @Override
+    public void onSyncSnapshotCompletion() {
     }
 }

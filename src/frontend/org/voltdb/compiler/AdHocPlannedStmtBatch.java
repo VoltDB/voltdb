@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
@@ -109,7 +110,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
 
     public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
             Object[] extractedValues, VoltType[] paramTypes,
-            Object[] userParams, int partitionParamIndex) {
+            Object[] userParams, int partitionParamIndex, byte[] catalogHash)
+    {
         // Mock up a dummy completion handler to satisfy the dummy work request.
         AsyncCompilerWorkCompletionHandler dummyHandler = new AsyncCompilerWorkCompletionHandler() {
 
@@ -132,7 +134,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 false,
                 true,
                 paramTypes,
-                0);
+                catalogHash);
         AdHocPlannedStatement s = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                 core,
                 extractedValues == null ? ParameterSet.emptyParameterSet() :
@@ -237,7 +239,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     /**
      * For convenience, serialization is accomplished with this single method,
      * but deserialization is piecemeal via the static methods userParamsFromBuffer
-     * and planArrayFromBuffer wih no dummy "AdHocPlannedStmtBatch receiver" instance required.
+     * and planArrayFromBuffer with no dummy "AdHocPlannedStmtBatch receiver" instance required.
      */
     public ByteBuffer flattenPlanArrayToBuffer() throws IOException {
         int size = 0; // sizeof batch
@@ -312,8 +314,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         return statements;
     }
 
-    public boolean isExplainWork() {
-        return work.isExplainWork;
+    public ExplainMode getExplainMode() {
+        return work.explainMode;
     }
 
     /*

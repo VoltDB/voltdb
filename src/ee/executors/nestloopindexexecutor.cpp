@@ -312,10 +312,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                         (ctr == (activeNumOfSearchKeys - 1))) {
 
-                        // sanity check that there is at least one EQ column
-                        // or else the join wouldn't work, right?
-                        assert(activeNumOfSearchKeys > 1);
-
                         if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                             if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
                                 (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
@@ -357,8 +353,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         keyException = true;
                     }
                     break;
-                }
-            }
+                } // End catch block for under- or overflow when setting index key
+            } // End for each active search key
             VOLT_TRACE("Searching %s", index_values.debug("").c_str());
 
             // if a search value didn't fit into the targeted index key, skip this key

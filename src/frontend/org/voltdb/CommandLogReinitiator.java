@@ -35,8 +35,6 @@ public interface CommandLogReinitiator {
 
     public void setCallback(Callback callback);
 
-    public void setCatalogContext(CatalogContext context);
-
     public void setInitiator(TransactionCreator initiator);
 
     public void initPartitionTracking();

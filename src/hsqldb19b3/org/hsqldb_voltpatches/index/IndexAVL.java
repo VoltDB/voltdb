@@ -1594,7 +1594,7 @@ public class IndexAVL implements Index {
      *
      * @param name HsqlName of the index
      * @param id persistnece id
-     * @param table table of the index
+     * @param tableRep table of the index
      * @param cols
      * @param expressions
      * @param unique is this a unique index
