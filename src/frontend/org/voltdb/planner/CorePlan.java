@@ -102,12 +102,8 @@ public class CorePlan {
         isReplicatedTableDML = plan.replicatedTableDML;
         this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
-<<<<<<< HEAD
         readOnly = plan.isReadOnly();
-=======
-        readOnly = plan.getReadOnly();
         m_questionMarkParameterCount = plan.getQuestionMarkParameterCount();
->>>>>>> VoltDB/master
     }
 
     /***

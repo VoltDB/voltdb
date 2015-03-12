@@ -60,13 +60,9 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
         m_bestAndOnlyPlanWasGenerated = true;
         ParsedInsertStmt insertStmt = (ParsedInsertStmt)m_parsedStmt;
         Table targetTable = insertStmt.m_tableList.get(0);
-<<<<<<< HEAD
-        StmtSubqueryScan subquery = insertStmt.getSubqueryScan();
-=======
         targetTable.getTypeName();
-        StmtSubqueryScan subquery = insertStmt.getSubqueries().get(0);
+        StmtSubqueryScan subquery = insertStmt.getSubqueryScans().get(0);
         boolean subqueryIsMultiFragment = subquery.getBestCostPlan().rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND);
->>>>>>> VoltDB/master
 
         if (targetTable.getIsreplicated()) {
             // must not be single-partition insert if targeting a replicated table

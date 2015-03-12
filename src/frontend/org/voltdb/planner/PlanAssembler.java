@@ -43,7 +43,6 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -337,7 +336,7 @@ public class PlanAssembler {
         // When subqueries in WHERE clauses of DML are allowed, we will need to make sure the
         // subqueries are content-deterministic too.
 
-        if (plan == null || plan.getReadOnly()) {
+        if (plan == null || plan.isReadOnly()) {
             return;
         }
 
@@ -457,25 +456,7 @@ public class PlanAssembler {
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
 
-<<<<<<< HEAD
-        // If we have content non-determinism on DML, then fail planning.
-        // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
-        // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
-        //   (e.g., WHERE c IN (SELECT ...))
-        if (retval != null && !retval.isReadOnly() && !retval.isOrderDeterministic()) {
-            String errorMsg = "DML statement manipulates data in content non-deterministic way ";
-            if (parsedStmt.m_isUpsert) {
-                throw new PlanningErrorException(errorMsg +
-                        "(this may happen on UPSERT INTO ... SELECT, for example).");
-            }
-            if (retval.hasLimitOrOffset()) {
-                throw new PlanningErrorException(errorMsg +
-                        "(this may happen on INSERT INTO ... SELECT, for example).");
-            }
-        }
-=======
         failIfNonDeterministicDml(parsedStmt, retval);
->>>>>>> VoltDB/master
 
         if ( ! subqueryExprs.isEmpty() ) {
              if ( ! (m_partitioning.isInferredSingle() ||

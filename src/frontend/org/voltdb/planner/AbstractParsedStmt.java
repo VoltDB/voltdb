@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
@@ -1165,7 +1165,6 @@ public abstract class AbstractParsedStmt {
         throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
     }
 
-<<<<<<< HEAD
     /*
      *  Extract FROM(SELECT...) sub-queries from this statement
      */
@@ -1189,7 +1188,8 @@ public abstract class AbstractParsedStmt {
             }
         }
         return exprs;
-=======
+    }
+
     /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
     /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
     /// the parameter is being used in a BIGINT context.
@@ -1400,7 +1400,9 @@ public abstract class AbstractParsedStmt {
      */
     public boolean hasSubquery() {
         // This method should be called only after the statement is parsed and join tree is built
-        return !getSubqueries().isEmpty();
->>>>>>> VoltDB/master
+        // It will do a complete pass over the join tree.
+        // TO DO: If performance is an issue,
+        // hard-code a tree walk that stops at the first subquery scan.
+        return ! getSubqueryScans().isEmpty();
     }
 }

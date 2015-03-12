@@ -115,14 +115,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // Test group by queries, order by, limit
         for (String tb: tbs) {
-<<<<<<< HEAD
-            vt = client.callProcedure("@AdHoc", "select * from ( SELECT dept, sum(wage) as sw, sum(wage)/count(wage) as avg_wage " +
-                    "from " + tb + " GROUP BY dept) T1 ORDER BY dept DESC;").getResults()[0];
-=======
+            String sql;
             sql = "select * from ( SELECT dept, sum(wage) as sw, sum(wage)/count(wage) as avg_wage " +
                     "from " + tb + " GROUP BY dept) T1 ORDER BY dept DESC;";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
->>>>>>> VoltDB/master
             validateTableOfLongs(vt, new long[][] {{2, 140, 35}, {1, 60, 20} });
 
             sql = "select sw from ( SELECT dept, sum(wage) as sw, sum(wage)/count(wage) as avg_wage " +
@@ -136,21 +132,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfScalarLongs(vt, new long[]{35, 20});
 
             // derived aggregated table + aggregation on subselect
-<<<<<<< HEAD
-            vt = client.callProcedure("@AdHoc",
-                    " select a4, sum(wage) " +
-                            " from (select wage, sum(id)+1 as a1, sum(id+1) as a2, sum(dept+3)/count(distinct dept) as a4 " +
-                            "       from " + tb +
-                            "       GROUP BY wage ORDER BY wage ASC LIMIT 4) T1" +
-                    " Group by a4 order by a4;").getResults()[0];
-=======
             sql =  " select a4, sum(wage) " +
                     " from (select wage, sum(id)+1 as a1, sum(id+1) as a2, sum(dept+3)/count(distinct dept) as a4 " +
                     "       from " + tb +
                     "       GROUP BY wage ORDER BY wage ASC LIMIT 4) T1" +
                     " Group by a4 order by a4;";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
->>>>>>> VoltDB/master
             validateTableOfLongs(vt, new long[][] {{4, 60}, {10, 40}});
 
             // groupby from groupby
@@ -160,19 +147,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(vt, new long[][] {{3, 1}, {4, 1}});
 
             // groupby from groupby + limit
-<<<<<<< HEAD
-            vt = client.callProcedure("@AdHoc",
-                    "select dept_count, count(*) " +
-                            "from (select dept, count(*) as dept_count " +
-                            "       from (select dept, id from " + tb + " order by dept limit 6) T1 group by dept) T2 " +
-                    "group by dept_count order by dept_count").getResults()[0];
-=======
             sql = "select dept_count, count(*) " +
                     "from (select dept, count(*) as dept_count " +
                     "       from (select dept, id from " + tb + " order by dept limit 6) T1 group by dept) T2 " +
                     "group by dept_count order by dept_count";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
->>>>>>> VoltDB/master
             validateTableOfLongs(vt, new long[][] {{3, 2}});
         }
     }
@@ -190,21 +169,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltTable vt;
 
         for (String tb: tbs) {
-<<<<<<< HEAD
-            vt = client.callProcedure("@AdHoc",
-                    "select newid, id  " +
-                            "FROM (SELECT id, wage FROM R1) T1, (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
-                    "WHERE T1.id = T2.dept ORDER BY newid").getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{4, 2}, {5, 2}});
-
-            vt = client.callProcedure("@AdHoc",
-                    "select id, wage, dept_count " +
-                            "FROM R1, (select dept, count(*) as dept_count " +
-                            "          from (select dept, id " +
-                            "                from "+tb+" order by dept limit 5) T1 " +
-                            "          group by dept) T2 " +
-                    "WHERE R1.wage / T2.dept_count > 10 ORDER BY wage,dept_count").getResults()[0];
-=======
+            String sql;
             sql = "select newid, id  " +
                     "FROM (SELECT id, wage FROM R1) T1, (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
                     "WHERE T1.id = T2.dept ORDER BY newid";
@@ -218,7 +183,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "          group by dept) T2 " +
                     "WHERE R1.wage / T2.dept_count > 10 ORDER BY wage,dept_count";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
->>>>>>> VoltDB/master
             validateTableOfLongs(vt, new long[][] {{3, 30, 2}, {4, 40, 2}, {4, 40, 3},{5, 50, 2},{5, 50, 3}});
 
             sql = "select id, newid  " +
@@ -232,17 +196,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     {3, Long.MIN_VALUE}, {4, Long.MIN_VALUE}, {5, Long.MIN_VALUE}});
         }
 
-<<<<<<< HEAD
-        vt = client.callProcedure("@AdHoc",
-                "select T2.id " +
-                        "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
-                "ORDER BY T2.id").getResults()[0];
-=======
         sql = "select T2.id " +
                 "FROM (SELECT id, wage FROM R1) T1, R1 T2 " +
                 "ORDER BY T2.id";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
->>>>>>> VoltDB/master
         validateTableOfLongs(vt, new long[][] { {1}, {1}, {1}, {1}, {1}, {2}, {2}, {2}, {2}, {2},
                 {3}, {3}, {3}, {3}, {3}, {4}, {4}, {4}, {4}, {4}, {5}, {5}, {5}, {5}, {5}});
     }
@@ -307,30 +264,20 @@ public class TestSubQueriesSuite extends RegressionSuite {
             }
         }
 
-<<<<<<< HEAD
-        String query =
+        String sql =
                 "SELECT -8, A.NUM " +
                         "FROM R4 B, (select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) A " +
                         "WHERE (A.NUM + 5 ) > 44";
 
-        vt = client.callProcedure("@AdHoc", query).getResults()[0];
-=======
-        sql =
-                "SELECT -8, A.NUM " +
-                        "FROM R4 B, (select max(RATIO) RATIO, sum(NUM) NUM, DESC from P4 group by DESC) A " +
-                        "WHERE (A.NUM + 5 ) > 44";
-
-        vt = client.callProcedure("@Explain", sql).getResults()[0];
-        System.err.println(vt);
+        //* enable for debug*/ vt = client.callProcedure("@Explain", sql).getResults()[0];
+        //* enable for debug*/ System.err.println(vt);
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
->>>>>>> VoltDB/master
         long[] row = new long[] {-8, 63890};
         validateTableOfLongs(vt, new long[][] {row, row, row, row,
                 row, row, row, row});
     }
 
-<<<<<<< HEAD
     /**
      * Simple sub-query expression
      * @throws NoConnectionsException
@@ -719,8 +666,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
     }
 
-=======
->>>>>>> VoltDB/master
     // Test subqueries on partitioned table cases
     public void testSubSelects_from_partitioned() throws NoConnectionsException, IOException, ProcCallException
     {
@@ -738,23 +683,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}});
 
-<<<<<<< HEAD
-
-        vt = client.callProcedure("@AdHoc",
-                "select T1.ID, T1.DEPT " +
-                        "FROM (SELECT ID, DEPT FROM P1 where ID = 2) T1, " +
-                        "       (SELECT DEPT FROM P2 ) T2,  " +
-                        "       (SELECT ID FROM P3 ) T3  " +
-                "where T1.ID = T2.DEPT and T2.DEPT = T3.ID order by T1.ID;").getResults()[0];
-        validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}});
-
-
-        vt = client.callProcedure("@AdHoc",
-                "select T1.ID, T1.DEPT " +
-                        "FROM (SELECT P1.ID, P1.DEPT FROM P1, P2 where P1.ID = P2.DEPT) T1, P2 " +
-                "where T1.ID = P2.DEPT and P2.DEPT = 2 order by T1.ID;").getResults()[0];
-
-=======
         sql = "select T1.ID, T1.DEPT " +
                 "FROM (SELECT ID, DEPT FROM P1 where ID = 2) T1, " +
                 "       (SELECT DEPT FROM P2 ) T2,  " +
@@ -767,7 +695,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "FROM (SELECT P1.ID, P1.DEPT FROM P1, P2 where P1.ID = P2.DEPT) T1, P2 " +
                 "where T1.ID = P2.DEPT and P2.DEPT = 2 order by T1.ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
->>>>>>> VoltDB/master
         validateTableOfLongs(vt, new long[][] { {2, 1}, {2, 1}, {2, 1}, {2, 1}});
 
 

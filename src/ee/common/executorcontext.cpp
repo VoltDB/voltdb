@@ -48,17 +48,13 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_topEnd(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
-<<<<<<< HEAD
-    m_staticParams(params), m_executorsMap(),
-    m_drStream(drStream), m_engine(engine),
-    m_txnId(0), m_spHandle(0),
-=======
+    m_staticParams(params),
+    m_executorsMap(),
     m_drStream(drStream),
     m_drReplicatedStream(drReplicatedStream),
     m_engine(engine),
     m_txnId(0),
     m_spHandle(0),
->>>>>>> VoltDB/master
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
     m_partitionId(partitionId),
@@ -139,8 +135,5 @@ void ExecutorContext::cleanupExecutors(int subqueryId) const
         executor->cleanupTempOutputTable();
     }
 }
-<<<<<<< HEAD
 
 } // end namespace voltdb
-=======
->>>>>>> VoltDB/master

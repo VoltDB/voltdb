@@ -58,11 +58,7 @@ const int BUFFER_SIZE = 1024;
 class ExportTupleStreamTest : public Test {
 public:
     ExportTupleStreamTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
-<<<<<<< HEAD
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, NULL, true, "localhost", 2, NULL)) {
-=======
         m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, "localhost", 2, NULL, NULL)) {
->>>>>>> VoltDB/master
         srand(0);
 
         // set up the schema used to fill the new buffer

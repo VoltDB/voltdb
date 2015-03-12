@@ -377,23 +377,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
-<<<<<<< HEAD
         void cleanupExecutorList(std::vector<AbstractExecutor*>& executorList);
 
         ExecutorVector * getCurrentExecutorVector() {
             return m_currExecutorVec;
-=======
-        int64_t tempTableMemoryLimit() const {
-            return m_tempTableMemoryLimit;
-        }
-
-        int64_t tempTableLogLimit() const {
-            return (m_tempTableMemoryLimit * 3) / 4;
-        }
-
-        int32_t getPartitionId() const {
-            return m_partitionId;
->>>>>>> VoltDB/master
         }
 
     private:
@@ -409,11 +396,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-<<<<<<< HEAD
-        bool initCluster();
-        AbstractExecutor* initPlanNode(AbstractPlanNode* node, TempTableLimits* limits, int64_t fragId);
-=======
->>>>>>> VoltDB/master
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViewsAndLimitDeletePlans();
         bool updateCatalogDatabaseReference();
@@ -444,14 +426,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-<<<<<<< HEAD
-
-        void resetCurrentExecutorVec();
-
-        void cleanupExecutors();
-=======
         void resetExecutionMetadata();
->>>>>>> VoltDB/master
 
         // -------------------------------------------------
         // Data Members

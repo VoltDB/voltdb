@@ -53,11 +53,7 @@ static int64_t addPartitionId(int64_t value) {
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-<<<<<<< HEAD
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, NULL, false, "", 0, &drStream);
-=======
             engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, "", 0, &drStream, &drReplicatedStream);
->>>>>>> VoltDB/master
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);

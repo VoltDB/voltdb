@@ -652,29 +652,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (col.tableAlias == null) {
                 col.tableAlias = col.tableName;
             }
-<<<<<<< HEAD
-            col.alias = child.attributes.get("alias");
-            if (col.alias == null) {
-                col.alias = col.columnName;
-            }
-            // This index calculation is only used for sanity checking
-            // materialized views (which use the parsed select statement but
-            // don't go through the planner pass that does more involved
-            // column index resolution).
-            col.index = m_displayColumns.size();
-
-            insertAggExpressionsToAggResultColumns(m_aggregationList, col);
-            if (m_aggregationList.size() >= 1) {
-                m_hasAggregateExpression = true;
-
-                for (AbstractExpression agg: m_aggregationList) {
-                    assert(agg instanceof AggregateExpression);
-                    if (! m_hasAggregateDistinct &&
-                            ((AggregateExpression)agg).isDistinct() ) {
-                        m_hasAggregateDistinct = true;
-                        break;
-                    }
-=======
         }
         else
         {
@@ -703,7 +680,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         ((AggregateExpression)agg).isDistinct() ) {
                     m_hasAggregateDistinct = true;
                     break;
->>>>>>> VoltDB/master
                 }
             }
         }
@@ -790,16 +766,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         };
 
-<<<<<<< HEAD
-            if ((child.name.equals("operation") == false) &&
-                    (child.name.equals("aggregation") == false) &&
-                    (child.name.equals("function") == false)) {
-                throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-            }
-        }
-=======
         ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(this, orderByNode, adjuster);
->>>>>>> VoltDB/master
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
@@ -1037,7 +1004,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // must be added to the subquery's HAVING expressions. If not, it should be added
         // to the WHERE expressions
         for (AbstractExpression expr : inExprList) {
-            ParsedSelectStmt.ParsedColInfo colInfo = selectStmt.m_displayColumns.get(idx++);
+            ParsedColInfo colInfo = selectStmt.m_displayColumns.get(idx++);
             assert(colInfo.expression != null);
             // The TVE and the aggregated expressions from the IN clause will be
             // parameters to the child select statement once the IN expression is
@@ -1107,7 +1074,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 havingColumnNamesSet.add(tve.getColumnAlias());
             }
         }
-        for (ParsedSelectStmt.ParsedColInfo colInfo: m_groupByColumns) {
+        for (ParsedColInfo colInfo: m_groupByColumns) {
             groupByColumnNamesSet.add(colInfo.alias);
         }
 
@@ -1375,12 +1342,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return true;
     }
 
-<<<<<<< HEAD
-    public boolean hasAggregateExpression () {
-=======
-
     public boolean hasAggregateExpression() {
->>>>>>> VoltDB/master
         return m_hasAggregateExpression;
     }
 
@@ -1519,31 +1481,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_limit != -1 || m_limitParameterId != -1;
     }
 
-    private boolean hasOffset() {
+    public boolean hasOffset() {
         return m_offset > 0 || m_offsetParameterId != -1;
     }
 
     @Override
     public boolean hasLimitOrOffset() {
-<<<<<<< HEAD
-        return hasLimit() || hasOffset();
-    }
-
-    public boolean hasOffset() {
-        if ((m_offset > 0) || (m_offsetParameterId != -1)) {
-            return true;
-        }
-        return false;
-    }
-
-    public boolean hasLimit() {
-        if ((m_limit != -1) || (m_limitParameterId != -1)) {
-=======
-        if (hasLimit() || hasOffset()) {
->>>>>>> VoltDB/master
-            return true;
-        }
-        return false;
+        return (hasLimit() || hasOffset());
     }
 
     public boolean hasLimitOrOffsetParameters() {
@@ -1639,111 +1583,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
-<<<<<<< HEAD
-    private boolean orderByColumnsCoverUniqueKeys()
-    {
-        // In theory, if EVERY table in the query has a uniqueness constraint
-        // (primary key or other unique index) on columns that are all listed in the ORDER BY values,
-        // the result is deterministic.
-        // This holds regardless of whether the associated index is actually used in the selected plan,
-        // so this check is plan-independent.
-        HashMap<String, List<AbstractExpression> > baseTableAliases =
-                new HashMap<String, List<AbstractExpression> >();
-        for (ParsedColInfo col : m_orderColumns) {
-            AbstractExpression expr = col.expression;
-            List<AbstractExpression> baseTVEs = expr.findBaseTVEs();
-            if (baseTVEs.size() != 1) {
-                // Table-spanning ORDER BYs -- like ORDER BY A.X + B.Y are not helpful.
-                // Neither are (nonsense) constant (table-less) expressions.
-                continue;
-            }
-            // This loops exactly once.
-            AbstractExpression baseTVE = baseTVEs.get(0);
-            String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
-            assert(nextTableAlias != null);
-            List<AbstractExpression> perTable = baseTableAliases.get(nextTableAlias);
-            if (perTable == null) {
-                perTable = new ArrayList<AbstractExpression>();
-                baseTableAliases.put(nextTableAlias, perTable);
-            }
-            perTable.add(expr);
-        }
-
-        if (m_tableAliasMap.size() > baseTableAliases.size()) {
-            // FIXME: This would be one of the tricky cases where the goal would be to prove that the
-            // row with no ORDER BY component came from the right side of a 1-to-1 or many-to-1 join.
-            return false;
-        }
-        boolean allScansAreDeterministic = true;
-        for (Entry<String, List<AbstractExpression>> orderedAlias : baseTableAliases.entrySet()) {
-            List<AbstractExpression> orderedAliasExprs = orderedAlias.getValue();
-            StmtTableScan tableScan = m_tableAliasMap.get(orderedAlias.getKey());
-            if (tableScan == null) {
-                assert(false);
-                return false;
-            }
-
-            if (tableScan instanceof StmtSubqueryScan) {
-                return false; // don't yet handle FROM clause subquery, here.
-            }
-
-            Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
-
-            // This table's scans need to be proven deterministic.
-            allScansAreDeterministic = false;
-            // Search indexes for one that makes the order by deterministic
-            for (Index index : table.getIndexes()) {
-                // skip non-unique indexes
-                if ( ! index.getUnique()) {
-                    continue;
-                }
-
-                // get the list of expressions for the index
-                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
-
-                String jsonExpr = index.getExpressionsjson();
-                // if this is a pure-column index...
-                if (jsonExpr.isEmpty()) {
-                    for (ColumnRef cref : index.getColumns()) {
-                        Column col = cref.getColumn();
-                        TupleValueExpression tve = new TupleValueExpression(
-                                table.getTypeName(),
-                                orderedAlias.getKey(),
-                                col.getName(),
-                                col.getName(),
-                                col.getIndex());
-                        indexExpressions.add(tve);
-                    }
-                }
-                // if this is a fancy expression-based index...
-                else {
-                    try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                        assert(false);
-                        continue;
-                    }
-                }
-
-                // If the sort covers the index, then it's a unique sort.
-                //TODO: The statement's equivalence sets would be handy here to recognize cases like
-                //    WHERE B.unique_id = A.b_id
-                //    ORDER BY A.unique_id, A.b_id
-                if (orderedAliasExprs.containsAll(indexExpressions)) {
-                    allScansAreDeterministic = true;
-                    break;
-                }
-            }
-            // ALL tables' scans need to have proved deterministic
-            if ( ! allScansAreDeterministic) {
-                return false;
-            }
-        }
-        return true;
-    }
-=======
->>>>>>> VoltDB/master
 
     private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered)
     {

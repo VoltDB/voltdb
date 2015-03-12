@@ -183,13 +183,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
             assert(m_hasSignificantOutputSchema);
         }
-<<<<<<< HEAD
         // Possible subquery expressions
         generateSubqueryExpressionOutputSchema(m_postPredicate, db);
         generateSubqueryExpressionOutputSchema(m_prePredicate, db);
-        return;
-=======
->>>>>>> VoltDB/master
     }
 
     @Override

@@ -777,13 +777,7 @@ TEST_F(NValueTest, TestCastToDouble) {
 TEST_F(NValueTest, TestCastToString) {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
 
     NValue tinyInt = ValueFactory::getTinyIntValue(120);
     NValue smallInt = ValueFactory::getSmallIntValue(120);
@@ -2064,14 +2058,8 @@ TEST_F(NValueTest, TestSubstring)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
 
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2159,13 +2147,7 @@ TEST_F(NValueTest, TestExtract)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
@@ -2356,14 +2338,7 @@ TEST_F(NValueTest, TestInList)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
 
     int int_set1[] = { 10, 2, -3 };
     int int_set2[] = { 0, 1, 100, 10000, 1000000 };
@@ -2565,14 +2540,7 @@ bool checkValueVector(vector<NValue> &values) {
 TEST_F(NValueTest, TestDedupAndSort) {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
 
     std::vector<NValue> vectorValues;
     NValue arrayValue;
@@ -2773,13 +2741,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
 
     bool failed = false;
     const char* trials[] = {
@@ -3043,13 +3005,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
 
     std::string peekString;
 
@@ -3104,13 +3060,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-<<<<<<< HEAD
     getExecutorContextForTest(testPool);
-=======
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
->>>>>>> VoltDB/master
 
     std::string peekString;
 

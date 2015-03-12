@@ -295,9 +295,6 @@ public class CompiledPlan {
         return m_extractedParamValues;
     }
 
-<<<<<<< HEAD
-    public boolean isReadOnly() {
-=======
     public int getQuestionMarkParameterCount() {
         if (parameters == null) {
             return 0;
@@ -305,8 +302,7 @@ public class CompiledPlan {
         return parameters.length - m_generatedParameterCount;
     }
 
-    public boolean getReadOnly() {
->>>>>>> VoltDB/master
+    public boolean isReadOnly() {
         return m_readOnly;
     }
 

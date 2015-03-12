@@ -1614,28 +1614,26 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
 
-<<<<<<< HEAD
         // T
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A FROM P1) T1, P2 where T1.A = P2.A",
                 joinErrorMsg);
 
-=======
         // Distinct with GROUP BY
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
->>>>>>> VoltDB/master
 
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
 
-<<<<<<< HEAD
         failToCompile(
                 "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
                 "                (SELECT Distinct P1.A FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
-=======
+                "              P2 " +
+                "where T1.A = P2.A");
+
         // Distinct without GROUP BY
         String sql1, sql2;
         sql1 = "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A";
@@ -1644,7 +1642,6 @@ public class TestSubQueries extends PlannerTestCase {
 
         sql1 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
                 "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
->>>>>>> VoltDB/master
                 "              P2 " +
                 "where T1.A = P2.A";
         sql2 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
@@ -1653,7 +1650,6 @@ public class TestSubQueries extends PlannerTestCase {
                 "where T1.A = P2.A";
         checkQueriesPlansAreTheSame(sql1, sql2);
 
-<<<<<<< HEAD
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT T0.A FROM R1, " +
                 "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
@@ -1663,7 +1659,7 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
-=======
+
         sql1 =  "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
                 "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
@@ -1673,7 +1669,6 @@ public class TestSubQueries extends PlannerTestCase {
                 "              P2 " +
                 "where T1.A = P2.A";
         checkQueriesPlansAreTheSame(sql1, sql2);
->>>>>>> VoltDB/master
     }
 
     public void testEdgeCases() {

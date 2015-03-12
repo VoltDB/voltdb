@@ -46,8 +46,6 @@ import java.util.regex.PatternSyntaxException;
 import org.junit.Test;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.ExecuteCallResults;
-import org.voltdb.parser.SQLParser.FileInfo;
-import org.voltdb.utils.SQLCommand.QueryInfo;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -278,12 +276,8 @@ public class TestSqlCmdInterface
     @Test
     public void testParseQuery21() throws FileNotFoundException {
         ID = 21;
-
-        String fileCmd = "file ./tests/frontend/org/voltdb/utils/localQry.txt";
-        final FileInfo fileInfo = SQLParser.parseFileStatement(fileCmd);
-        final File sqlFile = fileInfo.getFile();
-        List<QueryInfo> queryBatchInfo = SQLCommand.readScriptFile(fileInfo, null);
-        String raw = QueryInfo.convertToString(queryBatchInfo);
+        final File sqlFile = new File("./tests/frontend/org/voltdb/utils/localQry.txt");
+        String raw = SQLCommand.readScriptFile(sqlFile);
 
         int numOfQueries = -1;
         String qryFrmFile = "";
@@ -496,7 +490,7 @@ public class TestSqlCmdInterface
     // test select statement with FROM subquery
     @Test
     public void testParseQuery30() {
-        String raw = "SELECT * FROM (SELECT * FROM table2)";
+        String raw = "SELECT * FROM (SELECT * FROM table2);";
         String expected = raw;
         ID = 30;
         assertThis(raw, expected, 1, ID);
@@ -505,7 +499,7 @@ public class TestSqlCmdInterface
     // test select statement with IN subquery
     @Test
     public void testParseQuery31() {
-        String raw = "SELECT * FROM table1 WHERE (A,C) IN ( SELECT A,C FROM table2)";
+        String raw = "SELECT * FROM table1 WHERE (A,C) IN ( SELECT A,C FROM table2);";
         String expected = raw;
         ID = 31;
         assertThis(raw, expected, 1, ID);
@@ -514,36 +508,10 @@ public class TestSqlCmdInterface
     // test select statement with EXISTS subquery
     @Test
     public void testParseQuery32() {
-        String raw = "SELECT * FROM table1 WHERE EXISTS( SELECT 1FROM table2)";
+        String raw = "SELECT * FROM table1 WHERE EXISTS( SELECT 1FROM table2);";
         String expected = raw;
         ID = 32;
         assertThis(raw, expected, 1, ID);
-    }
-
-    private static void setQryString(File QryFileHandle) throws FileNotFoundException {
-        // Prepare a Scanner that will "scan" the document
-        Scanner opnScanner = new Scanner(QryFileHandle);
-        // Read each line in the file
-        while(opnScanner.hasNext()) {
-            String line = opnScanner.nextLine();
-            String str1 = "^--num=\\d+$";
-            // To filter out sql comments starting with '--'
-            // Note that currently, we only filter out the comments lines with
-            // leading '--'. For instance:
-            // 1) --this commenting line will be filtered out
-            String str2 = "-{2,}.*";
-            boolean result = line.matches(str2);
-            if(result == true) {
-                if(line.matches(str1))
-                    numOfQueries = Integer.parseInt(line.replaceAll("\\D+", ""));
-            }
-            else {
-                qryFrmFile = qryFrmFile.concat(line).concat(" ");
-            }
-        }
-        qryFrmFile = qryFrmFile.replaceAll("\\;+", " ");
-        qryFrmFile = trimKeyWordsLeadingSpaces(qryFrmFile);
-        //qryFrmFile += " #blah#"; // For testing only
     }
 
     private static String trimKeyWordsLeadingSpaces(String str) {
@@ -602,18 +570,5 @@ public class TestSqlCmdInterface
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";
         assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
-    }
-
-    @Test
-    public void testParseFileBatchDDL()
-    {
-        ID = 50;
-        FileInfo fileInfo = null;
-
-        fileInfo = SQLParser.parseFileStatement("FILE  -batch haha.sql;\n");
-        assertTrue(fileInfo.isBatch());
-
-        fileInfo = SQLParser.parseFileStatement("FILE haha.sql;\n");
-        assertFalse(fileInfo.isBatch());
     }
 }
