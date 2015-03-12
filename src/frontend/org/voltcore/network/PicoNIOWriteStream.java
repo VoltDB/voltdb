@@ -114,13 +114,14 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
                 bytesWritten += rc;
 
             } while (rc > 0);
-        } finally {
+        } catch (IOException ex) {
             if (m_currentWriteBuffer != null) {
                 networkLog.warn("Must have failed to write buffers. Possible cause flakey network.");
                 //if we are failing to write we end up with last buffer not discarded.
                 m_currentWriteBuffer.discard();
                 m_currentWriteBuffer = null;
             }
+            throw ex;
         }
 
         m_bytesWritten += bytesWritten;
