@@ -221,7 +221,7 @@ public class SQLCommand
 
                 // EXIT command - exit immediately
                 if (SQLParser.isExitCommand(line)) {
-                    System.exit(m_exitCode);
+                    return;
                 }
 
                 // RECALL command
