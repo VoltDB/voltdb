@@ -235,7 +235,6 @@ public class Tokenizer extends AbstractTokenizer {
 
         if( currentColumn.length() > columnSizeLimit ) {
             state = TokenizerState.NORMAL;
-            System.out.println("AWESOME");
             throw new SuperCsvException(
                     String
                     .format(
