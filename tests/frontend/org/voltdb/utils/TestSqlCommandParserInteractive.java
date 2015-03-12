@@ -57,7 +57,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
             } catch (Exception e) {}
         }
 
-        Callable<List<String>> makeQueryTask(final InputStream in, final OutputStream out)
+        private Callable<List<String>> makeQueryTask(final InputStream in, final OutputStream out)
         {
             return new Callable<List<String>>() {
                 @Override
@@ -150,10 +150,11 @@ public class TestSqlCommandParserInteractive extends TestCase {
         String query3 = "insert into stoats values (0, 1)";
         cmd.submitText(query3 + ";\n");
         cmd.waitOnResult();
-        assertEquals(3, result.get().size());
-        assertEquals(query1, result.get().get(0));
-        assertEquals(query2, result.get().get(1));
-        assertEquals(query3, result.get().get(2));
+        List<String> got = result.get();
+        assertEquals(3, got.size());
+        assertEquals(query1, got.get(0));
+        assertEquals(query2, got.get(1));
+        assertEquals(query3, got.get(2));
         cmd.close();
     }
 
@@ -179,17 +180,11 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
-        // This is the behavior you might want, doesn't work
-        //cmd.submitText("--insert into goats values (0, 1)\n");
-        //cmd.waitOnResult();
-        //System.out.println("RESULT: " + result.get());
-        //assertEquals(0, result.get().size());
-        //result = cmd.openQuery();
 
-        cmd.submitText("--insert into goats values (0, 1)");
+        cmd.submitText("--insert into goats values (0, 1); select * from goats;\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
-        cmd.submitText("; select * from goats;\n");
+        cmd.submitText(";\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
         assertEquals(0, result.get().size());

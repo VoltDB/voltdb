@@ -46,6 +46,9 @@ public class SQLConsoleReader extends jline.console.ConsoleReader implements SQL
         setExpandEvents(false);  // don't process shell ! and !!
     }
 
+    @Override
+    public String readBatchLine() throws IOException { return readLine("batch>"); }
+
     /* (non-Javadoc)
      * @see jline.console.ConsoleReader#searchBackwards(java.lang.String, int, boolean)
      * Overrides and replaces search logic to make it case-insensitive.
