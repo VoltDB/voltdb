@@ -104,7 +104,7 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
 
             rc = channel.write(buffer);
             if (networkLog.isTraceEnabled() && rc == 0 && buffer.hasRemaining()) {
-                networkLog.trace("Wrote 0 bytes and buffer is not empty.");
+                networkLog.trace("Pico Wrote 0 bytes and buffer is not empty.");
             }
             //Discard the buffer back to a pool if no data remains
             if (!buffer.hasRemaining()) {
