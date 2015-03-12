@@ -430,7 +430,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         column.attributes.put("name", columnName.name);
         // TODO: consider breaking sqlTypeToString out from SqlFIle
         // to somewhere more convenient like Types.java.
-        String typestring = dataType.sqlTypeToString();
+        String typestring = dataType.getNameString();
         column.attributes.put("valuetype", typestring);
         column.attributes.put("nullable", String.valueOf(isNullable()));
         column.attributes.put("size", String.valueOf(dataType.precision));

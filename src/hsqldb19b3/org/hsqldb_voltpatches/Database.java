@@ -32,7 +32,7 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.dbinfo.DatabaseInformation;
+////import org.hsqldb_voltpatches.dbinfo.DatabaseInformation;
 import org.hsqldb_voltpatches.error.Error;
 import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.FrameworkLogger;
@@ -73,7 +73,7 @@ public class Database {
     public HsqlProperties      urlProperties;
     private final String       path;
     public Collation           collation;
-    public DatabaseInformation dbInfo;
+    ////public DatabaseInformation dbInfo;
 
     /** indicates the state of the database */
     private volatile int dbState;
@@ -227,12 +227,12 @@ public class Database {
             isReferentialIntegrity = true;
             sessionManager         = new SessionManager(this);
             collation              = collation.newDatabaseInstance();
-            dbInfo = DatabaseInformation.newDatabaseInformation(this);
+            ////dbInfo = DatabaseInformation.newDatabaseInformation(this);
             txManager              = new TransactionManager2PL(this);
 
-            lobManager.createSchema();
-            sessionManager.getSysLobSession().setSchema(
-                SqlInvariants.LOBS_SCHEMA);
+            ////lobManager.createSchema();
+            ////sessionManager.getSysLobSession().setSchema(
+            ////    SqlInvariants.LOBS_SCHEMA);
             schemaManager.setSchemaChangeTimestamp();
             schemaManager.createSystemTables();
 
@@ -250,8 +250,8 @@ public class Database {
                 logger.checkpoint(false);
             }
 
-            lobManager.open();
-            dbInfo.setWithContent(true);
+            ////lobManager.open();
+            ////dbInfo.setWithContent(true);
 
             checkpointRunner = new CheckpointRunner();
             timeoutRunner    = new TimeoutRunner();
@@ -297,7 +297,7 @@ public class Database {
         nameManager      = null;
         schemaManager    = null;
         sessionManager   = null;
-        dbInfo           = null;
+        ////dbInfo           = null;
         checkpointRunner = null;
         timeoutRunner    = null;
     }

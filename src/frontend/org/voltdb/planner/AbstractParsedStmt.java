@@ -21,8 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
@@ -501,8 +501,17 @@ public abstract class AbstractParsedStmt {
         // The design fully abstracts other volt classes from the XML serialization.
         // So, this goes here instead of in derived Expression implementations.
 
-        assert (exprNode.children.size() == 1);
+        assert(exprNode.children.size() == 2);
 
+        // Get the implicit second aggregation argument.
+        // It's expected to be a Boolean true constant value for the cases VoltDB supports.
+        VoltXMLElement fixedExprNode = exprNode.children.get(1);
+        if ( ! "BOOLEAN".equals(fixedExprNode.attributes.get("valuetype")) ||
+                ! "true".equals(fixedExprNode.attributes.get("value"))) {
+            //TODO: get a better description of this hsql "extension" feature.
+            //TODO: long-term, consider supporting this hsql "extension" feature.
+            throw new PlanningErrorException("Unsupported aggregation extension");
+        }
         // get the single required child node
         VoltXMLElement childExprNode = exprNode.children.get(0);
         assert(childExprNode != null);

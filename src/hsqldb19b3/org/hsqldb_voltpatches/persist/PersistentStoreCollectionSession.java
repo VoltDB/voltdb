@@ -155,10 +155,10 @@ implements PersistentStoreCollection {
                             table);
                 }
 
-                if (table.getTableType() == TableBase.INFO_SCHEMA_TABLE) {
-                    session.database.dbInfo.setStore(session, (Table) table,
-                                                     store);
-                }
+                ////if (table.getTableType() == TableBase.INFO_SCHEMA_TABLE) {
+                ////    session.database.dbInfo.setStore(session, (Table) table,
+                ////                                     store);
+                ////}
 
                 return store;
 

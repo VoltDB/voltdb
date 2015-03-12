@@ -364,6 +364,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                         "alter table FOO alter VAL set null;");
             }
             catch (ProcCallException pce) {
+                pce.printStackTrace();
                 fail(String.format(
                         "Should be able to make an existing column nullable. "
                         + "Exception: %s", pce.getLocalizedMessage()));
@@ -395,16 +396,14 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // Setting to not null should fail if the table is not empty.
             m_client.callProcedure("FOO.insert", 0, "whatever");
-            boolean threw = false;
+
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO alter VAL set not null;");
+                fail("Shouldn't be able to declare not null on existing column of a non-empty table");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
-                threw = true;
             }
-            assertTrue("Shouldn't be able to declare not null on existing column of a non-empty table", threw);
             assertTrue(isColumnNullable("FOO", "VAL"));
 
             // Clear the table and reset VAL default (by setting to NULL)
@@ -427,16 +426,13 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // Can't make primary key nullable
             assertFalse(isColumnNullable("FOO", "ID"));
-            threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO alter ID set null;");
+                fail("Shouldn't be able to make the primary key nullable");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
-                threw = true;
             }
-            assertTrue("Shouldn't be able to make the primary key nullable", threw);
             assertFalse(isColumnNullable("FOO", "ID"));
 
             // magic name for PK index
@@ -466,29 +462,27 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_CT_FOO_ID", true));
 
             // Can't add a PK constraint on the other column
-            threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO add constraint PK_TREE primary key (VAL);");
+                fail("Shouldn't be able to add a primary key on nullable column");
             }
             catch (ProcCallException pce) {
-                threw = true;
             }
-            assertTrue("Shouldn't be able to add a primary key on nullable column", threw);
 
-//            // But we can add it back on the original column
-//            try {
-//                m_client.callProcedure("@AdHoc",
-//                        "alter table FOO add constraint PK_TREE primary key (ID);");
-//            }
-//            catch (ProcCallException pce) {
-//                pce.printStackTrace();
-//                fail("Shouldn't fail to add primary key constraint");
-//            }
-//            System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
-//            // Of course we rename this yet again, because, why not?
-//            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_FOO_ID"));
-//            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_FOO_ID", true));
+            // But we can add it back on the original column
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add constraint PK_TREE primary key (ID);");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Shouldn't fail to add primary key constraint");
+            }
+            System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
+            // Of course we rename this yet again, because, why not?
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_FOO_ID", true));
         }
         finally {
             teardownSystem();

@@ -775,12 +775,12 @@ public class SchemaManager {
                 t      = findUserTable(session, name, schema);
             }
 
-            if (t == null) {
-                if (SqlInvariants.INFORMATION_SCHEMA.equals(schema)
-                        && database.dbInfo != null) {
-                    t = database.dbInfo.getSystemTable(session, name);
-                }
-            }
+            ////if (t == null) {
+            ////    if (SqlInvariants.INFORMATION_SCHEMA.equals(schema)
+            ////            && database.dbInfo != null) {
+            ////        t = database.dbInfo.getSystemTable(session, name);
+            ////    }
+            ////}
 
             if (t == null) {
                 throw Error.error(ErrorCode.X_42501, name);

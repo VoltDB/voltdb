@@ -40,8 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-import org.hsqldb_voltpatches.types.BinaryData;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
@@ -62,9 +60,11 @@ import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.types.ArrayType;
+import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Collation;
 import org.hsqldb_voltpatches.types.NullType;
+import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.Types;
 
@@ -2358,10 +2358,11 @@ public class Expression implements Cloneable {
                     exp.attributes.put("valuetype", "NULL");
                     return exp;
                 }
-                exp.attributes.put("valuetype", dataType.sqlTypeToString());
+                exp.attributes.put("valuetype", dataType.getNameString());
                 return exp;
             }
 
+            /* This test traps false positives and needs to be narrowed if not eliminated for hsql232
             if (dataType.isBooleanType()) {
                 // FIXME: Since BOOLEAN is not a valid user data type a BOOLEAN VALUE is always the result of a constant logical
                 // expression (WHERE clause) like "2 > 1" that HSQL has optimized to a constant value.
@@ -2378,8 +2379,9 @@ public class Expression implements Cloneable {
                 throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                         "VoltDB does not support WHERE clauses containing only constants");
             }
+            */
 
-            exp.attributes.put("valuetype", dataType.sqlTypeToString());
+            exp.attributes.put("valuetype", dataType.getNameString());
 
             if (valueData instanceof TimestampData) {
                 // When we get the default from the DDL,
@@ -2714,6 +2716,9 @@ public class Expression implements Cloneable {
     static protected Expression voltCombineWithAnd(Expression... conditions)
     {
         Expression result = null;
+        if (conditions == null) {
+            return null;
+        }
         for (Expression child : conditions) {
             if (child == null) {
                 continue;

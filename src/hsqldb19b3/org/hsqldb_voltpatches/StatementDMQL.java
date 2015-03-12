@@ -1065,7 +1065,8 @@ public abstract class StatementDMQL extends Statement {
                  * and mutate the exprColumn entries setting the alias string on the aliased
                  * column entry.
                  */
-                if (expr instanceof ExpressionColumn) {
+                if (expr instanceof ExpressionColumn &&
+                    ! expr.isDynamicParam()) {
                     ExpressionColumn exprColumn = (ExpressionColumn)expr;
                     if (exprColumn.alias != null && exprColumn.columnName == null) {
                         aliases.add(Pair.of(expr.columnIndex, expr.alias));
@@ -1277,7 +1278,7 @@ public abstract class StatementDMQL extends Statement {
             parameter.attributes.put("index", String.valueOf(index));
             ++index;
             parameter.attributes.put("id", expr.getUniqueId(session));
-            parameter.attributes.put("valuetype", paramType.sqlTypeToString());
+            parameter.attributes.put("valuetype", paramType.getNameString());
             // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
             // that values passed to parameters such as the one in "col in ?" must be vectors.
             // So, it can just be forwarded as a boolean.

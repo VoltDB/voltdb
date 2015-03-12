@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches.types;
 
-import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
@@ -1288,109 +1287,96 @@ public abstract class Type implements SchemaObject, Cloneable {
 
     /**
      * Return a String representation of the specified java.sql.Types type.
-     * Implementation salvaged from org.hsqldb_voltpatches.cmdline.SqlFile.sqlTypeToString.
-     */
-    public String sqlTypeToString() {
+     * Not needed for hsql232 after all?
+    public String getNameString() {
         switch (typeCode) {
-            case java.sql.Types.ARRAY :
+            case Types.SQL_ARRAY :
                 return "ARRAY";
 
-            case java.sql.Types.BIGINT :
+            case Types.SQL_BIGINT :
                 return "BIGINT";
 
-            case java.sql.Types.BINARY :
+            case Types.SQL_BINARY :
                 return "BINARY";
 
-            case java.sql.Types.BIT :
+            case Types.SQL_BIT :
                 return "BIT";
 
-            case java.sql.Types.BLOB :
+            case Types.SQL_BLOB :
                 return "BLOB";
 
             //case JDBC3_BOOLEAN :
             //    return "BOOLEAN";
 
-            case java.sql.Types.CHAR :
+            case Types.SQL_CHAR :
                 return "CHAR";
 
-            case java.sql.Types.CLOB :
+            case Types.SQL_CLOB :
                 return "CLOB";
 
             //case JDBC3_DATALINK :
             //    return "DATALINK";
 
-            case java.sql.Types.DATE :
+            case Types.SQL_DATE :
                 return "DATE";
 
-            case java.sql.Types.DECIMAL :
+            case Types.SQL_DECIMAL :
                 return "DECIMAL";
 
-            case java.sql.Types.DISTINCT :
-                return "DISTINCT";
-
-            case java.sql.Types.DOUBLE :
+            case Types.SQL_DOUBLE :
                 return "DOUBLE";
 
-            case java.sql.Types.FLOAT :
+            case Types.SQL_FLOAT :
                 return "FLOAT";
 
-            case java.sql.Types.INTEGER :
+            case Types.SQL_INTEGER :
                 return "INTEGER";
 
-            case java.sql.Types.JAVA_OBJECT :
-                return "JAVA_OBJECT";
-
-            case java.sql.Types.LONGVARBINARY :
+            case Types.SQL_LONGVARBINARY :
                 return "LONGVARBINARY";
 
-            case java.sql.Types.LONGVARCHAR :
+            case Types.LONGVARCHAR :
                 return "LONGVARCHAR";
 
-            case java.sql.Types.NULL :
+            case Types.NULL :
                 return "NULL";
 
-            case java.sql.Types.NUMERIC :
+            case Types.SQL_NUMERIC :
                 return "NUMERIC";
 
-            case java.sql.Types.OTHER :
-                return "OTHER";
-
-            case java.sql.Types.REAL :
+            case Types.SQL_REAL :
                 return "REAL";
 
-            case java.sql.Types.REF :
+            case Types.SQL_REF :
                 return "REF";
 
-            case java.sql.Types.SMALLINT :
+            case Types.SQL_SMALLINT :
                 return "SMALLINT";
 
-            case java.sql.Types.STRUCT :
-                return "STRUCT";
-
-            case java.sql.Types.TIME :
+            case Types.SQL_TIME :
                 return "TIME";
 
-            case java.sql.Types.TIMESTAMP :
+            case Types.SQL_TIMESTAMP :
                 return "TIMESTAMP";
 
-            case java.sql.Types.TINYINT :
+            case Types.TINYINT :
                 return "TINYINT";
 
-            case java.sql.Types.VARBINARY :
+            case Types.SQL_VARBINARY :
                 return "VARBINARY";
 
-            case java.sql.Types.VARCHAR :
+            case Types.SQL_VARCHAR :
                 return "VARCHAR";
 
-            case org.hsqldb_voltpatches.types.Types.SQL_TIME_WITH_TIME_ZONE :
+            case Types.SQL_TIME_WITH_TIME_ZONE :
                 return "SQL_TIME_WITH_TIME_ZONE";
 
-            case org.hsqldb_voltpatches.types.Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
+            case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
                 return "SQL_TIMESTAMP_WITH_TIME_ZONE";
         }
 
         return "Unknown type " + typeCode;
     }
-
+*/
     /**********************************************************************/
 }

@@ -5748,16 +5748,21 @@ public class ParserDQL extends ParserBase {
 
         if (!isOpenBracket) {
             if (parseList[0] == Tokens.X_OPTION) {
-            // A VoltDB extension to avoid using exceptions for flow control.
-            return new ExpressionOrException(function);
-            /* disable 1 line ...
+                // A VoltDB extension to avoid using exceptions for flow control.
+                return new ExpressionOrException(function);
+                /* disable 1 line ...
                 return function;
-            ... disabled 1 line */
-            // End of VoltDB extension
+                ... disabled 1 line */
+                // End of VoltDB extension
             } else {
                 rewind(position);
 
+                // A VoltDB extension to avoid using exceptions for flow control.
+                return new ExpressionOrException((Expression)null);
+                /* disable 1 line ...
                 return null;
+                ... disabled 1 line */
+                // End of VoltDB extension
             }
         }
 

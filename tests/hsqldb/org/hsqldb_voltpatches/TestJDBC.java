@@ -35,7 +35,7 @@ import junit.framework.TestCase;
 
 public class TestJDBC extends TestCase {
 
-    /*public void testSimpleStuff() {
+    public void testSimpleStuff() {
         String ddl = "create table test (cash integer default 23);";
         String dml = "insert into test values (123);";
         String query = "select * from test;";
@@ -45,7 +45,7 @@ public class TestJDBC extends TestCase {
         try {
             Class.forName("org.hsqldb_voltpatches.jdbcDriver" );
 
-            dbconn = DriverManager.getConnection("jdbc:hsqldb:mem:x1", "sa", "");
+            dbconn = DriverManager.getConnection("jdbc:hsqldb_voltpatches:mem:x1", "sa", "");
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
 
@@ -81,7 +81,7 @@ public class TestJDBC extends TestCase {
             e.printStackTrace();
             assertTrue(false);
         }
-    }*/
+    }
 
     public void testVarbinary() {
         String ddl = "create table testvb (cash integer default 23, b varbinary(1024) default NULL);";
@@ -93,7 +93,7 @@ public class TestJDBC extends TestCase {
         try {
             Class.forName("org.hsqldb_voltpatches.jdbcDriver" );
 
-            dbconn = DriverManager.getConnection("jdbc:hsqldb:mem:x1", "sa", "");
+            dbconn = DriverManager.getConnection("jdbc:hsqldb_voltpatches:mem:x1", "sa", "");
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
 
@@ -141,7 +141,7 @@ public class TestJDBC extends TestCase {
         try {
             Class.forName("org.hsqldb_voltpatches.jdbcDriver" );
 
-            dbconn = DriverManager.getConnection("jdbc:hsqldb:mem:x1", "sa", "");
+            dbconn = DriverManager.getConnection("jdbc:hsqldb_voltpatches:mem:x1", "sa", "");
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
 
@@ -199,7 +199,7 @@ public class TestJDBC extends TestCase {
         try {
             Class.forName("org.hsqldb_voltpatches.jdbcDriver" );
 
-            dbconn = DriverManager.getConnection("jdbc:hsqldb:mem:x1", "sa", "");
+            dbconn = DriverManager.getConnection("jdbc:hsqldb_voltpatches:mem:x1", "sa", "");
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
 
