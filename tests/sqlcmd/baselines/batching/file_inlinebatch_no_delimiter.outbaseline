@@ -1,6 +1,8 @@
+
 drop table t if exists;
+Command succeeded.
+
 drop table s if exists;
+Command succeeded.
 
-file -inlinebatch EOF
-create table t (i integer);
-
+FILE -inlinebatch EOF

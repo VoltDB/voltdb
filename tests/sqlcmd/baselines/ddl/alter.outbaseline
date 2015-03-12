@@ -1,4 +1,7 @@
+
 drop table addable if exists;
+Command succeeded.
+
 create table addable (
  stable integer,
  altkey integer,
@@ -6,10 +9,17 @@ create table addable (
  nevernullable integer,
  alterable integer,
  );
+Command succeeded.
 
 select * from addable;
+STABLE  ALTKEY  DEFAULTABLE  NEVERNULLABLE  ALTERABLE 
+------- ------- ------------ -------------- ----------
+
+(Returned 0 rows in #.##s)
 
 drop table dropable if exists;
+Command succeeded.
+
 create table dropable (
  limit partition rows 1,
  stable integer,
@@ -20,53 +30,72 @@ create table dropable (
  defaulted integer default -1,
  nevernull integer not null,
 );
+Command succeeded.
 
 select * from dropable;
-
-FILE scripts/ddl/alter.sqlfile
-
-select * from addable;
-
-select * from dropable;
-
-drop table addable;
-
-drop table dropable;
-
-Command succeeded.
-Command succeeded.
-STABLE  ALTKEY  DEFAULTABLE  NEVERNULLABLE  ALTERABLE 
-------- ------- ------------ -------------- ----------
-
-(Returned 0 rows in #.##s)
-Command succeeded.
-Command succeeded.
 STABLE  ALTKEY  EXPENDABLE  DEFAULTED  NEVERNULL 
 ------- ------- ----------- ---------- ----------
 
 (Returned 0 rows in #.##s)
+
+FILE scripts/ddl/alter.sqlfile
+
+alter table dropable alter column defaulted set default null;
 Command succeeded.
+
+alter table dropable alter column nevernull set null;
 Command succeeded.
+
+alter table dropable drop column expendable;
 Command succeeded.
+
+alter table dropable drop constraint altuniq;
 Command succeeded.
+
+alter table dropable drop primary key;
 Command succeeded.
+
+alter table dropable drop limit partition rows;
 Command succeeded.
+
+alter table addable alter column defaultable SET default -1;
 Command succeeded.
+
+alter table addable alter column nevernullable SET not null;
 Command succeeded.
+
+alter table addable add primary key ( stable );
 Command succeeded.
+
+alter table addable add unique ( altkey );
 Command succeeded.
+
+alter table addable add limit partition rows 1;
 Command succeeded.
+
+alter table addable add column added integer;
 Command succeeded.
+
+alter table addable alter alterable bigint default -2;
 Command succeeded.
+
+alter table addable add constraint aa unique( added, alterable );
 Command succeeded.
+
+select * from addable;
 STABLE  ALTKEY  DEFAULTABLE  NEVERNULLABLE  ALTERABLE  ADDED 
 ------- ------- ------------ -------------- ---------- ------
 
 (Returned 0 rows in #.##s)
+
+select * from dropable;
 STABLE  ALTKEY  DEFAULTED  NEVERNULL 
 ------- ------- ---------- ----------
 
 (Returned 0 rows in #.##s)
-Command succeeded.
+
+drop table addable;
 Command succeeded.
 
+drop table dropable;
+Command succeeded.
