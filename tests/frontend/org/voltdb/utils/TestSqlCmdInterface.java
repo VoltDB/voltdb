@@ -506,16 +506,6 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 1, ID);
     }
 
-    private static String trimKeyWordsLeadingSpaces(String str) {
-        str = str.toLowerCase();
-        for(String keyWord :  firstKeyQryWord) {
-            String raw = "\\s+" + keyWord;
-            String cleaned = " " + keyWord;
-            str = str.replaceAll(raw, cleaned);
-        }
-        return str.trim();
-    }
-
     private void assertThis(String qryStr, int numOfQry, int testID) {
         List<String> parsed = SQLParser.parseQuery(qryStr);
         String msg = "Test ID: " + testID + ". ";

@@ -76,6 +76,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         Client client = getClient();
         loadData(false);
         VoltTable vt;
+        String sql;
 
         for (String tb: tbs) {
             sql = "select ID, DEPT FROM (SELECT ID, DEPT FROM "+ tb +") T1 " +
@@ -167,9 +168,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
         Client client = getClient();
         loadData(false);
         VoltTable vt;
+        String sql;
 
         for (String tb: tbs) {
-            String sql;
             sql = "select newid, id  " +
                     "FROM (SELECT id, wage FROM R1) T1, (SELECT id as newid, dept FROM "+ tb +" where dept > 1) T2 " +
                     "WHERE T1.id = T2.dept ORDER BY newid";
@@ -209,6 +210,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         Client client = getClient();
         loadData(false);
         VoltTable vt;
+        String sql;
 
         sql = "select P1.ID, P1.WAGE FROM (SELECT ID, DEPT FROM R1) T1, P1 " +
                 "where T1.ID = P1.ID and T1.ID < 4 order by P1.ID;";
@@ -672,6 +674,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         Client client = getClient();
         loadData(false);
         VoltTable vt;
+        String sql;
 
         sql = "select T1.ID, T1.DEPT FROM (SELECT ID, DEPT FROM P1) T1, P2 " +
                 "where T1.ID = P2.DEPT order by T1.ID;";
