@@ -1039,9 +1039,6 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .loadExportConfig { margin: 0 0 0 29%;}
 .iconDeleteAddConfig {background-position:0px -1570px; width:20px; height:20px; float:left; position:relative; top:6px;}
 
-.exportList{ padding: 11px 5px 10px 23px!important;cursor: default!important; }
-h3.noExport { font-size: 14px;}
-
 /****Export details Ends*******/
 a.changePsd {color: #0079bb;}
 a:hover.changePsd { text-decoration: underline; }
