@@ -1135,7 +1135,7 @@ public class VoltCompiler {
                 if (colName != null) {
                     assert(tables.getIgnoreCase(tableName) != null);
                     if (table.getMaterializer() != null) {
-                        msg += "the materialized view is automatically partitioned based on source table. "
+                        msg += "the materialized view is automatically partitioned based on its source table. "
                                 + "Invalid PARTITION statement on view table " + tableName + ".";
                         throw new VoltCompilerException(msg);
                     }

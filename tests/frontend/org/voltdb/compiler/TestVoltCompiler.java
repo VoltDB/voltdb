@@ -2308,7 +2308,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
 
         String errorMsg = "In database, the materialized view is automatically "
-                + "partitioned based on source table. Invalid PARTITION statement on view table MY_VIEW.";
+                + "partitioned based on its source table. Invalid PARTITION statement on view table MY_VIEW.";
 
         ddl = "create table t(id integer not null, num integer not null);\n" +
                 "partition table t on column num;\n" +
@@ -2316,13 +2316,13 @@ public class TestVoltCompiler extends TestCase {
                 "partition table my_view on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        ddl = "create table t(id integer not null, num integer);\n" +
+        ddl = "create table t(id integer not null, num integer not null);\n" +
                 "partition table t on column num;" +
                 "create view my_view as select num, count(*) as ct from t group by num;" +
                 "partition table my_view on column ct;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        ddl = "create table t(id integer not null, num integer);\n" +
+        ddl = "create table t(id integer not null, num integer not null);\n" +
                 "create view my_view as select num, count(*) from t group by num;" +
                 "partition table my_view on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
