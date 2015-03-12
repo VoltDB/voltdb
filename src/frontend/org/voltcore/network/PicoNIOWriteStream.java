@@ -85,44 +85,36 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
     int drainTo (final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
         long rc = 0;
-        try {
-            do {
-                /*
-                 * Nothing to write
-                 */
-                if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
-                    break;
-                }
+        do {
+            /*
+             * Nothing to write
+             */
+            if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                break;
+            }
 
-                ByteBuffer buffer = null;
-                if (m_currentWriteBuffer == null) {
-                    m_currentWriteBuffer = m_queuedBuffers.poll();
-                    buffer = m_currentWriteBuffer.b();
-                    buffer.flip();
-                } else {
-                    buffer = m_currentWriteBuffer.b();
-                }
+            ByteBuffer buffer = null;
+            if (m_currentWriteBuffer == null) {
+                m_currentWriteBuffer = m_queuedBuffers.poll();
+                buffer = m_currentWriteBuffer.b();
+                buffer.flip();
+            } else {
+                buffer = m_currentWriteBuffer.b();
+            }
 
-                rc = channel.write(buffer);
-
-                //Discard the buffer back to a pool if no data remains
-                if (!buffer.hasRemaining()) {
-                    m_currentWriteBuffer.discard();
-                    m_currentWriteBuffer = null;
-                    m_messagesWritten++;
-                }
-                bytesWritten += rc;
-
-            } while (rc > 0);
-        } catch (IOException ex) {
-            if (m_currentWriteBuffer != null) {
-                networkLog.warn("Must have failed to write buffers. Possible cause flakey network.");
-                //if we are failing to write we end up with last buffer not discarded.
+            rc = channel.write(buffer);
+            if (networkLog.isTraceEnabled() && rc == 0 && buffer.hasRemaining()) {
+                networkLog.trace("Wrote 0 bytes and buffer is not empty.");
+            }
+            //Discard the buffer back to a pool if no data remains
+            if (!buffer.hasRemaining()) {
                 m_currentWriteBuffer.discard();
                 m_currentWriteBuffer = null;
+                m_messagesWritten++;
             }
-            throw ex;
-        }
+            bytesWritten += rc;
+
+        } while (rc > 0);
 
         m_bytesWritten += bytesWritten;
         return bytesWritten;
