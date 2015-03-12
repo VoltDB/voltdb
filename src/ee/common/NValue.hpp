@@ -1505,6 +1505,10 @@ private:
      */
     void inlineCopyObject(void *storage, int32_t maxLength, bool isInBytes) const {
         if (isNull()) {
+            // Always reset all the bits regardless of the actual length of the value
+            // 1 additional byte for the length prefix
+            ::memset(storage, 0, maxLength + 1);
+
             /*
              * The 7th bit of the length preceding value
              * is used to indicate that the object is null.
@@ -1515,6 +1519,10 @@ private:
             const int32_t objLength = getObjectLength_withoutNull();
             const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
             checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+
+            // Always reset all the bits regardless of the actual length of the value
+            // 1 additional byte for the length prefix
+            ::memset(storage, 0, maxLength + 1);
 
             if (m_sourceInlined)
             {
@@ -2813,6 +2821,9 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         // the NULL SQL string is a NULL C pointer
         if (isInlined) {
+            // Always reset the bits regardless of how long the actual value is.
+            ::memset(storage, 0, lengthLength + maxLength);
+
             setObjectLengthToLocation(length, storage);
             if (length == OBJECTLENGTH_NULL) {
                 break;

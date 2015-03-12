@@ -163,14 +163,14 @@ function loadAdminPage() {
     var adminValidationRules = {
         numericRules: {
             required: true,
-            min: 0,
+            min: 1,
             max: INT_MAX_VALUE,
             digits: true,
         },
         numericMessages: {
             required: "Please enter a valid positive number.",
-            min: "Please enter a valid positive number.",
-            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            min: "Please enter a positive number. Its minimum value should be 1.",
+            max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
 
@@ -199,7 +199,21 @@ function loadAdminPage() {
         },
         restoreSnapshotMessages: {
             required: "Please select a snapshot to restore."
-        }
+        },
+
+        queryTimeoutRules: {
+            required: true,
+            min: 0,
+            max: INT_MAX_VALUE,
+            digits: true,
+        },
+        queryTimeoutMessages: {
+            required: "Please enter a valid positive number.",
+            min: "Please enter a positive number.",
+            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            digits: "Please enter a positive number without any decimal."
+        },
+
     };
 
     //Admin Page download link
@@ -514,12 +528,12 @@ function loadAdminPage() {
             });
         }
     });
-    
+
 
     $("#loginWarnPopup").popup({
         afterOpen: function (event, ui, ele) {
             var popup = $(this)[0];
-           
+
             $("#btnLoginWarningOk").unbind("click");
             $("#btnLoginWarningOk").on('click', function () {
                 if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
@@ -563,9 +577,6 @@ function loadAdminPage() {
                     txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
-            
-            $("#saveSnapshotConfirm").hide();
-            $("#saveSnapshot").show();
         },
         afterOpen: function (event) {
             var popup = $(this)[0];
@@ -594,29 +605,14 @@ function loadAdminPage() {
                     return;
                 }
 
-                $("#saveSnapshot").hide();
-                $("#saveSnapshotConfirm").show();
-            });
-
-            $("#btnSaveSnapshotCancel").unbind("click");
-            $("#btnSaveSnapshotCancel").on("click", function () {
-                popup.close();
-            });
-            
-            $("#btnSaveSnapshotConfirmCancel").unbind("click");
-            $("#btnSaveSnapshotConfirmCancel").on("click", function () {
-                $("#saveSnapshotConfirm").hide();
-                $("#saveSnapshot").show();
-            });
-            
-            $("#btnSaveSnapshotOk").unbind("click");
-            $("#btnSaveSnapshotOk").on("click", function (e) {
                 var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
                     if (success) {
                         if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
-                            showUpdateMessage('Snapshot queued successfully.');
+                            $('#saveSnapshotStatus').html('Snapshot queued successfully');
+                            $('#saveSnapshotMessage').html('To verify snapshot completion, please check the server logs.');
+                            $('#btnSaveSnapshotPopup').click();
                         } else {
                             $('#saveSnapshotStatus').html('Failed to save snapshot');
                             $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
@@ -627,6 +623,11 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
+                popup.close();
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -973,6 +974,10 @@ function loadAdminPage() {
             adminEditObjects.tBoxFilePrefix.hide();
             adminDOMObjects.retainedLabel.hide();
 
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
+
             adminEditObjects.loadingSnapshot.show();
             adminEditObjects.loadingSnapshotFrequency.show();
             adminEditObjects.loadingSnapshotPrefix.show();
@@ -1003,6 +1008,9 @@ function loadAdminPage() {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
             adminEditObjects.LinkAutoSnapshotEdit.show();
             adminEditObjects.iconAutoSnapshotOption.show();
             adminDOMObjects.autoSnapshotLabel.show();
@@ -1085,6 +1093,14 @@ function loadAdminPage() {
         },
         messages: {
             txtRetained: adminValidationRules.numericMessages
+        }
+    });
+    $("#formQueryTimeout").validate({
+        rules: {
+            txtQueryTimeout: adminValidationRules.queryTimeoutRules
+        },
+        messages: {
+            txtQueryTimeout: adminValidationRules.queryTimeoutMessages
         }
     });
 
@@ -1326,6 +1342,7 @@ function loadAdminPage() {
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
             adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.errorQueryTimeout.hide();
 
             adminEditObjects.loadingQueryTimeout.show();
         }
@@ -1342,6 +1359,7 @@ function loadAdminPage() {
             adminEditObjects.loadingQueryTimeout.hide();
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.errorQueryTimeout.hide();
             adminEditObjects.LinkQueryTimeoutEdit.show();
 
             adminEditObjects.tBoxQueryTimeout.hide();
@@ -1577,7 +1595,7 @@ function loadAdminPage() {
         this.escapeHtml = function (value) {
             if (!value)
                 return "";
-            
+
             return $('<div/>').text(value).html();
         };
 
@@ -1639,10 +1657,10 @@ function loadAdminPage() {
         };
 
         var getExportProperties = function (data) {
-            
+
             var result = "";
             if (data != undefined) {
-                
+
                 for (var i = 0; i < data.length; i++) {
                     var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
                     var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
@@ -1651,13 +1669,13 @@ function loadAdminPage() {
                     var rowId = 'row-4' + i;
                     var style = '';
                     var additionalCss = (VoltDbAdminConfig.toggleStates[rowId] === true) ? 'labelExpanded' : '';
-                    
+
                     if (!VoltDbAdminConfig.toggleStates.hasOwnProperty(rowId) || VoltDbAdminConfig.toggleStates[rowId] === false) {
                         VoltDbAdminConfig.toggleStates[rowId] = false;
                         style = 'style = "display:none;"';
                     }
 
-                    result +='<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
+                    result += '<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
                             '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
                             '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + type + '</a>' +
                             '   </td>' +
