@@ -978,8 +978,6 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .adminTbl1 tr.subLabelRow td.expoStream { padding-left: 40px;font-weight: bold;cursor: pointer;}
 .expoProper {padding-left: 70px!important; font-weight: bold;}
 
-.exportList{ padding: 11px 5px 10px 23px!important;cursor: default!important; }
-h3.noExport { font-size: 14px;}
 /****Export details Ends*******/
 
 /*********************************************media Qu********************/

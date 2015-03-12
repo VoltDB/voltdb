@@ -188,22 +188,6 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
         }
     };
 
-    var populateExportData = function (tables) {
-        var count = 0;
-        var src = "";
-        for (var k in tables) {
-            tablesArray.push(k);
-            src += '<h3 class="ui-accordion-header exportList">' + k + '</h3>';
-            count++;
-        }
-        if (src == "") {
-            src += '<h3 class ="noExport">No data found.</h3>';
-            $('#accordionExports').html(src);
-        } else {
-            $('#accordionExports').html(src);
-        }
-    };
-
     var populateViewData = function (views) {
         var count = 0;
         var src = "";
@@ -365,13 +349,11 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
     };
 
     var populateTablesAndViews = function () {
-        voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData, exportData) {
+        voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData,sysProcedureData) {
             var tables = tablesData['tables'];
             populateTableData(tables);
             var views = viewsData['views'];
             populateViewData(views);
-            var exports = exportData['exports'];
-            populateExportData(exports);
             var procedures = proceduresData['procedures'];
             var procedureColumns = procedureColumnsData['procedureColumns'];
             var sysProcedure = sysProcedureData['sysProcedures'];
