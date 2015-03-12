@@ -813,45 +813,58 @@ class AdminTest extends TestBase {
     def "click security button"(){
         when:
         at AdminPage
-        waitFor(30) { overview.securityEdit.isDisplayed() }
+        page.securityEdit.isDisplayed()
         then:
-        overview.securityEdit.click()
+        waitFor(10){
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
+        }
     }
 
     def "click security edit button and cancel"(){
         when:
         at AdminPage
-        waitFor(10) {
-            overview.securityEdit.isDisplayed()
-        }
+        waitFor(10) { page.securityEdit.isDisplayed() }
         then:
-        overview.securityEdit.click()
-        waitFor(30) { overview.securityEditOk.isDisplayed() }
-        overview.securityEditOk.click()
-        overview.securityPopupCancel.click()
+        waitFor(10) {
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
+        }
+        waitFor(10) {
+            page.securityEditCancel.click()
+            !page.securityEditOk.isDisplayed()
+            !page.securityEditCancel.isDisplayed()
+        }
     }
 
     def "click security edit button and ok"(){
         when:
         at AdminPage
-        waitFor(10) {
-            overview.securityEdit.isDisplayed()
-        }
+        waitFor(10) { page.securityEdit.isDisplayed() }
         then:
-        overview.securityEdit.click()
-        waitFor(30) { overview.securityEditOk.isDisplayed() }
-        overview.securityEditOk.click()
-        overview.securityPopupOk.click()
-    }
+        waitFor(10) {
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
+        }
+        page.securityEditOk.click()
+        waitFor(10) {
+            page.securityPopup.isDisplayed()
+            page.securityPopupOk.isDisplayed()
+            page.securityPopupCancel.isDisplayed()
+        }
 
+    }
     // --Auto snapshot
 
     def "check Auto Snapshots edit"() {
         when:
         at AdminPage
         then:
-        waitFor(10){ overview.autoSnapshotsEdit.isDisplayed() }
-        String string = overview.autoSnapshotsEdit.text()
+        waitFor(10){ page.autoSnapshotsEdit.isDisplayed() }
+        String string = page.autoSnapshotsEdit.text()
         !(string.equals(""))
     }
 
@@ -860,15 +873,15 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(10) {
-            overview.autoSnapshotsEdit.isDisplayed()
+            page.autoSnapshotsEdit.isDisplayed()
         }
-        overview.autoSnapshotsEdit.click()
-		
-		waitFor(30) {
-		    overview.autoSnapshotsEditCheckbox.isDisplayed()
-		    overview.autoSnapshotsEditOk.isDisplayed()
-		    overview.autoSnapshotsEditCancel.isDisplayed()
-		}
+        page.autoSnapshotsEdit.click()
+
+        waitFor(30) {
+            page.autoSnapshotsEditCheckbox.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
+        }
     }
 
     def "click Auto Snapshot edit and click cancel"() {
@@ -876,24 +889,24 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(10) {
-            overview.autoSnapshotsEdit.isDisplayed()
+            page.autoSnapshotsEdit.isDisplayed()
         }
 
         when:
-        overview.autoSnapshotsEdit.click()
+        page.autoSnapshotsEdit.click()
         then:
-		waitFor(30) {
-		    overview.autoSnapshotsEditOk.isDisplayed()
-		    overview.autoSnapshotsEditCancel.isDisplayed()
-		}
+        waitFor(30) {
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
+        }
 
         when:
-        overview.autoSnapshotsEditCancel.click()
+        page.autoSnapshotsEditCancel.click()
         then:
-		waitFor(30) {
-		    !(overview.autoSnapshotsEditCancel.isDisplayed())
-		    !(overview.autoSnapshotsEditOk.isDisplayed())
-		}
+        waitFor(30) {
+            !(page.autoSnapshotsEditCancel.isDisplayed())
+            !(page.autoSnapshotsEditOk.isDisplayed())
+        }
     }
 
     def "click Auto Snapshots edit and click checkbox to change on off"() {
@@ -901,23 +914,23 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(10) {
-            overview.autoSnapshotsEdit.isDisplayed()
+            page.autoSnapshotsEdit.isDisplayed()
         }
 
         when:
-        overview.autoSnapshotsEdit.click()
-        String string = overview.autoSnapshotsValue.text()
+        page.autoSnapshotsEdit.click()
+        String string = page.autoSnapshotsValue.text()
         then:
         waitFor(10){
-            overview.autoSnapshotsEditCheckbox.isDisplayed()
-            overview.autoSnapshotsEditOk.isDisplayed()
-            overview.autoSnapshotsEditCancel.isDisplayed()
+            page.autoSnapshotsEditCheckbox.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
         }
 
         when:
-        overview.autoSnapshotsEditCheckbox1.click()
+        page.autoSnapshotsEditCheckbox1.click()
         then:
-        String stringChange = overview.autoSnapshotsValue.text()
+        String stringChange = page.autoSnapshotsValue.text()
 
         if ( string.toLowerCase() == "on" ) {
             assert stringChange.toLowerCase().equals("off")
@@ -929,61 +942,6 @@ class AdminTest extends TestBase {
         }
     }
 
-    def "click edit and ok to check popup"() {
-        String prefix 			= "SNAPSHOTNONCE"
-        String frequency 		= "10"
-        String frequencyUnit	= "Hrs"
-        String retained 		= "1"
-
-        String title			= "Auto Snapshots"
-        String display			= "Do you want to save the value?"
-        String ok				= "Ok"
-        String cancel			= "Cancel"
-
-        when:
-        at AdminPage
-        then:
-        waitFor(10) {
-            overview.autoSnapshotsEdit.isDisplayed()
-        }
-
-        when:
-        overview.autoSnapshotsEdit.click()
-        String string = overview.autoSnapshotsValue.text()
-        then:
-        waitFor(10) {
-            overview.autoSnapshotsEditCheckbox.isDisplayed()
-            overview.autoSnapshotsEditOk.isDisplayed()
-            overview.autoSnapshotsEditCancel.isDisplayed()
-        }
-        overview.filePrefixField.value(prefix)
-        overview.frequencyField.value(frequency)
-        overview.frequencyUnitField.click()
-        overview.frequencyUnitField.value(frequencyUnit)
-        overview.retainedField.value(retained)
-        assert withConfirm(true) { overview.autoSnapshotsEditOk.click() } == "Do you want to save the value?"
-        when:
-        overview.filePrefixField.value(prefix)
-        overview.frequencyField.value(frequency)
-        overview.frequencyUnitField.click()
-        overview.frequencyUnitField.value(frequencyUnit)
-        overview.retainedField.value(retained)
-        overview.autoSnapshotsEditOk.click()
-        then:
-        waitFor(10) {
-            overview.autoSnapshotsPopup.isDisplayed()
-            overview.autoSnapshotsPopupTitle.isDisplayed()
-            overview.autoSnapshotsPopupDisplay.isDisplayed()
-            overview.autoSnapshotsPopupClose.isDisplayed()
-            overview.autoSnapshotsPopupOk.isDisplayed()
-            overview.autoSnapshotsPopupCancel.isDisplayed()
-        }
-        overview.autoSnapshotsPopupTitle.text().equals(title)
-        overview.autoSnapshotsPopupDisplay.text().equals(display)
-        overview.autoSnapshotsPopupOk.text().equals(ok)
-        overview.autoSnapshotsPopupCancel.text().equals(cancel)
-
-    }
-
+    //
 
 }

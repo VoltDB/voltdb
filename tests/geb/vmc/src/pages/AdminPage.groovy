@@ -76,7 +76,71 @@ class AdminPage extends VoltDBManagementCenterPage {
         clustertransactionsecondmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
         clustertransactionminutesmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        
+
+
+        // Network interfaces
+        title1				{ $(text:"Overview") }
+        sitePerHost			{ $(class:"configLabel", text:"Sites Per Host") }
+        ksafety				{ $(class:"configLabel", text:"K-Safety") }
+        partitionDetection	{ $(class:"configLabel", text:"Partition Detection") }
+        security			{ $(class:"labelCollapsed", text:"Security") }
+        httpAccess			{ $(class:"labelCollapsed", text:"HTTP Access") }
+        autoSnapshots		{ $(class:"labelCollapsed", text:"Auto Snapshots") }
+        commandLogging		{ $(class:"labelCollapsed", text:"Command Logging") }
+        export				{ $(class:"labelCollapsed", text:"Export") }
+        advanced			{ $(class:"labelCollapsed", text:"Advanced") }
+
+
+        sitePerHostValue			{ $("#sitePerHost") }
+        ksafetyValue				{ $("#kSafety") }
+        partitionDetectionValue		{ $("#partitionDetectionLabel") }
+        securityValue				{ $("#spanSecurity") }
+        httpAccessValue				{ $("#httpAccessLabel") }
+        autoSnapshotsValue			{ $("#txtAutoSnapshot") }
+        commandLoggingValue			{ $("#commandLogLabel") }
+
+
+        securityEdit				{ $("#securityEdit") }
+        securityEditCheckbox		{ $(class:"iCheck-helper") }
+        securityEditOk				{ $("#btnEditSecurityOk") }
+        securityEditCancel			{ $("#btnEditSecurityCancel") }
+
+        autoSnapshotsEdit			{ $("#autoSnapshotEdit") }
+        autoSnapshotsEditCheckbox1 	{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td#autoSnapshotOption.snapshottd div.icheckbox_square-aero.customCheckbox ins.iCheck-helper") }
+        autoSnapshotsEditCheckbox 	{ $(class:"icheckbox_square-aero customCheckbox") }
+
+        autoSnapshotsEditOk 		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotOk.editOk") }
+        autoSnapshotsEditCancel 	{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotCancel.editCancel") }
+
+
+        filePrefixField             { $(id:"txtPrefix") }
+        frequencyField              { $(id:"txtFrequency") }
+        frequencyUnitField          { $(id:"ddlfrequencyUnit") }
+        retainedField               { $(id:"txtRetained") }
+
+        filePrefix                  { $(id:"prefixSpan") }
+        frequency                   { $(id:"frequencySpan") }
+        frequencyUnit               { $(id:"spanFrequencyUnit") }
+        retained                    { $(id:"retainedSpan") }
+
+        hour                        { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#snapshotFrequencyRow.child-row-2.subLabelRow td.tdSnapshotFrequency form#frmSnapshotFrequency select#ddlfrequencyUnit.valid option") }
+        minute                      { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#snapshotFrequencyRow.child-row-2.subLabelRow td.tdSnapshotFrequency form#frmSnapshotFrequency select#ddlfrequencyUnit.valid option") }
+        second                      { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#snapshotFrequencyRow.child-row-2.subLabelRow td.tdSnapshotFrequency form#frmSnapshotFrequency select#ddlfrequencyUnit.valid option") }
+
+        // SECURITY POPUP
+        securityPopup				{ $(class:"popup_content14") }
+        securityPopupOk             { $("#btnSecurityOk") }
+        securityPopupCancel         { $("#btnPopupSecurityCancel") }
+
+        // AUTO SNAPSHOTS EDIT POPUP
+
+        autoSnapshotsPopup			{ $("html body div.popup_cont div.popup div.popup_content") }
+        autoSnapshotsPopupTitle		{ $("html body div.popup_cont div.popup div.popup_content div.overlay-title.icon-alert") }
+        autoSnapshotsPopupDisplay	{ $("html body div.popup_cont div.popup div.popup_content div.overlay-content.confirmationHeight p.txt-bold") }
+        autoSnapshotsPopupClose		{ $("html body div.popup_cont div.popup_close") }
+        autoSnapshotsPopupOk		{ $(id:"btnSaveSnapshot", text:"Ok") }
+        autoSnapshotsPopupCancel	{ $("html body div.popup_cont div.popup div.popup_content div.overlay-btns a#btnPopupAutoSnapshotCancel.btn.btn-gray") }
+
     }
     static at = {
         adminTab.displayed
