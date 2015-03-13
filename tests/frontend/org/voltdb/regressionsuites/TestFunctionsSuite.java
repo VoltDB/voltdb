@@ -2698,21 +2698,13 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "WHEN num >=5 THEN num * 10  ELSE num END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.BIGINT, vt.getColumnType(1));
-        if (isHSQL()) {
-            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 50}});
-        } else {
-            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, 50}});
-        }
+        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, 50}});
 
         sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
                 "WHEN num >=5 THEN NULL  ELSE num END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        if (isHSQL()) {
-            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 0}});
-        } else {
-            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, Long.MIN_VALUE}});
-        }
+        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, Long.MIN_VALUE}});
 
         // Expected failed type cases:
         try {
@@ -2803,32 +2795,20 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "WHEN num >=5 THEN num END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        if (isHSQL()) {
-            validateTableOfLongs(vt, new long[][] {{1, 0},{2,5}, {3, 8}});
-        } else {
-            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,5}, {3, 8}});
-        }
+        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,5}, {3, 8}});
 
         sql = "SELECT ID, CASE WHEN num > 3 AND num < 5 THEN 4 " +
                 "WHEN num >=5 THEN num*10 END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.BIGINT, vt.getColumnType(1));
-        if (isHSQL()) {
-            validateTableOfLongs(vt, new long[][] {{1, 0},{2,50}, {3, 80}});
-        } else {
-            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,50}, {3, 80}});
-        }
+        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,50}, {3, 80}});
 
         // Test NULL
         cl.callProcedure("R1.insert", 4, "DB2",  null, null, new Timestamp(1000000000000L));
         sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        if (isHSQL()) {
-            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, 0}});
-        } else {
-            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, Long.MIN_VALUE}});
-        }
+        validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, Long.MIN_VALUE}});
 
     }
 
@@ -2846,20 +2826,12 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // No ELSE clause
         sql = "SELECT ID, CASE num WHEN 1 THEN 10 WHEN 2 THEN 1 END FROM R1 ORDER BY 1;";
-        if (isHSQL()) {
-            validateTableOfLongs(cl, sql, new long[][] {{1, 10},{2, 0}});
-        } else {
-            validateTableOfLongs(cl, sql, new long[][] {{1, 10},{2, Long.MIN_VALUE}});
-        }
+        validateTableOfLongs(cl, sql, new long[][] {{1, 10},{2, Long.MIN_VALUE}});
 
         // Test NULL
         cl.callProcedure("R1.insert", 3, "Oracle",  null, null, new Timestamp(1000000000000L));
         sql = "SELECT ID, CASE num WHEN 5 THEN 50 ELSE num + 10 END FROM R1 ORDER BY 1;";
-        if (isHSQL()) {
-            validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, 0}});
-        } else {
-            validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}});
-        }
+        validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}});
     }
 
     private static StringBuilder joinStringArray(String[] params, String sep) {
