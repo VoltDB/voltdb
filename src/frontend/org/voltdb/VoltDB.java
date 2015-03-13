@@ -35,6 +35,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -50,7 +51,7 @@ public class VoltDB {
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_ZK_PORT = 7181;
     public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
@@ -154,7 +155,7 @@ public class VoltDB {
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
-        public int m_httpPort = Integer.MAX_VALUE;
+        public int m_httpPort = Constants.HTTP_PORT_DISABLED;
         public String m_httpPortInterface = "";
 
         public String m_publicInterface = "";

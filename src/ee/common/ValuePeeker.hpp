@@ -124,7 +124,7 @@ public:
     }
 
     static inline int64_t peekAsRawInt64(const NValue value) {
-        return value.castAsRawInt64AndGetValue();
+        return value.castAsBigIntAndGetValue();
     }
 };
 }

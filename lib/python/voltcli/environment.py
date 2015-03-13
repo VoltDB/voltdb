@@ -101,7 +101,9 @@ if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
 
 # Set common options now.
 java_opts.append('-server')
-java_opts.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600')
+java_opts.append('-Djava.awt.headless=true')
+java_opts.append('-Dsun.net.inetaddr.ttl=300')
+java_opts.append('-Dsun.net.inetaddr.negative.ttl=3600')
 java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
 java_opts.append('-XX:HeapDumpPath=/tmp')
 java_opts.append('-XX:+UseParNewGC')

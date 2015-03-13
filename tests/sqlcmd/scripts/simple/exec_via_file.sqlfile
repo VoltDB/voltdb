@@ -1,0 +1,21 @@
+drop table t if exists;
+create table t ( c integer, d varchar(4) );
+exec T.insert 1,'a';
+execute T.insert 2 ab;
+exec T.insert 3,'abc';
+execute T.insert,4,'abcd';
+
+-- extra whitespace
+ exec T.insert 11, 'a' ;
+  execute T.insert 12 ab;
+exec    T.insert 13 , 'abc' ;
+execute  T.insert  ,  14  ,  'abcd';
+
+-- tabs for fun
+	exec T.insert 21, 'a' ;
+  execute T.insert	22	ab;
+exec	   T.insert 23	,	'abc'	;
+execute 		T.insert		,		24		,		'abcd';
+
+select * from t;
+drop table t;

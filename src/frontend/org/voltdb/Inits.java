@@ -44,6 +44,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -112,7 +113,7 @@ public class Inits {
 
     Inits(RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
-        m_config = rvdb.m_config;
+        m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
         if (m_config.m_startAction.doesRejoin()) {
@@ -455,9 +456,10 @@ public class Inits {
         }
 
         //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, int httpPort, boolean findAny, boolean mustListen) {
+        private void setupHttpServer(String httpInterface, int httpPortStart, boolean findAny, boolean mustListen) {
 
             boolean success = false;
+            int httpPort = httpPortStart;
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen);
@@ -474,12 +476,13 @@ public class Inits {
                 }
             }
             if (!success) {
-                m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
-                        + String.valueOf(httpPort - 1);
+                m_rvdb.m_httpPortExtraLogMessage = String.format(
+                        "HTTP service unable to bind to ports %d through %d",
+                        httpPortStart, httpPort - 1);
                 if (mustListen) {
                     System.exit(-1);
                 }
-                m_config.m_httpPort = -1;
+                m_config.m_httpPort = Constants.HTTP_PORT_DISABLED;
                 return;
             }
             m_config.m_httpPort = httpPort;
@@ -498,14 +501,14 @@ public class Inits {
                 }
             }
             // if set by cli use that.
-            if (m_config.m_httpPort != Integer.MAX_VALUE) {
+            if (m_config.m_httpPort != Constants.HTTP_PORT_DISABLED) {
                 setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
                 // if not set by the user, just find a free port
-            } else if (httpPort == 0) {
-                // if not set by the user, start at 8080
-                httpPort = 8080;
+            } else if (httpPort == Constants.HTTP_PORT_AUTO) {
+                // if not set scan for an open port starting with the default
+                httpPort = VoltDB.DEFAULT_HTTP_PORT;
                 setupHttpServer("", httpPort, true, false);
-            } else if (httpPort != -1) {
+            } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {
                     return;
                 }
@@ -556,10 +559,9 @@ public class Inits {
         @Override
         public void run() {
             int replicationPort = VoltDB.DEFAULT_DR_PORT;
-
-            if (m_deployment.getReplication() != null) {
+            if (m_deployment.getDr() != null) {
                 // set the replication port from the deployment file
-                replicationPort = m_deployment.getReplication().getPort();
+                replicationPort = m_deployment.getDr().getPort();
             }
 
             // allow command line override

@@ -124,7 +124,8 @@ public abstract class BaseInitiator implements Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          PartitionDRGateway drGateway)
+                          PartitionDRGateway drGateway,
+                          PartitionDRGateway mpDrGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -155,7 +156,8 @@ public abstract class BaseInitiator implements Initiator
                                        memStats,
                                        coreBindIds,
                                        taskLog,
-                                       drGateway);
+                                       drGateway,
+                                       mpDrGateway);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 

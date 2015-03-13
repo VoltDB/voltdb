@@ -175,7 +175,6 @@ public class HsqlBackend {
                 while (rs.next()) {
                     Object[] row = new Object[table.getColumnCount()];
                     for (int i = 0; i < table.getColumnCount(); i++) {
-                        // TODO(evanj): JDBC returns 0 instead of null. Put null into the row?
                         if (table.getColumnType(i) == VoltType.STRING)
                             row[i] = rs.getString(i + 1);
                         else if (table.getColumnType(i) == VoltType.TINYINT)
@@ -203,7 +202,12 @@ public class HsqlBackend {
                         } else {
                             throw new ExpectedProcedureException("Trying to read a (currently) unsupported type from a JDBC resultset.");
                         }
+                        if (rs.wasNull()) {
+                            // JDBC returns 0/0.0 instead of null. Put null into the row.
+                            row[i] = null;
+                        }
                     }
+
                     table.addRow(row);
                 }
                 stmt.close();
