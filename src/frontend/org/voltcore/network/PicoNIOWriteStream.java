@@ -103,7 +103,7 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
             }
 
             rc = channel.write(buffer);
- 
+
             //Discard the buffer back to a pool if no data remains
             if (!buffer.hasRemaining()) {
                 m_currentWriteBuffer.discard();
