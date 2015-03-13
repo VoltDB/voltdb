@@ -296,14 +296,15 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     # Accumulate the total number of Valid, Invalid, Mismatched & Total statements
     global total_statements
     def next_keyStats_column_value():
-        prefix = "<td align=right>"
+        prefix = "<td"
         suffix = "</td>"
         global keyStats_start_index
         start_index  = 0
         end_index    = 0
-        next_col_val = "-1"
+        next_col_val = "0"
         try:
             start_index  = success["keyStats"].index(prefix, keyStats_start_index) + len(prefix)
+            start_index  = success["keyStats"].index('>', start_index) + 1
             end_index    = success["keyStats"].index(suffix, start_index)
             next_col_val = success["keyStats"][start_index: end_index]
             keyStats_start_index = end_index + len(suffix)

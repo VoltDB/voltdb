@@ -221,7 +221,7 @@ public class SQLCommand
 
                 // EXIT command - exit immediately
                 if (SQLParser.isExitCommand(line)) {
-                    System.exit(m_exitCode);
+                    return;
                 }
 
                 // RECALL command
@@ -755,24 +755,32 @@ public class SQLCommand
             // LOAD CLASS <jar>?
             String loadPath = SQLParser.parseLoadClasses(statement);
             if (loadPath != null) {
-                printResponse(m_client.callProcedure("@UpdateClasses", loadPath, null));
+                File jarfile = new File(loadPath);
+                printDdlResponse(m_client.updateClasses(jarfile, null));
+                loadStoredProcedures(Procedures, Classlist);
+                return;
             }
 
             // REMOVE CLASS <class-selector>?
             String classSelector = SQLParser.parseRemoveClasses(statement);
             if (classSelector != null) {
-                printResponse(m_client.callProcedure("@UpdateClasses", null, classSelector));
+                printDdlResponse(m_client.updateClasses(null, classSelector));
+                loadStoredProcedures(Procedures, Classlist);
+                return;
             }
 
-            // All other commands get forwarded to @AdHoc
+            // DDL statements get forwarded to @AdHoc,
+            // but get special post-processing.
             if (SQLParser.queryIsDDL(statement)) {
                 // if the query is DDL, reload the stored procedures.
                 printDdlResponse(m_client.callProcedure("@AdHoc", statement));
                 loadStoredProcedures(Procedures, Classlist);
+                return;
             }
-            else {
-                printResponse(m_client.callProcedure("@AdHoc", statement));
-            }
+
+            // All other commands get forwarded to @AdHoc
+            printResponse(m_client.callProcedure("@AdHoc", statement));
+
         } catch (Exception exc) {
             stopOrContinue(exc);
         }
