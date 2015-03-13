@@ -31,26 +31,28 @@
 
 class Host(dict):
 
-    def __init__(self, id):
+    def __init__(self, id, abort_func):
         self.id = id
+        self.abort_func = abort_func
 
     # Provide pseudo-attributes for dictionary items with error checking
     def __getattr__(self, name):
         try:
             return self[name]
         except IndexError:
-            runner.abort('Attribute "%s" not present for host.' % name)
+            self.abort_func('Attribute "%s" not present for host.' % name)
 
 
 class Hosts(object):
 
-    def __init__(self):
+    def __init__(self, abort_func):
         self.hosts_by_id = {}
+        self.abort_func = abort_func
 
     def update(self, host_id_raw, prop_name_raw, value):
         host_id = int(host_id_raw)
         prop_name = prop_name_raw.lower()
-        self.hosts_by_id.setdefault(host_id, Host(host_id))[prop_name] = value
+        self.hosts_by_id.setdefault(host_id, Host(host_id, self.abort_func))[prop_name] = value
 
     def lookup(self, *host_names):
         """
@@ -90,7 +92,7 @@ def stop(runner):
                                 ['OVERVIEW'])
 
     # Convert @SystemInformation results to objects.
-    hosts = Hosts()
+    hosts = Hosts(runner.abort)
     for tuple in response.table(0).tuples():
         hosts.update(tuple[0], tuple[1], tuple[2])
 
