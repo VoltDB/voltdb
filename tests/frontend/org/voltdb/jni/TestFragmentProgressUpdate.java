@@ -302,51 +302,27 @@ public class TestFragmentProgressUpdate extends TestCase {
     }
 
     public void testProgressUpdateLogSqlStmt() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.SQL_STATEMENT);
-        }
+        verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.SQL_STATEMENT);
     }
 
     public void testProgressUpdateLogNoSqlStmt() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.NO_STATEMENT);
-        }
+        verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.NO_STATEMENT);
     }
 
     public void testProgressUpdateLogSqlStmtList() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.STATEMENT_LIST);
-        }
+        verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.STATEMENT_LIST);
     }
 
     public void testProgressUpdateLogSqlStmtRW() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.SQL_STATEMENT);
-        }
+        verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.SQL_STATEMENT);
     }
 
     public void testProgressUpdateLogNoSqlStmtRW() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.NO_STATEMENT);
-        }
+        verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.NO_STATEMENT);
     }
 
     public void testProgressUpdateLogSqlStmtListRW() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.STATEMENT_LIST);
-        }
+        verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.STATEMENT_LIST);
     }
 
     private enum SqlTextExpectation {
@@ -460,6 +436,9 @@ public class TestFragmentProgressUpdate extends TestCase {
         ExecutionEngine.setVoltLoggerForTest(mockedLogger);
 
         try (AutoEngineSettings aes = new AutoEngineSettings()) {
+            // Set the log duration to be short to ensure that a message will be logged
+            // for long-running queries
+            aes.setInitialLogDuration(1);
             aes.setTimeoutLatency(timeout);
 
             // NOTE: callers of this method specify something other than SQL_STATEMENT
@@ -560,16 +539,10 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Write query (negative)
         //
         procName = "item_big_del";
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50000, 0, procName, false);
-        }
+        verifyLongRunningQueries(50000, 0, procName, false);
         tearDown(); setUp();
 
-        try (AutoEngineSettings aes = new AutoEngineSettings()) {
-            aes.setInitialLogDuration(1);
-            verifyLongRunningQueries(50000, 100, procName, false);
-        }
+        verifyLongRunningQueries(50000, 100, procName, false);
         tearDown(); setUp();
     }
 
