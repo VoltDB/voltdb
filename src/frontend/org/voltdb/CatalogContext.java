@@ -115,7 +115,7 @@ public class CatalogContext {
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            this.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
+            this.catalogHash = m_jarfile.getSha1Hash();
         }
         else {
             throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
@@ -129,7 +129,7 @@ public class CatalogContext {
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
 
         this.deploymentBytes = deploymentBytes;
-        this.deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
+        this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
         m_memoizedDeployment = null;
 
         m_defaultProcs = new DefaultProcedureManager(database);
