@@ -481,8 +481,8 @@ function alertNodeClicked(obj) {
                     if (val["CLUSTERSTATE"] == "RUNNING" || val["CLUSTERSTATE"] == "PAUSED")
                         activeCount++;
 
-                    else if (val["CLUSTERSTATE"] == "JOINING")
-                        joiningCount++;
+                    //else if (val["CLUSTERSTATE"] == "JOINING")
+                    //    joiningCount++;
                 });
 
                 if (totalServerCount == 0) {
