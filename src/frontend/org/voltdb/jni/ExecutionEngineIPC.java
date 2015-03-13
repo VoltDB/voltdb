@@ -339,7 +339,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     int partitionId = getBytes(4).getInt();
                     int signatureLength = getBytes(4).getInt();
                     byte signatureBytes[] = new byte[signatureLength];
-                    System.out.println("Recieved: generation " + exportGeneration + " partitionid " + partitionId + " signatureLength " + signatureLength);
                     getBytes(signatureLength).get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
                     long uso = getBytes(8).getLong();
