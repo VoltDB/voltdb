@@ -2196,6 +2196,7 @@ function loadAdminPage() {
         this.registeredElements = [];
         this.servers = [];
         this.stoppedServer = "";
+        this.stoppedServers = [];
         this.runningServerIds = "";
         this.firstResponseReceived = false;
         this.adminPort = -1;
@@ -2209,10 +2210,10 @@ function loadAdminPage() {
             this.serverState = serverStateValue;
         };
 
-        this.stoppedServer = function (hostIdvalue, serverNameValue, serverStateValue) {
-            this.hostId = hostIdvalue;
-            this.serverName = serverNameValue;
-            this.serverState = serverStateValue;
+        this.stoppedServer = function (hostIdvalue, serverNameValue) {
+            this.HOSTID = hostIdvalue;
+            this.HOSTNAME = serverNameValue;
+            this.CLUSTERSTATE = "MISSING";
 
         };
 

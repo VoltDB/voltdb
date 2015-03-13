@@ -2144,8 +2144,9 @@ function alertNodeClicked(obj) {
             var currentServerColumnClass;
             var count = 0;
 
-            this.setServerDetails = function (hostId, serverInfo, clusterState,iteratorCount) {
+            this.setServerDetails = function (hostId, serverInfo,iteratorCount) {
                 var count = 0;
+                var stopperServerCount = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
                     && VoltDbAdminConfig.servers.length > 0) {
 
@@ -2153,8 +2154,15 @@ function alertNodeClicked(obj) {
                         {
                             if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
                                 serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
-                                //VoltDbAdminConfig.servers.push(serverDetails);
                                 VoltDbAdminConfig.servers[iteratorCount] = serverDetails;
+                               
+                                $.each(VoltDbAdminConfig.stoppedServers, function(key,val) {
+                                    if (val.HOSTNAME == value.serverName) {
+                                        //remove server from the stopped server list if server stopped while ago is already in running state
+                                        VoltDbAdminConfig.stoppedServers.splice(stopperServerCount, 1);
+                                    }
+                                    stopperServerCount++;
+                                });
 
                             }
                             else if (value.serverName == serverInfo['HOSTNAME']) {
@@ -2216,8 +2224,12 @@ function alertNodeClicked(obj) {
                 if (systemOverview != null || systemOverview != undefined) {
                     VoltDbAdminConfig.servers = [];
                     $.each(systemOverview, function (id, val) {
-                        setServerDetails(val.NODEID, val, val['CLUSTERSTATE'], count);
+                        setServerDetails(val.NODEID, val, count);
                         count++;
+                    });
+
+                    $.each(VoltDbAdminConfig.stoppedServers, function(id, val) {
+                        setServerDetails(val.HOSTID, val, count);
                     });
                 }
 
@@ -2264,9 +2276,10 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.stopServer = function (nodeId, onServerStopped) {
+        this.stopServer = function (nodeId,hostNameValue, onServerStopped) {
             VoltDBService.stopServerNode(nodeId, function (connection, status, statusString) {
                 if (status == 1) {
+                    VoltDbAdminConfig.stoppedServers[VoltDbAdminConfig.stoppedServers.length] = new VoltDbAdminConfig.stoppedServer(nodeId, hostNameValue);
                     onServerStopped(true, statusString);
                 } else {
                     onServerStopped(false, statusString);

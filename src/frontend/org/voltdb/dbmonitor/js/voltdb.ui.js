@@ -561,7 +561,7 @@ var loadPage = function (serverName, portid) {
                         
                         //API Request
                         try {
-                            voltDbRenderer.stopServer(hostId, function (success, statusString) {
+                            voltDbRenderer.stopServer(hostId,hostName, function (success, statusString) {
                                 if (success) {
                                     adminClusterObjects.ignoreServerListUpdateCount = 2;
                                     updateServers(hostId, hostName, "MISSING");
