@@ -17,19 +17,19 @@ import org.openqa.selenium.JavascriptExecutor
 class Header extends Module {
     static content = {
         banner                    { $("#headerMain") }
-        image                     { $("html body div.page-wrap div#wrapper div#headerMain.header div.headLeft div.logo img") }
+        image                     { $(class:"logo") }
         tabDBMonitor              { $("#navDbmonitor") }
         tabAdmin                  { $("#navAdmin") }
         tabSchema                 { $("#navSchema") }
         tabSQLQuery               { $("#navSqlQuery") }
-        username                  { $(class:"userN") }
-        logout                    { $("#logOut > div") }
+        username                  { $("#btnlogOut") }
+        logout                    { $(class:"user", title:"Log Out") }
         help                      { $("#showMyHelp") }
         popup                     { $(class:"popup_content10") }
         popupTitle                { $(class:"overlay-title helpIcon ", text:"Help") }
         popupClose                { $(class:"popup_close") }
         logoutPopup               { $(class:"popup_content2") }
-        logoutPopupTitle          { $("html body div.popup_cont.2 div.popup div.popup_content2 div.overlay-title img.imgError") }
+        logoutPopupTitle          { $(class:"overlay-contentError errorMsg") }
         logoutPopupOkButton       { $("#A1") }
         logoutPopupCancelButton   { $("#btnCancel") }
     }
