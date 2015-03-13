@@ -250,6 +250,18 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          */
         static final int kErrorCode_getQueuedExportBytes = 105;
 
+        ByteBuffer getBytes(int size) throws IOException {
+            ByteBuffer header = ByteBuffer.allocate(size);
+            while (header.hasRemaining()) {
+                final int read = m_socket.getChannel().read(header);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            header.flip();
+            return header;
+        }
+
         /**
          * Read a single byte indicating a return code. This method has evolved
          * to include providing dependency tables necessary for the completion of previous
@@ -323,42 +335,26 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
                 }
                 if (status == kErrorCode_pushExportBuffer) {
-                    ByteBuffer header = ByteBuffer.allocate(30);
-                    while (header.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(header);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    header.flip();
-
-                    long exportGeneration = header.getLong();
-                    int partitionId = header.getInt();
-                    int signatureLength = header.getInt();
+                    long exportGeneration = getBytes(8).getLong();
+                    int partitionId = getBytes(4).getInt();
+                    int signatureLength = getBytes(4).getInt();
                     byte signatureBytes[] = new byte[signatureLength];
-                    header.get(signatureBytes);
+                    System.out.println("Recieved: generation " + exportGeneration + " partitionid " + partitionId + " signatureLength " + signatureLength);
+                    getBytes(signatureLength).get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
-                    long uso = header.getLong();
-                    boolean sync = header.get() == 1 ? true : false;
-                    boolean isEndOfGeneration = header.get() == 1 ? true : false;
-                    int length = header.getInt();
-                    ByteBuffer exportBuffer = ByteBuffer.allocate(length);
-                    while (exportBuffer.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(exportBuffer);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    exportBuffer.flip();
+                    long uso = getBytes(8).getLong();
+                    boolean sync = getBytes(1).get() == 1 ? true : false;
+                    boolean isEndOfGeneration = getBytes(1).get() == 1 ? true : false;
+                    int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
                             exportGeneration,
                             partitionId,
                             signature,
                             uso,
                             0,
-                            length == 0 ? null : exportBuffer,
-                                    sync,
-                                    isEndOfGeneration);
+                            length == 0 ? null : getBytes(length),
+                            sync,
+                            isEndOfGeneration);
                     continue;
                 }
                 if (status == kErrorCode_getQueuedExportBytes) {

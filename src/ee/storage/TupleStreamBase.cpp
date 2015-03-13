@@ -280,6 +280,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     }
 
     m_currBlock = new StreamBlock(buffer, m_defaultCapacity, m_uso);
+    ::memset(m_currBlock->rawPtr(), 0, (m_defaultCapacity - 8));
 
     pushPendingBlocks();
 }
