@@ -18,7 +18,6 @@
 package org.voltcore.logging;
 
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
@@ -162,16 +161,6 @@ public class VoltLog4jLogger implements CoreVoltLogger {
             }
         }
         return logLevels;
-    }
-
-    @Override
-    public void addSimpleWriterAppender(StringWriter writer) {
-        m_logger.addAppender(new org.apache.log4j.WriterAppender(new org.apache.log4j.SimpleLayout(), writer));
-    }
-
-    @Override
-    public void setLevel(Level level) {
-        m_logger.setLevel(getPriorityForLevel(level));
     }
 
     /**
