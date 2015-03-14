@@ -671,13 +671,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param spHandle                 The spHandle of the current transaction
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
+     * @param undoToken                For undo
      * @throws EEException
      */
     public abstract void applyBinaryLog(ByteBuffer log,
                                         long txnId,
                                         long spHandle,
                                         long lastCommittedSpHandle,
-                                        long uniqueId) throws EEException;
+                                        long uniqueId,
+                                        long undoToken) throws EEException;
 
     /**
      * Execute an arbitrary non-transactional task that is described by the task id and
@@ -941,7 +943,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                               long txnId,
                                               long spHandle,
                                               long lastCommittedSpHandle,
-                                              long uniqueId);
+                                              long uniqueId,
+                                              long undoToken);
 
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.

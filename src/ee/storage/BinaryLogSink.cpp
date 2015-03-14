@@ -82,9 +82,9 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
                     VOLT_ERROR("%s", msg);
                     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
                 }
-                table->deleteTuple(deleteTuple, false);
+                table->deleteTuple(deleteTuple, true);
             } else {
-                table->insertPersistentTuple(tempTuple, false);
+                table->insertPersistentTuple(tempTuple, true);
             }
             break;
         }
@@ -121,7 +121,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             PersistentTable *table = tableIter->second;
 
-            table->truncateTable(engine, false);
+            table->truncateTable(engine, true);
             break;
         }
         case DR_RECORD_UPDATE:
