@@ -16,13 +16,13 @@ import org.openqa.selenium.JavascriptExecutor
 
 class Directories extends Module {
     static content = {
-        title { $("h1", text:"Directories") }
+        title 					{ $("h1", text:"Directories") }
 
-       	rootTitle 				{ $(text:"Root (Destination)") }
-        snapshotTitle 			{ $(text:"Snapshot") }
-        exportOverflowTitle 	{ $(text:"Export Overflow") }
-        commandLogsTitle 		{ $(text:"Command Log") }
-        commandLogSnapshotTitle { $(text:"Command Log Snapshots") }
+        rootTitle 				{ $("td", text:"Root (Destination)") }
+        snapshotTitle 			{ $("td", text:"Snapshot") }
+        exportOverflowTitle 	{ $("td", text:"Export Overflow") }
+        commandLogsTitle 		{ $("td", text:"Command Log") }
+        commandLogSnapshotTitle { $("td", text:"Command Log Snapshots") }
 
         rootValue 				{ $("#voltdbroot") }
         snapshotValue 			{ $("#snapshotpath") }

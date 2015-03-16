@@ -12,17 +12,17 @@ class AdminPage extends VoltDBManagementCenterPage {
         overview            { $('#admin > div.adminContainer > div.adminContentLeft') }
         networkInterfaces   { $('#admin > div.adminContainer > div.adminContentRight > div.adminPorts') }
         directories         { $('#admin > div.adminContainer > div.adminContentRight > div.adminDirectories') }
-		networkInterfaces   { module NetworkInterfaces } 
-		directories		 	{ module Directories }	
-		overview			{ module Overview }
-		cluster				{ module Cluster }       
-		header              { module Header }
+        networkInterfaces   { module NetworkInterfaces }
+        directories		 	{ module Directories }
+        overview			{ module Overview }
+        cluster				{ module Cluster }
+        header              { module Header }
         footer              { module Footer }
         server              { module voltDBclusterserver}
         downloadbtn         { module downloadconfigbtn}
         schema              { module schemaTab}
 
-		serverbutton				{ $("#serverName") }
+        serverbutton				{ $("#serverName") }
         serverconfirmation			{ $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
         deerwalkserver3stopbutton   { $("#stopServer_deerwalk3") }
         deeerwalkservercancelbutton { $("#StopConfirmCancel") }
@@ -169,7 +169,7 @@ class AdminPage extends VoltDBManagementCenterPage {
     def boolean doesNetworkInterfacesExist() {
         return networkInterfaces.displayed
     }
-    
+
     /**
      * Returns true if the "Directories"
      * currently exists (displayed).

@@ -16,24 +16,24 @@ import org.openqa.selenium.JavascriptExecutor
 
 class NetworkInterfaces extends Module {
     static content = {
-	 	title			{ $("h1", text:"Network Interfaces") }
+        title			{ $("h1", text:"Network Interfaces") }
 
-		portNameTitle			{ $(text:"Port Name") }
-		clusterSettingTitle		{ $(text:"Cluster Settings") }
-		serverSettingTitle		{ $(text:"Server Settings") }
-		clientPortTitle			{ $(text:"Client Port") }
-		adminPortTitle			{ $(text:"Admin Port") }
-		httpPortTitle 			{ $(text:"HTTP Port") }
-		internalPortTitle		{ $(text:"Internal Port") }
-		zookeeperPortTitle		{ $(text:"Zookeeper Port") }
-		replicationPortTitle	{ $(text:"Replication Port") }
-	
-		clusterClientPortValue			{ $("#clusterClientport") }
-		clusterAdminPortValue			{ $("#clusterAdminport") }
-		clusterHttpPortValue			{ $("#clusterHttpport") }
-		clusterInternalPortValue		{ $("#clusterInternalPort") }
-		clusterZookeeperPortValue		{ $("#clusterZookeeperPort") }
-		clusterReplicationPortValue		{ $("#clusterReplicationPort") }	     
+        portNameTitle			{ $("th", text:"Port Name") }
+        clusterSettingTitle		{ $("th", text:"Cluster Settings") }
+        serverSettingTitle		{ $("th", text:"Server Settings") }
+        clientPortTitle			{ $("td", text:"Client Port") }
+        adminPortTitle			{ $("td", text:"Admin Port") }
+        httpPortTitle 			{ $("td", text:"HTTP Port") }
+        internalPortTitle		{ $("td", text:"Internal Port") }
+        zookeeperPortTitle		{ $("td", text:"Zookeeper Port") }
+        replicationPortTitle	{ $("td", text:"Replication Port") }
+
+        clusterClientPortValue			{ $("#clusterClientport") }
+        clusterAdminPortValue			{ $("#clusterAdminport") }
+        clusterHttpPortValue			{ $("#clusterHttpport") }
+        clusterInternalPortValue		{ $("#clusterInternalPort") }
+        clusterZookeeperPortValue		{ $("#clusterZookeeperPort") }
+        clusterReplicationPortValue		{ $("#clusterReplicationPort") }
     }
 
 }
