@@ -743,7 +743,7 @@ public class TestClientInterface {
             m_ci.schedulePeriodicWorks();
 
             //Shouldn't get anything
-            assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
+            assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS)); //Doesn't Work
 
             //Change the bytes of the topology results and expect a topology update
             //to make its way to the client

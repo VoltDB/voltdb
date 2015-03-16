@@ -2452,7 +2452,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     final ByteBuffer buf = ByteBuffer.allocate(size + 4);
                     buf.putInt(size);
                     r.flattenToBuffer(buf);
-                    buf.flip();
 
                     //Check for no change
                     ByteBuffer oldValue = null;
@@ -2463,6 +2462,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
 
                     if (buf.equals(oldValue)) return;
+                    buf.flip();
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
