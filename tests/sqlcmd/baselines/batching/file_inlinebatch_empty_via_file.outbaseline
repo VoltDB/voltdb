@@ -1,2 +1,4 @@
-file scripts/batching/file_inlinebatch_empty.in
 
+FILE scripts/batching/file_inlinebatch_empty.in
+
+FILE -inlinebatch EOF

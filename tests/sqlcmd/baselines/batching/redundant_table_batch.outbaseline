@@ -1,2 +1,8 @@
-file -batch ./scripts/batching/redundant_table_batch.sqlfile
+
+FILE -batch ./scripts/batching/redundant_table_batch.sqlfile
+
+create table my_table_1 (i integer);
+create table my_table_2 (i integer);
+create table my_table_3 (i integer);
+create table my_table_1 (j integer);
 

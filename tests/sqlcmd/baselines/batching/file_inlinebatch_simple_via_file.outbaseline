@@ -1,7 +1,20 @@
-file scripts/batching/file_inlinebatch_simple.in
+
+FILE scripts/batching/file_inlinebatch_simple.in
+
+drop table t if exists;
 Command succeeded.
+
+create table t (i integer not null);
 Command succeeded.
+
+FILE -inlinebatch EOF
+
+partition table t on column i;
+create index tidx on t(i);
+
 Batch command succeeded.
+
+explain select * from t;
 EXECUTION_PLAN                 
 -------------------------------
 RETURN RESULTS TO STORED PROCEDURE
@@ -11,4 +24,3 @@ RETURN RESULTS TO STORED PROCEDURE
 
 
 (Returned 1 rows in #.##s)
-

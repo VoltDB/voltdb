@@ -2272,7 +2272,7 @@ function alertNodeClicked(obj) {
 
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
-                if (rawTables[k][6] == 'StreamedTable')
+                if (rawTables[k][6] == 'StreamedTable') 
                     exports[tableName] = { name: tableName };
                 else {
                     var isView = false;
@@ -2298,7 +2298,6 @@ function alertNodeClicked(obj) {
 
             connection.Metadata['tables'] = tables;
             connection.Metadata['views'] = views;
-
             for (var i = 0; i < rawColumns.length; i++) {
                 var TableName = rawColumns[i][2].toUpperCase();
                 if (connection.Metadata['tables'][TableName] != null) {

@@ -832,6 +832,44 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
+    public void testExportRejectedIfNotEmpty() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("B", "C1");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+        catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("B", "C1");
+        builder.addLiteralSchema("\nEXPORT TABLE B;");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2");
+        catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
+
     public void testAddTableConstraintRejectedIfNotEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
@@ -1191,6 +1229,54 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
         verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testAddDRTableColumn() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A ADD COLUMN C3 INTEGER;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testRemoveDRTableColumn() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A DROP COLUMN C2;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testModifyDRTableColumn() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 INTEGER;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testConnectorPropertiesChanges() throws Exception {
