@@ -121,6 +121,14 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
 
+        static final int FUNC_VOLT_GEO_WITHIN             = 20026;
+        static final int FUNC_VOLT_GEO_AREA               = 20027;
+        static final int FUNC_VOLT_GEO_DISTANCE           = 20028;
+        static final int FUNC_VOLT_GEO_NUM_POLYGONS       = 20029;
+        static final int FUNC_VOLT_GEO_NUM_INTERIOR_RINGS = 20030;
+        static final int FUNC_VOLT_GEO_NUM_POINTS         = 20031;
+        static final int FUNC_VOLT_GEO_PERIMETER          = 20032;
+
         static final int FUNC_CONCAT                      = 124;
 
         private static final FunctionId[] instances = {
@@ -147,6 +155,45 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            // Really want this function to return a boolean.
+            // for now, make it return 0, 1, or NULL.
+            new FunctionId("geo_within", Type.SQL_INTEGER, FUNC_VOLT_GEO_WITHIN, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("geo_area", Type.SQL_DOUBLE, FUNC_VOLT_GEO_AREA, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("geo_perimeter", Type.SQL_DOUBLE, FUNC_VOLT_GEO_PERIMETER, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("geo_distance", Type.SQL_DOUBLE, FUNC_VOLT_GEO_DISTANCE, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("geo_num_polygons", Type.SQL_BIGINT, FUNC_VOLT_GEO_NUM_POLYGONS, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("geo_num_interior_rings", Type.SQL_BIGINT, FUNC_VOLT_GEO_NUM_INTERIOR_RINGS, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("geo_num_points", Type.SQL_BIGINT, FUNC_VOLT_GEO_NUM_POINTS, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
 
             new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
