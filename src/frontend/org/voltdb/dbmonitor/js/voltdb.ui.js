@@ -232,6 +232,7 @@ $(document).ready(function () {
             $("#VDBMonHelp").hide();
             $("#VDBSchHelp").hide();
             $("#VDBQHelp").show();
+            $("#VDBAdmHelp").hide();
 
             if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
                 shortcut.add("f6", function () {
@@ -250,6 +251,7 @@ $(document).ready(function () {
                 $("#VDBMonHelp").show();
                 $("#VDBSchHelp").hide();
                 $("#VDBQHelp").hide();
+                $("#VDBAdmHelp").hide();
 
                 MonitorGraphUI.UpdateCharts();
             }
@@ -258,6 +260,14 @@ $(document).ready(function () {
                 $("#VDBMonHelp").hide();
                 $("#VDBSchHelp").show();
                 $("#VDBQHelp").hide();
+                $("#VDBAdmHelp").hide();
+            }
+            else if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
+
+                $("#VDBMonHelp").hide();
+                $("#VDBSchHelp").hide();
+                $("#VDBQHelp").hide();
+                $("#VDBAdmHelp").show();
             }
 
             shortcut.remove("f5");

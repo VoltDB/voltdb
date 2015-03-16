@@ -1305,6 +1305,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
-        m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId);
+        m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
+                            getNextUndoToken(m_currentTxnId));
     }
 }

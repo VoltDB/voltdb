@@ -376,13 +376,8 @@ public class RegressionSuite extends TestCase {
             if (expected[i] != Long.MIN_VALUE) {
                 assertEquals("At index " + i + ", ", expected[i], actual);
             } else {
-                if (isHSQL()) {
-                    // Hsql return 0 for NULL
-                    assertEquals(0, actual);
-                } else {
-                    VoltType type = vt.getColumnType(i);
-                    assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
-                }
+                VoltType type = vt.getColumnType(i);
+                assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
             }
         }
     }
