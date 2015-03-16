@@ -50,6 +50,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         userStoredProcs { defaultStoredProcsHeader.nextAll('h3') }
         allStoredProcs  { storedProcs.find('h3') }
 
+        queryStatus			{ $("th", text:"STATUS") }
+
         // Query elements
         queryInput  { $('#theQueryText') }
         runButton   { $('#runBTn') }
@@ -504,4 +506,22 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         header.tabDBMonitor.click()
     }
 
+    /*
+	 *	Get delete query
+	 */
+    def String getQueryToDeleteTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
 }

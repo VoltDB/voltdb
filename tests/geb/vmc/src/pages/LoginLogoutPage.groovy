@@ -8,7 +8,7 @@ import geb.Page
  * Created by anrai on 2/12/15.
  */
 class LoginLogoutPage extends Page {
-    static url="http://192.168.0.213:8080/"
+    static url="http://localhost:8080/"
 
     static at = {
         waitFor { loginBoxuser1.isDisplayed() }

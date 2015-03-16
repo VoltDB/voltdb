@@ -195,4 +195,14 @@ class TestBase extends GebReportingSpec {
         debugPrint(text, getBooleanSystemProperty("debugPrint", DEFAULT_DEBUG_PRINT))
     }
 
+    def cleanupSpec() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            when: 'Open VMC page'
+            ensureOnVoltDBManagementCenterPage()
+            then: 'to be on VMC page'
+            at VoltDBManagementCenterPage
+        }
+
+        page.loginIfNeeded()
+    }
 }

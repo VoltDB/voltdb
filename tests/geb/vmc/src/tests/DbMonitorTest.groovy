@@ -147,135 +147,6 @@ class DbMonitorTest extends TestBase {
         debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
     }
 
-
-
-    def clickGraphViewSeconds() {
-        expect: 'Graph view button exists'
-        page.graphViewDisplayed()
-
-        when: 'choose Seconds in Graph View'
-        page.chooseGraphView("Seconds")
-        then: 'display'
-
-        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
-        Date date = new Date();
-        String stringTwo = dateFormat.format(date)
-
-        String stringOne = timeOne.text()
-        int hourOne = page.changeToHour(stringOne)
-        int minuteOne = page.changeToMinute(stringOne)
-
-        int hourTwo = page.changeToHour(stringTwo)
-        int minuteTwo = page.changeToMinute(stringTwo)
-
-        int diff = minuteTwo - minuteOne
-
-        if ( hourOne == hourTwo && diff < 20 ) {
-            assert true
-        }
-        else if ( hourOne < hourTwo && minuteTwo < 20 ){
-            assert true
-        }
-        else {
-            assert false
-        }
-    }
-
-    def clickGraphViewMinute() {
-        expect: 'Graph view button exists'
-        page.graphViewDisplayed()
-
-        when: 'choose Seconds in Graph View'
-        page.chooseGraphView("Minutes")
-        then: 'display'
-
-        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
-        Date date = new Date();
-        String stringTwo = dateFormat.format(date)
-
-        String stringOne = timeOne.text()
-        int hourOne = page.changeToHour(stringOne)
-        int minuteOne = page.changeToMinute(stringOne)
-
-        int hourTwo = page.changeToHour(stringTwo)
-        int minuteTwo = page.changeToHour(stringTwo)
-
-        int hourDiff = hourTwo - hourOne
-
-        if ( hourDiff == 1 ) {
-            assert true
-        }
-        else if ( hourDiff > 1 && minuteTwo < 30 ){
-            assert true
-        }
-        else {
-            assert false
-        }
-    }
-
-    def clickGraphViewDays() {
-        expect: 'Graph view button exists'
-        page.graphViewDisplayed()
-
-        when: 'choose Seconds in Graph View'
-        page.chooseGraphView("Days")
-        then: 'display'
-
-        String stringOne = timeOne.text()
-        if ( stringOne.length() > 8 ) {
-            assert true
-        }
-        else {
-            assert false
-        }
-    }
-
-	 def checkActiveMissingJoining() {
-        expect: '1 Active server (at least)'
-        page.getActive() >= 1
-
-        and: '0 Missing servers (initially)'
-        page.getMissing() == 0
-
-        and: 'Joining servers not shown (for now)'
-        page.getJoining() == -1
-    }
-
-    def openAndCloseServerList() {
-        expect: 'Server list closed initially'
-        !page.isServerListOpen()
-        
-        when: 'click Server button (to open list)'
-        page.openServerList()
-        then: 'Server list is open'
-        page.isServerListOpen()
-
-        when: 'click Server button (to close list)'
-        page.closeServerList()
-        then: 'Server list is closed (again)'
-        !page.isServerListOpen()
-    }
-
-    def triggerAlert() {
-        expect: 'no Alerts shown, initially'
-        page.getAlert() == -1
-
-        // TODO: add more testing here, setting threshold
-    }
-
-    def checkServerNamesAndMemoryUsage() {
-        expect: 'Server list closed initially'
-        !page.isServerListOpen()
-
-        // TODO: make this a real test, not just printing values
-        List<String> serverNames = page.getServerNames()
-        debugPrint "Server Names            : " + serverNames
-        debugPrint "Memory Usages           : " + page.getMemoryUsages()
-        debugPrint "Memory Usage Percents   : " + page.getMemoryUsagePercents()
-        debugPrint "Memory Usage (0)        : " + page.getMemoryUsage(serverNames.get(0))
-        debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
-    }
-
     // HEADER TESTS
 
 	def "header banner exists" () {
@@ -891,58 +762,86 @@ class DbMonitorTest extends TestBase {
 
 
     def "Add a table in Tables and check it"() {
-		
-		String createQuery = page.getQueryToCreateTable()
+
+        String createQuery = page.getQueryToCreateTable()
         String deleteQuery = page.getQueryToDeleteTable()
-		String tablename = page.getTablename()
-
-		when: 'sql query tab is clicked'
-			page.gotoSqlQuery()
-		then: 'at sql query'
-			at SqlQueryPage
-
-		when: 'set query in the box'
-			page.setQueryText(createQuery)
-		then: 'run the query'
-			page.runQuery()
-
-		when: 'Db Monitor tab is clicked'
-			page.gotoDbMonitor()
-		then: 'at DbMonitor Page'
-			at DbMonitorPage
-
-		when:
-			page.searchDatabaseTable(tablename)	
-        then:    
-			String number = page.databaseTableCurrentPage.text()
-            String numbers = page.databaseTableTotalPage.text()
+        String tablename = page.getTablename()
 
         when: 'sql query tab is clicked'
-			page.gotoSqlQuery()
-		then: 'at sql query'
-			at SqlQueryPage
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
 
-		when: 'set query in the box'
-			page.setQueryText(deleteQuery)
-		then: 'run the query'
-			page.runQuery()
-            
+        when: 'set query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        if ( page.queryStatus.isDisplayed() ) {
+            println("Create query successful")
+        }
+        else {
+            println("Create query unsuccessful")
+            assert false
+        }
+
         when: 'Db Monitor tab is clicked'
-			page.gotoDbMonitor()
-		then: 'at DbMonitor Page'
-			at DbMonitorPage
-		
-		when: 
-			page.searchDatabaseTable(tablename)	
-		then:
-			String number1 = page.databaseTableCurrentPage.text()
-            String numbers1 = page.databaseTableTotalPage.text()
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
 
-			!number.equals("0")
-			!numbers.equals("0")
-            number1.equals("0")
-            numbers1.equals("0")
-	}
+        when:
+        page.searchDatabaseTable(tablename)
+        then:
+        waitFor(30) {
+            !page.databaseTableCurrentPage.text().equals("0")
+            !page.databaseTableTotalPage.text().equals("0")
+        }
+        if ( !page.databaseTableCurrentPage.text().equals("0") && !page.databaseTableTotalPage.text().equals("0") ){
+            println("The table was successfully created")
+        }
+        else {
+            println("Table not found after creation")
+            assert false
+        }
+        when: 'sql query tab is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set query in the box'
+        page.setQueryText(deleteQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        if ( page.queryStatus.isDisplayed() ) {
+            println("Delete query successful")
+        }
+        else {
+            println("Delete query unsuccessful")
+            assert false
+        }
+
+        when: 'Db Monitor tab is clicked'
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
+
+        when:
+        page.searchDatabaseTable(tablename)
+        then:
+        waitFor(30) {
+            page.databaseTableCurrentPage.text().equals("0")
+            page.databaseTableTotalPage.text().equals("0")
+        }
+        if ( page.databaseTableCurrentPage.text().equals("0") && page.databaseTableTotalPage.text().equals("0") ) {
+            println("The table was successfully removed")
+        }
+        else {
+            println("Table found after deletion")
+            assert false
+        }
+    }
 
 
     def "check if Row Count is clickable"() {
@@ -1313,11 +1212,14 @@ class DbMonitorTest extends TestBase {
         when:'clicked server button'
         at DbMonitorPage
         page.clusterserverbutton.click()
-        page.serversearch.value($line)
+        waitFor(5){page.serversearch.value($line)
+        }
 
         then:
         at DbMonitorPage
+        waitFor(5){page.clusterserverbutton.isDisplayed()}
         page.clusterserverbutton.click()
+        println("server searched matched")
     }
 
 
@@ -1341,25 +1243,28 @@ class DbMonitorTest extends TestBase {
         when:'clicked server button'
         at DbMonitorPage
         page.clusterserverbutton.click()
-        page.serversearch.value($line3)
+        waitFor(5){page.serversearch.value($line3)}
+        //page.serversearch.value($line3)
 
         then:
         at DbMonitorPage
+        waitFor(5){page.clusterserverbutton.isDisplayed()}
         page.clusterserverbutton.click()
+        println("server searched unmatched")
     }
 
 
     def "check server title on dbmonitor"(){
         when:
         at DbMonitorPage
-        page.clusterserverbutton.isDisplayed()
+        waitFor(5){page.clusterserverbutton.isDisplayed()}
         page.clusterserverbutton.click()
         then:
         at DbMonitorPage
         page.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
         page.clusterserverbutton.click()
+        println("server title matched");
     }
-
 
 
     //dbmonitor graph part
@@ -1736,4 +1641,23 @@ class DbMonitorTest extends TestBase {
         }
     }
 
+    def cleanupSpec() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            when: 'Open VMC page'
+            ensureOnVoltDBManagementCenterPage()
+            then: 'to be on VMC page'
+            at VoltDBManagementCenterPage
+        }
+
+        page.loginIfNeeded()
+
+        when: 'click the Schema link (if needed)'
+        page.openSqlQueryPage()
+        then: 'should be on DB Monitor page'
+        at SqlQueryPage
+        String deleteQuery = page.getQueryToDeleteTable()
+        page.setQueryText(deleteQuery)
+
+        page.runQuery()
+    }
 }

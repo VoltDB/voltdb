@@ -7,21 +7,25 @@ import vmcTest.pages.*
 import geb.Page;
 
 class LoginLogoutTest extends TestBase {
-    
+
     def "Login Test Valid Username and Password"() {
         given:
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        def $line1
+        new File("src/resources/users.txt").withReader { $line = it.readLine()
+            $line1=it.readLine()}
 
         when: "submitted"
         loginBoxuser1.value($line)
-        loginBoxuser2.value($line)
-        loginbtn.click()
+        loginBoxuser2.value($line1)
+
 
         then:
-        at DbMonitorPage
+        loginbtn.click()
+        println("valid username and valid password")
+
     }
 
     def "Login Test Valid Username and Invalid Password"() {
@@ -29,15 +33,17 @@ class LoginLogoutTest extends TestBase {
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        new File("src/resources/users.txt").withReader { $line = it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value($line)
-        loginBoxuser2.value("anything")
-        loginbtn.click()
+        loginBoxuser2.value("wrong password")
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("valid username and invalid password")
     }
 
     def "Login Test Valid Username and empty Password"() {
@@ -45,15 +51,17 @@ class LoginLogoutTest extends TestBase {
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        new File("src/resources/users.txt").withReader { $line = it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value($line)
         loginBoxuser2.value("")
-        loginbtn.click()
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("valid username and empty password")
     }
 
     def "Login Test Invalid Username and Password"() {
@@ -61,48 +69,56 @@ class LoginLogoutTest extends TestBase {
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        new File("src/resources/users.txt").withReader { $line = it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value("anything")
         loginBoxuser2.value("anything")
-        loginbtn.click()
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("invalid username and invalid password")
     }
-    
+
     def "Login Test Invalid Username and Empty Password"() {
         given:
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        new File("src/resources/users.txt").withReader { $line = it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value("anything")
         loginBoxuser2.value("")
-        loginbtn.click()
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("invalid username and empty password")
     }
-    
+
 
     def "Login Test Invalid Username and Valid Password"() {
         given:
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        def $line1
+        new File("src/resources/users.txt").withReader { $line = it.readLine()
+            $line1=it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value("anything")
-        loginBoxuser2.value($line)
-        loginbtn.click()
+        loginBoxuser2.value($line1)
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("invalid username and valid password")
     }
 
     def "Login Test Empty Username and Password"() {
@@ -110,33 +126,39 @@ class LoginLogoutTest extends TestBase {
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        new File("src/resources/users.txt").withReader { $line = it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value("")
         loginBoxuser2.value("")
-        loginbtn.click()
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("empty username and empty password")
     }
 
-    
-    
+
+
     def "Login Test Empty Username and Valid Password"() {
         given:
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        def $line1
+        new File("src/resources/users.txt").withReader { $line = it.readLine()
+            $line1= it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value("")
         loginBoxuser2.value($line)
-        loginbtn.click()
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("empty username and valid password")
     }
 
     def "Login Test Empty Username and Invalid Password"() {
@@ -144,15 +166,17 @@ class LoginLogoutTest extends TestBase {
         to LoginLogoutPage
 
         def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+        new File("src/resources/users.txt").withReader { $line = it.readLine() }
 
         when: "submitted"
         loginBoxuser1.value("")
         loginBoxuser2.value("anything")
-        loginbtn.click()
+
 
         then:
         at LoginLogoutPage
+        loginbtn.click()
+        println("empty username and invalid password")
     }
 
 

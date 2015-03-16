@@ -845,35 +845,46 @@ class AdminTest extends TestBase {
         waitFor(30) { cluster.promotebutton.isDisplayed() }
     }
 
-    def "when Resume cancel"(){
+    def "check pause cancel"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.resumebutton.isDisplayed() }
-        cluster.resumebutton.click()
+        waitFor(5){cluster.pausebutton.isDisplayed()}
+
         then:
-        waitFor(30) { cluster.resumeconfirmation.isDisplayed() }
-        cluster.resumeconfirmation.text().toLowerCase().equals("Do you want to resume the cluster and exit admin mode?".toLowerCase());
-        cluster.resumeconfirmation.resumecancel.click()
+        at AdminPage
+        cluster.pausebutton.click()
+        waitFor(5){cluster.pausecancel.isDisplayed()}
+
+        cluster.pausecancel.click()
+        println("cancel button clicked for pause testing")
+
     }
 
-    def "when Resume ok"(){
+    def "check pause ok and resume ok"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.resumebutton.isDisplayed() }
-        cluster.resumebutton.click()
+        waitFor(5) { cluster.pausebutton.isDisplayed() }
         then:
-        waitFor(30) { cluster.resumeconfirmation.isDisplayed() }
-        cluster.resumeconfirmation.text().toLowerCase().equals("Do you want to resume the cluster and exit admin mode?".toLowerCase());
-        cluster.resumeconfirmation.resumeok.click()
+
+        cluster.pausebutton.click()
+        waitFor{cluster.pauseok.isDisplayed()}
+        cluster.pauseok.click()
+        waitFor(4){cluster.resumebutton.isDisplayed()
+
+            cluster.resumebutton.click()}
+        waitFor(10) {
+            cluster.resumeok.isDisplayed()}
+        cluster.resumeok.click()
+        println("resume for ok has been clicked")
     }
 
     def "when save for cancel"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.savebutton.isDisplayed() }
+        waitFor(5) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(30) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(5) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savecancel.click()
     }
@@ -881,31 +892,30 @@ class AdminTest extends TestBase {
     def "when save for yes"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.savebutton.isDisplayed() }
+        waitFor(5) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(30) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(5) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savedirectory.value("/var/opt/test/manual_snapshots")
         cluster.saveok.click()
+        println("success in local for yes")
 
-        waitFor(30) { cluster.saveyes.isDisplayed() }
-        cluster.saveyes.click()
+        // cluster.saveyes.click()
         // failsavedok.click()
     }
 
     def "when save for No"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.savebutton.isDisplayed() }
+        waitFor(5) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(30) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(5) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
-        cluster.savedirectory.value("bbb")
-        cluster.saveok.click()
-        cluster.saveno.click()
+        cluster.savedirectory.value("abc/bcc/dfg")
         cluster.savecancel.click()
+
     }
 
     def "when restore and ok"(){
@@ -922,13 +932,14 @@ class AdminTest extends TestBase {
     }
 
     def "when restore and cancel"(){
+
         when:
         at AdminPage
-        waitFor(30) { cluster.restorebutton.isDisplayed() }
+        waitFor(7) { cluster.restorebutton.isDisplayed() }
         cluster.restorebutton.click()
         then:
-        waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
-        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         cluster.restorecancelbutton.click()
 
     }
@@ -936,14 +947,15 @@ class AdminTest extends TestBase {
     def "when restore and close"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.restorebutton.isDisplayed() }
+        waitFor(7) { cluster.restorebutton.isDisplayed() }
         cluster.restorebutton.click()
         then:
-        waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
-        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         cluster.restoreclosebutton.click()
 
     }
+
 
     def "when shutdown cancel button"(){
         when:
