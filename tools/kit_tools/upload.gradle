@@ -17,22 +17,13 @@ configurations {
   ascSignatures
 }
 
-artifacts.add('clientArchives', file("voltdbclient-${version}.jar")) {
-    name = 'voltdbclient'
-    type = extension = 'jar'
-    classifier = null
-}
-
-artifacts.add('clientArchives', file("voltdbclient-${version}-javadoc.jar")) {
-    name = 'voltdbclient'
-    type = extension = 'jar'
-    classifier = 'javadoc'
-}
-
-artifacts.add('clientArchives', file("voltdbclient-${version}-sources.jar")) {
-    name = 'voltdbclient'
-    type = extension = 'jar'
-    classifier = 'sources'
+artifacts {
+  clientArchives file:file("voltdbclient-${version}.jar", name:'voltdbclient',
+                         classifier:null, type:'jar', extension:'jar'
+  clientArchives file:file("voltdbclient-${version}-javadoc.jar", name:'voltdbclient',
+                         classifier:'javadoc', type:'jar', extension:'jar'
+  clientArchives file:file("voltdbclient-${version}-sources.jar", name:'voltdbclient',
+                         classifier:'sources', type:'jar', extension:'jar'
 }
 
 signing {
