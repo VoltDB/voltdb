@@ -342,6 +342,21 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_LN:
             ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
             break;
+        case FUNC_VOLT_GEO_AREA:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_GEO_AREA>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_GEO_NUM_POLYGONS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_GEO_NUM_POLYGONS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_GEO_NUM_INTERIOR_RINGS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_GEO_NUM_INTERIOR_RINGS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_GEO_NUM_POINTS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_GEO_NUM_POINTS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_GEO_PERIMETER:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_GEO_PERIMETER>((*arguments)[0]);
+            break;
         default:
             return NULL;
         }
@@ -423,6 +438,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        case FUNC_VOLT_GEO_WITHIN:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_GEO_WITHIN>(*arguments);
+            break;
+        case FUNC_VOLT_GEO_DISTANCE:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_GEO_DISTANCE>(*arguments);
             break;
         default:
             return NULL;
