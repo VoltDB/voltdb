@@ -603,10 +603,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId)
+    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
+                               long undoToken)
     throws EEException
     {
-        final int errorCode = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId);
+        final int errorCode = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         checkErrorCode(errorCode);
     }
 

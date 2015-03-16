@@ -203,6 +203,7 @@ typedef struct {
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
+    int64_t undoToken;
     char log[0];
 }__attribute__((packed)) apply_binary_log;
 
@@ -1395,6 +1396,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
                                  ntohll(params->spHandle),
                                  ntohll(params->lastCommittedSpHandle),
                                  ntohll(params->uniqueId),
+                                 ntohll(params->undoToken),
                                  params->log);
     } catch (const FatalException& e) {
         crashVoltDB(e);
