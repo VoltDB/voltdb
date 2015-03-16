@@ -396,15 +396,15 @@ public class TestSQLParser extends TestCase {
     public void testParseRecall()
     {
         parseRecallCase("RECALL 1", 1);
-        parseRecallCase("RECALL 2 ", 2);
+        parseRecallCase("  RECALL 2 ", 2);
         parseRecallCase("RECALL 33;", 33);
-        parseRecallCase("RECALL 99 ;", 99);
+        parseRecallCase("recall 99 ;", 99);
         parseRecallCase("RECALL 100 ; ", 100);
 
         // Try too short commands.
         parseRecallErrorCase("RECALL");
         parseRecallErrorCase("RECALL ");
-        parseRecallErrorCase("RECALL;");
+        parseRecallErrorCase("Recall;");
         parseRecallErrorCase("RECALL ;");
 
         // Try interspersed garbage.
@@ -438,9 +438,22 @@ public class TestSQLParser extends TestCase {
 
         // Try invalid numerics
         parseRecallErrorCase("RECALL 0");
-        parseRecallErrorCase("RECALL -2;");
+        parseRecallErrorCase("recall -2;");
         parseRecallErrorCase("RECALL 101");
-        parseRecallErrorCase("RECALL 1000;");
+        parseRecallErrorCase("recall 1000;");
+
+        // confirm that the recall command parser does not overstep
+        // its mandate and try to process anything but a recall command.
+        assertNull(SQLParser.parseRecallStatement("RECAL", 99));
+        assertNull(SQLParser.parseRecallStatement("recal 1", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALL1", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALLL", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALLL 1", 99));
+        assertNull(SQLParser.parseRecallStatement("HELP;", 99));
+        assertNull(SQLParser.parseRecallStatement("FILE ddl.sql", 99));
+        assertNull(SQLParser.parseRecallStatement("@RECALL 1", 99));
+        assertNull(SQLParser.parseRecallStatement("--recall 1", 99));
+        assertNull(SQLParser.parseRecallStatement("ECALL 1", 99));
     }
 
     private void parseRecallCase(String lineText, int lineNumber)
