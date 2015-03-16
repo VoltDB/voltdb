@@ -365,6 +365,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    bool drEnabled = catalogTable.isDRed();
     materialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -373,12 +374,14 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
     SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureHash));
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, signatureHash, materialized,
+                                                    schema, columnNames, signatureHash,
+                                                    materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
                                                     catalogTable.tuplelimit(),
-                                                    compactionThreshold);
+                                                    compactionThreshold,
+                                                    drEnabled);
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
@@ -411,7 +414,7 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
         return false; // mixing ints and booleans here :(
     }
 
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    m_exportEnabled = evaluateExport(catalogDatabase, catalogTable);
 
     // configure for stats tables
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -419,6 +422,14 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
 
     m_table->incrementRefcount();
     return 0;
+}
+
+//After catalog is updated call this to ensure your export tables are connected correctly.
+bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
+                           catalog::Table const &catalogTable)
+{
+    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    return m_exportEnabled;
 }
 
 
@@ -476,6 +487,11 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
                                            catalog::Table const &catalogTable,
                                            std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream());
+    if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
+        DRTupleStreamDisableGuard guardReplicated(ExecutorContext::getExecutorContext()->drReplicatedStream());
+    }
+
     ///////////////////////////////////////////////
     // Create a new table so two tables exist
     ///////////////////////////////////////////////

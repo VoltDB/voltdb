@@ -22,6 +22,7 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * This class represents an instance of a column in a parsed statement.
@@ -131,6 +132,11 @@ public class ParsedColInfo implements Cloneable {
         }
 
         return orderCol;
+    }
+
+    /** Return this as an instance of SchemaColumn */
+    public SchemaColumn asSchemaColumn() {
+        return new SchemaColumn(tableName, tableAlias, columnName, alias, expression);
     }
 
     @Override

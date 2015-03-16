@@ -1,0 +1,62 @@
+
+drop table prefixes if exists;
+Command succeeded.
+
+create table prefixes (
+ help_name integer,
+ goFish integer,
+ exitStrategy integer,
+ listList integer,
+ recallRecall integer,
+ file_name integer,
+ create_from_sql integer,
+ alter_from_sql integer,
+ drop_from_sql integer,
+ insert_from_sql integer,
+ select_from_sql integer,
+ update_from_sql integer,
+ delete_from_sql integer,
+ truncate_from_sql integer,
+ exec_like_a_proc integer,
+ );
+Command succeeded.
+
+select * from prefixes;
+HELP_NAME  GOFISH  EXITSTRATEGY  LISTLIST  RECALLRECALL  FILE_NAME  CREATE_FROM_SQL  ALTER_FROM_SQL  DROP_FROM_SQL  INSERT_FROM_SQL  SELECT_FROM_SQL  UPDATE_FROM_SQL  DELETE_FROM_SQL  TRUNCATE_FROM_SQL  EXEC_LIKE_A_PROC 
+---------- ------- ------------- --------- ------------- ---------- ---------------- --------------- -------------- ---------------- ---------------- ---------------- ---------------- ------------------ -----------------
+
+(Returned 0 rows in #.##s)
+
+drop table prefixes;
+Command succeeded.
+
+drop table raw if exists;
+Command succeeded.
+
+create table raw (
+ help integer,
+ go integer,
+ exit integer,
+ list integer,
+ recall integer,
+ file integer, 
+
+ alter integer,
+
+ insert integer,
+
+ update integer,
+ delete integer,
+ truncate integer,
+ exec integer,
+ );
+Command succeeded.
+
+select * from raw;
+HELP  GO  EXIT  LIST  RECALL  FILE  ALTER  INSERT  UPDATE  DELETE  TRUNCATE  EXEC 
+----- --- ----- ----- ------- ----- ------ ------- ------- ------- --------- -----
+
+(Returned 0 rows in #.##s)
+
+drop table raw;
+Command succeeded.

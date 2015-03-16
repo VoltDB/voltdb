@@ -53,7 +53,7 @@ void CatalogType::set(const string &field, const string &value) {
     int32_t indicator = tolower(value[0]);
     // paths
     if (indicator == '/') {
-        //printf("Adding a path ref for %s[%s]:\n    %s\n", path().c_str(), field.c_str(), value.c_str());
+        //printf("Adding a path ref for %s[%s:\n    %s\n", path().c_str(), field.c_str(), value.c_str());
         //fflush(stdout);
         CatalogType *type = m_catalog->itemForRef(value);
         if (!type) {

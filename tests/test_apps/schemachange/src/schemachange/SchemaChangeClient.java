@@ -24,20 +24,14 @@
 package schemachange;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
-import org.voltdb.TableHelper.ViewRep;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -48,7 +42,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltCompilerUtils;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -60,33 +53,27 @@ public class SchemaChangeClient {
     Client client = null;
     private SchemaChangeConfig config = null;
     private final Random rand = new Random(0);
+    private final TableHelper helper;
     private Topology topo = null;
     private final AtomicInteger totalConnections = new AtomicInteger(0);
     private final AtomicInteger fatalLevel = new AtomicInteger(0);
 
-    // If catalog update is chosen deployment.xml must not have schema="ddl" in the cluster element.
-    private final boolean useCatalogUpdate = false;
-    SchemaChanger schemaChanger = useCatalogUpdate ? new CatalogSchemaChanger() : new DDLSchemaChanger();
-
-    // Current active tables, view and verification proc. Supports dropping before re-creating.
-    Set<String> activeTableNames = new HashSet<String>();
-    TableHelper.ViewRep activeViewRep = null;
-    Class<?> activeVerifyProc = null;
-
+    // Current test state.
     private int schemaVersionNo = 0;
+
+    // Percent probability of a test cycle creating a new table.
+    // TODO: Expose these as options?
+    private int percentNewTable = 10;
+    // Percent probability of a test cycle loading data into the table.
+    private double percentLoadTable = 50;
+
+    private boolean addAlternateKey = true;
 
     @SuppressWarnings("unused")
     private long startTime;
 
     private static String _F(String str, Object... parameters) {
         return String.format(str, parameters);
-    }
-
-    static void logStackTrace(Throwable t) {
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw, true);
-        t.printStackTrace(pw);
-        log.error(sw.toString());
     }
 
     /**
@@ -127,571 +114,639 @@ public class SchemaChangeClient {
     }
 
     /**
-     * Call a procedure and check the return code.
-     * Success just returns the result to the caller.
-     * Unpossible errors end the process.
-     * Some errors will retry the call until the global progress timeout with various waits.
-     * After the global progress timeout, the process is killed.
+     * Call a R/O procedure with retries and check the return code. See SchemaChangeUtility for more info.
      */
     ClientResponse callROProcedureWithRetry(String procName, Object... params) {
-        long startTime = System.currentTimeMillis();
-        long now = startTime;
-
-        while (now - startTime < (config.noProgressTimeout * 1000)) {
-            ClientResponse cr = null;
-
-            try {
-                cr = client.callProcedure(procName, params);
-            }
-            catch (ProcCallException e) {
-                log.debug("callROProcedureWithRetry operation exception:", e);
-                cr = e.getClientResponse();
-            }
-            catch (NoConnectionsException e) {
-                log.debug("callROProcedureWithRetry operation exception:", e);
-                // wait a bit to retry
-                try { Thread.sleep(1000); } catch (InterruptedException e1) {}
-            }
-            catch (IOException e) {
-                log.debug("callROProcedureWithRetry operation exception:", e);
-                // IOException is not cool man
-                logStackTrace(e);
-                System.exit(-1);
-            }
-
-            if (cr != null) {
-                if (cr.getStatus() != ClientResponse.SUCCESS) {
-                    log.debug("callROProcedureWithRetry operation failed: " + ((ClientResponseImpl)cr).toJSONString());
-                }
-                switch (cr.getStatus()) {
-                case ClientResponse.SUCCESS:
-                    // hooray!
-                    return cr;
-                case ClientResponse.CONNECTION_LOST:
-                case ClientResponse.CONNECTION_TIMEOUT:
-                    // can retry after a delay
-                    try { Thread.sleep(5 * 1000); } catch (Exception e) {}
-                    break;
-                case ClientResponse.RESPONSE_UNKNOWN:
-                    // can try again immediately - cluster is up but a node died
-                    break;
-                case ClientResponse.SERVER_UNAVAILABLE:
-                    // shouldn't be in admin mode (paused) in this app, but can retry after a delay
-                    try { Thread.sleep(30 * 1000); } catch (Exception e) {}
-                    break;
-                case ClientResponse.GRACEFUL_FAILURE:
-                    //log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
-                    //log.error(((ClientResponseImpl)cr).toJSONString());
-                    //logStackTrace(new Throwable());
-                    return cr; // caller should always check return status
-                case ClientResponse.UNEXPECTED_FAILURE:
-                case ClientResponse.USER_ABORT:
-                    log.error(_F("Error in procedure call for: %s", procName));
-                    log.error(((ClientResponseImpl)cr).toJSONString());
-                    // for starters, I'm assuming these errors can't happen for reads in a sound system
-                    assert(false);
-                    System.exit(-1);
-                }
-            }
-
-            now = System.currentTimeMillis();
-        }
-
-        log.error(_F("Error no progress timeout reached, terminating"));
-        System.exit(-1);
-        return null;
+        return SchemaChangeUtility.callROProcedureWithRetry(client, procName, config.noProgressTimeout, params);
     }
 
     SchemaChangeClient(SchemaChangeConfig config) {
         this.config = config;
+        TableHelper.Configuration tableHelperConfig = new TableHelper.Configuration();
+        tableHelperConfig.rand = rand;
+        tableHelperConfig.numExtraColumns = addAlternateKey ? 1 : 0;
+        // Partitioning is handled here.
+        tableHelperConfig.randomPartitioning = TableHelper.RandomPartitioning.CALLER;
+        this.helper = new TableHelper(tableHelperConfig);
     }
+
+    // Immutable schema change data
+    private static class CatalogChangeSchema
+    {
+        final VoltTable table;
+        final TableHelper.ViewRep viewRep;
+        final String tableName;
+        final boolean partitioned;
+        final String pkeyName;
+        final String uniqueColumnName;
+        final String uniqueIndexName;
+        final Class<?> verifyProc;
+
+        /**
+         * Fully-specified constructor.
+         */
+        CatalogChangeSchema(
+                final VoltTable table,
+                final TableHelper.ViewRep viewRep,
+                final String tableName,
+                final boolean partitioned,
+                final String pkeyName,
+                final String uniqueColumnName,
+                final String uniqueIndexName,
+                final Class<?> verifyProc) {
+            this.table = table;
+            this.viewRep = viewRep;
+            this.tableName = tableName;
+            this.partitioned = partitioned;
+            this.pkeyName = pkeyName;
+            this.uniqueColumnName = uniqueColumnName;
+            this.uniqueIndexName = uniqueIndexName;
+            this.verifyProc = verifyProc;
+        }
+
+        /**
+         * Spawn new object for mutated table/view.
+         */
+        CatalogChangeSchema mutate(final VoltTable mutatedTable, TableHelper.ViewRep mutatedViewRep) {
+            return new CatalogChangeSchema(
+                    mutatedTable,
+                    mutatedViewRep,
+                    this.tableName,
+                    this.partitioned,
+                    this.pkeyName,
+                    this.uniqueColumnName,
+                    this.uniqueIndexName,
+                    this.verifyProc);
+        }
+    }
+
+    enum ChangeType { CREATE, MUTATE_NONEMPTY, MUTATE_EMPTY }
+
+    enum BatchResult { BATCH_SUCCEEDED, BATCH_FAILED, BATCH_FAILED_AS_EXPECTED }
 
     /**
      * Test driver that initiates catalog changes and tracks state, e.g. for retries.
      */
     private class CatalogChangeTestDriver {
 
-        // Keep track of retries to limit how many occur.
-        private int retryCount = 0;
-
         /*
          * These members have the remaining state related to tables and views
          * that allows a retry attempt to perform the identical operation.
          */
-        private VoltTable t2 = null;
-        private String currentName = null;
-        private String newName = null;
+        private CatalogChangeSchema oldSchema = null;
+        private CatalogChangeSchema newSchema = null;
         private VoltTable versionT = null;
-        private TableHelper.ViewRep newViewRep = null;
         private long count = 0;
         private long start = 0;
-        private Class<?> provisionalActiveVerifyProc = null;
 
+        // number of mutations since the last create
+        private long mutationCount = 0;
 
-        // Forces random failures.
-        class FailBot {
-            // Number of possible places to generate failures.
-            final int failPoints;
-            final boolean enabled;
+        /**
+         * Add rows until RSS or rowcount target met.
+         * Delete some rows rows (triggers compaction).
+         * Re-add odd rows until RSS or rowcount target met (makes buffers out of order).
+         */
+        void loadTable() {
+            // if #partitions is odd, delete every 2 - if even, delete every 3
+            //int n = 3 - (topo.partitions % 2);
 
-            FailBot(int failPoints, boolean enabled) {
-                this.failPoints = failPoints;
-                this.enabled = enabled;
+            int redundancy = topo.sites / topo.partitions;
+            long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
+            String tableName = this.getTableName();
+            // if replicated
+            if (tableName.equals("B")) {
+                realRowCount /= topo.partitions;
             }
 
-            boolean failHere(String desc) {
-                // Divide by the number of possible places to force failures.
-                if (this.enabled && (config.retryForcedPercent / this.failPoints) > rand.nextInt(100)) {
-                    log.info(_F("Forcing failure: %s", desc));
-                    return true;
-                }
-                return false;
-            }
+            long max = this.maxId();
+
+            TableLoader loader = new TableLoader(client, this.oldSchema.table,
+                                                 config.noProgressTimeout, helper);
+
+            log.info(_F("Loading table %s", tableName));
+            loader.load(max + 1, realRowCount);
         }
 
         /**
-         * Perform a schema change to a mutated version of the current table (80%) or
-         * to a new table entirely (20%, drops and adds the new table).
+         * Grab some random rows that aren't on the first EE page for the table.
          */
-        Pair<VoltTable,TableHelper.ViewRep> catalogChange(
-                VoltTable t1,
-                boolean newTable,
-                TableHelper.ViewRep viewIn,
-                boolean isRetry) throws Exception {
+        private VoltTable sample(long offset) {
+            VoltTable t2 = this.oldSchema.table.clone(4096 * 1024);
 
-            // There are 3 possible forced failure points. Don't force failures during
-            // the initial call.
-            FailBot failBot = new FailBot(3, t1 != null);
-
-            // A retry may skip the drops if they had succeeded.
-            boolean skipDrops = false;
-
-            if (isRetry) {
-                log.info(_F("Catalog update retry #%d for V%d in %d seconds...",
-                            this.retryCount+1, schemaVersionNo+1, config.retrySleep));
-                Thread.sleep(config.retrySleep * 1000);
-
-                if (++this.retryCount >= config.retryLimit) {
-                    throw new IOException("Retry limit reached");
-                }
-                assert(this.t2 != null);
-                assert(this.currentName != null);
-                assert(this.newName != null);
-                assert(this.versionT != null);
-                assert(this.provisionalActiveVerifyProc != null);
-                // this.newViewRep can be null
-
-                // Figure out what we have to redo, if anything. Non-transaction-related
-                // problems can return errors while still completing the transation.
-
-                // If V<next> is present there is nothing to retry, just finish what we started.
-                // isSchemaVersionObservable() retries internally if the connection is still bad.
-                if (isSchemaVersionObservable(schemaVersionNo+1)) {
-                    log.info(_F("The new version table V%d is present, not retrying.", schemaVersionNo+1));
-                    return finishUpdate(newTable);
-                }
-
-                if (isSchemaVersionObservable(schemaVersionNo)) {
-                    // If V<previous> is present we need to repeat the drop batch.
-                    log.info(_F("The old version table V%d is present, enabling drop batch.", schemaVersionNo));
-                }
-                else {
-                    // If V<previous> is not present there is no need to repeat the drop batch.
-                    log.info(_F("The old version table V%d is not present, disabling drop batch.", schemaVersionNo));
-                    skipDrops = true;
-                }
+            ClientResponse cr = callROProcedureWithRetry("@AdHoc",
+                    String.format("select * from %s where pkey >= %d order by pkey limit 100;",
+                            TableHelper.getTableName(this.oldSchema.table), offset));
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            VoltTable result = cr.getResults()[0];
+            result.resetRowPosition();
+            while (result.advanceRow()) {
+                t2.add(result);
             }
 
-            // We may have determined that a retry isn't really necessary, e.g. if a
-            // batch succeeds but has a communication problem at the tail end.
-            if (this.retryCount == 0) {
-                this.t2 = null;
-                this.currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
-                this.newName = this.currentName;
+            return t2;
+        }
 
-                // add an empty table with the schema version number in the name
-                this.versionT = TableHelper.quickTable(_F("V%d (BIGINT)", schemaVersionNo + 1));
+        class SampleResults {
+            VoltTable table = null;
+            long sampleOffset = -1;
+        }
 
-                if (newTable) {
-                    this.newName = this.currentName.equals("A") ? "B" : "A";
-                    this.t2 = TableHelper.getTotallyRandomTable(this.newName, rand, false);
-                }
-                else {
-                    this.t2 = TableHelper.mutateTable(t1, true, rand);
-                }
+        // deterministically sample some rows
+        SampleResults sampleRows() {
+            SampleResults results = new SampleResults();
+            long max = this.maxId();
+            if (max > 0) {
+                if (max <= 100)
+                    results.sampleOffset = 0;
+                else
+                    results.sampleOffset = Math.min((long) (max * .75), max - 100);
+                assert(max >= 0);
+                results.table = this.sample(results.sampleOffset);
+                assert(results.table.getRowCount() > 0);
+                log.info(_F("Sampled table %s from offset %d limit 100 and found %d rows.",
+                        this.getTableName(), results.sampleOffset, results.table.getRowCount()));
+            }
+            return results;
+        }
 
-                // handle views
-                this.newViewRep = viewIn;
-                if (this.newViewRep == null) {
-                    this.newViewRep = TableHelper.ViewRep.viewRepForTable("MV", this.t2, rand);
-                }
-                else {
-                    if (!this.newViewRep.compatibleWithTable(this.t2)) {
-                        this.newViewRep = null;
-                    }
-                }
+        String getTableName() {
+            return TableHelper.getTableName(this.oldSchema.table);
+        }
+
+        long maxId() {
+            return SchemaChangeUtility.maxId(client, this.oldSchema.table, config.noProgressTimeout);
+        }
+
+        /**
+         * Implements DDL batch execution and error tracking.
+         */
+        class DDLBatch {
+            StringBuilder ddl = null;
+            String lastSuccessfulDDL = null;
+            String lastFailureDDL = null;
+            String lastFailureError = null;
+            String expectedError = null;
+
+            void begin() {
+                this.ddl = new StringBuilder();
+                this.expectedError = null;
             }
 
-            // Do the drops as a separate batch because the UAC-based mechanism currently
-            // doesn't deal well with a batch dropping and re-creating an existing table.
-            // The catalog update implementation ignores this stage. The stage is skipped
-            // during retries when V# isn't found because the drop batch had succeeded.
-            if (!skipDrops) {
-                this.logStage("drop");
-                schemaChanger.beginBatch();
+            void add(String queryFmt, Object... params) {
+                if (this.ddl.length() > 0) {
+                    this.ddl.append(_F(";%n"));
+                }
+                if (queryFmt.endsWith(";")) {
+                    queryFmt = queryFmt.substring(0, queryFmt.length() - 1);
+                }
+                this.ddl.append(_F(queryFmt, params));
+            }
+
+            BatchResult execute() throws IOException {
+                String ddlString = this.ddl.toString();
+                BatchResult result = BatchResult.BATCH_SUCCEEDED;
                 try {
-                    // Force failure?
-                    if (failBot.failHere("in drop batch")) {
-                        schemaChanger.addForcedFailure();
-                    }
-                    schemaChanger.dropTables(_F("V%d", schemaVersionNo));
-                    if (activeViewRep != null) {
-                        schemaChanger.dropViews(activeViewRep.viewName);
-                    }
-                    activeViewRep = this.newViewRep;
-                    if (activeVerifyProc != null) {
-                        schemaChanger.dropProcedures(activeVerifyProc.getName());
-                    }
-                    if (newTable) {
-                        if (activeTableNames.contains(this.newName)) {
-                            schemaChanger.dropTables(this.newName);
-                            activeTableNames.remove(this.newName);
+                    if (ddlString.length() > 0) {
+                        log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
+                        String error = execLiveDDL(client, ddlString, false);
+                        if (error == null) {
+                            // hoooey!
+                            this.lastSuccessfulDDL = ddlString;
+                            // the caller may be disappointed by success
+                            if (this.expectedError != null) {
+                                die("Expected an error containing '%s', but the batch succeeded.",
+                                    this.expectedError);
+                            }
+                        }
+                        else {
+                            // blowed up good!
+                            if (this.expectedError != null) {
+                                // expected an error, check that it's the right one
+                                if (this.expectedError.length() == 0) {
+                                    result = BatchResult.BATCH_FAILED_AS_EXPECTED;
+                                    log.info("Ignored expected error.");
+                                }
+                                else if (error.contains(this.expectedError)) {
+                                    result = BatchResult.BATCH_FAILED_AS_EXPECTED;
+                                    log.info(_F("Ignored expected error containing '%s'.", this.expectedError));
+                                }
+                                else {
+                                    result = BatchResult.BATCH_FAILED;  // not really used, but correct
+                                    die("Expected an error containing '%s'.", this.expectedError);
+                                }
+                            }
+                            else {
+                                result = BatchResult.BATCH_FAILED;
+                                this.lastFailureDDL = ddlString;
+                                this.lastFailureError = error;
+                            }
                         }
                     }
-                    if (!schemaChanger.executeBatch(client)) {
-                        return null;
-                    }
-                    activeViewRep = null;
-                    activeVerifyProc = null;
                 }
-                catch (IOException e) {
-                    // All SchemaChanger problems become IOExceptions.
-                    // This is a normal error return that is handled by the caller.
-                    return null;
+                finally {
+                    this.ddl = null;
                 }
+                return result;
             }
 
-            // Now do the creates and alters.
-            this.logStage("create/alter");
-            schemaChanger.beginBatch();
-            this.count = 0;
-            this.start = 0;
-            this.provisionalActiveVerifyProc = null;
-            try {
-                // Force failure?
-                if (failBot.failHere("in create/alter batch")) {
-                    schemaChanger.addForcedFailure();
+            void setExpectedError() {
+                this.setExpectedError("");
+            }
+
+            void setExpectedError(String expectedError) {
+                // assume that the first error specified is the one that will happen
+                if (this.expectedError == null) {
+                    this.expectedError = expectedError;
                 }
-                schemaChanger.createTables(this.versionT);
-                // make tables name A partitioned and tables named B replicated
-                boolean partitioned = this.newName.equalsIgnoreCase("A");
-                if (newTable) {
-                    schemaChanger.createTables(this.t2);
-                }
-                else {
-                    schemaChanger.updateTable(t1, this.t2);
-                }
-                if (partitioned) {
-                    schemaChanger.addTablePartitionInfo(this.t2, this.newName);
-                    this.provisionalActiveVerifyProc = VerifySchemaChangedA.class;
-                }
-                else {
-                    this.provisionalActiveVerifyProc = VerifySchemaChangedB.class;
-                }
-                schemaChanger.createProcedures(client, this.provisionalActiveVerifyProc);
-                if (activeViewRep != null) {
-                    schemaChanger.createViews(activeViewRep);
+            }
+        }
+
+        // DDL batch handler is reused for all batches.
+        DDLBatch batch = new DDLBatch();
+
+        /**
+         * Perform schema changes with retry logic.
+         *
+         * Perform a schema change to a mutated version of the current table (80%) or
+         * to a new table entirely (20%, drops and adds the new table).
+         *
+         * Returns the ChangeType because a retry that goes backward more than one
+         * version may switch to CREATE to restart from a fresh table.
+         */
+        ChangeType catalogChange(ChangeType reqChangeType) throws Exception {
+
+            // change type may change for retry
+            ChangeType changeType = reqChangeType;
+
+            log.info(_F("::::: Catalog Change: %s%s :::::",
+                    changeType.toString(), this.oldSchema == null ? " FIRST" : ""));
+
+            // table mutation requires a current schema to mutate
+            assert(changeType == ChangeType.CREATE || this.oldSchema != null);
+
+            // add empty table with schema version number in name
+            this.versionT = TableHelper.quickTable(_F("V%d (BIGINT)", schemaVersionNo + 1));
+            // create or mutate table
+            if (changeType == ChangeType.CREATE) {
+                this.newSchema = createSchema();
+            }
+            else {
+                this.newSchema = mutateSchema();
+            }
+
+            int retryCount = 0;
+            BatchResult result = this.executeChanges(changeType, false);
+            while (result != BatchResult.BATCH_SUCCEEDED) {
+                //=== retry
+
+                // If V<next> is present there is nothing to retry, just finish what we started.
+                // findSchemaVersion() retries internally if the connection is still bad.
+                int actualSchemaVersionNo = findSchemaVersion();
+                if (actualSchemaVersionNo == schemaVersionNo + 1) {
+                    log.info(_F("The new version table V%d is present, not retrying.", schemaVersionNo+1));
+                    break;
                 }
 
-                this.count = tupleCount(t1);
+                // set up for a retry if the limit hasn't been reached
+                retryCount++;
+                if (retryCount > config.retryLimit) {
+                    this.die("Retry limit (%d) exceeded.", config.retryLimit);
+                }
+
+                // If behind by exactly 1 version then the current changes can be retried.
+                // Recovery from async command logs could put us more than one version behind.
+                if (actualSchemaVersionNo < schemaVersionNo) {
+                    // Behind by more than 1 version.
+                    // Reset the current version number and retry with a fresh create.
+                    // Can't (easily) retry mutations on an arbitrarily old schema version.
+                    schemaVersionNo = actualSchemaVersionNo;
+                    if (changeType != ChangeType.CREATE) {
+                        changeType = ChangeType.CREATE;
+                        this.newSchema = createSchema();
+                    }
+                }
+
+                log.info(_F("::::: Catalog Change (retry #%d): %s :::::", retryCount, changeType.toString()));
+                if (result != BatchResult.BATCH_FAILED_AS_EXPECTED) {
+                    // sleep before retrying when its an unexpected failure
+                    log.info(_F("Sleeping %d seconds...", config.retrySleep));
+                    Thread.sleep(config.retrySleep * 1000);
+                }
+
+                // give it another go
+                result = this.executeChanges(changeType, true);
+            }
+
+            this.catalogChangeComplete(changeType);
+
+            return changeType;
+        }
+
+        /**
+         * Internal implementation to execute the DDL changes.
+         */
+        private BatchResult executeChanges(ChangeType changeType, boolean isRetry) throws Exception {
+            /*
+             * === Drop Batch ===
+             *
+             * Perform the drops as a separate batch because the catalog diff doesn't deal well
+             * with a drop and create of an existing object in the same batch. E.g. dropping and
+             * re-creating a table ends up altering the table without dropping it.
+             *
+             * It's always safe to re-run the drop batch, e.g. during a retry, because all the
+             * DROP statements have IF EXISTS clauses. I.e. don't need to know whether the
+             * failure occured during the drop or the create/alter batch.
+             */
+            batch.begin();
+            try {
+                batch.add("DROP VIEW MV IF EXISTS");
+                batch.add("DROP PROCEDURE VerifySchemaChangedA IF EXISTS");
+                batch.add("DROP PROCEDURE VerifySchemaChangedB IF EXISTS");
+                // drop all existing tables if creating a new one
+                if (changeType == ChangeType.CREATE) {
+                    batch.add("DROP TABLE A IF EXISTS");
+                    batch.add("DROP TABLE B IF EXISTS");
+                }
+                log.info("Starting to drop database objects.");
+                BatchResult result = batch.execute();
+                if (result != BatchResult.BATCH_SUCCEEDED) {
+                    return result;
+                }
+            }
+            catch (IOException e) {
+                return BatchResult.BATCH_FAILED;
+            }
+
+            /*
+             * === Create/Alter Batch ===
+             */
+            batch.begin();
+            try {
+                // Drop the version table as part of the create/mutate transaction batch.
+                batch.add("DROP TABLE V%d IF EXISTS", schemaVersionNo);
+
+                // Force failure before executing the batch?
+                // Don't do on the first run (currentSchema!=null).
+                if (this.oldSchema != null && config.retryForcedPercent > rand.nextInt(100)) {
+                    log.info(_F("Forcing failure"));
+                    batch.add("CREATE DEATH FOR BATCH");
+                    // expect some error, don't care what
+                    batch.setExpectedError();
+                }
+
+                // create version table
+                batch.add(TableHelper.ddlForTable(this.versionT));
+
+                /*
+                 * Create or mutate test table (A or B).
+                 * When mutating randomly create a unique index if an extra column exists
+                 * for that purpose. Expect it to succeed when empty or fail when not.
+                 * Don't create the index more than once because it isn't dropped.
+                 */
+                switch (changeType) {
+                  case CREATE:
+                    batch.add(TableHelper.ddlForTable(this.newSchema.table));
+                    this.count = 0;
+                    break;
+
+                  case MUTATE_EMPTY:
+                    if (!isRetry && this.mutationCount == 1 && this.newSchema.uniqueIndexName != null) {
+                        batch.add("CREATE UNIQUE INDEX %s ON %s (%s)",
+                                  this.newSchema.uniqueIndexName,
+                                  this.newSchema.tableName,
+                                  this.newSchema.uniqueColumnName);
+                    }
+                    batch.add(TableHelper.getAlterTableDDLToMigrate(
+                                    this.oldSchema.table, this.newSchema.table));
+                    this.count = tupleCount(this.oldSchema.table);
+                    break;
+
+                  case MUTATE_NONEMPTY:
+                    // unique index creation fails when not empty
+                    if (!isRetry && this.mutationCount == 1 && this.newSchema.uniqueIndexName != null) {
+                        batch.add("CREATE UNIQUE INDEX %s ON %s (%s)",
+                                  this.newSchema.uniqueIndexName,
+                                  this.newSchema.tableName,
+                                  this.newSchema.uniqueColumnName);
+                        if (changeType == ChangeType.MUTATE_NONEMPTY) {
+                            batch.setExpectedError("is not empty.");
+                        }
+                    }
+                    batch.add(TableHelper.getAlterTableDDLToMigrate(
+                                    this.oldSchema.table, this.newSchema.table));
+                    this.count = tupleCount(this.oldSchema.table);
+                    break;
+                }
+
+                // partition table
+                if (this.newSchema.partitioned) {
+                    batch.add("PARTITION TABLE %s ON COLUMN %s",
+                              this.newSchema.tableName, this.newSchema.pkeyName);
+                }
+
+                // create verify procedure
+                batch.add("CREATE PROCEDURE FROM CLASS %s", this.newSchema.verifyProc.getName());
+                if (this.newSchema.viewRep != null) {
+                    batch.add(this.newSchema.viewRep.ddlForView());
+                }
+
                 this.start = System.nanoTime();
 
-                if (newTable) {
+                if (changeType == ChangeType.CREATE) {
                     log.info("Starting to swap tables.");
                 }
                 else {
                     log.info("Starting to change schema.");
                 }
 
-                if (!schemaChanger.executeBatch(client)) {
-                    return null;
-                }
-
-                // Exercise the retry logic by simulating a communication failure after
-                // successfully executing the batch. (t1 test avoids failing initial call)
-                if (failBot.failHere("after create/alter batch")) {
-                    return null;
-                }
+                return batch.execute();
             }
             catch (IOException e) {
                 // All SchemaChanger problems become IOExceptions.
                 // This is a normal error return that is handled by the caller.
-                return null;
+                return BatchResult.BATCH_FAILED;
             }
-
-            return finishUpdate(newTable);
         }
 
-        private Pair<VoltTable, TableHelper.ViewRep> finishUpdate(boolean newTable)
+        private void catalogChangeComplete(ChangeType changeType)
         {
-            if (newTable) {
-                activeTableNames.add(this.newName);
-            }
-            activeVerifyProc = this.provisionalActiveVerifyProc;
-
-            // We presumably succeeded, so it's no longer a retry situation.
-            this.retryCount = 0;
-
             // don't actually trust the call... manually verify
             int obsCatVersion = verifyAndGetSchemaVersion();
             // UAC worked
             if (obsCatVersion == schemaVersionNo) {
-                log.error(_F("Catalog update was reported to be successful but did not pass "
-                           + "verification: expected V%d, observed V%d",
-                             schemaVersionNo+1, obsCatVersion));
-                assert(false);
-                System.exit(-1);
+                this.die("Catalog update was reported to be successful but did not pass "
+                        + "verification: expected V%d, observed V%d",
+                        schemaVersionNo+1, obsCatVersion);
             }
 
             if (obsCatVersion == schemaVersionNo+1) {
                 schemaVersionNo++;
             }
             else {
-                assert(false);
-                System.exit(-1);
+                SchemaChangeUtility.die(false, null);
             }
 
             long end = System.nanoTime();
             double seconds = (end - this.start) / 1000000000.0;
 
-            if (newTable) {
+            if (changeType == ChangeType.CREATE) {
                 log.info(_F("Completed table swap in %.4f seconds", seconds));
             }
-            else {
-                log.info(_F("Completed %d tuples in %.4f seconds (%d tuples/sec)",
+            else if (this.count > 0) {
+                log.info(_F("Completed table mutation with %d tuples in %.4f seconds (%d tuples/sec)",
                             this.count, seconds, (long) (this.count / seconds)));
+            } else {
+                log.info(_F("Completed empty table mutation in %.4f seconds", seconds));
             }
-            return new Pair<VoltTable,TableHelper.ViewRep>(this.t2, this.newViewRep, false);
+
+            // the new/mutated schema becomes the current one
+            this.oldSchema = this.newSchema;
+            this.newSchema = null;
         }
 
-        private void logStage(final String action) {
-            // Only log with retries because a stage might be skipped.
-            if (this.retryCount > 0) {
-                log.info(_F("Retry #%d: %s", this.retryCount, action));
+        private CatalogChangeSchema createSchema()
+        {
+            // Invert the partitioning and flip the table name.
+            // make tables name A partitioned and tables named B replicated
+            final boolean partitioned = this.oldSchema == null || !this.oldSchema.partitioned;
+            final String tableName = partitioned ? "A" : "B";
+            final TableHelper.RandomTable ranTable = helper.getTotallyRandomTable(tableName, partitioned);
+            final TableHelper.ViewRep viewRep = this.makeViewRep(ranTable.table);
+            final String pkeyName = ranTable.table.getColumnName(ranTable.bigintPrimaryKey);
+            // unique column, if present, is one column that immediately follows random columns
+            assert(ranTable.numExtraColumns == 0 || ranTable.numExtraColumns == 1);
+            final String uniqueColumnName = ranTable.numExtraColumns != 0
+                    ? ranTable.table.getColumnName(ranTable.numRandomColumns) : null;
+            final String uniqueIndexName = uniqueColumnName != null
+                    ? String.format("IX_%s_%s", tableName, uniqueColumnName) : null;
+            final Class<?> verifyClass = partitioned ? VerifySchemaChangedA.class : VerifySchemaChangedB.class;
+            CatalogChangeSchema schema = new CatalogChangeSchema(
+                    ranTable.table,
+                    viewRep,
+                    tableName,
+                    partitioned,
+                    pkeyName,
+                    uniqueColumnName,
+                    uniqueIndexName,
+                    verifyClass);
+            this.mutationCount = 0;
+            return schema;
+        }
+
+        private CatalogChangeSchema mutateSchema()
+        {
+            assert(this.oldSchema != null);
+            VoltTable mutatedTable = helper.mutateTable(this.oldSchema.table, true);
+            TableHelper.ViewRep mutatedViewRep = this.makeViewRep(mutatedTable);
+            CatalogChangeSchema schema = this.oldSchema.mutate(mutatedTable, mutatedViewRep);
+            this.mutationCount++;
+            return schema;
+        }
+
+        TableHelper.ViewRep makeViewRep(VoltTable table) {
+            TableHelper.ViewRep viewRep = this.oldSchema != null ? this.oldSchema.viewRep : null;
+            if (viewRep == null) {
+                viewRep = helper.viewRepForTable("MV", table);
             }
-        }
-    }
-
-    interface SchemaChanger {
-        void addProcedureClasses(Client client, Class<?>... procedures) throws IOException;
-        void beginBatch();
-        void createTables(VoltTable... tables) throws IOException;
-        void createViews(ViewRep... views) throws IOException;
-        void createProcedures(Client client, Class<?>... procedures) throws IOException;
-        void dropTables(String... names) throws IOException;
-        void dropViews(String... names) throws IOException;
-        void dropProcedures(String... names) throws IOException;
-        void updateTable(VoltTable t1, VoltTable t2) throws IOException;
-        void addTablePartitionInfo(VoltTable table, String name) throws IOException;
-        void addForcedFailure() throws IOException;
-        boolean executeBatch(Client client) throws IOException;
-    }
-
-    /**
-     * SchemaChanger subclass that uses catalog updates.
-     */
-    static class CatalogSchemaChanger implements SchemaChanger {
-
-        CatalogBuilder builder = null;
-        byte[] catalogData = null;
-        boolean isNOP = true;   // Set to false with the first real action of a batch
-
-        CatalogSchemaChanger() {
-        }
-
-        @Override
-        public void addProcedureClasses(Client client, Class<?>... procedures) throws IOException {
-        }
-
-        @Override
-        public void beginBatch() {
-            this.isNOP = true;
-            this.builder = new CatalogBuilder();
-        }
-
-        @Override
-        public void createTables(VoltTable... tables) throws IOException {
-            this.isNOP = false;
-            for (VoltTable table : tables) {
-                log.info(_F("New Table:\n%s", TableHelper.ddlForTable(table)));
-                this.builder.addLiteralSchema(TableHelper.ddlForTable(table));
-            }
-        }
-
-        @Override
-        public void createViews(ViewRep... views) throws IOException {
-            this.isNOP = false;
-            for (ViewRep view : views) {
-                log.info(_F("New View:\n%s", view.ddlForView()));
-                this.builder.addLiteralSchema(view.ddlForView());
-            }
-        }
-
-        @Override
-        public void createProcedures(Client client, Class<?>... procedures) throws IOException {
-            this.isNOP = false;
-            this.builder.addProcedures(procedures);
-        }
-
-        @Override
-        public void dropTables(String... names) throws IOException {
-        }
-
-        @Override
-        public void dropViews(String... names) throws IOException {
-        }
-
-        @Override
-        public void dropProcedures(String... names) throws IOException {
-        }
-
-        @Override
-        public void updateTable(VoltTable t1, VoltTable t2) throws IOException {
-            this.isNOP = false;
-            log.info(_F("Update Table:\n%s", TableHelper.ddlForTable(t2)));
-            this.createTables(t2);
-        }
-
-        @Override
-        public void addTablePartitionInfo(VoltTable table, String name) throws IOException {
-            int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(table);
-            this.builder.addPartitionInfo(name, table.getColumnName(pkeyIndex));
-        }
-
-        @Override
-        public void addForcedFailure() throws IOException {
-            // Unimplemented.
-        }
-
-        @Override
-        public boolean executeBatch(Client client) throws IOException {
-            boolean success = true;
-            try {
-                if (!this.isNOP) {
-                    this.catalogData = this.builder.compileToBytes();
-                    assert(this.catalogData != null);
-                    success = execUpdate(client, "@UpdateApplicationCatalog", catalogData, false);
+            else {
+                if (!viewRep.compatibleWithTable(table)) {
+                    viewRep = null;
                 }
             }
-            finally {
-                this.builder = null;
-                this.isNOP = true;  // belt and suspenders
+            return viewRep;
+        }
+
+        /**
+         * Check sample and return error string on failure.
+         */
+        String checkSample(SampleResults sampleResults) throws Exception {
+            VoltTable guessT = this.oldSchema.table.clone(4096 * 1024);
+            //log.info(_F("Empty clone:\n%s", guessT.toFormattedString()));
+
+            TableHelper.migrateTable(sampleResults.table, guessT);
+            //log.info(_F("Java migration:\n%s", guessT.toFormattedString()));
+
+            // deterministically sample the same rows
+            assert(sampleResults.sampleOffset >= 0);
+            ClientResponse cr = callROProcedureWithRetry("VerifySchemaChanged" + this.getTableName(),
+                                                         sampleResults.sampleOffset, guessT);
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            VoltTable result = cr.getResults()[0];
+            if (result.fetchRow(0).getLong(0) != 1) {
+                return result.fetchRow(0).getString(1);
             }
-            return success;
-        }
-    }
-
-    /**
-     * SchemaChanger subclass that uses ad hoc DDL.
-     */
-    static class DDLSchemaChanger implements SchemaChanger {
-
-        StringBuilder ddl = null;
-
-        DDLSchemaChanger() {
+            return null;
         }
 
-        @Override
-        public void addProcedureClasses(Client client, Class<?>... procedures) throws IOException {
+        // Dump the schema to help with debugging.
+        void dumpSchema(StringBuilder sb) {
+            sb.append(":::: Schema Dump ::::\n\n");
+            sb.append(":: TABLES ::\n\n");
+            ClientResponse cr = callROProcedureWithRetry("@SystemCatalog", "TABLES");
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            for (VoltTable t : cr.getResults()) {
+                while (t.advanceRow()) {
+                    sb.append(_F("%s: %s\n", t.getString("TABLE_TYPE"), t.getString("TABLE_NAME")));
+                }
+            }
+            sb.append("\n");
+            sb.append(":: COLUMNS ::\n\n");
+            cr = callROProcedureWithRetry("@SystemCatalog", "COLUMNS");
+            String lastTableName = null;
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            for (VoltTable t : cr.getResults()) {
+                while (t.advanceRow()) {
+                    String tableName = t.getString("TABLE_NAME");
+                    if (lastTableName != null && !lastTableName.equals(tableName)){
+                        sb.append("\n");
+                    }
+                    lastTableName = tableName;
+                    sb.append(_F("%s.%s %s\n", tableName, t.getString("COLUMN_NAME"), t.getString("TYPE_NAME")));
+                }
+            }
+            sb.append("\n");
+            sb.append(":: PROCEDURES ::\n\n");
+            cr = callROProcedureWithRetry("@SystemCatalog", "PROCEDURES");
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            for (VoltTable t : cr.getResults()) {
+                while (t.advanceRow()) {
+                    String procName = t.getString("PROCEDURE_NAME");
+                    if (!procName.endsWith(".insert") && !procName.endsWith(".update") && !procName.endsWith(".delete") && !procName.endsWith(".upsert")) {
+                        sb.append(_F("%s\n", procName));
+                    }
+                }
+            }
+        }
+
+        void die(final String format, Object... params) {
+
+            StringBuilder sb = new StringBuilder("FATAL ERROR\n\n");
+            this.dumpSchema(sb);
+            sb.append("\n");
+            sb.append(":::: Live DDL Post-Mortem ::::\n\n");
+            if (this.batch.lastSuccessfulDDL != null) {
+                sb.append(_F(":: Last successful DDL ::\n\n%s\n", this.batch.lastSuccessfulDDL));
+            }
+            sb.append("\n");
+            if (this.batch.lastFailureDDL != null) {
+                sb.append(_F(":: Last (unforced) failure DDL ::\n\n%s\n", this.batch.lastFailureDDL));
+            }
+            sb.append("\n");
+            if (this.batch.lastFailureError != null) {
+                sb.append(_F(":: Last (unforced) failure error ::\n\n%s\n", this.batch.lastFailureError));
+            }
+            sb.append("\n:::: Error ::::\n\n");
+            sb.append(_F(format, params));
+            sb.append("\n");
+            SchemaChangeUtility.die(false, sb.toString());
+        }
+
+        void addProcedureClasses(Client client, Class<?>... procedures) throws IOException {
             // Use @UpdateClasses to inject procedure(s).
             InMemoryJarfile jar = VoltCompilerUtils.createClassesJar(procedures);
             // true => fail hard with exception.
             execUpdate(client, "@UpdateClasses", jar.getFullJarBytes(), true);
-        }
-
-        @Override
-        public void beginBatch() {
-            this.ddl = new StringBuilder();
-        }
-
-        @Override
-        public void createTables(VoltTable... tables) throws IOException {
-            for (VoltTable table : tables) {
-                this.add(TableHelper.ddlForTable(table));
-            }
-        }
-
-        @Override
-        public void createViews(ViewRep... views) throws IOException {
-            for (ViewRep view : views) {
-                this.add(view.ddlForView());
-            }
-        }
-
-       @Override
-       public void createProcedures(Client client, Class<?>... procedures) throws IOException {
-           // Prepare CREATE PROCEDURE DDL statement(s).
-           for (final Class<?> procedure : procedures) {
-               this.add(_F("CREATE PROCEDURE FROM CLASS %s", procedure.getName()));
-           }
-       }
-
-        @Override
-        public void dropTables(String... names) throws IOException {
-            for (String name : names) {
-                this.add(_F("DROP TABLE %s IF EXISTS", name));
-            }
-        }
-
-        @Override
-        public void dropViews(String... names) throws IOException {
-            for (String name : names) {
-                this.add(_F("DROP VIEW %s IF EXISTS", name));
-            }
-        }
-
-        @Override
-        public void dropProcedures(String... names) throws IOException {
-            for (String name : names) {
-                this.add(_F("DROP PROCEDURE %s", name));
-            }
-        }
-
-        @Override
-        public void updateTable(VoltTable t1, VoltTable t2) throws IOException {
-            this.add(TableHelper.getAlterTableDDLToMigrate(t1, t2));
-        }
-
-        @Override
-        public void addTablePartitionInfo(VoltTable table, String name) throws IOException {
-        }
-
-        @Override
-        public void addForcedFailure() throws IOException {
-            this.add("DRIZZLE GOBBLE GUNK");
-        }
-
-        @Override
-        public boolean executeBatch(Client client) throws IOException {
-            String ddlString = this.ddl.toString();
-            boolean success = true;
-            try {
-                if (ddl.length() > 0) {
-                    log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
-                    success = execLiveDDL(client, ddlString, false);
-                }
-            }
-            finally {
-                this.ddl = null;
-            }
-            return success;
-        }
-
-        void add(String query) {
-            if (this.ddl.length() > 0) {
-                this.ddl.append(_F(";%n"));
-            }
-            this.ddl.append(query);
         }
     }
 
@@ -746,12 +801,24 @@ public class SchemaChangeClient {
         if (!isSchemaVersionObservable(version)) {
             if (!isSchemaVersionObservable(++version)) {
                 // version should be one of these two values
-                log.error("Catalog version is out of range");
-                assert(false);
-                System.exit(-1);
+                SchemaChangeUtility.die(false, "Catalog version is out of range");
             }
         }
         //log.info(_F("detected catalog version is: %d", version));
+        return version;
+    }
+
+    /**
+     * Find the current active schema version, e.g. for recovery.
+     */
+    private int findSchemaVersion() {
+        // start with the next schema id and scan backwards
+        int version = schemaVersionNo + 1;
+        for (; version >= 0; --version) {
+            if (isSchemaVersionObservable(version)) {
+                break;
+            }
+        }
         return version;
     }
 
@@ -764,75 +831,16 @@ public class SchemaChangeClient {
     /**
      * Count the number of tuples in the table.
      */
-    private long tupleCount(VoltTable t) {
-        if (t == null) {
+    private long tupleCount(VoltTable table) {
+        if (table == null) {
             return 0;
         }
         ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select count(*) from %s;", TableHelper.getTableName(t)));
+                String.format("select count(*) from %s;", TableHelper.getTableName(table)));
         assert(cr.getStatus() == ClientResponse.SUCCESS);
         VoltTable result = cr.getResults()[0];
         return result.asScalarLong();
     }
-
-    /**
-     * Find the largest pkey value in the table.
-     */
-    public long maxId(VoltTable t) {
-        if (t == null) {
-            return 0;
-        }
-        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select pkey from %s order by pkey desc limit 1;", TableHelper.getTableName(t)));
-        assert(cr.getStatus() == ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        return result.getRowCount() > 0 ? result.asScalarLong() : 0;
-    }
-
-    /**
-     * Add rows until RSS or rowcount target met.
-     * Delete some rows rows (triggers compaction).
-     * Re-add odd rows until RSS or rowcount target met (makes buffers out of order).
-     */
-    private void loadTable(VoltTable t) {
-        // if #partitions is odd, delete every 2 - if even, delete every 3
-        //int n = 3 - (topo.partitions % 2);
-
-        int redundancy = topo.sites / topo.partitions;
-        long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
-        // if replicated
-        if (TableHelper.getTableName(t).equals("B")) {
-            realRowCount /= topo.partitions;
-        }
-
-        long max = maxId(t);
-
-        TableLoader loader = new TableLoader(this, t, rand);
-
-        log.info(_F("loading table"));
-        loader.load(max + 1, realRowCount);
-    }
-
-    /**
-     * Grab some random rows that aren't on the first EE page for the table.
-     */
-    private VoltTable sample(long offset, VoltTable t) {
-        VoltTable t2 = t.clone(4096 * 1024);
-
-        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select * from %s where pkey >= %d order by pkey limit 100;",
-                        TableHelper.getTableName(t), offset));
-        assert(cr.getStatus() == ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        result.resetRowPosition();
-        while (result.advanceRow()) {
-            t2.add(result);
-        }
-
-        return t2;
-    }
-
-
 
     /**
      * Connect to a single server with retry. Limited exponential backoff. No
@@ -950,8 +958,7 @@ public class SchemaChangeClient {
                     return;
                 try { Thread.sleep(config.duration * 1000); }
                 catch (Exception e) { }
-                log.info("Duration limit reached, terminating run");
-                System.exit(0);
+                SchemaChangeUtility.die(true, "Duration limit reached, terminating run");
             }
         };
         watchDog th = new watchDog();
@@ -967,84 +974,62 @@ public class SchemaChangeClient {
         // get the topo
         topo = getClusterTopology();
 
-        // The ad hoc DDL mechanism requires the procs be available on the server.
-        schemaChanger.addProcedureClasses(client, VerifySchemaChangedA.class, VerifySchemaChangedB.class);
-
         CatalogChangeTestDriver testDriver = new CatalogChangeTestDriver();
 
-        // kick this off with a random schema
-        VoltTable t = null;
-        TableHelper.ViewRep v = null;
-        while (t == null) {
-            Pair<VoltTable, TableHelper.ViewRep> schema = testDriver.catalogChange(null, true, null, false);
-            t = schema.getFirst();
-            v = schema.getSecond();
-        }
+        // The ad hoc DDL mechanism requires the procs be available on the server.
+        testDriver.addProcedureClasses(client, VerifySchemaChangedA.class, VerifySchemaChangedB.class);
 
+        // kick off with a random new table schema
+        testDriver.catalogChange(ChangeType.CREATE);
+        boolean tableHasData = false;
+
+        // Main test loop. Exits by exception, including running out of time.
         while (true) {
 
-            // make sure the table is full and mess around with it
-            loadTable(t);
+            /*
+             *  Randomly decide what happens this cycle.
+             *  Whether or not a mutation happens against an empty table is determined
+             *  by the data that remains from previous test cycles. This cycle's data
+             *  loading optionally occurs at the end, after creation/mutation.
+             */
+            ChangeType changeType = (rand.nextInt(100) < percentNewTable
+                                        ? ChangeType.CREATE
+                                        : (tableHasData
+                                            ? ChangeType.MUTATE_NONEMPTY
+                                            : ChangeType.MUTATE_EMPTY));
 
-            for (int j = 0; j < 3; j++) {
+            boolean addDataToTable = rand.nextInt(100) < percentLoadTable;
 
-                String tableName = TableHelper.getTableName(t);
-
-                // deterministically sample some rows
-                VoltTable preT = null;
-                long max = maxId(t);
-                long sampleOffset = -1;
-                if (max > 0) {
-                    if (max <= 100)
-                        sampleOffset = 0;
-                    else
-                        sampleOffset = Math.min((long) (max * .75), max - 100);
-                    assert(max >= 0);
-                    preT = sample(sampleOffset, t);
-                    assert(preT.getRowCount() > 0);
-                    log.info(_F("Sampled table %s from offset %d limit 100 and found %d rows.",
-                            tableName, sampleOffset, preT.getRowCount()));
-                }
+            // deterministically sample some rows if there's data
+            CatalogChangeTestDriver.SampleResults sampleResults = null;
+            if (tableHasData && changeType != ChangeType.CREATE) {
+                sampleResults = testDriver.sampleRows();
                 //log.info(_F("First sample:\n%s", preT.toFormattedString()));
+            }
 
-                // move to an entirely new table or migrated schema
-                VoltTable newT = null;
-                TableHelper.ViewRep newV = null;
-                boolean isNewTable = (j == 0) && (rand.nextInt(5) == 0);
-                boolean isRetry = false;
-                while (newT == null) {
-                    Pair<VoltTable, TableHelper.ViewRep> schema = testDriver.catalogChange(t, isNewTable, v, isRetry);
-                    if (schema == null) {
-                        isRetry = true;
-                    } else {
-                        isRetry = false;
-                        newT = schema.getFirst();
-                        newV = schema.getSecond();
+            // perform the changes, retrying as needed
+            changeType = testDriver.catalogChange(changeType);
+
+            // there's no more data if a new table was created
+            if (changeType == ChangeType.CREATE) {
+                tableHasData = false;
+            }
+
+            // if the table has been migrated check the sampled data
+            if (tableHasData) {
+                assert(sampleResults != null);
+                if (sampleResults.table != null) {
+                    String err = testDriver.checkSample(sampleResults);
+                    if (err != null) {
+                        SchemaChangeUtility.die(false, err);
                     }
                 }
-                t = newT;
-                v = newV;
+            }
 
-                // if the table has been migrated, check the data
-                if (!isNewTable && (preT != null)) {
-                    VoltTable guessT = t.clone(4096 * 1024);
-                    //log.info(_F("Empty clone:\n%s", guessT.toFormattedString()));
-
-                    TableHelper.migrateTable(preT, guessT);
-                    //log.info(_F("Java migration:\n%s", guessT.toFormattedString()));
-
-                    // deterministically sample the same rows
-                    assert(sampleOffset >= 0);
-                    ClientResponse cr = callROProcedureWithRetry("VerifySchemaChanged" + tableName, sampleOffset, guessT);
-                    assert(cr.getStatus() == ClientResponse.SUCCESS);
-                    VoltTable result = cr.getResults()[0];
-                    boolean success = result.fetchRow(0).getLong(0) == 1;
-                    String err = result.fetchRow(0).getString(1);
-                    if (!success) {
-                        log.error(_F(err));
-                        assert(false);
-                    }
-                }
+            // load the table with some data?
+            if (addDataToTable) {
+                testDriver.loadTable();
+                tableHasData = true;
             }
         }
     }
@@ -1094,10 +1079,9 @@ public class SchemaChangeClient {
             case ClientResponse.GRACEFUL_FAILURE:
             case ClientResponse.USER_ABORT:
                 // should never happen
-                log.error(_F("USER_ABORT in procedure call for Catalog update"));
-                log.error(((ClientResponseImpl)cr).toJSONString());
-                assert(false);
-                System.exit(-1);
+                SchemaChangeUtility.die(false,
+                        "USER_ABORT in procedure call for Catalog update: %s",
+                        ((ClientResponseImpl)cr).toJSONString());
             }
         }
 
@@ -1111,24 +1095,24 @@ public class SchemaChangeClient {
     }
 
     /**
-     * Execute live DDL.
+     * Execute DDL and returns an error string for failure or null for success.
      */
-    private static boolean execLiveDDL(Client client, String ddl, boolean hardFail) throws IOException
+    private static String execLiveDDL(Client client, String ddl, boolean hardFail) throws IOException
     {
-        boolean success = false;
+        String error = null;
         ClientResponse cr = null;
         try {
             cr = client.callProcedure("@AdHoc", ddl);
-            success = true;
         }
         catch (NoConnectionsException e) {
+            error = e.getLocalizedMessage();
         }
         catch (ProcCallException e) {
-            log.error(_F("Procedure @AdHoc call exception: %s", e.getMessage()));
+            error = _F("Procedure @AdHoc call exception: %s", e.getLocalizedMessage());
             cr = e.getClientResponse();
         }
 
-        if (success && cr != null) {
+        if (error == null && cr != null) {
             switch (cr.getStatus()) {
             case ClientResponse.SUCCESS:
                 // hooray!
@@ -1139,25 +1123,27 @@ public class SchemaChangeClient {
             case ClientResponse.RESPONSE_UNKNOWN:
             case ClientResponse.SERVER_UNAVAILABLE:
                 // can try again after a break
-                success = false;
+                error = String.format("Communication error: %s", cr.getStatusString());
                 break;
             case ClientResponse.UNEXPECTED_FAILURE:
             case ClientResponse.GRACEFUL_FAILURE:
             case ClientResponse.USER_ABORT:
                 // should never happen
-                log.error(_F("USER_ABORT in procedure call for live DDL"));
-                log.error(((ClientResponseImpl)cr).toJSONString());
-                assert(false);
-                System.exit(-1);
+                SchemaChangeUtility.die(false,
+                        "USER_ABORT in procedure call for live DDL: %s",
+                        ((ClientResponseImpl)cr).toJSONString());
             }
         }
 
-        // Fail hard or allow retries?
-        if (!success && hardFail) {
-            String msg = (cr != null ? ((ClientResponseImpl)cr).toJSONString() : _F("Unknown @AdHoc failure"));
-            throw new IOException(msg);
+        if (error != null) {
+            log.error(error);
+            // Fail hard (or allow retries)?
+            if (hardFail) {
+                String msg = (cr != null ? ((ClientResponseImpl)cr).toJSONString() : _F("Unknown @AdHoc failure"));
+                throw new IOException(msg);
+            }
         }
 
-        return success;
+        return error;
     }
 }

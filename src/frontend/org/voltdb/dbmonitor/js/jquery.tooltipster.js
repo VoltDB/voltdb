@@ -383,11 +383,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 										});
 									}
 									
-									// as for mouse interaction, we get rid of the tooltip only after the mouse has spent some time out of it
+									// as for mouse interaction, we get rid of the tooltip only after the mouse has spent some time of it
 									var tolerance = null;
 									
 									self.$elProxy.add(self.$tooltip)
-										// hide after some time out of the proxy and the tooltip
+										// hide after some timeout of the proxy and the tooltip
 										.on('mouseleave.'+ self.namespace + '-autoClose', function() {
 											clearTimeout(tolerance);
 											tolerance = setTimeout(function(){

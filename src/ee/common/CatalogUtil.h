@@ -40,17 +40,23 @@ bool isTableExportOnly(catalog::Database const & database, int32_t tableIndex) {
         return false;
     }
 
-    // there is one well-known-named connector
-    catalog::Connector *connector = database.connectors().get("0");
-
-    // iterate the connector tableinfo list looking for tableindex
-    std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
-    for (it = connector->tableInfo().begin();
-         it != connector->tableInfo().end();
-         it++)
+    // iterate through all connectors
+    std::map<std::string, catalog::Connector*>::const_iterator connIter;
+    for (connIter = database.connectors().begin();
+         connIter != database.connectors().end();
+         connIter++)
     {
-        if (it->second->table()->relativeIndex() == tableIndex) {
-            return it->second->appendOnly();
+        catalog::Connector *connector = connIter->second;
+
+        // iterate the connector tableinfo list looking for tableIndex matches
+        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
+        for (it = connector->tableInfo().begin();
+             it != connector->tableInfo().end();
+             it++)
+        {
+            if (it->second->table()->relativeIndex() == tableIndex) {
+                return true;
+            }
         }
     }
 
@@ -70,22 +76,28 @@ bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIn
         return false;
     }
 
-    // there is one well-known-named connector
-    catalog::Connector *connector = database.connectors().get("0");
-
-    // export is disabled if the connector is disabled
-    if (!(connector->enabled())) {
-        return false;
-    }
-
-    // iterate the connector tableinfo list looking for tableIndex
-    std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
-    for (it = connector->tableInfo().begin();
-         it != connector->tableInfo().end();
-         it++)
+    // iterate through all connectors
+    std::map<std::string, catalog::Connector*>::const_iterator connIter;
+    for (connIter = database.connectors().begin();
+         connIter != database.connectors().end();
+         connIter++)
     {
-        if (it->second->table()->relativeIndex() == tableIndex) {
-            return true;
+        catalog::Connector *connector = connIter->second;
+
+        // skip this connector if disabled
+        if (!connector->enabled()) {
+            continue;
+        }
+
+        // iterate the connector tableinfo list looking for tableIndex matches
+        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
+        for (it = connector->tableInfo().begin();
+             it != connector->tableInfo().end();
+             it++)
+        {
+            if (it->second->table()->relativeIndex() == tableIndex) {
+                return true;
+            }
         }
     }
 

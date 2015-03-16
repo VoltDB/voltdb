@@ -39,7 +39,6 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
-import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.SchemaType;
@@ -87,7 +86,7 @@ public class DeploymentBuilder {
 
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
 
-    // zero defaults to first open port >= 8080.
+    // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
@@ -319,19 +318,19 @@ public class DeploymentBuilder {
         voltdbroot.setPath(m_voltRootPath);
 
         if (m_snapshotPath != null) {
-            PathEntry snapshotPathElement = factory.createPathEntry();
+            PathsType.Snapshots snapshotPathElement = factory.createPathsTypeSnapshots();
             snapshotPathElement.setPath(m_snapshotPath);
             paths.setSnapshots(snapshotPathElement);
         }
 
         if (m_commandLogPath != null) {
-            PathEntry commandLogPathElement = factory.createPathEntry();
+            PathsType.Commandlog commandLogPathElement = factory.createPathsTypeCommandlog();
             commandLogPathElement.setPath(m_commandLogPath);
             paths.setCommandlog(commandLogPathElement);
         }
 
         if (m_internalSnapshotPath != null) {
-            PathEntry commandLogSnapshotPathElement = factory.createPathEntry();
+            PathsType.Commandlogsnapshot commandLogSnapshotPathElement = factory.createPathsTypeCommandlogsnapshot();
             commandLogSnapshotPathElement.setPath(m_internalSnapshotPath);
             paths.setCommandlogsnapshot(commandLogSnapshotPathElement);
         }

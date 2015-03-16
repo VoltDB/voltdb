@@ -69,23 +69,32 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
-import org.codehaus.jackson.map.ObjectMapper;
 
+import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Query;
+import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
@@ -97,6 +106,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestJSONInterface extends TestCase {
 
     ServerThread server;
+    Client client;
 
     static class Response {
 
@@ -118,6 +128,13 @@ public class TestJSONInterface extends TestCase {
         }
         s = s.substring(1);
         return s;
+    }
+
+    static String getHTTPURL(Integer port, String path) {
+        if (port == null) {
+            port = VoltDB.DEFAULT_HTTP_PORT;
+        }
+        return String.format("http://localhost:%d/%s", port, path);
     }
 
     public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
@@ -187,12 +204,21 @@ public class TestJSONInterface extends TestCase {
         return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
     }
 
+    private static String putUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+        return httpUrlOverJSON("PUT", url, user, password, scheme, expectedCode, expectedCt, params);
+    }
+
+    private static String deleteUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+        return httpUrlOverJSON("DELETE", url, user, password, scheme, expectedCode, expectedCt, null);
+    }
+
     private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setRequestMethod(method);
         conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         if (user != null && password != null) {
             if (scheme.equalsIgnoreCase("hashed")) {
                 MessageDigest md = MessageDigest.getInstance("SHA-1");
@@ -347,6 +373,125 @@ public class TestJSONInterface extends TestCase {
 
         return response;
     }
+
+    public void testAJAXAndClientTogether() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            client = ClientFactory.createClient(new ClientConfig());
+            client.createConnection("localhost");
+
+            final AtomicLong fcnt = new AtomicLong(0);
+            final AtomicLong scnt = new AtomicLong(0);
+            final AtomicLong cfcnt = new AtomicLong(0);
+            final AtomicLong cscnt = new AtomicLong(0);
+            final int jsonRunnerCount = 50;
+            final int clientRunnerCount = 50;
+            final ParameterSet pset = ParameterSet.fromArrayNoCopy("select count(*) from foo");
+            String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            Response r = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+            //Do replicated table read.
+            class JSONRunner implements Runnable {
+
+                @Override
+                public void run() {
+                    try {
+                        String rresponseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+                        System.out.println("Response: " + rresponseJSON);
+                        Response rr = responseFromJSON(rresponseJSON);
+                        assertEquals(ClientResponse.SUCCESS, rr.status);
+                        scnt.incrementAndGet();
+                    } catch (Exception ex) {
+                        fcnt.incrementAndGet();
+                        ex.printStackTrace();
+                    }
+                }
+
+            }
+
+            //Do replicated table read.
+            class ClientRunner implements Runnable {
+
+                class Callback implements ProcedureCallback {
+
+                    @Override
+                    public void clientCallback(ClientResponse clientResponse) throws Exception {
+                        if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
+                            cscnt.incrementAndGet();
+                        } else {
+                            System.out.println("Client failed: " + clientResponse.getStatusString());
+                            cfcnt.incrementAndGet();
+                        }
+                    }
+
+                }
+                @Override
+                public void run() {
+                    try {
+                        if (!client.callProcedure(new Callback(), "@AdHoc", "SELECT count(*) from foo")) {
+                            cfcnt.decrementAndGet();
+                        }
+                    } catch (Exception ex) {
+                        fcnt.incrementAndGet();
+                        ex.printStackTrace();
+                    }
+                }
+
+            }
+
+            //Start runners
+            ExecutorService es = CoreUtils.getBoundedSingleThreadExecutor("runners", jsonRunnerCount);
+            for (int i = 0; i < jsonRunnerCount; i++) {
+                es.submit(new JSONRunner());
+            }
+            ExecutorService ces = CoreUtils.getBoundedSingleThreadExecutor("crunners", clientRunnerCount);
+            for (int i = 0; i < clientRunnerCount; i++) {
+                ces.submit(new ClientRunner());
+            }
+
+            es.shutdown();
+            es.awaitTermination(1, TimeUnit.DAYS);
+            assertEquals(jsonRunnerCount, scnt.get());
+            ces.shutdown();
+            ces.awaitTermination(1, TimeUnit.DAYS);
+            client.drain();
+            assertEquals(clientRunnerCount, cscnt.get());
+            responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            r = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+            //Make sure we are still good.
+            ClientResponse resp = client.callProcedure("@AdHoc", "SELECT count(*) from foo");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+            if (client != null) {
+                client.close();
+            }
+        }
+    }
+
 
     public void testAdminMode() throws Exception {
         try {
@@ -640,7 +785,7 @@ public class TestJSONInterface extends TestCase {
             // Call @AdHoc with many parameters (more than 2)
             pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            assertTrue(responseJSON.contains("Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
+            assertTrue(responseJSON.contains("Incorrect number of parameters passed: expected 0, passed 2"));
 
         } finally {
             if (server != null) {
@@ -952,6 +1097,66 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
+    public void testLongQuerySTring() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //create a large query string
+            final StringBuilder b = new StringBuilder();
+            b.append("Procedure=@Statistics&Parameters=[TABLE]&jsonpxx=");
+            for (int i = 0; i < 450000; i++) {
+                b.append(i);
+            }
+            //call multiple times.
+            for (int i = 0; i < 500; i++) {
+                String response = callProcOverJSONRaw(b.toString(), 200);
+                System.out.println(response);
+                Response r = responseFromJSON(response);
+                assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+                //make sure good queries can still work.
+                ParameterSet pset = ParameterSet.fromArrayNoCopy("select * from foo");
+                String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+                System.out.println(responseJSON);
+                r = responseFromJSON(responseJSON);
+                System.out.println(r.statusString);
+                assertEquals(ClientResponse.SUCCESS, r.status);
+            }
+            //make sure good queries can still work after.
+            ParameterSet pset = ParameterSet.fromArrayNoCopy("select * from foo");
+            String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            System.out.println(responseJSON);
+            Response response = responseFromJSON(responseJSON);
+            System.out.println(response.statusString);
+            assertEquals(ClientResponse.SUCCESS, response.status);
+
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
     public void testBinaryProc() throws Exception {
         try {
             String simpleSchema
@@ -1037,8 +1242,8 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 404);
         } finally {
             if (server != null) {
                 server.shutdown();
@@ -1154,7 +1359,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
-            assertEquals(nto, 99);
+            assertEquals(99, nto);
 
             //Test change Query timeout
             SystemSettingsType ss = deptype.getSystemsettings();
@@ -1165,9 +1370,12 @@ public class TestJSONInterface extends TestCase {
             Query qv = ss.getQuery();
             if (qv == null) {
                 qv = new Query();
-                ss.setQuery(qv);
+                qv.setTimeout(99);
+            } else {
                 qv.setTimeout(99);
             }
+            ss.setQuery(qv);
+            deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
@@ -1177,7 +1385,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
-            assertEquals(nto, 99);
+            assertEquals(99, nto);
 
             qv.setTimeout(88);
             ss.setQuery(qv);
@@ -1191,7 +1399,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
-            assertEquals(nto, 88);
+            assertEquals(88, nto);
 
         } finally {
             if (server != null) {
@@ -1378,6 +1586,84 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
+    public void testUsers() throws Exception {
+        try {
+            String simpleSchema
+            = "CREATE TABLE foo (\n"
+            + "    bar BIGINT NOT NULL,\n"
+            + "    PRIMARY KEY (bar)\n"
+            + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            builder.setUseDDLSchema(true);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get users
+            String json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            assertEquals(json, "");
+            getUrlOverJSON("http://localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
+
+            //Put users
+            ObjectMapper mapper = new ObjectMapper();
+            UsersType.User user = new UsersType.User();
+            user.setName("foo");
+            user.setPassword("foo");
+            String map = mapper.writeValueAsString(user);
+            Map<String,String> params = new HashMap<>();
+            params.put("user", map);
+            putUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 201,  "application/json", params);
+
+            //Get users
+            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            JSONArray jarray = new JSONArray(json);
+            assertEquals(jarray.length(), 1);
+            JSONObject jobj = jarray.getJSONObject(0);
+            assertTrue(jobj.getString("id").contains("/deployment/users/foo"));
+            assertTrue(jobj.getString("roles").equalsIgnoreCase("null"));
+
+            //Post users
+            user.setRoles("foo");
+            map = mapper.writeValueAsString(user);
+            params.put("user", map);
+            postUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
+
+            //Get users
+            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            jarray = new JSONArray(json);
+            assertEquals(jarray.length(), 1);
+            jobj = jarray.getJSONObject(0);
+            assertTrue(jobj.getString("roles").equals("foo"));
+
+            //Delete users
+            deleteUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
+
+            //Get users
+            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            assertEquals(json, "");
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
 
     public void testProfile() throws Exception {
         try {
@@ -1418,5 +1704,4 @@ public class TestJSONInterface extends TestCase {
             server = null;
         }
     }
-
 }

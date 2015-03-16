@@ -17,13 +17,14 @@
 
 package org.voltdb;
 
+import java.util.List;
+
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
-
-import java.util.List;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
@@ -69,12 +70,16 @@ public interface SystemProcedureExecutionContext {
 
     public TheHashinator getCurrentHashinator();
 
+    public Procedure ensureDefaultProcLoaded(String procName);
+
     /**
      * Update the EE hashinator with the given configuration.
      */
     public void updateHashinator(TheHashinator hashinator);
 
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
+
+    public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);

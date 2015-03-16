@@ -129,12 +129,12 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
     public void testErrorOnInsertIntoSelect() throws Exception {
 
         // This should fail.
-        ddlErrorTest("DML statement manipulates data in content non-deterministic way",
+        ddlErrorTest("statement manipulates data in a content non-deterministic way",
                 "create procedure MyInsert as insert into partitioned_blah (sval, ival) select sval, ival from blah where sval = ? limit 1;",
                 "partition procedure MyInsert on table partitioned_blah column sval;");
 
         // limit with no order by implies non-deterministic content, so we won't compile the statement.
-        ddlErrorTest("DML statement manipulates data in content non-deterministic way",
+        ddlErrorTest("statement manipulates data in a content non-deterministic way",
                 "create procedure MyInsert as insert into partitioned_blah (sval, ival) " +
                 "select sval, ival from blah where sval = ? limit 1;",
                 "partition procedure MyInsert on table partitioned_blah column sval;");

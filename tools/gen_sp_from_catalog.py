@@ -127,7 +127,7 @@ def extract_a_procedure(f):
     # get the type of each parameter
     param_types = []
     is_array = []
-    while line.startswith('add /clusters[cluster]/databases[database]/procedures[' + func_name + ']/statements[sql] parameters'):
+    while line.startswith('add /clusters[cluster/databases[database/procedures[' + func_name + '/statements[sql parameters'):
         f.next()
         line = f.next()
         param_types.append(volt_type[int(line.strip().split()[-1])])
@@ -143,7 +143,7 @@ def extract_a_procedure(f):
     return func_name, statement, param_types, is_array, line
 
 def find_a_procedure(f, func_name = "", cur_line = ""):
-    target = "add /clusters[cluster]/databases[database] procedures " + func_name
+    target = "add /clusters[cluster/databases[database procedures " + func_name
     if cur_line.startswith(target):
         return extract_a_procedure(f)
 

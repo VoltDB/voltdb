@@ -51,7 +51,6 @@ public final class DBBPool {
         final String msg = "Strict java memory checking is enabled, don't do release builds " +
                      "or performance runs with this enabled. Invoke \"ant clean\" and \"ant -Djmemcheck=NO_MEMCHECK\" to disable.";
         HOST.warn(msg);
-        System.err.println(msg);
     }
 #endif
 
@@ -73,6 +72,8 @@ public final class DBBPool {
         private volatile Throwable m_freeThrowable;
         private final Throwable m_allocationThrowable;
         private List<String> m_tags = null;
+#else
+        private boolean m_previouslyFreed = false;
 #endif
 
         public BBContainer(ByteBuffer b) {
@@ -123,6 +124,10 @@ public final class DBBPool {
                 HOST.fatal("Use was by:", t);
                 System.exit(-1);
             }
+#else
+            if (m_previouslyFreed) {
+                crash("Use after free in DBBPool", true, null);
+            }
 #endif
         }
 
@@ -148,6 +153,11 @@ public final class DBBPool {
                 }
                 m_freeThrowable = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
             }
+#else
+            if (m_previouslyFreed) {
+                crash("Double free in DBBPool", true, null);
+            }
+            m_previouslyFreed = true;
 #endif
             return b;
         }
@@ -441,19 +451,24 @@ public final class DBBPool {
                 logDeallocation(buf.capacity());
                 DBBPool.cleanByteBuffer(buf);
             } catch (Throwable e) {
-                // The client code doesn't want to link to the VoltDB class, so this hack was born.
-                // It should be temporary as the goal is to remove client code dependency on
-                // DBBPool in the medium term.
-                try {
-                    Class<?> vdbClz = Class.forName("org.voltdb.VoltDB");
-                    Method m = vdbClz.getMethod("crashLocalVoltDB", String.class, boolean.class, Throwable.class);
-                    m.invoke(null, "Failed to deallocate direct byte buffer", false, e);
-                } catch (Exception ignored) {
-                    System.err.println("Failed to deallocate direct byte buffer");
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
+                crash("Failed to deallocate direct byte buffer", false, e);
             }
+        }
+    }
+
+    private static void crash(String msg, boolean stackTrace, Throwable e) {
+        // The client code doesn't want to link to the VoltDB class, so this hack was born.
+        // It should be temporary as the goal is to remove client code dependency on
+        // DBBPool in the medium term.
+        try {
+            Class<?> vdbClz = Class.forName("org.voltdb.VoltDB");
+            Method m = vdbClz.getMethod("crashLocalVoltDB", String.class, boolean.class, Throwable.class);
+            m.invoke(null, msg, stackTrace, e);
+        } catch (Exception ignored) {
+            HOST.fatal(msg, ignored);
+            System.err.println(msg);
+            e.printStackTrace();
+            System.exit(-1);
         }
     }
 

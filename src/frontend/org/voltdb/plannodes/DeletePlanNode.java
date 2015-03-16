@@ -70,6 +70,17 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
 
     @Override
     public boolean isOrderDeterministic() {
+
+        /* This API seems like "not the right question" here.  DELETE nodes
+         * just return the one row, so order determinism is not really
+         * applicable.  Note however that INSERT nodes will return the
+         * order determinism of the SELECT statement in the case of INSERT INTO
+         * ... SELECT.  So just returning true here is a little inconsistent.
+         *
+         * Seems like we need a better way to model determinism for DML.  See
+         * ENG-7445.
+         */
+
         return true;
     }
 }

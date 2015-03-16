@@ -47,10 +47,10 @@ class ExecutorContext {
                     Topend* topend,
                     Pool* tempStringPool,
                     VoltDBEngine* engine,
-                    bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId,
-                    DRTupleStream *drTupleStream);
+                    DRTupleStream *drTupleStream,
+                    DRTupleStream *drReplicatedStream);
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
@@ -93,7 +93,11 @@ class ExecutorContext {
         m_spHandle = std::max(lastCommittedSpHandle, m_spHandle);
     }
 
-    // for test (VoltDBEngine::getExecutorContext())
+    // Used originally for test. Now also used to NULL
+    // out the UndoQuantum when it is released to make it possible
+    // to check if there currently exists an active undo quantum
+    // so that things that should only execute after the currently running
+    // transaction has committed can assert on that.
     void setupForPlanFragments(UndoQuantum *undoQuantum) {
         m_undoQuantum = undoQuantum;
     }
@@ -143,6 +147,10 @@ class ExecutorContext {
         return m_drStream;
     }
 
+    DRTupleStream* drReplicatedStream() {
+        return m_drReplicatedStream;
+    }
+
     static ExecutorContext* getExecutorContext();
 
     static Pool* getTempStringPool() {
@@ -152,11 +160,16 @@ class ExecutorContext {
         return singleton->m_tempStringPool;
     }
 
+    void setDrStreamForTest(DRTupleStream *drStream) {
+        m_drStream = drStream;
+    }
+
   private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
     DRTupleStream *m_drStream;
+    DRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;
@@ -168,7 +181,6 @@ class ExecutorContext {
     CatalogId m_partitionId;
     std::string m_hostname;
     CatalogId m_hostId;
-    bool m_exportEnabled;
 
     /** local epoch for voltdb, somtime around 2008, pulled from catalog */
     int64_t m_epoch;

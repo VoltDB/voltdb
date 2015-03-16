@@ -234,4 +234,9 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     public File[] getPathInSubroots(File path) throws IOException {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public int getLogicalPartitionCount() {
+        return 1;
+    }
 }

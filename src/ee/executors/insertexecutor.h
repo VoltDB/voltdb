@@ -71,6 +71,7 @@ public:
         m_multiPartition(false),
         m_isStreamed(false),
         m_isUpsert(false),
+        m_sourceIsPartitioned(false),
         m_hasPurgeFragment(false),
         m_templateTuple(),
         m_memoryPool(),
@@ -90,6 +91,7 @@ public:
         bool m_multiPartition;
         bool m_isStreamed;
         bool m_isUpsert;
+        bool m_sourceIsPartitioned;
         bool m_hasPurgeFragment;
 
     private:
@@ -97,8 +99,14 @@ public:
         /** If the table is at or over its tuple limit, this method
          * executes the purge fragment for the table.  Returns true if
          * nothing went wrong (regardless of whether the purge
-         * fragment was executed) and false otherwise. */
-        bool executePurgeFragmentIfNeeded(PersistentTable* table);
+         * fragment was executed) and false otherwise.
+         *
+         * The purge fragment might perform a truncate table,
+         * in which case the persistent table object we're inserting
+         * into might change.  Passing a pointer-to-pointer allows
+         * the callee to update the persistent table pointer.
+         */
+        bool executePurgeFragmentIfNeeded(PersistentTable** table);
 
         /** A tuple with the target table's schema that is populated
          * with default values for each field. */

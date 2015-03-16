@@ -25,6 +25,7 @@ package org.voltdb.planner;
 
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
@@ -229,6 +230,21 @@ public class TestUnion extends PlannerTestCase {
         // union processing below the send/receive, so each child of the union requires
         // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
         failToCompile("select DESC from T1 UNION select DESC from T1");
+    }
+
+    public void testSubqueryUnionWithParamENG7783() {
+        AbstractPlanNode pn = compile(
+                "SELECT B, ABS( B - ? ) AS distance FROM ( " +
+                "( SELECT B FROM T2 WHERE B >=? ORDER BY B LIMIT ? " +
+                ") UNION ALL ( " +
+                "SELECT B FROM T2 WHERE B < ? ORDER BY B DESC LIMIT ? ) " +
+                ") AS n ORDER BY distance LIMIT ?;"
+                );
+        assertTrue(pn.getChild(0) instanceof ProjectionPlanNode);
+        assertTrue(pn.getChild(0).getChild(0) instanceof OrderByPlanNode);
+        assertTrue(pn.getChild(0).getChild(0).getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(pn.getChild(0).getChild(0).getChild(0).getChild(0) instanceof UnionPlanNode);
+
     }
 
     @Override

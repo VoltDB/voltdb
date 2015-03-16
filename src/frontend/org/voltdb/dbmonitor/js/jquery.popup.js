@@ -49,22 +49,24 @@
 	 *
 	 * @param {Object} settings
 	 */
-	$.Popup = function(settings) {
+	var popupCounter = 0;
+	$.Popup = function (settings) {
 
+	    popupCounter++; //For creating unique classes.
 	    var p = this,
 	        defaults = {
 	            // Markup
 	            backClass: 'popup_back',
 	            backOpacity: 0.7,
-	            containerClass: 'popup_cont',
+	            containerClass: 'popup_cont ' + popupCounter,
 	            closeContent: '<div class="popup_close">&times;</div>',
-	            markup: '<div class="popup"><div class="popup_content"/></div>',
-	            contentClass: 'popup_content',
+	            markup: '<div class="popup"><div class="popup_content' + popupCounter + '"/></div>',
+	            contentClass: 'popup_content' + popupCounter,
 	            preloaderContent: '<p class="preloader">Loading</p>',
-	            activeClass: 'popup_active',
+	            activeClass: 'popup_active' + popupCounter,
 	            hideFlash: false,
 	            speed: 200,
-	            popupPlaceholderClass: 'popup_placeholder',
+	            popupPlaceholderClass: 'popup_placeholder' + popupCounter,
 	            keepInlineChanges: true,
 
 	            // Content
@@ -109,9 +111,11 @@
 					// Animate in
 					$popup
 						.animate({opacity : 1}, plugin.o.speed, function(){
-						    $('body').css("height", $(window).height()); $('body').css("overflow", "hidden");
-						    $('body').css("position", "fixed");
-						    $('body').css("width", "100%");
+						    $('body').css("height", $(window).height());
+							$('body').css("overflow", "hidden");
+							$('body').css("position", "fixed");
+							$('body').css("overflow-y", "scroll");
+							$('body').css("width", "100%");
 							//$('body').bind('touchmove', function(e){e.preventDefault()});//mobile
 							// Call the open callback
 							plugin.o.afterOpen.call(plugin);
@@ -126,7 +130,7 @@
 						.o.afterOpen.call(this);
 
 				},
-				hide : function($popup, $back) {
+				hide: function ($popup, $back) {
 					if( $popup !== undefined ){
 
 						// Fade the popup out
@@ -293,6 +297,14 @@
 		        });
 		    }
 		    
+		    var btnSaveSnapshotStatus = $("a[id='btnSaveSnapshotStatus']");
+		    if (btnSaveSnapshotStatus != undefined) {
+		        btnSaveSnapshotStatus.unbind('click');
+		        btnSaveSnapshotStatus.bind('click', function () {
+		            p.close();
+		        });
+		    }
+
 		    var cancelBtn = $("a[id='btnCancel']");
 		    if (cancelBtn != undefined) {
 		        cancelBtn.unbind('click');
@@ -313,6 +325,28 @@
 		        });
 		    }
 
+		    var serverShutdownBtn = $("a[id=btnServerShutdownOk]");
+		    if (serverShutdownBtn != undefined) {
+		        serverShutdownBtn.unbind('click');
+		        serverShutdownBtn.bind('click', function (e) {
+		            e.preventDefault();
+		            p.o.closeDialog();
+		            VoltDBCore.isServerConnected = true;
+		            p.close();
+		        });
+		    }
+			
+			//admin
+			var closeBtn = $(".closeBtn");
+		    if (closeBtn != undefined) {
+		        closeBtn.unbind('click');
+		        closeBtn.bind('click', function () {
+					$('.restoreConfirmation').hide();
+					$('.restoreInfo').show();
+		            p.close();
+		    });
+		    }
+			
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content

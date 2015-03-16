@@ -137,7 +137,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
-            if (tupleCount > 0) {
+            if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
                 nonEmptyTables.add(tableName);
             }
         }
@@ -365,8 +365,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
          */
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         if (worksWithElastic == 0 &&
-            !zk.getChildren(VoltZK.elasticJoinActiveBlockers, false).isEmpty()) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
         }
 
         // Pull the current catalog and deployment version and hash info.  Validate that we're either:

@@ -46,7 +46,7 @@ public class SystemStatsCollector {
     static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
     static long memorysize = 256;
-    static int pid;
+    static int pid = 0;
     static boolean initialized = false;
     static GetRSSMode mode = GetRSSMode.PS;
     static Thread thread = null;
@@ -352,6 +352,11 @@ public class SystemStatsCollector {
         catch (Exception e) {
             return -1;
         }
+    }
+
+    public static synchronized long getRSSMB() {
+        Datum d = generateCurrentSample();
+        return d.rss;
     }
 
     /**

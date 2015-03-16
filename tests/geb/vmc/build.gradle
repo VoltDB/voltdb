@@ -21,28 +21,57 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+//import org.apache.tools.ant.taskdefs.condition.Os
+//import org.apache.commons.io.FileUtils
+
 apply plugin: "groovy"
 
 // The drivers to use
-ext.drivers = ["firefox", "chrome", "safari"]
+ext.drivers = ["firefox", "chrome", "ie", /*"htmlunit", "phantomjs",*/ "safari"]
 
 repositories {
-    mavenCentral() 
+    mavenCentral()
+    //jcenter()
+}
+/*
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath "commons-io:commons-io:2.4"
+    }
+}
+*/
+// Returns the specified project property value, if it is defined; otherwise,
+// returns the specified default value
+def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultValue) {
+    if (project.hasProperty(projectPropertyName)) {
+        return project.getProperties()[projectPropertyName]
+    } else {
+        return defaultValue
+    }
 }
 
+//ext { phantomJsVersion = getProjectPropertyOrDefaultValue("phantomJsVersion", "1.1.0") }
+
 dependencies {
-    def gebVersion = "0.10.0"
-    def seleniumVersion = "2.44.0"
-    def spockVersion = "0.7-groovy-2.0"
+    def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.10.0")
+    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.44.0")
+    def spockVersion = getProjectPropertyOrDefaultValue("spockVersion", "0.7-groovy-2.0")
 
     // GEB & Spock
     testCompile "org.gebish:geb-spock:$gebVersion"
     testCompile "org.spockframework:spock-core:$spockVersion"
+    testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
 
     // Drivers
     drivers.each { driver ->
-        testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
+        if (driver != "phantomJs") {
+            testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
+        }
     }
+    //testCompile "com.github.detro.ghostdriver:phantomjsdriver:$phantomJsVersion"
 }
 
 sourceSets {
@@ -59,11 +88,82 @@ sourceSets {
 
 drivers.each { driver ->
     task "${driver}Test"(type: Test) {
-        testReportDir = reporting.file("$name/tests")
-        testResultsDir = file("$buildDir/test-results/$name")
+        reports.html.destination = reporting.file("$name/tests")
+        reports.junitXml.destination = file("$buildDir/test-results/$name")
 
         systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
         systemProperty "geb.env", driver
 
+        // Set various system properties, either to project property values
+        // set on the command line (via -P), or to their default values; for
+        // example, to set 'url', use: -Purl=http://my.web.site/
+        systemProperty "geb.build.baseUrl", getProjectPropertyOrDefaultValue("url", "http://localhost:8080/")
+        systemProperty "debugPrint", getProjectPropertyOrDefaultValue("debugPrint", false)
+        systemProperty "windowWidth", getProjectPropertyOrDefaultValue("windowWidth", 1500)
+        systemProperty "windowHeight", getProjectPropertyOrDefaultValue("windowHeight", 1000)
+        //systemProperty "reusePage", getProjectPropertyOrDefaultValue("reusePage", false)
+        systemProperty "sleepSeconds", getProjectPropertyOrDefaultValue("sleepSeconds", 0)
+        systemProperty "numRowsToInsert", getProjectPropertyOrDefaultValue("numRowsToInsert", 3)
+        systemProperty "testTables", getProjectPropertyOrDefaultValue("testTables", "PARTITIONED_TABLE,REPLICATED_TABLE")
+        systemProperty "testViews", getProjectPropertyOrDefaultValue("testViews", null)
+        systemProperty "insertJson", getProjectPropertyOrDefaultValue("insertJson", false)
     }
 }
+/*
+chromeTest {
+    dependsOn unzipChromeDriver
+
+    def chromedriverFilename = Os.isFamily(Os.FAMILY_WINDOWS) ? "chromedriver.exe" : "chromedriver"
+    systemProperty "webdriver.chrome.driver", new File(unzipChromeDriver.outputs.files.singleFile, chromedriverFilename).absolutePath
+}
+*/
+/*
+// Special set-up for running PhantomJs (headless) browser...
+task downloadPhantomJs {
+//    def phantomJsVersion = getProjectPropertyOrDefaultValue("phantomJsVersion", "1.9.8")
+
+    def osFilenamePart
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        osFilenamePart = "windows.zip"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        osFilenamePart = "macosx.zip"
+    } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+        osFilenamePart = Os.isArch("amd64") ? "linux-x86_64.tar.bz2" : "linux-i686.tar.bz2"
+    }
+
+    def filename = "phantomjs-$phantomJsVersion-$osFilenamePart"
+    def outputFile = file("$buildDir/webdriver/$filename")
+    inputs.property("phantomJsVersion", phantomJsVersion)
+    outputs.file(outputFile)
+
+    doLast {
+        FileUtils.copyURLToFile(new URL("https://bitbucket.org/ariya/phantomjs/downloads/$filename"), outputFile)
+    }
+}
+
+task unzipPhantomJs(type: Copy) {
+    def outputDir = file("$buildDir/webdriver/phantomjs")
+    dependsOn downloadPhantomJs
+    outputs.dir(outputDir)
+
+    def archive = downloadPhantomJs.outputs.files.singleFile
+
+    from(Os.isFamily(Os.FAMILY_MAC) || Os.isFamily(Os.FAMILY_WINDOWS) ? zipTree(archive) : tarTree(archive))
+    into(outputDir)
+    eachFile { FileCopyDetails fcp ->
+        fcp.relativePath = new RelativePath(!fcp.directory, *fcp.relativePath.segments[1..-1])
+    }
+}
+
+phantomJsTest {
+    dependsOn unzipPhantomJs
+
+    def phantomJsFilename = Os.isFamily(Os.FAMILY_WINDOWS) ? "phantomjs.exe" : "bin/phantomjs"
+    systemProperty "phantomjs.binary.path", new File(unzipPhantomJs.outputs.files.singleFile, phantomJsFilename).absolutePath
+}
+
+test {
+    dependsOn drivers.collect { tasks["${it}Test"] }
+    enabled = false
+}
+*/

@@ -156,7 +156,7 @@ public class JSONClient {
             } else {
                 site = new BlogSession("writer", "reader");
             }
-            site.props.put("last-login", new Long(System.currentTimeMillis()).toString());
+            site.props.put("last-login", new Long(System.currentTimeMillis()));
             // Return the generated login
             return new LoginRecord(username, "pwd", gson.toJson(site));
         }
@@ -392,14 +392,14 @@ public class JSONClient {
         // Specify, run and print the queries (and their results), one at a time
         runQuery("Select some login sessions - just a small portion of the data (limit results to 10):",
                  "SELECT username, json_data FROM user_session_table ORDER BY username LIMIT 10");
-        runQuery("Select some login sessions that have been made to the VoltDB Forum (limit results to 10):",
+        runQuery("Select some login sessions that have been made to the VoltDB Forum, using 'field' (limit results to 10):",
                  "SELECT username, field(json_data,'site') AS site, json_data FROM user_session_table "
                  + "WHERE field(json_data, 'site')='VoltDB Forum' ORDER BY username LIMIT 10");
 
-        runQuery("Select VoltDB Forum sessions that are moderators (at most 10):",
+        runQuery("Select VoltDB Forum sessions that are moderators (at most 10), using 'field' multiple times:",
                  "SELECT username, field(json_data,'moderator') AS moderator, json_data FROM user_session_table "
                  + "WHERE field(json_data, 'site')='VoltDB Forum' AND field(json_data, 'moderator')='true' ORDER BY username LIMIT 10");
-        runQuery("Change user 'voltdb' to be a moderator:",
+        runQuery("Change user 'voltdb' to be a moderator, using 'set_field':",
                  "UPDATE user_session_table SET json_data = set_field(json_data, 'moderator', 'true') "
                  + "WHERE username='voltdb'");
         runQuery("Select VoltDB Forum sessions that are moderators (again, after update):",
@@ -410,34 +410,37 @@ public class JSONClient {
                  "SELECT username, field(json_data,'download_count') AS download_count, json_data FROM user_session_table "
                  + "WHERE cast(field(json_data,'download_count') AS INTEGER) > 1 ORDER BY username LIMIT 10");
 
-        runQuery("User pattern matching (SQL LIKE) to look for records of (VoltDB Forum) logins who have downloaded version v2.x:",
+        runQuery("User pattern matching (SQL LIKE) to look for records of (VoltDB Forum) logins who have downloaded version v2.x "
+                 + "- the old way, using nested calls of 'field':",
                  "SELECT username, field(field(json_data,'props'), 'download_version') AS download_version, json_data FROM user_session_table "
                  + "WHERE field(field(json_data,'props'), 'download_version') LIKE 'v2%' ORDER BY username LIMIT 10");
-        runQuery("Identical query (logins who have downloaded version v2.x) using dot notation, rather than 'field' twice:",
+        runQuery("Identical query (logins who have downloaded version v2.x), using newer, simpler dot notation, rather than 'field' twice:",
                  "SELECT username, field(json_data,'props.download_version') AS download_version, json_data FROM user_session_table "
                  + "WHERE field(json_data, 'props.download_version') LIKE 'v2%' ORDER BY username LIMIT 10");
-        runQuery("Change several users to set 'props.download_version' to 'v2.9':",
+        runQuery("Change several users to set 'props.download_version' to 'v2.9', using 'set_field' with dot notation:",
                  "UPDATE user_session_table SET json_data = set_field(json_data, 'props.download_version', '\"v2.9\"') "
                  + "WHERE username < 'user-10000'");
-        runQuery("User pattern matching (SQL LIKE) to look for records of (VoltDB Forum??) logins who have downloaded version v2.x (again, after update):",
+        runQuery("User pattern matching (SQL LIKE) to look for records of (VoltDB Forum??) logins who have downloaded "
+                 + "version v2.x (again, after update):",
                  "SELECT username, field(json_data,'props.download_version') AS download_version, json_data FROM user_session_table "
                  + "WHERE field(json_data, 'props.download_version') LIKE 'v2%' ORDER BY username LIMIT 10");
 
-        runQuery("Select records of (VoltDB Blog) logins whose first role is 'writer':",
+        runQuery("Select records of (VoltDB Blog) logins whose first role is 'writer' - the old way, using 'array_element':",
                  "SELECT username, array_element(field(json_data,'roles'), 0) AS first_role, json_data FROM user_session_table "
                  + "WHERE array_element(field(json_data,'roles'), 0)='writer' ORDER BY username LIMIT 10");
-        runQuery("Identical query (logins whose first role is 'writer') using bracket notation, rather than 'array_element':",
+        runQuery("Identical query (logins whose first role is 'writer'), using newer, simpler bracket notation, "
+                 + "rather than 'array_element':",
                  "SELECT username, field(json_data,'roles[0]') AS first_role, json_data FROM user_session_table "
                  + "WHERE field(json_data,'roles[0]')='writer' ORDER BY username LIMIT 10");
 
-        runQuery("Select records of (VoltDB Blog) logins that have more than one role:",
+        runQuery("Select records of (VoltDB Blog) logins that have more than one role, using 'array_length':",
                  "SELECT username, field(json_data,'roles[0]') AS first_role, field(json_data,'roles[1]') AS second_role, "
                  + "field(json_data,'roles[2]') AS third_role, json_data FROM user_session_table "
                  + "WHERE array_length(field(json_data,'roles')) > 1 ORDER BY username LIMIT 10");
-        runQuery("Change user voltdb2's first role to be 'author' (to match the others):",
+        runQuery("Change user voltdb2's first role to be 'author' (to match the others), using 'set_field' with bracket notation:",
                  "UPDATE user_session_table SET json_data = set_field(json_data, 'roles[0]', '\"author\"') "
                  + "WHERE username='voltdb2'");
-        runQuery("Add an additional role to user 'voltdb2': 'administrator':",
+        runQuery("Add an additional role to user 'voltdb2': 'administrator', using 'set_field' with [-1] to mean beyond the last:",
                  "UPDATE user_session_table SET json_data = set_field(json_data, 'roles[-1]', '\"administrator\"') "
                  + "WHERE username='voltdb2'");
         runQuery("Select records of (VoltDB Blog) logins that have more than one role (again, after updates):",
@@ -445,7 +448,7 @@ public class JSONClient {
                  + "field(json_data,'roles[2]') AS third_role, json_data FROM user_session_table "
                  + "WHERE array_length(field(json_data,'roles')) > 1 ORDER BY username LIMIT 10");
 
-        runQuery("Select records of (VoltDB Blog) logins whose last role is 'administrator':",
+        runQuery("Select records of (VoltDB Blog) logins whose last role is 'administrator', using 'field' with [-1] to mean the last:",
                  "SELECT username, field(json_data,'roles[-1]') AS last_role, json_data FROM user_session_table "
                  + "WHERE field(json_data,'roles[-1]')='administrator' ORDER BY username LIMIT 10");
 
@@ -455,7 +458,8 @@ public class JSONClient {
                  + "WHERE field(json_data, 'props.download_version')='v3.0' and field(json_data, 'props.client_languages[0]')='Java' "
                  + "ORDER BY username LIMIT 10");
 
-        runQuery("Select records of (VoltDB Forum) logins that have more than one client language:",
+        runQuery("Select records of (VoltDB Forum) logins that have more than one client language (combines "
+                 + "'array_length' and 'field' with dot notation):",
                  "SELECT username, field(json_data,'props.client_languages') AS client_languages, json_data FROM user_session_table "
                  + "WHERE array_length(field(json_data,'props.client_languages')) > 1 ORDER BY username LIMIT 10");
 
@@ -471,14 +475,16 @@ public class JSONClient {
         runQuery("Select records of (VoltDB Forum) logins whose second client language is Java (again, after updates):",
                  "SELECT username, field(json_data,'props.client_languages') AS client_languages, json_data FROM user_session_table "
                  + "WHERE field(json_data,'props.client_languages[1]')='Java' ORDER BY username LIMIT 10");
-        runQuery("Add an additional client language to user 'voltdb': 'Python':",
+        runQuery("Add an additional client language to user 'voltdb': 'Python' (using 'set_field', combines dot and "
+                 + "bracket notation, with [-1]):",
                  "UPDATE user_session_table SET json_data = set_field(json_data, 'props.client_languages[-1]', '\"Python\"') "
                  + "WHERE username='voltdb'");
         runQuery("Select records of (VoltDB Forum) logins whose second client language is Java (again, after one more update):",
                  "SELECT username, field(json_data,'props.client_languages') AS client_languages, json_data FROM user_session_table "
                  + "WHERE field(json_data,'props.client_languages[1]')='Java' ORDER BY username LIMIT 10");
 
-        runQuery("Select records of (VoltDB Blog) logins whose last client language is 'Python':",
+        runQuery("Select records of (VoltDB Blog) logins whose last client language is 'Python' (using 'field', combines "
+                 + "dot and bracket notation, with [-1]):",
                  "SELECT username, field(json_data,'props.client_languages') AS client_languages, json_data FROM user_session_table "
                  + "WHERE field(json_data,'props.client_languages[-1]')='Python' ORDER BY username LIMIT 10");
 

@@ -18,10 +18,9 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.http.HttpServletResponse;
@@ -29,15 +28,16 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.server.Request;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.client.AuthenticatedConnectionCache;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
 import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.AuthenticatedConnectionCache;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
@@ -54,14 +54,20 @@ public class HTTPClientInterface {
     public static final String PARAM_PASSWORD = "Password";
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
+    int m_timeout = 0;
+    final String m_timeoutResponse;
 
+    public final static int MAX_QUERY_PARAM_SIZE = 2 * 1024 * 1024; // 2MB
+
+    public void setTimeout(int seconds) {
+        m_timeout = seconds * 1000;
+    }
 
     class JSONProcCallback implements ProcedureCallback {
 
         final Request m_request;
         final Continuation m_continuation;
         final String m_jsonp;
-        final CountDownLatch m_latch = new CountDownLatch(1);
 
         public JSONProcCallback(Request request, Continuation continuation, String jsonp) {
             assert(request != null);
@@ -83,40 +89,61 @@ public class HTTPClientInterface {
                 msg = String.format("%s( %s )", m_jsonp, msg);
             }
 
-            // send the response back through jetty
-            HttpServletResponse response = (HttpServletResponse) m_continuation.getServletResponse();
-            response.setStatus(HttpServletResponse.SC_OK);
-            m_request.setHandled(true);
-            response.getWriter().print(msg);
-            try{
-                m_continuation.complete();
-             } catch (IllegalStateException e){
+            m_request.setAttribute("result", msg);
+            if (!m_continuation.isInitial()) try {
+                m_continuation.resume();
+            } catch (IllegalStateException e) {
                 // Thrown when we shut down the server via the JSON/HTTP (web studio) API
                 // Essentially we're closing everything down from underneath the HTTP request.
                  m_log.warn("JSON request completion exception: ", e);
-             }
-            m_latch.countDown();
-        }
-
-        public void waitForResponse() throws InterruptedException {
-            m_latch.await();
+            }
         }
     }
 
     public HTTPClientInterface() {
+        final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
+                new VoltTable[0], "Request Timeout");
+        m_timeoutResponse = r.toJSONString();
     }
 
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
-
+        boolean suspended = false;
+        boolean forceClose = false;
         Continuation continuation = ContinuationSupport.getContinuation(request);
-        continuation.suspend(response);
+        if (m_timeout > 0) {
+            continuation.setTimeout(m_timeout);
+        }
+        String result = (String )request.getAttribute("result");
+        if (result != null) {
+            try {
+                response.setStatus(HttpServletResponse.SC_OK);
+                request.setHandled(true);
+                response.getWriter().print(result);
+            } catch (IllegalStateException | IOException e){
+               // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+               // Essentially we're closing everything down from underneath the HTTP request.
+                m_log.warn("JSON failed to send response: ", e);
+            }
+            return;
+        }
+        //Check if this is resumed request.
+        if (Boolean.TRUE.equals(request.getAttribute("SQLSUBMITTED"))) {
+            try {
+                continuation.suspend(response);
+            } catch (IllegalStateException e){
+                // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+                // Essentially we're closing everything down from underneath the HTTP request.
+                 m_log.warn("JSON request completion exception in process: ", e);
+            }
+            return;
+        }
         String jsonp = null;
         try {
             jsonp = request.getParameter("jsonp");
             if (request.getMethod().equalsIgnoreCase("POST")) {
                 int queryParamSize = request.getContentLength();
-                if (queryParamSize > 150000) {
+                if (queryParamSize > MAX_QUERY_PARAM_SIZE) {
                     // We don't want to be building huge strings
                     throw new Exception("Query string too large: " + String.valueOf(request.getContentLength()));
                 }
@@ -131,7 +158,6 @@ public class HTTPClientInterface {
             // null procs are bad news
             if (procName == null) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                continuation.complete();
                 return;
             }
 
@@ -147,11 +173,12 @@ public class HTTPClientInterface {
                 request.setHandled(true);
                 try {
                     response.getWriter().print(msg);
-                    continuation.complete();
                 } catch (IOException e1) {} // Ignore this as browser must have closed.
                 return;
             }
 
+            continuation.suspend(response);
+            suspended = true;
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
             if (params != null) {
@@ -179,11 +206,15 @@ public class HTTPClientInterface {
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
             }
-            if (authResult.m_adminMode) {
-                cb.waitForResponse();
+            if (jsonp != null) {
+                request.setAttribute("jsonp", jsonp);
             }
+            request.setAttribute("SQLSUBMITTED", Boolean.TRUE);
         } catch (Exception e) {
             String msg = e.getMessage();
+            if (e instanceof IOException || e instanceof NoConnectionsException) {
+                forceClose = true;
+            }
             m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             msg = rimpl.toJSONString();
@@ -194,10 +225,12 @@ public class HTTPClientInterface {
             request.setHandled(true);
             try {
                 response.getWriter().print(msg);
-                continuation.complete();
+                if (suspended) {
+                    continuation.complete();
+                }
             } catch (IOException e1) {} // Ignore this as browser must have closed.
         } finally {
-            releaseClient(authResult);
+            releaseClient(authResult, forceClose);
         }
     }
 
@@ -285,11 +318,9 @@ public class HTTPClientInterface {
             try {
                 // Create a MessageDigest every time because MessageDigest is not thread safe (ENG-5438)
                 MessageDigest md = MessageDigest.getInstance("SHA-1");
-                hashedPasswordBytes = md.digest(password.getBytes("UTF-8"));
+                hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             } catch (NoSuchAlgorithmException e) {
                 return new AuthenticationResult(null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
-            } catch (UnsupportedEncodingException e) {
-                return new AuthenticationResult(null, adminMode, username, "JVM doesn't support UTF-8. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority
@@ -330,21 +361,10 @@ public class HTTPClientInterface {
     }
 
     //Must be called by all who call authenticate.
-    public void releaseClient(AuthenticationResult authResult) {
+    public void releaseClient(AuthenticationResult authResult, boolean force) {
         if (authResult != null && authResult.m_client != null) {
             assert(m_connections != null);
-            // admin connections aren't cached
-            if (authResult.m_adminMode) {
-                try {
-                    authResult.m_client.close();
-                } catch (InterruptedException e) {
-                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
-                }
-            }
-            // other connections are cached
-            else {
-                m_connections.releaseClient(authResult.m_client);
-            }
+            m_connections.releaseClient(authResult.m_client, force);
         }
     }
 

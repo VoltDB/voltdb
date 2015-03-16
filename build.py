@@ -97,17 +97,21 @@ CTX.TEST_PREFIX = "tests/ee/"
 ###############################################################################
 # SET RELEASE LEVEL CONTEXT
 ###############################################################################
+if "VOLT_LOG_LEVEL" in os.environ:
+    LOG_LEVEL = os.environ["VOLT_LOG_LEVEL"]
+else:
+    LOG_LEVEL = "500"
 
 if CTX.LEVEL == "MEMCHECK":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=500"
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
     CTX.OUTPUT_PREFIX = "obj/memcheck"
 
 if CTX.LEVEL == "DEBUG":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=500"
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
     CTX.OUTPUT_PREFIX = "obj/debug"
 
 if CTX.LEVEL == "RELEASE":
-    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=500"
+    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
     CTX.OUTPUT_PREFIX = "obj/release"
 
 # build in parallel directory instead of subdir so that relative paths work
@@ -158,9 +162,7 @@ CTX.INPUT[''] = """
 """
 
 CTX.INPUT['catalog'] = """
- authprogram.cpp
  catalog.cpp
- cataloginteger.cpp
  catalogtype.cpp
  cluster.cpp
  column.cpp
@@ -171,23 +173,11 @@ CTX.INPUT['catalog'] = """
  constraint.cpp
  constraintref.cpp
  database.cpp
- deployment.cpp
- group.cpp
- groupref.cpp
  index.cpp
  materializedviewinfo.cpp
  planfragment.cpp
- procedure.cpp
- procparameter.cpp
- program.cpp
  statement.cpp
- stmtparameter.cpp
- systemsettings.cpp
  table.cpp
- user.cpp
- userref.cpp
- snapshotschedule.cpp
- commandlog.cpp
 """
 
 CTX.INPUT['structures'] = """
@@ -220,6 +210,7 @@ CTX.INPUT['common'] = """
  TupleOutputStream.cpp
  TupleOutputStreamProcessor.cpp
  MiscUtil.cpp
+ debuglog.cpp
 """
 
 CTX.INPUT['execution'] = """

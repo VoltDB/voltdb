@@ -34,11 +34,13 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
-import org.voltdb.utils.SQLLexer;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -60,6 +62,15 @@ public class AsyncCompilerAgent {
     // do work in this executor service
     final ListeningExecutorService m_es =
         CoreUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
+
+    // Enable debug hooks when the "asynccompilerdebug" sys prop is set to "true" or "yes".
+    private final static MiscUtils.BooleanSystemProperty DEBUG_MODE =
+            new MiscUtils.BooleanSystemProperty("asynccompilerdebug");
+
+    // When DEBUG_MODE is true this (valid) DDL string triggers an exception.
+    // Public visibility allows it to be used from a unit test.
+    public final static String DEBUG_EXCEPTION_DDL =
+            "create table DEBUG_MODE_ENG_7653_crash_me_now (die varchar(7654) not null)";
 
     // intended for integration test use. finish planning what's in
     // the queue and terminate the TPE.
@@ -111,132 +122,170 @@ public class AsyncCompilerAgent {
 
     void handleMailboxMessage(final VoltMessage message) {
         final LocalObjectMessage wrapper = (LocalObjectMessage)message;
-        if (wrapper.payload instanceof AdHocPlannerWork) {
-            final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
-            // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
-            // This is not currently robust to comment, multi-line statments,
-            // multiple statements on a line, etc.
-            Boolean hasDDL = null;
-            // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
-            SortedSet<String> conflictTables = new TreeSet<String>();
-            Set<String> createdTables = new HashSet<String>();
-            for (String stmt : w.sqlStatements) {
-                String ddlToken = SQLLexer.extractDDLToken(stmt);
-                if (hasDDL == null) {
-                    hasDDL = (ddlToken != null) ? true : false;
+        if (wrapper.payload instanceof AsyncCompilerWork) {
+            AsyncCompilerWork compilerWork = (AsyncCompilerWork)wrapper.payload;
+            // Don't let exceptions escape
+            try {
+                if (compilerWork instanceof AdHocPlannerWork) {
+                    handleAdHocPlannerWork((AdHocPlannerWork)(compilerWork));
                 }
-                else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null))
-                {
+                else if (compilerWork instanceof CatalogChangeWork) {
+                    handleCatalogChangeWork((CatalogChangeWork)(compilerWork));
+                }
+                else {
+                    // Definitely shouldn't happen since we should be handling all possible
+                    // AsyncCompilerWork derivative classes above.
                     AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "DDL mixed with DML and queries is unsupported.");
-                    // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
-                    w.completionHandler.onCompletion(errResult);
-                    return;
-                }
-                // do a couple of additional checks if it's DDL
-                if (hasDDL) {
-                    // check that the DDL is allowed
-                    if (!SQLLexer.isPermitted(stmt)) {
-                        AsyncCompilerResult errResult =
-                            AsyncCompilerResult.makeErrorResult(w,
-                                    "AdHoc DDL contains an unsupported DDL statement: " + stmt);
-                        w.completionHandler.onCompletion(errResult);
-                        return;
-                    }
-                    // make sure not to mix drop and create in the same batch for the same table
-                    if (ddlToken.equals("drop")) {
-                        String tableName = SQLLexer.extractDDLTableName(stmt);
-                        if (tableName != null) {
-                            conflictTables.add(tableName);
-                        }
-                    }
-                    else if (ddlToken.equals("create")) {
-                        String tableName = SQLLexer.extractDDLTableName(stmt);
-                        if (tableName != null) {
-                            createdTables.add(tableName);
-                        }
-                    }
+                        AsyncCompilerResult.makeErrorResult(compilerWork,
+                            String.format("Unexpected compiler work class: %s %s: %s",
+                                    compilerWork.getClass().getName(),
+                                    "Please contact VoltDB support with this message and the contents:",
+                                    message.toString()));
+                    compilerWork.completionHandler.onCompletion(errResult);
                 }
             }
-            if (!hasDDL) {
-                final AsyncCompilerResult result = compileAdHocPlan(w);
-                w.completionHandler.onCompletion(result);
-            }
-            else {
-                // We have adhoc DDL.  Is it okay to run it?
-
-                // check for conflicting DDL create/drop table statements.
-                // unhappy if the intersection is empty
-                conflictTables.retainAll(createdTables);
-                if (!conflictTables.isEmpty()) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("AdHoc DDL contains both DROP and CREATE statements for the following table(s):");
-                    for (String tableName : conflictTables) {
-                        sb.append(" ");
-                        sb.append(tableName);
-                    }
-                    sb.append("\nYou cannot DROP and ADD a table with the same name in a single batch "
-                            + "(via @AdHoc). Issue the DROP and ADD statements as separate commands.");
-                    AsyncCompilerResult errResult =
-                            AsyncCompilerResult.makeErrorResult(w, sb.toString());
-                        w.completionHandler.onCompletion(errResult);
-                        return;
-                }
-
-                // Is it forbidden by the replication role and configured schema change method?
-                // master and UAC method chosen:
-                if (!w.onReplica && !w.useAdhocDDL) {
-                    AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "Cluster is configured to use @UpdateApplicationCatalog " +
-                                "to change application schema.  AdHoc DDL is forbidden.");
-                    w.completionHandler.onCompletion(errResult);
-                    return;
-                }
-                // Any adhoc DDL on the replica is forbidden (master changes appear as UAC
-                else if (w.onReplica) {
-                    AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "AdHoc DDL is forbidden on a DR replica cluster. " +
-                                "Apply schema changes to the master and they will propogate to replicas.");
-                    w.completionHandler.onCompletion(errResult);
-                    return;
-                }
-                final CatalogChangeWork ccw = new CatalogChangeWork(w);
-                dispatchCatalogChangeWork(ccw);
-            }
-        }
-        else if (wrapper.payload instanceof CatalogChangeWork) {
-            final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-            // We have an @UAC.  Is it okay to run it?
-            // If we weren't provided operationBytes, it's a deployment-only change and okay to take
-            // master and adhoc DDL method chosen
-            if (w.invocationName.equals("@UpdateApplicationCatalog") &&
-                w.operationBytes != null && !w.onReplica && w.useAdhocDDL)
-            {
+            catch (RuntimeException e) {
                 AsyncCompilerResult errResult =
-                    AsyncCompilerResult.makeErrorResult(w,
-                            "Cluster is configured to use AdHoc DDL to change application " +
-                            "schema.  Use of @UpdateApplicationCatalog is forbidden.");
-                w.completionHandler.onCompletion(errResult);
-                return;
+                    AsyncCompilerResult.makeErrorResult(compilerWork,
+                        String.format("Unexpected async compiler exception for %s: %s: %s: %s",
+                                compilerWork.getClass().getName(),
+                                e.getLocalizedMessage(),
+                                "Please contact VoltDB support with this message and the contents:",
+                                message.toString()));
+                compilerWork.completionHandler.onCompletion(errResult);
             }
-            else if (w.invocationName.equals("@UpdateClasses") && !w.onReplica && !w.useAdhocDDL) {
-                AsyncCompilerResult errResult =
-                    AsyncCompilerResult.makeErrorResult(w,
-                            "Cluster is configured to use @UpdateApplicationCatalog " +
-                            "to change application schema.  Use of @UpdateClasses is forbidden.");
-                w.completionHandler.onCompletion(errResult);
-                return;
-            }
-            dispatchCatalogChangeWork(w);
         }
         else {
-            hostLog.warn("Unexpected message received by AsyncCompilerAgent.  " +
+            hostLog.error("Unexpected message received by AsyncCompilerAgent.  " +
                     "Please contact VoltDB support with this message and the contents: " +
                     message.toString());
         }
+    }
+
+    void handleAdHocPlannerWork(final AdHocPlannerWork w) {
+        // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
+        Boolean hasDDL = null;
+        // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
+        SortedSet<String> conflictTables = new TreeSet<String>();
+        Set<String> createdTables = new HashSet<String>();
+        for (String stmt : w.sqlStatements) {
+            // Simulate an unhandled exception? (ENG-7653)
+            if (DEBUG_MODE.isTrue() && stmt.equals(DEBUG_EXCEPTION_DDL)) {
+                throw new IndexOutOfBoundsException(DEBUG_EXCEPTION_DDL);
+            }
+            if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
+                continue;
+            }
+            String ddlToken = SQLLexer.extractDDLToken(stmt);
+            if (hasDDL == null) {
+                hasDDL = (ddlToken != null) ? true : false;
+            }
+            else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null))
+            {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "DDL mixed with DML and queries is unsupported.");
+                // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
+            // do a couple of additional checks if it's DDL
+            if (hasDDL) {
+                // check that the DDL is allowed
+                String rejectionExplanation = SQLLexer.checkPermitted(stmt);
+                if (rejectionExplanation != null) {
+                    AsyncCompilerResult errResult =
+                            AsyncCompilerResult.makeErrorResult(w, rejectionExplanation);
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                // make sure not to mix drop and create in the same batch for the same table
+                if (ddlToken.equals("drop")) {
+                    String tableName = SQLLexer.extractDDLTableName(stmt);
+                    if (tableName != null) {
+                        conflictTables.add(tableName);
+                    }
+                }
+                else if (ddlToken.equals("create")) {
+                    String tableName = SQLLexer.extractDDLTableName(stmt);
+                    if (tableName != null) {
+                        createdTables.add(tableName);
+                    }
+                }
+            }
+        }
+        if (hasDDL == null) {
+            // we saw neither DDL or DQL/DML.  Make sure that we get a
+            // response back to the client
+            AsyncCompilerResult errResult =
+                AsyncCompilerResult.makeErrorResult(w,
+                        "Failed to plan, no SQL statement provided.");
+            w.completionHandler.onCompletion(errResult);
+            return;
+        }
+        else if (!hasDDL) {
+            final AsyncCompilerResult result = compileAdHocPlan(w);
+            w.completionHandler.onCompletion(result);
+        }
+        else {
+            // We have adhoc DDL.  Is it okay to run it?
+
+            // check for conflicting DDL create/drop table statements.
+            // unhappy if the intersection is empty
+            conflictTables.retainAll(createdTables);
+            if (!conflictTables.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("AdHoc DDL contains both DROP and CREATE statements for the following table(s):");
+                for (String tableName : conflictTables) {
+                    sb.append(" ");
+                    sb.append(tableName);
+                }
+                sb.append("\nYou cannot DROP and ADD a table with the same name in a single batch "
+                        + "(via @AdHoc). Issue the DROP and ADD statements as separate commands.");
+                AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w, sb.toString());
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+            }
+
+            // Is it forbidden by the replication role and configured schema change method?
+            // master and UAC method chosen:
+            if (!w.useAdhocDDL) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Cluster is configured to use @UpdateApplicationCatalog " +
+                            "to change application schema.  AdHoc DDL is forbidden.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
+            final CatalogChangeWork ccw = new CatalogChangeWork(w);
+            dispatchCatalogChangeWork(ccw);
+        }
+    }
+
+    void handleCatalogChangeWork(final CatalogChangeWork w) {
+        // We have an @UAC.  Is it okay to run it?
+        // If we weren't provided operationBytes, it's a deployment-only change and okay to take
+        // master and adhoc DDL method chosen
+        if (w.invocationName.equals("@UpdateApplicationCatalog") &&
+            w.operationBytes != null && w.useAdhocDDL)
+        {
+            AsyncCompilerResult errResult =
+                AsyncCompilerResult.makeErrorResult(w,
+                        "Cluster is configured to use AdHoc DDL to change application " +
+                        "schema.  Use of @UpdateApplicationCatalog is forbidden.");
+            w.completionHandler.onCompletion(errResult);
+            return;
+        }
+        else if (w.invocationName.equals("@UpdateClasses") && !w.useAdhocDDL) {
+            AsyncCompilerResult errResult =
+                AsyncCompilerResult.makeErrorResult(w,
+                        "Cluster is configured to use @UpdateApplicationCatalog " +
+                        "to change application schema.  Use of @UpdateClasses is forbidden.");
+            w.completionHandler.onCompletion(errResult);
+            return;
+        }
+        dispatchCatalogChangeWork(w);
     }
 
     public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {
@@ -267,7 +316,7 @@ public class AsyncCompilerAgent {
         work.completionHandler.onCompletion(result);
     }
 
-    AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {
+    AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
@@ -316,6 +365,28 @@ public class AsyncCompilerAgent {
         if (!errorMsgs.isEmpty()) {
             errorSummary = StringUtils.join(errorMsgs, "\n");
         }
+
+        // check the parameters count
+        if (work.explainMode == ExplainMode.NONE && work.userParamSet != null) {
+            int totalQuestionMarkParameters = 0;
+            for (AdHocPlannedStatement result: stmts) {
+                totalQuestionMarkParameters += result.getQuestionMarkParameterCount();
+            }
+            if (work.sqlStatements.length > 1 && totalQuestionMarkParameters > 0) {
+                return AsyncCompilerResult.makeErrorResult(work,
+                        String.format("The @AdHoc stored procedure when called with more than one parameter "
+                                + "must be passed a single parameterized SQL statement as its first parameter. "
+                                + "Pass each parameterized SQL statement to a separate callProcedure invocation."));
+            }
+
+            if (totalQuestionMarkParameters != work.userParamSet.length) {
+                return AsyncCompilerResult.makeErrorResult(work,
+                        String.format("Incorrect number of parameters passed: expected %d, passed %d",
+                                totalQuestionMarkParameters, work.userParamSet.length));
+            }
+
+        }
+
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
                                                                            stmts,
                                                                            partitionParamIndex,

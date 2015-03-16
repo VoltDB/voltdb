@@ -26,17 +26,11 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
@@ -48,7 +42,6 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
-import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -60,7 +53,7 @@ import org.voltdb.types.JoinType;
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<ParsedColInfo>();
-    public ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
+    private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression m_having = null;
     public ArrayList<ParsedColInfo> m_groupByColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
@@ -901,8 +894,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_limitNodeTop.setLimitParameterIndex(limitParamIndex);
         m_limitNodeTop.setOffsetParameterIndex(offsetParamIndex);
 
-        // check if limit can be pushed down
-        m_limitCanPushdown = !m_distinct;
+        // Check if the LimitPlanNode can be pushed down.  The LimitPlanNode may have a LIMIT
+        // clause only, OFFSET clause only, or both.  Offset only cannot be pushed down.
+        m_limitCanPushdown = (hasLimit() && !m_distinct);
         if (m_limitCanPushdown) {
             for (ParsedColInfo col : m_displayColumns) {
                 AbstractExpression rootExpr = col.expression;
@@ -1229,6 +1223,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_hasPartitionColumnInDistinctGroupby = true;
     }
 
+    @Override
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
     }
@@ -1314,14 +1309,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return Collections.unmodifiableList(m_groupByColumns);
     }
 
+    @Override
     public List<ParsedColInfo> orderByColumns() {
         return Collections.unmodifiableList(m_orderColumns);
     }
 
+    private boolean hasLimit() {
+        return m_limit != -1 || m_limitParameterId != -1;
+    }
+
+    private boolean hasOffset() {
+        return m_offset > 0 || m_offsetParameterId != -1;
+    }
+
     @Override
     public boolean hasLimitOrOffset() {
-        if ((m_limit != -1) || (m_limitParameterId != -1) ||
-            (m_offset > 0) || (m_offsetParameterId != -1)) {
+        if (hasLimit() || hasOffset()) {
             return true;
         }
         return false;
@@ -1329,28 +1332,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public boolean hasLimitOrOffsetParameters() {
         return m_limitParameterId != -1 || m_offsetParameterId != -1;
-    }
-
-    /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
-    /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
-    /// the parameter is being used in a BIGINT context.
-    /// There may be limitations elsewhere that restrict limits and offsets to 31-bit unsigned values,
-    /// but enforcing that at parameter passing/checking time seems a little arbitrary, so we keep
-    /// the parameters at maximum width -- a 63-bit unsigned BIGINT.
-    private int parameterCountIndexById(long paramId) {
-        if (paramId == -1) {
-            return -1;
-        }
-        assert(m_paramsById.containsKey(paramId));
-        ParameterValueExpression pve = m_paramsById.get(paramId);
-        // As a side effect, re-establish these parameters as integer-typed
-        // -- this helps to catch type errors earlier in the invocation process
-        // and prevents a more serious error in HSQLBackend statement reconstruction.
-        // The HSQL parser originally had these correctly pegged as BIGINTs,
-        // but the VoltDB code ( @see AbstractParsedStmt#parseParameters )
-        // skeptically second-guesses that pending its own verification. This case is now verified.
-        pve.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        return pve.getParameterIndex();
     }
 
     public int getLimitParameterIndex() {
@@ -1442,113 +1423,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
-
-    /**
-     * Order by Columns or expressions has to operate on the display columns or expressions.
-     * @return
-     */
-    private boolean orderByColumnsCoverUniqueKeys()
-    {
-        // In theory, if EVERY table in the query has a uniqueness constraint
-        // (primary key or other unique index) on columns that are all listed in the ORDER BY values,
-        // the result is deterministic.
-        // This holds regardless of whether the associated index is actually used in the selected plan,
-        // so this check is plan-independent.
-        HashMap<String, List<AbstractExpression> > baseTableAliases =
-                new HashMap<String, List<AbstractExpression> >();
-        for (ParsedColInfo col : m_orderColumns) {
-            AbstractExpression expr = col.expression;
-            List<AbstractExpression> baseTVEs = expr.findBaseTVEs();
-            if (baseTVEs.size() != 1) {
-                // Table-spanning ORDER BYs -- like ORDER BY A.X + B.Y are not helpful.
-                // Neither are (nonsense) constant (table-less) expressions.
-                continue;
-            }
-            // This loops exactly once.
-            AbstractExpression baseTVE = baseTVEs.get(0);
-            String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
-            assert(nextTableAlias != null);
-            List<AbstractExpression> perTable = baseTableAliases.get(nextTableAlias);
-            if (perTable == null) {
-                perTable = new ArrayList<AbstractExpression>();
-                baseTableAliases.put(nextTableAlias, perTable);
-            }
-            perTable.add(expr);
-        }
-
-        if (m_tableAliasMap.size() > baseTableAliases.size()) {
-            // FIXME: This would be one of the tricky cases where the goal would be to prove that the
-            // row with no ORDER BY component came from the right side of a 1-to-1 or many-to-1 join.
-            // like Unique Index nested loop join, etc.
-            return false;
-        }
-        boolean allScansAreDeterministic = true;
-        for (Entry<String, List<AbstractExpression>> orderedAlias : baseTableAliases.entrySet()) {
-            List<AbstractExpression> orderedAliasExprs = orderedAlias.getValue();
-            StmtTableScan tableScan = m_tableAliasMap.get(orderedAlias.getKey());
-            if (tableScan == null) {
-                assert(false);
-                return false;
-            }
-
-            if (tableScan instanceof StmtSubqueryScan) {
-                return false; // don't yet handle FROM clause subquery, here.
-            }
-
-            Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
-
-            // This table's scans need to be proven deterministic.
-            allScansAreDeterministic = false;
-            // Search indexes for one that makes the order by deterministic
-            for (Index index : table.getIndexes()) {
-                // skip non-unique indexes
-                if ( ! index.getUnique()) {
-                    continue;
-                }
-
-                // get the list of expressions for the index
-                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
-
-                String jsonExpr = index.getExpressionsjson();
-                // if this is a pure-column index...
-                if (jsonExpr.isEmpty()) {
-                    for (ColumnRef cref : index.getColumns()) {
-                        Column col = cref.getColumn();
-                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
-                                                                            orderedAlias.getKey(),
-                                                                            col.getName(),
-                                                                            col.getName(),
-                                                                            col.getIndex());
-                        indexExpressions.add(tve);
-                    }
-                }
-                // if this is a fancy expression-based index...
-                else {
-                    try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                        assert(false);
-                        continue;
-                    }
-                }
-
-                // If the sort covers the index, then it's a unique sort.
-                // TODO: The statement's equivalence sets would be handy here to recognize cases like
-                //    WHERE B.unique_id = A.b_id
-                //    ORDER BY A.unique_id, A.b_id
-                if (orderedAliasExprs.containsAll(indexExpressions)) {
-                    allScansAreDeterministic = true;
-                    break;
-                }
-            }
-            // ALL tables' scans need to have proved deterministic
-            if ( ! allScansAreDeterministic) {
-                return false;
-            }
-        }
-        return true;
-    }
 
     private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered)
     {

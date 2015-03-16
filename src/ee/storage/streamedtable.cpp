@@ -29,8 +29,7 @@ StreamedTable::StreamedTable(bool exportEnabled)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
-        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
+        enableStream();
     }
 }
 
@@ -41,6 +40,15 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
     return st;
 }
 
+//This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+bool StreamedTable::enableStream() {
+    if (!m_wrapper) {
+        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                           m_executorContext->m_siteId);
+        return true;
+    }
+    return false;
+}
 
 StreamedTable::~StreamedTable()
 {

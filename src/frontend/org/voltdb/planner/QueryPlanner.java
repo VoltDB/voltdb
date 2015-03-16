@@ -268,6 +268,7 @@ public class QueryPlanner {
 
                 // note, expect real planning errors ignored here to be thrown again below
                 m_recentErrorMsg = null;
+                m_partitioning.resetAnalysisState();
             }
         }
         // if parameterization isn't requested or if it failed, plan here
@@ -395,6 +396,7 @@ public class QueryPlanner {
             ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }
+
         return bestPlan;
     }
 

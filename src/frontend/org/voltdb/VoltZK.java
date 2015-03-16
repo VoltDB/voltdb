@@ -32,6 +32,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
@@ -59,7 +60,7 @@ public class VoltZK {
     /*
      * Processes that want to block catalog updates create children here
      */
-    public static final String elasticJoinActiveBlockers = "/db/elastic_join_active_blockers";
+    public static final String catalogUpdateBlockers = "/db/catalog_update_blockers";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -109,7 +110,8 @@ public class VoltZK {
     public static final String start_action = "/db/start_action";
     public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
 
-    public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(elasticJoinActiveBlockers, "join_blocker");
+    public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "join_blocker");
+    public static final String rejoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "rejoin_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
 
@@ -129,9 +131,9 @@ public class VoltZK {
             leaders_initiators,
             leaders_globalservice,
             lastKnownLiveNodes,
-            elasticJoinActiveBlockers,
-            request_truncation_snapshot,
             syncStateMachine,
+            catalogUpdateBlockers,
+            request_truncation_snapshot
     };
 
     /**
@@ -244,5 +246,38 @@ public class VoltZK {
 
     public static int getHostIDFromChildName(String childName) {
         return Integer.parseInt(childName.split("_")[1]);
+    }
+
+    public static void createCatalogUpdateBlocker(ZooKeeper zk, String node)
+    {
+        try {
+            zk.create(node,
+                      null,
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.EPHEMERAL);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NODEEXISTS) {
+                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker", true, e);
+            }
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create catalog update blocker", true, e);
+        }
+    }
+
+    public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger log)
+    {
+        try {
+            ZKUtil.deleteRecursively(zk, node);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
+                if (log != null) {
+                    log.error("Failed to remove catalog udpate blocker: " + e.getMessage(), e);
+                }
+                return false;
+            }
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return true;
     }
 }

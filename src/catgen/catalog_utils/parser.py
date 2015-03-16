@@ -37,10 +37,11 @@ class Field:
         return self.comment != None and len(self.comment) > 0
 
 class CatalogDefn:
-    def __init__(self, name, fields, comment):
+    def __init__(self, name, fields, comment, hasEE):
         self.name = name
         self.fields = fields
         self.comment = comment
+        self.hasEE = hasEE
 
     def has_comment(self):
         return self.comment != None and len(self.comment) > 0
@@ -48,20 +49,31 @@ class CatalogDefn:
 # return values are lists of CatalogDefn
 def parse(text):
     retval = []
+    javaOnlyClasses = []
 
     text = strip_comments(text)
     text = text.split('\n')
 
     while len(text):
-        line = text.pop(0).split(None, 2)
+        line = text.pop(0).split(None, 3)
         if len(line) == 0:
             continue
-        if line.pop(0) != "begin":
+        beginStmt = line.pop(0)
+        if not beginStmt.startswith("begin"):
             raise Exception("Didn't find expected \"begin\" token.")
         name = line.pop(0)
         comment = None
+        hasEE = True # unless changed below
         if len(line):
-            comment = line.pop(0).strip("\"")
+            nextToken = line.pop(0)
+            if (nextToken.lower() == "javaonly"):
+                javaOnlyClasses.append(name)
+                hasEE = False
+                if len(line):
+                    comment = line.pop(0).strip("\"")
+            else:
+
+                comment = nextToken.strip("\"")
 
         fields = []
         fieldline = text.pop(0).split(None, 2)
@@ -73,8 +85,8 @@ def parse(text):
                 fieldcomment = fieldline.pop(0).strip("\"")
             fields.append(Field(nametoken, typetoken, fieldcomment))
             fieldline = text.pop(0).split(None, 2)
-        retval.append(CatalogDefn(name, fields, comment))
+        retval.append(CatalogDefn(name, fields, comment, hasEE))
 
-    return retval
+    return retval, javaOnlyClasses
 
 #classes = parse(testspec)

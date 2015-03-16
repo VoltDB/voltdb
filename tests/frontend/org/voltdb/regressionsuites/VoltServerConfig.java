@@ -140,4 +140,9 @@ public interface VoltServerConfig {
     public File[] getPathInSubroots(File path) throws IOException;
 
     public void setMaxHeap(int max);
+
+    /**
+     * @return the number of logical partitions in this configuration
+     * I.e. (sitesPerHost * numHosts) when K safetey is zero. */
+    public int getLogicalPartitionCount();
 }

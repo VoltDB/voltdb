@@ -10,7 +10,7 @@ The command for running sqlcmd is the following:
 
     $ sqlcmd  [options]
 
-Options let you specify what database to connect to and how the output is 
+Options let you specify what database to connect to and how the output is
 formatted. The allowable options are:
 
     --help or --usage
@@ -24,8 +24,8 @@ formatted. The allowable options are:
     --query={query}
     --stop-on-error={true|false}
 
-In addition to SQL statements, sqlcmd lets you enter directives that provide 
-information, execute stored procedures, or batch process a file of sqlcmd 
+In addition to SQL statements, sqlcmd lets you enter directives that provide
+information, execute stored procedures, or batch process a file of sqlcmd
 commands. Valid commands are:
 
     {SQL statement}
@@ -36,12 +36,14 @@ commands. Valid commands are:
     LIST|SHOW CLASSES
     LIST|SHOW PROC[EDURES]
     LIST|SHOW TABLES
+    LOAD CLASSES {jar-file}
+    REMOVE CLASSES {class-specification}
     HELP
     QUIT|EXIT
 
 Commands and SQL keywords (such as SELECT) are case insensitive. Each
 command must begin on a separate line, although individual SQL queries can span
-multiple lines. Use a semi-colon to terminate SQL commands and EXECUTE 
+multiple lines. Use a semi-colon to terminate SQL commands and EXECUTE
 directives.
 
 The following sections provide more detail on how to use the sqlcmd utility.
@@ -60,10 +62,10 @@ Connecting to a VoltDB database ------------------------------------------------
 
 Executing SQL Statements -------------------------------------------------------
 
-+ To execute a SQL statement, simply enter any valid VoltDB SQL statement 
++ To execute a SQL statement, simply enter any valid VoltDB SQL statement
   (select, insert, update, etc.) on the command line.
 
-+ Individual SQL statements can span multiple lines. (A line continuation 
++ Individual SQL statements can span multiple lines. (A line continuation
   character is not required.)
 
 + Use a semi-colon at the end of every SQL statement.
@@ -90,18 +92,18 @@ Executing Stored Procedures ----------------------------------------------------
 
 Explaining SQL Queries and VoltDB Stored Procedures ----------------------------
 
-+ You can use the EXPLAIN command to display the execution plan for a given SQL 
-  statement.  The execution plan describes how VoltDB expects to execute the 
++ You can use the EXPLAIN command to display the execution plan for a given SQL
+  statement.  The execution plan describes how VoltDB expects to execute the
   query at runtime, including what indexes are used, the order the tables are
   joined, and so on.  For example:
-  
+
       explain select * from votes;
-  
-+ You can use the EXPLAINPROC command to return the execution plans for 
+
++ You can use the EXPLAINPROC command to return the execution plans for
   all of the SQL queries within the specified stored procedure. For example:
-  
+
       explainproc Vote;
-  
+
 
 Listing Tables, Views, Stored Procedures, and Classes --------------------------
 
@@ -122,10 +124,29 @@ Listing Tables, Views, Stored Procedures, and Classes --------------------------
 
 + SHOW is an alias for LIST.
 
+Loading and removing classes ---------------------------------------------------
+
++ Use the LOAD CLASSES command to load classes for stored procedures. For
+  example, the following command loads any classes in myapp.jar, adding or
+  replacing class definitions as appropriate:
+
+      LOAD CLASSES myapp.jar
+
+  Loaded classes are available for use as stored procedures. For example, if
+  myapp.jar has a class myapp.MyProc, the following DDL command will expose
+  that class as the MyProc stored procedure:
+
+      create procedure MyProc from class myapp.MyProc;
+
++ Use the REMOVE CLASSES command to remove any classes that match the specified
+  class name string. The class specification can include wildcards. For example,
+  the following command removes all classes that were loaded from myapp.jar:
+
+      REMOVE CLASSES myapp.*
 
 Recalling commands -------------------------------------------------------------
 
-+ You can recall previous commands using the up and down arrow keys. Or you can 
++ You can recall previous commands using the up and down arrow keys. Or you can
   recall a specific command by number (the command prompt shows the line number)
   using the RECALL command:
 
@@ -137,15 +158,15 @@ Recalling commands -------------------------------------------------------------
 
   Where 123 is the line number you wish to recall.
 
-+ Once recalled, you can edit the command before reissuing it using typical 
++ Once recalled, you can edit the command before reissuing it using typical
   editing keys, such as the left and right arrow keys, backspace and delete.
 
 + You can also search and find matching entries in the history list by typing
   Control-R. This will search backward in the history for the next entry
-  matching the search string typed so far. Hitting Enter will terminate the 
-  search and accept the line, thereby executing the command from the history 
+  matching the search string typed so far. Hitting Enter will terminate the
+  search and accept the line, thereby executing the command from the history
   list. Note that the last incremental search string is remembered. If you type
-  two CTRL-R's without any intervening characters defining a new search string, 
+  two CTRL-R's without any intervening characters defining a new search string,
   the previous search string is used.
 
 + In general, sqlcmd follows the bash shell emacs-style keyboard interface.
@@ -203,10 +224,10 @@ Controlling output format ------------------------------------------------------
 
 + By default, columns header information, as well as affected row count is
   displayed in the output. When post-processing the file or piping it to a file,
-  you can remove such metadata with the --output-skip-metadata command line 
+  you can remove such metadata with the --output-skip-metadata command line
   argument.
 
-+ For example, the following command returns CSV data with no header 
++ For example, the following command returns CSV data with no header
   information:
 
      $ echo "exec Results" | sqlcmd --output-format=csv --output-skip-metadata
@@ -214,9 +235,9 @@ Controlling output format ------------------------------------------------------
 
 Important note on standard output messages -------------------------------------
 
-+ The sqlcmd utility writes informational messages to standard output. If you 
-  want to remove these extraneous messages from your sqlcmd output, you can use 
-  grep to filter the output when saving data to a file. The following command 
++ The sqlcmd utility writes informational messages to standard output. If you
+  want to remove these extraneous messages from your sqlcmd output, you can use
+  grep to filter the output when saving data to a file. The following command
   shows how you can filter the output:
 
 + echo "exec Results" | sqlcmd --output-format=csv \

@@ -306,7 +306,7 @@ public class TestDeterminism extends PlannerTestCase {
     }
 
     public void testDeterminismOfWrites() {
-        // "LIMIT" not currently supported for DML.
+        // "LIMIT" not currently supported for some DML.
         assertDMLPlanDeterminism("insert into ttree values (1,2,3,4)");
         assertDMLPlanDeterminism("insert into tunique values (1,2,3,4)");
         assertDMLPlanDeterminism("insert into tpk values (1,2,3,4)");

@@ -282,8 +282,13 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testExportTable() throws Exception
     {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         assertTrue(findTableInSystemCatalogResults("T25"));
         assertEquals(getTableType("T25"), "EXPORT");
+        //Export table created with STREAM syntax
+        assertTrue(findTableInSystemCatalogResults("T25S"));
+        assertEquals(getTableType("T25S"), "EXPORT");
     }
 
 //    @Test
@@ -330,14 +335,14 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         ClientResponse resp;
         VoltTable vt;
-        resp = m_client.callProcedure("p4", 18);
+        resp = m_client.callProcedure("p4", 1, 18);
         vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.BIGINT), 0l);
 
         m_client.callProcedure("T26.insert", 18, 1);
 
-        resp = m_client.callProcedure("p4", 18);
+        resp = m_client.callProcedure("p4", 1, 18);
         vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.BIGINT), 1l);
