@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import junit.framework.TestCase;
 
 import org.voltdb.parser.SQLParser.FileOption;
+import org.voltdb.parser.SQLParser.ParseRecallResults;
 
 public class TestSQLParser extends TestCase {
 
@@ -342,6 +343,26 @@ public class TestSQLParser extends TestCase {
         return cleanCommand;
     }
 
+    private void expectFromAll(boolean fudge, String expected, String... candidates) {
+        for (String candidate : candidates) {
+            String got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
+            // Guarding assert to makes breakpoints easier.
+            if (got == null) {
+                if (expected == null) {
+                    continue;
+                }
+            }
+            else if (got.equals(expected)) {
+                continue;
+            }
+            // Retry before reporting failure for chance to debug.
+            got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
+            // sure to fail
+            assertEquals("For input '" + candidate + "'" + (fudge ? " fudging " : " "),
+                         expected, got);
+        }
+    }
+
     public void testParseVoltDBSpecificDDLStatementPreambles() {
 
         expectFromAll(true, "CREATE PROCEDURE",
@@ -372,23 +393,71 @@ public class TestSQLParser extends TestCase {
                 "create role ;");
     }
 
-    private void expectFromAll(boolean fudge, String expected, String... candidates) {
-        for (String candidate : candidates) {
-            String got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
-            // Guarding assert to makes breakpoints easier.
-            if (got == null) {
-                if (expected == null) {
-                    continue;
-                }
-            }
-            else if (got.equals(expected)) {
-                continue;
-            }
-            // Retry before reporting failure for chance to debug.
-            got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
-            // sure to fail
-            assertEquals("For input '" + candidate + "'" + (fudge ? " fudging " : " "),
-                         expected, got);
-        }
+    public void testParseRecall()
+    {
+        parseRecallCase("RECALL 1", 1);
+        parseRecallCase("RECALL 2 ", 2);
+        parseRecallCase("RECALL 33;", 33);
+        parseRecallCase("RECALL 99 ;", 99);
+        parseRecallCase("RECALL 100 ; ", 100);
+
+        // Try too short commands.
+        parseRecallErrorCase("RECALL");
+        parseRecallErrorCase("RECALL ");
+        parseRecallErrorCase("RECALL;");
+        parseRecallErrorCase("RECALL ;");
+
+        // Try interspersed garbage.
+        parseRecallErrorCase("RECALL abc 1");
+        parseRecallErrorCase("RECALL 2 def");
+        parseRecallErrorCase("RECALL 33;ghi");
+        parseRecallErrorCase("RECALL 44 jkl;");
+
+        parseRecallErrorCase("RECALL mno");
+        parseRecallErrorCase("RECALL; pqr");
+        parseRecallErrorCase("RECALL ;stu");
+
+        // Try invalid keyword terminators
+        parseRecallErrorCase("RECALL,1");
+        parseRecallErrorCase("RECALL. 1");
+        parseRecallErrorCase("RECALL'1;");
+        parseRecallErrorCase("RECALL( 1;");
+        parseRecallErrorCase("RECALL(1);");
+        parseRecallErrorCase("RECALL- 1 ;");
+        parseRecallErrorCase("RECALL,");
+        parseRecallErrorCase("RECALL, ");
+        parseRecallErrorCase("RECALL,;");
+        parseRecallErrorCase("RECALL, ;");
+
+        // Try imaginative usage.
+        parseRecallErrorCase("RECALL 1 3;");
+        parseRecallErrorCase("RECALL 1,3;");
+        parseRecallErrorCase("RECALL 1, 3;");
+        parseRecallErrorCase("RECALL 1-3;");
+        parseRecallErrorCase("RECALL 1..3;");
+
+        // Try invalid numerics
+        parseRecallErrorCase("RECALL 0");
+        parseRecallErrorCase("RECALL -2;");
+        parseRecallErrorCase("RECALL 101");
+        parseRecallErrorCase("RECALL 1000;");
     }
+
+    private void parseRecallCase(String lineText, int lineNumber)
+    {
+        ParseRecallResults result = SQLParser.parseRecallStatement(lineText, 99);
+        assertNotNull(result);
+        assertNull(result.getError());
+        // Line number inputs are 1-based but getLine() results are 0-based
+        assertEquals(lineNumber, result.getLine()+1);
+    }
+
+    private void parseRecallErrorCase(String lineText)
+    {
+        ParseRecallResults result = SQLParser.parseRecallStatement(lineText, 99);
+        assertNotNull(result);
+        assertNotNull(result.getError());
+    }
+
+
 }
