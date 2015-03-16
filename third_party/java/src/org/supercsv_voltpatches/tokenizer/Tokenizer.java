@@ -128,6 +128,7 @@ public class Tokenizer extends AbstractTokenizer {
 	int charIndex = 0;
 	boolean espectQuote = this.strictQuotes;
 	boolean isEscape = false;
+	boolean sawNewLineInQuote = false;
 
 	while( true ) {
 
@@ -232,17 +233,18 @@ public class Tokenizer extends AbstractTokenizer {
 		/*
 		 * QUOTE_MODE (within quotes).
 		 */
-
-        if( currentColumn.length() > columnSizeLimit ) {
-            state = TokenizerState.NORMAL;
-            throw new SuperCsvException(
-                    String
-                    .format(
-                            "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
-                            "See --columnsizelimit.",
-                            columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
+        if( sawNewLineInQuote ) {
+            if( currentColumn.length() > columnSizeLimit ) {
+                state = TokenizerState.NORMAL;
+                sawNewLineInQuote = false;
+                throw new SuperCsvException(
+                        String
+                        .format(
+                                "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
+                                "See --columnsizelimit.",
+                                columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
+            }
         }
-
 		if( c == NEWLINE ) {
 
 		    /*
@@ -254,6 +256,17 @@ public class Tokenizer extends AbstractTokenizer {
 		     *
 		     * Yes I'll set the limit to be 16*1024*1024B = 16MB by default
 		     */
+		    if( currentColumn.length() > columnSizeLimit ) {
+		        state = TokenizerState.NORMAL;
+		        sawNewLineInQuote = false;
+		        throw new SuperCsvException(
+		                String
+		                .format(
+		                        "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
+		                        "See --columnsizelimit.",
+		                        columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
+		    }
+		    sawNewLineInQuote = true;
 		    currentColumn.append(NEWLINE);
 		    currentRow.append(NEWLINE); // specific line terminator lost, \n will have to suffice
 
@@ -284,7 +297,20 @@ public class Tokenizer extends AbstractTokenizer {
 			 * A single quote ("). Update to NORMAL (but don't save quote), then continue to next character.
 			 */
 			state = TokenizerState.NORMAL;
+			sawNewLineInQuote = false;
 			quoteScopeStartingLine = -1; // reset ready for next multi-line cell
+
+			// Check that we haven't gone over the column size limit
+			if( currentColumn.length() > columnSizeLimit ) {
+                state = TokenizerState.NORMAL;
+                sawNewLineInQuote = false;
+                throw new SuperCsvException(
+                        String
+                        .format(
+                                "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
+                                "See --columnsizelimit.",
+                                columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
+            }
 		    }
 		} else {
 		    /*
