@@ -49,39 +49,36 @@ class Hosts(object):
         self.hosts_by_id = {}
         self.abort_func = abort_func
 
-    def update(self, host_id_raw, prop_name_raw, value):
+    def update(self, host_id_raw, prop_name_raw, value_raw):
         host_id = int(host_id_raw)
         prop_name = prop_name_raw.lower()
+        value = value_raw
+        if prop_name.endswith('port'):
+            value = int(value)
         self.hosts_by_id.setdefault(host_id, Host(host_id, self.abort_func))[prop_name] = value
 
-    def lookup(self, *host_names):
+    def get_target_and_connection_host(self, host_name):
         """
-        Lookup host name(s) and return found and unused host objects,
-        plus a list of the host names that are missing. The unused host
-        list is arbitrarily ordered.
+        Find an arbitrary host that isn't the one being stopped.
+        Returns a tuple with connection and target host objects.
         """
-        found = []
-        unused = []
-        missing = set(host_names)
+        connection_host = None
+        target_host = None
         for host in self.hosts_by_id.values():
-            if host.hostname in host_names:
-                found.append(host)
-                missing.remove(host.hostname)
-            else:
-                unused.append(host)
-        return found, unused, sorted(list(missing))
+            if host.hostname == host_name:
+                target_host = host
+            elif connection_host is None:
+                connection_host = host
+            if not connection_host is None and not target_host is None:
+                break
+        return (target_host, connection_host)
 
 
-# To make it work with multiple hosts:
-#   - set max_count to None in the argument definition
-#   - change the lookup() call to hosts.lookup(*runner.opts.target_host)
-#   - change message text to reflect the possibility of multiple targets.
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
     description = 'Stop one host of a running VoltDB cluster.',
     arguments = (
-        VOLT.StringArgument('target_host', 'the target HOST name or address',
-                            min_count=1, max_count=1),
+        VOLT.StringArgument('target_host', 'the target HOST name or address'),
     ),
 )
 def stop(runner):
@@ -96,30 +93,26 @@ def stop(runner):
     for tuple in response.table(0).tuples():
         hosts.update(tuple[0], tuple[1], tuple[2])
 
-    # Look up the hosts specified as command line arguments.
-    found, unused, missing = hosts.lookup(runner.opts.target_host)
-    if len(missing) > 0:
-        runner.abort('Host not found in cluster: %s' % ' '.join(missing))
-    if len(unused) == 0:
+    # Connect to an arbitrary host that isn't being stopped.
+    (thost, chost) = hosts.get_target_and_connection_host(runner.opts.target_host)
+    if thost is None:
+        runner.abort('Host not found in cluster: %s' % runner.opts.target_host)
+    if chost is None:
         runner.abort('The entire cluster is being stopped, use "shutdown" instead.')
 
-    # Connect to an arbitrary host that isn't being stopped.
-    hostname = unused[0].hostname
-    port = int(unused[0].adminport)
-    username = runner.opts.username
-    password = runner.opts.password
-    if username:
-        user_info = ', user: %s' % username
+    if runner.opts.username:
+        user_info = ', user: %s' % runner.opts.username
     else:
         user_info = ''
-    runner.info('Connecting to host: %s:%d%s' % (hostname, port, user_info))
-    runner.voltdb_connect(hostname, port, username, password)
+    runner.info('Connecting to host: %s:%d%s' % (chost.hostname, chost.adminport, user_info))
+    runner.voltdb_connect(chost.hostname, chost.adminport,
+                          runner.opts.username, runner.opts.password)
 
-    # Stop all the requested hosts using exec @StopNode HOST_ID
-    for host in found:
-        runner.info('Stopping host %d: %s' % (host.id, host.hostname))
+    # Stop the requested host using exec @StopNode HOST_ID
+    runner.info('Stopping host %d: %s' % (thost.id, thost.hostname))
+    if not runner.opts.dryrun:
         response = runner.call_proc('@StopNode',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],
-                                    [host.id],
+                                    [thost.id],
                                     check_status=False)
         print response
