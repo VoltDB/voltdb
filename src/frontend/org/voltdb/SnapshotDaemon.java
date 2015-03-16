@@ -246,8 +246,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         @Override
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {}
         @Override
-        protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {}
-        @Override
         protected void membershipChanged(Set<String> addedMembers, Set<String> removedMembers) {}
 
         /*
@@ -284,6 +282,37 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
             // Start with an empty queue
             registerStateMachineWithManager(ByteBuffer.wrap(m_startQueue));
+        }
+
+        @Override
+        public String stateToString(ByteBuffer state) {
+            if (state == null || state.limit() < m_queueSlots+1) {
+                return "state is FUBAR";
+            }
+            ByteBuffer bb = state.asReadOnlyBuffer();
+            bb.flip();
+
+            final SNAPSHOT_TYPE [] types = SNAPSHOT_TYPE.values();
+            StringBuilder sb = new StringBuilder(512);
+
+            byte slot = bb.get();
+            sb.append("SnapshotQueue: { Active: ").append(types[slot]);
+
+            sb.append(", Queued: [ ");
+            for (int i = 0; i < m_queueSlots; ++i) {
+                slot = bb.get();
+                if (i>0) sb.append(", ");
+                sb.append(types[slot]);
+            }
+            sb.append("]");
+            if (bb.hasRemaining()) {
+                sb.append(", activeNode: ");
+                byte [] nb = new byte[bb.remaining()];
+                bb.get(nb);
+                String activeNode = new String(nb, StandardCharsets.UTF_8);
+                sb.append(activeNode);
+            }
+            return sb.append(" }").toString();
         }
 
         public void setQueueChangeCallback(Runnable queueChangeCallback) {
@@ -369,7 +398,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         private ByteBuffer buildProposalFromUpdatedQueue(ByteBuffer activeSnapshotdata) {
-            assert(ownDistributedLock());
             ByteBuffer newQueue = null;
             newQueue = ByteBuffer.allocate(1 + m_queueSlots + activeSnapshotdata.remaining());
             newQueue.put((byte) m_activeSnapshot.ordinal());   // snapshot in progress

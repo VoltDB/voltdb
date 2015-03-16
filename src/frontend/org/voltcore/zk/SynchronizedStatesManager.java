@@ -110,7 +110,7 @@ public class SynchronizedStatesManager {
         NO_QUORUM
     }
 
-    protected boolean addIfMissing(String absolutePath, CreateMode createMode, byte[] data)
+    public boolean addIfMissing(String absolutePath, CreateMode createMode, byte[] data)
             throws KeeperException, InterruptedException {
         return ZKUtil.addIfMissing(m_zk, absolutePath, createMode, data);
     }
@@ -179,7 +179,7 @@ public class SynchronizedStatesManager {
         protected final String m_stateMachineId;
         private Set<String> m_knownMembers;
         private boolean m_membershipChangePending = false;
-        private final String m_statePath;
+        protected final String m_statePath;
         private final String m_lockPath;
         private final String m_barrierResultsPath;
         private final String m_myResultPath;
@@ -864,6 +864,14 @@ public class SynchronizedStatesManager {
                     monitorParticipantChanges();
                 }
             }
+        }
+
+        protected boolean isProposalInProgress() {
+            boolean proposalInProgress;
+            lockLocalState();
+            proposalInProgress = m_pendingProposal != null;
+            unlockLocalState();
+            return proposalInProgress;
         }
 
         private void checkForBarrierResultsChanges() {
