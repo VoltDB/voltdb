@@ -842,6 +842,41 @@
                 <h2 class="help">Additional Controls</h2>
                 <p>To quckly hide or show either the graphs or the charts, you can click on the "Show/Hide" triangle above each section. You can also choose to display or hide specific charts and graphs using the <span class="helpStyleButton">Display&nbsp;Preference</span> button above the graphs. Clear the checkbox next to the graphs and/or charts you want to hide and press "Save". This setting is saved as a browser cookie so will be retained across sessions. </p>
             </div>
+            <div class="VDBAdminHelp" id="VDBAdmHelp" style="display: none;">
+                <p>The <span class="helpStyleTitle">VoltDB Management Center Admin</span> lets authorized users perform 
+                administrative functions on the cluster. Supported tasks include pausing and resuming the database, 
+                saving and restoring snapshots, as well as reviewing and editing the database configuration.
+                The Administration page is divided into four parts: </p>
+                <ul class="helpList">
+                    <li>Control Bar</li>
+                    <li>Configuration Overview</li>
+                    <li>Network Interfaces &amp; Directories</li>
+                </ul>
+                <br>
+                <h2 class="help">Control Bar</h2>
+                <p>The control bar at the top of the page lets you perform common administrative functions to a running database. The buttons on the control bar perform the following actions:</p>
+                <ul class="helpList">
+                    <li><span class="helpStyleTitle">Pause &amp; Resume</span> &mdash; To pause the database click on the pause button.
+                    When you pause the database, the button's icon changes to "resume" to indicate it will now resume the database next time you click on it.</li>
+                    <li><span class="helpStyleTitle">Promote</span> &mdash; If the database was started as a replica for database replication (DR), the Promote button lets you stop DR, exit read-only mode and promote the database to normal mode.</li>
+                    <li><span class="helpStyleTitle">Save &amp; Restore</span> &mdash; There are separate buttons for saving and restoring snapshots. 
+                    For saving, you must provide an absolute directory path where the snapshot files will be stored and a unique identifier. 
+                    For restoring, specify an absolute path and click search to see a list of available snapshots.</li>
+                    <li><span class="helpStyleTitle">Shutdown</span> &mdash; The shutdown button lets you shutdown the database.</li>
+                </ul>
+                <p>
+                    The right side of the control bar includes two additional controls. The "Download Configuration" button lets you download a text file of the current deployment file settings. 
+                    The server pull-down menu to the far right lets you change which server you are administering. 
+                    You can also use the server menu to stop an individual node in a K-safe cluster. (For example, if you need to perform maintenance on the server hardware.)
+            	</p>
+                <h2 class="help">Configuration Overview</h2>
+                    <p>The configuration overview shows the settings for various database features that are configurable in the deployment file. If a setting is editable on the running cluster, 
+                    a pencil icon appears to the right of the option. Click on the pencil to edit the setting then click on OK to save and apply your changes.</p>
+                    
+                <h2 class="help">Network Interfaces &amp; Directories</h2>
+                <p>To the right of the configuration overview is a list of the network interfaces, ports, and directories configured for the cluster. These settings are also settable in the 
+                deployment file or on the command line when starting the database. However, they are not editable after the server is running and so this section is for reference only.</p>
+            </div>
             <div class="VDBSchemaHelp" id="VDBSchHelp" style="display: none;">
                 <p>The <strong class="helpStyleTitle">VoltDB Management Center Schema</strong> viewer lets you examine the logical definition of your database, including the tables, views, indexes, and stored procedures. Five tabs along the top of the viewer let you choose between: </p>
                 <ul class="helpSchemaList">
