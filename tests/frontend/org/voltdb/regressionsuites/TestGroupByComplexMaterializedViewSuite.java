@@ -1422,12 +1422,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             sql = sql.replace("V_P1_ENG5386", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             //* enable for debug*/ System.out.println(vt);
-            long voltNullLong = Long.MIN_VALUE;
-            if (isHSQL()) {
-                voltNullLong = 0l;
-            }
-            validateTableOfLongs(vt, new long[][] {{10,303,37,12,21}, {20,90,37,7,22}, {30,109,voltNullLong,14,24}});
-
+            validateTableOfLongs(vt, new long[][] {{10,303,37,12,21}, {20,90,37,7,22}, {30,109,Long.MIN_VALUE,14,24}});
         }
 
     }
