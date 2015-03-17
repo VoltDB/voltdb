@@ -33,12 +33,12 @@ import java.util.Map;
  */
 class SchemaPageSchemaTab extends SchemaPage {
     static content = {
+		requiredId		{ $(checkId) }
         schemaTable { $('#schematable') }
 
         ascending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerAsc") }
         descending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerDesc") }
 
-        refresh				{ $(class:"refreshBtn schm", text:"Refresh") }
         row					{ $(class:"primaryrow") }
 
 
@@ -66,6 +66,7 @@ class SchemaPageSchemaTab extends SchemaPage {
         schemaTable.displayed
     }
 
+	String checkId = "#s-"+ getTablename()
     /**
      * Returns the contents of the "Schema" table, on the Schema tab of the
      * Schema page of the VMC, by column, as a Map<String,List<String>>.

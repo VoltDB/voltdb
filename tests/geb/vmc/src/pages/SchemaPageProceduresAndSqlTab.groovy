@@ -30,12 +30,21 @@ package vmcTest.pages
  */
 class SchemaPageProceduresAndSqlTab extends SchemaPage {
     static content = {
-        // TODO: add content
+	
+        procedureName	{ $(class:"tablesorter-header-inner", text:"Procedure Name") }
+        parameters		{ $(class:"tablesorter-header-inner", text:"Parameters") }
+        partitioning 	{ $(class:"tablesorter-header-inner", text:"Partitioning") }
+        rw				{ $(class:"tablesorter-header-inner", text:"R/W") }
+        access			{ $(class:"tablesorter-header-inner", text:"Access") }
+        attributes		{ $(class:"tablesorter-header-inner", text:"Attributes") }
+        
+        ascending		{ $(class:"tablesorter-icon icon-chevron-up") }
+        descending		{ $(class:"tablesorter-icon icon-chevron-down") }
     }
     static at = {
         proceduresTab.displayed
         proceduresTab.attr('class') == 'active'
-        // TODO: add a few key elements, that should always appear
+        
     }
 
 }

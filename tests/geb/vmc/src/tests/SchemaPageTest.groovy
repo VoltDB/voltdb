@@ -986,9 +986,381 @@ class SchemaPageTest extends TestBase {
             assert false
         }
     }
-
-    def cleanupSpec() {
-        if (!(page instanceof VoltDBManagementCenterPage)) {
+	
+	// Schema Tab
+	
+	def "Schema Tab:Check Ascending Descending in Name"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'click name'
+		page.name.click()
+		then: 'check ascending'
+		if (page.ascending.isDisplayed()) {
+			println("Schema Tab:Ascending Success")
+		}
+		
+		when: 'click name'
+		page.name.click()
+		then: 'check descending'
+		if(page.descending.isDisplayed()) {
+			println("Schema Tab:Descending Success")
+		}
+		println()
+	}
+	
+	def "Schema Tab:Check Ascending Descending in Type"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'click name'
+		page.type.click()
+		then: 'check ascending'
+		if (page.ascending.isDisplayed()) {
+			println("Schema Tab:Ascending Success")
+		}
+		
+		when: 'click name'
+		page.type.click()
+		then: 'check descending'
+		if(page.descending.isDisplayed()) {
+			println("Schema Tab:Descending Success")
+		}
+		println()
+	}
+	
+	def "Schema Tab:Check Ascending Descending in Partitioning"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'click name'
+		page.partitioning.click()
+		then: 'check ascending'
+		if (page.ascending.isDisplayed()) {
+			println("Schema Tab:Ascending Success")
+		}
+		
+		when: 'click name'
+		page.partitioning.click()
+		then: 'check descending'
+		if(page.descending.isDisplayed()) {
+			println("Schema Tab:Descending Success")
+		}
+		println()
+	}
+	
+	def "Schema Tab:Check Ascending Descending in Columns"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'click name'
+		page.columns.click()
+		then: 'check ascending'
+		if (page.ascending.isDisplayed()) {
+			println("Schema Tab:Ascending Success")
+		}
+		
+		when: 'click name'
+		page.columns.click()
+		then: 'check descending'
+		if(page.descending.isDisplayed()) {
+			println("Schema Tab:Descending Success")
+		}
+		println()
+	}
+	
+	def "Schema Tab:Check Ascending Descending in Indexes"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'click name'
+		page.indexes.click()
+		then: 'check ascending'
+		if (page.ascending.isDisplayed()) {
+			println("Schema Tab:Ascending Success")
+		}
+		
+		when: 'click name'
+		page.indexes.click()
+		then: 'check descending'
+		if(page.descending.isDisplayed()) {
+			println("Schema Tab:Descending Success")
+		}
+		println()
+	}
+	
+	def "Schema Tab:Check Ascending Descending in PKey"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'click name'
+		page.pkey.click()
+		then: 'check ascending'
+		if (page.ascending.isDisplayed()) {
+			println("Schema Tab:Ascending Success")
+		}
+		
+		when: 'click name'
+		page.pkey.click()
+		then: 'check descending'
+		if(page.descending.isDisplayed()) {
+			println("Schema Tab:Descending Success")
+		}
+		println()
+	}
+	
+	def "Schema Tab:Check Ascending Descending in Tuple Limit"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'click name'
+		page.tuplelimit.click()
+		then: 'check ascending'
+		if (page.ascending.isDisplayed()) {
+			println("Schema Tab:Ascending Success")
+		}
+		
+		when: 'click name'
+		page.tuplelimit.click()
+		then: 'check descending'
+		if(page.descending.isDisplayed()) {
+			println("Schema Tab:Descending Success")
+		}
+		println()
+	}
+	
+	def "Schema Tab:Add table, search and delete"() {
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		String createQuery = page.getQueryToCreateTable()
+		String deleteQuery = page.getQueryToDeleteTable()
+		String tablename = page.getTablename()
+		
+		when: 'go to SQL Query page'
+		page.gotoSqlQuery()
+		then: 'at SQL Query page'
+		at SqlQueryPage
+		
+		when: 'set search query in the box'
+		page.setQueryText(createQuery)
+		then: 'run the query'
+		page.runQuery()
+				
+		if ( page.queryStatus.isDisplayed() ) {
+			println("Create query successful")
+		}
+		else {
+			println("Create query unsuccessful")
+			assert false
+		}
+		
+		when: 'go to Schema page'
+		page.gotoSchema()
+		then: 'at Schema page'
+		at SchemaPage
+		
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at schema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'tablename is searched'
+		page.refreshbutton.click()
+		page.searchName.value(tablename)
+		then: 'at least one table is present'
+		waitFor(30) { page.requiredId.isDisplayed() }
+		
+		when: 'go to SQL Query page'
+		page.gotoSqlQuery()
+		then: 'at SQL Query page'
+		at SqlQueryPage
+		
+		when: 'set delete query in the box'
+		page.setQueryText(deleteQuery)
+		then: 'run the query'
+		page.runQuery()
+		if ( page.queryStatus.isDisplayed() ) {
+			println("Delete query successful")
+		}
+		else {
+			println("Delete query unsuccessful")
+			assert false
+		}
+		
+		when: 'go to Schema page'
+		page.gotoSchema()
+		then: 'at Schema page'
+		at SchemaPage
+		
+		when: 'go to schema tab'
+		page.openSchemaPageSchemaTab()
+		then: 'at sschema tab'
+		at SchemaPageSchemaTab
+		
+		when: 'tablename is searched'
+		page.refreshbutton.click()
+		page.searchName.value(tablename)
+		then: 'at least one table is present'
+		
+		try {
+			page.requiredId.isDisplayed()
+			println("Schema Tab:Add table, search and delete-FAIL")
+			assert false
+		}
+		catch (geb.error.RequiredPageContentNotPresent e) {
+			println("Schema Tab:Add table, search and delete-PASS")
+		}
+		println()
+	}
+	
+	// Procedures and SQLData
+	
+	def "Procedures And SQL Tab:Check Ascending Descending in Procedure Name"() {
+		when: 'go to procedures and sql tab'
+		page.openSchemaPageProceduresAndSqlTab()
+		then: 'at procedures and sql tab'
+		at SchemaPageProceduresAndSqlTab
+		
+		when: 'click procedure name'
+		page.procedureName.click()
+		then: 'check ascending'
+		page.ascending.isDisplayed()
+		
+		when: 'click procedure name'
+		page.procedureName.click()
+		then: 'check descending'
+		page.descending.isDisplayed()
+	}
+	
+	def "Procedures And SQL Tab:Check Ascending Descending in Parameters"() {
+		when: 'go to procedures and sql tab'
+		page.openSchemaPageProceduresAndSqlTab()
+		then: 'at procedures and sql tab'
+		at SchemaPageProceduresAndSqlTab
+		
+		when: 'click procedure name'
+		page.parameters.click()
+		then: 'check ascending'
+		page.ascending.isDisplayed()
+		
+		when: 'click procedure name'
+		page.parameters.click()
+		then: 'check descending'
+		page.descending.isDisplayed()
+	}
+	
+	def "Procedures And SQL Tab:Check Ascending Descending in Partitioning"() {
+		when: 'go to procedures and sql tab'
+		page.openSchemaPageProceduresAndSqlTab()
+		then: 'at procedures and sql tab'
+		at SchemaPageProceduresAndSqlTab
+		
+		when: 'click procedure name'
+		page.partitioning.click()
+		then: 'check ascending'
+		page.ascending.isDisplayed()
+		
+		when: 'click procedure name'
+		page.partitioning.click()
+		then: 'check descending'
+		page.descending.isDisplayed()
+	}
+	
+	def "Procedures And SQL Tab:Check Ascending Descending in RW"() {
+		when: 'go to procedures and sql tab'
+		page.openSchemaPageProceduresAndSqlTab()
+		then: 'at procedures and sql tab'
+		at SchemaPageProceduresAndSqlTab
+		
+		when: 'click procedure name'
+		page.rw.click()
+		then: 'check ascending'
+		page.ascending.isDisplayed()
+		
+		when: 'click procedure name'
+		page.rw.click()
+		then: 'check descending'
+		page.descending.isDisplayed()
+	}
+	
+	def "Procedures And SQL Tab:Check Ascending Descending in Access"() {
+		when: 'go to procedures and sql tab'
+		page.openSchemaPageProceduresAndSqlTab()
+		then: 'at procedures and sql tab'
+		at SchemaPageProceduresAndSqlTab
+		
+		when: 'click procedure name'
+		page.access.click()
+		then: 'check ascending'
+		page.ascending.isDisplayed()
+		
+		when: 'click procedure name'
+		page.access.click()
+		then: 'check descending'
+		page.descending.isDisplayed()
+	}
+	
+	def "Procedures And SQL Tab:Check Ascending Descending in Attributes"() {
+		when: 'go to procedures and sql tab'
+		page.openSchemaPageProceduresAndSqlTab()
+		then: 'at procedures and sql tab'
+		at SchemaPageProceduresAndSqlTab
+		
+		when: 'click procedure name'
+		page.attributes.click()
+		then: 'check ascending'
+		page.ascending.isDisplayed()
+		
+		when: 'click procedure name'
+		page.attributes.click()
+		then: 'check descending'
+		page.descending.isDisplayed()
+	}
+	
+	// DLL Source
+	
+	def "DDL Source Tab:Check Download Button"() {
+		when: 'go to ddl source tab'
+		page.openSchemaPageDdlSourceTab()
+		then: 'at ddl source tab'
+		at SchemaPageDdlSourceTab
+		
+		when: 'check if download button is present'
+		waitFor(30) { page.downloadButton.isDisplayed() }
+		then: 'check if download button is correct'
+		page.downloadButton.text().equals("Download")
+	}
+	
+	def "DDL Source Tab:Check Content"() {
+		when: 'go to ddl source tab'
+		page.openSchemaPageDdlSourceTab()
+		then: 'at ddl source tab'
+		at SchemaPageDdlSourceTab
+		
+		waitFor(30) { page.sourceText.isDisplayed() }
+	}
+	
+	// Cleanup
+	
+	def cleanupSpec() {
+		if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
             then: 'to be on VMC page'
@@ -996,14 +1368,14 @@ class SchemaPageTest extends TestBase {
         }
 
         page.loginIfNeeded()
-
+        
         when: 'click the Schema link (if needed)'
         page.openSqlQueryPage()
         then: 'should be on DB Monitor page'
         at SqlQueryPage
         String deleteQuery = page.getQueryToDeleteTable()
-        page.setQueryText(deleteQuery)
+		page.setQueryText(deleteQuery)
 
-        page.runQuery()
-    }
+		page.runQuery()
+	}
 }

@@ -31,7 +31,7 @@ package vmcTest.pages
 class SchemaPageDdlSourceTab extends SchemaPage {
     static content = {
         mainContent { $('#d') }
-        downloadButton  { mainContent.find('.dataBlockHeading').find('a') }
+        downloadButton  { $("#downloadDDL") }
         sourceText  { mainContent.find('.dataBlockContent') }
     }
     static at = {
