@@ -320,12 +320,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled) {
-        drMark = drStream->m_uso;
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
+        drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
     }
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
@@ -436,13 +435,12 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
-        drMark = drStream->m_uso;
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -577,13 +575,12 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled) {
-        drMark = drStream->m_uso;
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
         drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
     }
 
@@ -736,12 +733,11 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled) {
-        drMark = drStream->m_uso;
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE);
     }
 
     if (fallible) {
