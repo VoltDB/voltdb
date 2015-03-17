@@ -8,7 +8,7 @@ group = 'org.voltdb'
 def srcfilepath = new FileNameFinder().getFileNames ('.' , 'voltdbclient-*-sources.jar')[0]
 def matcher = ( srcfilepath =~ /.*voltdbclient-(.*)-sources.jar$/)
 version = matcher[0][1]
-
+println version
 description = 'VoltDB client interface libraries'
 archivesBaseName = 'voltdbclient'
 
@@ -18,11 +18,11 @@ configurations {
 }
 
 artifacts {
-  clientArchives file:file("voltdbclient-${version}.jar", name:'voltdbclient',
+  clientArchives file: file("voltdbclient-${version}.jar"), name:'voltdbclient',
                          classifier:null, type:'jar', extension:'jar'
-  clientArchives file:file("voltdbclient-${version}-javadoc.jar", name:'voltdbclient',
+  clientArchives file: file("voltdbclient-${version}-javadoc.jar"), name:'voltdbclient',
                          classifier:'javadoc', type:'jar', extension:'jar'
-  clientArchives file:file("voltdbclient-${version}-sources.jar", name:'voltdbclient',
+  clientArchives file: file("voltdbclient-${version}-sources.jar"), name:'voltdbclient',
                          classifier:'sources', type:'jar', extension:'jar'
 }
 
