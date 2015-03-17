@@ -49,7 +49,7 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
 }
 
 waiting {
-    timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 5)
+    timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 10)
 }
 
 environments {
