@@ -319,7 +319,9 @@ public class TestSpPromoteAlgo
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             msg.setSpHandle(sphandle.getTxnId());
-            maxBinaryLogUniqueId = Math.max(maxBinaryLogUniqueId, TestRepairLog.setBinaryLogUniqueId(msg, buig));
+            if (msg instanceof Iv2InitiateTaskMessage) {
+                maxBinaryLogUniqueId = Math.max(maxBinaryLogUniqueId, TestRepairLog.setBinaryLogUniqueId(msg, buig));
+            }
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 if (!stops[0]) {

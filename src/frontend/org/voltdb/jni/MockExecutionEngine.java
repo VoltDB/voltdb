@@ -221,6 +221,13 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
+                               long undoToken) throws EEException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public long getThreadLocalPoolAllocations() {
         return 0L;
     }

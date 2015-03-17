@@ -30,7 +30,7 @@ import java.util.ListIterator;
  * searchBackwards(String searchTerm, int startIndex, boolean startsWith).
  * Be aware of possible breakage when implementing JLine2 updates.
  */
-public class SQLConsoleReader extends jline.console.ConsoleReader
+public class SQLConsoleReader extends jline.console.ConsoleReader implements SQLCommandLineReader
 {
     /**
      * Constructor.
@@ -45,6 +45,9 @@ public class SQLConsoleReader extends jline.console.ConsoleReader
         // If we decide to upgrade, take note.
         setExpandEvents(false);  // don't process shell ! and !!
     }
+
+    @Override
+    public String readBatchLine() throws IOException { return readLine("batch>"); }
 
     /* (non-Javadoc)
      * @see jline.console.ConsoleReader#searchBackwards(java.lang.String, int, boolean)

@@ -1,0 +1,14 @@
+drop table t if exists;
+create table t (
+ stable integer,
+ constraint pk primary key (stable),
+ altkey integer,
+ constraint altuniq unique (altkey),
+);
+
+FILE scripts/ddl/indexes.sqlfile
+
+select * from t;
+
+drop table t;
+

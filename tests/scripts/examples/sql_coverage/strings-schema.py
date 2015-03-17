@@ -25,6 +25,7 @@
 {
     "P1": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC_INLINE_MAX", FastSerializer.VOLTTYPE_STRING),
                     ("DESC_INLINE", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -33,6 +34,7 @@
         },
     "R1": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC_INLINE_MAX", FastSerializer.VOLTTYPE_STRING),
                     ("DESC_INLINE", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),

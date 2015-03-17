@@ -771,8 +771,8 @@ public abstract class CatalogUtil {
             HttpdType httpd = deployment.getHttpd();
             if (httpd == null) {
                 httpd = new HttpdType();
-                //-1 means find next port from 8080
-                httpd.setPort(-1);
+                // Find next available port starting with the default
+                httpd.setPort(Constants.HTTP_PORT_AUTO);
                 deployment.setHttpd(httpd);
             }
             //jsonApi
@@ -1577,7 +1577,7 @@ public abstract class CatalogUtil {
      * or deployment file, do the irritating exception crash test, jam the bytes in,
      * and get the SHA-1 hash.
      */
-    public static byte[] makeCatalogOrDeploymentHash(byte[] inbytes)
+    public static byte[] makeDeploymentHash(byte[] inbytes)
     {
         MessageDigest md = null;
         try {
@@ -1613,8 +1613,14 @@ public abstract class CatalogUtil {
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
-        versionAndBytes.put(makeCatalogOrDeploymentHash(catalogBytes));
-        versionAndBytes.put(makeCatalogOrDeploymentHash(deploymentBytes));
+        try {
+            versionAndBytes.put((new InMemoryJarfile(catalogBytes)).getSha1Hash());
+        }
+        catch (IOException ioe) {
+            VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
+                    true, ioe);
+        }
+        versionAndBytes.put(makeDeploymentHash(deploymentBytes));
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
         versionAndBytes.putInt(deploymentBytes.length);

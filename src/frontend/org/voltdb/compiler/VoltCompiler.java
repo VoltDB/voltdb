@@ -112,6 +112,7 @@ public class VoltCompiler {
     /** Represents the level of severity for a Feedback message generated during compiling. */
     public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED }
     public static final int NO_LINE_NUMBER = -1;
+    private static final String NO_FILENAME = "null";
 
     // Causes the "debugoutput" folder to be generated and populated.
     // Also causes explain plans on disk to include cost.
@@ -122,10 +123,10 @@ public class VoltCompiler {
 
     // tables that change between the previous compile and this one
     // used for Live-DDL caching of plans
-    private Set<String> m_dirtyTables = new TreeSet<>();
+    private final Set<String> m_dirtyTables = new TreeSet<>();
     // A collection of statements from the previous catalog
     // used for Live-DDL caching of plans
-    private Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
+    private final Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -144,7 +145,7 @@ public class VoltCompiler {
     public static final boolean DISABLE_DR_WARNING = Boolean.getBoolean("DISABLE_DR_WARNING");
 
     String m_projectFileURL = null;
-    String m_currentFilename = null;
+    private String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
     String[] m_importLines = null;
@@ -1278,10 +1279,19 @@ public class VoltCompiler {
         m_dirtyTables.clear();
 
         for (final VoltCompilerReader schemaReader : schemaReaders) {
-            // add the file object's path to the list of files for the jar
-            m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
+            String origFilename = m_currentFilename;
+            try {
+                if (m_currentFilename == null || m_currentFilename.equals(NO_FILENAME))
+                    m_currentFilename = schemaReader.getName();
 
-            ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                // add the file object's path to the list of files for the jar
+                m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
+
+                ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+            }
+            finally {
+                m_currentFilename = origFilename;
+            }
         }
 
         ddlcompiler.compileToCatalog(db);
@@ -1581,7 +1591,7 @@ public class VoltCompiler {
             ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor, jarOutput);
         }
         // done handling files
-        m_currentFilename = null;
+        m_currentFilename = NO_FILENAME;
 
         // allow gc to reclaim any cache memory here
         m_previousCatalogStmts.clear();
@@ -2081,8 +2091,9 @@ public class VoltCompiler {
             }
             if (m_reportPath != null) {
                 outputStream.println("------------------------------------------\n");
-                outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
-                            "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+                outputStream.println(String.format(
+                        "Full catalog report can be found at file://%s.\n",
+                        m_reportPath));
             }
             outputStream.println("------------------------------------------\n");
         }
@@ -2327,7 +2338,7 @@ public class VoltCompiler {
         ClassLoader originalClassLoader = m_classLoader;
         try {
             canonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
-            newDDLReader = new VoltCompilerStringReader("ADHOCDDL.sql", newDDL);
+            newDDLReader = new VoltCompilerStringReader("Ad Hoc DDL Input", newDDL);
 
             List<VoltCompilerReader> ddlList = new ArrayList<>();
             ddlList.add(newDDLReader);
@@ -2345,11 +2356,10 @@ public class VoltCompiler {
                 if (m_errors.size() > 0) {
                     errString = m_errors.get(m_errors.size() - 1).getLogString();
                 }
-                int fronttrim = errString.indexOf("DDL Error");
-                if (fronttrim < 0) { fronttrim = 0; }
+
                 int endtrim = errString.indexOf(" in statement starting");
                 if (endtrim < 0) { endtrim = errString.length(); }
-                String trimmed = errString.substring(fronttrim, endtrim);
+                String trimmed = errString.substring(0, endtrim);
                 throw new IOException(trimmed);
             }
         }

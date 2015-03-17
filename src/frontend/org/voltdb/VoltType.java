@@ -820,6 +820,7 @@ public enum VoltType {
             case INTEGER:
             case BIGINT:
             case FLOAT:
+            case DECIMAL:
                 return true;
             default:
                 return false;

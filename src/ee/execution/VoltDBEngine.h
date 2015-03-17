@@ -360,6 +360,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void updateHashinator(HashinatorType type, const char *config,
                               int32_t *configPtr, uint32_t numTokens);
 
+        void applyBinaryLog(int64_t txnId,
+                            int64_t spHandle,
+                            int64_t lastCommittedSpHandle,
+                            int64_t uniqueId,
+                            int64_t undoToken,
+                            const char *log);
+
         /*
          * Execute an arbitrary task represented by the task id and serialized parameters.
          * Returns serialized representation of the results

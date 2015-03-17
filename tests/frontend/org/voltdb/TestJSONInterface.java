@@ -132,6 +132,13 @@ public class TestJSONInterface extends TestCase {
         return s;
     }
 
+    static String getHTTPURL(Integer port, String path) {
+        if (port == null) {
+            port = VoltDB.DEFAULT_HTTP_PORT;
+        }
+        return String.format("http://localhost:%d/%s", port, path);
+    }
+
     public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
         URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
 
@@ -1178,8 +1185,8 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 404);
         } finally {
             if (server != null) {
                 server.shutdown();

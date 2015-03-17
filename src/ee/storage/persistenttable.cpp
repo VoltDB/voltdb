@@ -320,12 +320,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled) {
-        drMark = drStream->m_uso;
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
+        drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
     }
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
@@ -436,13 +435,12 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
-        drMark = drStream->m_uso;
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -573,6 +571,19 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
+    }
+
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
         increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
@@ -602,20 +613,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
-
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
-    if (drStream && !m_isMaterialized && m_drEnabled) {
-        drMark = drStream->m_uso;
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
-        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
-        const int64_t currentSpHandle = ec->currentSpHandle();
-        const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
-    }
 
     if (uq) {
         /*
@@ -678,7 +675,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     else {
         matchable.move(sourceTupleDataWithNewValues);
     }
-    TableTuple targetTupleToUpdate = lookupTuple(matchable);
+    TableTuple targetTupleToUpdate = lookupTupleForUndo(matchable);
     TableTuple sourceTupleWithNewValues(sourceTupleDataWithNewValues, m_schema);
 
     //If the indexes were never updated there is no need to revert them.
@@ -736,12 +733,11 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
     if (drStream && !m_isMaterialized && m_drEnabled) {
-        drMark = drStream->m_uso;
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE);
     }
 
     if (fallible) {
@@ -842,7 +838,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     if (!skipLookup) {
         // The UndoInsertAction got a pooled copy of the tupleData.
         // Relocate the original tuple actually in the table.
-        target = lookupTuple(matchable);
+        target = lookupTupleForUndo(matchable);
     }
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
@@ -860,7 +856,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     deleteTupleFinalize(target); // also frees object columns
 }
 
-TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
+TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
     TableTuple nullTuple(m_schema);
 
     TableIndex *pkeyIndex = primaryKeyIndex();
@@ -868,16 +864,27 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
         /*
          * Do a table scan.
          */
-        size_t tuple_length = m_schema->tupleLength();
         TableTuple tableTuple(m_schema);
         TableIterator ti(this, m_data.begin());
-        while (ti.hasNext()) {
-            ti.next(tableTuple);
+        if (forUndo || m_schema->getUninlinedObjectColumnCount() == 0) {
+            size_t tuple_length = m_schema->tupleLength();
             // Do an inline tuple byte comparison
             // to avoid matching duplicate tuples with different pointers to Object storage
             // -- which would cause erroneous releases of the wrong Object storage copy.
-            if (::memcmp(tableTuple.address(), tuple.address(), tuple_length) == 0) {
-                return tableTuple;
+            while (ti.hasNext()) {
+                ti.next(tableTuple);
+                char* tableTupleData = tableTuple.address() + TUPLE_HEADER_SIZE;
+                char* tupleData = tuple.address() + TUPLE_HEADER_SIZE;
+                if (::memcmp(tableTupleData, tupleData, tuple_length) == 0) {
+                    return tableTuple;
+                }
+            }
+        } else {
+            while (ti.hasNext()) {
+                ti.next(tableTuple);
+                if (tableTuple.equalsNoSchemaCheck(tuple)) {
+                    return tableTuple;
+                }
             }
         }
         return nullTuple;

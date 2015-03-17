@@ -35,6 +35,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.TimestampType;
@@ -155,7 +156,7 @@ public class VoltDB {
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
-        public int m_httpPort = Integer.MAX_VALUE;
+        public int m_httpPort = Constants.HTTP_PORT_DISABLED;
         public String m_httpPortInterface = "";
 
         public String m_publicInterface = "";
