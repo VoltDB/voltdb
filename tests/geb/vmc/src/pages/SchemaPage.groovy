@@ -41,7 +41,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
         sizeLink    (to: SchemaPageSizeWorksheetTab){ sizeTab.find('a') }
         ddlLink     (to: SchemaPageDdlSourceTab)    { ddlTab.find('a') }
         voltDbDocumentationLink { $('a#iconDoc') }
-        schema              { module schemaTab}
+        refreshbutton 		{ $(class:"refreshBtn schm", text:"Refresh") }
     }
 
 
