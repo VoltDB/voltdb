@@ -801,4 +801,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         return true;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_endExpression, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_initialExpression, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
+        for (AbstractExpression ae : m_searchkeyExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
+    }
+
 }

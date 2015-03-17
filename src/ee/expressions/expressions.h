@@ -60,5 +60,7 @@
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/hashrangeexpression.h"
 #include "expressions/subqueryexpression.h"
+#include "expressions/scalarvalueexpression.h"
+#include "expressions/vectorcomparisonexpression.hpp"
 
 #endif

@@ -37,10 +37,10 @@ import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SemiSeqScanPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
+import org.voltdb.plannodes.TupleScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 
@@ -58,7 +58,7 @@ public enum PlanNodeType {
     INDEXCOUNT       (12, IndexCountPlanNode.class),
     TABLECOUNT       (13, TableCountPlanNode.class),
     MATERIALIZEDSCAN (14, MaterializedScanPlanNode.class),
-    SEMISEQSCAN      (15, SemiSeqScanPlanNode.class),
+    TUPLESCAN        (15, TupleScanPlanNode.class),
 
     //
     // Join Nodes

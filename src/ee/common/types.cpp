@@ -410,8 +410,8 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
-    case PLAN_NODE_TYPE_SEMISEQSCAN: {
-        return "SEMISEQSCAN";
+    case PLAN_NODE_TYPE_TUPLESCAN: {
+        return "TUPLESCAN";
     }
     } // END OF SWITCH
     return "UNDEFINED";
@@ -461,8 +461,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_LIMIT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
-    } else if (str == "SEMISEQSCAN") {
-        return PLAN_NODE_TYPE_SEMISEQSCAN;
+    } else if (str == "TUPLESCAN") {
+        return PLAN_NODE_TYPE_TUPLESCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -499,6 +499,9 @@ string expressionToString(ExpressionType type)
     }
     case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
         return "OPERATOR_IS_NULL";
+    }
+    case EXPRESSION_TYPE_OPERATOR_EXISTS: {
+        return "OPERATOR_EXISTS";
     }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
@@ -542,6 +545,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS: {
         return "VALUE_TUPLE_ADDRESS";
     }
+    case EXPRESSION_TYPE_VALUE_SCALAR: {
+        return "VALUE_SCALAR";
+    }
     case EXPRESSION_TYPE_VALUE_NULL: {
         return "VALUE_NULL";
     }
@@ -578,11 +584,11 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
         return "OPERATOR_ALTERNATIVE";
     }
-    case EXPRESSION_TYPE_IN_SUBQUERY: {
-        return "IN_SUBQUERY";
+    case EXPRESSION_TYPE_ROW_SUBQUERY: {
+        return "ROW_SUBQUERY";
     }
-    case EXPRESSION_TYPE_EXISTS_SUBQUERY: {
-        return "EXISTS_SUBQUERY";
+    case EXPRESSION_TYPE_SELECT_SUBQUERY: {
+        return "SELECT_SUBQUERY";
     }
     }
     return "INVALID";
@@ -610,6 +616,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_NOT;
     } else if (str == "OPERATOR_IS_NULL") {
         return EXPRESSION_TYPE_OPERATOR_IS_NULL;
+    } else if (str == "OPERATOR_EXISTS") {
+        return EXPRESSION_TYPE_OPERATOR_EXISTS;
     } else if (str == "COMPARE_EQUAL") {
         return EXPRESSION_TYPE_COMPARE_EQUAL;
     } else if (str == "COMPARE_NOTEQUAL") {
@@ -638,6 +646,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_VALUE_TUPLE;
     } else if (str == "VALUE_TUPLE_ADDRESS") {
         return EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS;
+    } else if (str == "VALUE_SCALAR") {
+        return EXPRESSION_TYPE_VALUE_SCALAR;
     } else if (str == "VALUE_NULL") {
         return EXPRESSION_TYPE_VALUE_NULL;
     } else if (str == "AGGREGATE_COUNT") {
@@ -662,13 +672,40 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
     } else if (str == "OPERATOR_ALTERNATIVE") {
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
-    } else if (str == "IN_SUBQUERY") {
-        return EXPRESSION_TYPE_IN_SUBQUERY;
-    } else if (str == "EXISTS_SUBQUERY") {
-        return EXPRESSION_TYPE_EXISTS_SUBQUERY;
+    } else if (str == "ROW_SUBQUERY") {
+        return EXPRESSION_TYPE_ROW_SUBQUERY;
+    } else if (str == "SELECT_SUBQUERY") {
+        return EXPRESSION_TYPE_SELECT_SUBQUERY;
     }
 
+
     return EXPRESSION_TYPE_INVALID;
+}
+
+string quantifiernToString(QuantifierType type)
+{
+    switch (type) {
+    case QUANTIFIER_TYPE_NONE: {
+        return "NONE";
+    }
+    case QUANTIFIER_TYPE_ANY: {
+        return "ANY";
+    }
+    case QUANTIFIER_TYPE_ALL: {
+        return "ALL";
+    }
+    }
+    return "INVALID";
+}
+
+QuantifierType stringToQunatifier(string str )
+{
+    if (str == "ANY") {
+        return QUANTIFIER_TYPE_ANY;
+    } else if (str == "ALL") {
+        return QUANTIFIER_TYPE_ALL;
+    }
+    return QUANTIFIER_TYPE_NONE;
 }
 
 string indexLookupToString(IndexLookupType type)

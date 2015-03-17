@@ -53,7 +53,9 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         testLoadQueryPlanTree("select a, sum(id) as sc1 from l where (a, id) in ( SELECT a, count(id) as sc2 from  l  GROUP BY a ORDER BY a DESC) GROUP BY a");
         testLoadQueryPlanTree("select a from l group by a having max(id) in (select b from t )");
         testLoadQueryPlanTree("select a from l group by a having max(id) in (select b from t )");
-
+        testLoadQueryPlanTree("select a, (select b from t limit 1) b from l ");
+        testLoadQueryPlanTree("select a FROM t where a = (SELECT a FROM l where a = ?)");
+        testLoadQueryPlanTree("select a FROM t where (b,b) in (SELECT a, a FROM l where l.a = t.a)");
     }
 
     public void testLoadQueryPlanTree(String sql) throws JSONException {

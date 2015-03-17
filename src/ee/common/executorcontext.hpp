@@ -195,6 +195,8 @@ class ExecutorContext {
     Table* executeExecutors(const std::vector<AbstractExecutor*>& executorList,
                             int subqueryId) const;
 
+    Table* getSubqueryOutputTable(int subqueryId) const;
+
     void cleanupExecutors(int subqueryId) const;
 
     DRTupleStream* drStream() {

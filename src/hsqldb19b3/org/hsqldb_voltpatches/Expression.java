@@ -1627,6 +1627,13 @@ public class Expression {
             exp.attributes.put("alias", getAlias());
         }
 
+        // Add expresion sub type
+        if (exprSubType == OpTypes.ANY_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "any");
+        } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "all");
+        }
+
         for (Expression expr : nodes) {
             if (expr != null) {
                 VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
@@ -1739,8 +1746,6 @@ public class Expression {
             if (subQuery == null || subQuery.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
-            // @TODO: SubQuery doesn't have an information about the query parameters
-            // Or maybe there is a way?
             ExpressionColumn parameters[] = new ExpressionColumn[0];
             exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
             return exp;

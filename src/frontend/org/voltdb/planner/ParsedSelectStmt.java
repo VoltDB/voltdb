@@ -40,8 +40,9 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -634,18 +635,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseDisplayColumn(VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
-        col.expression = parseExpressionTree(child);
-        if (col.expression instanceof ConstantValueExpression) {
-            assert(col.expression.getValueType() != VoltType.NUMERIC);
+        AbstractExpression colExpr = parseExpressionTree(child);;
+        if (colExpr instanceof ConstantValueExpression) {
+            assert(colExpr.getValueType() != VoltType.NUMERIC);
         }
-        assert(col.expression != null);
+        assert(colExpr != null);
         if (isDistributed) {
-            col.expression = col.expression.replaceAVG();
+            colExpr = colExpr.replaceAVG();
             updateAvgExpressions();
         }
-        ExpressionUtil.finalizeValueTypes(col.expression);
+        ExpressionUtil.finalizeValueTypes(colExpr);
 
         if (child.name.equals("columnref")) {
+            col.expression = colExpr;
             col.columnName = child.attributes.get("column");
             col.tableName = child.attributes.get("table");
             col.tableAlias = child.attributes.get("tablealias");
@@ -653,8 +655,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.tableAlias = col.tableName;
             }
         }
+        else if (child.name.equals("tablesubquery")) {
+            // Scalar subquery like 'select c, (select count(*) from t1), from t2;'
+            col.columnName = child.attributes.get("alias");
+            assert(colExpr instanceof SelectSubqueryExpression);
+            SelectSubqueryExpression scalarSubqueryExpr = (SelectSubqueryExpression) colExpr;
+            if (scalarSubqueryExpr.getSubqueryNode().getOutputSchema().size() != 1) {
+                throw new PlanningErrorException("Scalar subquery can have only one output column");
+            }
+            col.tableName = scalarSubqueryExpr.getSubqueryScan().getTableName();
+            col.tableAlias = scalarSubqueryExpr.getSubqueryScan().getTableAlias();
+            // Need to add a ScalarValueExpression on top of the subquery expression
+            // to be able to extract the subquery expression result
+            col.expression = ExpressionUtil.addScalarValueExpression(scalarSubqueryExpr);
+        }
         else
         {
+            col.expression = colExpr;
+            // XXX hacky, assume all non-column refs come from a temp table
             // XXX hacky, assume all non-column refs come from a temp table
             col.tableName = "VOLT_TEMP_TABLE";
             col.tableAlias = "VOLT_TEMP_TABLE";
@@ -985,10 +1003,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
         List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
 
-        // multi-column IN expression is a VectorValueExpression
-        // where each arg represents individual columns
+        // multi-column IN expression is a RowSubqueryExpression
+        // where each arg represents an individual column
         List<AbstractExpression> inExprList = null;
-        if (inListExpr instanceof VectorValueExpression) {
+        if (inListExpr instanceof RowSubqueryExpression) {
             inExprList = inListExpr.getArgs();
         } else {
             inExprList = new ArrayList<AbstractExpression>();
@@ -1814,6 +1832,37 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<AbstractExpression> exprs = super.findAllSubexpressionsOfType(exprType);
         if (m_having != null) {
             exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
+        }
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
+            }
+        }
+        for(ParsedColInfo col : m_displayColumns) {
+            if (col.expression != null) {
+                exprs.addAll(col.expression.findAllSubexpressionsOfType(exprType));
+            }
+        }
+        return exprs;
+    }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+        if (m_having != null) {
+            exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+        if (m_projectSchema != null) {
+            for(SchemaColumn col : m_projectSchema.getColumns()) {
+                if (col.getExpression() != null) {
+                    exprs.addAll(col.getExpression().findAllSubexpressionsOfClass(aeClass));
+                }
+            }
         }
         return exprs;
     }

@@ -23,10 +23,10 @@ import java.util.List;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
@@ -167,6 +167,15 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         return exprs;
     }
 
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        for (AbstractParsedStmt childStmt : m_children) {
+            exprs.addAll(childStmt.findAllSubexpressionsOfClass(aeClass));
+        }
+        return exprs;
+    }
+
     /**
      * Break up UNION/INTERSECT (ALL) set ops into individual selects that are part
      * of the IN/EXISTS subquery into multiple expressions for each set op child
@@ -180,16 +189,27 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param subqueryExpr - IN/EXISTS expression with a possible SET OP subquery
      * @return simplified expression
      */
-    protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression subqueryExpr) {
-        assert (subqueryExpr instanceof SubqueryExpression);
-        AbstractParsedStmt subquery = ((SubqueryExpression) subqueryExpr).getSubqueryStmt();
+    protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression expr) {
+        assert(expr != null);
+        SelectSubqueryExpression subqueryExpr = null;
+        if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL &&
+                expr.getRight() instanceof SelectSubqueryExpression) {
+            subqueryExpr = (SelectSubqueryExpression) expr.getRight();
+        } else if (expr.getExpressionType() == ExpressionType.OPERATOR_EXISTS &&
+                expr.getLeft() instanceof SelectSubqueryExpression) {
+            subqueryExpr = (SelectSubqueryExpression) expr.getLeft();
+        }
+        if (subqueryExpr == null) {
+            return expr;
+        }
+        AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
         if (!(subquery instanceof ParsedUnionStmt)) {
-            return subqueryExpr;
+            return expr;
         }
         ParsedUnionStmt setOpStmt = (ParsedUnionStmt) subquery;
         if (UnionType.EXCEPT == setOpStmt.m_unionType || UnionType.EXCEPT_ALL == setOpStmt.m_unionType) {
             setOpStmt.m_unionType = UnionType.EXCEPT;
-            return subqueryExpr;
+            return expr;
         }
         if (UnionType.UNION_ALL == setOpStmt.m_unionType) {
             setOpStmt.m_unionType = UnionType.UNION;
@@ -200,23 +220,36 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
         AbstractExpression retval = null;
         AbstractParsedStmt parentStmt = subquery.m_parentStmt;
-        // It's a subquery which meant it must have a parent
+        // It's a subquery which means it must have a parent
         assert (parentStmt != null);
         for (AbstractParsedStmt child : setOpStmt.m_children) {
             // add table to the query cache
             String withoutAlias = null;
             StmtSubqueryScan tableCache = parentStmt.addSubqueryToStmtCache(child, withoutAlias);
             AbstractExpression childSubqueryExpr =
-                    new SubqueryExpression(subqueryExpr.getExpressionType(), tableCache);
-            if (ExpressionType.IN_SUBQUERY == subqueryExpr.getExpressionType()) {
-                childSubqueryExpr.setLeft(subqueryExpr.getLeft());
+                    new SelectSubqueryExpression(subqueryExpr.getExpressionType(), tableCache);
+            AbstractExpression newExpr = null;
+            try {
+                newExpr = expr.getExpressionType().getExpressionClass().newInstance();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage(), e);
+            }
+            newExpr.setExpressionType(expr.getExpressionType());
+            if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType()) {
+                newExpr.setLeft((AbstractExpression) expr.getLeft().clone());
+                newExpr.setRight(childSubqueryExpr);
+                assert(newExpr instanceof ComparisonExpression);
+                ((ComparisonExpression)newExpr).setQuantifier(((ComparisonExpression)expr).getQuantifier());
+            } else {
+                newExpr.setLeft(childSubqueryExpr);
             }
             // Recurse
-            childSubqueryExpr = ParsedUnionStmt.breakUpSetOpSubquery(childSubqueryExpr);
+            newExpr = ParsedUnionStmt.breakUpSetOpSubquery(newExpr);
             if (retval == null) {
-                retval = childSubqueryExpr;
+                retval = newExpr;
             } else {
-                retval = new ConjunctionExpression(conjuctionType, retval, childSubqueryExpr);
+                retval = new ConjunctionExpression(conjuctionType, retval, newExpr);
             }
         }
         return retval;

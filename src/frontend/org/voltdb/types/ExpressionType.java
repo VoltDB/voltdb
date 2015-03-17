@@ -31,7 +31,9 @@ import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.ScalarValueExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
@@ -83,7 +85,7 @@ public enum ExpressionType {
         // greater than equal operator between left and right
     COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE"),
         // LIKE operator (left LIKE right). both children must be string.
-    COMPARE_IN                 (InComparisonExpression.class, 17, "IN"),
+    COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
         // IN operator. left IN right. right must be VectorValue
 
     // ----------------------------
@@ -100,6 +102,7 @@ public enum ExpressionType {
     VALUE_TUPLE                  (TupleValueExpression.class, 32, "<column>"),
     VALUE_TUPLE_ADDRESS        (TupleAddressExpression.class, 33, "<address>"),
     VALUE_VECTOR                (VectorValueExpression.class, 35, "<vector>"),
+    VALUE_SCALAR                (ScalarValueExpression.class, 36, "<scalar>"),
 
     // ----------------------------
     // Aggregate
@@ -133,9 +136,8 @@ public enum ExpressionType {
     // -----------------------------
     // Subquery
     // -----------------------------
-    SUBQUERY                    (SubqueryExpression.class, 400, "<subquery>"),
-    IN_SUBQUERY                 (SubqueryExpression.class, 401, "<in subquery>"),
-    EXISTS_SUBQUERY             (SubqueryExpression.class, 402, "<exists subquery>"),
+    ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
+    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>"),
 ;
 
     private final int m_value;

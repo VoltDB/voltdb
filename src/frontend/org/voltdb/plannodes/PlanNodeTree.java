@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -187,6 +188,12 @@ public class PlanNodeTree implements JSONString {
      * Scan node, join node can have predicate, so does the Aggregate node (Having clause).
      */
     private void findPlanNodeWithPredicate(AbstractPlanNode node) {
+        NodeSchema outputSchema = node.getOutputSchema();
+        if (outputSchema != null) {
+            for(SchemaColumn col : outputSchema.getColumns()) {
+                connectPredicateStmt(col.getExpression());
+            }
+        }
         if (node instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode)node;
             connectPredicateStmt(scanNode.getPredicate());
@@ -210,11 +217,11 @@ public class PlanNodeTree implements JSONString {
             return;
         }
         List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfClass(
-                SubqueryExpression.class);
+                AbstractSubqueryExpression.class);
 
         for (AbstractExpression expr : subquerysExprs) {
-            assert(expr instanceof SubqueryExpression);
-            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            assert(expr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) expr;
             int subqueryId = subqueryExpr.getSubqueryId();
             int subqueryNodeId = subqueryExpr.getSubqueryNodeId();
             List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);
@@ -309,40 +316,20 @@ public class PlanNodeTree implements JSONString {
      *  - NestLoopInPlan
      *  - AbstractScanPlanNode predicate
      *  - AbstractJoinPlanNode predicates
+     *  - IndexScan search keys and predicates
+     *  - IndexJoin inline inner scan
      *  - Aggregate post-predicate(HAVING clause)
+     *  - Projection, output schema (scalar subquery)
      * @param node
      * @throws Exception
      */
     private void extractSubqueries(AbstractPlanNode node)  throws Exception {
-        if (node instanceof AbstractScanPlanNode) {
-            AbstractScanPlanNode scanNode = (AbstractScanPlanNode) node;
-            extractSubqueriesFromExpression(scanNode.getPredicate());
-        } else if (node instanceof AbstractJoinPlanNode) {
-            AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode) node;
-            extractSubqueriesFromExpression(joinNode.getPreJoinPredicate());
-            extractSubqueriesFromExpression(joinNode.getJoinPredicate());
-            extractSubqueriesFromExpression(joinNode.getWherePredicate());
-        } else if (node instanceof AggregatePlanNode) {
-            AggregatePlanNode aggNode = (AggregatePlanNode) node;
-            extractSubqueriesFromExpression(aggNode.getPostPredicate());
-        }
-
-        // also check the inlined plan nodes
-        for (AbstractPlanNode inlineNode: node.getInlinePlanNodes().values()) {
-            extractSubqueries(inlineNode);
-        }
-    }
-
-    private void extractSubqueriesFromExpression(AbstractExpression expr)  throws Exception {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subexprs = expr.findAllSubexpressionsOfClass(
-                SubqueryExpression.class);
+        assert(node != null);
+        Collection<AbstractExpression> subexprs = node.findAllExpressionsOfClass(AbstractSubqueryExpression.class);
 
         for(AbstractExpression nextexpr : subexprs) {
-            assert(nextexpr instanceof SubqueryExpression);
-            SubqueryExpression subqueryExpr = (SubqueryExpression) nextexpr;
+            assert(nextexpr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;
             int stmtId = subqueryExpr.getSubqueryId();
             m_subqueryMap.put(stmtId, subqueryExpr.getSubqueryNode());
             List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();

@@ -41,8 +41,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.SubqueryExpression;
-import org.voltdb.planner.CompiledPlan;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -124,25 +123,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public int overrideId(int newId) {
         m_id = newId++;
-        return newId;
-    }
-
-    /**
-     * Override the plan node ids from subquery expressions
-     * @param newId the next available node id
-     * @param expr - expression with possible subqury expressions
-     * @return the next available node id
-     */
-    protected int overrideSubqueryIds(int newId, AbstractExpression expr) {
-        if (expr == null) {
-            return newId;
-        }
-        List<AbstractExpression> subqueries = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
+        // Override subqueries ids
+        Collection<AbstractExpression> subqueries = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
         for (AbstractExpression subquery : subqueries) {
-            assert(subquery instanceof SubqueryExpression);
-            CompiledPlan subqueryPlan = ((SubqueryExpression)subquery).getSubqueryScan().getBestCostPlan();
-            newId = subqueryPlan.resetPlanNodeIds(newId);
-            ((SubqueryExpression)subquery).resetSubqueryNodeId();
+            assert(subquery instanceof AbstractSubqueryExpression);
+            newId = ((AbstractSubqueryExpression) subquery).overrideSubqueryNodeIds(newId);
         }
         return newId;
     }
@@ -215,23 +200,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Generate the output schemas for the subquery expression nodes
-     * @param expr
-     * @param db
-     */
-    protected void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof SubqueryExpression);
-            AbstractPlanNode subqueryPlan = ((SubqueryExpression) subqueryExpression).getSubqueryNode();
-            subqueryPlan.generateOutputSchema(db);
-        }
-    }
-
-    /**
      * Recursively iterate through the plan and resolve the column_idx value for
      * every TupleValueExpression in every AbstractExpression in every PlanNode.
      * Few enough common cases so we force every AbstractPlanNode subclass to
@@ -245,26 +213,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */
     public abstract void resolveColumnIndexes();
-
-    /**
-     * Recursively iterate through the subquery expression plan and resolve the column indexes
-     * @param expr
-     * @param db
-     */
-    protected void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
-        if (subqueryExpressions.isEmpty()) {
-            return;
-        }
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof SubqueryExpression);
-            AbstractPlanNode subqueryPlan = ((SubqueryExpression) subqueryExpression).getSubqueryNode();
-            subqueryPlan.resolveColumnIndexes();
-        }
-    }
 
     public void validate() throws Exception {
         //
@@ -746,6 +694,39 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Collect a unique list of expressions of a given type that this node has including its inlined nodes
+     * @param type expression type to search for
+     * @return a collection(set) of expressions that this node has
+     */
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
+        findAllExpressionsOfClass(aeClass, collected);
+        return collected;
+    }
+
+    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        // Check the inlined plan nodes
+        for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
+            // For inline node we MUST go recursive to its children!!!!!
+            Collection<AbstractExpression> exprs = inlineNode.findAllExpressionsOfClass(aeClass);
+            collected.addAll(exprs);
+        }
+
+        // and the output column expressions if there were no projection
+        NodeSchema schema = getOutputSchema();
+        if (schema != null) {
+            for (SchemaColumn col : schema.getColumns()) {
+                AbstractExpression expr = col.getExpression();
+                if (expr != null) {
+                    List<AbstractExpression> exprs = expr.findAllSubexpressionsOfClass(
+                            aeClass);
+                    collected.addAll(exprs);
+                }
+            }
+        }
+    }
+
+    /**
      * @param type plan node type to search for
      * @return whether a node of that type is contained in the plan tree
      */
@@ -902,7 +883,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // surrounded by the 'Subquery_[SubqueryId]' tags. Example:
         // Subquery_1SEQUENTIAL SCAN of "R1"Subquery_1
         Pattern subqueryPattern = Pattern.compile(
-                String.format("(%s)([0-9]+)(.*)(\\s*)%s(\\2)", SubqueryExpression.SUBQUERY_TAG,SubqueryExpression.SUBQUERY_TAG),
+                String.format("(%s)([0-9]+)(.*)(\\s*)%s(\\2)", AbstractSubqueryExpression.SUBQUERY_TAG, AbstractSubqueryExpression.SUBQUERY_TAG),
                 Pattern.DOTALL);
         Map<String, String> subqueries = new TreeMap<String, String>();
         String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
@@ -923,7 +904,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             pos = matcher.end();
             // Recurse into the subquery string to extract its own subqueries if any
             String nextExplainedStmt = extractExplainedSubquries(matcher.group(3), pattern, subqueries);
-            subqueries.put(SubqueryExpression.SUBQUERY_TAG + matcher.group(2), nextExplainedStmt);
+            subqueries.put(AbstractSubqueryExpression.SUBQUERY_TAG + matcher.group(2), nextExplainedStmt);
         }
         // Append the rest of the input string
         if (pos < explainedSubquery.length()) {

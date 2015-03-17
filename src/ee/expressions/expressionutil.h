@@ -63,7 +63,7 @@ public:
                                                  AbstractExpression* lc, AbstractExpression* rc,
                                                  const std::vector<AbstractExpression*>* arguments);
 
-    static AbstractExpression* comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
+    static AbstractExpression* comparisonFactory(PlannerDomValue obj,ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
     static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
 
     static void loadIndexedExprsFromJson(std::vector<voltdb::AbstractExpression*>& indexed_exprs,

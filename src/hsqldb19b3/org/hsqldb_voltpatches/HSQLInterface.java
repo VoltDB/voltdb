@@ -344,7 +344,7 @@ public class HSQLInterface {
     }
 
     /**
-     * Recursively find all in-lists found in the XML and munge them into the
+     * Recursively find all in-lists, subquery, row comparisons found in the XML and munge them into the
      * simpler thing we want to pass to the AbstractParsedStmt.
      * @throws HSQLParseException 
      */
@@ -378,7 +378,6 @@ public class HSQLInterface {
         // see if the children are "row" and "table" or "tablesubquery".
         int rowCount = 0;
         int tableCount = 0;
-        int subqueryCount = 0;
         int valueCount = 0;
         for (VoltXMLElement child : expr.children) {
             if (child.name.equals("row")) {
@@ -387,17 +386,17 @@ public class HSQLInterface {
             else if (child.name.equals("table")) {
                 tableCount++;
             }
-            else if (child.name.equals("tablesubquery")) {
-                subqueryCount++;
-            }
             else if (child.name.equals("value")) {
                 valueCount++;
             }
         }
-        if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0) ||
-                subqueryCount > 0) {
+        //  T.C     IN (SELECT ...) => row       equal                  tablesubquery => IN
+        //  T.C     =  (SELECT ...) => columnref equal                  tablesubquery
+        //  (C1,C2)  IN (SELECT ...) => row       equal/anyqunatified    tablesubquery
+        //  (C1, C2) =  (SELECT ...) => row       equal                  tablesubquery
+        if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0)) {
             assert rowCount == 1;
-            assert tableCount + subqueryCount + valueCount == 1;
+            assert tableCount + valueCount == 1;
             return true;
         }
 

@@ -30,6 +30,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -116,12 +117,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                                     " table: " + col.getTableName());
             }
         }
-    }
-
-    @Override
-    public int overrideId(int newId) {
-        m_id = newId++;
-        return overrideSubqueryIds(newId, m_predicate);
     }
 
     /**
@@ -323,7 +318,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
 
         // Generate the output schema for subqueries
-        generateSubqueryExpressionOutputSchema(m_predicate, db);
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
@@ -392,7 +390,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
         // Resolve subquery expression indexes
-        resolveSubqueryExpressionColumnIndexes(m_predicate);
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
 
@@ -415,7 +416,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
-        if (m_isSubQuery || PlanNodeType.SEMISEQSCAN == getPlanNodeType()) {
+        if (m_isSubQuery) {
             stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
         }
     }
@@ -452,4 +453,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected String getTableNameForExplain() {
         return (m_targetTableAlias != null) ? m_targetTableAlias : m_targetTableName;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_predicate, aeClass));
+        return collected;
+    }
+
 }

@@ -35,11 +35,13 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
@@ -53,6 +55,7 @@ import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.QuantifierType;
 
 public abstract class AbstractParsedStmt {
 
@@ -432,16 +435,17 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Parse a subquery for SQL-IN(SELECT...)
+     * Parse an expression subquery
      */
-    private SubqueryExpression parseSubqueryExpression(VoltXMLElement exprNode) {
+    private SelectSubqueryExpression parseSubqueryExpression(VoltXMLElement exprNode) {
         assert(exprNode.children.size() == 1);
         VoltXMLElement subqueryElmt = exprNode.children.get(0);
         AbstractParsedStmt subqueryStmt = parseSubquery(subqueryElmt);
         // add table to the query cache
         String withoutAlias = null;
         StmtSubqueryScan tableCache = addSubqueryToStmtCache(subqueryStmt, withoutAlias);
-        return new SubqueryExpression(tableCache);
+        // Set to the default SELECT_SUBQUERY. May be overridden depending on the context
+        return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, tableCache);
     }
 
     /**
@@ -456,9 +460,24 @@ public abstract class AbstractParsedStmt {
            return parseExpressionTree(exprNode.children.get(0));
        } else {
            // (COL1, COL2) IN (SELECT C1, C2 FROM...)
-           return parseVectorExpression(exprNode);
+           return parseRowExpression(exprNode.children);
        }
    }
+
+   /**
+   *
+   * @param exprNode
+   * @return
+   */
+  private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
+      // Parse individual columnref expressions from the IN output schema
+      List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+      for (VoltXMLElement exprNode : exprNodes) {
+          AbstractExpression expr = this.parseExpressionTree(exprNode);
+          exprs.add(expr);
+      }
+      return new RowSubqueryExpression(exprs);
+  }
 
     /**
      * Return StmtTableScan by table alias. In case of correlated queries, would need
@@ -544,6 +563,16 @@ public abstract class AbstractParsedStmt {
             expr.setValueType(VoltType.typeFromString(valueType));
         }
 
+        if (expr instanceof ComparisonExpression) {
+            String opsubtype = exprNode.attributes.get("opsubtype");
+            if (opsubtype != null) {
+                QuantifierType quantifier = QuantifierType.get(opsubtype);
+                if (quantifier != QuantifierType.NONE) {
+                    ((ComparisonExpression)expr).setQuantifier(quantifier);
+                }
+            }
+        }
+
         // get the first (left) node that is an element
         VoltXMLElement leftExprNode = exprNode.children.get(0);
         assert(leftExprNode != null);
@@ -579,27 +608,14 @@ public abstract class AbstractParsedStmt {
                 expr.setValueSize(voltType.getMaxLengthInBytes());
             }
         }
-        if ((exprType == ExpressionType.COMPARE_IN && expr.getRight() instanceof SubqueryExpression) ||
+        if ((exprType == ExpressionType.COMPARE_EQUAL && QuantifierType.ANY == ((ComparisonExpression) expr).getQuantifier()) ||
                 exprType == ExpressionType.OPERATOR_EXISTS) {
-            // Compact the expression hierarchy by removing parent and setting
-            // the subquery type (IN/EXISTS) to the child - SubqueryExpression
-            AbstractExpression subqueryExpr = null;
-            if (ExpressionType.COMPARE_IN == exprType) {
-                subqueryExpr = expr.getRight();
-                subqueryExpr.setLeft(expr.getLeft());
-                subqueryExpr.setExpressionType(ExpressionType.IN_SUBQUERY);
-            } else {
-                subqueryExpr = expr.getLeft();
-                subqueryExpr.setExpressionType(ExpressionType.EXISTS_SUBQUERY);
-            }
-            assert(subqueryExpr != null);
-
             // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
             // AND/OR operator
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
             // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
-            subqueryExpr = ParsedUnionStmt.breakUpSetOpSubquery(subqueryExpr);
-            expr = optimizeSubqueryExpression(subqueryExpr);
+            expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
+            expr = optimizeSubqueryExpression(expr);
         }
         return expr;
     }
@@ -619,17 +635,16 @@ public abstract class AbstractParsedStmt {
             expr.setRight(optimizedRight);
             return expr;
         }
-        if (expr instanceof SubqueryExpression) {
-            SubqueryExpression subqueryExpr = (SubqueryExpression)expr;
-            if (ExpressionType.IN_SUBQUERY == subqueryExpr.getExpressionType()) {
-                subqueryExpr = optimizeInExpression(subqueryExpr);
+        if (expr instanceof ComparisonExpression) {
+            QuantifierType quantifer = ((ComparisonExpression)expr).getQuantifier();
+            if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType() && quantifer == QuantifierType.ANY) {
+                expr = optimizeInExpression(expr);
                 // Do not return here because the original IN expressions
-                // is converted to EXISTS and can be optimized further.
+                // is converted to EXISTS and can be optimized farther.
             }
-            if (ExpressionType.EXISTS_SUBQUERY == subqueryExpr.getExpressionType()) {
-                subqueryExpr = optimizeExistsExpression(subqueryExpr);
-            }
-            subqueryExpr.resolveCorrelations();
+        }
+        if (ExpressionType.OPERATOR_EXISTS == expr.getExpressionType()) {
+            optimizeExistsExpression(expr);
         }
         return expr;
     }
@@ -642,8 +657,28 @@ public abstract class AbstractParsedStmt {
      * @param inExpr
      * @return existsExpr
      */
-    private boolean canConvertInToExistsExpression() {
+    private boolean canConvertInToExistsExpression(AbstractExpression inExpr) {
+        AbstractExpression leftExpr = inExpr.getLeft();
+        if (leftExpr instanceof SelectSubqueryExpression) {
+            // If the left child is a (SELECT ...) expression itself we can't convert it
+            // to the EXISTS expression because the manadatory run time scalar check -
+            // (expression must return a single row at most)
+            return false;
+        }
+        AbstractExpression rightExpr = inExpr.getRight();
+        if (!(rightExpr instanceof SelectSubqueryExpression)) {
+            return false;
+        }
+
         // Must be a SELECT statement
+        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) inExpr.getRight();
+        AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
+        if (!(subquery instanceof ParsedSelectStmt)) {
+            return false;
+        }
+
+        boolean canConvert = false;
+        ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
         // Must not have OFFSET set
         // EXISTS (select * from T where T.X = parent.X order by T.Y offset 10 limit 5)
         //      seems to require 11 matches
@@ -660,17 +695,20 @@ public abstract class AbstractParsedStmt {
      *  3. Add LIMIT 1
      *  4. Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
      *
-     * @param inExpr
-     * @return existsExpr
+     * @param existsExpr
      */
-    private SubqueryExpression optimizeExistsExpression(SubqueryExpression subqueryExpr) {
-        assert(ExpressionType.EXISTS_SUBQUERY == subqueryExpr.getExpressionType());
-        AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
-        if (subquery instanceof ParsedSelectStmt) {
-            ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
-            selectSubquery.simplifyExistsSubqueryStmt();
+    private void optimizeExistsExpression(AbstractExpression existsExpr) {
+        assert(ExpressionType.OPERATOR_EXISTS == existsExpr.getExpressionType());
+        assert(existsExpr.getLeft() != null);
+
+        if (existsExpr.getLeft() instanceof SelectSubqueryExpression) {
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) existsExpr.getLeft();
+            AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
+            if (subquery instanceof ParsedSelectStmt) {
+                ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
+                selectSubquery.simplifyExistsSubqueryStmt();
+            }
         }
-        return subqueryExpr;
     }
 
     /**
@@ -679,24 +717,31 @@ public abstract class AbstractParsedStmt {
      * @param inExpr
      * @return existsExpr
      */
-    private SubqueryExpression optimizeInExpression(SubqueryExpression subqueryExpr) {
-        assert(ExpressionType.IN_SUBQUERY == subqueryExpr.getExpressionType());
-        assert(subqueryExpr.getLeft() != null);
-
-        AbstractExpression inColumns = subqueryExpr.getLeft();
-        AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
-        if (subquery.canConvertInToExistsExpression()) {
+    private AbstractExpression optimizeInExpression(AbstractExpression inExpr) {
+        assert(ExpressionType.COMPARE_EQUAL == inExpr.getExpressionType());
+        if (canConvertInToExistsExpression(inExpr)) {
+            AbstractExpression inColumns = inExpr.getLeft();
+            assert(inColumns != null);
+            assert(inExpr.getRight() instanceof SelectSubqueryExpression);
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) inExpr.getRight();
+            AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
+            assert(subquery instanceof ParsedSelectStmt);
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
             ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inColumns);
-            subqueryExpr.setExpressionType(ExpressionType.EXISTS_SUBQUERY);
-            inColumns = null;
+            //// still needed? subqueryExpr.moveUpTVE();
+            AbstractExpression existsExpr = null;
+            try {
+                existsExpr = ExpressionType.OPERATOR_EXISTS.getExpressionClass().newInstance();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage(), e);
+            }
+            existsExpr.setExpressionType(ExpressionType.OPERATOR_EXISTS);
+            existsExpr.setLeft(subqueryExpr);
+            return existsExpr;
         } else {
-            // Need to replace TVE from the IN list with the corresponding PVE
-            // to be passed as parameters to the subquery similar to the correlated TVE
-            inColumns = subquery.replaceExpressionsWithPve(inColumns);
+            return inExpr;
         }
-        subqueryExpr.setLeft(inColumns);
-        return subqueryExpr;
     }
 
     /**
@@ -1000,7 +1045,7 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    /** Get a list of the subqueries used by this statement.  This method
+    /** Get a list of the table subqueries used by this statement.  This method
      * may be overridden by subclasses, e.g., insert statements have a subquery
      * but does not use m_joinTree.
      **/
@@ -1394,15 +1439,36 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /*
+     *  Extract all subexpressions of a given expression class from this statement
+     */
+    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        if (m_joinTree != null) {
+            AbstractExpression treeExpr = m_joinTree.getAllFilters();
+            if (treeExpr != null) {
+                exprs.addAll(treeExpr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+        return exprs;
+    }
+
     /**
      * Return true if a SQL statement contains a subquery of any kind
      * @return TRUE is this statement contains a subquery
      */
     public boolean hasSubquery() {
         // This method should be called only after the statement is parsed and join tree is built
-        // It will do a complete pass over the join tree.
+        assert(m_joinTree != null);
         // TO DO: If performance is an issue,
         // hard-code a tree walk that stops at the first subquery scan.
-        return ! getSubqueryScans().isEmpty();
+        if ( ! getSubqueryScans().isEmpty()) {
+            return true;
+        }
+        // Verify expression subqueries
+        List<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
+                SelectSubqueryExpression.class);
+        return !subqueryExprs.isEmpty();
     }
+
 }

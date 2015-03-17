@@ -226,6 +226,10 @@ public class ParameterValueExpression extends AbstractValueExpression {
         return m_correlatedExpr;
     }
 
+    public void setCorrelatedExpression(AbstractExpression correlatedExpr) {
+        m_correlatedExpr = correlatedExpr;
+    }
+
     // Return this parameter in a list of bound parameters if the expr argument is in fact
     // its original value constant "binding". This ensures that the index plan that depends
     // on the parameter binding to a critical constant value does not get misapplied to a later

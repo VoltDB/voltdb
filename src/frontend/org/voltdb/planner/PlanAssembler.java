@@ -40,7 +40,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
@@ -65,7 +65,6 @@ import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
-import org.voltdb.plannodes.SemiSeqScanPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
@@ -392,12 +391,11 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfType(
-                ExpressionType.EXISTS_SUBQUERY);
-        subqueryExprs.addAll(parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY));
+        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
+                SelectSubqueryExpression.class);
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
-                m_recentErrorMsg = "IN/EXISTS subquery clauses are only supported in SELECT statements";
+                m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
                 return null;
             }
 
@@ -459,9 +457,9 @@ public class PlanAssembler {
         failIfNonDeterministicDml(parsedStmt, retval);
 
         if ( ! subqueryExprs.isEmpty() ) {
-             if ( ! (m_partitioning.isInferredSingle() ||
-                     m_partitioning.wasSpecifiedAsSingle())) {
-                m_recentErrorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
+            if ( ! (m_partitioning.isInferredSingle() ||
+                    m_partitioning.wasSpecifiedAsSingle())) {
+                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
                 return null;
              }
         }
@@ -515,8 +513,11 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
 
         for (AbstractExpression expr : subqueryExprs) {
-            assert(expr instanceof SubqueryExpression);
-            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            if (!(expr instanceof SelectSubqueryExpression)) {
+                // it can be IN (values)
+                continue;
+            }
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan bestPlan = subqueryScan.getBestCostPlan();
@@ -529,13 +530,8 @@ public class PlanAssembler {
             // multiple times during the parent statement execution.
             if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
                 // fail the whole plan
-                m_recentErrorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
+                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
                 return false;
-            }
-            // For IN Expressions only
-            if (ExpressionType.IN_SUBQUERY  == expr.getExpressionType()) {
-                // Add an artificial SeqScan on top of the subquery plan
-                addScanToInSubquery(subqueryExpr);
             }
         }
         // need to reset plan id for the entire SQL
@@ -544,28 +540,6 @@ public class PlanAssembler {
         return true;
     }
 
-    /*
-     * Create a SemiSeqScan node to aid the EE to perform the scan of the
-     * subquery output table. The scan will have a predicate built from
-     * the IN expression:
-     * outer_expr IN (SELECT inner_expr FROM ... WHERE subq_where)
-     * The predicate: outer_expr=inner_expr
-     * The node's executor quits either after it encounters the first tuple
-     * satisfied the predicate or after the whole table is exhausted.
-     * @param subqueryExpr The subquery Expression
-     * @param inColumnsExpr - PVE for each column from the IN list combined by the AND expression
-     */
-    private void addScanToInSubquery(SubqueryExpression subqueryExpr) {
-        // Get the top node from the subquery best plan
-        AbstractPlanNode subqueryNode = subqueryExpr.getSubqueryNode();
-        assert(subqueryNode != null);
-        AbstractExpression inColumnsExpr = subqueryExpr.getLeft();
-        assert(inColumnsExpr != null);
-        SemiSeqScanPlanNode inScanNode = new SemiSeqScanPlanNode(subqueryExpr.getSubqueryScan().getTableAlias(), inColumnsExpr);
-        // Add the new node to the top
-        inScanNode.addAndLinkChild(subqueryNode);
-        subqueryExpr.setSubqueryNode(inScanNode);
-    }
 
     /**
      * Generate a unique and correct plan for the current SQL statement context.

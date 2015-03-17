@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -144,15 +145,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public int overrideId(int newId) {
-        m_id = newId++;
-        newId = overrideSubqueryIds(newId, m_preJoinPredicate);
-        newId = overrideSubqueryIds(newId, m_joinPredicate);
-        newId = overrideSubqueryIds(newId, m_wherePredicate);
-        return newId;
-    }
-
-    @Override
     public void generateOutputSchema(Database db)
     {
         // FUTURE: At some point it would be awesome to further
@@ -174,9 +166,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
 
         // Generate the output schema for subqueries
-        generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
-        generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
-        generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
 
         generateRealOutputSchema(db);
     }
@@ -257,9 +249,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
 
         // Resolve subquery expression indexes
-        resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
-        resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
-        resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
 
         resolveRealOutputSchema();
     }
@@ -384,6 +376,16 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             }
         }
         return result;
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_preJoinPredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_joinPredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_wherePredicate, aeClass));
+        return collected;
     }
 
 }
