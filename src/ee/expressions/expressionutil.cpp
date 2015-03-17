@@ -475,7 +475,7 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
             // join inner table
             tableLabel = " inner";
         }
-        snprintf(message, 128, 
+        snprintf(message, 128,
                 "tupleValueFactory: invalid column_idx %d for%s table\nStack trace:\n",
                 columnIndex, tableLabel);
         throw UnexpectedEEException(
