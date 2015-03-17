@@ -469,17 +469,11 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
 
     // verify input
     if (columnIndex < 0) {
-        char message[100]; // enough to hold all numbers up to 64-bits
-        const char* tableLabel = "";
-        if (tableIdx != 0) {
-            // join inner table
-            tableLabel = " inner";
-        }
-        snprintf(message, 128,
-                "tupleValueFactory: invalid column_idx %d for%s table\nStack trace:\n",
-                columnIndex, tableLabel);
-        throw UnexpectedEEException(
-                std::string(message) + StackTrace::stringStackTrace());
+        std::ostringstream message;
+        message << "tupleValueFactory: invalid column_idx " << columnIndex <<
+                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n" <<
+                StackTrace::stringStackTrace();
+        throw UnexpectedEEException(message.str());
     }
 
     return new TupleValueExpression(tableIdx, columnIndex);

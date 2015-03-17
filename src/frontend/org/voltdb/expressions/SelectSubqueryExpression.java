@@ -87,14 +87,17 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         return (m_subquery == null) ? null : m_subquery.getSubqueryStmt();
     }
 
+    @Override
     public int getSubqueryId() {
         return m_subqueryId;
     }
 
+    @Override
     public int getSubqueryNodeId() {
         return m_subqueryNodeId;
     }
 
+    @Override
     public AbstractPlanNode getSubqueryNode() {
         return m_subqueryNode;
     }
@@ -102,6 +105,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     /**
      * From JSON
      */
+    @Override
     public void setSubqueryNode(AbstractPlanNode subqueryNode) {
         assert(subqueryNode != null);
         m_subqueryNode = subqueryNode;
@@ -192,9 +196,17 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             // will be extracted into a separated line from the final explain string
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-
             String result = "(" + SUBQUERY_TAG + m_subqueryId + " " + sb.toString()
-                    + SUBQUERY_TAG + m_subqueryId + ")";
+                    + SUBQUERY_TAG + m_subqueryId + "";
+            if (m_args != null && ! m_args.isEmpty()) {
+                String connector = "\n on arguments (";
+                for (AbstractExpression arg : m_args) {
+                    result += connector + arg.explain(impliedTableName);
+                    connector = ", ";
+                }
+                result += ")\n";
+            }
+            result +=")";
             return result;
         } else {
             return "(Subquery: null)";

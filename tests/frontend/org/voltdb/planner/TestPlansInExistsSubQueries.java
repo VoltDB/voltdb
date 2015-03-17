@@ -27,9 +27,9 @@ import java.util.List;
 
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -50,16 +50,16 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testInExistsGuard() {
         String errorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
-
         String sql;
+/* These are now supported cases.
         sql = "select p2.c from p2 where p2.c > ? and exists (select c from r1 where r1.c = p2.c)";
         failToCompile(sql, errorMsg);
 
         sql = "select p2.c from p2 where p2.a in (select c from r1)";
         failToCompile(sql, errorMsg);
-
-
-        errorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
+*/
+        //TODO: clarify message to complain about partitioned tables.
+        errorMsg = "Subquery expressions are only supported in single partition procedures";
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from p1 where p1.c = r2.c)";
         failToCompile(sql, errorMsg);
     }
@@ -371,7 +371,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             AbstractExpression le = pred.getLeft();
             assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
             AbstractExpression re = pred.getRight();
-            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+            assertEquals(ExpressionType.VALUE_PARAMETER, re.getLeft().getExpressionType());
         }
         {
             // OFFSET prevents In-to-EXISTS transformation
@@ -470,6 +470,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             // child
             assertEquals(ExpressionType.OPERATOR_EXISTS, p.getExpressionType());
             AbstractSubqueryExpression se = (AbstractSubqueryExpression) p.getLeft();
+            //* enable to debug */ System.out.println(se.explain(""));
             List<AbstractExpression> args = se.getArgs();
             assertEquals(1, args.size());
             assertEquals(1, se.getParameterIdxList().size());
@@ -494,7 +495,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         {
             // filter on agg of expression involving parent tve
             AbstractPlanNode pn = compile("select a from r1 where c in " +
-                    " (select max(c) from r2 group by c having min(a) > r1.d) ");
+                    " (select max(c) from r2 group by e having min(a) > r1.d) ");
 
             pn = pn.getChild(0);
             assertTrue(pn instanceof SeqScanPlanNode);
@@ -526,7 +527,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         {
             // filter on agg of expression involving user parameter ('?')
             AbstractPlanNode pn = compile("select a from r1 where c in " +
-                    " (select max(c) from r2 group by c having min(a) > ?) ");
+                    " (select max(c) from r2 group by e having min(a) > ?) ");
 
             pn = pn.getChild(0);
             assertTrue(pn instanceof SeqScanPlanNode);
@@ -556,7 +557,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         {
             // filter on agg of local tve
             AbstractPlanNode pn = compile("select a from r1 where c in " +
-                    " (select max(c) from r2 group by c having min(a) > 0) ");
+                    " (select max(c) from r2 group by e having min(a) > 0) ");
 
             pn = pn.getChild(0);
             assertTrue(pn instanceof SeqScanPlanNode);

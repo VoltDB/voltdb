@@ -456,13 +456,13 @@ public class PlanAssembler {
 
         failIfNonDeterministicDml(parsedStmt, retval);
 
-        if ( ! subqueryExprs.isEmpty() ) {
-            if ( ! (m_partitioning.isInferredSingle() ||
-                    m_partitioning.wasSpecifiedAsSingle())) {
-                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
-                return null;
-             }
-        }
+////        if ( ! subqueryExprs.isEmpty() ) {
+////            if ( ! (m_partitioning.isInferredSingle() ||
+////                    m_partitioning.wasSpecifiedAsSingle())) {
+////                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
+////                return null;
+////             }
+////        }
 
         return retval;
     }

@@ -728,7 +728,7 @@ public abstract class AbstractParsedStmt {
             assert(subquery instanceof ParsedSelectStmt);
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
             ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inColumns);
-            //// still needed? subqueryExpr.moveUpTVE();
+            subqueryExpr.resolveCorrelations();
             AbstractExpression existsExpr = null;
             try {
                 existsExpr = ExpressionType.OPERATOR_EXISTS.getExpressionClass().newInstance();
