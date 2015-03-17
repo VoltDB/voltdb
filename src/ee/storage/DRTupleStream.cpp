@@ -73,7 +73,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    size_t startingUso = commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -102,8 +102,11 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     // update m_offset
     m_currBlock->consumed(io.position());
 
+    // No BEGIN TXN entry was written, use the current USO
+    if (startingUso == 0) {
+        startingUso = m_uso;
+    }
     // update uso.
-    const size_t startingUso = m_uso;
     m_uso += io.position();
 
     return startingUso;
@@ -140,7 +143,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    size_t startingUso = commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -189,8 +192,11 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update m_offset
     m_currBlock->consumed(io.position());
 
+    // No BEGIN TXN entry was written, use the current USO
+    if (startingUso == 0) {
+        startingUso = m_uso;
+    }
     // update uso.
-    const size_t startingUso = m_uso;
     m_uso += io.position();
 
 //    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
@@ -219,7 +225,7 @@ void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfSt
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
-void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+size_t DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -253,10 +259,14 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      crc = vdbcrc::crc32cFinish(crc);
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
+
+     const size_t startingUso = m_uso;
      m_uso += io.position();
+
+     return startingUso;
 }
 
-void DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+size_t DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -293,7 +303,11 @@ void DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      crc = vdbcrc::crc32cFinish(crc);
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
+
+     const size_t startingUso = m_uso;
      m_uso += io.position();
+
+     return startingUso;
 }
 
 // If partial transaction is going to span multiple buffer, first time move it to
