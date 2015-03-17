@@ -2001,7 +2001,10 @@ public class Scanner {
 
         // A VoltDB extension -- handle timestamp strings only containing date
         if (s.length() == 10) {
-            return newDate(s);
+            Type saved = dateTimeType;
+            TimestampData result = newDate(s);
+            dateTimeType = saved;// DateTimeType.getDateTimeType(Types.SQL_DATE, 0);
+            return result;
         }
         // End of VoltDB extension
         long    zoneSeconds = 0;

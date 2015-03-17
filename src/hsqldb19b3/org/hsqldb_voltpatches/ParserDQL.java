@@ -341,12 +341,20 @@ public class ParserDQL extends ParserBase {
                       : 0;
         int scale = 0;
 
+        // A VoltDB extension to support cast to varchar without declared length.
+        // If this means that VARCHAR columns can be specified with no length so
+        // that they default to max length, so be it.
+        // An alternative way to bypass this code might be to always have
+        // HSQLInterface pull the levers that control database.sqlEnforceSize.
+        /* disable 6 lines ...
         if (Types.requiresPrecision(typeNumber)
                 && token.tokenType != Tokens.OPENBRACKET
                 && database.sqlEnforceSize && !session.isProcessingScript()) {
             throw Error.error(ErrorCode.X_42599,
                               Type.getDefaultType(typeNumber).getNameString());
         }
+        ... disabled 6 lines */
+        // End of VoltDB extension
 
         // A VoltDB extension to support the character in bytes.
         boolean           inBytes = false;

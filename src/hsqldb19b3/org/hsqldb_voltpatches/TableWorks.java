@@ -700,10 +700,17 @@ public class TableWorks {
         database.schemaManager.checkSchemaObjectNotExists(
             constraint.getName());
 
+        // A VoltDB extension to support backward compatability
+        // -- not sure why this is suddenly getting triggered,
+        // MAY BE a side effect of some other temporary bug, so MAYBE
+        // it should be reenabled once other code paths seem to be working.
+        /* disable 4 lines ...
         if (table.getUniqueConstraintForColumns(constraint.getMainColumns())
                 != null) {
             throw Error.error(ErrorCode.X_42522);
         }
+        ... disabled 4 lines */
+        // End of VoltDB extension
 
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, constraint.getMainIndex(),

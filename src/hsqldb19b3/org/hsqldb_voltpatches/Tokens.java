@@ -1718,11 +1718,9 @@ public class Tokens {
     public static final int WEEKOFYEAR                 = 788; // supports MySQL compatibility
     public static final int WEEKDAY                    = 789; // supports MySQL compatibility
     // Make WEEK public for additional use cases
-    public static final int WEEK                       = 790;
-    /* disable 1 line ...
-    static final int        WEEK                       = 790;
-    ... disabled 1 line */
+    public 
     // End of VoltDB extension
+    static final int        WEEK                       = 790;
     public static final int WEEK_OF_YEAR               = 791;
     static final int        LONGBLOB                   = 792;
     static final int        LONGTEXT                   = 793;

@@ -507,7 +507,14 @@ public abstract class AbstractParsedStmt {
         // It's expected to be a Boolean true constant value for the cases VoltDB supports.
         VoltXMLElement fixedExprNode = exprNode.children.get(1);
         if ( ! "BOOLEAN".equals(fixedExprNode.attributes.get("valuetype")) ||
-                ! "true".equals(fixedExprNode.attributes.get("value"))) {
+                ! ("true".equals(fixedExprNode.attributes.get("value")) ||
+                        "true".equals(fixedExprNode.attributes.get("isplannergenerated")))) {
+            //TODO: it's only a little risky to give parameterized constants full credit
+            //      as probably stemming from the familiar true value
+            // -- if constant FALSE turns out to be a real use case,
+            //    as opposed to a more complex expression that would NOT get parameterized,
+            // we'll at least be throwing here in the stored proc case
+            // -- at which point we will probably want to revisit all of this.
             //TODO: get a better description of this hsql "extension" feature.
             //TODO: long-term, consider supporting this hsql "extension" feature.
             throw new PlanningErrorException("Unsupported aggregation extension");

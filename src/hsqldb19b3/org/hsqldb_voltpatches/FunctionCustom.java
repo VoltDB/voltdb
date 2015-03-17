@@ -396,7 +396,11 @@ public class FunctionCustom extends FunctionSQL {
     static {
         customValueFuncMap.put(Tokens.TODAY, FUNC_CURRENT_DATE);
         customValueFuncMap.put(Tokens.NOW, FUNC_LOCALTIMESTAMP);
-    }
+        // A VoltDB extension to override NOW as an alias
+        // for CURRENT TIMESTAMP vs. LOCAL TIMESTAMP.
+        customValueFuncMap.put(Tokens.NOW, FUNC_CURRENT_TIMESTAMP);
+        // End of VoltDB extension
+        }
 
     private int                   extractSpec;
     private Pattern               pattern;

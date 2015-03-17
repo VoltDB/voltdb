@@ -34,11 +34,11 @@ package org.hsqldb_voltpatches;
 // A VoltDB extension to transfer Expression structures to the VoltDB planner
 // We DO NOT reorganize imports in hsql code. And we try to keep these structured comments in place.
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
@@ -2156,11 +2156,32 @@ public class Expression implements Cloneable {
     /************************* Volt DB Extensions *************************/
 
     // VoltDB support for indexed expressions
-    public void collectAllColumnExpressions(OrderedHashSet set) {
-        collectAllExpressions(set, columnExpressionSet, emptyExpressionSet);
+    public void voltCollectAllColumnExpressions(ArrayList<ExpressionColumn> list) {
+        if (this instanceof ExpressionColumn) {
+            if (opType == OpTypes.COLUMN) {
+                list.add((ExpressionColumn)this);
+            }
+        }
+        else {
+            for (int i = 0; i < nodes.length; i++) {
+                if (nodes[i] != null) {
+                    nodes[i].voltCollectAllColumnExpressions(list);
+                }
+            }
+        }
     }
 
-    static Map<Integer, VoltXMLElement> prototypes = new HashMap<Integer, VoltXMLElement>();
+    // VoltDB support for indexed expressions
+    public void voltCollectAllColumnNames(OrderedHashSet col_set) {
+        ArrayList<ExpressionColumn> set = new ArrayList<>();
+        voltCollectAllColumnExpressions(set);
+        for (ExpressionColumn exprColumn : set) {
+            col_set.add(exprColumn.columnName);
+        }
+    }
+
+    static final HashMap<Integer, VoltXMLElement> prototypes =
+            new HashMap<Integer, VoltXMLElement>();
 
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
@@ -2569,7 +2590,7 @@ public class Expression implements Cloneable {
     public Expression eliminateDuplicates(final Session session) {
         // First build the map of child expressions joined by the logical AND
         // The key is the expression id and the value is the expression itself
-        Map<String, Expression> subExprMap = new HashMap<String, Expression>();
+        HashMap<String, Expression> subExprMap = new HashMap<String, Expression>();
         extractAndSubExpressions(session, this, subExprMap);
         // Reconstruct the expression
         if (!subExprMap.isEmpty()) {
@@ -2584,7 +2605,7 @@ public class Expression implements Cloneable {
     }
 
     protected void extractAndSubExpressions(final Session session, Expression expr,
-            Map<String, Expression> subExprMap) {
+            HashMap<String, Expression> subExprMap) {
         // If it is a logical expression AND then traverse down the tree
         if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
             extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
@@ -2621,13 +2642,13 @@ public class Expression implements Cloneable {
         if (getType() == OpTypes.VALUE || getType() == OpTypes.COLUMN) {
             hashCode = super.hashCode();
         //
-        // Otherwise we need to generate and Id based on what our children are
+        // Otherwise we need to generate an Id based on what our children are
         //
         } else {
             //
             // Horribly inefficient, but it works for now...
             //
-            final List<String> id_list = new Vector<String>();
+            final List<String> id_list = new ArrayList<>();
             new Object() {
                 public void traverse(Expression exp) {
                     for (Expression expr : exp.nodes) {
@@ -2654,20 +2675,18 @@ public class Expression implements Cloneable {
 
     public VoltXMLElement voltGetExpressionXML(Session session, Table table)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
-        resolveTableColumns(table);
+        voltResolveTableColumns(table);
         Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
         resolveTypes(session, parent);
         return voltGetXML(session);
     }
 
-    private void resolveTableColumns(Table table) {
-        OrderedHashSet set = new OrderedHashSet();
-        collectAllColumnExpressions(set);
-        for (int i = 0; i < set.size(); i++) {
-            ExpressionColumn array_element = (ExpressionColumn)set.get(i);
-            ColumnSchema column = table.getColumn(table.getColumnIndex(array_element.getAlias()));
-            array_element.setAttributesAsColumn(column, false);
-
+    private void voltResolveTableColumns(Table table) {
+        ArrayList<ExpressionColumn> set = new ArrayList<>();
+        voltCollectAllColumnExpressions(set);
+        for (ExpressionColumn col : set) {
+            ColumnSchema column = table.getColumn(table.getColumnIndex(col.getColumnName()));
+            col.setAttributesAsColumn(column, false);
         }
     }
 

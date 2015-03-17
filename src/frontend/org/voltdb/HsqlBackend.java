@@ -101,18 +101,13 @@ public class HsqlBackend {
         }
 
         try {
-            final String connectionURL = "jdbc:hsqldb:mem:x" + String.valueOf(siteId);
+            final String connectionURL = "jdbc:hsqldb_voltpatches:mem:x" + String.valueOf(siteId);
             dbconn = DriverManager.getConnection(connectionURL, "sa", "");
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to open connection to " + "jdbc:hsqldb:mem:x" + String.valueOf(siteId), e);
+            throw new RuntimeException("Failed to open connection to " + "jdbc:hsqldb_voltpatches:mem:x" + String.valueOf(siteId), e);
         }
-    }
-
-    /** Creates a new backend wrapping dbconn. This is used for testing only. */
-    private HsqlBackend(Connection dbconn) {
-        this.dbconn = dbconn;
     }
 
     public void runDDL(String ddl) {

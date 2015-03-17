@@ -513,6 +513,14 @@ public class StatementSchema extends Statement {
 
                                     break;
                                 }
+                                // A VoltDB extension to support row LIMIT constraints
+                                case SchemaObject.ConstraintTypes.LIMIT : {
+                                    TableWorks tableWorks =
+                                        new TableWorks(session, table);
+                                    tableWorks.addLimitConstraint(c);
+                                    break;
+                                }
+                                // End of VoltDB extension
                             }
 
                             break;
@@ -550,6 +558,11 @@ public class StatementSchema extends Statement {
 
                             newCol.setType(type);
                             newCol.setIdentity(sequence);
+                            // A VoltDB extension to restore alter column
+                            // functionality dropped by hsql
+                            newCol.setDefaultExpression((Expression) arguments[5]);
+                            newCol.setNullable(((Boolean)arguments[6]).booleanValue());
+                            // End of VoltDB extension
 
                             TableWorks tw = new TableWorks(session, table);
 
