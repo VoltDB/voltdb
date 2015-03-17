@@ -1920,8 +1920,9 @@ public class VoltCompiler {
             }
             if (m_reportPath != null) {
                 outputStream.println("------------------------------------------\n");
-                outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
-                            "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+                outputStream.println(String.format(
+                        "Full catalog report can be found at file://%s.\n",
+                        m_reportPath));
             }
             outputStream.println("------------------------------------------\n");
         }

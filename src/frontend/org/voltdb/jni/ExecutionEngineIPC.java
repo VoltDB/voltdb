@@ -123,7 +123,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         GetPoolAllocations(24),
         GetUSOs(25),
         updateHashinator(27),
-        executeTask(28);
+        executeTask(28),
+        applyBinaryLog(29);
         Commands(final int id) {
             m_id = id;
         }
@@ -1428,6 +1429,29 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(config.type.typeId());
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
+        try {
+            m_data.flip();
+            m_connection.write();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
+                               long undoToken)
+    throws EEException
+    {
+        m_data.clear();
+        m_data.putInt(Commands.applyBinaryLog.m_id);
+        m_data.putLong(txnId);
+        m_data.putLong(spHandle);
+        m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(uniqueId);
+        m_data.putLong(undoToken);
+        m_data.put(log.array());
+
         try {
             m_data.flip();
             m_connection.write();

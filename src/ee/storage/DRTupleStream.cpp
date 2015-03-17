@@ -230,6 +230,16 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
 
+     if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
+         m_currBlock->lastDRSequenceNumber() != (sequenceNumber - 1)) {
+         throwFatalException(
+             "Appending begin transaction message to a DR buffer without closing the previous transaction."
+             " Last closed DR sequence number (%jd), last closed unique ID (%jd)."
+             " Current DR sequence number (%jd), current unique ID (%jd)",
+             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastUniqueId(),
+             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
+     }
+
      m_currBlock->startDRSequenceNumber(sequenceNumber);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -253,6 +263,22 @@ void DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 
      if (m_currBlock->remaining() < END_RECORD_SIZE) {
          extendBufferChain(END_RECORD_SIZE);
+     }
+
+     if (m_currBlock->startDRSequenceNumber() == std::numeric_limits<int64_t>::max()) {
+         throwFatalException(
+             "Appending end transaction message to a DR buffer with no matching begin transaction message."
+             " DR sequence number (%jd), unique ID (%jd)",
+             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
+     }
+     if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
+         m_currBlock->lastDRSequenceNumber() > sequenceNumber) {
+         throwFatalException(
+             "Appending end transaction message to a DR buffer with a greater DR sequence number."
+             " Buffer end DR sequence number (%jd), buffer end unique ID (%jd)."
+             " Current DR sequence number (%jd), current unique ID (%jd)",
+             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastUniqueId(),
+             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
      }
 
      m_currBlock->recordCompletedTxnForDR(sequenceNumber, uniqueId);

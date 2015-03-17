@@ -23,9 +23,13 @@
 
 package org.voltdb.parser;
 
-import org.voltdb.parser.SQLParser.FileOption;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
+
+import org.voltdb.parser.SQLParser.FileOption;
+import org.voltdb.parser.SQLParser.ParseRecallResults;
 
 public class TestSQLParser extends TestCase {
 
@@ -209,24 +213,29 @@ public class TestSQLParser extends TestCase {
     public void testParseFileStatementInlineBatch() {
         SQLParser.FileInfo fi = null;
 
-        fi = SQLParser.parseFileStatement("file -inlinebatch EOF");
+        SQLParser.FileInfo parent = SQLParser.FileInfo.forSystemIn();
+
+
+        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch EOF");
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("EOF", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
-        fi = SQLParser.parseFileStatement("file -inlinebatch <<<<   ");
+        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch <<<<   ");
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("<<<<", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
         // terminating semicolon is ignored, as bash does.
-        fi = SQLParser.parseFileStatement("file -inlinebatch EOF;");
+        // also try FILE parent
+        SQLParser.FileInfo fileParent = SQLParser.parseFileStatement(parent, "file foo.sql ;");
+        fi = SQLParser.parseFileStatement(fileParent, "file -inlinebatch EOF;");
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("EOF", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
         // There can be whitespace around the semicolon
-        fi = SQLParser.parseFileStatement("file -inlinebatch END_OF_THE_BATCH  ; ");
+        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch END_OF_THE_BATCH  ; ");
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("END_OF_THE_BATCH", fi.getDelimiter());
         assertTrue(fi.isBatch());
@@ -286,6 +295,181 @@ public class TestSQLParser extends TestCase {
 
         // Edge case.
         assertEquals(null, SQLParser.parseFileStatement(""));
+    }
+
+    private static final Pattern RequiredWhitespace = Pattern.compile("\\s+");
+    /**
+     * Match statement against pattern for all VoltDB-specific statement preambles
+     * @param statement  statement to match against
+     * @return           upper case single-space-separated preamble token string or null if not a match
+     */
+    private static String parseVoltDBSpecificDdlStatementPreamble(String statement, boolean fudge)
+    {
+        Matcher matcher = SQLParser.matchAllVoltDBStatementPreambles(statement);
+        if ( ! matcher.find()) {
+            if (fudge) {
+                String padded = statement.substring(0, statement.length()-1) + " ;";
+                matcher = SQLParser.matchAllVoltDBStatementPreambles(padded);
+                if ( ! matcher.find()) {
+                    return null;
+                }
+            }
+            else {
+                return null;
+            }
+        }
+        String cleanCommand = matcher.group(1);
+        cleanCommand = cleanCommand.toUpperCase();
+        if (fudge) {
+            cleanCommand = RequiredWhitespace.matcher(cleanCommand).replaceAll(" ");
+            if ("PROCEDURE".equals(cleanCommand) || "ROLE".equals(cleanCommand)) {
+                return "CREATE " + cleanCommand;
+            }
+            // This kind of heavy lifting should REALLY be done by the pattern.
+            if ("DROP".equals(cleanCommand)) {
+                String cleanStatement =
+                        RequiredWhitespace.matcher(statement.toUpperCase()).replaceAll(" ");
+                if (cleanStatement.substring(0, "DROP ROLE".length()).
+                        equals("DROP ROLE")) {
+                    return "DROP ROLE";
+                }
+                else if (cleanStatement.substring(0, "DROP PROCEDURE".length()).
+                        equals("DROP PROCEDURE")) {
+                    return "DROP PROCEDURE";
+                }
+                return null;
+            }
+        }
+        return cleanCommand;
+    }
+
+    private void expectFromAll(boolean fudge, String expected, String... candidates) {
+        for (String candidate : candidates) {
+            String got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
+            // Guarding assert to makes breakpoints easier.
+            if (got == null) {
+                if (expected == null) {
+                    continue;
+                }
+            }
+            else if (got.equals(expected)) {
+                continue;
+            }
+            // Retry before reporting failure for chance to debug.
+            got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
+            // sure to fail
+            assertEquals("For input '" + candidate + "'" + (fudge ? " fudging " : " "),
+                         expected, got);
+        }
+    }
+
+    public void testParseVoltDBSpecificDDLStatementPreambles() {
+
+        expectFromAll(true, "CREATE PROCEDURE",
+                "CREATE PROCEDURE XYZ ...;",
+                "Create Procedure 123 ...;",
+                "CREATE PROCEDURE AS ...;",
+                "CREATE\tPROCEDURE ALLOW ...;",
+                "CREATE  PROCEDURE PARTITION ...;",
+                "CREATE\t PROCEDURE ...;",
+                "CREATE PROCEDURE\tOK...;",
+                "CREATE PROCEDURE  ALRIGHT...;",
+                "CREATE PROCEDURE;",
+
+                "create procedure ;");
+
+
+        expectFromAll(true, "CREATE ROLE",
+                "CREATE ROLE XYZ ...;",
+                "Create Role 123 ...;",
+                "CREATE ROLE AS ...;",
+                "CREATE\tROLE ALLOW ...;",
+                "CREATE  ROLE PARTITION ...;",
+                "CREATE\t ROLE ...;",
+                "CREATE ROLE\tOK...;",
+                "CREATE ROLE  ALRIGHT...;",
+                "CREATE ROLE;",
+
+                "create role ;");
+    }
+
+    public void testParseRecall()
+    {
+        parseRecallCase("RECALL 1", 1);
+        parseRecallCase("  RECALL 2 ", 2);
+        parseRecallCase("RECALL 33;", 33);
+        parseRecallCase("recall 99 ;", 99);
+        parseRecallCase("RECALL 100 ; ", 100);
+
+        // Try too short commands.
+        parseRecallErrorCase("RECALL");
+        parseRecallErrorCase("RECALL ");
+        parseRecallErrorCase("Recall;");
+        parseRecallErrorCase("RECALL ;");
+
+        // Try interspersed garbage.
+        parseRecallErrorCase("RECALL abc 1");
+        parseRecallErrorCase("RECALL 2 def");
+        parseRecallErrorCase("RECALL 33;ghi");
+        parseRecallErrorCase("RECALL 44 jkl;");
+
+        parseRecallErrorCase("RECALL mno");
+        parseRecallErrorCase("RECALL; pqr");
+        parseRecallErrorCase("RECALL ;stu");
+
+        // Try invalid keyword terminators
+        parseRecallErrorCase("RECALL,1");
+        parseRecallErrorCase("RECALL. 1");
+        parseRecallErrorCase("RECALL'1;");
+        parseRecallErrorCase("RECALL( 1;");
+        parseRecallErrorCase("RECALL(1);");
+        parseRecallErrorCase("RECALL- 1 ;");
+        parseRecallErrorCase("RECALL,");
+        parseRecallErrorCase("RECALL, ");
+        parseRecallErrorCase("RECALL,;");
+        parseRecallErrorCase("RECALL, ;");
+
+        // Try imaginative usage.
+        parseRecallErrorCase("RECALL 1 3;");
+        parseRecallErrorCase("RECALL 1,3;");
+        parseRecallErrorCase("RECALL 1, 3;");
+        parseRecallErrorCase("RECALL 1-3;");
+        parseRecallErrorCase("RECALL 1..3;");
+
+        // Try invalid numerics
+        parseRecallErrorCase("RECALL 0");
+        parseRecallErrorCase("recall -2;");
+        parseRecallErrorCase("RECALL 101");
+        parseRecallErrorCase("recall 1000;");
+
+        // confirm that the recall command parser does not overstep
+        // its mandate and try to process anything but a recall command.
+        assertNull(SQLParser.parseRecallStatement("RECAL", 99));
+        assertNull(SQLParser.parseRecallStatement("recal 1", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALL1", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALLL", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALLL 1", 99));
+        assertNull(SQLParser.parseRecallStatement("HELP;", 99));
+        assertNull(SQLParser.parseRecallStatement("FILE ddl.sql", 99));
+        assertNull(SQLParser.parseRecallStatement("@RECALL 1", 99));
+        assertNull(SQLParser.parseRecallStatement("--recall 1", 99));
+        assertNull(SQLParser.parseRecallStatement("ECALL 1", 99));
+    }
+
+    private void parseRecallCase(String lineText, int lineNumber)
+    {
+        ParseRecallResults result = SQLParser.parseRecallStatement(lineText, 99);
+        assertNotNull(result);
+        assertNull(result.getError());
+        // Line number inputs are 1-based but getLine() results are 0-based
+        assertEquals(lineNumber, result.getLine()+1);
+    }
+
+    private void parseRecallErrorCase(String lineText)
+    {
+        ParseRecallResults result = SQLParser.parseRecallStatement(lineText, 99);
+        assertNotNull(result);
+        assertNotNull(result.getError());
     }
 
 
