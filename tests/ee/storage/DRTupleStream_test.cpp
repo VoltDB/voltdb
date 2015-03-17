@@ -65,8 +65,11 @@ static int64_t addPartitionId(int64_t value) {
 
 class DRTupleStreamTest : public Test {
 public:
-    DRTupleStreamTest() : m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, "localhost", 2, &m_wrapper, NULL)) {
+    DRTupleStreamTest()
+      : m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
+                                      (NValueArray*)NULL, (VoltDBEngine*)NULL,
+                                      "localhost", 2, &m_wrapper, NULL))
+    {
         m_wrapper.m_enabled = true;
         srand(0);
         // set up the schema used to fill the new buffer

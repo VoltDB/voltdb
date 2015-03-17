@@ -370,16 +370,16 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // verify input
     if (columnIndex < 0) {
         char message[100]; // enough to hold all numbers up to 64-bits
-        std::string tableName = "";
+        const char* tableLabel = "";
         if (tableIdx != 0) {
             // join inner table
-            tableName = " inner";
+            tableLabel = " inner";
         }
-        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table",
-                columnIndex, tableName.c_str());
-
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                std::string(message));
+        snprintf(message, 128, 
+                "tupleValueFactory: invalid column_idx %d for%s table\nStack trace:\n",
+                columnIndex, tableLabel);
+        throw UnexpectedEEException(
+                std::string(message) + StackTrace::stringStackTrace());
     }
 
     return new TupleValueExpression(tableIdx, columnIndex);

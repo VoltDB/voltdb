@@ -108,9 +108,15 @@ PlanNodeFragment::createFromCatalog(const string value)
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
 
     PlannerDomRoot domRoot(value.c_str());
-
-    PlanNodeFragment *retval = PlanNodeFragment::fromJSONObject(domRoot.rootObject());
-    return retval;
+    try {
+        PlanNodeFragment *retval = PlanNodeFragment::fromJSONObject(domRoot.rootObject());
+        return retval;
+    }
+    catch (UnexpectedEEException& ue) {
+        string prefix("\ncreateFromCatalog:\n");
+        ue.appendContextToMessage(prefix + value);
+        throw;
+    }
 }
 
 PlanNodeFragment *

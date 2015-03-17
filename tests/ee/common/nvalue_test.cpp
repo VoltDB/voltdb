@@ -80,10 +80,12 @@ public:
         scaledDirect = (int64_t)(floatDirect * scale);
     }
 
-    ExecutorContext * getExecutorContextForTest(Pool* testPool) {
+    ExecutorContext * getExecutorContextForTest(Pool* testPool)
+    {
         m_testPool.reset(testPool);
-        ExecutorContext *newExec = new ExecutorContext(0, 0,
-                NULL, NULL, testPool, NULL, NULL, false, "", 0, NULL);
+        ExecutorContext *newExec = new ExecutorContext(0, 0, NULL, NULL, testPool,
+                                                       (NValueArray*)NULL, (VoltDBEngine*)NULL,
+                                                       "", 0, NULL, NULL);
         m_executorContext.reset(newExec);
         return m_executorContext.get();
     }

@@ -61,7 +61,6 @@
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
-#include "boost/shared_array.hpp"
 
 #include <cassert>
 #include <map>
@@ -107,8 +106,6 @@ const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
  */
 // TODO(evanj): Used by JNI so must be exported. Remove when we only one .so
 class __attribute__((visibility("default"))) VoltDBEngine {
-    friend class ExecutorVector;
-
     public:
         /** The defaults apply to test code which does not enable JNI/IPC callbacks. */
         VoltDBEngine(Topend *topend = NULL, LogProxy *logProxy = new StdoutLogProxy());
@@ -170,7 +167,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // executes the corresponding fragment.
         //
         // Returns ENGINE_ERRORCODE_SUCCESS on success
-        int executePurgeFragment(PersistentTable* table);
+        void executePurgeFragment(PersistentTable* table);
 
         // -------------------------------------------------
         // Dependency Transfer Functions
@@ -377,10 +374,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
-        void cleanupExecutorList(std::vector<AbstractExecutor*>& executorList);
+        int64_t tempTableMemoryLimit() const {
+            return m_tempTableMemoryLimit;
+        }
 
-        ExecutorVector * getCurrentExecutorVector() {
-            return m_currExecutorVec;
+        int64_t tempTableLogLimit() const {
+            return (m_tempTableMemoryLimit * 3) / 4;
+        }
+
+        int32_t getPartitionId() const {
+            return m_partitionId;
         }
 
     private:
@@ -418,12 +421,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                 bool last);
 
         /**
-         * Get a vector of executors for a given fragment id.
+         * Set up the vector of executors for a given fragment id.
          * Get the vector from the cache if the fragment id is there.
          * If not, get a plan from the Java topend and load it up,
          * putting it in the cache and possibly bumping something else.
          */
-        void setExecutorVectorForFragmentId(const int64_t fragId);
+        void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
         void resetExecutionMetadata();

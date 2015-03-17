@@ -53,14 +53,21 @@ public class TestSubQueriesSuite extends RegressionSuite {
             String proc = tb + ".insert";
             // id, wage, dept, tm
             cr = client.callProcedure(proc, 1,  10,  1 , "2013-06-18 02:00:00.123457");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure(proc, 2,  20,  1 , "2013-07-18 02:00:00.123457");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure(proc, 3,  30,  1 , "2013-07-18 10:40:01.123457");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure(proc, 4,  40,  2 , "2013-08-18 02:00:00.123457");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure(proc, 5,  50,  2 , "2013-09-18 02:00:00.123457");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
             if (extra) {
                 client.callProcedure(proc, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 client.callProcedure(proc, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             }
         }
     }
@@ -400,30 +407,42 @@ public class TestSubQueriesSuite extends RegressionSuite {
         loadData(false);
         VoltTable vt;
         String sql;
+        ClientResponse cr;
 
         for (String tb: tbs) {
-            client.callProcedure(tb+".insert", 6,  10,  2 , "2013-07-18 02:00:00.123457");
-            client.callProcedure(tb+".insert", 7,  40,  2 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(tb+".insert", 6,  10,  2 , "2013-07-18 02:00:00.123457");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            cr = client.callProcedure(tb+".insert", 7,  40,  2 , "2013-07-18 02:00:00.123457");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
 
         for (String tb: replicated_tbs) {
             vt = client.callProcedure("@AdHoc",
-                    "select dept, sum(wage) as sw1 from " + tb + " where (id, dept + 2) in " +
-                            "( SELECT dept, count(dept) " +
-                            "from " + tb + " GROUP BY dept ORDER BY dept DESC) GROUP BY dept;").getResults()[0];
+                    "select dept, sum(wage) as sw1 from " + tb +
+                    " where (id, dept + 2) in " +
+                    "        ( select dept, count(dept) from " + tb + 
+                    "          group by dept " +
+//// Leaving out ORDER BY -- which really should be getting ignored/dropped
+//// from an "in expression" subquery but instead was getting serialized with
+//// a bad column index.
+////                    "          order by dept DESC " +
+                    "        ) " +
+                    "group by dept;").getResults()[0];
+            /* enable for debug */ System.out.println(vt);
             validateTableOfLongs(vt, new long[][] {{1,10}});
 
 
-            sql = "select dept from " + tb + " group by dept " +
+            sql = "select dept from " + tb +
+                    " group by dept " +
                     " having max(wage) in (select wage from R1) order by dept desc";
-            vt = client.callProcedure("@Explain", sql).getResults()[0];
+            /* enable for debug */ vt = client.callProcedure("@Explain", sql).getResults()[0];
+            /* enable for debug */ System.out.println(vt);
+            //TODO: Whatever @Explain is testung here should be covered in a planner test instead.
             assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
 
-          sql = "select dept from " + tb + " group by dept " +
-                  " having max(wage) in (select wage from R1) order by dept desc";
-          vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-          System.out.println(vt.toString());
-          validateTableOfLongs(vt, new long[][] {{2} ,{1}});
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            /* enable for debug */ System.out.println(vt);
+            validateTableOfLongs(vt, new long[][] {{2} ,{1}});
 
             // having with subquery
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -432,27 +451,33 @@ public class TestSubQueriesSuite extends RegressionSuite {
             // subquery with having
             vt = client.callProcedure("@AdHoc",
                     "select id from " + tb + " TBA where exists " +
-                            " (select dept from R1  group by dept having max(wage) = TBA.wage or " +
-                    " min(wage) = TBA.wage)").getResults()[0];
+                            " (select dept from R1 " +
+                            "  group by dept " +
+                            "  having max(wage) = TBA.wage or min(wage) = TBA.wage)").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
 
             // subquery with having and grand parent parameter TVE
             vt = client.callProcedure("@AdHoc",
                     "select id from " + tb + " TBA where exists " +
                             " (select 1 from R2 where exists " +
-                            " (select dept from R1  group by dept having max(wage) = TBA.wage))").getResults()[0];
+                            "         (select dept from R1 " +
+                            "          group by dept " +
+                            "          having max(wage) = TBA.wage))").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{3}, {5}});
 
-          vt = client.callProcedure("@AdHoc",
-                  "select id from " + tb + " TBA where exists " +
-                          " (select dept from R1  group by dept having max(wage) = ?)", 3).getResults()[0];
-          validateTableOfLongs(vt, new long[][] {});
+            vt = client.callProcedure("@AdHoc",
+                    "select id from " + tb + " TBA where exists " +
+                            " (select dept from R1 " +
+                            "  group by dept " +
+                            "  having max(wage) = ?)", 3).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {});
 
             // having with subquery with having
             vt = client.callProcedure("@AdHoc",
                     "select id from " + tb + " where wage " +
-                            " in (select max(wage) from R1 group by dept " +
-                    " having max(wage) > 30) ").getResults()[0];
+                            " in (select max(wage) from R1 " +
+                            "     group by dept " +
+                            "     having max(wage) > 30) ").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{5}});
 
             // subquery with group by but no having
