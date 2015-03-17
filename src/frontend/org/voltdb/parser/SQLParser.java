@@ -364,6 +364,9 @@ public class SQLParser extends SQLPatternFactory
             "^\\s*" +         // optional indent at start of line
             "help" +          // required HELP command token
             "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that help
+            // command diagnostics can "own" any line starting with the word
+            // help.
             "\\s*" +          // optional whitespace before subcommand
             "([^;\\s]*)" +    // optional subcommand (group 2)
             InitiallyForgivingDirectiveTermination,
@@ -394,6 +397,8 @@ public class SQLParser extends SQLPatternFactory
             "(\\W|$)" +    // require an end to the keyword OR EOL (group 1)
             // Make everything that follows optional so that recall command
             // diagnostics can "own" any line starting with the word recall.
+            "\\s*" +          // extra spaces
+            "([^;\\s]*)" + // (first) non-space non-semicolon garbage word (group 2)
             InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
 
