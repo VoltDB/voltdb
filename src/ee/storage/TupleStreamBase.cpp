@@ -95,8 +95,10 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
+size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
 {
+    size_t beginUso = 0;
+
     if (currentSpHandle < m_openSpHandle)
     {
         throwFatalException(
@@ -123,7 +125,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
             extendBufferChain(0);
         }
 
-        return;
+        return beginUso;
     }
 
     // If the current TXN ID has advanced, then we know that:
@@ -153,7 +155,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
             extendBufferChain(0, false);
         }
 
-        beginTransaction(m_openSequenceNumber, uniqueId);
+        beginUso = beginTransaction(m_openSequenceNumber, uniqueId);
     }
 
     // now check to see if the lastCommittedSpHandle tells us that our open
@@ -185,6 +187,8 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                 true,
                 false);
     }
+
+    return beginUso;
 }
 
 void TupleStreamBase::pushPendingBlocks() {
