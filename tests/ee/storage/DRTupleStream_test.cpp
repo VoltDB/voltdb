@@ -52,7 +52,6 @@ const int COLUMN_COUNT = 5;
 // total: 67
 const int MAGIC_TUPLE_SIZE = 39;
 const int MAGIC_TRANSACTION_SIZE = 36;
-const int MAGIC_BEGIN_SIZE = 22;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // 1k buffer
 const int BUFFER_SIZE = 950;
@@ -551,7 +550,7 @@ TEST_F(DRTupleStreamTest, RollbackMiddleTuple)
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10) + MAGIC_BEGIN_SIZE);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10);
 }
 
 /**
