@@ -269,6 +269,10 @@ public final class DBBPool {
      * Number of bytes allocated globally by DBBPools
      */
     private static AtomicLong bytesAllocatedGlobally = new AtomicLong(0);
+    /**
+     * Number of bytes allocated and pooled by DBBPools
+     */
+    private static AtomicLong bytesAllocatedGloballyAndPooled = new AtomicLong(0);
 
     static long getBytesAllocatedGlobally()
     {
@@ -350,7 +354,7 @@ public final class DBBPool {
         ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(capacity);
         if (pooledBuffers == null) {
             pooledBuffers = new ConcurrentLinkedQueue<BBContainer>();
-            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) == null) {
+            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) != null) {
                 pooledBuffers = m_pooledBuffers.get(capacity);
             }
         }
@@ -358,6 +362,14 @@ public final class DBBPool {
         BBContainer cont = pooledBuffers.poll();
         if (cont == null) {
             cont = allocateDirect(capacity);
+            bytesAllocatedGloballyAndPooled.getAndAdd(capacity);
+        }
+        if (TRACE.isTraceEnabled()) {
+            String message =
+                    "Pooled Buffer pool size is " + m_pooledBuffers.size() +
+                     " total pooled allocated " + bytesAllocatedGloballyAndPooled.get() +
+                     " from " + CoreUtils.throwableToString(new Throwable());
+            TRACE.trace(message);
         }
         final BBContainer origin = cont;
         cont = new BBContainer(origin.b()) {
@@ -365,6 +377,13 @@ public final class DBBPool {
             public void discard() {
                 final ByteBuffer b = checkDoubleFree();
                 m_pooledBuffers.get(b.capacity()).offer(origin);
+                if (TRACE.isTraceEnabled()) {
+                    String message =
+                            "Pooled Buffer pool size is " + m_pooledBuffers.size() +
+                             " total pooled allocated " + bytesAllocatedGloballyAndPooled.get() +
+                             " from " + CoreUtils.throwableToString(new Throwable());
+                    TRACE.trace(message);
+                }
             }
         };
         cont.b().clear();
