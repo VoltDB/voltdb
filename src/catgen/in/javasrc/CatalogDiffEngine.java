@@ -638,25 +638,6 @@ public class CatalogDiffEngine {
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
-
-        if (suspect instanceof Cluster && field.equals("drClusterId") ||
-                suspect instanceof Cluster && field.equals("drProducerPort")) {
-            // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
-            if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
-                restrictionQualifier = " while DR is enabled";
-            }
-            else {
-                return null;
-            }
-        }
-        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
-            if ((Boolean)suspect.getField("drProducerEnabled")) {
-                restrictionQualifier = " active-active and daisy-chained DR unsupported";
-            }
-            else {
-                return null;
-            }
-        }
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {
