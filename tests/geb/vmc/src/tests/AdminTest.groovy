@@ -321,52 +321,104 @@ class AdminTest extends TestBase {
     def "click security button"(){
         when:
         at AdminPage
-        overview.securityEdit.isDisplayed()
+        page.securityEdit.isDisplayed()
         then:
-        waitFor(30){
-            overview.securityEdit.click()
-            overview.securityEditOk.isDisplayed()
-            overview.securityEditCancel.isDisplayed()
+        waitFor(10){
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
         }
     }
 
-    def "click security edit button and cancel"(){
+     def "click security edit button and cancel"(){
         when:
         at AdminPage
-        waitFor(30) { overview.securityEdit.isDisplayed() }
+        waitFor(5) { page.securityEdit.isDisplayed()
+
+        }
+
         then:
-        waitFor(30) {
-            overview.securityEdit.click()
-            overview.securityEditOk.isDisplayed()
-            overview.securityEditCancel.isDisplayed()
+
+        waitFor(10) {
+
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
+
+
         }
-        waitFor(30) {
-            overview.securityEditCancel.click()
-            !overview.securityEditOk.isDisplayed()
-            !overview.securityEditCancel.isDisplayed()
-        }
+
+
+        page.securityEditCancel.click()
+        println("security edit canceled!")
+
+        page.securityEdit.isDisplayed()
+
     }
 
-    def "click security edit button and ok"(){
+    def "click security edit button and ok and cancel"(){
         when:
         at AdminPage
-        waitFor(30) { overview.securityEdit.isDisplayed() }
+        waitFor(5) { page.securityEdit.isDisplayed() }
         then:
-        waitFor(30) {
-            overview.securityEdit.click()
-            overview.securityEditOk.isDisplayed()
-            overview.securityEditCancel.isDisplayed()
+
+        waitFor(10) {
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
         }
-        overview.securityEditOk.click()
-        waitFor(30) {
-            overview.securityPopup.isDisplayed()
-            overview.securityPopupOk.isDisplayed()
-            overview.securityPopupCancel.isDisplayed()
+        page.securityEditOk.click()
+        println("security edit ok clicked!")
+        waitFor(10) {
+            page.securityPopup.isDisplayed()
+            page.securityPopupOk.isDisplayed()
+            page.securityPopupCancel.isDisplayed()
+            page.securityPopupCancel.click()
+            println("cancel clicked")
+            page.securityEdit.isDisplayed()
+
+
         }
+
+
+
 
     }
 
 
+    def "click security edit button and ok and ok"(){
+        when:
+        at AdminPage
+        waitFor(5) { page.securityEdit.isDisplayed() }
+        then:
+
+        waitFor(10) {
+            page.securityEdit.click()
+            page.securityEditOk.isDisplayed()
+            page.securityEditCancel.isDisplayed()
+        }
+        page.securityEditOk.click()
+        println("security edit ok clicked!")
+        waitFor(10) {
+            //page.securityPopup.isDisplayed()
+            page.securityPopupOk.isDisplayed()
+            page.securityPopupCancel.isDisplayed()
+            page.securityPopupOk.click()
+            println("security popup ok clicked!")
+            //page.securityEdit.isDisplayed()
+
+        }
+
+
+
+
+    }
+
+
+
+
+
+// autosnapshot
     def "check Auto Snapshots edit"() {
         when:
         at AdminPage
@@ -820,7 +872,6 @@ class AdminTest extends TestBase {
     }
 
     //CLUSTER
-
     def "cluster title"(){
         when:
         at AdminPage

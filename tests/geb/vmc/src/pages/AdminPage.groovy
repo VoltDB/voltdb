@@ -99,6 +99,9 @@ class AdminPage extends VoltDBManagementCenterPage {
         autoSnapshotsValue			{ $("#txtAutoSnapshot") }
         commandLoggingValue			{ $("#commandLogLabel") }
 
+        fileprefixEdit				{$("#txtPrefix", name:"txtPrefix")}
+        frequencyEdit				{$("#txtFrequency", name:"txtFrequency")}
+        retainedEdit				{$("#txtRetained", name:"txtRetained")}
 
         securityEdit				{ $("#securityEdit") }
         securityEditCheckbox		{ $(class:"iCheck-helper") }
@@ -111,7 +114,7 @@ class AdminPage extends VoltDBManagementCenterPage {
 
         autoSnapshotsEditOk 		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotOk.editOk") }
         autoSnapshotsEditCancel 	{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotCancel.editCancel") }
-
+        autosnapshotsconfirmok      {$("#btnSaveSnapshot", text:"Ok")}
 
         filePrefixField             { $(id:"txtPrefix") }
         frequencyField              { $(id:"txtFrequency") }
