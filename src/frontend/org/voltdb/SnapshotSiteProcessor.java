@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -814,7 +815,7 @@ public class SnapshotSiteProcessor {
             }
 
             try {
-                JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
+                JSONObject jsonObj = new JSONObject(new String(data, StandardCharsets.UTF_8));
                 if (jsonObj.getLong("txnId") != txnId) {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
@@ -827,7 +828,11 @@ public class SnapshotSiteProcessor {
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
                 mergeDRTupleStreamInfo(jsonObj, drTupleStreamInfo);
                 mergeDRLastIds(jsonObj, remoteDCLastIds);
-                zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
+                zk.setData(
+                        snapshotPath,
+                        jsonObj.toString(4).getBytes(StandardCharsets.UTF_8),
+                        stat.getVersion()
+                        );
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {

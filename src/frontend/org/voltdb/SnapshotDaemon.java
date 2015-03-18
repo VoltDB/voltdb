@@ -393,7 +393,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return ZKUtil.joinZKPath(snapshotDirPrefix, Integer.toString(nodeId));
         }
 
-        private byte[] getDetailsFromSnapshotNode(String snapshotDirPrefix, int nodeId) throws KeeperException, InterruptedException {
+        private byte[] getDetailsFromSnapshotNode(String snapshotDirPrefix, int nodeId)
+                throws KeeperException, InterruptedException {
             return m_zk.getData(getPathFromNodeId(snapshotDirPrefix, nodeId), false, null);
         }
 
@@ -603,7 +604,19 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         public SNAPSHOT_TYPE getActiveSnapshotType() {
             return m_activeSnapshot;
         }
-    }
+
+        public byte [] getActiveNode() {
+            if (m_activeSnapshot == SNAPSHOT_TYPE.EMPTY) {
+                return new byte[0];
+            }
+
+            ByteBuffer activeState = getCurrentState();
+            activeState.position(1+m_queueSlots);
+            byte [] activeNode = new byte[activeState.remaining()];
+            activeState.get(activeNode);
+            return activeNode;
+        }
+     }
 
     static int m_periodicWorkInterval = 2000;
     public static volatile int m_userSnapshotRetryInterval = 30;
@@ -664,6 +677,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     public boolean isTruncationSnapshotQueuedOrActive() {
         return m_snapshotQueue.snapshotPending(SNAPSHOT_TYPE.LOG)
             || m_snapshotQueue.getActiveSnapshotType() == SNAPSHOT_TYPE.LOG;
+    }
+
+    public JSONObject getActiveSnapshot() throws JSONException {
+        if (m_snapshotQueue.getActiveSnapshotType() == SNAPSHOT_TYPE.EMPTY) {
+            return null;
+        }
+        byte [] activeNode = m_snapshotQueue.getActiveNode();
+        String jsonString = new String(activeNode,StandardCharsets.UTF_8);
+        return new JSONObject(jsonString);
     }
 
     /*
@@ -2589,7 +2611,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private final static Iterator<String> jsonFieldKeys(JSONObject jo) {
         return jo.keys();
     }

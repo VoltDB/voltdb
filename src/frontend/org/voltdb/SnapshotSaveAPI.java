@@ -37,7 +37,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -361,26 +360,25 @@ public class SnapshotSaveAPI
                                                                      String nonce,
                                                                      long txnId,
                                                                      boolean isTruncation,
-                                                                     String truncReqId) {
+                                                                     String truncReqId,
+                                                                     JSONObject hardLinks) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
 
         byte nodeBytes[] = null;
         try {
-            JSONStringer stringer = new JSONStringer();
-            stringer.object();
-            stringer.key("txnId").value(txnId);
-            stringer.key("isTruncation").value(isTruncation);
-            stringer.key("didSucceed").value(false);
-            stringer.key("hostCount").value(-1);
-            stringer.key("path").value(path);
-            stringer.key("nonce").value(nonce);
-            stringer.key("truncReqId").value(truncReqId);
-            stringer.key("exportSequenceNumbers").object().endObject();
-            stringer.endObject();
-            JSONObject jsonObj = new JSONObject(stringer.toString());
-            nodeBytes = jsonObj.toString(4).getBytes(Charsets.UTF_8);
+            JSONObject jo = new JSONObject();
+            jo.put("txnId", txnId);
+            jo.put("isTruncation", isTruncation);
+            jo.put("didSucceed", false);
+            jo.put("hostCount", -1);
+            jo.put("path", path);
+            jo.put("nonce", nonce);
+            jo.put("truncReqId", truncReqId);
+            jo.put("exportSequenceNumbers", new JSONObject());
+            jo.putOpt("hardLinks", hardLinks);
+            nodeBytes = jo.toString(4).getBytes(Charsets.UTF_8);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error serializing snapshot completion node JSON", true, e);
         }
@@ -464,7 +462,7 @@ public class SnapshotSaveAPI
             long timestamp)
     {
         JSONObject jsData = null;
-        if (data != null && !data.isEmpty()) {
+        if (data != null && !data.trim().isEmpty()) {
             try {
                 jsData = new JSONObject(data);
             }

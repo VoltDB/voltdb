@@ -19,7 +19,9 @@ package org.voltdb;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -176,13 +178,11 @@ public class SnapshotCompletionMonitor {
             final JSONObject exportSequenceJSON = jsonObj.getJSONObject("exportSequenceNumbers");
             final ImmutableMap.Builder<String, Map<Integer, Pair<Long, Long>>> builder =
                     ImmutableMap.builder();
-            @SuppressWarnings("unchecked")
             final Iterator<String> tableKeys = exportSequenceJSON.keys();
             while (tableKeys.hasNext()) {
                 final String tableName = tableKeys.next();
                 final JSONObject tableSequenceNumbers = exportSequenceJSON.getJSONObject(tableName);
                 ImmutableMap.Builder<Integer, Pair<Long, Long>> tableBuilder = ImmutableMap.builder();
-                @SuppressWarnings("unchecked")
                 final Iterator<String> partitionKeys = tableSequenceNumbers.keys();
                 while (partitionKeys.hasNext()) {
                     final String partitionString = partitionKeys.next();
@@ -239,6 +239,15 @@ public class SnapshotCompletionMonitor {
                 remoteDCLastIds.put(Integer.valueOf(dcIdKey), Collections.unmodifiableMap(lastSeenIds));
             }
 
+            final JSONObject jsHardLinks = jsonObj.optJSONObject("hardLinks");
+            final Set<String> hlReqIds = new LinkedHashSet<>();
+            if (jsHardLinks != null) {
+                Iterator<String> hlitr = jsHardLinks.keys();
+                while (hlitr.hasNext()) {
+                    hlReqIds.add(hlitr.next());
+                }
+            }
+
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
@@ -255,6 +264,21 @@ public class SnapshotCompletionMonitor {
                                 exportSequenceNumbers,
                                 Collections.unmodifiableMap(drSequenceNumbers),
                                 Collections.unmodifiableMap(remoteDCLastIds)));
+                    for (String hlReqId: hlReqIds) {
+                        JSONObject hardLink = jsHardLinks.getJSONObject(hlReqId);
+                        interest.snapshotCompleted(
+                                new SnapshotCompletionEvent(
+                                    hardLink.getString("path"),
+                                    hardLink.getString("nonce"),
+                                    txnId,
+                                    partitionTxnIdsMap,
+                                    false /*truncation*/,
+                                    didSucceed,
+                                    hlReqId,
+                                    exportSequenceNumbers,
+                                    Collections.unmodifiableMap(drSequenceNumbers),
+                                    Collections.unmodifiableMap(remoteDCLastIds)));
+                    }
                 } catch (Exception e) {
                     SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
                 }
