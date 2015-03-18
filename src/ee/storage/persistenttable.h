@@ -234,7 +234,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings);
 
-    virtual void truncateTable(VoltDBEngine* engine);
+    virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -278,10 +278,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     /*
-     * Lookup the address of the tuple that is identical to the specified tuple.
+     * Lookup the address of the tuple whose values are identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
      */
-    voltdb::TableTuple lookupTuple(TableTuple tuple);
+    voltdb::TableTuple lookupTupleByValues(TableTuple tuple);
+
+    /*
+     * Lookup the address of the tuple that is identical to the specified tuple.
+     * It is assumed that the tuple argument was first retrieved from this table.
+     * Does a primary key lookup or table scan if necessary.
+     */
+    voltdb::TableTuple lookupTupleForUndo(TableTuple tuple);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -373,6 +380,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleLimit;
     }
 
+    bool isDREnabled() const { return m_drEnabled; }
+
+    // for test purpose
+    void setDR(bool flag) { m_drEnabled = flag; }
+
     void setTupleLimit(int32_t newLimit) {
         m_tupleLimit = newLimit;
     }
@@ -452,7 +464,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
   private:
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
+    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -532,7 +544,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     size_t &tupleCountPosition,
                                     bool shouldDRStreamRows);
 
+    TableTuple lookupTuple(TableTuple tuple, bool forUndo);
+
     TBPtr allocateNextBlock();
+
+    inline DRTupleStream *getDRTupleStream(ExecutorContext *ec) {
+        if (m_partitionColumn == -1) {
+            return ec->drReplicatedStream();
+        } else {
+            return ec->drStream();
+        }
+    }
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
@@ -588,6 +610,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     //Cache config info, is this a materialized view
     bool m_isMaterialized;
+
+    // is DR enabled
+    bool m_drEnabled;
 
     //SHA-1 of signature string
     char m_signature[20];
@@ -770,7 +795,13 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
 inline void
 PersistentTableSurgeon::DRRollback(size_t drMark) {
     if (!m_table.m_isMaterialized) {
-        ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
+        if (m_table.m_partitionColumn == -1) {
+            if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
+                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark);
+            }
+        } else {
+            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
+        }
     }
 }
 
@@ -869,6 +900,13 @@ inline TBPtr PersistentTable::allocateNextBlock() {
     return block;
 }
 
+inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
+    return lookupTuple(tuple, false);
+}
+
+inline TableTuple PersistentTable::lookupTupleForUndo(TableTuple tuple) {
+    return lookupTuple(tuple, true);
+}
 
 }
 

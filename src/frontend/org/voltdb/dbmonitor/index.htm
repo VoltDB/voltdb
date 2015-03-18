@@ -1010,12 +1010,12 @@
     <div id="savePop" style="display: none">
         <div class="overlay-title icon-alert">Save</div>
         <div class="clear"></div>
-        <div id="saveSnapshot" class="saveInfo">
+        <div id="saveSnapshot">
             <div class="overlay-content ">
                 <form id="formSaveSnapshot" method="get" action="">
                     <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
                         <tr>
-                            <td>Directory:</td>
+                            <td>Directory:<br />(absolute path)</td>
                             <td id="tdSnapshotDirectory"></td>
                         </tr>
                         <tr>
@@ -1025,13 +1025,7 @@
                     </table>
                 </form>
             </div>
-            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
-        </div>
-        <div id="saveSnapshotConfirm" class="saveConfirmation" style="display: none;">
-            <div class="overlay-content ">
-                <div class="confirmationInfo">Are you sure you want to save?</div>
-            </div>
-            <div class="overlay-btns"><a id="btnSaveSnapshotOk" class="btn closeBtn">Yes</a> <a id="btnSaveSnapshotConfirmCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
         </div>
     </div>
     <!-- POPUP savePop -->
@@ -1048,7 +1042,7 @@
                             <div class="directoryRestore">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
                                     <tr>
-                                        <th align="left">Directory</th>
+                                        <th align="left">Directory <br />(absolute path)</th>
                                         <td align="left" id="tdSearchSnapshots">
                                             <!--<input id="txtSearchSnapshots" type="text">-->
                                         </td>
@@ -1132,7 +1126,7 @@
     <div id="saveSnapShotPopup" style="display: none">
         <div id="saveSnaps">
             <div class="overlay-title ">
-                <img src="css/resources/images/Information.png" class="imgError" /><span id="saveSnapshotStatus"></span>
+                <img id="imgSaveSnapshotStatus" src="css/resources/images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError ">

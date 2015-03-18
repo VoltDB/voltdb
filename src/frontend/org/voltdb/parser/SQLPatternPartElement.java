@@ -19,6 +19,8 @@ package org.voltdb.parser;
 
 import java.util.regex.Pattern;
 
+import org.voltcore.logging.VoltLogger;
+
 public class SQLPatternPartElement extends SQLPatternPart
 {
     //===== Private
@@ -28,6 +30,8 @@ public class SQLPatternPartElement extends SQLPatternPart
     String m_separator = null;
     private SQLPatternPart[] m_parts;
     String m_captureLabel = null;
+
+    private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
 
     /**
      * Private constructor from multiple strings
@@ -47,7 +51,7 @@ public class SQLPatternPartElement extends SQLPatternPart
      * SQLPat static factory methods should be used for element creation.
      * @param parts  pattern parts
      */
-    SQLPatternPartElement(SQLPatternPart[] parts)
+    SQLPatternPartElement(SQLPatternPart... parts)
     {
         m_parts = parts;
     }
@@ -78,16 +82,21 @@ public class SQLPatternPartElement extends SQLPatternPart
         boolean captureGroup = (flags & SQLPatternFactory.CAPTURE) != 0;
         boolean explicitNonCaptureGroup = !captureGroup && (flags & SQLPatternFactory.GROUP) != 0;
         boolean optional = ((flags & SQLPatternFactory.OPTIONAL) != 0);
+        // Suppress the leading space at this level when it should be pushed down to the child.
         boolean leadingSpace = ((flags & SQLPatternFactory.LEADING_SPACE) != 0);
+        boolean leadingSpaceToChild = ((flags & SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD) != 0);
+        boolean childLeadingSpace = ((flags & SQLPatternFactory.CHILD_SPACE_SEPARATOR) != 0 ||
+                                     (leadingSpace && leadingSpaceToChild));
         boolean nonCaptureGroup = (explicitNonCaptureGroup ||
-            (optional && (!captureGroup || leadingSpace)));
+                                  (optional && (!captureGroup || leadingSpace)));
         boolean innerOptional = optional && captureGroup && !nonCaptureGroup;
         boolean outerOptional = optional && nonCaptureGroup;
         if (nonCaptureGroup) {
             sb.append("(?:");
         }
-        if (leadingSpace) {
-            sb.append("\\s+");
+        if (leadingSpace && !leadingSpaceToChild) {
+            // Protect something like an OR sequence by using an inner group
+            sb.append("\\s+(?:");
         }
         if (captureGroup) {
             if (m_captureLabel != null) {
@@ -103,14 +112,14 @@ public class SQLPatternPartElement extends SQLPatternPart
                 if (m_separator != null) {
                     sb.append(m_separator);
                 }
-                if ((flags & SQLPatternFactory.CHILD_SPACE_SEPARATOR) != 0) {
+                if (childLeadingSpace) {
                     flagsAddChild |= SQLPatternFactory.LEADING_SPACE;
                 }
             }
+            else if (childLeadingSpace && leadingSpaceToChild) {
+                flagsAddChild |= SQLPatternFactory.LEADING_SPACE;
+            }
             sb.append(m_parts[i].generateExpression(flagsAddChild));
-        }
-        if (m_trailer != null) {
-            sb.append(m_trailer);
         }
         if (captureGroup) {
             sb.append(")");
@@ -118,11 +127,17 @@ public class SQLPatternPartElement extends SQLPatternPart
         if (innerOptional) {
             sb.append("?");
         }
+        if (leadingSpace && !leadingSpaceToChild) {
+            sb.append(")");
+        }
         if (nonCaptureGroup) {
             sb.append(")");
         }
         if (outerOptional) {
             sb.append("?");
+        }
+        if (m_trailer != null) {
+            sb.append(m_trailer);
         }
         return sb.toString();
     }
@@ -134,7 +149,7 @@ public class SQLPatternPartElement extends SQLPatternPart
     }
 
     @Override
-    public Pattern compile()
+    public Pattern compile(String label)
     {
         int reFlags = 0;
         if ((m_flags & SQLPatternFactory.CASE_SENSITIVE) == 0) {
@@ -147,6 +162,7 @@ public class SQLPatternPartElement extends SQLPatternPart
             reFlags |= Pattern.MULTILINE;
         }
         String regex = generateExpression(0);
+        COMPILER_LOG.debug(String.format("PATTERN: %s: %s", label, regex));
         return Pattern.compile(regex, reFlags);
     }
 }

@@ -46,7 +46,9 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -224,8 +226,10 @@ public class VoltProjectBuilder {
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
 
-    // zero defaults to first open port >= 8080.
+    // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
+    // a null HTTP port or json flag indicates that the corresponding element should
+    // be omitted from the deployment XML.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
 
@@ -269,6 +273,10 @@ public class VoltProjectBuilder {
     private Integer m_queryTimeout = null;
 
     private boolean m_useDDLSchema = false;
+
+    private String m_drMasterHost;
+    private Boolean m_drProducerEnabled = null;
+    private Integer m_drProducerClusterId = null;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -369,6 +377,12 @@ public class VoltProjectBuilder {
             else {
                 transformer.append(";");
             }
+        }
+    }
+
+    public void addDRTables(final String tableNames[]) {
+        for (final String drTable : tableNames) {
+            transformer.append("DR TABLE " + drTable + ";");
         }
     }
 
@@ -595,6 +609,22 @@ public class VoltProjectBuilder {
     public void setMaxTempTableMemory(int max)
     {
         m_maxTempTableMemory = max;
+    }
+
+    public void setDRMasterHost(String drMasterHost) {
+        m_drMasterHost = drMasterHost;
+    }
+
+    public void setDrProducerEnabled(int clusterId)
+    {
+        m_drProducerEnabled = true;
+        m_drProducerClusterId = new Integer(clusterId);
+    }
+
+    public void setDrProducerDisabled(int clusterId)
+    {
+        m_drProducerEnabled = false;
+        m_drProducerClusterId = new Integer(clusterId);
     }
 
     /**
@@ -982,6 +1012,7 @@ public class VoltProjectBuilder {
         }
 
         // <httpd>. Disabled unless port # is configured by a testcase
+        // Omit element(s) when null.
         HttpdType httpd = factory.createHttpdType();
         deployment.setHttpd(httpd);
         httpd.setEnabled(m_httpdPortNo != -1);
@@ -1022,6 +1053,20 @@ public class VoltProjectBuilder {
                 }
             }
             export.getConfiguration().add(exportConfig);
+        }
+
+        if (m_drProducerClusterId != null || (m_drMasterHost != null && !m_drMasterHost.isEmpty())) {
+            DrType dr = factory.createDrType();
+            deployment.setDr(dr);
+            if (m_drProducerClusterId != null) {
+                dr.setListen(m_drProducerEnabled);
+                dr.setId(m_drProducerClusterId);
+            }
+            if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
+                ConnectionType conn = factory.createConnectionType();
+                dr.setConnection(conn);
+                conn.setSource(m_drMasterHost);
+            }
         }
 
         // Have some yummy boilerplate!

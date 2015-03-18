@@ -956,6 +956,10 @@ class NValue {
         return fractional.ToInt();
     }
 
+    /**
+     * Implicitly converting function to big integer type
+     * DOUBLE, DECIMAL should not be handled here
+     */
     int64_t castAsBigIntAndGetValue() const {
         assert(isNull() == false);
 
@@ -972,39 +976,16 @@ class NValue {
             return getBigInt();
         case VALUE_TYPE_TIMESTAMP:
             return getTimestamp();
-        case VALUE_TYPE_DOUBLE:
-            if (getDouble() > (double)INT64_MAX || getDouble() < (double)VOLT_INT64_MIN) {
-                throwCastSQLValueOutOfRangeException<double>(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_BIGINT);
-            }
-            return static_cast<int64_t>(getDouble());
-        case VALUE_TYPE_ADDRESS:
-            return getBigInt();
         default:
             throwCastSQLException(type, VALUE_TYPE_BIGINT);
             return 0; // NOT REACHED
         }
     }
 
-    int64_t castAsRawInt64AndGetValue() const {
-        const ValueType type = getValueType();
-
-        switch (type) {
-        case VALUE_TYPE_TINYINT:
-            return static_cast<int64_t>(getTinyInt());
-        case VALUE_TYPE_SMALLINT:
-            return static_cast<int64_t>(getSmallInt());
-        case VALUE_TYPE_INTEGER:
-            return static_cast<int64_t>(getInteger());
-        case VALUE_TYPE_BIGINT:
-            return getBigInt();
-        case VALUE_TYPE_TIMESTAMP:
-            return getTimestamp();
-        default:
-            throwCastSQLException(type, VALUE_TYPE_BIGINT);
-            return 0; // NOT REACHED
-        }
-    }
-
+    /**
+     * Implicitly converting function to integer type
+     * DOUBLE, DECIMAL should not be handled here
+     */
     int32_t castAsIntegerAndGetValue() const {
         assert(isNull() == false);
 
@@ -1023,14 +1004,6 @@ class NValue {
             const int64_t value = getBigInt();
             if (value > (int64_t)INT32_MAX || value < (int64_t)VOLT_INT32_MIN) {
                 throwCastSQLValueOutOfRangeException<int64_t>(value, VALUE_TYPE_BIGINT, VALUE_TYPE_INTEGER);
-            }
-            return static_cast<int32_t>(value);
-        }
-        case VALUE_TYPE_DOUBLE:
-        {
-            const double value = getDouble();
-            if (value > (double)INT32_MAX || value < (double)VOLT_INT32_MIN) {
-                throwCastSQLValueOutOfRangeException(value, VALUE_TYPE_DOUBLE, VALUE_TYPE_INTEGER);
             }
             return static_cast<int32_t>(value);
         }
@@ -1092,7 +1065,7 @@ class NValue {
           case VALUE_TYPE_INTEGER:
           case VALUE_TYPE_BIGINT:
           case VALUE_TYPE_TIMESTAMP: {
-            int64_t value = castAsRawInt64AndGetValue();
+            int64_t value = castAsBigIntAndGetValue();
             TTInt retval(value);
             retval *= kMaxScaleFactor;
             return retval;
@@ -1472,7 +1445,7 @@ class NValue {
         case VALUE_TYPE_INTEGER:
         case VALUE_TYPE_BIGINT:
         {
-            int64_t rhsint = castAsRawInt64AndGetValue();
+            int64_t rhsint = castAsBigIntAndGetValue();
             retval.createDecimalFromInt(rhsint);
             break;
         }
@@ -1520,6 +1493,10 @@ class NValue {
      */
     void inlineCopyObject(void *storage, int32_t maxLength, bool isInBytes) const {
         if (isNull()) {
+            // Always reset all the bits regardless of the actual length of the value
+            // 1 additional byte for the length prefix
+            ::memset(storage, 0, maxLength + 1);
+
             /*
              * The 7th bit of the length preceding value
              * is used to indicate that the object is null.
@@ -1530,6 +1507,10 @@ class NValue {
             const int32_t objLength = getObjectLength_withoutNull();
             const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
             checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+
+            // Always reset all the bits regardless of the actual length of the value
+            // 1 additional byte for the length prefix
+            ::memset(storage, 0, maxLength + 1);
 
             if (m_sourceInlined)
             {
@@ -2828,6 +2809,9 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         // the NULL SQL string is a NULL C pointer
         if (isInlined) {
+            // Always reset the bits regardless of how long the actual value is.
+            ::memset(storage, 0, lengthLength + maxLength);
+
             setObjectLengthToLocation(length, storage);
             if (length == OBJECTLENGTH_NULL) {
                 break;

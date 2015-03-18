@@ -183,6 +183,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
+        // BigInt or Float, Decimal is not selected here because of its range is smaller
         VoltType fallbackType = VoltType.FLOAT;
         if (m_originalValue != null) {
             m_originalValue.refineOperandType(VoltType.BIGINT);
