@@ -458,8 +458,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.title.isDisplayed()
-            networkInterfaces.title.text().toLowerCase().equals("Network Interfaces".toLowerCase())
+            page.networkInterfaces.title.isDisplayed()
+            page.networkInterfaces.title.text().toLowerCase().equals("Network Interfaces".toLowerCase())
         }
     }
 
@@ -468,8 +468,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.portNameTitle.isDisplayed()
-            networkInterfaces.portNameTitle.text().toLowerCase().equals("Port Name".toLowerCase())
+            page.networkInterfaces.portNameTitle.isDisplayed()
+            page.networkInterfaces.portNameTitle.text().toLowerCase().equals("Port Name".toLowerCase())
         }
     }
 
@@ -479,8 +479,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.clusterSettingTitle.isDisplayed()
-            networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
+            page.networkInterfaces.clusterSettingTitle.isDisplayed()
+            page.networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
         }
     }
 
@@ -489,8 +489,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.serverSettingTitle.isDisplayed()
-            networkInterfaces.serverSettingTitle.text().toLowerCase().equals("Server Settings".toLowerCase())
+            page.networkInterfaces.serverSettingTitle.isDisplayed()
+            page.networkInterfaces.serverSettingTitle.text().toLowerCase().equals("Server Settings".toLowerCase())
         }
     }
 
@@ -499,8 +499,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.clientPortTitle.isDisplayed()
-            networkInterfaces.clientPortTitle.text().toLowerCase().equals("Client Port".toLowerCase())
+            page.networkInterfaces.clientPortTitle.isDisplayed()
+            page.networkInterfaces.clientPortTitle.text().toLowerCase().equals("Client Port".toLowerCase())
         }
     }
 
@@ -509,8 +509,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.adminPortTitle.isDisplayed()
-            networkInterfaces.adminPortTitle.text().toLowerCase().equals("Admin Port".toLowerCase())
+            page.networkInterfaces.adminPortTitle.isDisplayed()
+            page.networkInterfaces.adminPortTitle.text().toLowerCase().equals("Admin Port".toLowerCase())
         }
     }
 
@@ -519,8 +519,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.httpPortTitle.isDisplayed()
-            networkInterfaces.httpPortTitle.text().toLowerCase().equals("HTTP Port".toLowerCase())
+            page.networkInterfaces.httpPortTitle.isDisplayed()
+            page.networkInterfaces.httpPortTitle.text().toLowerCase().equals("HTTP Port".toLowerCase())
         }
     }
 
@@ -529,8 +529,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.internalPortTitle.isDisplayed()
-            networkInterfaces.internalPortTitle.text().toLowerCase().equals("Internal Port".toLowerCase())
+            page.networkInterfaces.internalPortTitle.isDisplayed()
+            page.networkInterfaces.internalPortTitle.text().toLowerCase().equals("Internal Port".toLowerCase())
         }
     }
 
@@ -539,8 +539,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.zookeeperPortTitle.isDisplayed()
-            networkInterfaces.zookeeperPortTitle.text().toLowerCase().equals("Zookeeper Port".toLowerCase())
+            page.networkInterfaces.zookeeperPortTitle.isDisplayed()
+            page.networkInterfaces.zookeeperPortTitle.text().toLowerCase().equals("Zookeeper Port".toLowerCase())
         }
     }
 
@@ -549,8 +549,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.replicationPortTitle.isDisplayed()
-            networkInterfaces.replicationPortTitle.text().toLowerCase().equals("Replication Port".toLowerCase())
+            page.networkInterfaces.replicationPortTitle.isDisplayed()
+            page.networkInterfaces.replicationPortTitle.text().toLowerCase().equals("Replication Port".toLowerCase())
         }
     }
 
@@ -561,8 +561,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30){
-            networkInterfaces.clusterClientPortValue.isDisplayed()
-            networkInterfaces.clusterClientPortValue.text().equals("")
+            page.networkInterfaces.clusterClientPortValue.isDisplayed()
+            page.networkInterfaces.clusterClientPortValue.text().equals("")
         }
     }
 
@@ -571,8 +571,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30){
-            networkInterfaces.clusterAdminPortValue.isDisplayed()
-            networkInterfaces.clusterAdminPortValue.text().equals("")
+            page.networkInterfaces.clusterAdminPortValue.isDisplayed()
+            page.networkInterfaces.clusterAdminPortValue.text().equals("")
         }
     }
 
@@ -581,8 +581,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30){
-            networkInterfaces.clusterHttpPortValue.isDisplayed()
-            networkInterfaces.clusterHttpPortValue.text().equals("")
+            page.networkInterfaces.clusterHttpPortValue.isDisplayed()
+            page.networkInterfaces.clusterHttpPortValue.text().equals("")
         }
     }
 
@@ -591,8 +591,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30) {
-            networkInterfaces.clusterInternalPortValue.isDisplayed()
-            networkInterfaces.clusterInternalPortValue.text().equals("")
+            page.networkInterfaces.clusterInternalPortValue.isDisplayed()
+            page.networkInterfaces.clusterInternalPortValue.text().equals("")
         }
     }
 
@@ -601,8 +601,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30){
-            networkInterfaces.clusterZookeeperPortValue.isDisplayed()
-            networkInterfaces.clusterZookeeperPortValue.text().equals("")
+            page.networkInterfaces.clusterZookeeperPortValue.isDisplayed()
+            page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
         }
     }
 
@@ -611,8 +611,8 @@ class AdminTest extends TestBase {
         at AdminPage
         then:
         waitFor(30){
-            networkInterfaces.clusterReplicationPortValue.isDisplayed()
-            networkInterfaces.clusterReplicationPortValue.text().equals("")
+            page.networkInterfaces.clusterReplicationPortValue.isDisplayed()
+            page.networkInterfaces.clusterReplicationPortValue.text().equals("")
         }
     }
 
@@ -1019,5 +1019,56 @@ class AdminTest extends TestBase {
         server.deerwalkserver4stopbutton.click()
         server.deeerwalkservercancelbutton.click()
         //server.serverbutton.click()
+    }
+	
+	// Overview Expansion
+	
+	def "HTTP Access Expand:Check Text"() {
+    	when:
+    	page.overview.httpAccess.click()
+    	then:
+    	waitFor(30) {
+    		page.overview.jsonApi.text().equals("JSON API")
+    		!page.overview.jsonApiStatus.text().equals("")
+    	}
+    }
+    
+    def "Command Logging Expand:Check Text"() {
+    	when:
+    	page.overview.commandLogging.click()
+    	then:
+    	waitFor(30) {
+    		page.overview.logFrequencyTime.text().equals("Log Frequency Time")
+    		!page.overview.logFrequencyTimeValue.text().equals("")
+    		
+    		page.overview.logFrequencyTransactions.text().equals("Log Frequency Transactions")
+    		!page.overview.logFrequencyTransactionsValue.text().equals("")
+    		
+    		page.overview.logSize.text().equals("Log Size")
+    		!page.overview.logSizeValue.text().equals("")
+    	}
+    }
+    
+    def "Advanced Expand:Check Text"() {
+    	when:
+    	page.overview.advanced.click()
+    	then:
+    	waitFor(30) {
+    		page.overview.maxJavaHeap.text().equals("Max Java Heap")
+    		!page.overview.maxJavaHeapValue.text().equals("")
+    		
+    		page.overview.heartbeatTimeout.text().equals("Heartbeat Timeout")
+    		!page.overview.heartbeatTimeoutValue.text().equals("")
+    		
+    		page.overview.queryTimeout.text().equals("Query Timeout")
+    		!page.overview.queryTimeoutValue.text().equals("")
+    		
+    		page.overview.maxTempTableMemory.text().equals("Max Temp Table Memory")
+    		!page.overview.maxTempTableMemoryValue.text().equals("")
+    		
+    		page.overview.snapshotPriority.text().equals("Snapshot Priority")
+    		!page.overview.snapshotPriorityValue.text().equals("")
+    		
+    	}
     }
 }

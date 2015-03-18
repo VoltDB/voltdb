@@ -151,7 +151,7 @@ class DbMonitorTest extends TestBase {
 
     def "header banner exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.banner.isDisplayed() }
     }
@@ -159,28 +159,28 @@ class DbMonitorTest extends TestBase {
 
     def "header image exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.image.isDisplayed() }
     }
 
     def "header username exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.username.isDisplayed() }
     }
 
     def "header logout exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.logout.isDisplayed() }
     }
 
     def "header help exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.help.isDisplayed() }
     }
@@ -189,7 +189,7 @@ class DbMonitorTest extends TestBase {
 
     def "header tab dbmonitor exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) {
             header.tabDBMonitor.isDisplayed()
@@ -199,7 +199,7 @@ class DbMonitorTest extends TestBase {
 
     def "header tab admin exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) {
             header.tabAdmin.isDisplayed()
@@ -209,7 +209,7 @@ class DbMonitorTest extends TestBase {
 
     def "header tab schema exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) {
             header.tabSchema.isDisplayed()
@@ -220,7 +220,7 @@ class DbMonitorTest extends TestBase {
 
     def "header tab sql query exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.tabSQLQuery.isDisplayed()
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
@@ -232,7 +232,7 @@ class DbMonitorTest extends TestBase {
         new File("src/pages/users.txt").withReader { $line = it.readLine() }
 
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) {
             header.username.isDisplayed()
@@ -243,7 +243,7 @@ class DbMonitorTest extends TestBase {
 
     def "header username click and close" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.username.isDisplayed() }
         header.username.click()
@@ -257,7 +257,7 @@ class DbMonitorTest extends TestBase {
 
     def "header username click and cancel" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.username.isDisplayed() }
         header.username.click()
@@ -274,7 +274,7 @@ class DbMonitorTest extends TestBase {
 
     def "logout button test close" ()  {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.logout.isDisplayed() }
         header.logout.click()
@@ -289,7 +289,7 @@ class DbMonitorTest extends TestBase {
 
     def "logout button test cancel" ()  {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { header.logout.isDisplayed() }
         header.logout.click()
@@ -305,7 +305,7 @@ class DbMonitorTest extends TestBase {
 
     def "help popup existance" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         waitFor(30) { header.help.isDisplayed() }
         header.help.click()
         then:
@@ -323,14 +323,14 @@ class DbMonitorTest extends TestBase {
 
     def "footer exists" () {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) { footer.banner.isDisplayed() }
     }
 
     def "footer text exists and valid"() {
         when:
-        at AdminPage
+        at DbMonitorPage
         then:
         waitFor(30) {
             footer.banner.isDisplayed()
