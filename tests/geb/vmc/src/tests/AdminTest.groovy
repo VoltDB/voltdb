@@ -419,86 +419,228 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){ overview.autoSnapshotsEdit.isDisplayed() }
-        String string = overview.autoSnapshotsEdit.text()
+        waitFor(10){ page.autoSnapshotsEdit.isDisplayed() }
+        String string = page.autoSnapshotsEdit.text()
         !(string.equals(""))
     }
+
 
     def "click edit Auto Snapshots and check"() {
         when:
         at AdminPage
         then:
-        waitFor(30) {
-            overview.autoSnapshotsEdit.isDisplayed()
+        waitFor(10) {
+            page.autoSnapshotsEdit.isDisplayed()
         }
-        overview.autoSnapshotsEdit.click()
+        page.autoSnapshotsEdit.click()
 
         waitFor(30) {
-            overview.autoSnapshotsEditCheckbox.isDisplayed()
-            overview.autoSnapshotsEditOk.isDisplayed()
-            overview.autoSnapshotsEditCancel.isDisplayed()
+            page.autoSnapshotsEditCheckbox.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
+
+        }
+        waitFor(30){
+
+            page.frequencyEdit.isDisplayed()
+            //println("first wait")
+            page.retainedEdit.isDisplayed()
+            page.fileprefixEdit.isDisplayed()
+
+
         }
     }
+
 
     def "click Auto Snapshot edit and click cancel"() {
         when:
         at AdminPage
         then:
-        waitFor(30) {
-            overview.autoSnapshotsEdit.isDisplayed()
+        waitFor(10) {
+            page.autoSnapshotsEdit.isDisplayed()
         }
 
         when:
-        overview.autoSnapshotsEdit.click()
+        page.autoSnapshotsEdit.click()
         then:
         waitFor(30) {
-            overview.autoSnapshotsEditOk.isDisplayed()
-            overview.autoSnapshotsEditCancel.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
         }
 
         when:
-        overview.autoSnapshotsEditCancel.click()
+        page.autoSnapshotsEditCancel.click()
         then:
         waitFor(30) {
-            !(overview.autoSnapshotsEditCancel.isDisplayed())
-            !(overview.autoSnapshotsEditOk.isDisplayed())
+            !(page.autoSnapshotsEditCancel.isDisplayed())
+            !(page.autoSnapshotsEditOk.isDisplayed())
         }
     }
 
-    def "click Auto Snapshots edit and click checkbox to change on off"() {
+
+
+
+
+
+
+
+      def "click Auto Snapshots edit and click checkbox to change on off"() {
         when:
         at AdminPage
         then:
-        waitFor(30) {
-            overview.autoSnapshotsEdit.isDisplayed()
+        waitFor(10) {
+            page.autoSnapshotsEdit.isDisplayed()
         }
 
         when:
-        overview.autoSnapshotsEdit.click()
-        String string = overview.autoSnapshotsValue.text()
+        page.autoSnapshotsEdit.click()
+        String enabledDisabled = page.autoSnapshotsValue.text()
+        println(enabledDisabled)
         then:
-        waitFor(30){
-            overview.autoSnapshotsEditCheckbox.isDisplayed()
-            overview.autoSnapshotsEditOk.isDisplayed()
-            overview.autoSnapshotsEditCancel.isDisplayed()
+        waitFor(10){
+            page.autoSnapshotsEditCheckbox.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
         }
 
         when:
-        overview.autoSnapshotsEditCheckbox1.click()
+        page.autoSnapshotsEditCheckbox1.click()
         then:
-        String stringChange = overview.autoSnapshotsValue.text()
+        String enabledDisabledEdited = page.autoSnapshotsValue.text()
+        println(enabledDisabledEdited)
 
-        if ( string.toLowerCase() == "on" ) {
-            assert stringChange.toLowerCase().equals("off")
+        if ( enabledDisabled.toLowerCase() == "on" ) {
+            assert enabledDisabledEdited.toLowerCase().equals("off")
         }
-        else if ( string.toLowerCase() == "off" ) {
-            assert stringChange.toLowerCase().equals("on")
+        else if ( enabledDisabled.toLowerCase() == "off" ) {
+            assert enabledDisabledEdited.toLowerCase().equals("on")
         }
-        else {
+
+    }
+
+    def "click edit and cancel to check popup"() {
+
+
+        String title			= "Auto Snapshots"
+        String display			= "Do you want to save the value?"
+        String ok				= "Ok"
+        String cancel			= "Cancel"
+
+        when:
+        at AdminPage
+        then:
+        waitFor(10) {
+            page.autoSnapshotsEdit.isDisplayed()
+            page.autoSnapshotsValue.isDisplayed()
+        }
+
+        when:
+        page.autoSnapshotsEdit.click()
+        String string = page.autoSnapshotsValue.text()
+        then:
+        waitFor(10) {
+            page.autoSnapshotsEditCheckbox.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
+        }
+
+        //assert withConfirm(true) { page.autoSnapshotsEditOk.click() } == "Do you want to save the value?"
+        page.autoSnapshotsEditOk.click()
+        when:
+
+        page.autoSnapshotsEditCancel.click()
+        println("cancel clicked successfully")
+        then:
+        waitFor(10) {
+            page.autoSnapshotsEdit.isDisplayed()
+        }
+
+
+    }
+
+
+
+    def "click edit and ok to check popup"() {
+        String prefix 			= "SNAPSHOTNONCE"
+        String frequency 		= "10"
+        String frequencyUnit		= "Hrs"
+        String retained 		= "1"
+
+        String title			= "Auto Snapshots"
+        String display			= "Do you want to save the value?"
+        String ok				= "Ok"
+        String cancel			= "Cancel"
+
+        when:
+        at AdminPage
+        then:
+        waitFor(10) {
+            page.autoSnapshotsEdit.isDisplayed()
+	    page.autoSnapshotsValue.isDisplayed()
+        }
+
+        when:
+        page.autoSnapshotsEdit.click()
+        String string = page.autoSnapshotsValue.text()
+        then:
+        waitFor(10) {
+            page.autoSnapshotsEditCheckbox.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
+        }
+
+
+
+
+    if(page.fileprefixEdit.text() != " "){
+        println("fileprefix passed, found non-empty")
+
+        if(
+        page.frequencyEdit.text() != " "){
+            println("frequency passed, found non-empty")}
+        // page.frequencyUnitField.click()
+        if( page.frequencyUnitField.text() != " "){
+            println("frequency unit passed, found non-empty")}
+        if ( page.retainedEdit.text() != " "){
+            println("retained passed, found non-empty")}
+    }
+    page.autoSnapshotsEditOk.click()
+    println("pop up visible")
+    // then click "ok" from popup
+
+//assert withConfirm(true) {page.autosnapshotsconfirmok.click()} == "Do you want to save the value?"
+    //waitFor(5){page.autosnapshotsconfirmok.click()}
+    //println("ok clicked successfully")
+// check for edited values
+
+
+    when:
+
+    waitFor(10, 0){
+        if (page.autosnapshotsconfirmok.isDisplayed()){
+
+            page.autosnapshotsconfirmok.click()
+            //println("inside ok clicked successfully")
         }
     }
 
-    // NETWORK INTERFACES
+    then:
+
+    waitFor(15, 0){
+
+        page.filePrefix.isDisplayed()
+        //println("2nd check")
+
+
+    }
+
+    println("testtt")
+
+
+}
+
+
+// NETWORK INTERFACES
 
 
     def "check Network Interfaces title"() {
