@@ -336,6 +336,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
                 }
                 if (status == kErrorCode_pushExportBuffer) {
+                    // Message structure:
+                    // pushExportBuffer error code - 1 byte
+                    // export generation - 8 bytes
+                    // partition id - 4 bytes
+                    // signature length (in bytes) - 4 bytes
+                    // signature - signature length bytes
+                    // uso - 8 bytes
+                    // sync - 1 byte
+                    // end of generation flag - 1 byte
+                    // export buffer length - 4 bytes
+                    // export buffer - export buffer length bytes
                     long exportGeneration = getBytes(8).getLong();
                     int partitionId = getBytes(4).getInt();
                     int signatureLength = getBytes(4).getInt();
