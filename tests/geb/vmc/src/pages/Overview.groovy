@@ -80,54 +80,38 @@ class Overview extends Module {
 
         // HTTP ACCESS EXPANSION
 
-        jsonApi 					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-1.subLabelRow td.configLabel") }
-        jsonApiValue 				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-1.subLabelRow td#txtJsonAPI") }
-
+        jsonApi			{ $(class:"configLabel", text:"JSON API") }
+		jsonApiStatus	{ $("#txtJsonAPI") }
+	
         // AUTO SNAPSHOTS EXPANSION
 
 
 
         // COMMAND LOGGING EXPANSION
 
-        lftime 						{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-3.subLabelRow td.configLabel") }
-        lftransactions 				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-3.subLabelRow td.configLabel") }
-        lssize						{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-3.subLabelRow td.configLabel") }
-
-        lftimeValue 				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-3.subLabelRow td span#commandLogFrequencyTime") }
-        lftransactionsValue 		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-3.subLabelRow td#commandLogFrequencyTxns") }
-        lssizeValue					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-3.subLabelRow td span#commandLogSegmentSize") }
-
-
+		logFrequencyTime			{ $(class:"configLabel", text:"Log Frequency Time") }
+		logFrequencyTransactions	{ $(class:"configLabel", text:"Log Frequency Transactions") }
+		logSize						{ $(class:"configLabel", text:"Log Size") }
+		
+		logFrequencyTimeValue			{ $("#commandLogFrequencyTime") }
+		logFrequencyTransactionsValue	{ $("#commandLogFrequencyTxns") }
+		logSizeValue					{ $("#commandLogSegmentSize") }
 
         // EXPORT EXPANSION
 
-        target 						{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-4.subLabelRow td.configLabel") }
-        properties 					{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-4.subLabelRow td.configLabel") }
-        propertiesSub 				{ $("tbody tr.propertyLast td") }
-
         // ADVANCED EXPANSION
 
-        maxJavaHeap 				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-5.subLabelRow td.configLabel") }
-        heartbeatTimeOut			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#heartbeatTimeoutRow.child-row-5.subLabelRow td.configLabel") }
-        queryTimeOut				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#queryTimoutRow.child-row-5.subLabelRow td.configLabel") }
-        maxTempTableMemory			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-5.subLabelRow td.configLabel") }
-        snapshotPriority			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-5.subLabelRow td.configLabel") }
-
-        maxJavaHeapValue			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-5.subLabelRow td") }
-        heartbeatTimeOutValue		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#heartbeatTimeoutRow.child-row-5.subLabelRow td.heartbeattd form#formHeartbeatTimeout span#hrtTimeOutSpan.unit") }
-        queryTimeOutValue			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#queryTimoutRow.child-row-5.subLabelRow td.queryTimeOut form#formQueryTimeout") }
-        maxTempTableMemoryValue		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-5.subLabelRow td span#temptablesmaxsize") }
-        snapshotPriorityValue		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr.child-row-5.subLabelRow td#snapshotpriority") }
-
-        heartbeatTimeOutEdit		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#heartbeatTimeoutRow.child-row-5.subLabelRow td a#btnEditHrtTimeOut.edit") }
-        heartbeatTimeOutBox			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#heartbeatTimeoutRow.child-row-5.subLabelRow td.heartbeattd form#formHeartbeatTimeout input#txtHrtTimeOut.exitableTxtBx.valid") }
-        heartbeatTimeOutOk			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#heartbeatTimeoutRow.child-row-5.subLabelRow td a#btnEditHeartbeatTimeoutOk.editOk") }
-        heartbeatTimeOutCancel		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#heartbeatTimeoutRow.child-row-5.subLabelRow td a#btnEditHeartbeatTimeoutCancel.editCancel") }
-
-        queryTimeOutEdit			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#queryTimoutRow.child-row-5.subLabelRow td a#btnEditQueryTimeout.edit") }
-        queryTimeOutBox				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#queryTimoutRow.child-row-5.subLabelRow td.queryTimeOut form#formQueryTimeout input#txtQueryTimeout.exitableTxtBx.valid") }
-        queryTimeOutOk				{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#queryTimoutRow.child-row-5.subLabelRow td a#btnEditQueryTimeoutOk.editOk") }
-        queryTimeOutCancel			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#queryTimoutRow.child-row-5.subLabelRow td a#btnEditQueryTimeoutCancel.editCancel") }
+        maxJavaHeap				{ $(class:"configLabel", text:"Max Java Heap") }
+		heartbeatTimeout		{ $(class:"configLabel", text:"Heartbeat Timeout") }
+		queryTimeout			{ $(class:"configLabel", text:"Query Timeout") }
+		maxTempTableMemory		{ $(class:"configLabel", text:"Max Temp Table Memory") }
+		snapshotPriority		{ $(class:"configLabel", text:"Snapshot Priority") }
+		
+		maxJavaHeapValue		{ $("#maxJavaHeap") }
+		heartbeatTimeoutValue	{ $("#formHeartbeatTimeout") }
+		queryTimeoutValue		{ $("#queryTimeOutUnitSpan") }
+		maxTempTableMemoryValue	{ $("#temptablesmaxsizeUnit") }
+		snapshotPriorityValue	{ $("#snapshotpriority") }
     }
 }
 
