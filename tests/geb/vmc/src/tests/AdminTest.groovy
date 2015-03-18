@@ -717,8 +717,6 @@ class AdminTest extends TestBase {
         waitFor(30) { header.username.isDisplayed() }
         header.username.click()
         waitFor(30) {
-            //header.logoutPopup.isDisplayed()
-            //header.logoutPopupTitle.isDisplayed()
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -733,8 +731,6 @@ class AdminTest extends TestBase {
         waitFor(30) { header.username.isDisplayed() }
         header.username.click()
         waitFor(30) {
-            //header.logoutPopup.isDisplayed()
-            //header.logoutPopupTitle.isDisplayed()
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -752,8 +748,6 @@ class AdminTest extends TestBase {
         waitFor(30) { header.logout.isDisplayed() }
         header.logout.click()
         waitFor(30) {
-            //header.logoutPopup.isDisplayed()
-            //header.logoutPopupTitle.isDisplayed()
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -769,8 +763,6 @@ class AdminTest extends TestBase {
         waitFor(30) { header.logout.isDisplayed() }
         header.logout.click()
         waitFor(30) {
-            //header.logoutPopup.isDisplayed()
-            //header.logoutPopupTitle.isDisplayed()
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()

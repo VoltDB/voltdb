@@ -77,6 +77,198 @@ class SchemaPageTest extends TestBase {
         return runningGenqa
     }
 
+    // HEADER TESTS
+
+    def "header banner exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.banner.isDisplayed() }
+    }
+
+
+    def "header image exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.image.isDisplayed() }
+    }
+
+    def "header username exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.username.isDisplayed() }
+    }
+
+    def "header logout exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.logout.isDisplayed() }
+    }
+
+    def "header help exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.help.isDisplayed() }
+    }
+
+    // HEADER TAB TESTS
+
+    def "header tab dbmonitor exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) {
+            header.tabDBMonitor.isDisplayed()
+            header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
+        }
+    }
+
+    def "header tab admin exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) {
+            header.tabAdmin.isDisplayed()
+            header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
+        }
+    }
+
+    def "header tab schema exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) {
+            header.tabSchema.isDisplayed()
+            header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
+
+        }
+    }
+
+    def "header tab sql query exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.tabSQLQuery.isDisplayed()
+            header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
+        }
+    }
+
+    def "header username check" () {
+        def $line
+        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) {
+            header.username.isDisplayed()
+            header.username.text().equals($line)
+        }
+    }
+
+
+    def "header username click and close" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.username.isDisplayed() }
+        header.username.click()
+        waitFor(30) {
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+        }
+        header.popupClose.click()
+    }
+
+    def "header username click and cancel" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.username.isDisplayed() }
+        header.username.click()
+        waitFor(30) {
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+        }
+        header.logoutPopupCancelButton.click()
+    }
+
+
+    // LOGOUT TEST
+
+    def "logout button test close" ()  {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.logout.isDisplayed() }
+        header.logout.click()
+        waitFor(30) {
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+        }
+        header.popupClose.click()
+
+    }
+
+    def "logout button test cancel" ()  {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { header.logout.isDisplayed() }
+        header.logout.click()
+        waitFor(30) {
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+        }
+        header.logoutPopupCancelButton.click()
+    }
+
+    // HELP POPUP TEST
+
+    def "help popup existance" () {
+        when:
+        at SchemaPage
+        waitFor(30) { header.help.isDisplayed() }
+        header.help.click()
+        then:
+        waitFor(30) {
+            header.popup.isDisplayed()
+            header.popupTitle.isDisplayed()
+            header.popupClose.isDisplayed()
+            header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
+        }
+
+        header.popupClose.click()
+    }
+
+    // FOOTER TESTS
+
+    def "footer exists" () {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) { footer.banner.isDisplayed() }
+    }
+
+    def "footer text exists and valid"() {
+        when:
+        at SchemaPage
+        then:
+        waitFor(30) {
+            footer.banner.isDisplayed()
+            footer.text.isDisplayed()
+            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
+        }
+    }
+
     def 'confirm Overview tab open initially'() {
         expect: 'Overview tab open initially'
         page.isSchemaPageOverviewTabOpen()

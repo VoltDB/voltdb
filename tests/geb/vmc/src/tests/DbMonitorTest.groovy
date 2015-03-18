@@ -149,112 +149,124 @@ class DbMonitorTest extends TestBase {
 
     // HEADER TESTS
 
-	def "header banner exists" () {
-		when:
-			at DbMonitorPage
-		then:
-			header.banner.isPresent()
-	}
+    def "header banner exists" () {
+        when:
+        at AdminPage
+        then:
+        waitFor(30) { header.banner.isDisplayed() }
+    }
 
 
     def "header image exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.image.isDisplayed();
+        waitFor(30) { header.image.isDisplayed() }
     }
 
     def "header username exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.username.isDisplayed();
+        waitFor(30) { header.username.isDisplayed() }
     }
 
     def "header logout exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.logout.isDisplayed();
+        waitFor(30) { header.logout.isDisplayed() }
     }
 
     def "header help exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.help.isDisplayed();
+        waitFor(30) { header.help.isDisplayed() }
     }
 
     // HEADER TAB TESTS
 
-    def "header tab dbmonitor exists" ()  {
+    def "header tab dbmonitor exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.tabDBMonitor.isDisplayed();
+        waitFor(30) {
+            header.tabDBMonitor.isDisplayed()
             header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
+        }
     }
 
-    def "header tab admin exists" ()  {
+    def "header tab admin exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.tabAdmin.isDisplayed();
+        waitFor(30) {
+            header.tabAdmin.isDisplayed()
             header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
+        }
     }
 
-    def "header tab schema exists" ()  {
+    def "header tab schema exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.tabSchema.isDisplayed();
+        waitFor(30) {
+            header.tabSchema.isDisplayed()
             header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
+
+        }
     }
 
-    def "header tab sql query exists" ()  {
+    def "header tab sql query exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.tabSQLQuery.isDisplayed();
+        waitFor(30) { header.tabSQLQuery.isDisplayed()
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
+        }
     }
-
-    // USERNAME TEST
 
     def "header username check" () {
         def $line
         new File("src/pages/users.txt").withReader { $line = it.readLine() }
 
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.username.text().equals($line);
+        waitFor(30) {
+            header.username.isDisplayed()
+            header.username.text().equals($line)
+        }
     }
+
 
     def "header username click and close" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.username.click()
-            header.logoutPopup.isDisplayed()
-            header.logoutPopupTitle.isDisplayed()
+        waitFor(30) { header.username.isDisplayed() }
+        header.username.click()
+        waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
-            header.popupClose.click()
+        }
+        header.popupClose.click()
     }
 
     def "header username click and cancel" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.username.click()
-            header.logoutPopup.isDisplayed()
-            header.logoutPopupTitle.isDisplayed()
+        waitFor(30) { header.username.isDisplayed() }
+        header.username.click()
+        waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
-            header.logoutPopupCancelButton.click()
+        }
+        header.logoutPopupCancelButton.click()
     }
 
 
@@ -262,60 +274,69 @@ class DbMonitorTest extends TestBase {
 
     def "logout button test close" ()  {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            header.logout.click()
-            header.logoutPopup.isDisplayed()
-            header.logoutPopupTitle.isDisplayed()
+        waitFor(30) { header.logout.isDisplayed() }
+        header.logout.click()
+        waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
-            header.popupClose.click()
+        }
+        header.popupClose.click()
 
     }
 
     def "logout button test cancel" ()  {
         when:
-        at DbMonitorPage
+        at AdminPage
         then:
+        waitFor(30) { header.logout.isDisplayed() }
         header.logout.click()
-        header.logoutPopup.isDisplayed()
-        header.logoutPopupTitle.isDisplayed()
-        header.logoutPopupOkButton.isDisplayed()
-        header.logoutPopupCancelButton.isDisplayed()
-        header.popupClose.isDisplayed()
+        waitFor(30) {
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+        }
         header.logoutPopupCancelButton.click()
-
     }
 
     // HELP POPUP TEST
 
     def "help popup existance" () {
         when:
-            at DbMonitorPage
-            header.help.click()
+        at AdminPage
+        waitFor(30) { header.help.isDisplayed() }
+        header.help.click()
         then:
+        waitFor(30) {
             header.popup.isDisplayed()
+            header.popupTitle.isDisplayed()
+            header.popupClose.isDisplayed()
             header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
-            header.popupClose.click()
+        }
+
+        header.popupClose.click()
     }
 
-	// FOOTER TESTS
+    // FOOTER TESTS
 
     def "footer exists" () {
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            footer.banner.isDisplayed();
+        waitFor(30) { footer.banner.isDisplayed() }
     }
 
     def "footer text exists and valid"() {
-
         when:
-            at DbMonitorPage
+        at AdminPage
         then:
-            footer.banner.isDisplayed();
-            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase());
+        waitFor(30) {
+            footer.banner.isDisplayed()
+            footer.text.isDisplayed()
+            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
+        }
     }
 
     def clickGraphViewSeconds() {
@@ -1134,40 +1155,50 @@ class DbMonitorTest extends TestBase {
 			else
 				assert false
     }
-	
-	//  check if data is being displayed in the stored procedure table or not
-	// one test fails and the other passes
-	
-	def "check if any data is displayed in Stored Procedures"() {
-		when:
-			page.storedProceduresDisplayed()
-		then:
-			page.storedProceduresDataDisplayed()
-	}
 
-	def "check if no data is displayed in Stored Procedures"() {
-		when:
-			page.storedProceduresDisplayed()
-		then:
-			!page.storedProceduresDataDisplayed()
-	}
+    def "Check Data in Stored Procedures"() {
+        when:
+        page.storedProceduresTableDisplayed()
+        then:
+        if(page.storedProceduresMsg.text().equals("No data to be displayed")) {
+            println("No data displayed-PASS")
+            println()
+            assert true
+        }
+        else if(!page.storedProceduresMsg.text().equals("")) {
+            println("Data displayed-PASS")
+            println(page.storedProceduresMsg.text())
+            println()
+            assert true
+        }
+        else {
+            println("FAIL")
+            println()
+            assert false
+        }
+    }
 
-	// check if data is being displayed in the database table or not
-	// one test fails and the other passes
-	
-	def "check if any data is displayed in Database Tables"() {
-		when:
-			page.databaseTableDisplayed()
-		then:
-			page.databaseTableDisplayed()
-	}
-
-	def "check if no data is displayed in Database Tables"() {
-		when:
-			page.databaseTableDisplayed()
-		then:
-			!page.databaseTableDisplayed()
-	}
+    def "Check Data in Database Tables"() {
+        when:
+        page.storedDatabaseTableDisplayed()
+        then:
+        if(page.databaseTableMsg.text().equals("No data to be displayed")) {
+            println("No data displayed-PASS")
+            println()
+            assert true
+        }
+        else if(!page.databaseTableMsg.text().equals("")) {
+            println("Data displayed-PASS")
+            println(page.databaseTableMsg.text())
+            println()
+            assert true
+        }
+        else {
+            println("FAIL")
+            println()
+            assert false
+        }
+    }
 
     // ALERT
 
