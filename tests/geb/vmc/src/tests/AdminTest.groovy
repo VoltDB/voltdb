@@ -576,7 +576,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(10) {
             page.autoSnapshotsEdit.isDisplayed()
-	    page.autoSnapshotsValue.isDisplayed()
+            page.autoSnapshotsValue.isDisplayed()
         }
 
         when:
@@ -589,55 +589,50 @@ class AdminTest extends TestBase {
             page.autoSnapshotsEditCancel.isDisplayed()
         }
 
+        page.filePrefixField.value(prefix)
+        page.frequencyField.value(frequency)
+        page.frequencyUnitField.click()
+        page.frequencyUnitField.value(frequencyUnit)
+        page.retainedField.value(retained)
 
 
 
-    if(page.fileprefixEdit.text() != " "){
-        println("fileprefix passed, found non-empty")
+        if(page.fileprefixEdit.text() != " "){
+            println("fileprefix passed, found non-empty")
 
-        if(
-        page.frequencyEdit.text() != " "){
-            println("frequency passed, found non-empty")}
-        // page.frequencyUnitField.click()
-        if( page.frequencyUnitField.text() != " "){
-            println("frequency unit passed, found non-empty")}
-        if ( page.retainedEdit.text() != " "){
-            println("retained passed, found non-empty")}
-    }
-    page.autoSnapshotsEditOk.click()
-    println("pop up visible")
-    // then click "ok" from popup
-
-//assert withConfirm(true) {page.autosnapshotsconfirmok.click()} == "Do you want to save the value?"
-    //waitFor(5){page.autosnapshotsconfirmok.click()}
-    //println("ok clicked successfully")
-// check for edited values
-
-
-    when:
-
-    waitFor(10, 0){
-        if (page.autosnapshotsconfirmok.isDisplayed()){
-
-            page.autosnapshotsconfirmok.click()
-            //println("inside ok clicked successfully")
+            if(
+            page.frequencyEdit.text() != " "){
+                println("frequency passed, found non-empty")}
+            // page.frequencyUnitField.click()
+            if( page.frequencyUnitField.text() != " "){
+                println("frequency unit passed, found non-empty")}
+            if ( page.retainedEdit.text() != " "){
+                println("retained passed, found non-empty")}
         }
+        page.autoSnapshotsEditOk.click()
+        println("pop up visible")
+
+        when:
+
+        while(true) {
+            page.autosnapshotsconfirmok.click()
+            println("inside ok clicked successfully")
+            if(page.filePrefixField.isDisplayed()== false)
+                break
+        }
+
+        then:
+
+        waitFor(15){
+            page.filePrefix.text().equals(prefix)
+            page.frequency.text().equals(frequency)
+            page.frequencyUnit.text().equals(frequencyUnit)
+            page.retained.text().equals(retained)
+            page.filePrefix.isDisplayed()
+        }
+
+        println("test")
     }
-
-    then:
-
-    waitFor(15, 0){
-
-        page.filePrefix.isDisplayed()
-        //println("2nd check")
-
-
-    }
-
-    println("testtt")
-
-
-}
 
 
 // NETWORK INTERFACES
