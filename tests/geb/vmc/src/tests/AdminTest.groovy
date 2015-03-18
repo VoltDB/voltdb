@@ -416,8 +416,6 @@ class AdminTest extends TestBase {
 
 
 
-
-
 // autosnapshot
     def "check Auto Snapshots edit"() {
         when:
