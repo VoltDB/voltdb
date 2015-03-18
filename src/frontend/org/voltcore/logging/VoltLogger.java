@@ -27,11 +27,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.google_voltpatches.common.base.Throwables;
 
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.ShutdownHooks;
-
-import com.google_voltpatches.common.base.Throwables;
-
 /**
  * Class that implements the core functionality of a Log4j logger
  * or a java.util.logging logger. The point is that it should work
