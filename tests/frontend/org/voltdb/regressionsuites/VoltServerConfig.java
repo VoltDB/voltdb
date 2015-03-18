@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import org.voltdb.compiler.VoltProjectBuilder;
-
 /**
  * Interface allowing for the use of a particular configuration/topology
  * of a VoltDB server. For example, an implementation of this class might
@@ -39,25 +37,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
  *
  */
 public interface VoltServerConfig {
-
-    /**
-     * Build a catalog jar with the required topology according to the
-     * configuration parameters of the given VoltProjectBuilder instance.
-     *
-     * @param builder The VoltProjectBuilder instance describing the project to build.
-     */
-    public boolean compile(VoltProjectBuilder builder);
-
     /**
      * Start the instance of VoltDB.
      */
     public void startUp();
-
-    /**
-     * Start the instance of VoltDB and optionally clear the
-     * data directories first
-     */
-    public void startUp(boolean clearDataDirectories);
 
     /**
      * Shutdown the instance of VoltDB.
@@ -105,13 +88,6 @@ public interface VoltServerConfig {
      */
     public boolean isValgrind();
 
-    boolean compileWithPartitionDetection(VoltProjectBuilder builder,
-            String snapshotPath,
-            String ppdPrefix);
-
-    boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
-                                 boolean adminOnStartup);
-
     /**
      * Create a directory so it is accessible
      * to all voltdb instances represented by this config from within each instances
@@ -138,8 +114,6 @@ public interface VoltServerConfig {
     public List<File> listFiles(File path) throws IOException;
 
     public File[] getPathInSubroots(File path) throws IOException;
-
-    public void setMaxHeap(int max);
 
     /**
      * @return the number of logical partitions in this configuration

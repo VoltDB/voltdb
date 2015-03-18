@@ -30,6 +30,7 @@ import java.io.UnsupportedEncodingException;
 import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -66,14 +67,14 @@ public class CatalogUpgradeTools
         memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
     }
 
-    public static void dorkDowngradeVersion(String srcJar, String dstJar, String buildstring)
-        throws Exception
+    public static void dorkDowngradeVersion(Configuration config, String buildstring) throws IOException
     {
-        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadFromPath(srcJar);
+        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadFromPath(config.m_pathToCatalog);
         String[] bi = getBuildInfoLines(memCatalog);
         bi[0] = buildstring;
         memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
-        memCatalog.writeToFile(new File(dstJar));
+        config.m_pathToCatalog = config.m_pathToCatalog.replace(".jar", buildstring + ".jar");
+        memCatalog.writeToFile(new File(config.m_pathToCatalog));
     }
 
     /**
@@ -117,4 +118,5 @@ public class CatalogUpgradeTools
         }
         return jarfile;
     }
+
 }

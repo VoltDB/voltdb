@@ -23,9 +23,6 @@
 
 package org.voltdb.utils;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -37,25 +34,25 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
+import junit.framework.TestCase;
+
 import org.hsqldb_voltpatches.lib.tar.TarReader;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.junit.Before;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 import com.google_voltpatches.common.base.Charsets;
 
-public class TestCollector {
+public class TestCollector extends TestCase {
     private static final int STARTUP_DELAY = 3000;
-    VoltProjectBuilder builder;
     LocalCluster cluster;
     String listener;
     Client client;
@@ -64,27 +61,22 @@ public class TestCollector {
     String prefix = "voltdb_logs";
     boolean resetCurrentTime = true;
 
-    @Before
+    @Override
     public void setUp() throws Exception {
-        String simpleSchema =
+        CatalogBuilder cb = new CatalogBuilder(
                 "create table blah (" +
                 "ival bigint default 0 not null, " +
-                "PRIMARY KEY(ival));";
-
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashJVM.class);
-        builder.addProcedures(CrashVoltDBProc.class);
-
-        cluster = new LocalCluster("collect.jar",
-                2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(false);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
+                "PRIMARY KEY(ival));")
+        .addProcedures(CrashJVM.class, CrashVoltDBProc.class)
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(2);
+        cluster = LocalCluster.configure(getClass().getSimpleName(), cb, db);
+        assertNotNull("LocalCluster failed to compile", cluster);
+        cluster.bypassInProcessServerThread();
+        cluster.startUp();
 
         String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
-        File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
+        File voltDbRoot = new File(voltDbFilePrefix, db.getPathToVoltRoot().getPath());
         voltDbRootPath = voltDbRoot.getPath();
 
         listener = cluster.getListenerAddresses().get(0);

@@ -31,27 +31,21 @@ import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.MiscUtils;
 
 public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 {
     String testout_jar;
 
     private VoltCompiler compileForDDLTest2(String ddl) throws Exception {
-        String ddlPath = getPathForSchema(ddl);
+        String ddlPath = MiscUtils.writeStringToTempFilePath(ddl);
         final VoltCompiler compiler = new VoltCompiler();
         boolean success = compiler.compileFromDDL(testout_jar, ddlPath);
         assertTrue("Catalog compile failed!", success);
         return compiler;
-    }
-
-    private String getPathForSchema(String s) {
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(s);
-        schemaFile.deleteOnExit();
-        return schemaFile.getPath();
     }
 
     @Override

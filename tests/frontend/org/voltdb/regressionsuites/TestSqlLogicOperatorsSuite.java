@@ -25,20 +25,15 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
-
 public class TestSqlLogicOperatorsSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
     private void fillTables(Client client) throws NoConnectionsException, IOException, ProcCallException
     {
         for (int i = 0; i < 20; i++)
@@ -195,30 +190,14 @@ public class TestSqlLogicOperatorsSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSqlLogicOperatorsSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-
-        config = new LocalCluster("sqllogic-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqllogic-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqllogic-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        // No cluster tests for logic stuff
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(Insert.class.getResource("sql-update-ddl.sql"))
+        .addProcedures(Insert.class)
+        ;
+        return multiClusterSuiteBuilder(TestSqlLogicOperatorsSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 
 }

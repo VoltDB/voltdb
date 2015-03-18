@@ -39,59 +39,49 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.planner.ActivePlanRepository;
-import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 
 public class TestTwoSitePlans extends TestCase {
+    private ExecutionEngine ee1;
+    private ExecutionEngine ee2;
+
+    private Catalog catalog = null;
+    private Cluster cluster = null;
+    private Procedure selectProc = null;
+    private Statement selectStmt = null;
+    private PlanFragment selectTopFrag = null;
+    private PlanFragment selectBottomFrag = null;
+    private PlanFragment insertFrag = null;
 
     static final String JAR = "distplanningregression.jar";
-
-    ExecutionEngine ee1;
-    ExecutionEngine ee2;
-
-    Catalog catalog = null;
-    Cluster cluster = null;
-    Procedure selectProc = null;
-    Statement selectStmt = null;
-    PlanFragment selectTopFrag = null;
-    PlanFragment selectBottomFrag = null;
-    PlanFragment insertFrag = null;
 
     @SuppressWarnings("deprecation")
     @Override
     public void setUp() throws IOException, InterruptedException {
         VoltDB.instance().readBuildInfo("Test");
-
-        // compile a catalog
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String catalogJar = testDir + File.separator + JAR;
-
-        TPCCProjectBuilder pb = new TPCCProjectBuilder();
-        pb.addDefaultSchema();
-        pb.addDefaultPartitioning();
-        pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
-
-        pb.compile(catalogJar, 2, 0);
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
+        File catalogJar = File.createTempFile(getClass().getSimpleName(), ".jar");
+        catalogJar.deleteOnExit();
+        assertTrue("Failed to compile catalog", cb.compile(catalogJar.getAbsolutePath()));
 
         // load a catalog
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog =
-            CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-
+        byte[] bytes = MiscUtils.fileToBytes(catalogJar);
         // create the catalog (that will be passed to the ClientInterface
-        catalog = new Catalog();
-        catalog.execute(serializedCatalog);
+        catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
 
-        // update the catalog with the data from the deployment file
-        String pathToDeployment = pb.getPathToDeployment();
-        assertTrue(CatalogUtil.compileDeployment(catalog, pathToDeployment, false) == null);
+        // update the catalog with the data from the deployment file (WHY?)
+        String pathToDeployment = new DeploymentBuilder(2).writeXMLToTempFile();
+        assertTrue(CatalogUtil.compileDeploymentForTest(catalog, pathToDeployment) == null);
 
         cluster = catalog.getClusters().get("cluster");
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
@@ -140,9 +130,9 @@ public class TestTwoSitePlans extends TestCase {
 
         // create two EEs
         ee1 = site1Reference.get();
-        ee1.loadCatalog( 0, catalog.serialize());
+        ee1.loadCatalog(0, catalog.serialize());
         ee2 = site2Reference.get();
-        ee2.loadCatalog( 0, catalog.serialize());
+        ee2.loadCatalog(0, catalog.serialize());
 
         // cache some plan fragments
         selectStmt = selectProc.getStatements().get("selectAll");

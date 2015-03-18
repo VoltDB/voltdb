@@ -25,10 +25,10 @@ package org.voltdb.regressionsuites;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 public class TestTableCountSuite extends RegressionSuite {
     /**
@@ -156,52 +156,18 @@ public class TestTableCountSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
-
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestTableCountSuite.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-
-        boolean success;
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sqlCountingIndex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlCountingIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"))
+        ;
+        return multiClusterSuiteBuilder(TestTableCountSuite.class, cb,
+                // single-site testing
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                // two-site testing -- no multi-host cluster tests needed for SQL behavior tests.
+                new DeploymentBuilder(2));
     }
 
     public static void main(String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestIndexCountSuite.class);
+        org.junit.runner.JUnitCore.runClasses(TestTableCountSuite.class);
     }
 }

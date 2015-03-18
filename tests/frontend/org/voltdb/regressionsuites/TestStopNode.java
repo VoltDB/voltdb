@@ -26,32 +26,24 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
-
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.DeploymentBuilder;
 
-public class TestStopNode extends RegressionSuite
-{
+public class TestStopNode extends RegressionSuite {
+    private static final Class<? extends TestCase> TESTCASECLASS = TestShutdown.class;
 
-    static LocalCluster m_config;
+//    static LocalCluster m_config;
     static int kfactor = 3;
 
     public TestStopNode(String name) {
         super(name);
-    }
-
-    static VoltProjectBuilder getBuilderForTest() throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("");
-        return builder;
     }
 
     class StopCallBack implements ProcedureCallback {
@@ -97,23 +89,17 @@ public class TestStopNode extends RegressionSuite
                     break;
                 }
             }
-            System.out.println("Host " + hid + " Still there");
             if (done) {
-                if (client != null) {
-                    try {
-                        client.close();
-                    } catch (InterruptedException ex) {
-                    }
-                }
                 return;
             }
+            System.out.println("Host " + hid + " still there");
         }
     }
 
     public void testStopNode() throws Exception {
         Client client = ClientFactory.createClient();
 
-        client.createConnection("localhost", m_config.port(0));
+        client.createConnection("localhost", ((LocalCluster) m_config).port(0));
 
         try {
             CountDownLatch cdl = new CountDownLatch(1);
@@ -167,24 +153,12 @@ public class TestStopNode extends RegressionSuite
     }
 
     static public Test suite() throws IOException {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestStopNode.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = getBuilderForTest();
-        boolean success;
         //Lets tolerate 3 node failures.
-        if (!MiscUtils.isPro()) {
-            kfactor = 0;
-        }
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
-        success = m_config.compile(project);
-        assertTrue(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(m_config);
-        return builder;
+        DeploymentBuilder db = new DeploymentBuilder(4, 5, kfactor);
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), "", db);
+        cluster.bypassInProcessServerThread();
+        assertNotNull("LocalCluster failed to compile", cluster);
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
 }
 

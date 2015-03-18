@@ -19,10 +19,14 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -71,6 +75,88 @@ public class MiscUtils {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
         com.google_voltpatches.common.io.Files.copy(inputFile, outputFile);
+    }
+
+    /**
+     * Utility method to take a string and put it in a file.
+     *
+     * @param content The content of the file to create.
+     * @return A reference to the file created.
+     */
+    public static File writeStringToTempFile(String content) {
+        try {
+            File tempFile = File.createTempFile("VoltMiscUtils", ".tmp");
+            tempFile.deleteOnExit();
+            writeStringToFile(tempFile, content);
+            return tempFile;
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+
+    /**
+     * Utility method to take a string and put it in a file.
+     *
+     * @param content The content of the file to create.
+     * @return The path name of the file created.
+     */
+    public static String writeStringToTempFilePath(String content) {
+        File tempFile = writeStringToTempFile(content);
+        return tempFile.getPath();
+    }
+
+    public static String writeStringToTempFileAbsolutePath(String content) {
+        File tempFile = writeStringToTempFile(content);
+        return tempFile.getAbsolutePath();
+    }
+
+    /**
+     * Utility method to take a string and put it in a file.
+     *
+     * @param content The content of the file to create.
+     * @return The URL of the file created.
+     */
+    public static String writeStringToTempFileURL(String content) {
+        String path = writeStringToTempFilePath(content);
+        try {
+            return URLEncoder.encode(path, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+
+    public static FileInputStream writeStringToTempFileInputStream(String content) {
+        try {
+            return new FileInputStream(writeStringToTempFile(content));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+
+    /**
+     * Utility method to take a string and put it in the named file.
+     *
+     * @param content The content of the file to create.
+     * @return A reference to the file created.
+     */
+    public static File writeStringToPath(String path, String content) {
+        File file = new File(path);
+        writeStringToFile(file, content);
+        return file;
+    }
+
+    public static void writeStringToFile(File file, String content) {
+        try {
+            FileWriter writer = new FileWriter(file);
+            writer.write(content);
+            writer.close();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
     }
 
     /**
@@ -843,6 +929,7 @@ public class MiscUtils {
                 days, hours, minutes, seconds, remainingMs);
     }
 
+
     /**
      * Delays retrieval until first use, but holds onto a boolean value to
      * minimize overhead. The delayed retrieval allows tests to set properties
@@ -850,9 +937,9 @@ public class MiscUtils {
      */
     public static class BooleanSystemProperty
     {
-        private final String key;
-        private Boolean value = null;
-        private final boolean defaultValue;
+        private final String m_key;
+        private Boolean m_value = null;
+        private final boolean m_defaultValue;
 
         /**
          * Construct system property retriever with default value of false
@@ -869,8 +956,8 @@ public class MiscUtils {
          */
         public BooleanSystemProperty(String key, boolean defaultValue)
         {
-            this.key = key;
-            this.defaultValue = defaultValue;
+            m_key = key;
+            m_defaultValue = defaultValue;
         }
 
         /**
@@ -879,18 +966,19 @@ public class MiscUtils {
          */
         public boolean isTrue()
         {
-            if (this.value == null) {
+            if (m_value == null) {
                 // First time - retrieve and convert the value or use the default value.
-                String stringValue = System.getProperty(this.key);
+                String stringValue = System.getProperty(m_key);
                 if (stringValue != null) {
-                    this.value = (stringValue.equalsIgnoreCase("true") || stringValue.equalsIgnoreCase("yes"));
+                    m_value = stringValue.equalsIgnoreCase("true") ||
+                            stringValue.equalsIgnoreCase("yes");
                 }
                 else {
-                    this.value = this.defaultValue;
+                    m_value = m_defaultValue;
                 }
             }
-            assert this.value != null;
-            return this.value;
+            assert m_value != null;
+            return m_value;
         }
     }
 }

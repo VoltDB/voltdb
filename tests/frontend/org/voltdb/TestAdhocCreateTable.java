@@ -26,8 +26,6 @@ package org.voltdb;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
@@ -35,20 +33,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
     public void testBasicCreateTable() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("--dont care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+        Configuration config = configurationForTest("", 2);
         try {
             startSystem(config);
 
@@ -58,7 +43,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
                         "create table FOO (ID int default 0, VAL varchar(64 bytes));");
             }
             catch (ProcCallException pce) {
-                fail("create table should have succeeded");
+                fail("create table should have succeeded but got: " + pce);
             }
             assertTrue(findTableInSystemCatalogResults("FOO"));
             // make sure we can't create the same table twice
@@ -79,22 +64,9 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
     // Test creating a table when we feed a statement containing newlines.
     // I honestly didn't expect this to work yet --izzy
-    public void testMultiLineCreateTable() throws Exception {
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("--dont care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+    public void testMultiLineCreateTable() throws Exception
+    {
+        Configuration config = configurationForTest("", 2);
         try {
             startSystem(config);
 
@@ -111,7 +83,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
-                fail("create table should have succeeded");
+                fail("create table should have succeeded but got: " + pce);
             }
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
@@ -122,22 +94,9 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         }
     }
 
-    public void testCreatePartitionedTable() throws Exception {
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("--dont care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+    public void testCreatePartitionedTable() throws Exception
+    {
+        Configuration config = configurationForTest("", 2);
         try {
             startSystem(config);
 
@@ -157,7 +116,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
-                fail("create table should have succeeded");
+                fail("create table should have succeeded but got: " + pce);
             }
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);

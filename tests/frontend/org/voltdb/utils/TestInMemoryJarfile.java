@@ -25,15 +25,12 @@ package org.voltdb.utils;
 
 import java.io.CharArrayReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Arrays;
-import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
 
 import junit.framework.TestCase;
 
@@ -41,7 +38,6 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 
 public class TestInMemoryJarfile extends TestCase {
@@ -50,7 +46,7 @@ public class TestInMemoryJarfile extends TestCase {
     protected Catalog m_catalog;
     protected Database m_catalogDb;
 
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc, String elemPfx)
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc)
     {
         String schemaPath = "";
         try {
@@ -64,32 +60,27 @@ public class TestInMemoryJarfile extends TestCase {
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
-            "<%ss>" +
-            "<%s adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='false'/>" +
-            "</%ss>" +
+            "<roles>" +
+            "<role adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='false'/>" +
+            "</roles>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "<partitions><partition table='WAREHOUSE' column='W_ID' /></partitions>" +
             "</database>" +
             "</project>";
-        String simpleProject = String.format(simpleProjectTmpl, elemPfx, elemPfx, elemPfx);
+        String simpleProject = String.format(simpleProjectTmpl);
         System.out.println(simpleProject);
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
+        String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
         VoltCompiler compiler = new VoltCompiler();
         assertTrue(compiler.compileWithProjectXML(projectPath, jarFileName));
         return compiler.getCatalog();
-    }
-
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc) {
-        return createTestJarFile(jarFileName, adhoc, "role");
     }
 
     @Override
     protected void setUp() throws Exception {
         System.out.print("START: " + System.currentTimeMillis());
         super.setUp();
-        m_catalog = createTestJarFile("testout.jar", true, "role");
+        m_catalog = createTestJarFile("testout.jar", true);
         assertNotNull(m_catalog);
         m_catalogDb = m_catalog.getClusters().get("cluster").getDatabases().get("database");
         assertNotNull(m_catalogDb);
@@ -106,6 +97,7 @@ public class TestInMemoryJarfile extends TestCase {
     }
 
     /**
+     * @throws IOException
      *
      */
     public void testReadFileFromJarfile() throws IOException {

@@ -340,6 +340,7 @@ public class Inits {
         @Override
         public void run() {
             CatalogAndIds catalogStuff = null;
+            Catalog catalog = null;
             do {
                 try {
                     catalogStuff = CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
@@ -351,31 +352,25 @@ public class Inits {
                 }
             } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
 
-            String serializedCatalog = null;
             byte[] catalogJarBytes = catalogStuff.catalogBytes;
             try {
-                Pair<InMemoryJarfile, String> loadResults =
-                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
-                serializedCatalog =
-                    CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
-                catalogJarBytes = loadResults.getFirst().getFullJarBytes();
+                InMemoryJarfile loadResults =
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes).getFirst();
+                catalog = CatalogUtil.deserializeCatalogFromInMemoryJarfile(loadResults);
+                catalogJarBytes = loadResults.getFullJarBytes();
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
-            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
+            if (catalog == null) {
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
-
-            /* N.B. node recovery requires discovering the current catalog version. */
-            Catalog catalog = new Catalog();
-            catalog.execute(serializedCatalog);
-            serializedCatalog = null;
+            }
 
             // note if this fails it will print an error first
             // This is where we compile real catalog and create runtime
             // catalog context. To validate deployment we compile and create
             // a starter context which uses a placeholder catalog.
-            String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            String result = CatalogUtil.compileDeployment(catalog, m_deployment);
             if (result != null) {
                 hostLog.fatal(result);
                 VoltDB.crashLocalVoltDB(result);
@@ -664,9 +659,7 @@ public class Inits {
                 partitionCount = m_rvdb.m_configuredNumberOfPartitions;
             }
 
-            TheHashinator.initialize(
-                TheHashinator.getConfiguredHashinatorClass(),
-                TheHashinator.getConfigureBytes(partitionCount));
+            TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
         }
     }
 
@@ -695,8 +688,8 @@ public class Inits {
         public void run() {
             if (!m_isRejoin && !m_config.m_isRejoinTest && !m_rvdb.m_joining) {
                 String snapshotPath = null;
-                if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
-                    snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
+                if (m_rvdb.m_catalogContext.database.getSnapshotschedule().get("default") != null) {
+                    snapshotPath = m_rvdb.m_catalogContext.database.getSnapshotschedule().get("default").getPath();
                 }
 
                 int[] allPartitions = new int[m_rvdb.m_configuredNumberOfPartitions];

@@ -32,8 +32,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
@@ -42,25 +42,22 @@ public class TestPlannerTool extends TestCase {
     PlannerTool m_pt = null;
 
     public void testSimple() throws IOException {
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        builder.addAllDefaults();
+        CatalogBuilder cb = TPCCProjectBuilder.defaultCatalogBuilder();
         final File jar = new File("tpcc-oop.jar");
         jar.deleteOnExit();
 
         //long start = System.nanoTime();
         //for (int i = 0; i < 10000; i++) {
-        builder.compile("tpcc-oop.jar");
+        cb.compile("tpcc-oop.jar");
         /*    long end = System.nanoTime();
             System.err.printf("Took %.3f seconds to compile.\n",
                     (end - start) / 1000000000.0);
             start = end;
         }*/
 
-        byte[] bytes = MiscUtils.fileToBytes(new File("tpcc-oop.jar"));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
+        byte[] bytes = MiscUtils.fileToBytes(jar);
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
+        CatalogContext context = CatalogContext.simpleForTest(0, catalog, bytes);
 
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
@@ -135,27 +132,24 @@ public class TestPlannerTool extends TestCase {
     public void testBadDDL() throws IOException
     {
         // semicolons in in-lined comments are bad
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("CREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1)); -- this; is bad");
-        builder.addPartitionInfo("A", "C1");
-        // semicolons in string literals are bad
-        builder.addLiteralSchema("create table t(id bigint not null, name varchar(5) default 'a;bc', primary key(id));");
-        builder.addPartitionInfo("t", "id");
-        // Add a newline string literal case just for fun
-        builder.addLiteralSchema("create table s(id bigint not null, name varchar(5) default 'a\nb', primary key(id));");
-        builder.addStmtProcedure("MakeCompileHappy",
-                                 "SELECT * FROM A WHERE C1 = ?;",
-                                 "A.C1: 0");
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1)); -- this; WAS bad\n" +
+                "PARTITION TABLE A ON COLUMN C1;\n" +
 
-        final File jar = new File("testbadddl-oop.jar");
-        jar.deleteOnExit();
-        builder.compile("testbadddl-oop.jar");
-        byte[] bytes = MiscUtils.fileToBytes(new File("testbadddl-oop.jar"));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assertNotNull(serializedCatalog);
-        Catalog c = new Catalog();
-        c.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, c, bytes, new byte[] {}, 0);
+                // semicolons in string literals were bad
+                "create table t(id bigint not null, name varchar(5) default 'a;bc', primary key(id));\n" +
+                "partition table t on column id;\n" +
+
+                // Add a newline string literal case just for fun
+                "create table s(id bigint not null, name varchar(5) default 'a\nb', primary key(id));\n" +
+                "")
+        .addStmtProcedure("MakeCompileHappy", "SELECT * FROM A WHERE C1 = ?;", "A.C1", 0)
+        ;
+
+        byte[] bytes = cb.compileToBytes();
+        assertNotNull("Failed to compile tricky ddl", bytes);
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
+        CatalogContext context = CatalogContext.simpleForTest(0, catalog, bytes);
 
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 

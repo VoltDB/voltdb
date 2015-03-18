@@ -25,27 +25,18 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
-public class TestShutdown extends RegressionSuite
-{
+public class TestShutdown extends RegressionSuite {
+    private static final Class<? extends TestCase> TESTCASECLASS = TestShutdown.class;
+
     public TestShutdown(String name) {
         super(name);
-    }
-
-    static VoltProjectBuilder getBuilderForTest() throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("");
-        return builder;
     }
 
     public void testShutdown() throws Exception {
@@ -68,20 +59,10 @@ public class TestShutdown extends RegressionSuite
     }
 
     static public Test suite() throws IOException {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestShutdown.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = getBuilderForTest();
-        boolean success;
-        LocalCluster config = new LocalCluster("decimal-default.jar", 4, 5, 3, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
-        success = config.compile(project);
-        assertTrue(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        return builder;
+        DeploymentBuilder db = new DeploymentBuilder(4, 5, 3);
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), "", db);
+        cluster.bypassInProcessServerThread();
+        assertNotNull("LocalCluster failed to compile", cluster);
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
 }

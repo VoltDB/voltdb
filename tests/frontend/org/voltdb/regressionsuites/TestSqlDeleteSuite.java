@@ -23,15 +23,15 @@
 
 package org.voltdb.regressionsuites;
 
-import org.voltdb.BackendTarget;
+import java.util.Arrays;
+
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimit;
 import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimitOffset;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
-
-import java.util.Arrays;
 
 /**
  * System tests for DELETE
@@ -39,13 +39,6 @@ import java.util.Arrays;
  */
 
 public class TestSqlDeleteSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = {
-        DeleteOrderByLimit.class,
-        DeleteOrderByLimitOffset.class
-        };
-
     static final int ROWS = 10;
 
     private static void insertOneRow(Client client, String tableName,
@@ -563,29 +556,19 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSqlDeleteSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-
-        config = new LocalCluster("sqldelete-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqldelete-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("sqldelete-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(Insert.class.getResource("sql-update-ddl.sql"))
+        .addProcedures(
+                DeleteOrderByLimit.class,
+                DeleteOrderByLimitOffset.class)
+        ;
+        return multiClusterSuiteBuilder(TestSQLFeaturesSuite.class, cb,
+                // single-site testing -- no multi-host cluster tests needed for SQL behavior tests.
+                new DeploymentBuilder(),
+                // We never taught HSQL how to upsert.
+                DeploymentBuilder.forHSQLBackend(),
+                // multi-host cluster testing with replication
+                new DeploymentBuilder(2, 3, 1));
     }
 
 }

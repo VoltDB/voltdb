@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
@@ -36,8 +35,13 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.planner.TestPlansGroupBy;
+import org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1;
+import org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertDims;
+import org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF;
+import org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin;
 
 /*
  * Functional tests of the statements compiled in the test suite
@@ -45,13 +49,6 @@ import org.voltdb.planner.TestPlansGroupBy;
  */
 
 public class TestGroupBySuite extends RegressionSuite {
-
-    static final Class<?>[] PROCEDURES = {
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertDims.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
-
     /** Load 1 1's, 2 2's, 3 3's .. 10 10's and 1 11 */
     private int loaderNxN(Client client, int pkey) throws ProcCallException,
     IOException, NoConnectionsException {
@@ -753,37 +750,16 @@ public class TestGroupBySuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestGroupBySuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
-
-        project.addSchema(TestPlansGroupBy.class
-                .getResource("testplans-groupby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);");
-        project.addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);");
-
-        // config = new LocalSingleProcessServer("plansgroupby-ipc.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        // config.compile(project);
-        // builder.addServerConfig(config);
-
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"))
+        .addProcedures(CountT1A1.class, InsertF.class, InsertDims.class, SumGroupSingleJoin.class)
+        .addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);")
+        .addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);")
+        ;
+        return multiClusterSuiteBuilder(TestGroupBySuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 
     public class VRowComparator<T> implements Comparator<VoltTableRow>

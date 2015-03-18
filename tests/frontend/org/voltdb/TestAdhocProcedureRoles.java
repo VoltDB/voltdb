@@ -32,55 +32,65 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 
 public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
     final static boolean VERBOSE = false;
     final static String CATALOG_PATH = Configuration.getPathToCatalogForTest("adhocddl.jar");
     final static String DEPLOYMENT_PATH = Configuration.getPathToCatalogForTest("adhocddl.xml");
-    final static RoleInfo ADMIN_TEMPLATE = new RoleInfo(null, false, false, true, false, false, false);
     final static RoleInfo USER_TEMPLATE = new RoleInfo(null, false, false, false, false, false, false);
 
     private class Tester
     {
-        final VoltProjectBuilder builder;
+        final private Configuration m_config;
 
-        Tester()
+        Tester(String extraRole, String user)
         {
+            RoleInfo ADMIN_TEMPLATE = new RoleInfo(null, false, false, true, false, false, false);
             if (VERBOSE) {
                 System.out.println("================= Begin Test ==================");
             }
-            this.builder = new VoltProjectBuilder();
-            this.builder.setSecurityEnabled(true, true);
-            this.builder.setUseDDLSchema(true);
-        }
-
-        void createTable(String name) throws IOException
-        {
-            this.builder.addLiteralSchema(String.format(
-                    "create table %s (" +
-                        "ID integer not null," +
-                        "VAL bigint, " +
-                        "constraint PK_TREE primary key (ID)" +
-                    ");", name));
-        }
-
-        void createRoles(final RoleInfo template, String... roles)
-        {
-            this.builder.addRoles(RoleInfo.fromTemplate(template, roles));
-        }
-
-        void createUser(String user, String password, String... roles)
-        {
-            this.builder.addUsers(new UserInfo[] {new UserInfo(user, password, roles)});
+            CatalogBuilder cb = new CatalogBuilder(
+                    "create table FOO (" +
+                    "    ID integer not null," +
+                    "    VAL bigint, " +
+                    "    constraint PK_TREE primary key (ID)" +
+                    ");\n")
+            .addRoles(RoleInfo.fromTemplate(ADMIN_TEMPLATE, "ADMIN"))
+            .addRoles(RoleInfo.fromTemplate(USER_TEMPLATE, "GOOD"))
+            ;
+            if (extraRole != null) {
+                cb.addRoles(RoleInfo.fromTemplate(USER_TEMPLATE, extraRole));
+            }
+            ;
+            DeploymentBuilder db = new DeploymentBuilder(2)
+            .setSecurityEnabled(true, true)
+            .setUseAdHocDDL(true)
+            .addUsers(new UserInfo("ADMIN", "PASSWORD", "ADMIN"))
+            .addUsers(new UserInfo("USER", "PASSWORD", user));
+            ;
+            m_config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", m_config);
+            if (VERBOSE) {
+                System.out.println(":::Deployment:::");
+                try {
+                    List<String> lineList = Files.readAllLines(Paths.get(m_config.m_pathToDeployment),
+                            Charset.defaultCharset());
+                    for (String line : lineList) {
+                        System.out.println(line);
+                    }
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
         }
 
         void createProcedureAdHoc(String procName, String role, String tableName, boolean drop) throws Exception
@@ -104,27 +114,9 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
             assertTrue(findProcedureInSystemCatalog(procName));
         }
 
-        void compile() throws Exception
-        {
-            if (VERBOSE) {
-                System.out.println(":::Deployment:::");
-            }
-            Catalog catalog = this.builder.compile(CATALOG_PATH, 2, 1, 0, null);
-            if (VERBOSE) {
-                for (String line : Files.readAllLines(Paths.get(this.builder.getPathToDeployment()), Charset.defaultCharset())) {
-                    System.out.println(line);
-                }
-            }
-            assertNotNull("Schema compilation failed", catalog);
-            MiscUtils.copyFile(this.builder.getPathToDeployment(), DEPLOYMENT_PATH);
-        }
-
         void start() throws Exception
         {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = CATALOG_PATH;
-            config.m_pathToDeployment = DEPLOYMENT_PATH;
-            startServer(config);
+            startServer(m_config);
         }
 
         void connect(String user, String password) throws Exception
@@ -164,13 +156,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
     public void testGoodUserCall() throws Exception
     {
-        Tester tester = new Tester();
-        tester.createTable("FOO");
-        tester.createRoles(ADMIN_TEMPLATE, "ADMIN");
-        tester.createRoles(USER_TEMPLATE, "GOOD");
-        tester.createUser("ADMIN", "PASSWORD", "ADMIN");
-        tester.createUser("USER", "PASSWORD", "GOOD");
-        tester.compile();
+        Tester tester = new Tester(null, "GOOD");
         try {
             tester.start();
             try {
@@ -195,13 +181,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
     public void testBadUserCall() throws Exception
     {
-        Tester tester = new Tester();
-        tester.createTable("FOO");
-        tester.createRoles(ADMIN_TEMPLATE, "ADMIN");
-        tester.createRoles(USER_TEMPLATE, "GOOD", "BAD");
-        tester.createUser("ADMIN", "PASSWORD", "ADMIN");
-        tester.createUser("USER", "PASSWORD", "BAD");
-        tester.compile();
+        Tester tester = new Tester("BAD", "BAD");
         try {
             tester.start();
             try {
@@ -228,13 +208,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
     // When alter is supported it can become more interesting.
     public void testGoodAndBadUserCall() throws Exception
     {
-        Tester tester = new Tester();
-        tester.createTable("FOO");
-        tester.createRoles(ADMIN_TEMPLATE, "ADMIN");
-        tester.createRoles(USER_TEMPLATE, "GOOD", "BAD");
-        tester.createUser("ADMIN", "PASSWORD", "ADMIN");
-        tester.createUser("USER", "PASSWORD", "GOOD");
-        tester.compile();
+        Tester tester = new Tester("BAD", "GOOD");
         try {
             tester.start();
             try {

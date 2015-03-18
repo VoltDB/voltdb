@@ -141,7 +141,7 @@ public class TestMpPromoteAlgo
     @BeforeClass
     static public void initializeHashinator() {
         TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+        TheHashinator.initializeAsConfiguredForPartitions(8);
     }
 
     @Before
@@ -437,7 +437,7 @@ public class TestMpPromoteAlgo
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), true);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());
             for (Iv2RepairLogResponseMessage msg : stuff) {
-                msg.m_sourceHSId = (long)i;
+                msg.m_sourceHSId = i;
                 dut.deliver(msg);
             }
         }

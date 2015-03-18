@@ -33,16 +33,14 @@ import java.util.Set;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestInsertIntoSelectSuite extends RegressionSuite {
-
     public TestInsertIntoSelectSuite(String name) {
         super(name);
     }
@@ -411,41 +409,6 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         }
 
         return sb.toString();
-    }
-
-    static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestInsertIntoSelectSuite.class);
-
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-
-        try {
-            project.addLiteralSchema(generateSchema());
-        } catch (IOException error) {
-            fail(error.getMessage());
-        }
-
-        boolean success;
-
-        // JNI
-        config = new LocalCluster("iisf-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // CLUSTER (disable to opt for speed over coverage...
-        config = new LocalCluster("iisf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // ... disable for speed) */
-
-        config = new LocalCluster("iisf-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
     }
 
     private static void clearTargetTables(Client client) throws Exception {
@@ -917,4 +880,13 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             }
         }
     }
+
+    static public junit.framework.Test suite() {
+        String literalSchema = generateSchema();
+        return multiClusterSuiteBuilder(TestInsertIntoSelectSuite.class, literalSchema,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
+    }
+
 }

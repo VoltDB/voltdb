@@ -23,41 +23,17 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.IOException;
 
 import junit.framework.TestCase;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
 
 public class TestDefaultDeployment extends TestCase {
 
-    public void testDefaultDeploymentInitialization() throws InterruptedException, IOException, ProcCallException {
-        String ddl =
-            "CREATE TABLE WAREHOUSE (" +
-            "W_ID INTEGER DEFAULT '0' NOT NULL, "+
-            "W_NAME VARCHAR(16) DEFAULT NULL, " +
-            "PRIMARY KEY  (W_ID)" +
-            ");";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(ddl);
-        builder.addStmtProcedure("hello", "select * from warehouse");
-
-        // compileWithDefaultDeployment() generates no deployment.xml so that the default is used.
-        String jarPath = Configuration.getPathToCatalogForTest("test.jar");
-        assertTrue(builder.compileWithDefaultDeployment(jarPath));
-        final File jar = new File(jarPath);
-        jar.deleteOnExit();
-
-        String pathToDeployment = builder.getPathToDeployment();
-        assertEquals(pathToDeployment, null);
-
+    public void testDefaultDeploymentInitialization() throws IOException  {
         // the default deployment file includes an http server on port 8080.
         // do some verification without starting VoltDB, since that port
         // number conflicts with jenkins on some test servers.

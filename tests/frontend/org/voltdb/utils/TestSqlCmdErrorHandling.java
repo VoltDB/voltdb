@@ -39,7 +39,6 @@ import java.util.Scanner;
 import junit.framework.TestCase;
 
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -47,10 +46,9 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestSqlCmdErrorHandling extends TestCase {
-
     private final String m_lastError = "ThisIsObviouslyNotAnAdHocSQLCommand;\n";
 
     private ServerThread m_server;
@@ -70,7 +68,6 @@ public class TestSqlCmdErrorHandling extends TestCase {
                 "  PRIMARY KEY(key) );" +
                 "\n" +
                 "";
-
         // Define procs that to complain when sqlcmd passes them garbage parameters.
         for (String type : mytype) {
             simpleSchema += "create procedure myfussy_" + type + "_proc as" +
@@ -78,15 +75,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     "\n";
         }
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.setUseDDLSchema(false);
-        String catalogPath = Configuration.getPathToCatalogForTest("sqlcmderror.jar");
-        assertTrue(builder.compile(catalogPath, 1, 1, 0));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = catalogPath;
-        config.m_pathToDeployment = builder.getPathToDeployment();
+        DeploymentBuilder db = new DeploymentBuilder();
+        String testcaseclassname = TestSqlCmdErrorHandling.class.getSimpleName();
+        Configuration config = Configuration.compile(testcaseclassname, simpleSchema, db);
+        assertNotNull("Configuration failed to compile.");
         m_server = new ServerThread(config);
         m_server.start();
         m_server.waitForInitialization();

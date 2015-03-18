@@ -30,12 +30,12 @@ import java.util.Random;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.BufferArrayProc;
 import org.voltdb_testprocs.regressionsuites.CurrentTimestampProcedure;
 import org.voltdb_testprocs.regressionsuites.LastBatchLie;
@@ -43,13 +43,6 @@ import org.voltdb_testprocs.regressionsuites.VariableBatchSizeMP;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeSP;
 
 public class TestProcedureAPISuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        VariableBatchSizeMP.class, VariableBatchSizeSP.class, LastBatchLie.class, BufferArrayProc.class,
-        CurrentTimestampProcedure.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -62,7 +55,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
      * Given a size, build a batch that contains a list of ops
      * drawn from some subset of the complete list of possible opts
      */
-    int[] buildABatch(int size) {
+    private int[] buildABatch(int size) {
         int[] batch = new int[size];
 
         Random r = new Random(0);
@@ -78,7 +71,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
      * Convert an integer into a set of possible operations.
      * No real method here, just trying to get a mix
      */
-    List<Integer> getOpsMixFromAnyInt(int value) {
+    private List<Integer> getOpsMixFromAnyInt(int value) {
         List<Integer> ops = new ArrayList<Integer>();
         if ((value & VariableBatchSizeMP.P_READ) != 0) ops.add(VariableBatchSizeMP.P_READ);
         if ((value & VariableBatchSizeMP.R_READ) != 0) ops.add(VariableBatchSizeMP.R_READ);
@@ -168,48 +161,16 @@ public class TestProcedureAPISuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestProcedureAPISuite.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestProcedureAPISuite.class.getResource("procedureapisuite-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addProcedures(PROCEDURES);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config that similar, but doesn't use the same backend
-        config = new LocalCluster("failures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: N=2 K=1 Cluster
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestProcedureAPISuite.class.getResource("procedureapisuite-ddl.sql"))
+        .addPartitionInfo("P1", "ID")
+        .addProcedures(
+                    VariableBatchSizeMP.class, VariableBatchSizeSP.class, LastBatchLie.class,
+                    BufferArrayProc.class, CurrentTimestampProcedure.class)
+        ;
+        return multiClusterSuiteBuilder(TestProcedureAPISuite.class, cb,
+                new DeploymentBuilder(2),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 2, 1));
     }
 }

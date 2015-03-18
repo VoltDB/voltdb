@@ -27,20 +27,16 @@ import java.io.IOException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
+
 public class TestIndexLimitSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -355,81 +351,44 @@ public class TestIndexLimitSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
-
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestIndexLimitSuite.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"))
 
         // pure column index queries
-        project.addStmtProcedure("COL_TU1_MIN_POINTS", "SELECT MIN(POINTS) FROM TU1;");
-        project.addStmtProcedure("COL_TU2_MAX_UNAME", "SELECT MAX(UNAME) FROM TU2");
-        project.addStmtProcedure("COL_TU3_MAX_POINTS", "SELECT MAX(POINTS) FROM TU3 WHERE TEL = ?");
-        project.addStmtProcedure("COL_TU3_MIN_TEL", "SELECT MIN(TEL) FROM TU3 WHERE TEL = ?");
-        project.addStmtProcedure("COL_TU4_MIN_POINTS_WHERE", "SELECT MIN(POINTS) FROM TU4 WHERE UNAME = ? AND SEX = ?");
+        .addStmtProcedure("COL_TU1_MIN_POINTS", "SELECT MIN(POINTS) FROM TU1;")
+        .addStmtProcedure("COL_TU2_MAX_UNAME", "SELECT MAX(UNAME) FROM TU2")
+        .addStmtProcedure("COL_TU3_MAX_POINTS", "SELECT MAX(POINTS) FROM TU3 WHERE TEL = ?")
+        .addStmtProcedure("COL_TU3_MIN_TEL", "SELECT MIN(TEL) FROM TU3 WHERE TEL = ?")
+        .addStmtProcedure("COL_TU4_MIN_POINTS_WHERE", "SELECT MIN(POINTS) FROM TU4 WHERE UNAME = ? AND SEX = ?")
 
         // expression index queries
-        project.addStmtProcedure("EXPR_TU1_MIN_FUNC", "SELECT MIN(ABS(POINTS)) FROM TU1");
-        project.addStmtProcedure("EXPR_TU1_MIN_ARTH", "SELECT MIN(POINTS + ID) FROM TU1");
-        project.addStmtProcedure("EXPR_TU2_MAX_POINTS", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = ?");
-        project.addStmtProcedure("EXPR_TU2_MAX_UNAME", "SELECT MAX(UNAME) FROM TU2 WHERE POINTS * 2 = ?");
-        project.addStmtProcedure("EXPR_TU2_MIN_ABS_POINTS", "SELECT MIN(ABS(POINTS)) FROM TU2 WHERE ABS(POINTS) = ?");
-        project.addStmtProcedure("EXPR_TU2_MAX_LENGTH_UNAME", "SELECT MAX(CHAR_LENGTH(UNAME)) FROM TU2 WHERE ABS(POINTS) = ?");
+        .addStmtProcedure("EXPR_TU1_MIN_FUNC", "SELECT MIN(ABS(POINTS)) FROM TU1")
+        .addStmtProcedure("EXPR_TU1_MIN_ARTH", "SELECT MIN(POINTS + ID) FROM TU1")
+        .addStmtProcedure("EXPR_TU2_MAX_POINTS", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = ?")
+        .addStmtProcedure("EXPR_TU2_MAX_UNAME", "SELECT MAX(UNAME) FROM TU2 WHERE POINTS * 2 = ?")
+        .addStmtProcedure("EXPR_TU2_MIN_ABS_POINTS", "SELECT MIN(ABS(POINTS)) FROM TU2 WHERE ABS(POINTS) = ?")
+        .addStmtProcedure("EXPR_TU2_MAX_LENGTH_UNAME", "SELECT MAX(CHAR_LENGTH(UNAME)) FROM TU2 WHERE ABS(POINTS) = ?")
 
         // edge cases:
-        project.addStmtProcedure("EDGE_TU1_MIN_POINTS1", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS > ?");
-        project.addStmtProcedure("EDGE_TU1_MIN_POINTS2", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS >= ?");
-        project.addStmtProcedure("EDGE_TU1_MIN_POINTS3", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < ?");
-        project.addStmtProcedure("EDGE_TU1_MIN_POINTS4", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= ?");
-        project.addStmtProcedure("EDGE_TU1_MAX_POINTS1", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS > ?");
-        project.addStmtProcedure("EDGE_TU1_MAX_POINTS2", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= ?");
-        project.addStmtProcedure("EDGE_TU1_MAX_POINTS3", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < ?");
-        project.addStmtProcedure("EDGE_TU1_MAX_POINTS4", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= ?");
-        project.addStmtProcedure("EDGE_TU2_MIN_POINTS1", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = ? AND POINTS < ?");
-        project.addStmtProcedure("EDGE_TU2_MAX_POINTS1", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = ? AND POINTS > ?");
-        project.addStmtProcedure("EDGE_TU2_MIN_POINTS2", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < ? AND UNAME = ?");
-        project.addStmtProcedure("EDGE_TU2_MAX_POINTS2", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS > ? AND UNAME = ?");
-        project.addStmtProcedure("EDGE_TU2_MIN_POINTS_EXPR", "SELECT MIN(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?");
-        project.addStmtProcedure("EDGE_TU2_MAX_POINTS_EXPR", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?");
-
-        boolean success;
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sqlIndexLimit-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlIndexLimit-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("sqlIndexLimit-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        .addStmtProcedure("EDGE_TU1_MIN_POINTS1", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS > ?")
+        .addStmtProcedure("EDGE_TU1_MIN_POINTS2", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS >= ?")
+        .addStmtProcedure("EDGE_TU1_MIN_POINTS3", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < ?")
+        .addStmtProcedure("EDGE_TU1_MIN_POINTS4", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= ?")
+        .addStmtProcedure("EDGE_TU1_MAX_POINTS1", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS > ?")
+        .addStmtProcedure("EDGE_TU1_MAX_POINTS2", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= ?")
+        .addStmtProcedure("EDGE_TU1_MAX_POINTS3", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < ?")
+        .addStmtProcedure("EDGE_TU1_MAX_POINTS4", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= ?")
+        .addStmtProcedure("EDGE_TU2_MIN_POINTS1", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = ? AND POINTS < ?")
+        .addStmtProcedure("EDGE_TU2_MAX_POINTS1", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = ? AND POINTS > ?")
+        .addStmtProcedure("EDGE_TU2_MIN_POINTS2", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < ? AND UNAME = ?")
+        .addStmtProcedure("EDGE_TU2_MAX_POINTS2", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS > ? AND UNAME = ?")
+        .addStmtProcedure("EDGE_TU2_MIN_POINTS_EXPR", "SELECT MIN(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?")
+        .addStmtProcedure("EDGE_TU2_MAX_POINTS_EXPR", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?")
+        ;
+        return multiClusterSuiteBuilder(TestIndexLimitSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2));
     }
 
     public static void main(String args[]) {

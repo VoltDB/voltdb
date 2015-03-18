@@ -29,13 +29,14 @@ import java.math.BigInteger;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.SelectAll;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.rollbackprocs.AllTypesJavaAbort;
 import org.voltdb_testprocs.regressionsuites.rollbackprocs.AllTypesJavaError;
@@ -57,30 +58,6 @@ import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionParamS
 import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionUpdateConstraintError;
 
 public class TestRollbackSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        SinglePartitionJavaError.class,
-        SinglePartitionJavaAbort.class,
-        SinglePartitionConstraintError.class,
-        MultiPartitionJavaError.class,
-        MultiPartitionJavaAbort.class,
-        MultiPartitionConstraintError.class,
-        MultiPartitionParamSerializationError.class,
-        SinglePartitionUpdateConstraintError.class,
-        SinglePartitionConstraintFailureAndContinue.class,
-        SinglePartitionParamSerializationError.class,
-        SelectAll.class,
-        ReadMatView.class,
-        FetchNORowUsingIndex.class,
-        InsertAllTypes.class,
-        AllTypesJavaError.class,
-        AllTypesJavaAbort.class,
-        AllTypesUpdateJavaError.class,
-        AllTypesUpdateJavaAbort.class,
-        AllTypesMultiOpsJavaError.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -953,45 +930,35 @@ public class TestRollbackSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
-
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestRollbackSuite.class);
-
-        // build up a project builder for the workload
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addSchema(SinglePartitionJavaError.class.getResource("tpcc-extraview-ddl.sql"));
-        project.addDefaultPartitioning();
-        project.addPartitionInfo("ALL_TYPES", "ID");
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
-
-        boolean success;
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with two sites/partitions
-        config = new LocalCluster("rollback-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: Local Cluster (of processes)
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("rollback-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = TPCCProjectBuilder.addDefaultPartitioning(new CatalogBuilder())
+        .addSchema(SinglePartitionJavaError.class.getResource("tpcc-extraview-ddl.sql"))
+        .addPartitionInfo("ALL_TYPES", "ID")
+        .addProcedures(
+                SinglePartitionJavaError.class,
+                SinglePartitionJavaAbort.class,
+                SinglePartitionConstraintError.class,
+                MultiPartitionJavaError.class,
+                MultiPartitionJavaAbort.class,
+                MultiPartitionConstraintError.class,
+                MultiPartitionParamSerializationError.class,
+                SinglePartitionUpdateConstraintError.class,
+                SinglePartitionConstraintFailureAndContinue.class,
+                SinglePartitionParamSerializationError.class,
+                SelectAll.class,
+                ReadMatView.class,
+                FetchNORowUsingIndex.class,
+                InsertAllTypes.class,
+                AllTypesJavaError.class,
+                AllTypesJavaAbort.class,
+                AllTypesUpdateJavaError.class,
+                AllTypesUpdateJavaAbort.class,
+                AllTypesMultiOpsJavaError.class
+                )
+        .addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID", 2)
+        ;
+        return multiClusterSuiteBuilder(TestRollbackSuite.class, cb,
+                new DeploymentBuilder(2),
+                new DeploymentBuilder(2, 3, 1));
     }
 
     public static void main(String args[]) {

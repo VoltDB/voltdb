@@ -73,7 +73,6 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.AuthSystem;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -84,9 +83,10 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -202,28 +202,30 @@ public class TestClientInterface {
         File cat = File.createTempFile("temp-log-reinitiator", "catalog");
         cat.deleteOnExit();
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        String schema = "create table A (i integer not null, primary key (i));";
-        builder.addLiteralSchema(schema);
-        builder.addPartitionInfo("A", "i");
-        builder.addStmtProcedure("hello", "select * from A where i = ?", "A.i: 0");
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table A (i integer not null, primary key (i));" +
+                "PARTITION TABLE A ON COLUMN i;\n" +
+                "")
+        .addStmtProcedure("hello", "select * from A where i = ?", "A.i", 0);
 
-        if (!builder.compile(cat.getAbsolutePath())) {
+        if (! cb.compile(cat.getAbsolutePath())) {
             throw new IOException();
         }
 
         byte[] bytes = MiscUtils.fileToBytes(cat);
-        String serializedCat =
-            CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assertNotNull(serializedCat);
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCat);
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
+        assertNotNull(catalog);
 
-        String deploymentPath = builder.getPathToDeployment();
-        CatalogUtil.compileDeployment(catalog, deploymentPath, false);
+        //TODO: Here, a totally default deployment structure is inserted into the Catalog by
+        // constructing a default builder, generating its DeploymentType tree,
+        // writing that tree to a temp file, reading the temp file into a DeploymentType tree and
+        // inserting that into the Catalog. That's ONE way to leverage existing code.
+        DeploymentBuilder db = new DeploymentBuilder(); // yet (3) would match hashinator init below?
+        String deploymentPath = db.writeXMLToTempFile();
+        CatalogUtil.compileDeploymentForTest(catalog, deploymentPath);
 
-        m_context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
+        m_context = CatalogContext.simpleForTest(0, catalog, bytes);
+        TheHashinator.initializeAsConfiguredForPartitions(3);
     }
 
     @After

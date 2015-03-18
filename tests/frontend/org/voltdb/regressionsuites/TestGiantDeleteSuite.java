@@ -25,18 +25,16 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
+import junit.framework.TestCase;
+
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBatch;
 
-
 public class TestGiantDeleteSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { InsertBatch.class };
+    private static final Class<? extends TestCase> TESTCASECLASS = TestGiantDeleteSuite.class;
 
     public void testGiantDelete() throws IOException, ProcCallException
     {
@@ -78,21 +76,13 @@ public class TestGiantDeleteSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGiantDeleteSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("giant-delete-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
-
-        config = new LocalCluster("giantdelete-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(Insert.class.getResource("giant-delete-ddl.sql"))
+        .addProcedures(InsertBatch.class)
+        .addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;")
+        ;
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, 2);
+        assertNotNull("LocalCluster failed to compile", cluster);
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
-
 }

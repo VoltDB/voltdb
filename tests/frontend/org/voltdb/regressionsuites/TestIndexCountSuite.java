@@ -27,20 +27,15 @@ import java.io.IOException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
+
 public class TestIndexCountSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -71,6 +66,7 @@ public class TestIndexCountSuite extends RegressionSuite {
 
     public void testOverflow() throws Exception {
         Client client = getClient();
+
         // Unique Map, Single column index
         client.callProcedure("TU1.insert", 1, 1);
         client.callProcedure("TU1.insert", 2, 2);
@@ -290,6 +286,7 @@ public class TestIndexCountSuite extends RegressionSuite {
 
     public void testThreeColumnsUniqueIndex() throws Exception {
         Client client = getClient();
+
         client.callProcedure("TU4.insert", 1, 1, "xin", 0);
         client.callProcedure("TU4.insert", 2, 2, "xin", 1);
         client.callProcedure("TU4.insert", 3, 3, "xin", 0);
@@ -448,73 +445,38 @@ public class TestIndexCountSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestIndexCountSuite.class.getResource("sqlindex-ddl.sql"))
 
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestIndexCountSuite.class);
+        .addStmtProcedure("TU1_LT",      "SELECT COUNT(*) FROM TU1 WHERE POINTS < ?")
+        .addStmtProcedure("TU1_LET",     "SELECT COUNT(*) FROM TU1 WHERE POINTS <= ?")
+        .addStmtProcedure("TU1_GT",      "SELECT COUNT(*) FROM TU1 WHERE POINTS > ?")
+        .addStmtProcedure("TU1_GET",     "SELECT COUNT(*) FROM TU1 WHERE POINTS >= ?")
 
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        .addStmtProcedure("TU3_LT",      "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS < ?")
+        .addStmtProcedure("TU3_LET",     "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS <= ?")
+        .addStmtProcedure("TU3_GT_LT",   "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?")
+        .addStmtProcedure("TU3_GT_LET",  "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS <= ?")
+        .addStmtProcedure("TU3_GET_LT",  "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?")
+        .addStmtProcedure("TU3_GET_LET", "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS <= ?")
 
-        project.addStmtProcedure("TU1_LT",       "SELECT COUNT(*) FROM TU1 WHERE POINTS < ?");
-        project.addStmtProcedure("TU1_LET",       "SELECT COUNT(*) FROM TU1 WHERE POINTS <= ?");
-        project.addStmtProcedure("TU1_GT",       "SELECT COUNT(*) FROM TU1 WHERE POINTS > ?");
-        project.addStmtProcedure("TU1_GET",       "SELECT COUNT(*) FROM TU1 WHERE POINTS >= ?");
+        .addStmtProcedure("TM1_LT",      "SELECT COUNT(*) FROM TM1 WHERE POINTS < ?")
+        .addStmtProcedure("TM1_LET",     "SELECT COUNT(*) FROM TM1 WHERE POINTS <= ?")
+        .addStmtProcedure("TM1_GT",      "SELECT COUNT(*) FROM TM1 WHERE POINTS > ?")
+        .addStmtProcedure("TM1_GET",     "SELECT COUNT(*) FROM TM1 WHERE POINTS >= ?")
 
-        project.addStmtProcedure("TU3_LT",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_LET",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS <= ?");
-        project.addStmtProcedure("TU3_GT_LT",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_GT_LET",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS <= ?");
-        project.addStmtProcedure("TU3_GET_LT",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_GET_LET",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS <= ?");
+        .addStmtProcedure("TM2_LT",      "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS < ?")
+        .addStmtProcedure("TM2_LET",     "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS <= ?")
+        .addStmtProcedure("TM2_GT_LT",   "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?")
+        .addStmtProcedure("TM2_GT_LET",  "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?")
+        .addStmtProcedure("TM2_GET_LT",  "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?")
+        .addStmtProcedure("TM2_GET_LET", "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?")
+        ;
+        return multiClusterSuiteBuilder(TestIndexCountSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2));
 
-        project.addStmtProcedure("TM1_LT",       "SELECT COUNT(*) FROM TM1 WHERE POINTS < ?");
-        project.addStmtProcedure("TM1_LET",       "SELECT COUNT(*) FROM TM1 WHERE POINTS <= ?");
-        project.addStmtProcedure("TM1_GT",       "SELECT COUNT(*) FROM TM1 WHERE POINTS > ?");
-        project.addStmtProcedure("TM1_GET",       "SELECT COUNT(*) FROM TM1 WHERE POINTS >= ?");
-
-        project.addStmtProcedure("TM2_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS <= ?");
-        project.addStmtProcedure("TM2_GT_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?");
-        project.addStmtProcedure("TM2_GET_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_GET_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
-        boolean success;
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sqlCountingIndex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlCountingIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
     }
 
     public static void main(String args[]) {

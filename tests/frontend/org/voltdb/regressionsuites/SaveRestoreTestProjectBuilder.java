@@ -23,111 +23,80 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb_testprocs.regressionsuites.saverestore.GetTxnId;
 import org.voltdb_testprocs.regressionsuites.saverestore.MatView;
 import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreSelect;
 
-public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
+public class SaveRestoreTestProjectBuilder
 {
-    public static Class<?> PROCEDURES[] =
-        new Class<?>[] { MatView.class, SaveRestoreSelect.class, GetTxnId.class};
-    public static Class<?> PROCEDURES_NOPARTITIONING[] =
-            new Class<?>[] { MatView.class, SaveRestoreSelect.class};
+    private static String partitioning[][] = {
+        {"PARTITION_TESTER", "PT_ID"},
+        {"CHANGE_COLUMNS", "ID"},
+        {"JUMBO_ROW", "PKEY"},
+        {"JUMBO_ROW_UTF8", "PKEY"},
+        };
 
-    public static String partitioning[][] =
-        new String[][] {{"PARTITION_TESTER", "PT_ID"},
-                        {"CHANGE_COLUMNS", "ID"},
-                        {"JUMBO_ROW", "PKEY"},
-                        {"JUMBO_ROW_UTF8", "PKEY"},
-                       };
+    private static final URL ddlURL = MatView.class.getResource("saverestore-ddl.sql");
 
-    public static final URL ddlURL =
-        MatView.class.getResource("saverestore-ddl.sql");
-    public static final String jarFilename = "saverestore.jar";
-
-    public void addDefaultProcedures()
+    public static CatalogBuilder defaultProceduresNoPartitioning(URL url)
     {
-        addProcedures(PROCEDURES);
+        return new CatalogBuilder()
+        .addSchema(url)
+        .addProcedures(MatView.class, SaveRestoreSelect.class);
     }
 
-    public void addDefaultProceduresNoPartitioning()
+    private static CatalogBuilder addDefaultPartitioningTo(CatalogBuilder cb)
     {
-        addProcedures(PROCEDURES_NOPARTITIONING);
-    }
-
-    public void addDefaultPartitioning()
-    {
-        for (String pair[] : partitioning)
-        {
-            addPartitionInfo(pair[0], pair[1]);
+        for (String pair[] : partitioning) {
+            cb.addPartitionInfo(pair[0], pair[1]);
         }
+        return cb;
     }
 
-    public void addPartitioning(String tableName, String partitionColumnName)
-    {
-        addPartitionInfo(tableName, partitionColumnName);
+    // factory method
+    static public CatalogBuilder defaultBuilder() {
+        return addDefaultPartitioningTo(
+                new CatalogBuilder()
+                .addProcedures(MatView.class, SaveRestoreSelect.class, GetTxnId.class)
+                .addSchema(ddlURL)
+                .addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)",
+                        "JUMBO_ROW.PKEY", 0)
+                .addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?",
+                        "JUMBO_ROW.PKEY", 0)
+                .addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW")
+                .addStmtProcedure("JumboInsertChars", "INSERT INTO JUMBO_ROW_UTF8 VALUES ( ?, ?, ?)",
+                        "JUMBO_ROW.PKEY", 0)
+                .addStmtProcedure("JumboSelectChars", "SELECT * FROM JUMBO_ROW_UTF8 WHERE PKEY = ?",
+                        "JUMBO_ROW.PKEY", 0)
+                );
     }
 
-    public void addDefaultSchema()
-    {
-        addSchema(ddlURL);
-    }
-
-    @Override
-    public void addAllDefaults()
-    {
-        addDefaultSchema();
-        addDefaultPartitioning();
-        addDefaultProcedures();
-        addStmtProcedure("JumboInsert", "INSERT INTO JUMBO_ROW VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
-        addStmtProcedure("JumboSelect", "SELECT * FROM JUMBO_ROW WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
-        addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
-        addStmtProcedure("JumboInsertChars", "INSERT INTO JUMBO_ROW_UTF8 VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
-        addStmtProcedure("JumboSelectChars", "SELECT * FROM JUMBO_ROW_UTF8 WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
-    }
-
+    // factory method
     /*
      * Different default set for the test of ENG-696 TestReplicatedSaveRestoreSysprocSuite
      * Has no partitioned tables.
      */
-    public void addAllDefaultsNoPartitioning() {
-        addDefaultProceduresNoPartitioning();
-        addDefaultSchema();
+    static public CatalogBuilder noPartitioningBuilder() {
+        return new CatalogBuilder()
+        .addProcedures(MatView.class, SaveRestoreSelect.class)
+        .addSchema(ddlURL)
+        ;
     }
 
-    public String getJARFilename()
+    public static CatalogBuilder alternativeCatalogBuilder()
     {
-        return jarFilename;
+        return alternativeCatalogBuilder(
+                SaveRestoreTestProjectBuilder.class.getResource("saverestore-altered-ddl.sql"));
     }
 
-    public Catalog createSaveRestoreSchemaCatalog() throws IOException
+    public static CatalogBuilder alternativeCatalogBuilder(URL altSchema)
     {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String catalogJar = testDir + File.separator + "saverestore-jni.jar";
-
-        addAllDefaults();
-
-        boolean status = compile(catalogJar);
-        assert(status);
-
-        // read in the catalog
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assert(serializedCatalog != null);
-
-        // create the catalog (that will be passed to the ClientInterface
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-
-        return catalog;
+        return addDefaultPartitioningTo(new CatalogBuilder()
+                .addProcedures(MatView.class, SaveRestoreSelect.class, GetTxnId.class)
+                .addSchema(altSchema));
     }
+
 }

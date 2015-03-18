@@ -32,19 +32,13 @@ public class PortListener {
 
     private ServerSocketChannel socket = null;
 
-    public PortListener(int port) {
-        try {
-            socket = ServerSocketChannel.open();
-            socket.socket().bind(new InetSocketAddress(port));
-        } catch (IOException ex) {
-            Logger.getLogger(PortListener.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
     public PortListener(int port, boolean loopback) {
         try {
             socket = ServerSocketChannel.open();
-            socket.socket().bind(new InetSocketAddress("127.0.0.1", port));
+            socket.socket().bind((loopback ?
+                                  new InetSocketAddress("127.0.0.1", port) :
+                                  new InetSocketAddress(port))
+            );
         } catch (IOException ex) {
             Logger.getLogger(PortListener.class.getName()).log(Level.SEVERE, null, ex);
         }

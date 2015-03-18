@@ -260,7 +260,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, new byte[] {}, 0) {
+        m_context = new CatalogContext(now, now, m_catalog, null, new byte[] {}, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;

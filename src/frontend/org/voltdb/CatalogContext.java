@@ -148,6 +148,10 @@ public class CatalogContext {
         }
     }
 
+    public static CatalogContext simpleForTest(long uniqueId, Catalog catalog, byte[] catalogBytes) {
+        return new CatalogContext(uniqueId, uniqueId, catalog, catalogBytes, new byte[0], 0);
+    }
+
     public CatalogContext update(
             long txnId,
             long uniqueId,

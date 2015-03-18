@@ -23,11 +23,6 @@
 
 package org.voltdb.jdbc;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -35,19 +30,18 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import junit.framework.TestCase;
+
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.DeploymentBuilder;
 
-public class TestJDBCResultSet {
-
+public class TestJDBCResultSet extends TestCase {
     static Connection HsqlConn;
     PreparedStatement hsqlEmptyStmt;
     PreparedStatement hsql3RowStmt;
@@ -56,17 +50,14 @@ public class TestJDBCResultSet {
 
     static ServerThread voltDBServer;
     static Connection VoltDBConn;
-    static VoltProjectBuilder pb;
-    static String testjar;
+    private static Configuration m_config;
     Statement voltEmptyStmt;
     Statement volt3RowStmt;
     ResultSet voltEmptyRS;
     ResultSet volt3RowRS;
 
     @BeforeClass
-    public static void setUp() throws Exception {
-        final String TEST_XML = "jdbcresultsettest.xml";
-        final String TEST_JAR = "jdbcresultsettest.jar";
+    public static void setUpBeforeClass() throws Exception {
         final String table1Stmt = "CREATE TABLE HSQLTABLE (COL1 INTEGER PRIMARY KEY, COL2 VARCHAR(20))";
         final String table2Stmt = "CREATE TABLE HSQLEMPTY (COLEM1 INTEGER PRIMARY KEY, COLEM2 VARCHAR(20))";
         final String insert1Stmt = "INSERT INTO HSQLTABLE(COL1, COL2) VALUES(1,'FirstRow')";
@@ -96,16 +87,10 @@ public class TestJDBCResultSet {
 
             // VoltDB Setup
             String ddl = table1Stmt + ";" + table2Stmt + ";";
-
-            pb = new VoltProjectBuilder();
-            pb.addLiteralSchema(ddl);
-            boolean success = pb.compile(
-                    Configuration.getPathToCatalogForTest(TEST_JAR), 3, 1, 0);
-            assert (success);
-            MiscUtils.copyFile(pb.getPathToDeployment(),
-                    Configuration.getPathToCatalogForTest(TEST_XML));
-            testjar = Configuration.getPathToCatalogForTest(TEST_JAR);
-
+            String testcaseclassname = TestJDBCResultSet.class.getSimpleName();
+            m_config = Configuration.compile(testcaseclassname, ddl,
+                    new DeploymentBuilder(3));
+            assertNotNull("Configuration failed to compile", m_config);
             // Set up ServerThread and Connection
             startServer();
             Statement VoltDBStmt = VoltDBConn.createStatement();
@@ -123,7 +108,7 @@ public class TestJDBCResultSet {
     }
 
     @AfterClass
-    public static void tearDown() throws Exception {
+    public static void tearDownAfterClass() throws Exception {
         try {
             Statement st = HsqlConn.createStatement();
             st.execute("SHUTDOWN");
@@ -136,16 +121,13 @@ public class TestJDBCResultSet {
         }
     }
 
-    private static void startServer() throws ClassNotFoundException,
-            SQLException {
-        voltDBServer = new ServerThread(testjar, pb.getPathToDeployment(),
-                BackendTarget.NATIVE_EE_JNI);
+    private static void startServer() throws ClassNotFoundException, SQLException {
+        voltDBServer = new ServerThread(m_config);
         voltDBServer.start();
         voltDBServer.waitForInitialization();
 
         Class.forName("org.voltdb.jdbc.Driver");
-        VoltDBConn = DriverManager
-                .getConnection("jdbc:voltdb://localhost:21212");
+        VoltDBConn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
     }
 
     private static void stopServer() throws SQLException {

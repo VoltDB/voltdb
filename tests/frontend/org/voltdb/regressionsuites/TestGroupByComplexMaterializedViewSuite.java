@@ -24,22 +24,25 @@
 package org.voltdb.regressionsuites;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
-import org.voltdb.BackendTarget;
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 
 public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
-
     public static String longStr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
@@ -1436,20 +1439,9 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() throws Exception {
-        LocalCluster config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestGroupByComplexMaterializedViewSuite.class);
-        String literalSchema = null;
-        boolean success = true;
-        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
-        PrintStream capturing = new PrintStream(capturer);
-        String captured = null;
-        String[] lines = null;
+        String[] lines;
 
-
-        VoltProjectBuilder project0 = new VoltProjectBuilder();
-        project0.setCompilerDebugPrintStream(capturing);
-        literalSchema =
+        lines = configureToFail(
                 "CREATE TABLE F ( " +
                 "F_PKEY INTEGER NOT NULL, " +
                 "F_D1   INTEGER NOT NULL, " +
@@ -1462,26 +1454,13 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
                 "CREATE VIEW V0 (V_D1_PKEY, V_D2_PKEY, V_D3_PKEY, V_F_PKEY, CNT, SUM_V1, SUM_V2, SUM_V3) " +
                 "AS SELECT F_D1, F_D2, F_D3, F_PKEY, COUNT(*), SUM(F_VAL1)+1, SUM(F_VAL2), SUM(F_VAL3) " +
-                "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;"
-                ;
-        try {
-            project0.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            fail();
-        }
-
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project0);
-        assertFalse(success);
-        captured = capturer.toString("UTF-8");
-        lines = captured.split("\n");
+                "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;" +
+                "");
 
         assertTrue(foundLineMatching(lines,
                 ".*V0.*must have non-group by columns aggregated by sum, count, min or max.*"));
 
-        VoltProjectBuilder project1 = new VoltProjectBuilder();
-        project1.setCompilerDebugPrintStream(capturing);
-        literalSchema =
+        lines = configureToFail(
                 "CREATE TABLE F ( " +
                 "F_PKEY INTEGER NOT NULL, " +
                 "F_D1   INTEGER NOT NULL, " +
@@ -1494,26 +1473,14 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
                 "CREATE VIEW V1 (V_D1_PKEY, V_D2_PKEY, V_D3_PKEY, V_F_PKEY, CNT, SUM_V1, SUM_V2, SUM_V3) " +
                 "AS SELECT F_D1, F_D2, F_D3, F_PKEY, COUNT(*) + 1, SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
-                "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;"
-                ;
-        try {
-            project1.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            fail();
-        }
-
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project1);
-        assertFalse(success);
-        captured = capturer.toString("UTF-8");
-        lines = captured.split("\n");
+                "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;" +
+                "");
 
         assertTrue(foundLineMatching(lines,
                 ".*V1.*is missing count(.*) as the column after the group by columns, a materialized view requirement.*"));
 
         // Real config for tests
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        literalSchema =
+        CatalogBuilder cb = new CatalogBuilder(
                 "CREATE TABLE R1 ( " +
                 "id INTEGER NOT NULL, " +
                 "wage INTEGER, " +
@@ -1668,38 +1635,48 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "CREATE VIEW V2_R4 (V2_R4_G1, V2_R4_G2, V2_R4_CNT, V2_R4_sum_wage) " +
                 "AS SELECT dept*dept, dept+dept, count(*), SUM(wage) " +
                 "FROM R4 GROUP BY dept*dept, dept+dept;" +
-                "";
+                "");
+        final Class<? extends TestCase> TESTCASECLASS = TestGroupByComplexMaterializedViewSuite.class;
+        LocalCluster[] configSet = LocalCluster.defineClusters(TESTCASECLASS.getSimpleName(),
+                cb,
+                new DeploymentBuilder(2, 3, 1), // <-- keep this first, to address with [0] below.
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend()
+                );
+        assertNotNull("LocalCluster compile failed", configSet);
+        // Disable in-process ServerThread --
+        // with it enabled, multi-host pro configs mysteriously hang at startup under eclipse.
+        // TODO: This indexing to get the correct LocalCluster instance is a bit hacky.
+        // If this is a general issue, defineClusters should generally handle it with an isPro check.
+        configSet[0].bypassInProcessServerThread();
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, configSet);
+    }
+
+    /**
+     * @param literalSchema
+     * @return
+     * @throws UnsupportedEncodingException
+     */
+    private static String[] configureToFail(String literalSchema)
+            throws UnsupportedEncodingException {
+        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
+        PrintStream capturing = new PrintStream(capturer);
+        String captured = null;
+        CatalogBuilder cb = new CatalogBuilder(literalSchema)
+        .setCompilerDebugPrintStream(capturing)
+        ;
+        File tempJar = null;
         try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            fail();
+            tempJar = cb.compileToTempJar();
+            assertNull("Catalog should not have compiled", tempJar);
         }
-
-        //* Single-server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // End single-server configuration  -- please do not remove or corrupt this structured comment */
-
-        //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
-
-        //* Multi-server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        // Disable hasLocalServer -- with hasLocalServer enabled,
-        // multi-server pro configs mysteriously hang at startup under eclipse.
-        config.setHasLocalServer(false);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // End multi-server configuration  -- please do not remove or corrupt this structured comment */
-
-        return builder;
+        finally {
+            if (tempJar != null) {
+                tempJar.delete();
+            }
+        }
+        captured = capturer.toString("UTF-8");
+        return captured.split("\n");
     }
 
     static private boolean foundLineMatching(String[] lines, String pattern) {

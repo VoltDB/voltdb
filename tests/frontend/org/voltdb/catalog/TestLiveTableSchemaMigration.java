@@ -32,7 +32,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ServerThread;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -41,7 +40,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestLiveTableSchemaMigration extends TestCase {
@@ -50,17 +48,15 @@ public class TestLiveTableSchemaMigration extends TestCase {
      * Assuming given table has schema metadata, make a catalog containing
      * that table on disk.
      */
-    String catalogPathForTable(VoltTable t, String jarname) throws IOException {
-        CatalogBuilder builder = new CatalogBuilder();
-        String ddl = TableHelper.ddlForTable(t);
-        builder.addLiteralSchema(ddl);
-        String retval = Configuration.getPathToCatalogForTest(jarname);
-        boolean success = builder.compile(retval);
+    String catalogPathForTable(VoltTable t) throws IOException {
+        CatalogBuilder cb = new CatalogBuilder(TableHelper.ddlForTable(t));
+        File jarFile = cb.compileToTempJar();
         // good spot below for a breakpoint if compiling fails
-        if (!success) {
-            fail();
+        if (jarFile == null) {
+            fail("Catalog failed to compile");
+            return null;
         }
-        return retval;
+        return jarFile.getAbsolutePath();
     }
 
     void migrateSchema(VoltTable t1, VoltTable t2) throws Exception {
@@ -81,19 +77,20 @@ public class TestLiveTableSchemaMigration extends TestCase {
                 helper.randomFill(t1, 1000, 1024);
             }
 
-            String catPath1 = catalogPathForTable(t1, "t1.jar");
-            String catPath2 = catalogPathForTable(t2, "t2.jar");
+            String catPath1 = catalogPathForTable(t1);
+            String catPath2 = catalogPathForTable(t2);
             byte[] catBytes2 = MiscUtils.fileToBytes(new File(catPath2));
 
-            DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
-            depBuilder.setVoltRoot("/tmp/foobar");
+            DeploymentBuilder depBuilder = new DeploymentBuilder(1)
+            .setVoltRoot("/tmp/foobar")
             // disable logging
-            depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
+            .configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3)
+            ;
             String deployment = depBuilder.getXML();
-            File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
+            String deploymentFile = MiscUtils.writeStringToTempFileAbsolutePath(deployment);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToDeployment = deploymentFile.getAbsolutePath();
+            config.m_pathToDeployment = deploymentFile;
             config.m_pathToCatalog = catPath1;
             config.m_ipcPort = 10000;
             //config.m_backend = BackendTarget.NATIVE_EE_IPC;
@@ -159,18 +156,18 @@ public class TestLiveTableSchemaMigration extends TestCase {
                 helper.randomFill(t1, 1000, 1024);
             }
 
-            String catPath1 = catalogPathForTable(t1, "t1.jar");
+            String catPath1 = catalogPathForTable(t1);
 
             DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.setVoltRoot("/tmp/foobar");
-            depBuilder.setUseDDLSchema(true);
+            depBuilder.setUseAdHocDDL(true);
             // disable logging
             depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
             String deployment = depBuilder.getXML();
-            File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
+            String deploymentFile = MiscUtils.writeStringToTempFileAbsolutePath(deployment);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToDeployment = deploymentFile.getAbsolutePath();
+            config.m_pathToDeployment = deploymentFile;
             config.m_pathToCatalog = catPath1;
             config.m_ipcPort = 10000;
             //config.m_backend = BackendTarget.NATIVE_EE_IPC;

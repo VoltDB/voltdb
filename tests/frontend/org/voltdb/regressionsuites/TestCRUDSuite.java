@@ -23,24 +23,21 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestCRUDSuite extends RegressionSuite {
-
-    static final Class<?>[] PROCEDURES = {};
-
-    public TestCRUDSuite(String name) {
+    public TestCRUDSuite(String name)
+    {
         super(name);
     }
 
-    public void testNegativeWrongTypeParam() throws Exception {
+    public void testNegativeWrongTypeParam() throws Exception
+    {
         final Client client = this.getClient();
         ClientResponse resp = client.callProcedure("P5.insert", -1000);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
@@ -199,72 +196,37 @@ public class TestCRUDSuite extends RegressionSuite {
         assertEquals(0, resp.getResults()[0].asScalarLong());
     }
 
-
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCRUDSuite.class);
-
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-
-        project.addStmtProcedure("CountP1", "select count(*) from p1;");
-        project.addStmtProcedure("CountR1", "select count(*) from r1;");
-
-        try {
-            // a table that should generate procedures
-            // use column names such that lexical order != column order.
-            project.addLiteralSchema(
-                    "CREATE TABLE p1(b1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
-            );
-            project.addPartitionInfo("p1", "b1");
-
-            // a partitioned table that should not generate procedures (no pkey)
-            project.addLiteralSchema(
-                    "CREATE TABLE p2(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
-                    "CREATE UNIQUE INDEX p2_tree_idx ON p2(a1);"
-            );
-            project.addPartitionInfo("p2", "a1");
-
-            // a partitioned table that should not generate procedures (pkey not partition key)
-            project.addLiteralSchema(
-                    "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
-                    "CREATE ASSUMEUNIQUE INDEX p3_tree_idx ON p3(a1); " +
-                    "PARTITION TABLE P3 ON COLUMN a2;"
-            );
-
-            // a replicated table (should not generate procedures).
-            project.addLiteralSchema(
-                    "CREATE TABLE r1(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (a1));"
-            );
-
-            // table with a multi-column pkey. verify that pkey column ordering is
-            // in the index column order, not table order and not index column lex. order
-            project.addLiteralSchema(
-                    "CREATE TABLE p4(z INTEGER NOT NULL, x VARCHAR(10) NOT NULL, y INTEGER NOT NULL, PRIMARY KEY(y,x,z));"
-            );
-            project.addPartitionInfo("p4", "y");
-
-            // table with a bigint pkey
-            project.addLiteralSchema(
-                    "CREATE TABLE p5(x BIGINT NOT NULL, PRIMARY KEY(x));"
-            );
-            project.addPartitionInfo("p5", "x");
-
-        } catch (IOException error) {
-            fail(error.getMessage());
-        }
-
-        // JNI
-        config = new LocalCluster("crud-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t1 = config.compile(project);
-        assertTrue(t1);
-        builder.addServerConfig(config);
-
-        // CLUSTER
-        config = new LocalCluster("crud-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
-
+        final CatalogBuilder cb = new CatalogBuilder(
+                // a table that should generate procedures
+                // use column names such that lexical order != column order.
+                "CREATE TABLE p1(b1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));" +
+                "PARTITION TABLE p1 ON COLUMN b1;\n" +
+                // a partitioned table that should not generate procedures (no pkey)
+                "CREATE TABLE p2(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
+                "CREATE UNIQUE INDEX p2_tree_idx ON p2(a1);" +
+                "PARTITION TABLE p2 ON COLUMN a1;\n" +
+                // a partitioned table that should not generate procedures (pkey not partition key)
+                "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
+                "CREATE ASSUMEUNIQUE INDEX p3_tree_idx ON p3(a1); " +
+                "PARTITION TABLE P3 ON COLUMN a2;\n" +
+                // a replicated table (should not generate procedures).
+                "CREATE TABLE r1(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (a1)); " +
+                // table with a multi-column pkey. verify that pkey column ordering is
+                // in the index column order, not table order and not index column lex. order
+                "CREATE TABLE p4(z INTEGER NOT NULL, x VARCHAR(10) NOT NULL, y INTEGER NOT NULL, PRIMARY KEY(y,x,z));" +
+                "PARTITION TABLE p4 ON COLUMN y;\n" +
+                // table with a bigint pkey
+                "CREATE TABLE p5(x BIGINT NOT NULL, PRIMARY KEY(x));" +
+                "PARTITION TABLE p5 ON COLUMN x;\n" +
+                "")
+        .addStmtProcedure("CountP1", "select count(*) from p1;")
+        .addStmtProcedure("CountR1", "select count(*) from r1;");
+        MultiConfigSuiteBuilder builder = multiClusterSuiteBuilder(TestCRUDSuite.class,
+                cb,
+                new DeploymentBuilder(1),
+                new DeploymentBuilder(2, 3, 1));
         return builder;
     }
+
 }

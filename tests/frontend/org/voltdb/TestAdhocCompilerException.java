@@ -33,8 +33,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AsyncCompilerAgent;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestAdhocCompilerException extends AdhocDDLTestBase
 {
@@ -44,18 +43,11 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
         // Enables special DDL string triggering artificial exception in AsyncCompilerAgent.
         System.setProperty("asynccompilerdebug", "true");
 
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+        DeploymentBuilder db = new DeploymentBuilder()
+        .setUseAdHocDDL(true)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), "", db);
+        assertNotNull("Schema compilation failed", config);
 
         // Trigger an exception inside AsyncCompilerAgent
         try {

@@ -63,6 +63,7 @@ import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
+import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -103,6 +104,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
@@ -395,13 +397,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = false;
-            if (config.m_startAction.doesRejoin()) {
+            if (m_config.m_startAction.doesRejoin()) {
                 isRejoin = true;
             }
             m_rejoining = isRejoin;
-            m_rejoinDataPending = isRejoin || config.m_startAction == StartAction.JOIN;
+            m_rejoinDataPending = isRejoin || m_config.m_startAction == StartAction.JOIN;
 
-            m_joining = config.m_startAction == StartAction.JOIN;
+            m_joining = m_config.m_startAction == StartAction.JOIN;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -414,7 +416,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
-            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+            readBuildInfo(m_config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
             // Replay command line args that we can see
             StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
@@ -540,7 +542,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
+            JSONObject topo = getTopology();
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Integer>();
             try {
                 // IV2 mailbox stuff
@@ -740,9 +742,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         m_cartographer,
                         m_configuredNumberOfPartitions,
                         clientIntf,
-                        config.m_port,
+                        m_config.m_port,
                         adminIntf,
-                        config.m_adminPort,
+                        m_config.m_adminPort,
                         m_config.m_timestampTestingSalt);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -1180,18 +1182,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(StartAction startAction, JoinCoordinator joinCoordinator)
+    private JSONObject getTopology()
     {
         JSONObject topo = null;
-        if (startAction == StartAction.JOIN) {
-            assert(joinCoordinator != null);
-            topo = joinCoordinator.getTopology();
+        if (m_config.m_startAction == StartAction.JOIN) {
+            assert(m_joinCoordinator != null);
+            topo = m_joinCoordinator.getTopology();
         }
-        else if (!startAction.doesRejoin()) {
+        else if (!m_config.m_startAction.doesRejoin()) {
             int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
             int hostcount = m_catalogContext.getDeployment().getCluster().getHostcount();
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-            ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+            ClusterConfig clusterConfig = new ClusterConfig(sitesperhost, hostcount, kfactor);
             if (!clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
@@ -1230,34 +1232,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         // First, race to write the topology to ZK using Highlander rules
         // (In the end, there can be only one)
         JSONObject topo = null;
-        try
-        {
+        try {
             topo = config.getTopology(m_messenger.getLiveHostIds());
             byte[] payload = topo.toString(4).getBytes("UTF-8");
             m_messenger.getZK().create(VoltZK.topology, payload,
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT);
         }
-        catch (KeeperException.NodeExistsException nee)
-        {
+        catch (KeeperException.NodeExistsException nee) {
             // It's fine if we didn't win, we'll pick up the topology below
         }
-        catch (Exception e)
-        {
-            VoltDB.crashLocalVoltDB("Unable to write topology to ZK, dying",
-                    true, e);
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to write topology to ZK, dying", true, e);
         }
 
         // Then, have everyone read the topology data back from ZK
-        try
-        {
+        try {
             byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, null);
             topo = new JSONObject(new String(data, "UTF-8"));
         }
-        catch (Exception e)
-        {
-            VoltDB.crashLocalVoltDB("Unable to read topology from ZK, dying",
-                    true, e);
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to read topology from ZK, dying", true, e);
         }
         return topo;
     }
@@ -1314,7 +1309,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             byte deploymentBytes[] = null;
 
             try {
-                deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
+                deploymentBytes = CoreUtils.urlToBytes(m_config.m_pathToDeployment);
             } catch (Exception ex) {
                 //Let us get bytes from ZK
             }
@@ -1475,7 +1470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             @SuppressWarnings("unused")
             Database db = cluster.getDatabases().add("database");
 
-            String result = CatalogUtil.compileDeployment(catalog, deployment, true);
+            String result = CatalogUtil.compileDeploymentNoUsersOrExport(catalog, deployment);
             if (result != null) {
                 // Any other non-enterprise deployment errors will be caught and handled here
                 // (such as <= 0 host count)
@@ -1612,9 +1607,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
         int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
 
-        org.voltcore.messaging.HostMessenger.Config hmconfig;
+        HostMessenger.Config hmconfig;
 
-        hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
+        hmconfig = new HostMessenger.Config(hostname, port);
         hmconfig.internalPort = m_config.m_internalPort;
         if (m_config.m_internalPortInterface != null && m_config.m_internalPortInterface.trim().length() > 0) {
             hmconfig.internalInterface = m_config.m_internalPortInterface.trim();
@@ -1626,7 +1621,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
+        m_messenger = new HostMessenger(hmconfig);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
@@ -2008,8 +2003,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_latencyHistogramStats = null;
 
                 AdHocCompilerCache.clearHashCache();
-                org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
-
+                InitiatorMailbox.m_allInitiatorMailboxes.clear();
                 PartitionDRGateway.gateways.clear();
 
                 // probably unnecessary, but for tests it's nice because it
@@ -2729,7 +2723,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 new ZKUtil.StringCallback(),
                 null);
 
-        zk.getData(VoltZK.buildstring, false, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
+        zk.getData(VoltZK.buildstring, false, new AsyncCallback.DataCallback() {
 
             @Override
             public void processResult(int rc, String path, Object ctx,

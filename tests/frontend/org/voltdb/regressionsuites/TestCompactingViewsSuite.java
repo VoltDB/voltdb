@@ -23,19 +23,14 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestCompactingViewsSuite extends RegressionSuite {
-
-    static final Class<?>[] PROCEDURES = {};
-
     public TestCompactingViewsSuite(String name) {
         super(name);
     }
@@ -126,55 +121,33 @@ public class TestCompactingViewsSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCompactingViewsSuite.class);
+        final CatalogBuilder cb = new CatalogBuilder(
+                // partitioned
+                "CREATE TABLE PP(id INTEGER NOT NULL, value VARCHAR(63), " +
+                "e1 VARCHAR(63), e2 VARCHAR(63), e3 VARCHAR(63), e4 VARCHAR(63)," +
+                "e5 VARCHAR(63), e6 VARCHAR(63), e7 VARCHAR(63), e8 VARCHAR(63)," +
+                "PRIMARY KEY (id)); \n" +
+                "PARTITION TABLE pp ON COLUMN id;\n" +
 
-        final VoltProjectBuilder project = new VoltProjectBuilder();
+                "CREATE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);" +
 
-        try {
-            // partitioned
-            project.addLiteralSchema(
-                    "CREATE TABLE PP(id INTEGER NOT NULL, value VARCHAR(63), " +
-                    "e1 VARCHAR(63), e2 VARCHAR(63), e3 VARCHAR(63), e4 VARCHAR(63)," +
-                    "e5 VARCHAR(63), e6 VARCHAR(63), e7 VARCHAR(63), e8 VARCHAR(63)," +
-                    "PRIMARY KEY (id)); "
-            );
-            project.addLiteralSchema(
-                    "CREATE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);"
-            );
-            project.addLiteralSchema(
-                    "CREATE VIEW VP(id, value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
-                    "AS SELECT id, value, e1, e2, e3, e4, e5, e6, e7, e8, COUNT(*) " +
-                    "FROM PP GROUP BY id, value, e1, e2, e3, e4, e5, e6, e7, e8;"
-            );
-            project.addPartitionInfo("pp", "id");
+                "CREATE VIEW VP(id, value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
+                "AS SELECT id, value, e1, e2, e3, e4, e5, e6, e7, e8, COUNT(*) " +
+                "FROM PP GROUP BY id, value, e1, e2, e3, e4, e5, e6, e7, e8;" +
 
-            // replicated
-            project.addLiteralSchema(
-                    "CREATE TABLE PR(id INTEGER NOT NULL, value VARCHAR(1000), " +
-                    "e1 VARCHAR(63), e2 VARCHAR(63), e3 VARCHAR(63), e4 VARCHAR(63)," +
-                    "e5 VARCHAR(63), e6 VARCHAR(63), e7 VARCHAR(63), e8 VARCHAR(63)," +
-                    "PRIMARY KEY (id)); " +
-                    "CREATE VIEW VR(value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
-                    "AS SELECT value, e1, e2, e3, e4, e5, e6, e7, e8, COUNT(*) " +
-                    "FROM PR GROUP BY value, e1, e2, e3, e4, e5, e6, e7, e8;"
-            );
-
-            project.addStmtProcedure("selectPP", "select id from PP order by value, e1, e2, e3, e4, e5, e6, e7, e8");
-            project.addStmtProcedure("selectPR", "select id from PR order by value, e1, e2, e3, e4, e5, e6, e7, e8");
-
-            project.addStmtProcedure("deletePR", "delete from PR where id = ?");
-        }
-        catch (IOException error) {
-            fail(error.getMessage());
-        }
-
-        // JNI local with 1 site
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t1 = config.compile(project);
-        assertTrue(t1);
-        builder.addServerConfig(config);
-
-        return builder;
+                // replicated
+                "CREATE TABLE PR(id INTEGER NOT NULL, value VARCHAR(1000), " +
+                "e1 VARCHAR(63), e2 VARCHAR(63), e3 VARCHAR(63), e4 VARCHAR(63)," +
+                "e5 VARCHAR(63), e6 VARCHAR(63), e7 VARCHAR(63), e8 VARCHAR(63)," +
+                "PRIMARY KEY (id)); " +
+                "CREATE VIEW VR(value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
+                "AS SELECT value, e1, e2, e3, e4, e5, e6, e7, e8, COUNT(*) " +
+                "FROM PR GROUP BY value, e1, e2, e3, e4, e5, e6, e7, e8;" +
+                "")
+        .addStmtProcedure("selectPP", "select id from PP order by value, e1, e2, e3, e4, e5, e6, e7, e8")
+        .addStmtProcedure("selectPR", "select id from PR order by value, e1, e2, e3, e4, e5, e6, e7, e8")
+        .addStmtProcedure("deletePR", "delete from PR where id = ?")
+        ;
+        return multiClusterSuiteBuilder(TestCompactingViewsSuite.class, cb, new DeploymentBuilder());
     }
 }

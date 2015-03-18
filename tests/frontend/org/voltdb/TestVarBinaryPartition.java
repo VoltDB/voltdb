@@ -31,82 +31,56 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestVarBinaryPartition extends TestCase {
-
-    private String pathToCatalog;
-    private String pathToDeployment;
-    private ServerThread localServer;
-    private VoltDB.Configuration config;
-    private VoltProjectBuilder builder;
-    private Client client;
-
-    @Override
-    protected void setUp() throws Exception
-    {
-        super.setUp();
-    }
-
-
     public void testPartitionAndInsert () throws Exception {
-        String my_schema =
+        String simpleSchema =
                 "create table BLAH (" +
                 "clm_varinary varbinary(128) default '00' not null," +
                 "clm_smallint smallint default 0 not null, " +
-                ");";
+                ");" +
+                "";
+        //.addStmtProcedure("Insert", "INSERT into BLAH values (?, ?, ?, ?, ?, ?, ?);");
+        Configuration config = Configuration.compile(getClass().getSimpleName(), simpleSchema,
+                new DeploymentBuilder(2));
+        assertNotNull("Configuration failed to compile", config);
+        ServerThread localServer = new ServerThread(config);
 
-            pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
-            pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
-            builder = new VoltProjectBuilder();
+        localServer.start();
+        localServer.waitForInitialization();
 
-            builder.addLiteralSchema(my_schema);
-            builder.addPartitionInfo("BLAH", "clm_varinary");
-            //builder.addStmtProcedure("Insert", "INSERT into BLAH values (?, ?, ?, ?, ?, ?, ?);");
-            boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-            assertTrue(success);
-            MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-            config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
-            localServer = new ServerThread(config);
-            client = null;
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
 
-            localServer.start();
-            localServer.waitForInitialization();
+        ClientResponse resp;
+        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('22',1);");
+        assertEquals(1, resp.getResults()[0].asScalarLong());
+        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('80',3);" );
+        assertEquals(1, resp.getResults()[0].asScalarLong());
+        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('8081828384858687888990',4);" );
+        assertEquals(1, resp.getResults()[0].asScalarLong());
 
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
-
-            ClientResponse resp;
-            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('22',1);");
-            assertEquals(1, resp.getResults()[0].asScalarLong());
-            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('80',3);" );
-            assertEquals(1, resp.getResults()[0].asScalarLong());
-            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('8081828384858687888990',4);" );
-            assertEquals(1, resp.getResults()[0].asScalarLong());
-
-            Random rand = new Random();
-            for( int i = 0; i < 1000; i++ ){
-                byte[] bytes = new byte[rand.nextInt(128)];
-                rand.nextBytes(bytes);
-                // Just to mix things up, alternate methods of INSERT among
-                // literal hex string, hex string parameter, and byte[] parameter.
-                if ( i % 2 == 0 ) {
-                    String hexString = Encoder.hexEncode(bytes);
-                    if ( i % 4 == 0 ) {
-                        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('" + hexString + "',5);" );
-                    } else {
-                        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?,5);", hexString);
-                    }
+        Random rand = new Random();
+        for ( int i = 0; i < 1000; i++ ) {
+            byte[] bytes = new byte[rand.nextInt(128)];
+            rand.nextBytes(bytes);
+            // Just to mix things up, alternate methods of INSERT among
+            // literal hex string, hex string parameter, and byte[] parameter.
+            if ( i % 2 == 0 ) {
+                String hexString = Encoder.hexEncode(bytes);
+                if ( i % 4 == 0 ) {
+                    resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('" + hexString + "',5);" );
                 } else {
-                    resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?,5);", bytes);
+                    resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?,5);", hexString);
                 }
-                assertEquals(1, resp.getResults()[0].asScalarLong());
+            } else {
+                resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?,5);", bytes);
             }
-            resp =  client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;");
-            assertEquals(3 + 1000, resp.getResults()[0].asScalarLong());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+        resp =  client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;");
+        assertEquals(3 + 1000, resp.getResults()[0].asScalarLong());
     }
 }

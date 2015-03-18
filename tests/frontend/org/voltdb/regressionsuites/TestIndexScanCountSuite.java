@@ -27,21 +27,15 @@ import java.io.IOException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestIndexScanCountSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -50,7 +44,7 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         super(name);
     }
 
-    void callWithExpectedCount(Client client,int count, String procName, Object... params)
+    private void callWithExpectedCount(Client client,int count, String procName, Object... params)
             throws NoConnectionsException, IOException, ProcCallException {
 
         ClientResponse cr = client.callProcedure(procName, params);
@@ -62,7 +56,7 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         assertEquals(count, result.getLong(0));
     }
 
-    void callAdHocFilterWithExpectedCount(Client client, String tbName, String filters, int expectedCounts) throws Exception {
+    private void callAdHocFilterWithExpectedCount(Client client, String tbName, String filters, int expectedCounts) throws Exception {
         VoltTable vt;
         String sql = "SELECT COUNT(ID) FROM " + tbName + " WHERE " + filters;
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -453,73 +447,37 @@ public class TestIndexScanCountSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestIndexCountSuite.class.getResource("sqlindex-ddl.sql"))
 
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestIndexScanCountSuite.class);
+        .addStmtProcedure("TU1_LT",      "SELECT COUNT(ID) FROM TU1 WHERE POINTS < ?")
+        .addStmtProcedure("TU1_LET",     "SELECT COUNT(ID) FROM TU1 WHERE POINTS <= ?")
+        .addStmtProcedure("TU1_GT",      "SELECT COUNT(ID) FROM TU1 WHERE POINTS > ?")
+        .addStmtProcedure("TU1_GET",     "SELECT COUNT(ID) FROM TU1 WHERE POINTS >= ?")
 
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        .addStmtProcedure("TU3_LT",      "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS < ?")
+        .addStmtProcedure("TU3_LET",     "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS <= ?")
+        .addStmtProcedure("TU3_GT_LT",   "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?")
+        .addStmtProcedure("TU3_GT_LET",  "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS <= ?")
+        .addStmtProcedure("TU3_GET_LT",  "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?")
+        .addStmtProcedure("TU3_GET_LET", "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS <= ?")
 
-        project.addStmtProcedure("TU1_LT",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS < ?");
-        project.addStmtProcedure("TU1_LET",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS <= ?");
-        project.addStmtProcedure("TU1_GT",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS > ?");
-        project.addStmtProcedure("TU1_GET",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS >= ?");
+        .addStmtProcedure("TM1_LT",      "SELECT COUNT(ID) FROM TM1 WHERE POINTS < ?")
+        .addStmtProcedure("TM1_LET",     "SELECT COUNT(ID) FROM TM1 WHERE POINTS <= ?")
+        .addStmtProcedure("TM1_GT",      "SELECT COUNT(ID) FROM TM1 WHERE POINTS > ?")
+        .addStmtProcedure("TM1_GET",     "SELECT COUNT(ID) FROM TM1 WHERE POINTS >= ?")
 
-        project.addStmtProcedure("TU3_LT",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_LET",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS <= ?");
-        project.addStmtProcedure("TU3_GT_LT",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_GT_LET",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS <= ?");
-        project.addStmtProcedure("TU3_GET_LT",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_GET_LET",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS <= ?");
-
-        project.addStmtProcedure("TM1_LT",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS < ?");
-        project.addStmtProcedure("TM1_LET",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS <= ?");
-        project.addStmtProcedure("TM1_GT",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS > ?");
-        project.addStmtProcedure("TM1_GET",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS >= ?");
-
-        project.addStmtProcedure("TM2_LT",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS <= ?");
-        project.addStmtProcedure("TM2_GT_LT",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?");
-        project.addStmtProcedure("TM2_GET_LT",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_GET_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
-        boolean success;
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sqlIndex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        .addStmtProcedure("TM2_LT",      "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS < ?")
+        .addStmtProcedure("TM2_LET",     "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS <= ?")
+        .addStmtProcedure("TM2_GT_LT",   "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?")
+        .addStmtProcedure("TM2_GT_LET",  "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?")
+        .addStmtProcedure("TM2_GET_LT",  "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?")
+        .addStmtProcedure("TM2_GET_LET", "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?")
+        ;
+        return multiClusterSuiteBuilder(TestIndexCountSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2));
     }
 
     public static void main(String args[]) {

@@ -29,8 +29,8 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestHSQLBackend extends TestCase {
 /*
@@ -134,25 +134,18 @@ public class TestHSQLBackend extends TestCase {
     }
 */
     public void testVarbinary() throws Exception {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "b varbinary(1) default null, " +
-            "PRIMARY KEY(ival));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("hsqldbbin.jar"), 1, 1, 0);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("hsqldbbin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("hsqldbbin.xml");
-        config.m_backend = BackendTarget.HSQLDB_BACKEND;
-        config.m_noLoadLibVOLTDB = true;
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah (" +
+                "ival bigint default 0 not null, " +
+                "b varbinary(1) default null, " +
+                "PRIMARY KEY(ival));\n" +
+                "PARTITION TABLE blah ON COLUMN ival;\n" +
+                "")
+        .addStmtProcedure("Insert", "insert into blah values (?, ?);")
+        ;
+        DeploymentBuilder db = DeploymentBuilder.forHSQLBackend();
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+        assertNotNull("Configuration failed to compile", config);
         ServerThread localServer = new ServerThread(config);
         localServer.start();
         localServer.waitForInitialization();

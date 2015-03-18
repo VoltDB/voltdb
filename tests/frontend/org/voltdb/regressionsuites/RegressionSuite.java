@@ -43,6 +43,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -81,7 +83,7 @@ public class RegressionSuite extends TestCase {
     public void setUp() throws Exception {
         //New tests means a new server thread that hasn't done a restore
         m_config.setCallingMethodName(m_methodName);
-        m_config.startUp(true);
+        m_config.startUp();
     }
 
     /**
@@ -528,4 +530,40 @@ public class RegressionSuite extends TestCase {
         }
         assertTrue(found);
     }
+
+    /**
+     * @param leafTestCaseClass
+     * @param cb
+     * @param deploymentSet
+     * @return
+     */
+    protected static MultiConfigSuiteBuilder multiClusterSuiteBuilder(
+            Class<? extends TestCase> leafTestCaseClass,
+            CatalogBuilder cb,
+            DeploymentBuilder... deploymentSet)
+    {
+        String prefix = leafTestCaseClass.getSimpleName();
+        LocalCluster[] configSet = LocalCluster.defineClusters(prefix, cb, deploymentSet);
+        assertNotNull("LocalCluster compile failed", configSet);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(leafTestCaseClass, configSet);
+        return builder;
+    }
+
+    /**
+     * @param TESTCASECLASS
+     * @param literalSchema
+     * @param deploymentSet
+     * @return
+     */
+    protected static junit.framework.Test multiClusterSuiteBuilder(
+            Class<? extends TestCase> leafTestCaseClass,
+            String literalSchema,
+            DeploymentBuilder... deploymentSet) {
+        LocalCluster[] configSet = LocalCluster.defineClusters(leafTestCaseClass.getSimpleName(),
+                new CatalogBuilder(literalSchema), deploymentSet);
+        assertNotNull("LocalCluster compile failed", configSet);
+        return new MultiConfigSuiteBuilder(leafTestCaseClass, configSet);
+    }
+
+
 }

@@ -27,22 +27,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.IOException;
-
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
 public class TestMixedVersionClusters {
-
-    static final int K = MiscUtils.isPro() ? 1 : 0;
-
-    static final String JAR_NAME = "mixed.jar";
-    static final VoltProjectBuilder m_builder = new VoltProjectBuilder();
-
     private class MixedVersionCluster {
         LocalCluster m_cluster = null;
 
@@ -51,17 +42,12 @@ public class TestMixedVersionClusters {
             assert(regexOverrides != null);
             assert(versions.length == regexOverrides.length);
 
-            m_cluster = new LocalCluster(
-                    JAR_NAME,
-                    2,
-                    versions.length,
-                    K,
-                    BackendTarget.NATIVE_EE_JNI);
+            CatalogBuilder cb = new CatalogBuilder("CREATE TABLE V0 (id BIGINT);");
+            DeploymentBuilder db = new DeploymentBuilder(2, versions.length, 1)
+            .configureLogging(null, null, false, false, 200, Integer.MAX_VALUE, null);
+            m_cluster = LocalCluster.configure(getClass().getSimpleName(), cb, db);
             m_cluster.setOverridesForHotfix(versions, regexOverrides);
-            m_cluster.setHasLocalServer(false);
-            m_cluster.setDeploymentAndVoltDBRoot(
-                    m_builder.getPathToDeployment(),
-                    m_builder.getPathToVoltRoot().getAbsolutePath());
+            m_cluster.bypassInProcessServerThread();
         }
 
         boolean start() {
@@ -91,13 +77,6 @@ public class TestMixedVersionClusters {
         }
     }
 
-    @BeforeClass
-    public static void compileCatalog() throws IOException {
-        m_builder.addLiteralSchema("CREATE TABLE V0 (id BIGINT);");
-        m_builder.configureLogging(null, null, false, false, 200, Integer.MAX_VALUE, null);
-        assertTrue(m_builder.compile(Configuration.getPathToCatalogForTest(JAR_NAME), 2, 3, K));
-    }
-
     //
     // This test will bomb out if a version isn't compatible with itself. We shouldn't ship that.
     //
@@ -118,7 +97,7 @@ public class TestMixedVersionClusters {
         assertTrue(cluster.start());
         cluster.shutdown();
 
-        // Three different versions are not allowed simultaniously
+        // Three different versions are not allowed simultaneously
         cluster = new MixedVersionCluster(
                 new String[] {"4.1", "5.6", "4.1"},
                 new String[] {"^4\\.1(\\.\\d+)*\\z", "^5\\.6(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"});

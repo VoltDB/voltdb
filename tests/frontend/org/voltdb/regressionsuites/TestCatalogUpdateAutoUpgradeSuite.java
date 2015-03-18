@@ -30,8 +30,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -40,22 +40,20 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.CatalogUpgradeTools;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.DeploymentBuilder;
 
 /**
  * Tests catalog update with auto-upgrade.
  */
 public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
+    private static final Class<? extends TestCase> TESTCASECLASS =
+            TestCatalogUpdateAutoUpgradeSuite.class;
 
-    static final int SITES_PER_HOST = 2;
-    static final int HOSTS = 2;
-    static final int K = 0;
-
-    // procedures used by these tests
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
+    private static final int SITES_PER_HOST = 2;
+    private static final int HOSTS = 2;
+    private static final int K = 0;
 
     private static String upgradeCatalogBasePath;
     private static String upgradeCatalogXMLPath;
@@ -228,14 +226,6 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
     }
 
     static public Test suite() throws Exception {
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatalogUpdateAutoUpgradeSuite.class);
-
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        // Add an import of an exact class match here to trigger ENG-6611 on auto-catalog-recompile
-        project.addLiteralSchema("import class org.voltdb_testprocs.fullddlfeatures.NoMeaningClass;");
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
         upgradeCatalogBasePath = Configuration.getPathToCatalogForTest("catalogupdate-for-upgrade");
         upgradeCatalogXMLPath = upgradeCatalogBasePath + ".xml";
         upgradeCatalogJarPath = upgradeCatalogBasePath + ".jar";
@@ -243,15 +233,21 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         HashMap<String, String> env = new HashMap<String, String>();
         // If we are doing something special with a stored procedure it will be on HostId 0
         env.put("__VOLTDB_TARGET_CLUSTER_HOSTID__", "0");
-        LocalCluster config = new LocalCluster("catalogupdate-for-upgrade.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI, env);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
-        config.setHasLocalServer(false);
-        builder.addServerConfig(config);
 
-        MiscUtils.copyFile(project.getPathToDeployment(), upgradeCatalogXMLPath);
-
-        return builder;
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        // Add an import of an exact class match here to trigger ENG-6611 on auto-catalog-recompile
+        .addLiteralSchema("import class org.voltdb_testprocs.fullddlfeatures.NoMeaningClass;")
+        .addProcedures(
+                org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+                org.voltdb.benchmark.tpcc.procedures.delivery.class)
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K);
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, db);
+        assertNotNull("LocalCluster failed to compile", cluster);
+        cluster.setAdditionalEnv(env)
+        .bypassInProcessServerThread();
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
 
     @Override

@@ -27,19 +27,23 @@ import java.io.File;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
+import org.voltdb.benchmark.tpcc.procedures.SelectAll;
+import org.voltdb.benchmark.tpcc.procedures.delivery;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -49,15 +53,11 @@ import org.voltdb.utils.MiscUtils;
  *
  */
 public class TestUpdateDeployment extends RegressionSuite {
+    private static final Class<? extends TestCase> TESTCASECLASS = TestUpdateDeployment.class;
 
-    static final int SITES_PER_HOST = 2;
-    static final int HOSTS = 2;
-    static final int K = MiscUtils.isPro() ? 1 : 0;
-
-    // procedures used by these tests
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
+    private static final int SITES_PER_HOST = 2;
+    private static final int HOSTS = 2;
+    private static final int K = MiscUtils.isPro() ? 1 : 0;
 
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -67,13 +67,13 @@ public class TestUpdateDeployment extends RegressionSuite {
         super(name);
     }
 
-    AtomicInteger m_outstandingCalls = new AtomicInteger(0);
+    private AtomicInteger m_outstandingCalls = new AtomicInteger(0);
 
-    boolean callbackSuccess;
+    private boolean callbackSuccess;
 
     class CatTestCallback implements ProcedureCallback {
 
-        final byte m_expectedStatus;
+        private final byte m_expectedStatus;
 
         CatTestCallback(byte expectedStatus) {
             m_expectedStatus = expectedStatus;
@@ -320,6 +320,9 @@ public class TestUpdateDeployment extends RegressionSuite {
         assertTrue(dir.delete());
     }
 
+    private static void writeConfigFiles(String string, CatalogBuilder altCb, DeploymentBuilder altDb) {
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -330,111 +333,60 @@ public class TestUpdateDeployment extends RegressionSuite {
      * @throws Exception
      */
     static public Test suite() throws Exception {
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(2));
+        TheHashinator.initializeAsConfiguredForPartitions(2);
 
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestUpdateDeployment.class);
+        final Class<?>[] BASEPROCS = { InsertNewOrder.class, SelectAll.class, delivery.class };
 
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-
-        // Catalog upgrade test(s) sporadically fail if there's a local server because
-        // a file pipe isn't available for grepping local server output.
-        ((LocalCluster) config).setHasLocalServer(true);
-
-        // build up a project builder for the workload
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(BASEPROCS)
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K);
         // build the jarfile
-        boolean basecompile = config.compile(project);
-        assertTrue(basecompile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, db);
+        assertNotNull("LocalCluster failed to compile", cluster);
 
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
+        CatalogBuilder altCb;
+        DeploymentBuilder altDb;
         /////////////////////////////////////////////////////////////
         // DELTA CATALOGS FOR TESTING
         /////////////////////////////////////////////////////////////
 
         // Generate a catalog that adds a table and a deployment file that changes the dead host timeout.
-        config = new LocalCluster("catalogupdate-cluster-addtable.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
-        project.setDeadHostTimeout(6);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtable.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setDeadHostTimeout(6);
+        writeConfigFiles("-timeout", altCb, altDb);
 
         // A catalog change that enables snapshots
-        config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(BASEPROCS);
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setSnapshotSettings("1s", 3, "/tmp/snapshotdir1", "foo1");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml"));
+        writeConfigFiles("-enable-snapshot", altCb, altDb);
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
-        // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setSnapshotSettings("1s", 3, "/tmp/snapshotdir2", "foo2");
+        writeConfigFiles("-change-snapshot", altCb, altDb);
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
-        // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
+        writeConfigFiles("-change_snapshot-dir-not-exist", altCb, altDb);
 
         // A deployment change that changes the schema change mechanism
-        config = new LocalCluster("catalogupdate-cluster-change_schema_update.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setUseDDLSchema(true);
-        // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_schema_update.xml"));
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setUseAdHocDDL(true);
+        writeConfigFiles("-change-schema-update", altCb, altDb);
 
         // A deployment change that changes the schema change mechanism
-        config = new LocalCluster("catalogupdate-security-no-users.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSecurityEnabled(true, false);
-        // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-security-no-users.xml"));
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setSecurityEnabled(true, false);
+        writeConfigFiles("-secure-no-users", altCb, altDb);
 
-        return builder;
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
 
     @Override

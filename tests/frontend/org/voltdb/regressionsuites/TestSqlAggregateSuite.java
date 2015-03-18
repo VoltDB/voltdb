@@ -26,25 +26,20 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.aggregates.Insert;
 
 /**
  * System tests for basic aggregate and DISTINCT functionality
  */
-
 public class TestSqlAggregateSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
-    static final int ROWS = 10;
+    private static final int ROWS = 10;
 
     public void testDistinct() throws IOException, ProcCallException
     {
@@ -425,36 +420,15 @@ public class TestSqlAggregateSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSqlAggregateSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("aggregate-sql-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addProcedures(PROCEDURES);
-
-        config = new LocalCluster("sqlaggregate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqlaggregate-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqlaggregate-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        // HSQL backend testing fails a few cases,
-        // probably due to differences in null representation -- it doesn't support MIN_VALUE as null
-        // These specific cases are qualified with if ( ! isHSQL()).
-        config = new LocalCluster("sqlaggregate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(Insert.class.getResource("aggregate-sql-ddl.sql"))
+        .addProcedures(Insert.class)
+        ;
+        return multiClusterSuiteBuilder(TestSqlAggregateSuite.class, cb,
+                new DeploymentBuilder(),
+                new DeploymentBuilder(2),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 
 }

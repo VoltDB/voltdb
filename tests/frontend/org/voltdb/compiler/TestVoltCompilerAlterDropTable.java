@@ -38,6 +38,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.MiscUtils;
 
 public class TestVoltCompilerAlterDropTable extends TestCase {
 
@@ -54,27 +55,6 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
     public void tearDown() {
         File tjar = new File(testout_jar);
         tjar.delete();
-    }
-
-    //Utility to get projectPath for ddl
-    public String getSimpleProjectPathForDDL(String ddl) {
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject
-                = "<?xml version=\"1.0\"?>\n"
-                + "<project>"
-                + "<database name='database'>"
-                + "<schemas>"
-                + "<schema path='" + schemaPath + "' />"
-                + "</schemas>"
-                + "<procedures/>"
-                + "</database>"
-                + "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-        return projectPath;
     }
 
     //Check given col type if catalog was compiled.
@@ -154,389 +134,270 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertNotNull(table);
     }
 
-    public void testAlterTable() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable add column newcol varchar(50);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+    private VoltCompiler compileSimpleDdl(final String simpleSchema) {
+        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
+        return compiler;
+    }
+
+    //TDOD: deprecate this call after strengthening all callers to use something stronger that
+    // pattern matches expected error message text -- consider delegating to TestVoltCompiler methods.
+    private void failToCompileSimpleDdl(final String simpleSchema) {
+        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertFalse(success);
+    }
+
+    public void testAlterTable() throws IOException {
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytable add column newcol varchar(50);\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnType(compiler, "mytable", "newcol", VoltType.STRING);
         verifyTableColumnSize(compiler, "mytable", "newcol", 50);
     }
 
     public void testAlterTableWithProcedure() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable add column newcol varchar(50);\n"
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytable add column newcol varchar(50);\n"
                 + myproc;
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnType(compiler, "mytable", "newcol", VoltType.STRING);
         verifyTableColumnSize(compiler, "mytable", "newcol", 50);
     }
 
     public void testAlterTableWithProcedureUsingWrongColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable drop column column2_integer;\n"
-                + myproc;
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //Failed to plan for statement
-        int foundPlanError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("Failed to plan for statement")) {
-                foundPlanError++;
-            }
-        }
-        assertEquals(1, foundPlanError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytable drop column column2_integer;\n" +
+                myproc
+                , "Failed to plan for statement");
     }
 
     public void testAlterTableWithProcedureUsingDroppableColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable drop column pkey;\n"
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytable drop column pkey;\n"
                 + myproc;
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnGone(compiler, "mytable", "pkey");
     }
 
     public void testAlterTableOnView() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "CREATE VIEW v_mytable\n"
-                + "(\n"
-                + "  pkey\n"
-                + ", num_cont\n"
-                + ")\n"
-                + "AS\n"
-                + "   SELECT pkey\n"
-                + "        , COUNT(*)\n"
-                + "     FROM mytable\n"
-                + " GROUP BY pkey\n"
-                + ";"
-                + "alter table v_mytable drop column column2_integer;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //user lacks privilege or object not found: V_MYTABLE
-        int foundDropError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("user lacks privilege or object not found: V_MYTABLE")) {
-                foundDropError++;
-            }
-        }
-        assertEquals(1, foundDropError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "CREATE VIEW v_mytable\n" +
+                "(\n" +
+                "  pkey\n" +
+                ", num_cont\n" +
+                ")\n" +
+                "AS\n" +
+                "   SELECT pkey\n" +
+                "        , COUNT(*)\n" +
+                "     FROM mytable\n" +
+                " GROUP BY pkey\n" +
+                ";" +
+                "alter table v_mytable drop column column2_integer;\n"
+                , "user lacks privilege or object not found: V_MYTABLE");
     }
 
     public void testAlterTableDropUnrelatedColumnWithView() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "CREATE VIEW v_mytable\n"
-                + "(\n"
-                + "  pkey\n"
-                + ", num_cont\n"
-                + ")\n"
-                + "AS\n"
-                + "   SELECT pkey\n"
-                + "        , COUNT(*)\n"
-                + "     FROM mytable\n"
-                + " GROUP BY pkey\n"
-                + ";"
-                + "alter table mytable drop column column2_integer;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "CREATE VIEW v_mytable\n" +
+                "(\n" +
+                "  pkey\n" +
+                ", num_cont\n" +
+                ")\n" +
+                "AS\n" +
+                "   SELECT pkey\n" +
+                "        , COUNT(*)\n" +
+                "     FROM mytable\n" +
+                " GROUP BY pkey\n" +
+                ";" +
+                "alter table mytable drop column column2_integer;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnGone(compiler, "mytable", "column2_integer");
     }
 
     public void testAlterTableDropColumnWithView() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "CREATE VIEW v_mytable\n"
-                + "(\n"
-                + "  pkey\n"
-                + ", num_cont\n"
-                + ")\n"
-                + "AS\n"
-                + "   SELECT pkey\n"
-                + "        , COUNT(*)\n"
-                + "     FROM mytable\n"
-                + " GROUP BY pkey\n"
-                + ";"
-                + "alter table mytable drop column pkey;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //column is referenced in: PUBLIC.V_MYTABLE
-        int foundDropError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("column is referenced in: PUBLIC.V_MYTABLE")) {
-                foundDropError++;
-            }
-        }
-        assertEquals(1, foundDropError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "CREATE VIEW v_mytable\n" +
+                "(\n" +
+                "  pkey\n" +
+                ", num_cont\n" +
+                ")\n" +
+                "AS\n" +
+                "   SELECT pkey\n" +
+                "        , COUNT(*)\n" +
+                "     FROM mytable\n" +
+                " GROUP BY pkey\n" +
+                ";" +
+                "alter table mytable drop column pkey;\n"
+                , "column is referenced in: PUBLIC.V_MYTABLE");
     }
 
     public void testAlterTableDropColumnWithViewCascade() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "CREATE VIEW v_mytable\n"
-                + "(\n"
-                + "  pkey\n"
-                + ", num_cont\n"
-                + ")\n"
-                + "AS\n"
-                + "   SELECT pkey\n"
-                + "        , COUNT(*)\n"
-                + "     FROM mytable\n"
-                + " GROUP BY pkey\n"
-                + ";"
-                + "alter table mytable drop column pkey cascade;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "CREATE VIEW v_mytable\n" +
+                "(\n" +
+                "  pkey\n" +
+                ", num_cont\n" +
+                ")\n" +
+                "AS\n" +
+                "   SELECT pkey\n" +
+                "        , COUNT(*)\n" +
+                "     FROM mytable\n" +
+                " GROUP BY pkey\n" +
+                ";" +
+                "alter table mytable drop column pkey cascade;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnGone(compiler, "mytable", "pkey");
     }
 
     public void testAlterTableAlterColumnWithCountView() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "CREATE VIEW v_mytable\n"
-                + "(\n"
-                + "  pkey\n"
-                + ", num_cont\n"
-                + ")\n"
-                + "AS\n"
-                + "   SELECT pkey\n"
-                + "        , COUNT(pkey)\n"
-                + "     FROM mytable\n"
-                + " GROUP BY pkey\n"
-                + ";"
-                + "alter table mytable alter column pkey VARCHAR(20);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //dependent objects exist
-        int foundDepError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("dependent objects exist")) {
-                foundDepError++;
-            }
-        }
-        assertEquals(1, foundDepError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "CREATE VIEW v_mytable\n" +
+                "(\n" +
+                "  pkey\n" +
+                ", num_cont\n" +
+                ")\n" +
+                "AS\n" +
+                "   SELECT pkey\n" +
+                "        , COUNT(pkey)\n" +
+                "     FROM mytable\n" +
+                " GROUP BY pkey\n" +
+                ";" +
+                "alter table mytable alter column pkey VARCHAR(20);\n"
+                , "dependent objects exist");
     }
 
     public void testAlterTableAlterColumnWithSumViewToNonSummableType() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "CREATE VIEW v_mytable\n"
-                + "(\n"
-                + "  pkey\n"
-                + ", num_cont\n"
-                + ")\n"
-                + "AS\n"
-                + "   SELECT pkey\n"
-                + "        , SUM(pkey)\n"
-                + "     FROM mytable\n"
-                + " GROUP BY pkey\n"
-                + ";"
-                + "alter table mytable alter column pkey VARCHAR(20);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //dependent objects exist
-        int foundDepError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("dependent objects exist")) {
-                foundDepError++;
-            }
-        }
-        assertEquals(1, foundDepError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "CREATE VIEW v_mytable\n" +
+                "(\n" +
+                "  pkey\n" +
+                ", num_cont\n" +
+                ")\n" +
+                "AS\n" +
+                "   SELECT pkey\n" +
+                "        , SUM(pkey)\n" +
+                "     FROM mytable\n" +
+                " GROUP BY pkey\n" +
+                ";" +
+                "alter table mytable alter column pkey VARCHAR(20);\n"
+                , "dependent objects exist");
     }
 
     public void testAlterTableAlterColumnPossibleWithSumView() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "CREATE VIEW v_mytable\n"
-                + "(\n"
-                + "  pkey\n"
-                + ", num_cont\n"
-                + ")\n"
-                + "AS\n"
-                + "   SELECT pkey\n"
-                + "        , SUM(pkey)\n"
-                + "     FROM mytable\n"
-                + " GROUP BY pkey\n"
-                + ";"
-                + "alter table mytable alter column pkey smallint;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //dependent objects exist - This should technically be ok as int to smallint with count should work....
-        int foundDepError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("dependent objects exist")) {
-                foundDepError++;
-            }
-        }
-        assertEquals(1, foundDepError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "CREATE VIEW v_mytable\n" +
+                "(\n" +
+                "  pkey\n" +
+                ", num_cont\n" +
+                ")\n" +
+                "AS\n" +
+                "   SELECT pkey\n" +
+                "        , SUM(pkey)\n" +
+                "     FROM mytable\n" +
+                " GROUP BY pkey\n" +
+                ";" +
+                "alter table mytable alter column pkey smallint;\n"
+                , "dependent objects exist");
     }
 
     //Index
     public void testAlterTableDropColumnWithIndex() throws IOException {
-        final String simpleSchema1
-                = "create table mytable (pkey integer, column2_integer integer);\n"
-                + "create unique index pkey_idx on mytable(pkey);\n"
-                + "alter table mytable drop column column2_integer;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable (pkey integer, column2_integer integer);\n" +
+                "create unique index pkey_idx on mytable(pkey);\n" +
+                "alter table mytable drop column column2_integer;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnGone(compiler, "mytable", "column2_integer");
         verifyIndexExists(compiler, "mytable", "pkey_idx");
     }
 
     public void testAlterTableDropColumnWithIndexRecreateColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable (pkey integer, column2_integer integer);\n"
-                + "create unique index pkey_idx on mytable(pkey);\n"
-                + "alter table mytable drop column pkey;\n"
-                + "alter table mytable add column pkey integer;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable (pkey integer, column2_integer integer);\n" +
+                "create unique index pkey_idx on mytable(pkey);\n" +
+                "alter table mytable drop column pkey;\n" +
+                "alter table mytable add column pkey integer;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnExists(compiler, "mytable", "pkey");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
 
     public void testAlterTableDropRelatedColumnWithIndex() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "create unique index pkey_idx on mytable(pkey, column2_integer);\n" // This index should go
-                + "create unique index pkey_idxx on mytable(column2_integer);\n" //This index should remain
-                + "alter table mytable drop column pkey;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "create unique index pkey_idx on mytable(pkey, column2_integer);\n" + // This index should go +
+                "create unique index pkey_idxx on mytable(column2_integer);\n" + //This index should remain +
+                "alter table mytable drop column pkey;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnGone(compiler, "mytable", "pkey");
         verifyIndexExists(compiler, "mytable", "pkey_idxx");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
 
     public void testAlterTableBadVarchar() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable add column newcol varchar(0);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //precision or scale out of range
-        int foundSZError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("precision or scale out of range")) {
-                foundSZError++;
-            }
-        }
-        assertEquals(1, foundSZError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytable add column newcol varchar(0);\n"
+                , "precision or scale out of range");
     }
 
     public void testAlterTableAddConstraint() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(50), column2_integer integer);\n"
-                + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(50), column2_integer integer);\n" +
+                "alter table mytable alter column pkey varchar(50) NOT NULL;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         // Check that constraint is now valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
 
     public void testAlterTableRemoveConstraint() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(50) NOT NULL, column2_integer integer);\n"
-                + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(50) NOT NULL, column2_integer integer);\n" +
+                "alter table mytable alter column pkey varchar(50) NOT NULL;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         // Check that constraint is still valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
 
     public void testAlterTableOverflowVarchar() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable add column newcol varchar(" + String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //> 1048576 char maximum.
-        int foundSZError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("> 1048576 char maximum.")) {
-                foundSZError++;
-            }
-        }
-        assertEquals(1, foundSZError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytable add column newcol varchar(" +
+                String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n"
+                , "> 1048576 char maximum.");
     }
 
     public void testAlterTableOverflowVarcharExisting() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2 varchar(50));\n"
-                + "alter table mytable alter column column2 varchar(" + String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //> 1048576 char maximum.
-        int foundSZError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("> 1048576 char maximum.")) {
-                foundSZError++;
-            }
-        }
-        assertEquals(1, foundSZError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2 varchar(50));\n" +
+                "alter table mytable alter column column2 varchar(" +
+                String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n"
+                , "> 1048576 char maximum.");
     }
 
     public void testTooManyColumnTable() throws IOException {
@@ -552,19 +413,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         }
         br.close();
         ddl1.append("alter table JUST_ENOUGH_WIDE_COLUMNS add column COL01022 INTEGER DEFAULT '0' NOT NULL;");
-
-        final String projectPath = getSimpleProjectPathForDDL(ddl1.toString());
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //(max is 1024)
-        int foundSZError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("(max is 1024)")) {
-                foundSZError++;
-            }
-        }
-        assertEquals(1, foundSZError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar, ddl1.toString(), "(max is 1024)");
     }
 
     public void testTooManyColumnThenDropBelowLimit() throws IOException {
@@ -581,396 +430,241 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         br.close();
         ddl1.append("alter table MANY_COLUMNS drop column COL01022;");
 
-        final String projectPath = getSimpleProjectPathForDDL(ddl1.toString());
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdl(ddl1.toString());
         verifyTableColumnGone(compiler, "MANY_COLUMNS", "COL01022");
     }
 
     public void testAlterTableRowLimit() throws IOException {
         //Just enough big row one byte over and we will fail to compile.
-        String simpleSchema1 = "create table mytable (val1 varchar(1048572), val2 varchar(1048572));\n";
-        String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        String simpleSchema = "create table mytable (val1 varchar(1048572), val2 varchar(1048572));\n";
+        compileSimpleDdl(simpleSchema);
 
         //Still over after alter
-        simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
-                + "alter table mytable alter column val1 varchar(1048572);\n";
-        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        compiler = new VoltCompiler();
-        success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        simpleSchema = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));" +
+                "alter table mytable alter column val1 varchar(1048572);\n";
+        failToCompileSimpleDdl(simpleSchema);
 
         //Going under after alter
-        simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
-                + "alter table mytable alter column val1 varchar(1048572);\n"
-                + "alter table mytable alter column val2 varchar(1048572);\n";
-        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        compiler = new VoltCompiler();
-        success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        simpleSchema = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));" +
+                "alter table mytable alter column val1 varchar(1048572);\n" +
+                "alter table mytable alter column val2 varchar(1048572);\n";
+        compileSimpleDdl(simpleSchema);
 
         //Going over: after alter going under and back over
-        simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
-                + "alter table mytable alter column val1 varchar(1048572);\n"
-                + "alter table mytable alter column val2 varchar(1048572);\n"
-                + "alter table mytable alter column val1 varchar(1048576);\n";
-        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        compiler = new VoltCompiler();
-        success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        simpleSchema = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));" +
+                "alter table mytable alter column val1 varchar(1048572);\n" +
+                "alter table mytable alter column val2 varchar(1048572);\n" +
+                "alter table mytable alter column val1 varchar(1048576);\n";
+        failToCompileSimpleDdl(simpleSchema);
     }
 
     //We will be successful in compiling but a WARN should appear.
     public void testAlterTableAddForeignKey() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "create table ftable  (pkey integer, column2_integer integer UNIQUE);\n"
-                + "ALTER TABLE mytable ADD FOREIGN KEY (column2_integer) REFERENCES ftable(column2_integer);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        // Special case looking for successful compile with a warning message.
+        final VoltCompiler compiler = TestVoltCompiler.checkDDLWarningMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "create table ftable  (pkey integer, column2_integer integer UNIQUE);\n" +
+                "ALTER TABLE mytable ADD FOREIGN KEY (column2_integer) REFERENCES ftable(column2_integer);\n"
+                , "foreign");
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
         verifyTableColumnType(compiler, "ftable", "pkey", VoltType.INTEGER);
-
-        // verify that warnings exist for foreign key
-        int foundFKWarnings = 0;
-        for (VoltCompiler.Feedback f : compiler.m_warnings) {
-            if (f.message.toLowerCase().contains("foreign")) {
-                foundFKWarnings++;
-            }
-        }
-        assertEquals(1, foundFKWarnings);
     }
 
     public void testAlterUnknownTable() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytablenonexistent add column newcol varchar(50);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //type not found or user lacks privilege:
-        int foundMissingError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("user lacks privilege or object not found:")) {
-                foundMissingError++;
-            }
-        }
-        assertEquals(1, foundMissingError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytablenonexistent add column newcol varchar(50);\n"
+                , "user lacks privilege or object not found:");
     }
 
     public void testCreateDropAlterTable() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "drop table mytable;\n"
-                + "alter table mytable add column newcol varchar(50);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //type not found or user lacks privilege:
-        int foundMissingError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("user lacks privilege or object not found:")) {
-                foundMissingError++;
-            }
-        }
-        assertEquals(1, foundMissingError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "drop table mytable;\n" +
+                "alter table mytable add column newcol varchar(50);\n"
+                , "user lacks privilege or object not found:");
     }
 
     public void testCreateDropCreateAlterTable() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "drop table mytable;\n"
-                + "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable add column newcol varchar(50);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "drop table mytable;\n" +
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "alter table mytable add column newcol varchar(50);\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
     }
 
     public void testAlterTableBadDowngradeOfPartitionColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer NOT NULL, column2_integer integer);\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;"
-                + "alter table mytable alter column pkey NULL;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //type not found or user lacks privilege:
-        int foundMissingError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("type not found or user lacks privilege:")) {
-                foundMissingError++;
-            }
-        }
-        assertEquals(1, foundMissingError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey integer NOT NULL, column2_integer integer);\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;" +
+                "alter table mytable alter column pkey NULL;\n"
+                , "type not found or user lacks privilege:");
     }
 
     public void testAlterTableDropOfPartitionColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer NOT NULL, column2_integer integer);\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;"
-                + "alter table mytable drop column pkey;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer NOT NULL, column2_integer integer);\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;" +
+                "alter table mytable drop column pkey;\n" +
+                "";
+        compileSimpleDdl(simpleSchema);
     }
 
     public void testAlterTableSizeChangeAndConstraintChangeOfPartitionColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;"
-                + "alter table mytable alter column pkey varchar(50);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //Partition columns must be constrained "NOT NULL"
-        int foundConstraintError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("Partition columns must be constrained \"NOT NULL\"")) {
-                foundConstraintError++;
-            }
-        }
-        assertEquals(1, foundConstraintError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;" +
+                "alter table mytable alter column pkey varchar(50);\n"
+                , "Partition columns must be constrained \"NOT NULL\"");
     }
 
     public void testAlterTableSizeChangeAndKeepConstraintOfPartitionColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;"
-                + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;" +
+                "alter table mytable alter column pkey varchar(50) NOT NULL;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         // Check that constraint is still valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
 
     public void testAlterTableSizeChangeAndImplicitlyKeepConstraintOfPartitionColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;"
-                + "alter table mytable alter column pkey set data type varchar(50);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;" +
+                "alter table mytable alter column pkey set data type varchar(50);\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         // Check that constraint is still valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
 
     public void testAlterTableAddPartitionColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "alter table mytable add column pkey2 varchar(500);\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey2;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //Partition columns must be constrained
-        int foundConstraintError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("Partition columns must be constrained")) {
-                foundConstraintError++;
-            }
-        }
-        assertEquals(1, foundConstraintError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "alter table mytable add column pkey2 varchar(500);\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey2;\n"
+                , "Partition columns must be constrained");
     }
 
     //This is create procedure on valid column add after alter...should be successful.
     public void testAlterTableAddNonNULLPartitionColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "alter table mytable add column pkey2 varchar(500) NOT NULL;\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey2;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "alter table mytable add column pkey2 varchar(500) NOT NULL;\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey2;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnSize(compiler, "mytable", "pkey2", 500);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey2", false);
     }
 
     public void testAlterTableRedefColWithNonNULLThenPartitionOnIt() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20), column2_integer integer);\n"
-                + "alter table mytable alter column pkey varchar(20) NOT NULL;\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(20), column2_integer integer);\n" +
+                "alter table mytable alter column pkey varchar(20) NOT NULL;\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
 
     public void testAlterTableSetColNonNULLThenPartitionOnIt() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20), column2_integer integer);\n"
-                + "alter table mytable alter column pkey set NOT NULL;\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(20), column2_integer integer);\n" +
+                "alter table mytable alter column pkey set NOT NULL;\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
 
     public void testAlterTableRedundantlySetColNonNULLThenPartitionOnIt() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "alter table mytable alter column pkey set NOT NULL;\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "alter table mytable alter column pkey set NOT NULL;\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
 
     public void testAlterTableRedefColToDropNonNULLThenFailToPartitionOnIt() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "alter table mytable alter column pkey varchar(20);\n"
-                + "PARTITION TABLE mytable ON COLUMN pkey;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        int foundNullPartitionColError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("partition columns must be constrained ")) {
-                foundNullPartitionColError++;
-            }
-        }
-        assertEquals(1, foundNullPartitionColError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "alter table mytable alter column pkey varchar(20);\n" +
+                "PARTITION TABLE mytable ON COLUMN pkey;\n"
+                , "Partition columns must be constrained ");
     }
 
     public void testAlterTableFailToAddDuplicateColumnName() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
-                + "alter table mytable add column pkey varchar(20);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        int foundAlreadyExistsError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.toLowerCase().contains("name already exists ")) {
-                foundAlreadyExistsError++;
-            }
-        }
-        assertEquals(1, foundAlreadyExistsError);
+        TestVoltCompiler.checkDDLErrorMessage(testout_jar,
+                "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n" +
+                "alter table mytable add column pkey varchar(20);\n"
+                , "name already exists ");
     }
 
     //DROP TABLE TESTS from here
     public void testDropTable() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "drop table mytable;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "drop table mytable;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableGone(compiler, "mytable");
     }
 
     public void testDropTableThatDoesNotExists() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "drop table mytablefoo;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "drop table mytablefoo;\n";
+        failToCompileSimpleDdl(simpleSchema);
     }
 
     public void testDropTableIfExists() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "drop table mytablenonexistant if exists;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "drop table mytablenonexistant if exists;\n" +
+                "";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
     }
 
     public void testDropTableWithIndex() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "create unique index pkey_idx on mytable(pkey);\n"
-                + "drop table mytable;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "create unique index pkey_idx on mytable(pkey);\n" +
+                "drop table mytable;\n";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableGone(compiler, "mytable");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
 
     public void testDropTableWithIndexAndReCreateTable() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "create unique index pkey_idx on mytable(pkey);\n"
-                + "drop table mytable;\n"
-                + "create table mytable  (pkey integer, column2_integer integer);\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "create unique index pkey_idx on mytable(pkey);\n" +
+                "drop table mytable;\n" +
+                "create table mytable  (pkey integer, column2_integer integer);\n";
+        final VoltCompiler compiler = compileSimpleDdl(simpleSchema);
         verifyTableExists(compiler, "mytable");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
 
-    //Should fail as table should not exist
+    //Should fail as the table underlying the new procedure should not exist
     public void testDropTableWithProcedure() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "drop table mytable;\n"
-                + myproc;
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final String simpleSchema =
+                "create table mytable  (pkey integer, column2_integer integer);\n" +
+                "drop table mytable;\n" +
+                myproc;
+        failToCompileSimpleDdl(simpleSchema);
     }
 }

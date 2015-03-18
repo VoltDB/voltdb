@@ -31,20 +31,17 @@ import org.voltcore.utils.PortGenerator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public abstract class AdHocQueryTester extends TestCase {
-
     // TODO: make an enum
-    protected final int NOT_VALIDATING_SP_RESULT = 0;
-    protected final int VALIDATING_SP_RESULT = 1;
-    protected final int VALIDATING_TOTAL_SP_RESULT = 2;
+    protected static final int NOT_VALIDATING_SP_RESULT = 0;
+    protected static final int VALIDATING_SP_RESULT = 1;
+    protected static final int VALIDATING_TOTAL_SP_RESULT = 2;
 
-    public static void setUpSchema(VoltProjectBuilder builder,
-                                   String pathToCatalog,
-                                   String pathToDeployment) throws Exception {
-        String schema =
+    public static void setUpSchema(CatalogBuilder catalogBuilder) {
+        catalogBuilder.addLiteralSchema(
                 "create table PARTED1 (" +
                 "PARTVAL bigint not null, " +
                 "NONPART bigint not null," +
@@ -65,6 +62,11 @@ public abstract class AdHocQueryTester extends TestCase {
                 "NONPART bigint not null ASSUMEUNIQUE," +
                 "PRIMARY KEY(NONPART, PARTVAL));" +
 
+                "PARTITION TABLE PARTED1 ON COLUMN PARTVAL;\n" +
+                "PARTITION TABLE PARTED2 ON COLUMN PARTVAL;\n" +
+                "PARTITION TABLE PARTED3 ON COLUMN PARTVAL;\n" +
+                "PARTITION TABLE PARTED4 ON COLUMN PARTVAL;\n" +
+
                 "create table REPPED1 (" +
                 "REPPEDVAL bigint not null, " +
                 "NONPART bigint not null," +
@@ -84,35 +86,22 @@ public abstract class AdHocQueryTester extends TestCase {
                 "create view V_REPPED1 (REPPEDVAL, num_rows, sum_bigint) as " +
                 "select REPPEDVAL, count(*), sum(NONPART) from REPPED1 group by REPPEDVAL;" +
 
-                "";
+                "")
 
-        builder.addLiteralSchema(schema);
-        builder.addPartitionInfo("PARTED1", "PARTVAL");
-        builder.addPartitionInfo("PARTED2", "PARTVAL");
-        builder.addPartitionInfo("PARTED3", "PARTVAL");
-        builder.addPartitionInfo("PARTED4", "PARTVAL");
-        builder.addProcedures(
-                new Class<?>[] {
-                        org.voltdb_testprocs.adhoc.executeSQLMP.class,
-                        org.voltdb_testprocs.adhoc.executeSQLSP.class,
-                        org.voltdb_testprocs.adhoc.executeSQLMPWRITE.class,
-                        org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class,} );
+        .addProcedures(
+                org.voltdb_testprocs.adhoc.executeSQLMP.class,
+                org.voltdb_testprocs.adhoc.executeSQLSP.class,
+                org.voltdb_testprocs.adhoc.executeSQLMPWRITE.class,
+                org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class);
     }
 
-    public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-
-        setUpSchema(builder, pathToCatalog, pathToDeployment);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration(new PortGenerator());
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+    public Configuration setUpSPDB() throws IOException, Exception {
+        CatalogBuilder cb = new CatalogBuilder();
+        setUpSchema(cb);
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder(2))
+        .assignPorts(new PortGenerator());
+        assertNotNull("Configuration failed to compile.", config);
         return config;
     }
 

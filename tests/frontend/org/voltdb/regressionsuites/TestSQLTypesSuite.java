@@ -28,7 +28,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
@@ -36,7 +35,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -53,20 +53,14 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.UpdateDecimal;
 import com.google_voltpatches.common.base.Charsets;
 
 public class TestSQLTypesSuite extends RegressionSuite {
-
     // used to generate unique pkeys
-    public static final AtomicInteger pkey = new AtomicInteger(0);
+    private static final AtomicInteger pkey = new AtomicInteger(0);
 
     // constant for 0x00
     private static final byte OO = (byte) 0x00; // font test?
 
     // 1500 character string
     private static final String ReallyLongString;
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Delete.class, Insert.class,
-            InsertBase.class, InsertMulti.class, Select.class, Update.class,
-            UpdateDecimal.class, ParamSetArrays.class };
 
     /** Utility to create an array of bytes with value "b" of length "length" */
     public static byte[] byteArray(final int length, final byte b) {
@@ -1354,46 +1348,32 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestSQLTypesSuite.class);
-
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestSQLTypesSuite.class
-                .getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class
-                .getResource("sqltypessuite-nonulls-ddl.sql"));
-        project.addPartitionInfo("NO_NULLS", "PKEY");
-        project.addPartitionInfo("NO_NULLS_GRP", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS_GRP", "PKEY");
-        project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
-        project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
-        project.addPartitionInfo("JUMBO_ROW", "PKEY");
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure(
-                "PassObjectNull",
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"))
+        .addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"))
+        .addPartitionInfo("NO_NULLS", "PKEY")
+        .addPartitionInfo("NO_NULLS_GRP", "PKEY")
+        .addPartitionInfo("ALLOW_NULLS", "PKEY")
+        .addPartitionInfo("ALLOW_NULLS_GRP", "PKEY")
+        .addPartitionInfo("WITH_DEFAULTS", "PKEY")
+        .addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY")
+        .addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY")
+        .addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY")
+        .addPartitionInfo("JUMBO_ROW", "PKEY")
+        .addStmtProcedure("PassObjectNull",
                 "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-                "NO_NULLS.PKEY: 0");
-        project.addStmtProcedure("InsertDecimal", "INSERT INTO WITH_DEFAULTS (PKEY, A_DECIMAL) VALUES (?, ?);");
-
-        boolean success;
-
-        // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // CLUSTER?
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+                "NO_NULLS.PKEY", 0)
+        .addStmtProcedure("InsertDecimal", "INSERT INTO WITH_DEFAULTS (PKEY, A_DECIMAL) VALUES (?, ?);")
+        .addProcedures(
+                Delete.class, Insert.class, InsertBase.class, InsertMulti.class,
+                Select.class, Update.class, UpdateDecimal.class, ParamSetArrays.class)
+        ;
+        return multiClusterSuiteBuilder(TestSQLTypesSuite.class, cb,
+                // single-site testing -- no multi-host cluster tests needed for SQL behavior tests.
+                new DeploymentBuilder(),
+                // We never taught HSQL how to upsert.
+                DeploymentBuilder.forHSQLBackend(),
+                // multi-host cluster testing with replication
+                new DeploymentBuilder(2, 2, 1));
     }
 }

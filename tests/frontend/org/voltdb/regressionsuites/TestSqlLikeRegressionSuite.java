@@ -25,24 +25,20 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.TestLikeQueries;
 import org.voltdb.TestLikeQueries.LikeSuite;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.aggregates.Insert;
+import org.voltdb.compiler.DeploymentBuilder;
 
 /**
  * System tests for basic LIKE functionality
  */
 
 public class TestSqlLikeRegressionSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
-    static final int ROWS = 10;
+    public TestSqlLikeRegressionSuite(String name) {
+        super(name);
+    }
 
     public void testLike() throws IOException, ProcCallException
     {
@@ -51,48 +47,15 @@ public class TestSqlLikeRegressionSuite extends RegressionSuite {
         tests.doTests(client, true);
     }
 
-    //
-    // JUnit / RegressionSuite boilerplate
-    //
-    public TestSqlLikeRegressionSuite(String name) {
-        super(name);
-    }
-
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSqlLikeRegressionSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        try {
-            project.addLiteralSchema(TestLikeQueries.schema);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        project.addPartitionInfo("STRINGS", "ID");
-
-        config = new LocalCluster("sqllike-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqllike-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        // This config works for TestSqlAggregateSuite, but not here? Don't know why.
-        // It seems to get confused in leader election and start down some unwanted RECOVERY code path.
-        // Any multi-host config, even single site per host seems to be hanging.
-        // Disabling for now.
-        // config = new LocalCluster("sqllike-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        // if (!config.compile(project)) fail();
-        // builder.addServerConfig(config);
-
-        config = new LocalCluster("sqllike-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        return builder;
+        return multiClusterSuiteBuilder(TestSqlLikeRegressionSuite.class, TestLikeQueries.schema,
+                new DeploymentBuilder(),
+                new DeploymentBuilder(2),
+                // This config works for TestSqlAggregateSuite, but not here? Don't know why.
+                // It seems to get confused in leader election and start down some unwanted RECOVERY code path.
+                // Any multi-host config, even single site per host seems to be hanging.
+                // Disabling for now.
+                //new DeploymentBuilder(2, 3, 1),
+                DeploymentBuilder.forHSQLBackend());
     }
-
 }

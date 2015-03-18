@@ -27,22 +27,15 @@ import java.io.IOException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
 
 public class TestTempTableMemoryKnob extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES =
-    {
-     InsertLotsOfData.class, FetchTooMuch.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -90,29 +83,13 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
     }
 
     static public Test suite() {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestTempTableMemoryKnob.class);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("tempknob-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(FetchTooMuch.class.getResource("failures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        // Give ourselves a little leeway for slop over 300 MB
-        project.setMaxTempTableMemory(320);
-        // build the jarfile
-        if (!config.compile(project))
-            fail();
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(FetchTooMuch.class.getResource("failures-ddl.sql"))
+        .addProcedures(InsertLotsOfData.class, FetchTooMuch.class)
+        ;
+        return multiClusterSuiteBuilder(TestTempTableMemoryKnob.class, cb,
+                // get a server config for the native backend with two sites/partitions
+                // Give ourselves a little leeway for slop over 300 MB
+                new DeploymentBuilder(2).setMaxTempTableMemory(320));
     }
 }

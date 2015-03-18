@@ -32,7 +32,8 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 /**
  * Implementation of a VoltServerConfig for the simplest case:
@@ -43,29 +44,24 @@ import org.voltdb.compiler.VoltProjectBuilder;
  *
  */
 @Deprecated
-public abstract class LocalSingleProcessServer implements VoltServerConfig {
+public class LocalSingleProcessServer implements VoltServerConfig {
 
-    public final String m_jarFileName;
-    public int m_siteCount;
-    public final BackendTarget m_target;
+    private String m_jarFileName;
+    private int m_siteCount;
+    private final BackendTarget m_target;
 
-    ServerThread m_server = null;
-    boolean m_compiled = false;
-    protected String m_pathToDeployment;
+    private ServerThread m_server = null;
+    private boolean m_compiled = false;
+    private String m_pathToDeployment;
     private File m_pathToVoltRoot = null;
     private EEProcess m_siteProcess = null;
 
-    public LocalSingleProcessServer(String jarFileName, int siteCount,
-                                    BackendTarget target)
+    public LocalSingleProcessServer()
     {
-        assert(jarFileName != null);
-        assert(siteCount > 0);
-        m_jarFileName = Configuration.getPathToCatalogForTest(jarFileName);
-        m_siteCount = siteCount;
-        if (LocalCluster.isMemcheckDefined() && target.equals(BackendTarget.NATIVE_EE_JNI)) {
+        if (LocalCluster.isMemcheckDefined()) {
             m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
         } else {
-            m_target = target;
+            m_target = BackendTarget.NATIVE_EE_JNI;
         }
     }
 
@@ -74,52 +70,16 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         // do nothing yet
     }
 
-    @Override
-    public boolean compile(VoltProjectBuilder builder) {
-        if (m_compiled == true) {
-            return true;
+    public boolean compile(CatalogBuilder cb, DeploymentBuilder db) {
+        File jarFile = cb.compileToTempJar();
+        if (jarFile == null) {
+            return false;
         }
-
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, 1, 0);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
-
-        return m_compiled;
-    }
-
-    @Override
-    public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String snapshotPath, String ppdPrefix) {
-        // this doesn't really make a lot of sense, in that you can't partition a single node,
-        // but I suppose it is still feasible user configuration
-        int hostCount = 1;
-        int replication = 0;
-
-        if (m_compiled) {
-            return true;
-        }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     null, true, snapshotPath, ppdPrefix);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
-
-        return m_compiled;
-    }
-
-    @Override
-    public boolean compileWithAdminMode(VoltProjectBuilder builder,
-                                        int adminPort, boolean adminOnStartup)
-    {
-        int hostCount = 1;
-        int replication = 0;
-
-        if (m_compiled) {
-            return true;
-        }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup);
-        m_pathToDeployment = builder.getPathToDeployment();
-        return m_compiled;
-
+        m_jarFileName = jarFile.getAbsolutePath();
+        m_siteCount = db.sites();
+        m_pathToDeployment = db.writeXMLToTempFile();
+        m_compiled = true;
+        return true;
     }
 
     @Override
@@ -175,20 +135,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         }
     }
 
-    @Override
-    public void startUp(boolean clearLocalDataDirectories) {
-        if (clearLocalDataDirectories) {
-            File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
-            if (exportOverflow.exists()) {
-                assert(exportOverflow.isDirectory());
-                for (File f : exportOverflow.listFiles()) {
-                    if (f.isFile() && f.getName().endsWith(".pbd") || f.getName().endsWith(".ad")) {
-                        f.delete();
-                    }
-                }
-            }
-        }
-
+    public void startUpForRestore() {
         Configuration config = new Configuration();
         config.m_backend = m_target;
         config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
@@ -214,10 +161,21 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     public boolean isValgrind() {
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
+
     @Override
     public void startUp() {
-        startUp(true);
+        File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
+        if (exportOverflow.exists()) {
+            assert(exportOverflow.isDirectory());
+            for (File f : exportOverflow.listFiles()) {
+                if (f.isFile() && f.getName().endsWith(".pbd") || f.getName().endsWith(".ad")) {
+                    f.delete();
+                }
+            }
+        }
+        startUpForRestore();
     }
+
     @Override
     public void createDirectory(File path) throws IOException {
         throw new UnsupportedOperationException();

@@ -25,26 +25,17 @@ package org.voltdb;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestAdhocWithOnlyComment extends AdhocDDLTestBase {
 
     public void testAdhocWithOnlyComment() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("--dont care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+        DeploymentBuilder db = new DeploymentBuilder()
+        .setUseAdHocDDL(true)
+        ;
+        VoltDB.Configuration config = Configuration.compile(getClass().getSimpleName(), "", db);
+        assertNotNull("Schema compilation failed", config);
 
         try {
             startSystem(config);

@@ -23,10 +23,6 @@
 
 package org.voltdb.jdbc;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -34,65 +30,59 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import junit.framework.TestCase;
+
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.TestClientFeatures;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
-public class TestJDBCMultiConnection {
-    static String m_testJar;
-    static ServerThread m_server;
+public class TestJDBCMultiConnection extends TestCase {
+    private static Configuration m_config;
+    private static ServerThread m_server;
     // Use multiple connections to make sure reference counting doesn't prevent
     // detection of broken connections.
-    static Connection[] m_connections = new Connection[2];
-    static VoltProjectBuilder m_projectBuilder;
+    private static Connection[] m_connections = new Connection[2];
 
     @BeforeClass
-    public static void setUp() throws Exception {
+    public static void setUpBeforeClass() throws Exception {
         // Fake out the constraints that were previously written against the
         // TPCC schema
-        String ddl =
-            "CREATE TABLE TT(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
-            "CREATE TABLE ORDERS(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
-            "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
-            "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE TT(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+                "CREATE TABLE ORDERS(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1)); \n" +
+                "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
+                "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID); \n" +
+                "PARTITION TABLE TT ON COLUMN A1; \n" +
+                "PARTITION TABLE ORDERS ON COLUMN A1;\n" +
+                "")
+        .addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"))
+        .addProcedures(ArbitraryDurationProc.class)
+        .addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1", 0)
+        .addStmtProcedure("SelectB", "SELECT * FROM TT;")
+        ;
+        String testcaseclassname = TestJDBCMultiConnection.class.getSimpleName();
 
-
-        m_projectBuilder = new VoltProjectBuilder();
-        m_projectBuilder.addLiteralSchema(ddl);
-        m_projectBuilder.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
-        m_projectBuilder.addProcedures(ArbitraryDurationProc.class);
-        m_projectBuilder.addPartitionInfo("TT", "A1");
-        m_projectBuilder.addPartitionInfo("ORDERS", "A1");
-        m_projectBuilder.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
-        m_projectBuilder.addStmtProcedure("SelectB", "SELECT * FROM TT;");
-        boolean success = m_projectBuilder.compile(Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar"), 3, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(m_projectBuilder.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcreconnecttest.xml"));
-        m_testJar = Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar");
-
+        m_config = Configuration.compile(testcaseclassname, cb, new DeploymentBuilder(3));
+        assertNotNull("Configuration failed to compile", m_config);
         // Set up server and connections.
         startServer();
         connectClients();
     }
 
     @AfterClass
-    public static void tearDown() throws Exception {
+    public static void tearDownAfterClass() throws Exception {
         stopServer();
-        File f = new File(m_testJar);
-        f.delete();
     }
 
     private static void startServer()
     {
-        m_server = new ServerThread(m_testJar, m_projectBuilder.getPathToDeployment(),
-                                  BackendTarget.NATIVE_EE_JNI);
+        m_server = new ServerThread(m_config);
         m_server.start();
         m_server.waitForInitialization();
     }

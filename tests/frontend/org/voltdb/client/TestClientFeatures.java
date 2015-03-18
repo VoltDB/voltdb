@@ -44,30 +44,22 @@ import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestClientFeatures extends TestCase {
-
-    ServerThread localServer;
-    DeploymentBuilder depBuilder;
+    private ServerThread m_localServer;
 
     @Override
     public void setUp()
     {
         try {
-            CatalogBuilder catBuilder = new CatalogBuilder();
-            catBuilder.addSchema(getClass().getResource("clientfeatures.sql"));
-            catBuilder.addProcedures(ArbitraryDurationProc.class);
-
-            boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"));
-            assert(success);
-
-            depBuilder = new DeploymentBuilder(1, 1, 0);
-            depBuilder.writeXML(Configuration.getPathToCatalogForTest("timeouts.xml"));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("timeouts.jar");
-            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("timeouts.xml");
-            localServer = new ServerThread(config);
-            localServer.start();
-            localServer.waitForInitialization();
+            CatalogBuilder cb = new CatalogBuilder()
+            .addSchema(getClass().getResource("clientfeatures.sql"))
+            .addProcedures(ArbitraryDurationProc.class)
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                    new DeploymentBuilder());
+            assertNotNull("Configuration failed to compile", config);
+            m_localServer = new ServerThread(config);
+            m_localServer.start();
+            m_localServer.waitForInitialization();
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -77,7 +69,7 @@ public class TestClientFeatures extends TestCase {
 
     @Override
     public void tearDown() throws Exception {
-        localServer.shutdown();
+        m_localServer.shutdown();
     }
 
     class CSL extends ClientStatusListenerExt {
@@ -128,16 +120,16 @@ public class TestClientFeatures extends TestCase {
 
         if (MiscUtils.isPro()) {
             // build a catalog with a ton of indexes so catalog update will be slow
-            CatalogBuilder builder = new CatalogBuilder();
-            builder.addSchema(getClass().getResource("clientfeatures-wellindexed.sql"));
-            builder.addProcedures(ArbitraryDurationProc.class);
-            byte[] catalogToUpdate = builder.compileToBytes();
-            assert(catalogToUpdate != null);
+            CatalogBuilder cb = new CatalogBuilder()
+            .addSchema(getClass().getResource("clientfeatures-wellindexed.sql"))
+            .addProcedures(ArbitraryDurationProc.class);
+            byte[] catalogToUpdate = cb.compileToBytes();
+            assertNotNull("Catalog failed to compile", catalogToUpdate);
 
             // make a copy of the table from ddl for loading
             // (shouldn't have to do this, but for now, the table loader requires
             //  a VoltTable, and can't read schema. Could fix by using this VoltTable
-            //  to generate schema or by teaching to loader how to discover tables)
+            //  to generate schema or by teaching the loader how to discover tables)
             TableHelper.Configuration helperConfig = new TableHelper.Configuration();
             helperConfig.rand = new Random();
             TableHelper helper = new TableHelper(helperConfig);
@@ -163,7 +155,7 @@ public class TestClientFeatures extends TestCase {
 
             // run a catalog update that *might* normally timeout
             start = System.nanoTime();
-            response = client.callProcedure("@UpdateApplicationCatalog", catalogToUpdate, depBuilder.getXML());
+            response = client.callProcedure("@UpdateApplicationCatalog", catalogToUpdate, null);
             duration = (System.nanoTime() - start) / 1000000000.0;
             System.out.printf("Catalog update duration in seconds: %.2f\n", duration);
             assertEquals(ClientResponse.SUCCESS, response.getStatus());

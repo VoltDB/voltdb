@@ -25,41 +25,39 @@ package org.voltdb.eng1016;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class Runner extends TestCase {
 
     public static void main(String[] args) throws Exception {
         // compile the catalog
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("create table items (id bigint not null, created bigint not null, primary key (id));");
-        project.addLiteralSchema("create index idx_item_tree on items (created, id);");
-
-        project.addStmtProcedure("CreateItem",
-                                 "insert into items (id, created) values (?,?);",
-                                 "items.id:0");
-        project.addStmtProcedure("GetItems",
-                                 "select id, created from items " +
-                                 "where created <= ? and id < ? " +
-                                 "order by created desc, id desc " +
-                                 "limit ?;",
-                                 "items.id:1");
-
-        project.addPartitionInfo("items", "id");
-        boolean success = project.compile(Configuration.getPathToCatalogForTest("poc.jar"));
-        if (!success) {
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table items (id bigint not null, created bigint not null, primary key (id));\n" +
+                "partition table items on column id;\n" +
+                "create index idx_item_tree on items (created, id);\n" +
+                "")
+        .addStmtProcedure("CreateItem",
+                "insert into items (id, created) values (?,?);",
+                "items.id", 0)
+        .addStmtProcedure("GetItems",
+                "select id, created from items " +
+                "where created <= ? and id < ? " +
+                "order by created desc, id desc " +
+                "limit ?;",
+                "items.id", 1)
+        ;
+        Configuration config = Configuration.compile("Runner", cb, new DeploymentBuilder());
+        if (config == null) {
             System.err.println("Failure to compile catalog.");
             System.exit(-1);
         }
-        String pathToDeployment = project.getPathToDeployment();
-
         // start up voltdb
-        ServerThread server = new ServerThread(Configuration.getPathToCatalogForTest("poc.jar"), pathToDeployment, BackendTarget.NATIVE_EE_JNI);
+        ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();
 

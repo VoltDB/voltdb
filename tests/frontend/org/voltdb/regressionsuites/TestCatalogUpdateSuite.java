@@ -35,13 +35,13 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
@@ -49,14 +49,25 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
+import org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched;
+import org.voltdb.benchmark.tpcc.procedures.SelectAll;
+import org.voltdb.benchmark.tpcc.procedures.delivery;
+import org.voltdb.benchmark.tpcc.procedures.neworder;
+import org.voltdb.benchmark.tpcc.procedures.ostatByCustomerId;
+import org.voltdb.benchmark.tpcc.procedures.ostatByCustomerName;
+import org.voltdb.benchmark.tpcc.procedures.paymentByCustomerId;
+import org.voltdb.benchmark.tpcc.procedures.paymentByCustomerName;
+import org.voltdb.benchmark.tpcc.procedures.slev;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.CatalogBuilder.ProcedureInfo;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 
@@ -67,40 +78,41 @@ import org.voltdb.utils.MiscUtils;
  *
  */
 public class TestCatalogUpdateSuite extends RegressionSuite {
+    private static final Class<? extends TestCase> TESTCASECLASS = TestCatalogUpdateSuite.class;
 
-    static final int SITES_PER_HOST = 2;
-    static final int HOSTS = 2;
-    static final int K = MiscUtils.isPro() ? 1 : 0;
+    private static final int SITES_PER_HOST = 2;
+    private static final int HOSTS = 2;
+    private static final int K = MiscUtils.isPro() ? 1 : 0;
 
     // procedures used by these tests
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
+    private static Class<?>[] BASEPROCS = { InsertNewOrder.class,
+                                    SelectAll.class,
+                                    delivery.class };
 
-    static Class<?>[] BASEPROCS_OPROCS =  { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                            org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                            org.voltdb.benchmark.tpcc.procedures.delivery.class,
+    private static Class<?>[] BASEPROCS_OPROCS =  { InsertNewOrder.class,
+                                            SelectAll.class,
+                                            delivery.class,
                                             org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO1.class};
 
 
-    static Class<?>[] EXPANDEDPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                        org.voltdb.benchmark.tpcc.procedures.delivery.class,
-                                        org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class };
+    private static Class<?>[] EXPANDEDPROCS = { InsertNewOrder.class,
+                                        SelectAll.class,
+                                        delivery.class,
+                                        InsertOrderLineBatched.class };
 
-    static Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                        org.voltdb.benchmark.tpcc.procedures.delivery.class };
+    private static Class<?>[] CONFLICTPROCS = { org.voltdb.catalog.InsertNewOrder.class,
+                                        SelectAll.class,
+                                        delivery.class };
 
-    static Class<?>[] SOMANYPROCS =   { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                        org.voltdb.benchmark.tpcc.procedures.neworder.class,
-                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerId.class,
-                                        org.voltdb.benchmark.tpcc.procedures.ostatByCustomerName.class,
-                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerId.class,
-                                        org.voltdb.benchmark.tpcc.procedures.paymentByCustomerName.class,
-                                        org.voltdb.benchmark.tpcc.procedures.slev.class,
-                                        org.voltdb.benchmark.tpcc.procedures.delivery.class };
+    private static Class<?>[] SOMANYPROCS =   { InsertNewOrder.class,
+                                        SelectAll.class,
+                                        neworder.class,
+                                        ostatByCustomerId.class,
+                                        ostatByCustomerName.class,
+                                        paymentByCustomerId.class,
+                                        paymentByCustomerName.class,
+                                        slev.class,
+                                        delivery.class };
 
     // testUpdateHonkingBigCatalog constants and statistics. 100/100/40 makes a ~2MB jar.
     private static final int HUGE_TABLES = 100;
@@ -171,7 +183,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         int x = 3;
         SyncCallback cb = new SyncCallback();
         client.callProcedure(cb,
-                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                InsertOrderLineBatched.class.getSimpleName(),
                 new long[] {x}, new long[] {x}, x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
@@ -183,7 +195,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // now calling the new proc better work
         x = 2;
-        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+        client.callProcedure(InsertOrderLineBatched.class.getSimpleName(),
                 new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
@@ -352,7 +364,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         int x = 3;
         SyncCallback cb = new SyncCallback();
         client.callProcedure(cb,
-                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                InsertOrderLineBatched.class.getSimpleName(),
                 new long[] {x}, new long[] {x}, x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
@@ -364,7 +376,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // now calling the new proc better work
         x = 2;
-        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+        client.callProcedure(InsertOrderLineBatched.class.getSimpleName(),
                 new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
@@ -382,7 +394,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // now calling the new proc better work
         x = 4;
-        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+        client.callProcedure(InsertOrderLineBatched.class.getSimpleName(),
                 new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
@@ -399,7 +411,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         x = 4;
         cb = new SyncCallback();
         client.callProcedure(cb,
-                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                InsertOrderLineBatched.class.getSimpleName(),
                 new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
@@ -413,7 +425,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         x = 5;
         cb = new SyncCallback();
         client.callProcedure(cb,
-                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                InsertOrderLineBatched.class.getSimpleName(),
                 new long[] {x}, new long[] {x}, (short)x, new long[] {x},
                 new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
                 new double[] {x}, new String[] {"a"});
@@ -978,6 +990,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         return URLEncoder.encode(temp.getAbsolutePath(), "UTF-8");
     }
 
+    private static void writeAltConfigFiles(String string,
+            CatalogBuilder altCb, DeploymentBuilder altDb) {
+        // TODO Auto-generated method stub
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -988,252 +1005,140 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
      * @throws Exception
      */
     static public Test suite() throws Exception {
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(2));
+        TheHashinator.initializeAsConfiguredForPartitions(2);
 
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatalogUpdateSuite.class);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-
-        // Catalog upgrade test(s) sporadically fail if there's a local server because
-        // a file pipe isn't available for grepping local server output.
-        ((LocalCluster) config).setHasLocalServer(true);
-
-        // build up a project builder for the workload
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        // build the jarfile
-        boolean basecompile = config.compile(project);
-        assertTrue(basecompile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(BASEPROCS)
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K);
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, db);
+        assertNotNull("LocalCluster failed to compile", cluster);
 
         /////////////////////////////////////////////////////////////
         // DELTA CATALOGS FOR TESTING
         /////////////////////////////////////////////////////////////
 
+        CatalogBuilder altCb;
+        DeploymentBuilder altDb;
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
         // We piggy-back the heartbeat change here.
-        RoleInfo groups[] = new RoleInfo[] {new RoleInfo("group1", false, false, true, false, false, false)};
-        UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
-        ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
+        RoleInfo group1 = new RoleInfo("group1", false, false, true, false, false, false);
+        ProcedureInfo procInfo = new ProcedureInfo(InsertNewOrder.class, group1);
 
-        config = new LocalCluster("catalogupdate-cluster-base-secure.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addUsers(users);
-        project.addRoles(groups);
-        project.addProcedures(procInfo);
-        project.setSecurityEnabled(true, true);
-        project.setDeadHostTimeout(6000);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addRoles(group1)
+        .addProcedures(procInfo)
+        ;
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .addUsers(new UserInfo("user1", "userpass1", "group1"))
+        .setSecurityEnabled(true, true)
+        .setDeadHostTimeout(6000)
+        ;
+        writeAltConfigFiles("-secure", altCb, altDb);
 
-        //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-addtables.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS_OPROCS);
-        project.setElasticDuration(100);
-        project.setElasticThroughput(50);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+                .addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath())
+                .addProcedures(BASEPROCS_OPROCS)
+                ;
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setElasticDuration(100)
+        .setElasticThroughput(50)
+        ;
+        writeAltConfigFiles("-addtables", altCb, altDb);
 
         // as above but also with a materialized view added to O1
-        try {
-            config = new LocalCluster("catalogupdate-cluster-addtableswithmatview.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-            project = new TPCCProjectBuilder();
-            project.addDefaultSchema();
-            project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
-            project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1, C2, NUM) AS SELECT A_INT, PKEY, COUNT(*) FROM O1 GROUP BY A_INT, PKEY;");
-            project.addDefaultPartitioning();
-            project.addProcedures(BASEPROCS_OPROCS);
-            compile = config.compile(project);
-            assertTrue(compile);
-            MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml"));
-        } catch (IOException e) {
-            fail();
-        }
+        altCb.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath())
+        .addLiteralSchema(
+                "CREATE VIEW MATVIEW_O1(C1, C2, NUM)" +
+                " AS SELECT A_INT, PKEY, COUNT(*) FROM O1 GROUP BY A_INT, PKEY;")
+        .addProcedures(BASEPROCS_OPROCS);
+        writeAltConfigFiles("-addtableswithmatview", altCb, altDb);
 
-        config = new LocalCluster("catalogupdate-cluster-addindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addLiteralSchema("CREATE INDEX NEWINDEX ON NEW_ORDER (NO_O_ID);");
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addLiteralSchema("CREATE INDEX NEWINDEX ON NEW_ORDER (NO_O_ID);")
         // history is good because this new index is the only one (no pkey)
-        project.addLiteralSchema("CREATE INDEX NEWINDEX2 ON HISTORY (H_C_ID);");
+        .addLiteralSchema("CREATE INDEX NEWINDEX2 ON HISTORY (H_C_ID);")
         // unique index
-        project.addLiteralSchema("CREATE UNIQUE INDEX NEWINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY);");
+        .addLiteralSchema("CREATE UNIQUE INDEX NEWINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY);")
+        .addProcedures(BASEPROCS);
+        writeAltConfigFiles("-addindex", altCb, altDb);
 
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml"));
-
-        config = new LocalCluster("catalogupdate-cluster-addexpressindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX ON NEW_ORDER ((NO_O_ID+NO_O_ID)-NO_O_ID);");
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX ON NEW_ORDER ((NO_O_ID+NO_O_ID)-NO_O_ID);")
         // history is good because this new index is the only one (no pkey)
-        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX2 ON HISTORY ((H_C_ID+H_C_ID)-H_C_ID);");
+        .addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX2 ON HISTORY ((H_C_ID+H_C_ID)-H_C_ID);")
         // unique index
         // This needs to wait until the test for unique index coverage for indexed expressions can parse out any simple column expressions
         // and discover a unique index on some subset.
-        //TODO: project.addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY+S_QUANTITY-S_QUANTITY);");
+        //TODO: .addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY+S_QUANTITY-S_QUANTITY);");
+        .addProcedures(BASEPROCS)
+        ;
+        writeAltConfigFiles("-addexpressindex", altCb, altDb);
 
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addexpressindex.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(EXPANDEDPROCS);
+        writeAltConfigFiles("-expanded", altCb, altDb);
 
-        //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-expanded.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(EXPANDEDPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(CONFLICTPROCS);
+        writeAltConfigFiles("-conflict", altCb, altDb);
 
-        //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-conflict.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(CONFLICTPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
-
-        //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-many.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(SOMANYPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
-
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(SOMANYPROCS);
+        writeAltConfigFiles("-many", altCb, altDb);
 
         // A catalog change that enables snapshots
-        config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(BASEPROCS);
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml"));
+        writeAltConfigFiles("-enable-snapshot", altCb, altDb);
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
-        // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(BASEPROCS);
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
+        writeAltConfigFiles("-change-snapshot", altCb, altDb);
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
-        // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(BASEPROCS);
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setSnapshotSettings("1s", 3, "/tmp/snapshotdirasda2", "foo2");
+        writeAltConfigFiles("-change-snapshot-dir-not-exist", altCb, altDb);
 
         //A huge catalog update to test size limits
-        config = new LocalCluster("catalogupdate-cluster-huge.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
         long t = System.currentTimeMillis();
         String hugeSchemaURL = generateRandomDDL("catalogupdate-cluster-huge",
                                                   HUGE_TABLES, HUGE_COLUMNS, HUGE_NAME_SIZE);
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addSchema(hugeSchemaURL);
-        project.addProcedures(BASEPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addSchema(hugeSchemaURL)
+        .addProcedures(BASEPROCS);
         hugeCompileElapsed = (System.currentTimeMillis() - t) / 1000.0;
-        hugeCatalogXMLPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.xml");
-        hugeCatalogJarPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.jar");
-        MiscUtils.copyFile(project.getPathToDeployment(), hugeCatalogXMLPath);
-
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
-        // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+        writeAltConfigFiles("-huge", altCb, altDb);
 
         // Catalogs with different system settings on query time out
-        config = new LocalCluster("catalogupdate-cluster-timeout-1000.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.setQueryTimeout(1000);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml"));
+        altCb = TPCCProjectBuilder.catalogBuilderNoProcs();
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setQueryTimeout(1000);
+        writeAltConfigFiles("-timeout-1000", altCb, altDb);
 
-        config = new LocalCluster("catalogupdate-cluster-timeout-5000.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.setQueryTimeout(5000);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml"));
+        altDb.setQueryTimeout(5000);
+        writeAltConfigFiles("-timeout-5000", altCb, altDb);
 
-        config = new LocalCluster("catalogupdate-cluster-timeout-600.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.setQueryTimeout(600);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml"));
+        altDb.setQueryTimeout(600);
+        writeAltConfigFiles("-timeout-600", altCb, altDb);
 
         // elastic duration and throughput catalog update tests
-        config = new LocalCluster("catalogupdate-cluster-elastic-100-5.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        // build the jarfile
-        project.setElasticDuration(100);
-        project.setElasticThroughput(5);
-        compile = config.compile(project);
-        assertTrue(compile);
-        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.xml"));
+        altDb = new DeploymentBuilder(SITES_PER_HOST, HOSTS, K)
+        .setElasticDuration(100)
+        .setElasticThroughput(5);
+        writeAltConfigFiles("-elastic-100-5", altCb, altDb);
 
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
 
-        return builder;
     }
 
     @Override

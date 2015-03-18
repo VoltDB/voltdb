@@ -198,8 +198,7 @@ public class TestTheHashinator {
         }
         VoltType types[] = new VoltType[] { VoltType.INTEGER, VoltType.STRING, VoltType.VARBINARY };
 
-        final byte configBytes[] = TheHashinator.getConfigureBytes(partitionCount);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+        TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
         for (VoltType type : types) {
             Set<Integer> partitionsReached = new HashSet<Integer>(allPartitions);
             assertNull(TheHashinator.getPartitionKeys(VoltType.BIGINT));
@@ -224,8 +223,7 @@ public class TestTheHashinator {
     @Test
     public void testExpectNonZeroHash() throws Exception {
         int partitionCount = 3;
-        final byte configBytes[] = TheHashinator.getConfigureBytes(partitionCount);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+        TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
         HashinatorConfig config = TheHashinator.getCurrentConfig();
         ExecutionEngine ee =
                 new ExecutionEngineJNI(
@@ -258,7 +256,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash1() throws Exception {
         int partitionCount = 2;
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
+        TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
         HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine ee =
                 new ExecutionEngineJNI(
@@ -330,7 +328,7 @@ public class TestTheHashinator {
     public void testSizeChanges() {
         // try with lots of partition counts
         for (int partitionCount = 1; partitionCount <= 11; partitionCount++) {
-            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
+            TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
             HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
             ExecutionEngine ee =
                     new ExecutionEngineJNI(
@@ -396,8 +394,7 @@ public class TestTheHashinator {
             long[] values = new long[] {
                     Long.MIN_VALUE, Long.MAX_VALUE, Long.MAX_VALUE - 1, Long.MIN_VALUE + 1
             };
-            configBytes = TheHashinator.getConfigureBytes(partitionCount);
-            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+            TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
             for (long valueToHash : values) {
                 int eehash = ee.hashinate(valueToHash, TheHashinator.getCurrentConfig());
                 int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -419,7 +416,8 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() throws Exception {
         byte configBytes[] = TheHashinator.getConfigureBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100,
+                new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -427,8 +425,7 @@ public class TestTheHashinator {
          */
         for (int i = 0; i < 1500; i++) {
             final int partitionCount = r.nextInt(1000) + 1;
-            configBytes = TheHashinator.getConfigureBytes(partitionCount);
-            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+            TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
             // this will produce negative values, which is desired here.
             final long valueToHash = r.nextLong();
             final int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -462,9 +459,8 @@ public class TestTheHashinator {
 
         for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
-            configBytes = TheHashinator.getConfigureBytes(partitionCount);
             String valueToHash = Long.toString(r.nextLong());
-            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+            TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
 
             int eehash = ee.hashinate(valueToHash, TheHashinator.getCurrentConfig());
             int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -492,7 +488,6 @@ public class TestTheHashinator {
         System.out.println("NUMBER COERCION");
         for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
-            byte[] configBytes = TheHashinator.getConfigureBytes(partitionCount);
             long longToHash = r.nextLong();
             String stringToHash = Long.toString(longToHash);
             byte[] bufToHash;
@@ -500,7 +495,7 @@ public class TestTheHashinator {
             buf.order(ByteOrder.LITTLE_ENDIAN);
             buf.putLong(longToHash);
             bufToHash = buf.array();
-            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+            TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
             int longHash =
                 TheHashinator.getPartitionForParameter(VoltType.BIGINT.getValue(),
                     longToHash);
@@ -527,9 +522,9 @@ public class TestTheHashinator {
                         0,
                         "",
                         100,
-                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(2), 0, 0), false);
-        final byte configBytes[] = TheHashinator.getConfigureBytes(2);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(2), 0, 0),
+                        false);
+        TheHashinator.initializeAsConfiguredForPartitions(2);
         int jHash =
             TheHashinator.getPartitionForParameter(VoltType.TINYINT.getValue(), new Byte(VoltType.NULL_TINYINT));
         int cHash = ee.hashinate(VoltType.NULL_TINYINT, TheHashinator.getCurrentConfig());
@@ -596,8 +591,7 @@ public class TestTheHashinator {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] valueToHash = new byte[r.nextInt(1000)];
             r.nextBytes(valueToHash);
-            final byte configBytes[] = TheHashinator.getConfigureBytes(partitionCount);
-            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+            TheHashinator.initializeAsConfiguredForPartitions(partitionCount);
             int eehash = ee.hashinate(valueToHash, TheHashinator.getCurrentConfig());
             int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromClass(byte[].class).getValue(),
                     valueToHash);
@@ -829,7 +823,6 @@ public class TestTheHashinator {
     {
         final byte configBytes[] = TheHashinator.getConfigureBytes(2);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
-
 
         long expected = TheHashinator.computeConfigurationSignature(configBytes);
         assertEquals(expected, TheHashinator.getConfigurationSignature());

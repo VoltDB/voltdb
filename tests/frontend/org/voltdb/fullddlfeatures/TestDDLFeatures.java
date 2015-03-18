@@ -28,38 +28,27 @@ import java.net.URLDecoder;
 
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
-
-    String catalogJar = "DDLFeature.jar";
-    String pathToCatalog = Configuration.getPathToCatalogForTest("DDLFeature.jar");
-    String pathToDeployment = Configuration.getPathToCatalogForTest("DDLFeature.xml");
-
-    VoltProjectBuilder builder = new VoltProjectBuilder();
-
     @Override
     public void setUp() throws Exception
     {
         final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
         String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        builder.addSchema(schemaPath);
-
-        boolean success = builder.compile(pathToCatalog);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(schemaPath)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
         startSystem(config);
     }
 
@@ -173,7 +162,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testCreateTableConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T9
         assertTrue(findTableInSystemCatalogResults("T9"));
@@ -383,7 +371,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterTableDropConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T35
         assertTrue(findTableInSystemCatalogResults("T35"));
@@ -483,7 +470,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterTableAddConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T40
         assertTrue(findTableInSystemCatalogResults("T40"));

@@ -70,7 +70,7 @@ public class TestEncoder extends TestCase {
     }
 
     public void testB64WithBigness() throws IOException {
-        String someText = TPCCProjectBuilder.getTPCCSchemaCatalog().serialize();
+        String someText = TPCCProjectBuilder.createTPCCSchemaCatalog().serialize();
 
         String b64Text = Encoder.compressAndBase64Encode(someText);
         String result = Encoder.decodeBase64AndDecompress(b64Text);

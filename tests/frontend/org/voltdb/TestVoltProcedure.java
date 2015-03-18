@@ -50,7 +50,8 @@
 
 package org.voltdb;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 
 import java.math.BigDecimal;
 import java.util.Date;

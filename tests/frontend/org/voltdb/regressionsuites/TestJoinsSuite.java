@@ -25,13 +25,13 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestJoinsSuite extends RegressionSuite {
     public TestJoinsSuite(String name) {
@@ -824,31 +824,18 @@ public class TestJoinsSuite extends RegressionSuite {
 
     static public junit.framework.Test suite()
     {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestJoinsSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
-
-        project.addSchema(TestJoinsSuite.class.getResource("testjoins-ddl.sql"));
-        project.addStmtProcedure("InsertR1", "INSERT INTO R1 VALUES(?, ?, ?);");
-        project.addStmtProcedure("InsertR2", "INSERT INTO R2 VALUES(?, ?);");
-        project.addStmtProcedure("InsertR3", "INSERT INTO R3 VALUES(?, ?);");
-        project.addStmtProcedure("InsertP1", "INSERT INTO P1 VALUES(?, ?);");
-        project.addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);");
-        project.addStmtProcedure("InsertP3", "INSERT INTO P3 VALUES(?, ?);");
-        /*
-        config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-        */
-        // Cluster
-        config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        // HSQLDB
-        config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestJoinsSuite.class.getResource("testjoins-ddl.sql"))
+        .addStmtProcedure("InsertR1", "INSERT INTO R1 VALUES(?, ?, ?);")
+        .addStmtProcedure("InsertR2", "INSERT INTO R2 VALUES(?, ?);")
+        .addStmtProcedure("InsertR3", "INSERT INTO R3 VALUES(?, ?);")
+        .addStmtProcedure("InsertP1", "INSERT INTO P1 VALUES(?, ?);")
+        .addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);")
+        .addStmtProcedure("InsertP3", "INSERT INTO P3 VALUES(?, ?);")
+        ;
+        return multiClusterSuiteBuilder(TestJoinsSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 }

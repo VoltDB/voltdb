@@ -32,19 +32,20 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.utils.CompressionStrategySnappy;
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.utils.MiscUtils;
@@ -55,13 +56,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     private final static int HOSTS = 3;
     private final static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
-    private final static boolean hasLocalServer = false;
     private static StringBuilder m_recentAnalysis = null;
-
-    private static final Class<?>[] PROCEDURES =
-    {
-        GoSleep.class
-    };
 
     public TestStatisticsSuite(String name) {
         super(name);
@@ -1165,58 +1160,49 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        VoltServerConfig config = null;
-
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestStatisticsSuite.class);
-
         // Not really using TPCC functionality but need a database.
         // The testLoadMultipartitionTable procedure assumes partitioning
         // on warehouse id.
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(
-                        "CREATE TABLE WAREHOUSE (\n" +
-                        "  W_ID SMALLINT DEFAULT '0' NOT NULL,\n" +
-                        "  W_NAME VARCHAR(16) DEFAULT NULL,\n" +
-                        "  W_STREET_1 VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_STREET_2 VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_CITY VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_STATE VARCHAR(2) DEFAULT NULL,\n" +
-                        "  W_ZIP VARCHAR(9) DEFAULT NULL,\n" +
-                        "  W_TAX FLOAT DEFAULT NULL,\n" +
-                        "  W_YTD FLOAT DEFAULT NULL,\n" +
-                        "  CONSTRAINT W_PK_TREE PRIMARY KEY (W_ID)\n" +
-                        ");\n" +
-                        "CREATE TABLE ITEM (\n" +
-                        "  I_ID INTEGER DEFAULT '0' NOT NULL,\n" +
-                        "  I_IM_ID INTEGER DEFAULT NULL,\n" +
-                        "  I_NAME VARCHAR(32) DEFAULT NULL,\n" +
-                        "  I_PRICE FLOAT DEFAULT NULL,\n" +
-                        "  I_DATA VARCHAR(64) DEFAULT NULL,\n" +
-                        "  CONSTRAINT I_PK_TREE PRIMARY KEY (I_ID)\n" +
-                        ");\n" +
-                        "CREATE TABLE NEW_ORDER (\n" +
-                        "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
-                        ");\n");
-
-        project.addPartitionInfo("WAREHOUSE", "W_ID");
-        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addProcedures(PROCEDURES);
-
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE WAREHOUSE (\n" +
+                "  W_ID SMALLINT DEFAULT '0' NOT NULL,\n" +
+                "  W_NAME VARCHAR(16) DEFAULT NULL,\n" +
+                "  W_STREET_1 VARCHAR(32) DEFAULT NULL,\n" +
+                "  W_STREET_2 VARCHAR(32) DEFAULT NULL,\n" +
+                "  W_CITY VARCHAR(32) DEFAULT NULL,\n" +
+                "  W_STATE VARCHAR(2) DEFAULT NULL,\n" +
+                "  W_ZIP VARCHAR(9) DEFAULT NULL,\n" +
+                "  W_TAX FLOAT DEFAULT NULL,\n" +
+                "  W_YTD FLOAT DEFAULT NULL,\n" +
+                "  CONSTRAINT W_PK_TREE PRIMARY KEY (W_ID)\n" +
+                ");\n" +
+                "PARTITION TABLE WAREHOUSE ON COLUMN W_ID;\n" +
+                "CREATE TABLE ITEM (\n" +
+                "  I_ID INTEGER DEFAULT '0' NOT NULL,\n" +
+                "  I_IM_ID INTEGER DEFAULT NULL,\n" +
+                "  I_NAME VARCHAR(32) DEFAULT NULL,\n" +
+                "  I_PRICE FLOAT DEFAULT NULL,\n" +
+                "  I_DATA VARCHAR(64) DEFAULT NULL,\n" +
+                "  CONSTRAINT I_PK_TREE PRIMARY KEY (I_ID)\n" +
+                ");\n" +
+                "CREATE TABLE NEW_ORDER (\n" +
+                "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
+                ");\n" +
+                "PARTITION TABLE NEW_ORDER ON COLUMN NO_W_ID;\n" +
+                "")
+        .addProcedures(GoSleep.class)
+        ;
         /*
          * Create a cluster configuration.
          * Some of the sysproc results come back a little strange when applied to a cluster that is being
          * simulated through LocalCluster -- all the hosts have the same HOSTNAME, just different host ids.
          * So, these tests shouldn't rely on the usual uniqueness of host names in a cluster.
          */
-        config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
-                TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
-                BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-        boolean success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        DeploymentBuilder db = new DeploymentBuilder(SITES, HOSTS, KFACTOR);
+        final Class<? extends TestCase> testcaseclass = TestStatisticsSuite.class;
+        LocalCluster cluster = LocalCluster.configure(testcaseclass.getSimpleName(), cb, db);
+        assertNotNull("LocalCluster failed to compile", cluster);
+        cluster.bypassInProcessServerThread();
+        return new MultiConfigSuiteBuilder(testcaseclass, cluster);
     }
 }

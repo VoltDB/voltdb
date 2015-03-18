@@ -111,12 +111,11 @@ public class AuthenticatedConnectionCache {
             userNameWithAdminSuffix = userName + ADMIN_SUFFIX;
         }
         // UN-AUTHENTICATED
-        if ((userName == null) || userName.trim().isEmpty()) {
+        else {
             if ((hashedPassword != null) && (hashedPassword.length > 0)) {
                 throw new IOException("Username was null but password was not.");
             }
-            if (m_unauthClient == null)
-            {
+            if (m_unauthClient == null) {
                 try {
                     m_unauthClient = (ClientImpl) ClientFactory.createClient();
                     m_unauthClient.createConnection(m_hostname, m_port);
@@ -132,8 +131,7 @@ public class AuthenticatedConnectionCache {
 
                 }
             }
-            if (m_adminUnauthClient == null)
-            {
+            if (m_adminUnauthClient == null) {
                 try {
                     m_adminUnauthClient = (ClientImpl) ClientFactory.createClient();
                     m_adminUnauthClient.createConnection(m_hostname, m_adminPort);

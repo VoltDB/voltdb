@@ -25,14 +25,14 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestLimitOffsetSuite extends RegressionSuite {
     public TestLimitOffsetSuite(String name)
@@ -318,35 +318,20 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
     static public junit.framework.Test suite()
     {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestLimitOffsetSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestLimitOffsetSuite.class.getResource("testlimitoffset-ddl.sql"))
+        .addPartitionInfo("A", "PKEY")
 
-        project.addSchema(TestLimitOffsetSuite.class.getResource("testlimitoffset-ddl.sql"));
-        project.addPartitionInfo("A", "PKEY");
-
-        project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
-        project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
-        project.addStmtProcedure("LimitAPKEY", "SELECT * FROM A ORDER BY PKEY LIMIT ? OFFSET ?;");
-        project.addStmtProcedure("LimitBPKEY", "SELECT * FROM B ORDER BY PKEY LIMIT ? OFFSET ?;");
-        project.addStmtProcedure("LimitAI", "SELECT * FROM A ORDER BY I LIMIT ? OFFSET ?;");
-        project.addStmtProcedure("LimitBI", "SELECT * FROM B ORDER BY I LIMIT ? OFFSET ?;");
-
-        // local
-        config = new LocalCluster("testlimitoffset-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("testlimitoffset-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        // HSQL for baseline
-        config = new LocalCluster("testlimitoffset-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-        return builder;
+        .addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);")
+        .addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);")
+        .addStmtProcedure("LimitAPKEY", "SELECT * FROM A ORDER BY PKEY LIMIT ? OFFSET ?;")
+        .addStmtProcedure("LimitBPKEY", "SELECT * FROM B ORDER BY PKEY LIMIT ? OFFSET ?;")
+        .addStmtProcedure("LimitAI", "SELECT * FROM A ORDER BY I LIMIT ? OFFSET ?;")
+        .addStmtProcedure("LimitBI", "SELECT * FROM B ORDER BY I LIMIT ? OFFSET ?;")
+        ;
+        return multiClusterSuiteBuilder(TestLimitOffsetSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 }

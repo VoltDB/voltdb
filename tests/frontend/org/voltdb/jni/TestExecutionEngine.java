@@ -23,6 +23,7 @@
 
 package org.voltdb.jni;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
+import org.junit.BeforeClass;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -44,17 +46,29 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Database;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Tests native execution engine JNI interface.
  */
 public class TestExecutionEngine extends TestCase {
+    private ExecutionEngine sourceEngine;
+    private static final int CLUSTER_ID = 2;
+    private static final long NODE_ID = 1;
+
+    //private static Catalog m_catalog;
+    private static Database m_database;
+    private static String m_serializedCatalog;
+    private static int WAREHOUSE_TABLEID;
+    private static int STOCK_TABLEID;
+
 
     public void testLoadCatalogs() throws Exception {
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog(0, m_serializedCatalog);
     }
 
     public void testLoadBadCatalogs() throws Exception {
@@ -63,7 +77,7 @@ public class TestExecutionEngine extends TestCase {
          * loaded. We are really expecting an ERROR message on the terminal in
          * this case.
          */
-        String badCatalog = m_catalog.serialize().replaceFirst("set", "bad");
+        String badCatalog = m_serializedCatalog.replaceFirst("set", "bad");
         try {
             sourceEngine.loadCatalog( 0, badCatalog);
         } catch (final EEException e) {
@@ -77,11 +91,8 @@ public class TestExecutionEngine extends TestCase {
         // TODO
     }
 
-    private void loadTestTables(ExecutionEngine engine, Catalog catalog) throws Exception
+    private void loadTestTables(ExecutionEngine engine) throws Exception
     {
-        int WAREHOUSE_TABLEID = warehouseTableId(catalog);
-        int STOCK_TABLEID = stockTableId(catalog);
-
         VoltTable warehousedata = new VoltTable(
                 new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
                 new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
@@ -136,19 +147,15 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testLoadTable() throws Exception {
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
-
-        int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
-        int STOCK_TABLEID = stockTableId(m_catalog);
-
-        loadTestTables( sourceEngine, m_catalog);
+        sourceEngine.loadCatalog(0, m_serializedCatalog);
+        loadTestTables(sourceEngine);
 
         assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
     }
 
     public void testStreamTables() throws Exception {
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog(0, m_serializedCatalog);
 
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
@@ -170,16 +177,13 @@ public class TestExecutionEngine extends TestCase {
         destEEThread.start();
         destEEThread.join();
 
-        destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+        destinationEngine.get().loadCatalog(0, m_serializedCatalog);
 
-        int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
-        int STOCK_TABLEID = stockTableId(m_catalog);
+        loadTestTables(sourceEngine);
 
-        loadTestTables( sourceEngine, m_catalog);
-
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
+        sourceEngine.activateTableStream(WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(-1).toBytes());
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
+        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(-1).toBytes());
 
         final BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
@@ -234,19 +238,8 @@ public class TestExecutionEngine extends TestCase {
         }
     }
 
-    private int warehouseTableId(Catalog catalog) {
-        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-    }
-
-    private int stockTableId(Catalog catalog) {
-        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
-    }
-
     public void testGetStats() throws Exception {
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
-
-        final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        final int STOCK_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
+        sourceEngine.loadCatalog(0, m_serializedCatalog);
         final int locators[] = new int[] { WAREHOUSE_TABLEID, STOCK_TABLEID };
         final VoltTable results[] = sourceEngine.getStats(StatsSelector.TABLE, locators, false, 0L);
         assertNotNull(results);
@@ -261,7 +254,7 @@ public class TestExecutionEngine extends TestCase {
     }
 
     public void testStreamIndex() throws Exception {
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog(0, m_serializedCatalog);
 
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
@@ -283,11 +276,9 @@ public class TestExecutionEngine extends TestCase {
         destEEThread.start();
         destEEThread.join();
 
-        destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+        destinationEngine.get().loadCatalog(0, m_serializedCatalog);
 
-        int STOCK_TABLEID = stockTableId(m_catalog);
-
-        loadTestTables( sourceEngine, m_catalog);
+        loadTestTables(sourceEngine);
 
         SnapshotPredicates predicates = new SnapshotPredicates(-1);
         predicates.addPredicate(new HashRangeExpressionBuilder()
@@ -317,18 +308,19 @@ public class TestExecutionEngine extends TestCase {
         }
     }
 
-
-    private ExecutionEngine sourceEngine;
-    private static final int CLUSTER_ID = 2;
-    private static final long NODE_ID = 1;
-
-    TPCCProjectBuilder m_project;
-    Catalog m_catalog;
+    @BeforeClass
+    static void setupCatalog() throws IOException {
+        VoltDB.instance().readBuildInfo("Test");
+        Catalog m_catalog = TPCCProjectBuilder.createTPCCSchemaCatalog();
+        m_serializedCatalog = m_catalog.serialize();
+        m_database = CatalogUtil.getDatabase(m_catalog);
+        WAREHOUSE_TABLEID = m_database.getTables().get("WAREHOUSE").getRelativeIndex();
+        STOCK_TABLEID = m_database.getTables().get("STOCK").getRelativeIndex();
+    }
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
-        VoltDB.instance().readBuildInfo("Test");
         sourceEngine =
                 new ExecutionEngineJNI(
                         CLUSTER_ID,
@@ -337,9 +329,8 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         "",
                         100,
-                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0), false);
-        m_project = new TPCCProjectBuilder();
-        m_catalog = m_project.createTPCCSchemaCatalog();
+                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0),
+                        false);
     }
 
     @Override

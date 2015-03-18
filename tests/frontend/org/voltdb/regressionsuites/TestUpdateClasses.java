@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableTestHelpers;
@@ -37,13 +36,13 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -61,17 +60,21 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
     static Class<?>[] COLLIDING_CLASSES = { org.voltdb_testprocs.fullddlfeatures.testImportProc.class,
         org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc.class };
 
+    /**
+     * @return
+     */
+    private Configuration compileSimpleConfiguration() {
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setUseAdHocDDL(true)
+        ;
+        Configuration config = Configuration.compile(TESTCASECLASS.getSimpleName(), "-- Don't care", db);
+        assertNotNull("Configuration failed to compile", config);
+        return config;
+    }
+
     public void testBasic() throws Exception {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+        Configuration config = compileSimpleConfiguration();
 
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
@@ -84,12 +87,9 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             comp.addClassToJar(jarfile, clazz);
         }
         // Add a deployment file just to have something other than classes in the jar
-        jarfile.put("deployment.xml", new File(pathToDeployment));
+        jarfile.put("deployment.xml", new File(config.m_pathToDeployment));
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
 
             ClientResponse resp;
@@ -171,26 +171,19 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
     public void testRoleControl() throws Exception {
         System.out.println("\n\n-----\n testRoleControl \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        RoleInfo groups[] = new RoleInfo[] {
-            new RoleInfo("adhoc", true, false, false, false, false, false)
-        };
-        UserInfo users[] = new UserInfo[] {
-            new UserInfo("adhocuser", "adhocuser", new String[] {"adhoc"}),
-            new UserInfo("sysuser", "sysuser", new String[] {"ADMINISTRATOR"})
-        };
-        builder.addRoles(groups);
-        builder.addUsers(users);
-        // Test defines its own ADMIN user
-        builder.setSecurityEnabled(true, false);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+        CatalogBuilder cb = new CatalogBuilder("-- Don't care")
+        .addRoles(new RoleInfo("adhoc", true, false, false, false, false, false))
+        ;
+        // TEST DEFINES ITS OWN ADMIN USER
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setUseAdHocDDL(true)
+        .setSecurityEnabled(true, false)
+        .addUsers(
+                new UserInfo("adhocuser", "adhocuser", "adhoc"),
+                new UserInfo("sysuser", "sysuser", "ADMINISTRATOR"))
+        ;
+        Configuration config = Configuration.compile(TESTCASECLASS.getSimpleName(), cb, db);
+        assertNotNull("Configuration failed to compile", config);
 
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
@@ -205,9 +198,6 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
         Client auth_client = null;
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
             // Default client auth is going to fail, catch and keep chugging
             try {
                 startSystem(config);
@@ -276,16 +266,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
     public void testCollidingClasses() throws Exception {
         System.out.println("\n\n-----\n testCollidingProc \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
+        Configuration config = compileSimpleConfiguration();
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
@@ -298,9 +279,6 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
 
             ClientResponse resp;
@@ -367,20 +345,8 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
     public void testNonJarInput() throws Exception {
         System.out.println("\n\n-----\n testNonJarInput \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
+        Configuration config = compileSimpleConfiguration();
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
 
             ClientResponse resp;
@@ -405,20 +371,8 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
     public void testInnerClasses() throws Exception {
         System.out.println("\n\n-----\n testInnerClasses \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
+        Configuration config = compileSimpleConfiguration();
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
 
             // Something sane ought to work
@@ -455,22 +409,13 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    private static final Class<TestUpdateClasses> TESTCASECLASS = TestUpdateClasses.class;
+
     public void testBadInitializerClasses() throws Exception {
         System.out.println("\n\n-----\n testBadInitializerClasses \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+        Configuration config = compileSimpleConfiguration();
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
 
             ClientResponse resp;
@@ -516,16 +461,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
     // deleting inner classes
     public void testDeleteClasses() throws Exception {
         System.out.println("\n\n-----\n testCollidingProc \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
+        Configuration config = compileSimpleConfiguration();
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
@@ -542,9 +478,6 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
 
             ClientResponse resp;

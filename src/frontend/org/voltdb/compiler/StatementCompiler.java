@@ -242,7 +242,7 @@ public abstract class StatementCompiler {
         planDescription.append(plan.explainedPlan);
         String planString = planDescription.toString();
         // only write to disk if compiler is in standalone mode
-        if (compiler.standaloneCompiler) {
+        if (compiler.isStandAloneCompiler()) {
             BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
         }
         compiler.captureDiagnosticContext(planString);

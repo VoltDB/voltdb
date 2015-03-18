@@ -33,7 +33,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.DeploymentBuilder.UserInfo;
-import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
 
@@ -44,39 +43,28 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
     public void testBasic() throws Exception
     {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        // Need to parallel dbuilder as we modify builder
-        DeploymentBuilder dbuilder = new DeploymentBuilder(2, 1, 0);
-        builder.addLiteralSchema(
+        String literalSchema =
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE primary key (ID)" +
                 ");\n" +
+                "partition table FOO on column ID;\n" +
+
                 "create table FOO_R (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE_R primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        dbuilder.setUseDDLSchema(true);
+                ");\n" +
+                "";
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setUseAdHocDDL(true)
+        .setSecurityEnabled(true, false)
         // Use random caps in role names to check case-insensitivity
-        dbuilder.addUsers(new DeploymentBuilder.UserInfo[]
-                {new DeploymentBuilder.UserInfo("admin", "admin", new String[] {"Administrator"})});
-        dbuilder.setSecurityEnabled(true);
-        dbuilder.setEnableCommandLogging(false);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        dbuilder.writeXML(pathToDeployment);
-        //MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+        .addUsers(new DeploymentBuilder.UserInfo("admin", "admin", "Administrator"))
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), literalSchema, db);
+        assertNotNull("Configuration failed to compile", config);
 
         try {
             startServer(config);
@@ -97,10 +85,8 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
             }
             assertTrue("Connecting bad user should have failed", threw);
 
-            // Add the user with the new role
-            dbuilder.addUsers(new UserInfo[]
-                    {new UserInfo("user", "user", new String[] {"NEWROLE"})});
-            dbuilder.writeXML(pathToDeployment);
+            db.addUsers(new UserInfo("user", "user", "NEWROLE"));
+            String pathToDeployment = db.writeXMLToTempFile();
             try {
                 adminClient.updateApplicationCatalog(null, new File(pathToDeployment));
             }
@@ -251,8 +237,8 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
             assertTrue("Shouldn't be able to drop role ADMINISTRATOR", threw);
 
             // Make sure that we can't get rid of the administrator user
-            dbuilder.removeUser("admin");
-            dbuilder.writeXML(pathToDeployment);
+            db.removeUser("admin");
+            pathToDeployment = db.writeXMLToTempFile();
             threw = false;
             try {
                 adminClient.updateApplicationCatalog(null, new File(pathToDeployment));

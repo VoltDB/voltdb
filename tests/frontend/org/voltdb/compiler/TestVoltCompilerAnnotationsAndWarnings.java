@@ -24,11 +24,11 @@
 package org.voltdb.compiler;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.PrintStream;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.procedures.FloatParamToGetNiceComplaint;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRONonSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicROSeqProc;
@@ -53,23 +53,29 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate7;
 public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
 
     public void testFloatParamComplaint() throws Exception {
-        String simpleSchema =
-            "create table floatie (" +
-            "ival bigint default 0 not null, " +
-            "fval float not null," +
-            "PRIMARY KEY(ival)" +
-            ");";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();
         PrintStream capturing = new PrintStream(capturer);
-        builder.setCompilerDebugPrintStream(capturing);
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("floatie", "ival");
-        builder.addProcedures(FloatParamToGetNiceComplaint.class);
-
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
-        assertFalse(success);
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table floatie (" +
+                        "ival bigint default 0 not null, " +
+                        "fval float not null," +
+                        "PRIMARY KEY(ival)" +
+                        ");\n" +
+                "partition table floatie on column ival;\n" +
+                "")
+        .addProcedures(FloatParamToGetNiceComplaint.class)
+        .setCompilerDebugPrintStream(capturing)
+        ;
+        File jarFile = null;
+        try {
+            jarFile = cb.compileToTempJar();
+            assertNull("Procedure with float parameter should have been rejected", jarFile);
+        }
+        finally {
+            if (jarFile != null) {
+                jarFile.delete();
+            }
+        }
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
         // Output should include a line suggesting replacement of float with double.
@@ -77,74 +83,80 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
     }
 
     public void testSimple() throws Exception {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "sval varchar(255) not null" +
-            ");" +
-            "create table indexed_replicated_blah (" +
-            "ival bigint default 0 not null, " +
-            "sval varchar(255) not null, " +
-            "PRIMARY KEY(ival)" +
-            ");" +
-            "create table indexed_partitioned_blah (" +
-            "ival bigint default 0 not null, " +
-            "sval varchar(255) not null, " +
-            "PRIMARY KEY(ival)" +
-            ");" +
-            "";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();
         PrintStream capturing = new PrintStream(capturer);
-        builder.setCompilerDebugPrintStream(capturing);
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addPartitionInfo("indexed_partitioned_blah", "ival");
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah (" +
+                "ival bigint default 0 not null, " +
+                "sval varchar(255) not null" +
+                ");\n" +
+                "partition table blah on column ival;\n" +
+
+                "create table indexed_replicated_blah (" +
+                "ival bigint default 0 not null, " +
+                "sval varchar(255) not null, " +
+                "PRIMARY KEY(ival)" +
+                ");\n" +
+
+                "create table indexed_partitioned_blah (" +
+                "ival bigint default 0 not null, " +
+                "sval varchar(255) not null, " +
+                "PRIMARY KEY(ival)" +
+                ");\n" +
+                "partition table indexed_partitioned_blah on column ival;\n" +
+            "")
         // Note: indexed_replicated_blah is left as a replicated table.
-        builder.addStmtProcedure("Insert",
+        .addStmtProcedure("Insert",
                 // Include lots of filthy whitespace to test output cleanup.
-                "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;", null);
-        builder.addProcedures(NondeterministicROProc.class);
-        builder.addProcedures(NondeterministicRWProc.class);
-        builder.addProcedures(DeterministicRONonSeqProc.class);
-        builder.addProcedures(DeterministicROSeqProc.class);
-        builder.addProcedures(DeterministicRWProc1.class);
-        builder.addProcedures(DeterministicRWProc2.class);
+                "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;")
+        .addProcedures(NondeterministicROProc.class,
+                NondeterministicRWProc.class,
+                DeterministicRONonSeqProc.class,
+                DeterministicROSeqProc.class,
+                DeterministicRWProc1.class,
+                DeterministicRWProc2.class,
 
-        builder.addProcedures(ProcSPcandidate1.class);
-        builder.addProcedures(ProcSPcandidate2.class);
-        builder.addProcedures(ProcSPcandidate3.class);
-        builder.addProcedures(ProcSPcandidate4.class);
-        builder.addProcedures(ProcSPcandidate5.class);
-        builder.addProcedures(ProcSPcandidate6.class);
-        builder.addProcedures(ProcSPcandidate7.class);
+                ProcSPcandidate1.class,
+                ProcSPcandidate2.class,
+                ProcSPcandidate3.class,
+                ProcSPcandidate4.class,
+                ProcSPcandidate5.class,
+                ProcSPcandidate6.class,
+                ProcSPcandidate7.class,
 
-        builder.addProcedures(ProcSPNoncandidate1.class);
-        builder.addProcedures(ProcSPNoncandidate2.class);
-        builder.addProcedures(ProcSPNoncandidate3.class);
-        builder.addProcedures(ProcSPNoncandidate4.class);
-        builder.addProcedures(ProcSPNoncandidate5.class);
-        builder.addProcedures(ProcSPNoncandidate6.class);
+                ProcSPNoncandidate1.class,
+                ProcSPNoncandidate2.class,
+                ProcSPNoncandidate3.class,
+                ProcSPNoncandidate4.class,
+                ProcSPNoncandidate5.class,
+                ProcSPNoncandidate6.class)
 
-        builder.addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?", null);
-        builder.addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678", null);
-        builder.addStmtProcedure("StmtSPcandidate3",
+        .addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?")
+        .addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678")
+        .addStmtProcedure("StmtSPcandidate3",
                                  "select count(*) from blah, indexed_replicated_blah " +
-                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = 12345678", null);
-        builder.addStmtProcedure("StmtSPcandidate4",
+                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = 12345678")
+        .addStmtProcedure("StmtSPcandidate4",
                                  "select count(*) from blah, indexed_replicated_blah " +
-                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = abs(1)+1", null);
-        builder.addStmtProcedure("StmtSPcandidate5", "select count(*) from blah where sval = ? and ival = 12345678", null);
-        builder.addStmtProcedure("StmtSPcandidate6", "select count(*) from blah where sval = ? and ival = ?", null);
-        builder.addStmtProcedure("StmtSPNoncandidate1", "select count(*) from blah where sval = ?", null);
-        builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'", null);
-        builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?", null);
-        builder.addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah", null);
-
-
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
-        assert(success);
+                                 "where indexed_replicated_blah.sval = blah.sval and blah.ival = abs(1)+1")
+        .addStmtProcedure("StmtSPcandidate5", "select count(*) from blah where sval = ? and ival = 12345678")
+        .addStmtProcedure("StmtSPcandidate6", "select count(*) from blah where sval = ? and ival = ?")
+        .addStmtProcedure("StmtSPNoncandidate1", "select count(*) from blah where sval = ?")
+        .addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'")
+        .addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?")
+        .addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah")
+        .setCompilerDebugPrintStream(capturing)
+        ;
+        File jarFile = null;
+        try {
+            jarFile = cb.compileToTempJar();
+            assertNotNull("Catalog failed to compile", jarFile);
+        }
+        finally {
+            if (jarFile != null) {
+                jarFile.delete();
+            }
+        }
         String captured = capturer.toString("UTF-8");
         System.out.println(captured);
         String[] lines = captured.split("\n");

@@ -28,9 +28,7 @@ import java.util.Arrays;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -39,42 +37,36 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestBlobType extends TestCase {
     public void testVarbinary() throws Exception {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "b varbinary(256) default null, " +
-            "s varchar(256) default null," +
-            "bs varbinary(2) default null," +
-            "PRIMARY KEY(ival));\n" +
-            "create index idx on blah (ival,s);";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?, ?);", null);
-        builder.addStmtProcedure("Select", "select * from blah;", null);
-        builder.addStmtProcedure("Update", "update blah set b = ? where ival = ?", null);
-        builder.addStmtProcedure("FindString", "select * from blah where ival = ? and s = ?", null);
-        builder.addStmtProcedure("LiteralUpdate", "update blah set b = '0a1A' where ival = 5", null);
-        builder.addStmtProcedure("LiteralInsert", "insert into blah values (13, 'aabbcc', 'hi', 'aabb');", null);
-        builder.addProcedures(VarbinaryStringLookup.class);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest.xml"));
-
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah (" +
+                "ival bigint default 0 not null, " +
+                "b varbinary(256) default null, " +
+                "s varchar(256) default null," +
+                "bs varbinary(2) default null," +
+                "PRIMARY KEY(ival));\n" +
+                "PARTITION TABLE blah ON COLUMN ival;\n" +
+                "create index idx on blah (ival,s);"
+                )
+        .addStmtProcedure("Insert", "insert into blah values (?, ?, ?, ?);")
+        .addStmtProcedure("Select", "select * from blah;")
+        .addStmtProcedure("Update", "update blah set b = ? where ival = ?")
+        .addStmtProcedure("FindString", "select * from blah where ival = ? and s = ?")
+        .addStmtProcedure("LiteralUpdate", "update blah set b = '0a1A' where ival = 5")
+        .addStmtProcedure("LiteralInsert", "insert into blah values (13, 'aabbcc', 'hi', 'aabb');")
+        .addProcedures(VarbinaryStringLookup.class)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(),
+                cb, new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
         ServerThread localServer = null;
         Client client = null;
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest.jar");
-            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest.xml");
-            config.m_backend = BackendTarget.NATIVE_EE_JNI;
             localServer = new ServerThread(config);
             localServer.start();
             localServer.waitForInitialization();
@@ -186,49 +178,40 @@ public class TestBlobType extends TestCase {
     }
 
     public void testIndexRejection() throws Exception {
-        String simpleSchema =
+        CatalogBuilder cb = new CatalogBuilder(
             "create table blah (" +
             "ival bigint default 0 not null, " +
             "b varbinary(256) default null, " +
             "PRIMARY KEY(ival));\n" +
-            "create index idx on blah (ival,b);";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0);
-        assertFalse(success);
+            "PARTITION TABLE blah ON COLUMN ival;\n" +
+            "create index idx on blah (ival,b);\n" +
+            "")
+        .addStmtProcedure("Insert", "insert into blah values (?, ?);")
+        ;
+        assertNotNull("Catalog should have failed to compile", cb.compileToErrors());
     }
 
     public void testTPCCCustomerLookup() throws Exception {
-
-        // constants used int the benchmark
+        // constants used in the benchmark
         final short W_ID = 3;
         final byte D_ID = 7;
         final int C_ID = 42;
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(TPCCProjectBuilder.ddlURL);
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TPCCProjectBuilder.ddlURL)
+        .addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID", 2)
+        .addStmtProcedure("Fake1", "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_LAST = ? AND C_D_ID = ? AND C_W_ID = ? ORDER BY C_FIRST;")
+        .addProcedures(FakeCustomerLookup.class)
+        ;
         for (String pair[] : TPCCProjectBuilder.partitioning) {
-            builder.addPartitionInfo(pair[0], pair[1]);
+            cb.addPartitionInfo(pair[0], pair[1]);
         }
-        builder.addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2");
-        builder.addStmtProcedure("Fake1", "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_LAST = ? AND C_D_ID = ? AND C_W_ID = ? ORDER BY C_FIRST;");
-
-        builder.addProcedures(FakeCustomerLookup.class);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest2.jar"), 1, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest2.xml"));
-
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
         ServerThread localServer = null;
         Client client = null;
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest2.jar");
-            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest2.xml");
-            config.m_backend = BackendTarget.NATIVE_EE_JNI;
             localServer = new ServerThread(config);
             localServer.start();
             localServer.waitForInitialization();
@@ -302,25 +285,18 @@ public class TestBlobType extends TestCase {
     }
 
     public void testBigFatBlobs() throws Exception {
-        String simpleSchema =
+        CatalogBuilder cb = new CatalogBuilder(
             "create table blah (" +
             "ival bigint default 0 not null, " +
             "b varbinary(256) default null, " +
             "s varchar(256) default null, " +
-            "PRIMARY KEY(ival));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(BigFatBlobAndStringMD5.class);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("bigfatblobs.jar"), 1, 1, 0);
-        assertTrue("Failed to compile catalog", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("bigfatblobs.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("bigfatblobs.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("bigfatblobs.xml");
-        config.m_backend = BackendTarget.NATIVE_EE_JNI;
-
+            "PRIMARY KEY(ival)); \n" +
+            "")
+        .addProcedures(BigFatBlobAndStringMD5.class)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
         ServerThread localServer = null;
         Client client = null;
 

@@ -26,52 +26,86 @@ package org.voltdb.regressionsuites;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.security.SecureRandom;
 
 import junit.framework.TestCase;
 
 import org.voltdb.compiler.DeploymentBuilder;
 
-public class TestSecurityNoAdminUser extends TestCase {
+public abstract class PortTest extends TestCase {
+    private PortListener ncprocess;
+    private PipeToFile pf;
+    private final boolean m_loopback;
+    protected Process liveprocess; // optional
 
-    PipeToFile pf;
 
-    public TestSecurityNoAdminUser(String name) {
+
+    public PortTest(String name) {
         super(name);
+        m_loopback = false;
     }
 
+    public PortTest(String name, boolean loopback) {
+        super(name);
+        m_loopback = loopback;
+    }
+
+    /**
+     * JUnit special method called to setup the test. This instance will start the VoltDB server.
+     */
     @Override
     public void setUp() throws Exception {
-        //Build the catalog
-        DeploymentBuilder db = new DeploymentBuilder(2)
-        .setSecurityEnabled(true, false)
-        ;
+        int rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
+        System.out.println("Random port is: " + rport);
+        ncprocess = new PortListener(rport, m_loopback);
+        DeploymentBuilder db = customizeDeployment();
         LocalCluster config = LocalCluster.configure(getClass().getSimpleName(), "", db);
         assertNotNull("LocalCluster failed to compile", config);
+        config.portGenerator.enablePortProvider(); //XXX: does this need to be virtually disabled for TestJMXPort?
+        customizeConfig(config, rport);
         // We expect it to crash
         config.expectToCrash();
+
         config.startUp();
         pf = config.m_pipes.get(0);
+        assertNotNull(pf);
         Thread.sleep(10000);
     }
 
-    /*
-     *
+    protected DeploymentBuilder customizeDeployment() { return new DeploymentBuilder(2); }
+
+    abstract protected void customizeConfig(LocalCluster config, int rport);
+
+    /**
+     * JUnit special method called to shutdown the test. This instance will
+     * stop the VoltDB server using the VoltServerConfig instance provided.
      */
-    public void testSecurityNoUsers() throws Exception {
+    @Override
+    public void tearDown() throws Exception {
+        if (ncprocess != null) {
+            ncprocess.close();
+        }
+        if (liveprocess != null) {
+            liveprocess.destroy();
+        }
+    }
+
+    protected void checkPort(final CharSequence pattern) throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
-        final CharSequence cs = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
+        boolean found = false;
         try {
             while ((line = bi.readLine()) != null) {
                 System.out.println(line);
-                if (line.contains(cs)) {
-                    return;
+                if (line.contains(pattern)) {
+                    found = true;
+                    break;
                 }
             }
-            fail();
         }
         finally {
             bi.close();
         }
+        assertTrue(found);
     }
 }

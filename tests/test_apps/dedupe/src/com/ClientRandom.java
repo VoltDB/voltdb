@@ -23,7 +23,6 @@
 
 package com;
 
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;

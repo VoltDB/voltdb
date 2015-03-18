@@ -27,31 +27,25 @@ import junit.framework.TestCase;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 public class CrashVoltDBTest extends TestCase {
 
     public void testSimple() throws Exception {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "PRIMARY KEY(ival));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashVoltDBProc.class);
-        /*boolean success = builder.compile(Configuration.getPathToCatalogForTest("crash.jar"), 1, 1, 0, "localhost");
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("crash.xml"));*/
-
-        LocalCluster cluster = new LocalCluster("crash.jar",
-                2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(true);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah (" +
+                        "ival bigint default 0 not null, " +
+                        "PRIMARY KEY(ival));\n" +
+                "")
+        .addProcedures(CrashVoltDBProc.class)
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(2, 2, 1);
+        LocalCluster cluster = LocalCluster.configure(getClass().getSimpleName(), cb, db);
+        assertNotNull("LocalCluster failed to compile", cluster);
+        cluster.startUp();
 
         final String listener = cluster.getListenerAddresses().get(0);
         final Client client = ClientFactory.createClient();

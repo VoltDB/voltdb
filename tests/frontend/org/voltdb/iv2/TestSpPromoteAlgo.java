@@ -79,7 +79,7 @@ public class TestSpPromoteAlgo
     @BeforeClass
     static public void initializeHashinator() {
         TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+        TheHashinator.initializeAsConfiguredForPartitions(8);
     }
 
     // verify that responses are correctly unioned and ordered.

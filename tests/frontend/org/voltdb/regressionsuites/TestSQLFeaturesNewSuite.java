@@ -27,24 +27,20 @@ import java.io.IOException;
 import java.util.UUID;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
 
 public class TestSQLFeaturesNewSuite extends RegressionSuite {
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        TruncateTable.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -878,75 +874,22 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        LocalCluster config = null;
-
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSQLFeaturesNewSuite.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-new-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.setUseDDLSchema(true);
-
-        boolean success;
-
-        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
-        // IF (! DEBUG config) ...
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sqlfeatures-new-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        config.setMaxHeap(3300);
-
-        // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlfeatures-new-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        config.setMaxHeap(3300);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: Local Cluster (of processes)
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlfeatures-new-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        config.setMaxHeap(3800);
-        // Commented out until ENG-3076, ENG-3434 are resolved.
-        //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
-        //                          LocalCluster.FailureState.ONE_FAILURE, false);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("sqlfeatures-new-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
-        // build the jarfile
-        success = config.compile(project);
-        assert(success);
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-new-ddl.sql"))
+        .addProcedures(TruncateTable.class)
+        ;
+        // Requirement of calling setMaxHeap on each config (which is not currently a
+        // DeploymentBuilder option) prevent use of multiClusterSuiteBuilder here
+        Class<? extends TestCase> TESTCASECLASS = TestSQLFeaturesNewSuite.class;
+        LocalCluster[] configSet = LocalCluster.defineClusters(TESTCASECLASS.getSimpleName(), cb,
+                new DeploymentBuilder().setUseAdHocDDL(true),
+                DeploymentBuilder.forHSQLBackend().setUseAdHocDDL(true),
+                new DeploymentBuilder(2, 3, 1).setUseAdHocDDL(true));
+        assertNotNull("LocalCluster compile failed", configSet);
+        for (LocalCluster config : configSet) {
+            config.setMaxHeap(3800);
+        }
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, configSet);
     }
 
     public static void main(String args[]) {

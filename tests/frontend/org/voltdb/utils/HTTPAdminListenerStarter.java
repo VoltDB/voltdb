@@ -24,9 +24,9 @@
 package org.voltdb.utils;
 
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class HTTPAdminListenerStarter {
     /**
@@ -34,24 +34,25 @@ public class HTTPAdminListenerStarter {
      * a brain-dead VoltDB server so you can look at the admin page.
      */
     public static void main(String[] args) throws Exception {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "PRIMARY KEY(ival));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
-        builder.setHTTPDPort(8080);
-        builder.setJSONAPIEnabled(true);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE blah (" +
+                "ival bigint default 0 not null, " +
+                "PRIMARY KEY(ival));\n" +
+                "PARTITION TABLE blah ON COLUMN ival;\n" +
+                "")
+        .addStmtProcedure("Insert", "insert into blah values (?);")
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(1)
+        .setUseAdHocDDL(true)
+        .setHTTPDPort(8080)
+        .setJSONAPIEnabled(true);
+        ;
+        String testcaseclassname = HTTPAdminListenerStarter.class.getSimpleName();
+        Configuration config = Configuration.compile(testcaseclassname, cb, db);
+        if (config == null) {
+            System.err.println("Configuration failed to compile.");
+            System.exit(-1);
+        }
         ServerThread localServer = new ServerThread(config);
         localServer.start();
         localServer.waitForInitialization();

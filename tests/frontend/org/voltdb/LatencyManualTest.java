@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 
 public class LatencyManualTest {
@@ -42,23 +41,17 @@ public class LatencyManualTest {
             String simpleSchema =
                     "create table blah (" +
                     "ival bigint default 0 not null, " +
-                    "PRIMARY KEY(ival));";
+                    "PRIMARY KEY(ival));\n" +
+                    // this is a NOOP as builder will only honor it if there is
+                    // an accompanying call to DeploymentBuilder.addExport
+                    "PARTITION TABLE blah ON COLUMN ival;\n" +
+                    "EXPORT TABLE blah;\n" +
+                    "CREATE PROCEDURE Insert AS insert into blah values (?);\n" +
+                    "";
+            LocalCluster cluster = LocalCluster.configure("LatencyManualTest", simpleSchema, 2);
+            assert(cluster != null);
 
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema(simpleSchema);
-            builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
-            builder.addPartitionInfo("blah", "ival");
-            // this is a NOOP as builder will only honor it if there is
-            // and accompanying call to builder.addExport
-            builder.setTableAsExportOnly("blah");
-
-            LocalCluster cluster = new LocalCluster("latencycheck.jar",
-                    2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            cluster.setHasLocalServer(true);
-            boolean success = cluster.compile(builder);
-            assert(success);
-
-            cluster.startUp(true);
+            cluster.startUp();
 
             final String listener = cluster.getListenerAddresses().get(0);
             final Client client = ClientFactory.createClient();

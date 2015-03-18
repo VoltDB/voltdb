@@ -25,16 +25,21 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
+import org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadOnlyProc;
+import org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadWriteProc;
+import org.voltdb_testprocs.regressionsuites.querytimeout.PartitionWriteReadProc;
+import org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadOnlyProc;
+import org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadWriteProc;
+import org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedWriteReadProc;
 
 public class TestQueryTimeout extends RegressionSuite {
-
     private static final int TIMEOUT = 1500;
 //    private static String ERRORMSG = String.format(
 //            "A SQL query was terminated after %.2f seconds", TIMEOUT / 1000.0);
@@ -152,55 +157,27 @@ public class TestQueryTimeout extends RegressionSuite {
     public TestQueryTimeout(String name) {
         super(name);
     }
-    static final Class<?>[] PROCEDURES = {
-        org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadOnlyProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadWriteProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedWriteReadProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadOnlyProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadWriteProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.PartitionWriteReadProc.class
-    };
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestQueryTimeout.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        final String literalSchema =
+        CatalogBuilder cb = new CatalogBuilder(
                 "CREATE TABLE R1 ( " +
-                "phone_number INTEGER NOT NULL, " +
-                "state VARCHAR(2) NOT NULL, " +
-                "contestant_number INTEGER NOT NULL);" +
+                        "phone_number INTEGER NOT NULL, " +
+                        "state VARCHAR(2) NOT NULL, " +
+                        "contestant_number INTEGER NOT NULL);" +
 
                 "CREATE TABLE P1 ( " +
-                "phone_number INTEGER NOT NULL, " +
-                "state VARCHAR(2) NOT NULL, " +
-                "contestant_number INTEGER NOT NULL);" +
+                        "phone_number INTEGER NOT NULL, " +
+                        "state VARCHAR(2) NOT NULL, " +
+                        "contestant_number INTEGER NOT NULL);" +
 
                 "PARTITION TABLE P1 ON COLUMN phone_number;" +
-                ""
-                ;
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
-        project.addProcedures(PROCEDURES);
-
-        project.setQueryTimeout(TIMEOUT);
-        boolean success;
-
-        config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("querytimeout-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+                "")
+        .addProcedures(
+                ReplicatedReadOnlyProc.class, ReplicatedReadWriteProc.class, ReplicatedWriteReadProc.class,
+                PartitionReadOnlyProc.class, PartitionReadWriteProc.class, PartitionWriteReadProc.class)
+        ;
+        return multiClusterSuiteBuilder(TestQueryTimeout.class, cb,
+                new DeploymentBuilder().setQueryTimeout(TIMEOUT),
+                new DeploymentBuilder(2, 3, 1).setQueryTimeout(TIMEOUT));
     }
 }

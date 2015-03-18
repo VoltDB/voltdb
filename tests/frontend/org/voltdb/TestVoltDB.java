@@ -30,9 +30,10 @@ import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
@@ -196,38 +197,35 @@ public class TestVoltDB extends TestCase {
      * don't yet exist don't render the deployment file invalid.
      */
     public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addDefaultProcedures();
-
-        project.setSecurityEnabled(true, true);
-        RoleInfo groups[] = new RoleInfo[] {
+        CatalogBuilder cb = TPCCProjectBuilder.defaultCatalogBuilder()
+        .addRoles(
                 new RoleInfo("foo", false, false, false, false, false, false),
-                new RoleInfo("blah", false, false, false, false, false, false)
-        };
-        project.addRoles(groups);
-        UserInfo users[] = new UserInfo[] {
-                new UserInfo("john", "hugg", new String[] {"foo"}),
-                new UserInfo("ryan", "betts", new String[] {"foo", "bar"}),
-                new UserInfo("ariel", "weisberg", new String[] {"bar"})
-        };
-        project.addUsers(users);
+                new RoleInfo("blah", false, false, false, false, false, false))
+        ;
+        DeploymentBuilder db = new DeploymentBuilder()
+        .setSecurityEnabled(true, true)
+        .addUsers(
+                new UserInfo("john", "hugg", "foo"),
+                new UserInfo("ryan", "betts", "foo", "bar"),
+                new UserInfo("ariel", "weisberg", "bar"))
+        ;
+        File tmpJar = File.createTempFile(getClass().getSimpleName(), ".jar");
+        tmpJar.deleteOnExit();
+        if (!cb.compile(tmpJar.getAbsolutePath())) {
+            throw new IOException();
+        }
 
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String jarName = "compile-deployment.jar";
-        String catalogJar = testDir + File.separator + jarName;
-        assertTrue("Project failed to compile", project.compile(catalogJar));
+        byte[] bytes = MiscUtils.fileToBytes(tmpJar);
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
+        assertNotNull("Error loading catalog from jar", catalog);
 
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assertNotNull("Error loading catalog from jar", serializedCatalog);
-
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-
+        String deploymentPath = db.writeXMLToTempFile();
         // this should succeed even though group "bar" does not exist
-        assertTrue("Deployment file should have been able to validate",
-                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true) == null);
+        assertNull("Deployment file should have been able to validate",
+                CatalogUtil.compileDeploymentForTest(catalog, deploymentPath));
+// This is more like what used to get called here:
+//                CatalogUtil.compileDeploymentForTestNoUsersOrExport(catalog, deploymentPath));
+// but maybe skipping users as if this is a so-called place-holder catalog defeats this whole test.
+// If this test passes AS-IS, CatalogUtil.compileDeploymentForTestNoUsersOrExport can be purged.
     }
 }

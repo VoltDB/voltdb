@@ -27,7 +27,6 @@ import java.nio.channels.SocketChannel;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -37,7 +36,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestAdminMode extends RegressionSuite
 {
@@ -45,23 +45,11 @@ public class TestAdminMode extends RegressionSuite
         super(name);
     }
 
-    static VoltProjectBuilder getBuilderForTest() throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));");
-        builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
-        builder.addStmtProcedure("CountA", "SELECT COUNT(*) FROM T");
-        builder.addStmtProcedure("SelectA", "SELECT * FROM T");
-        return builder;
-    }
-
     void checkSystemInformationClusterState(VoltTable sysinfo, String state)
     {
-        for (int i = 0; i < sysinfo.getRowCount(); i++)
-        {
+        for (int i = 0; i < sysinfo.getRowCount(); i++) {
             sysinfo.advanceRow();
-            if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE"))
-            {
+            if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE")) {
                 assertTrue(state.equalsIgnoreCase((String) sysinfo.get("VALUE",
                                                                        VoltType.STRING)));
                 return;
@@ -180,6 +168,10 @@ public class TestAdminMode extends RegressionSuite
             // Verify that @SystemInformation tells us the right thing
             results = adminclient.callProcedure("@SystemInformation").getResults();
             checkSystemInformationClusterState(results[0], "Paused");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail(e.toString());
         }
         finally {
             adminclient.close();
@@ -318,23 +310,6 @@ public class TestAdminMode extends RegressionSuite
 //        }
 //    }
 
-    /**
-     * LocalSingleProcessServer is verboten, but it needs to be used here because
-     * LocalCluster doesn't yet do the right admin mode thing yet.
-     */
-    @SuppressWarnings("deprecation")
-    static class ForcedLocalSingleProcessServer extends LocalSingleProcessServer {
-        public ForcedLocalSingleProcessServer(String jarFileName,
-                int siteCount, BackendTarget target) {
-            super(jarFileName, siteCount, target);
-        }
-
-        @Override
-        public void setMaxHeap(int max) {
-            //Nothing
-        }
-    }
-
     @SuppressWarnings("deprecation")
     static public Test suite() throws IOException {
         // Set system property for 4sec CLIENT_HANGUP_TIMEOUT
@@ -343,16 +318,22 @@ public class TestAdminMode extends RegressionSuite
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAdminMode.class);
 
-        // build up a project builder for the workload
-        VoltProjectBuilder project = getBuilderForTest();
-        boolean success;
-        ForcedLocalSingleProcessServer config =
-                new ForcedLocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+                "PARTITION TABLE T ON COLUMN A1;\n" +
+                "")
+        .addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1", 0)
+        .addStmtProcedure("CountA", "SELECT COUNT(*) FROM T")
+        .addStmtProcedure("SelectA", "SELECT * FROM T")
+        ;
+        // LocalSingleProcessServer is verboten, but it needs to be used here because
+        // LocalCluster doesn't yet do the right admin mode thing yet.
+        LocalSingleProcessServer config = new LocalSingleProcessServer();
 
         // Start in admin mode
-        success = config.compileWithAdminMode(project, 32323, true);
-        assertTrue(success);
-
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .useCustomAdmin(32323, true);
+        assertTrue(config.compile(cb, db));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 

@@ -31,10 +31,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class ProcedureCallMicrobench {
 
@@ -43,17 +46,13 @@ public class ProcedureCallMicrobench {
     };
 
     public static void main(String[] args) throws Exception {
-        int siteCount = 1;
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(EmptyProcedure.class, MultivariateEmptyProcedure.class);
 
-        TPCCProjectBuilder pb = new TPCCProjectBuilder();
-        pb.addDefaultSchema();
-        pb.addDefaultPartitioning();
-        pb.addProcedures(EmptyProcedure.class, MultivariateEmptyProcedure.class);
+        Configuration config = Configuration.compile("ProcedureCallMicrobench", cb,
+                new DeploymentBuilder());
 
-        pb.compile("procedureCallMicrobench.jar", siteCount, 0);
-
-        ServerThread server = new ServerThread("procedureCallMicrobench.jar",
-                BackendTarget.NATIVE_EE_JNI);
+        ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();
 
@@ -91,8 +90,8 @@ public class ProcedureCallMicrobench {
 
                 // trigger classloading a couple times
                 {
-                    ClientConfig config = new ClientConfig("program", "none");
-                    Client client = ClientFactory.createClient(config);
+                    ClientConfig cconfig = new ClientConfig("program", "none");
+                    Client client = ClientFactory.createClient(cconfig);
                     client.createConnection("localhost");
                     for (int i = 0; i < 10000; i++)
                         client.callProcedure("EmptyProcedure", 0L);
@@ -107,6 +106,7 @@ public class ProcedureCallMicrobench {
 
                 for (int i = 0; i < clientCount; i++) {
                     futures.add(executor.submit(new Callable<Integer>() {
+                        @Override
                         public Integer call() {
                             try {
                                 ClientConfig config = new ClientConfig("program", "none");

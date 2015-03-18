@@ -22,13 +22,15 @@
  */
 package org.voltdb.groovy;
 
-import org.voltdb.BackendTarget;
+import junit.framework.TestCase;
+
 import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
@@ -88,26 +90,16 @@ public class TestGroovyDeployment extends RegressionSuite {
     static public junit.framework.Test suite() throws Exception
     {
         TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(2));
-        LocalCluster config;
-
-        final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGroovyDeployment.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(SCHEMA);
-
+        CatalogBuilder cb = new CatalogBuilder(SCHEMA);
         /*
          * compile the catalog all tests start with
          */
-        config = new LocalCluster("groovy-ddl-cluster-rep.jar", 2, 1, 0,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, null);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
-        config.setHasLocalServer(false);
-        config.setMaxHeap(512);
-        builder.addServerConfig(config);
-
-        return builder;
+        Class<? extends TestCase> testcaseclass = TestGroovyDeployment.class;
+        LocalCluster config = LocalCluster.configure(testcaseclass.getSimpleName(), cb,
+                new DeploymentBuilder(2));
+        assertNotNull("LocalCluster failed to compile.", config);
+        config.enableDebugPort().bypassInProcessServerThread().setMaxHeap(512);
+        return new MultiConfigSuiteBuilder(testcaseclass, config);
     }
 
 }

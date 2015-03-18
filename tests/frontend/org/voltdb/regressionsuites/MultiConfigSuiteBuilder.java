@@ -80,6 +80,13 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         m_testClass = testClass;
     }
 
+    public MultiConfigSuiteBuilder(Class<? extends TestCase> clz, LocalCluster... configSet) {
+        this(clz);
+        for (LocalCluster config : configSet) {
+            addServerConfig(config);
+        }
+    }
+
     /**
      * Add a sever configuration to the set of configurations we want these
      * tests to run on.
@@ -121,8 +128,8 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         if (LocalCluster.isMemcheckDefined()) {
             if (config instanceof LocalCluster) {
                 LocalCluster lc = (LocalCluster) config;
-                // don't run valgrind on multi-node clusters without embedded processes
-                if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
+                // don't run valgrind on clusters with external servers.
+                if ((lc.getNodeCount() > 1) ||  ! lc.m_hasLocalServer) {
                     return true;
                 }
             }

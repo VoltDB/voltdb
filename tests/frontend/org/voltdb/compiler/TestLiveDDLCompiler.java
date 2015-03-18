@@ -25,13 +25,13 @@ package org.voltdb.compiler;
 
 import java.io.File;
 
+import junit.framework.TestCase;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.TestCase;
 
 public class TestLiveDDLCompiler extends TestCase {
 
@@ -46,17 +46,16 @@ public class TestLiveDDLCompiler extends TestCase {
             "CREATE TABLE T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
             "PARTITION TABLE T ON COLUMN C1;\n" +
             "PARTITION TABLE T ON COLUMN C2;\n";
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
+        String schemaPath = MiscUtils.writeStringToTempFilePath(schema);
 
         VoltCompiler compiler = new VoltCompiler();
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
-        Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        byte[] bytes = MiscUtils.fileToBytes(new File(jarOut.getPath()));
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = CatalogUtil.getDatabase(catalog);
         Table t = db.getTables().get("T");
         assertEquals("C2", t.getPartitioncolumn().getTypeName());
     }
@@ -70,17 +69,16 @@ public class TestLiveDDLCompiler extends TestCase {
             "CREATE TABLE T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
             "PARTITION TABLE T ON COLUMN C1;\n" +
             "DROP TABLE T;\n";
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
+        String schemaPath = MiscUtils.writeStringToTempFilePath(schema);
 
         VoltCompiler compiler = new VoltCompiler();
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
-        Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        byte[] bytes = MiscUtils.fileToBytes(new File(jarOut.getPath()));
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = CatalogUtil.getDatabase(catalog);
         Table t = db.getTables().get("T");
         assertEquals(null, t);
     }
@@ -94,17 +92,16 @@ public class TestLiveDDLCompiler extends TestCase {
             "CREATE TABLE T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
             "EXPORT TABLE T;\n" +
             "DROP TABLE T;\n";
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
+        String schemaPath = MiscUtils.writeStringToTempFilePath(schema);
 
         VoltCompiler compiler = new VoltCompiler();
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
-        Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        byte[] bytes = MiscUtils.fileToBytes(new File(jarOut.getPath()));
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = CatalogUtil.getDatabase(catalog);
         Table t = db.getTables().get("T");
         assertEquals(null, t);
     }

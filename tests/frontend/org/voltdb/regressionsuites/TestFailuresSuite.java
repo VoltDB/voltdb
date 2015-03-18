@@ -27,12 +27,12 @@ import java.io.IOException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadFloatToVarcharCompare;
@@ -51,17 +51,6 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ViolateUniquenessAndCa
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestFailuresSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        BadVarcharCompare.class, BadFloatToVarcharCompare.class,
-        BadDecimalToVarcharCompare.class,
-        ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
-        DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
-        InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
-        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -488,48 +477,22 @@ public class TestFailuresSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestFailuresSuite.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(DivideByZero.class.getResource("failures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config that similar, but doesn't use the same backend
-        config = new LocalCluster("failures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: N=2 K=1 Cluster
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(DivideByZero.class.getResource("failures-ddl.sql"))
+        .addProcedures(
+                BadVarcharCompare.class, BadFloatToVarcharCompare.class,
+                BadDecimalToVarcharCompare.class,
+                ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
+                DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
+                InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
+                ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class
+                )
+        .addStmtProcedure("InsertNewOrder",
+                "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID", 2)
+        ;
+        return multiClusterSuiteBuilder(TestFailuresSuite.class, cb,
+                new DeploymentBuilder(2),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 2, 1));
     }
 }

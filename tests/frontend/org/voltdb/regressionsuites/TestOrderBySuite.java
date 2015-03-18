@@ -27,14 +27,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import org.voltdb.BackendTarget;
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO1;
 import org.voltdb_testprocs.regressionsuites.orderbyprocs.InsertO3;
 import org.voltdb_testprocs.regressionsuites.orderbyprocs.OrderByCountStarAlias;
@@ -42,23 +44,16 @@ import org.voltdb_testprocs.regressionsuites.orderbyprocs.OrderByNonIndex;
 import org.voltdb_testprocs.regressionsuites.orderbyprocs.OrderByOneIndex;
 
 public class TestOrderBySuite extends RegressionSuite {
-
     /*
      * CREATE TABLE O1 ( PKEY INTEGER, A_INT INTEGER, A_INLINE_STR VARCHAR(10),
      * A_POOL_STR VARCHAR(1024), PRIMARY_KEY (PKEY) );
      */
 
-    static final Class<?>[] PROCEDURES = {InsertO1.class,
-                                          InsertO3.class,
-                                          OrderByCountStarAlias.class,
-                                          OrderByNonIndex.class,
-                                          OrderByOneIndex.class };
+    private ArrayList<Integer> a_int = new ArrayList<Integer>();
+    private ArrayList<String> a_inline_str = new ArrayList<String>();
+    private ArrayList<String> a_pool_str = new ArrayList<String>();
 
-    ArrayList<Integer> a_int = new ArrayList<Integer>();
-    ArrayList<String> a_inline_str = new ArrayList<String>();
-    ArrayList<String> a_pool_str = new ArrayList<String>();
-
-    public final static String bigString = "ABCDEFGHIJ" +
+    private final static String bigString = "ABCDEFGHIJ" +
                                     "ABCDEFGHIJ" +
                                     "ABCDEFGHIJ" +
                                     "ABCDEFGHIJ" +
@@ -782,39 +777,29 @@ public class TestOrderBySuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        LocalCluster config = null;
-        boolean success;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestOrderBySuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
-
-        project.addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-
-        //* Single-server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // End single-server configuration  -- please do not remove or corrupt this structured comment */
-
-        //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("testorderby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
-
-        //* Multi-server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("testorderby-cluster.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        // Disable hasLocalServer -- with hasLocalServer enabled,
-        // multi-server pro configs mysteriously hang at startup under eclipse.
-        config.setHasLocalServer(false);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        // End multi-server configuration  -- please do not remove or corrupt this structured comment */
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"))
+        .addProcedures(
+                InsertO1.class,
+                InsertO3.class,
+                OrderByCountStarAlias.class,
+                OrderByNonIndex.class,
+                OrderByOneIndex.class)
+        ;
+        // Would like to have used "return multiClusterSuiteBuilder(TestOrderBySuite.class, cb, ..."
+        // but bypassInProcessServerThread needs access to each LocalCluster in the set.
+        // Without this option, some pro tests mysteriously failed under eclipse.
+        // If bypassInProcessServerThread could be enabled via a DeploymentBuilder hack,
+        // multiClusterSuiteBuilder could be salvaged, here.
+        Class<? extends TestCase> TESTCASECLASS = TestOrderBySuite.class;
+        LocalCluster[] configSet = LocalCluster.defineClusters(TESTCASECLASS.getSimpleName(), cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(3, 2, 1));
+        assertNotNull("LocalCluster compile failed", configSet);
+        for (LocalCluster config : configSet) {
+            config.bypassInProcessServerThread();
+        }
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, configSet);
     }
 }

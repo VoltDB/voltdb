@@ -26,9 +26,6 @@ package org.voltdb;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
-import java.net.URLEncoder;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.TestJSONInterface.Response;
@@ -36,7 +33,8 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestSimpleCJK {
     public static final String POORLY_TRANSLATED_CHINESE =
@@ -70,36 +68,21 @@ public class TestSimpleCJK {
 
     @Before
     public void startup() throws Exception {
-        String simpleSchema =
-            "create table cjk (" +
-            "sval1 varchar(1024) not null, " +
-            "sval2 varchar(1024) default 'foo', " +
-            "sval3 varchar(1024) default 'bar', " +
-            "PRIMARY KEY(sval1));";
-
-        /*String simpleSchema =
-            "create table cjk (" +
-            "sval1 varchar(20) not null, " +
-            "sval2 varchar(20) default 'foo', " +
-            "sval3 varchar(20) default 'bar', " +
-            "PRIMARY KEY(sval1));";*/
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("cjk", "sval1");
-        builder.addStmtProcedure("Insert", "insert into cjk values (?,?,?);");
-        builder.addStmtProcedure("Select", "select * from cjk;");
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0);
-        assertTrue(success);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("cjk.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table cjk (" +
+                        "sval1 varchar(1024) not null, " +
+                        "sval2 varchar(1024) default 'foo', " +
+                        "sval3 varchar(1024) default 'bar', " +
+                        "PRIMARY KEY(sval1));\n" +
+                        "PARTITION TABLE cjk ON COLUMN sval1;\n" +
+                        "")
+        .addStmtProcedure("Insert", "insert into cjk values (?,?,?);")
+        .addStmtProcedure("Select", "select * from cjk;")
+        ;
+        DeploymentBuilder db = new DeploymentBuilder()
+        .setHTTPDPort(8095)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();
