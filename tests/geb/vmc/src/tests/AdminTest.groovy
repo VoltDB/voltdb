@@ -399,19 +399,12 @@ class AdminTest extends TestBase {
         }
         page.securityEditOk.click()
         println("security edit ok clicked!")
-        waitFor(10) {
-            //page.securityPopup.isDisplayed()
+
+        waitFor(30) {
             page.securityPopupOk.isDisplayed()
             page.securityPopupCancel.isDisplayed()
             page.securityPopupOk.click()
-            println("security popup ok clicked!")
-            //page.securityEdit.isDisplayed()
-
         }
-
-
-
-
     }
 
 // autosnapshot
