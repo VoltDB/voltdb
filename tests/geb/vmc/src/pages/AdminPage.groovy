@@ -116,7 +116,6 @@ class AdminPage extends VoltDBManagementCenterPage {
         autoSnapshotsEditCancel 	{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotCancel.editCancel") }
         autosnapshotsconfirmok      {$("#btnSaveSnapshot", text:"Ok")}
 
-
         filePrefixField             { $(id:"txtPrefix") }
         frequencyField              { $(id:"txtFrequency") }
         frequencyUnitField          { $(id:"ddlfrequencyUnit") }
