@@ -162,6 +162,9 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clustertransactionminutesmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
+        storedProceduresMsg	{ $("#storeProcedureBody") }
+        databaseTableMsg	{ $("#tablesBody") }
+        
         header          		{ module Header }
         footer          		{ module Footer }
     }
