@@ -1392,26 +1392,30 @@ public class TestCatalogUtil extends TestCase {
                 "   </httpd>" +
                 "</deployment>";
 
-        File tmp = VoltProjectBuilder.writeStringToTempFile(noHTTPElement);
-        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        File tmp = MiscUtils.writeStringToTempFile(noHTTPElement);
+        DeploymentType depl = CatalogUtil.getDeployment(new FileInputStream(tmp));
+        CatalogUtil.compileDeployment(catalog, depl);
         Cluster cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getJsonapi());
 
         setUp();
-        tmp = VoltProjectBuilder.writeStringToTempFile(noJSONAPIElement);
-        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        tmp = MiscUtils.writeStringToTempFile(noJSONAPIElement);
+        depl = CatalogUtil.getDeployment(new FileInputStream(tmp));
+        CatalogUtil.compileDeployment(catalog, depl);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getJsonapi());
 
         setUp();
-        tmp = VoltProjectBuilder.writeStringToTempFile(jsonAPITrue);
-        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        tmp = MiscUtils.writeStringToTempFile(jsonAPITrue);
+        depl = CatalogUtil.getDeployment(new FileInputStream(tmp));
+        CatalogUtil.compileDeployment(catalog, depl);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getJsonapi());
 
         setUp();
-        tmp = VoltProjectBuilder.writeStringToTempFile(jsonAPIFalse);
-        CatalogUtil.compileDeployment(catalog, tmp.getPath(), false);
+        tmp = MiscUtils.writeStringToTempFile(jsonAPIFalse);
+        depl = CatalogUtil.getDeployment(new FileInputStream(tmp));
+        CatalogUtil.compileDeployment(catalog, depl);
         cluster =  catalog.getClusters().get("cluster");
         assertFalse(cluster.getJsonapi());
     }

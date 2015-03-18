@@ -23,15 +23,8 @@
 
 package org.voltdb;
 
-<<<<<<< HEAD
-import java.io.UnsupportedEncodingException;
-=======
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
-import java.io.File;
-import java.net.URLEncoder;
->>>>>>> master
 
 import org.junit.Before;
 import org.junit.Test;
@@ -71,8 +64,10 @@ public class TestSimpleCJK {
 
     public static final String POORLY_TRANSLATED_KOREAN = "두도";*/
 
-<<<<<<< HEAD
-    ServerThread startup() throws UnsupportedEncodingException {
+    ServerThread m_server;
+
+    @Before
+    public void startup() throws Exception {
         CatalogBuilder cb = new CatalogBuilder(
                 "create table cjk (" +
                         "sval1 varchar(1024) not null, " +
@@ -88,42 +83,6 @@ public class TestSimpleCJK {
         .setHTTPDPort(8095)
         ;
         Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
-=======
-    ServerThread m_server;
-
-    @Before
-    public void startup() throws Exception {
-        String simpleSchema =
-            "create table cjk (" +
-            "sval1 varchar(1024) not null, " +
-            "sval2 varchar(1024) default 'foo', " +
-            "sval3 varchar(1024) default 'bar', " +
-            "PRIMARY KEY(sval1));";
-
-        /*String simpleSchema =
-            "create table cjk (" +
-            "sval1 varchar(20) not null, " +
-            "sval2 varchar(20) default 'foo', " +
-            "sval3 varchar(20) default 'bar', " +
-            "PRIMARY KEY(sval1));";*/
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("cjk", "sval1");
-        builder.addStmtProcedure("Insert", "insert into cjk values (?,?,?);");
-        builder.addStmtProcedure("Select", "select * from cjk;");
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0);
-        assertTrue(success);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("cjk.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
->>>>>>> master
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();
