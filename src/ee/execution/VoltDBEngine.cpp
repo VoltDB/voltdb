@@ -213,9 +213,9 @@ public:
         return oss.str();
     }
 
-    void setupContext(ExecutorContext* executorContext) 
+    void setupContext(ExecutorContext* executorContext)
     { executorContext->setupForExecutors(&m_subplanExecListMap); }
-    
+
     void resetLimitStats() { m_limits.resetPeakMemory(); }
 
     ~ExecutorVector();

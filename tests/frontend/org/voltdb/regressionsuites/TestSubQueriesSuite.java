@@ -420,7 +420,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                     "select dept, sum(wage) as sw1 from " + tb +
                     " where (id, dept + 2) in " +
-                    "        ( select dept, count(dept) from " + tb + 
+                    "        ( select dept, count(dept) from " + tb +
                     "          group by dept " +
 //// Leaving out ORDER BY -- which really should be getting ignored/dropped
 //// from an "in expression" subquery but instead was getting serialized with
