@@ -18,5 +18,5 @@
 package org.voltdb;
 
 public interface ClientInterfaceRepairCallback {
-    public void repairCompleted(int partitionId);
+    public void repairCompleted(int partitionId, long initiatorHSId);
 }

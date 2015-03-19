@@ -1241,7 +1241,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         if (cihm.repairCallback != null) {
-            cihm.repairCallback.repairCompleted(partitionId);
+            cihm.repairCallback.repairCompleted(partitionId, initiatorHSId);
         }
     }
 
