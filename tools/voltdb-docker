@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+
+SCRIPT_NAME=$(basename "${BASH_SOURCE[0]}")
+CFG_FILE=$SCRIPT_NAME.cfg
+
+die() {
+    echo "FATAL: $@"
+    exit 1
+}
+
+find_root() {(
+    if [ -n "$VOLTDB_HOME"  ]; then
+        echo $VOLTDB_HOME
+        return
+    fi
+    while [ ! -d .git ]; do
+        cd ..
+        test "$(pwd)" == "/" && break
+    done
+    test -d .git && pwd
+)}
+
+if [ ! -e $CFG_FILE ]; then
+    echo "Please edit the configuration file, $CFG_FILE, before re-running."
+    echo "\
+V_ROOT=$(find_root)
+V_HOSTCOUNT=1
+V_KFACTOR=0
+V_SITESPERHOST=6
+V_MAINTAINER=\"VoltDB <info@voltdb.com>\"
+V_OS=debian:jessie
+V_HEAPMAX=1024
+V_DOCKER_HUB_REPO=???
+V_LOG4J=\$V_ROOT/voltdb/log4j.xml
+V_CLIENT_CLASSPATH_LOCAL=
+V_DDL=ddl.sql" > $CFG_FILE
+    exit 1
+fi
+source $CFG_FILE
+
+test -z "$V_ROOT" && die "Please configure a VoltDB development workspace in $CFG_FILE."
+
+V_VERSION=$(cat "$V_ROOT/version.txt")
+
+check_jar() {
+    local PATH="$V_ROOT/obj/$1/dist/voltdb/voltdb-$V_VERSION.jar"
+    test -f "$PATH" && echo "$PATH"
+}
+
+V_RELEASE_JAR="$(check_jar release)"
+V_DEBUG_JAR="$(check_jar debug)"
+
+test -z "$V_RELEASE_JAR" -a -z "$V_DEBUG_JAR" && die "No distribution build found."
+if [ -n "$V_RELEASE_JAR" -a -n "$V_DEBUG_JAR" ]; then
+    if [ "$V_DEBUG_JAR" -nt "$V_DEBUG_JAR" ]; then
+        V_JAR=$V_DEBUG_JAR
+    else
+        V_JAR=$V_RELEASE_JAR
+    fi
+else
+    if [ -n "$V_DEBUG_JAR" ]; then
+        V_JAR=$V_DEBUG_JAR
+    else
+        V_JAR=$V_RELEASE_JAR
+    fi
+fi
+
+V_DIST=$(dirname $(dirname $V_JAR))
+
+CMD_build() {
+    echo "workspace: $V_ROOT"
+    echo "version: $V_VERSION"
+    echo "distribution: $V_DIST"
+
+    cd "$V_DIST"
+
+    echo "\
+<?xml version=\"1.0\"?>
+<deployment>
+    <cluster hostcount=\"$V_HOSTCOUNT\" kfactor=\"$V_KFACTOR\" sitesperhost=\"$V_SITESPERHOST\"/>
+    <httpd enabled=\"true\">
+        <jsonapi enabled=\"true\" />
+    </httpd>
+</deployment>" > deployment.xml
+
+    echo "\
+FROM $V_OS
+MAINTAINER $V_MAINTAINER
+
+# External ports
+EXPOSE 8080
+EXPOSE 8081
+EXPOSE 9000
+EXPOSE 21211
+EXPOSE 21212
+
+# Internal ports
+EXPOSE 3021
+EXPOSE 4560
+EXPOSE 9090
+
+ENV VOLTDB_DIST /opt/voltdb
+ENV PATH \$PATH:\$VOLTDB_DIST/bin
+ENV VOLTDB_HEAPMAX $V_HEAPMAX
+
+ADD deployment.xml \$VOLTDB_DIST/
+ADD version.txt \$VOLTDB_DIST/
+ADD bin \$VOLTDB_DIST/bin/
+ADD lib \$VOLTDB_DIST/lib/
+ADD voltdb \$VOLTDB_DIST/voltdb/
+
+RUN apt-get update
+RUN apt-get install -qy --no-install-recommends procps psmisc python openjdk-7-jre-headless
+
+WORKDIR /opt/voltdb" > Dockerfile
+
+    docker build --force-rm=true -t $V_DOCKER_HUB_REPO .
+}
+
+_prefixed_functions() {
+    set | awk "match(\$0,/^$1_([a-z0-9_]+) \(\)/,g){print g[1]}"
+}
+
+_prefix_usage() {
+    echo "
+$3
+
+    $2:
+"
+    _prefixed_functions $1 | sed 's/^/        /'
+}
+
+_prefix_check() {
+    if [ -z "$1" ]; then
+        _prefix_usage "$2" "$3" "$4"
+        exit 1
+    fi
+    local PREFIX
+    for PREFIX in $(_prefixed_functions $2); do
+        test $1 = $PREFIX && return 0
+    done
+    echo "$3 \"$1\" not found. Need $2_$1() function, e.g. in $CFG_FILE."
+    _prefix_usage "$2" "$3" "$4"
+    return 1
+}
+
+v_docker_port() {
+    docker ps | awk "match(\$0,/0\.0\.0\.0:([0-9]+)->$1\//,g) {print g[1]}"
+}
+
+CMD_sql() {
+    local PORT=$(v_docker_port 21212)
+    test -z "$PORT" && die "Server client port not available."
+    sqlcmd --port=$PORT
+}
+
+CMD_ddl() {
+    test -n "$V_DDL" || die "No DDL file(s) configured."
+    local PORT=$(v_docker_port 21212)
+    test -z "$PORT" && die "Server client port not available."
+    cat $V_DDL | sqlcmd --port=$PORT
+}
+
+CMD_clean() {
+    docker rm `docker ps --no-trunc -aq`
+    docker rmi $(sudo docker images -q)
+}
+
+CMD_info() {
+    local HTTPPORT=$(v_docker_port 8080)
+    local ADMINPORT=$(v_docker_port 21211)
+    local CLIENTPORT=$(v_docker_port 21212)
+    echo "\
+Client port: $CLIENTPORT
+ Admin port: $ADMINPORT
+  HTTP port: $HTTPPORT"
+}
+
+CMD_server() {
+    docker run -P $V_DOCKER_HUB_REPO bin/voltdb create -d deployment.xml
+}
+
+CMD_client() {
+    V_CLIENT_CLASSPATH=
+    test -n "$V_CLIENT_CLASSPATH_LOCAL" && V_CLIENT_CLASSPATH=$V_CLIENT_CLASSPATH:$V_CLIENT_CLASSPATH_LOCAL
+    test -n "$V_CLASSPATH" && V_CLIENT_CLASSPATH=$V_CLIENT_CLASSPATH:$CLASSPATH
+    V_CLIENT_CLASSPATH=$V_CLIENT_CLASSPATH:$({ \
+        \ls -1 $V_ROOT/voltdb/voltdbclient-*.jar; \
+        \ls -1 $V_ROOT/lib/commons-cli-1.2.jar; \
+    } 2> /dev/null | paste -sd ':' - )
+    V_CLIENT_PORT=$(v_docker_port 21212)
+    test -z "$V_CLIENT_PORT" && die "Server client port not available."
+    _prefix_check "$1" "JAVA_CLIENT" "Client" "Known clients listed below." || exit 1
+    local ARGS=$("JAVA_CLIENT_$@")
+    java -classpath $V_CLIENT_CLASSPATH -Dlog4j.configuration=file://$V_LOG4J $ARGS
+}
+
+CMD_push() {
+    docker push $V_DOCKER_HUB_REPO
+}
+
+_prefix_check "$1" "CMD" "Command" "Usage: $SCRIPT_NAME COMMAND ARG ..." || exit 1
+
+"CMD_$@"
