@@ -2917,6 +2917,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
+        final Runnable onLockGrant = new SusceptibleRunnable() {
+            @Override
+            public void susceptibleRun() throws Exception {
+                JSONObject jo = getActiveSnapshot();
+                if (jo.getString("requestIdAtHead").equals(event.requestId)) {
+                }
+            }
+        };
 
         if (!event.truncationSnapshot || !event.didSucceed) {
             return new CountDownLatch(0);

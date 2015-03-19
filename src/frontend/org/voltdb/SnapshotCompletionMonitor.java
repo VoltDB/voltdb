@@ -44,6 +44,7 @@ import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class SnapshotCompletionMonitor {
+
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     final CopyOnWriteArrayList<SnapshotCompletionInterest> m_interests =
             new CopyOnWriteArrayList<SnapshotCompletionInterest>();
@@ -167,7 +168,7 @@ public class SnapshotCompletionMonitor {
         // A truncation request ID is not always provided. It's used for
         // snapshots triggered indirectly via ZooKeeper so that the
         // triggerer can recognize the snapshot when it finishes.
-        String truncReqId = jsonObj.optString("truncReqId");
+        String requestId = jsonObj.getString("requestIdAtHead");
 
         if (hostCount == 0) {
             /*
@@ -260,7 +261,7 @@ public class SnapshotCompletionMonitor {
                                 partitionTxnIdsMap,
                                 truncation,
                                 didSucceed,
-                                truncReqId,
+                                requestId,
                                 exportSequenceNumbers,
                                 Collections.unmodifiableMap(drSequenceNumbers),
                                 Collections.unmodifiableMap(remoteDCLastIds)));

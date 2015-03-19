@@ -361,7 +361,7 @@ public class SnapshotSaveAPI
                                                                      long txnId,
                                                                      boolean isTruncation,
                                                                      String truncReqId,
-                                                                     JSONObject hardLinks) {
+                                                                     JSONObject jsData) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
@@ -377,7 +377,9 @@ public class SnapshotSaveAPI
             jo.put("nonce", nonce);
             jo.put("truncReqId", truncReqId);
             jo.put("exportSequenceNumbers", new JSONObject());
-            jo.putOpt("hardLinks", hardLinks);
+            jo.put("requestIdAtHead", jsData.getString("requestIdAtHead"));
+            jo.putOpt("hardLinks", jsData.optJSONObject("hardLinks"));
+
             nodeBytes = jo.toString(4).getBytes(Charsets.UTF_8);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error serializing snapshot completion node JSON", true, e);
