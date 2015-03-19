@@ -100,7 +100,7 @@ public abstract class SnapshotWritePlan
                         @Override
                         public SnapshotRegistry.Snapshot.Table update(
                             SnapshotRegistry.Snapshot.Table registryTable) {
-                            return m_snapshotRecord.new Table(
+                            return new SnapshotRegistry.Snapshot.Table(
                                 registryTable,
                                 m_sdt.getBytesWritten(),
                                 m_sdt.getLastWriteException());

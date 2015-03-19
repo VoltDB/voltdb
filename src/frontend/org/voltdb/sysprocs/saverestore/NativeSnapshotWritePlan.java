@@ -120,7 +120,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.NATIVE,
-                    tableArray);
+                    tableArray,
+                    jsData.optJSONObject("hardLinks"));
 
         final ArrayList<SnapshotTableTask> partitionedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();

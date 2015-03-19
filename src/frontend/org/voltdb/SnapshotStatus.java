@@ -22,11 +22,11 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
-import org.voltcore.utils.Pair;
 
 public class SnapshotStatus extends StatsSource {
 
@@ -36,20 +36,25 @@ public class SnapshotStatus extends StatsSource {
      * object into a flat list.
      */
     private class StatusIterator implements Iterator<Object> {
-        private final List<Pair<Snapshot, Table>> m_snapshots;
-        private final Iterator<Pair<Snapshot, Table>> m_iter;
+        private final List<Pair<StatusRow, Table>> m_snapshots;
+        private final Iterator<Pair<StatusRow, Table>> m_iter;
 
         private StatusIterator(Iterator<Snapshot> i) {
-            m_snapshots = new LinkedList<Pair<Snapshot, Table>>();
+            m_snapshots = new LinkedList<Pair<StatusRow, Table>>();
 
             while (i.hasNext()) {
                 final Snapshot s = i.next();
                 s.iterateTables(new Snapshot.TableIterator() {
                     @Override
                     public void next(Table t) {
-                        m_snapshots.add(Pair.of(s, t));
+                        m_snapshots.add(Pair.of(new StatusRow(s,t), t));
                     }
                 });
+                for (SnapshotRegistry.HardLink hl: s.hardLinks.values()) {
+                    for (Table t: hl.tables.values()) {
+                        m_snapshots.add(Pair.of(new StatusRow(s,t,hl.path,hl.nonce), t));
+                    }
+                }
             }
 
             m_iter = m_snapshots.iterator();
@@ -94,8 +99,8 @@ public class SnapshotStatus extends StatsSource {
     @SuppressWarnings("unchecked")
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        Pair<Snapshot, Table> p = (Pair<Snapshot, Table>) rowKey;
-        Snapshot s = p.getFirst();
+        Pair<StatusRow, Table> p = (Pair<StatusRow, Table>) rowKey;
+        StatusRow s = p.getFirst();
         Table t = p.getSecond();
         double duration = 0;
         double throughput = 0;
@@ -103,7 +108,7 @@ public class SnapshotStatus extends StatsSource {
         if (s.timeFinished != 0) {
             duration =
                 (s.timeFinished - timeStarted) / 1000.0;
-            throughput = (s.bytesWritten / (1024.0 * 1024.0)) / duration;
+            throughput = (s.size / (1024.0 * 1024.0)) / duration;
         }
 
         rowValues[columnNameToIndex.get("TABLE")] = t.name;
@@ -119,6 +124,43 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("RESULT")] = t.error == null ? "SUCCESS" : "FAILURE";
         super.updateStatsRow(rowKey, rowValues);
     }
+
+    public static class StatusRow {
+        final public String table;
+        final public String path;
+        final public String filename;
+        final public String nonce;
+        final public long   txnId;
+        final public long   size;
+        final public long   timeStarted;
+        final public long   timeFinished;
+        final public String result;
+
+        private StatusRow(Snapshot s, Table t) {
+            this.table         = t.name;
+            this.path          = s.path;
+            this.filename      = t.filename;
+            this.nonce         = s.nonce;
+            this.size          = t.size;
+            this.txnId         = s.txnId;
+            this.timeStarted   = s.timeStarted;
+            this.timeFinished  = s.timeFinished;
+            this.result        = t.error == null ? "SUCCESS" : "FAILURE";
+        }
+
+        private StatusRow(Snapshot s, Table t, String path, String nonce) {
+            this.table         = t.name;
+            this.path          = path;
+            this.filename      = t.filename;
+            this.nonce         = nonce;
+            this.size          = t.size;
+            this.txnId         = s.txnId;
+            this.timeStarted   = s.timeStarted;
+            this.timeFinished  = s.timeFinished;
+            this.result        = t.error == null ? "SUCCESS" : "FAILURE";
+        }
+    }
+
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
