@@ -63,6 +63,16 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryTables  (required: false) { queryResHtml.find('table') }
         queryErrHtml (required: false) { queryResHtml.find('span') }
         queryDurHtml { $('#queryResults') }
+		
+		//options
+        htmlOptions				{ $("option", text:"HTML") }
+        csvOptions				{ $("option", text:"CSV") }
+        monospaceOptions		{ $("option", text:"Monospace") }
+        
+        //result
+        resultHtml		{ $("#resultHtml") }
+        resultCsv		{ $("#resultCsv") }
+        resultMonospace	{ $("#resultMonospace") }
     }
     static at = {
         sqlQueryTab.displayed

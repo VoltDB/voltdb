@@ -1278,4 +1278,69 @@ class AdminTest extends TestBase {
     		
     	}
     }
+	
+	def cleanupSpec() {
+    	if (!(page instanceof VoltDBManagementCenterPage)) {
+            when: 'Open VMC page'
+            ensureOnVoltDBManagementCenterPage()
+            then: 'to be on VMC page'
+            at VoltDBManagementCenterPage
+        }
+
+        page.loginIfNeeded()
+        
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+        
+		when:
+        page.autoSnapshotsEdit.click()
+        then:
+        waitFor(10) {
+            page.autoSnapshotsEditCheckbox.isDisplayed()
+            page.autoSnapshotsEditOk.isDisplayed()
+            page.autoSnapshotsEditCancel.isDisplayed()
+        }
+
+        page.filePrefixField.value(initialPrefix)
+        page.frequencyField.value(initialFreq)
+        page.frequencyUnitField.click()
+        page.frequencyUnitField.value(initialFreqUnit)
+        page.retainedField.value(initialRetained)
+
+        if(page.fileprefixEdit.text() != " "){
+            println("fileprefix passed, found non-empty")
+
+            if(
+            page.frequencyEdit.text() != " "){
+                println("frequency passed, found non-empty")}
+            // page.frequencyUnitField.click()
+            if( page.frequencyUnitField.text() != " "){
+                println("frequency unit passed, found non-empty")}
+            if ( page.retainedEdit.text() != " "){
+                println("retained passed, found non-empty")}
+        }
+        page.autoSnapshotsEditOk.click()
+        println("pop up visible")
+
+        when:
+
+        while(true) {
+            page.autosnapshotsconfirmok.click()
+            println("inside ok clicked successfully")
+            if(page.filePrefixField.isDisplayed()== false)
+                break
+        }
+
+        then:
+
+        waitFor(15){
+            page.filePrefix.text().equals(initialPrefix)
+            page.frequency.text().equals(initialFreq)
+            page.frequencyUnit.text().equals(initialFreqUnit)
+            page.retained.text().equals(initialRetained)
+        }
+        
+    }
 }
