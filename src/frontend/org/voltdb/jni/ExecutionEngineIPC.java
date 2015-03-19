@@ -1496,7 +1496,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.clear();
         m_data.putInt(Commands.executeTask.m_id);
         m_data.putLong(taskType.taskId);
-        m_data.put(task.array());
+        if (task != null)
+            m_data.put(task.array());
         try {
             m_data.flip();
             m_connection.write();

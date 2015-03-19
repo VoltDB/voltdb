@@ -303,10 +303,9 @@ void TupleStreamBase::extendBufferChain(size_t minLength, bool continueTxn /*= t
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
-    m_currBlock = new StreamBlock(buffer, blockSize, uso);
     // Valgrind needs the newly created block to be initialized
-    // Leaving the last 8 bytes for MAGIC_HEADER_SPACE_FOR_JAVA
-    ::memset(m_currBlock->rawPtr(), 0, (m_defaultCapacity - 8));
+    ::memset(buffer, 0, blockSize);
+    m_currBlock = new StreamBlock(buffer, blockSize, uso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }

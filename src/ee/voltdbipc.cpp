@@ -460,10 +460,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         m_exceptionBuffer = new char[MAX_MSG_SZ];
+        ::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
+        ::memset(m_exceptionBuffer, 0, MAX_MSG_SZ);
         m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
+        ::memset(m_tupleBuffer, 0, MAX_MSG_SZ);
 
         if (m_engine->initialize(cs->clusterId,
                                  cs->siteId,
