@@ -228,7 +228,7 @@ public class TestRateLimitedClientNotifier {
         connection = new MockConnection();
         mws = connection.m_writeStream;
         messages = mws.m_messages;
-        cihm = new ClientInterfaceHandleManager(false, connection, null );
+        cihm = new ClientInterfaceHandleManager(false, connection, null, null);
     }
 
     @After
