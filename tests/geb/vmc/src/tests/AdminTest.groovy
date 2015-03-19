@@ -1185,33 +1185,50 @@ class AdminTest extends TestBase {
 
     //server test
 
-    def "when server3 is clicked"() {
-        when:
+    def "when server is clicked and check server name list and stop cancel"() {
+
+        def $namelist1
+        def $namelist2
+        def $namelist3
+        def $namelist4
+        def $lineunused, $lineunused1
+       // new File("src/resources/serversearch.txt").withReader {
+          //  $lineunused = it.readLine()
+          //  $lineunused1 = it.readLine()
+          //  $namelist1 = it.readLine()
+           // $namelist2 = it.readLine()
+          //  $namelist3 = it.readLine()
+          //  $namelist4 = it.readLine()
+       // }
+        when:'clicked server button'
         at AdminPage
-        waitFor(30) { server.serverbutton.isDisplayed() }
+        page.serverbutton.isDisplayed()
+        page.serverbutton.click()
+        //if($namelist1 ==  page.servernamelist1.text()){println(page.servernamelist1.text())
+        // if($namelist2 ==  page.servernamelist2.text()){println(page.servernamelist2.text())}
+        // if($namelist3 ==  page.servernamelist3.text()){println(page.servernamelist3.text())}}
+
+        if(waitFor(10){page.servername.isDisplayed()}){
+
+            println("server name is displayed as: "+page.servername.text())}
+
+
         then:
-        server.serverbutton.click()
-        waitFor(30) { server.serverconfirmation.isDisplayed() }
-        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
-        server.deerwalkserver3stopbutton.click()
-        server.deeerwalkservercancelbutton.click()
-        //server.serverbutton.click()
+
+        waitFor(5){
+            page.serverstopbuttonmain.isDisplayed()
+        }
+        println("server stop button displayed")
+        page.serverstopbuttonmain.click()
+        waitFor(5) {page.serverstopcancel.isDisplayed()
+                    page.serverstopok.isDisplayed()}
+        page.serverstopcancel.click()
+        println("server cancel button clicked")
+
     }
 
-    def "when server4 is clicked"() {
-        when:
-        at AdminPage
-        waitFor(30) { serverbutton.isDisplayed() }
-        then:
-        server.serverbutton.click()
-        waitFor(30) { server.serverconfirmation.isDisplayed() }
-        server.serverconfirmation.text().toLowerCase().equals("Servers".toLowerCase())
-        server.deerwalkserver4stopbutton.click()
-        server.deeerwalkservercancelbutton.click()
-        //server.serverbutton.click()
-    }
-	
-	// Overview Expansion
+
+    // Overview Expansion
 	
 	def "HTTP Access Expand:Check Text"() {
     	when:

@@ -24,11 +24,23 @@ class AdminPage extends VoltDBManagementCenterPage {
 
         serverbutton				{ $("#serverName") }
         serverconfirmation			{ $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
-        deerwalkserver3stopbutton   { $("#stopServer_deerwalk3") }
-        deeerwalkservercancelbutton { $("#StopConfirmCancel") }
-        deerwalkserverstopok        { $("#StopConfirmOK") }
 
-        deerwalkserver4stopbutton   {$("#stopServer_deerwalk4")}
+
+
+        //servernamelist			    {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
+        servername			        {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
+        serverstopbuttonmain		{$("#stopServer_voltdbserver", text:"Stop")}
+
+        servernamelist1			{$("#serverListWrapperAdmin > table > tbody > tr.activeHostMonitoring > td.configLabel > a")}
+        servernamelist2			{$("#serverListWrapperAdmin > table > tbody > tr:nth-child(2) > td.configLabel > a")}
+        servernamelist3			{$("#serverListWrapperAdmin > table > tbody > tr:nth-child(3) > td.configLabel > a")}
+
+        serverstopbtn1   		{$("#stopServer_deerwalk3", class:"disableServer", text:"Stop") }
+        serverstopbtn2			{$("#stopServer_deerwalk2", text:"Stop")}
+        serverstopbtn3			{$("#stopServer_deerwalk4", text:"Stop")}
+        serverstopcancel		{$("#StopConfirmCancel",    text:"Cancel")}
+        serverstopok			{$("#StopConfirmOK",        text:"Ok")}
+        serverstoppopup  		{$("body > div.popup_content34", class:"popup")}
 
 
         //DBmonitor part for server
