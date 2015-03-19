@@ -551,7 +551,10 @@ class AdminTest extends TestBase {
 
     }
 
-
+	static String initialPrefix
+	static String initialFreq
+	static String initialFreqUnit
+	static String initialRetained
 
     def "click edit and ok to check popup"() {
         String prefix 			= "SNAPSHOTNONCE"
@@ -566,15 +569,27 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
+        page.autoSnapshots.click()
+        waitFor(30) {
+		    page.filePrefix.isDisplayed()
+		    page.frequency.isDisplayed()
+		    page.frequencyUnit.isDisplayed()
+		    page.retained.isDisplayed()
+        }
+        initialPrefix 	= page.filePrefix.text()
+        initialFreq		= page.frequency.text()
+        initialFreqUnit	= page.frequencyUnit.text()
+        initialRetained	= page.retained.text()
+        
         then:
         waitFor(10) {
             page.autoSnapshotsEdit.isDisplayed()
             page.autoSnapshotsValue.isDisplayed()
+            initialFreq
         }
 
         when:
         page.autoSnapshotsEdit.click()
-        String string = page.autoSnapshotsValue.text()
         then:
         waitFor(10) {
             page.autoSnapshotsEditCheckbox.isDisplayed()
@@ -587,8 +602,6 @@ class AdminTest extends TestBase {
         page.frequencyUnitField.click()
         page.frequencyUnitField.value(frequencyUnit)
         page.retainedField.value(retained)
-
-
 
         if(page.fileprefixEdit.text() != " "){
             println("fileprefix passed, found non-empty")
@@ -623,8 +636,8 @@ class AdminTest extends TestBase {
             page.retained.text().equals(retained)
             page.filePrefix.isDisplayed()
         }
-
-        println("test")
+        
+       
     }
 
 

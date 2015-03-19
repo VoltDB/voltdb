@@ -1180,7 +1180,7 @@ class DbMonitorTest extends TestBase {
 
     def "Check Data in Database Tables"() {
         when:
-        page.storedDatabaseTableDisplayed()
+        page.databaseTableDisplayed()
         then:
         if(page.databaseTableMsg.text().equals("No data to be displayed")) {
             println("No data displayed-PASS")

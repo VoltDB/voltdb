@@ -505,6 +505,32 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def boolean gotoDbMonitor() {
         header.tabDBMonitor.click()
     }
+	
+	/*
+	 * click DbMonitor tab to go to Db Monitor
+	 */
+    def boolean gotoSchema() {
+        header.tabSchema.click()
+    }
+	
+	/*
+     * get query to create a table
+     */
+    def String getQueryToCreateTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#create") {
+        }
+
+        while ((line = br.readLine()) != "#delete") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
 
     /*
 	 *	Get delete query
@@ -524,4 +550,22 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
 
         return query
     }
+	
+	/*
+	 * get tablename that is created and deleted
+	 */
+	def String getTablename() {
+		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+		String line;
+		String query = ""
+		
+		while((line = br.readLine()) != "#name") {
+		}
+
+		while ((line = br.readLine()) != null) {
+			query = query + line + "\n"
+		}
+		
+		return query
+	}
 }
