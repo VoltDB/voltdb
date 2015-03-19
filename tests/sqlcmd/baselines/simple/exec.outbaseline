@@ -29,6 +29,46 @@ exec    T.insert 13 , 'abc';
 execute  T.insert  ,  14  ,  abcd;
 (Returned 1 rows in #.##s)
 
+exec    T.insert 31,  'a z';
+(Returned 1 rows in #.##s)
+
+execute T.insert 32   ' ab';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 33 , 'abc ';
+(Returned 1 rows in #.##s)
+
+ exec   T.insert 41,  'a;z';
+(Returned 1 rows in #.##s)
+
+execute T.insert 42   ';ab';
+(Returned 1 rows in #.##s)
+
+EXEC    T.insert 43 , 'abc;';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 51,  'a,z';
+(Returned 1 rows in #.##s)
+
+execute T.insert 52   ',ab';
+(Returned 1 rows in #.##s)
+
+EXECUTE T.insert 53 , 'abc,';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 61,  ' ,;';
+(Returned 1 rows in #.##s)
+
+execute T.insert 62   '; ,';
+(Returned 1 rows in #.##s)
+
+EXECUTE T.insert 63 , ';,  ';
+(Returned 1 rows in #.##s)
+
+EXECUTE T.insert 71 ,
+ ';,  ';
+(Returned 1 rows in #.##s)
+
 select * from t;
 C   D    
 --- -----
@@ -40,8 +80,21 @@ C   D
  12 ab   
  13 abc  
  14 abcd 
+ 31 a z  
+ 32  ab  
+ 33 abc  
+ 41 a;z  
+ 42 ;ab  
+ 43 abc; 
+ 51 a,z  
+ 52 ,ab  
+ 53 abc, 
+ 61  ,;  
+ 62 ; ,  
+ 63 ;,   
+ 71 ;,   
 
-(Returned 8 rows in #.##s)
+(Returned 21 rows in #.##s)
 
 drop table t;
 Command succeeded.

@@ -344,7 +344,7 @@ public class SQLParser extends SQLPatternFactory
             "'" +
             "[^',\\s]*" +  // arbitrary string content NOT matching param separators
             "[,\\s]" +     // the first match for a param separator
-            "[^']" +       // arbitrary string content
+            "[^']*" +      // arbitrary string content
             "'",           // end of string OR start of escaped quote
             Pattern.MULTILINE);
 
@@ -1481,7 +1481,8 @@ public class SQLParser extends SQLPatternFactory
                 // even near the start
                 commandWordTerminator.equals(",")) {
         ExecuteCallResults results = new ExecuteCallResults();
-        results.params = parseExecParameters(statement.substring(matcher.end()));
+        String rawParams = statement.substring(matcher.end());
+        results.params = parseExecParameters(rawParams);
         results.procedure = results.params.remove(0);
         // TestSqlCmdInterface passes procedures==null because it
         // doesn't need/want the param types.

@@ -17,5 +17,23 @@ execute  T.insert  ,  14  ,  abcd;
 --exec 	  T.insert 23	,	'abc'	;	
 --execute		T.insert		,		24		,		abcd;
 
+-- embedded whitespace and punctuation.
+exec    T.insert 31,  'a z' ;
+execute T.insert 32   ' ab';
+exec    T.insert 33 , 'abc ' ;
+ exec   T.insert 41,  'a;z' ;
+execute T.insert 42   ';ab';
+EXEC    T.insert 43 , 'abc;' ;
+exec    T.insert 51,  'a,z' ;
+execute T.insert 52   ',ab';
+EXECUTE T.insert 53 , 'abc,' ;
+exec    T.insert 61,  ' ,;' ;
+execute T.insert 62   '; ,';
+EXECUTE T.insert 63 , ';,  ' ;
+
+EXECUTE T.insert 71 ,
+ ';,  '
+  ;
+
 select * from t;
 drop table t;
