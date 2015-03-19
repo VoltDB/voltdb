@@ -103,7 +103,9 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.CSV,
-                    tables.toArray(new Table[0]));
+                    tables.toArray(new Table[0]),
+                    null /* hardLinks */
+                    );
 
         boolean noTargetsCreated = true;
 

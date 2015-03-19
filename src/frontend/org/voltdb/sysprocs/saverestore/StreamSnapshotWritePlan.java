@@ -132,7 +132,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.STREAM,
-                    config.tables);
+                    config.tables,
+                    null /* hardLinks */);
 
         // table schemas for all the tables we'll snapshot on this partition
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();

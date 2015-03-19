@@ -17,12 +17,19 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.HashMap;
-import java.util.TreeSet;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeSet;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * The snapshot registry contains information about snapshots that executed
@@ -31,6 +38,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
  */
 public class SnapshotRegistry {
     private static final int m_maxStatusHistory = 10;
+
+    public static final Map<String,HardLink> NO_HARDLINKS = ImmutableMap.<String,HardLink>of();
 
     private static final TreeSet<Snapshot> m_snapshots = new TreeSet<Snapshot>(
             new java.util.Comparator<Snapshot>() {
@@ -42,7 +51,33 @@ public class SnapshotRegistry {
 
             });
 
+    public static class HardLink {
+
+        public final String path;
+        public final String nonce;
+        public final Map<String, Snapshot.Table> tables;
+
+        private HardLink(String path, String nonce, int hostId,
+                SnapshotFormat format, org.voltdb.catalog.Table [] tables) {
+            this.path = path;
+            this.nonce = nonce;
+
+            ImmutableMap.Builder<String, Snapshot.Table> mb = ImmutableMap.builder();
+            for (org.voltdb.catalog.Table table: tables) {
+                String filename =
+                        SnapshotUtil.constructFilenameForTable(
+                                table,
+                                nonce,
+                                format,
+                                hostId);
+                mb.put(table.getTypeName(), new Snapshot.Table(table.getTypeName(), filename));
+            }
+            this.tables = mb.build();
+        }
+    }
+
     public static class Snapshot {
+
         public final long txnId;
         public final long timeStarted;
         public final long timeFinished;
@@ -54,42 +89,64 @@ public class SnapshotRegistry {
         public final long bytesWritten;
         public final SnapshotFormat format;
 
-        private final HashMap< String, Table> tables = new HashMap< String, Table>();
+        private final Map<String,Table> tables = Collections.synchronizedMap(new LinkedHashMap<String,Table>());
+
+        public final Map<String,HardLink> hardLinks;
 
         private Snapshot(long txnId, long timeStarted, int hostId, String path, String nonce,
-                         SnapshotFormat format,
-                         org.voltdb.catalog.Table tables[]) {
+                         SnapshotFormat format, org.voltdb.catalog.Table tables[],
+                         JSONObject jsnHardLinks) {
+
             this.txnId = txnId;
             this.timeStarted = timeStarted;
             this.path = path;
             this.nonce = nonce;
             this.format = format;
-            timeFinished = 0;
-            synchronized (this.tables) {
-                for (org.voltdb.catalog.Table table : tables) {
-                    String filename =
+            this.timeFinished = 0;
+
+            Map<String,HardLink> hardLinks = NO_HARDLINKS;
+            for (org.voltdb.catalog.Table table : tables) {
+                String filename =
                         SnapshotUtil.constructFilenameForTable(
                                 table,
                                 nonce,
                                 format,
                                 hostId);
-                    this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename));
-                }
+                this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename));
             }
-            result = false;
-            bytesWritten = 0;
+            if (jsnHardLinks != null && jsnHardLinks.length() > 0) {
+                ImmutableMap.Builder<String,HardLink> hardLinksBuilder = ImmutableMap.builder();
+                Iterator<String> hlitr = jsnHardLinks.keys();
+                while (hlitr.hasNext()) try {
+                    String reqId = hlitr.next();
+                    JSONObject jsnHardLink = jsnHardLinks.getJSONObject(reqId);
+                    HardLink hardLink = new HardLink(
+                            jsnHardLink.getString("path"),
+                            jsnHardLink.getString("nonce"),
+                            hostId, format, tables
+                            );
+                    hardLinksBuilder.put(reqId, hardLink);
+                } catch (JSONException handleItByAssigninItAnEmptyMap) {
+                    hardLinks = NO_HARDLINKS;
+                }
+                hardLinks = hardLinksBuilder.build();
+            }
+
+            this.hardLinks = hardLinks;
+            this.result = false;
+            this.bytesWritten = 0;
         }
 
         private Snapshot(Snapshot incomplete, long timeFinished) {
-            txnId = incomplete.txnId;
-            timeStarted = incomplete.timeStarted;
-            path = incomplete.path;
-            nonce = incomplete.nonce;
-            format = incomplete.format;
+            this.txnId = incomplete.txnId;
+            this.timeStarted = incomplete.timeStarted;
+            this.path = incomplete.path;
+            this.nonce = incomplete.nonce;
+            this.format = incomplete.format;
+            this.hardLinks = incomplete.hardLinks;
             this.timeFinished = timeFinished;
-            synchronized (tables) {
-                tables.putAll(incomplete.tables);
-            }
+            this.tables.putAll(incomplete.tables);
+
             long bytesWritten = 0;
             boolean result = true;
             for (Table t : tables.values()) {
@@ -111,27 +168,21 @@ public class SnapshotRegistry {
         }
 
         public void iterateTables(TableIterator ti) {
-            synchronized (tables) {
-                for (Table t : tables.values()) {
-                    ti.next(t);
-                }
+            for (Table t: ImmutableList.copyOf(tables.values())) {
+                ti.next(t);
             }
         }
 
         public void updateTable(String name, TableUpdater tu) {
-            synchronized (tables) {
-                assert(tables.get(name) != null);
-                tables.put(name, tu.update(tables.get(name)));
-            }
+            assert(tables.get(name) != null);
+            tables.put(name, tu.update(tables.get(name)));
         }
 
         public Table removeTable(String name) {
-            synchronized (tables) {
-                return tables.remove(name);
-            }
+            return tables.remove(name);
         }
 
-        public class Table {
+        public static class Table {
             public final String name;
             public final String filename;
             public final long size;
@@ -159,9 +210,10 @@ public class SnapshotRegistry {
             String path,
             String nonce,
             SnapshotFormat format,
-            org.voltdb.catalog.Table tables[]) {
+            org.voltdb.catalog.Table tables[],
+            JSONObject jsnHardLinks) {
         final Snapshot s = new Snapshot(txnId, System.currentTimeMillis(),
-                hostId, path, nonce, format, tables);
+                hostId, path, nonce, format, tables, jsnHardLinks);
 
         m_snapshots.add(s);
         if (m_snapshots.size() > m_maxStatusHistory) {

@@ -73,7 +73,8 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                            file_path,
                                            file_nonce,
                                            SnapshotFormat.INDEX,
-                                           config.tables);
+                                           config.tables,
+                                           null /* hardLinks */);
 
         // create table tasks
         for (Table table : config.tables) {
