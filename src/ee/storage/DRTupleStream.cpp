@@ -171,7 +171,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // the nullarray lives in rowheader after the 4 byte header length prefix
     uint8_t *nullArray =
-      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position());
+        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof(int32_t));
 
     // write the tuple's data
     tuple.serializeToExport(io, 0, nullArray);
