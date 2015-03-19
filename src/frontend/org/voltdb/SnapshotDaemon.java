@@ -258,9 +258,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String m_indexSnapshotPrefix;
         private final String m_fileSnapshotPrefix;
         private final String m_csvSnapshotPrefix;
-        private Runnable m_lockGrantedTask = null;
-        private Runnable m_queueChanged = null;
+        private Runnable m_processQueueTask = null;
+        private Runnable m_processSnapshotCompleteTask = null;
+        private Runnable m_leaderQueueProcessor = null;
         private SNAPSHOT_TYPE m_activeSnapshot = SNAPSHOT_TYPE.EMPTY;
+        // Can contain either FILE or LOG but not both; FILE can be promoted to LOG
         private final LinkedHashSet<SNAPSHOT_TYPE> m_pendingSnapshotsQueue = new LinkedHashSet<SNAPSHOT_TYPE>();
         private final LinkedHashSet<SNAPSHOT_TYPE> m_localPendingSnapshots = new LinkedHashSet<SNAPSHOT_TYPE>();
         private final byte[] m_startQueue = new byte[] {(byte)SNAPSHOT_TYPE.EMPTY.ordinal(),
@@ -268,7 +270,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             (byte)SNAPSHOT_TYPE.EMPTY.ordinal(), (byte)SNAPSHOT_TYPE.EMPTY.ordinal(), 0};
 
 
-        public SnapshotQueue(SynchronizedStatesManager ssm, Runnable queueChangeCallback) throws KeeperException, InterruptedException {
+        public SnapshotQueue(SynchronizedStatesManager ssm) throws KeeperException, InterruptedException {
             ssm.super("snapshot_queue", SNAP_LOG);
             m_streamSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "stream_snapshots");
             ssm.addIfMissing(m_streamSnapshotPrefix, CreateMode.PERSISTENT, null);
@@ -278,7 +280,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             ssm.addIfMissing(m_fileSnapshotPrefix, CreateMode.PERSISTENT, null);
             m_csvSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "csv_snapshots");
             ssm.addIfMissing(m_csvSnapshotPrefix, CreateMode.PERSISTENT, null);
-            m_queueChanged = queueChangeCallback;
+            m_leaderQueueProcessor = null;
 
             // Start with an empty queue
             registerStateMachineWithManager(ByteBuffer.wrap(m_startQueue));
@@ -313,10 +315,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 sb.append(activeNode);
             }
             return sb.append(" }").toString();
-        }
-
-        public void setQueueChangeCallback(Runnable queueChangeCallback) {
-            m_queueChanged = queueChangeCallback;
         }
 
         private String getPathFromType(SNAPSHOT_TYPE type) {
@@ -439,7 +437,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
                 if (!m_pendingSnapshotsQueue.contains(snapshotReq)) {
                     if (snapshotReq == SNAPSHOT_TYPE.LOG) {
-                        // Easier to remove even if it is not there
+                        // Promote FILE entry to LOG entry (if it is there; remove could fail)
                         m_pendingSnapshotsQueue.remove(SNAPSHOT_TYPE.FILE);
                     }
                     m_pendingSnapshotsQueue.add(snapshotReq);
@@ -447,19 +445,41 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }
             m_localPendingSnapshots.clear();
-            if (m_lockGrantedTask != null) {
-                // We are the leader and we finished the last snapshot so start the next one in the queue
-                try {
-                    m_lockGrantedTask.run();
-                    if (isProposalInProgress()) {
-                        // The task updated the queue for us
-                        queueChanged = false;
+            if (m_bIsSnapshotDaemonLeader) {
+                if (m_processSnapshotCompleteTask != null) {
+                    // We are the leader and we finished the last snapshot so start the next one in the queue
+                    try {
+                        m_processSnapshotCompleteTask.run();
+                        m_processSnapshotCompleteTask = null;
+                        m_processQueueTask = null;
+                        if (isProposalInProgress()) {
+                            // The task updated the queue for us
+                            queueChanged = false;
+                        }
+                    }
+                    catch (Exception e) {
+                        if (isProposalInProgress()) {
+                            // Proposal was started so don't do
+                            queueChanged = false;
+                        }
                     }
                 }
-                catch (Exception e) {
-                    if (isProposalInProgress()) {
-                        // Proposal was started so don't do
-                        queueChanged = false;
+                else
+                if (m_processQueueTask != null) {
+                    // We are the leader and we finished the last snapshot so start the next one in the queue
+                    try {
+                        m_processQueueTask.run();
+                        m_processQueueTask = null;
+                        if (isProposalInProgress()) {
+                            // The task updated the queue for us
+                            queueChanged = false;
+                        }
+                    }
+                    catch (Exception e) {
+                        if (isProposalInProgress()) {
+                            // Proposal was started so don't do
+                            queueChanged = false;
+                        }
                     }
                 }
             }
@@ -483,12 +503,19 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {
             assert(success);
             if (ourProposal) {
-                // Since all changes are always successful, the were applied when we proposed the change
+                // Since all changes are always successful, they were applied when we proposed the change
                 return;
             }
             processCurrentQueueState(proposedState);
-            if (m_queueChanged != null) {
-                m_queueChanged.run();
+
+            if (m_bIsSnapshotDaemonLeader) {
+                try {
+                    lockDistributedLockAndProcessQueue();
+                }
+                catch (Exception e) {
+                    //  Auto-generated catch block
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -503,7 +530,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 if (!m_pendingSnapshotsQueue.contains(reqType)) {
                     if (reqType == SNAPSHOT_TYPE.LOG) {
-                        // Easier to remove even if it is not there
+                        // Promote FILE entry to LOG entry (if it is there; remove could fail)
                         m_pendingSnapshotsQueue.remove(SNAPSHOT_TYPE.FILE);
                     }
                     m_pendingSnapshotsQueue.add(reqType);
@@ -523,12 +550,21 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return (SNAPSHOT_TYPE) m_pendingSnapshotsQueue.toArray()[0];
         }
 
-        public void requestLockedTask(Runnable onLockGranted) throws Exception {
+        public void lockDistributedLockAndProcessQueue() throws Exception {
             if (requestLock()) {
-                onLockGranted.run();
+                m_processQueueChangeUnderDistributedLock.run();
             }
             else {
-                m_lockGrantedTask = onLockGranted;
+                m_processQueueTask = m_processQueueChangeUnderDistributedLock;
+            }
+        }
+
+        public void lockDistributedLockAndProcessCompletedSnapshot() throws Exception {
+            if (requestLock()) {
+                m_processSnapshotCompleteUnderDistributedLock.run();
+            }
+            else {
+                m_processSnapshotCompleteTask = m_processSnapshotCompleteUnderDistributedLock;
             }
         }
 
@@ -587,6 +623,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         public void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, ByteBuffer activeSnapshotData) {
+            assert(holdingDistributedLock());
             m_pendingSnapshotsQueue.remove(type);
             if (!satisfiesAllNodes) {
                 // re-queue at the tail
@@ -621,21 +658,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     static int m_periodicWorkInterval = 2000;
     public static volatile int m_userSnapshotRetryInterval = 30;
 
-    private final Runnable m_onQueueChange = new Runnable() {
-        @Override
-        public void run() {
-            m_es.submit(new SusceptibleRunnable() {
-                @Override
-                public void susceptibleRun() throws Exception {
-                    m_snapshotQueue.requestLockedTask(m_onQueueLockGrant);
-                }
-            });
-        }
-    };
-
-    private final Runnable m_onQueueLockGrant = new SusceptibleRunnable() {
+    private final Runnable m_processQueueChangeUnderDistributedLock = new SusceptibleRunnable() {
         @Override
         public void susceptibleRun() throws Exception {
+            assert(m_snapshotQueue.getActiveSnapshotType() == SNAPSHOT_TYPE.EMPTY);
             SNAPSHOT_TYPE atHeadType = m_snapshotQueue.getPendingSnapshotType();
             if (atHeadType == SNAPSHOT_TYPE.EMPTY) {
                 m_snapshotQueue.lastSnapshotProcessed();
@@ -674,6 +700,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     };
 
+    private final Runnable m_processSnapshotCompleteUnderDistributedLock = new SusceptibleRunnable() {
+        @Override
+        public void susceptibleRun() throws Exception {
+            assert(m_snapshotQueue.getActiveSnapshotType() != SNAPSHOT_TYPE.EMPTY);
+            m_snapshotQueue.m_activeSnapshot = SNAPSHOT_TYPE.EMPTY;
+            m_processQueueChangeUnderDistributedLock.run();
+        }
+    };
+
     public boolean isTruncationSnapshotQueuedOrActive() {
         return m_snapshotQueue.snapshotPending(SNAPSHOT_TYPE.LOG)
             || m_snapshotQueue.getActiveSnapshotType() == SNAPSHOT_TYPE.LOG;
@@ -707,6 +742,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private DaemonInitiator m_initiator;
     private long m_nextCallbackHandle;
     private String m_truncationSnapshotPath;
+    private boolean m_bIsSnapshotDaemonLeader = false;
 
     /*
      * Before doing truncation snapshot operations, wait a few seconds
@@ -826,7 +862,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
         catch (Exception e) {}
         try {
-            m_snapshotQueue = new SnapshotQueue(m_perHostStateManager, null);
+            m_snapshotQueue = new SnapshotQueue(m_perHostStateManager);
         }
         catch (Exception e) {}
 
@@ -1265,7 +1301,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             // TRAIL [TruncSnap:1] elected as leader
             truncationRequestExistenceCheck();
             userSnapshotRequestExistenceCheck(false);
-            m_snapshotQueue.setQueueChangeCallback(m_onQueueChange);
+            m_bIsSnapshotDaemonLeader = true;
+            // Need to decide what to do with the existing active entry if we are replacing a Daemon that
+            // has gone away.
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error while accepting snapshot daemon leadership", true, e);
         }
@@ -1514,7 +1552,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     /*
-     * A ZK event occured requestion a truncation snapshot be taken
+     * A ZK event occured requesting a truncation snapshot be taken
      */
     private void truncationSnapshotPrelude(final JSONObject joRequest) {
         String pathTemp = null;
@@ -2917,15 +2955,19 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
-        final Runnable onLockGrant = new SusceptibleRunnable() {
-            @Override
-            public void susceptibleRun() throws Exception {
-                JSONObject jo = getActiveSnapshot();
-                if (jo.getString("requestIdAtHead").equals(event.requestId)) {
-                }
+        JSONObject jo;
+        try {
+            jo = getActiveSnapshot();
+            if (jo.getString("requestIdAtHead").equals(event.requestId)) {
+                m_snapshotQueue.lockDistributedLockAndProcessCompletedSnapshot();
             }
-        };
-
+        }
+        catch (JSONException e1) {
+            //  Auto-generated catch block
+            e1.printStackTrace();
+        }
+        catch (Exception e) {
+        }
         if (!event.truncationSnapshot || !event.didSucceed) {
             return new CountDownLatch(0);
         }
