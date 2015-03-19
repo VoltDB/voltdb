@@ -784,7 +784,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public void started(final Connection c) {
             m_connection = c;
             m_cihm.put(c.connectionId(),
-                       new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
+                       new ClientInterfaceHandleManager( m_isAdmin, c, null, m_acg.get()));
             m_acg.get().addMember(this);
             if (!m_acg.get().hasBackPressure()) {
                 c.enableReadSelection();
@@ -1239,6 +1239,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             buf.flip();
             c.writeStream().enqueue(buf);
         }
+
+        if (cihm.repairCallback != null) {
+            cihm.repairCallback.repairCompleted(partitionId, initiatorHSId);
+        }
     }
 
     /**
@@ -1256,7 +1260,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_snapshotDaemon.init(this, messenger, new Runnable() {
             @Override
             public void run() {
-                bindAdapter(m_snapshotDaemonAdapter);
+                bindAdapter(m_snapshotDaemonAdapter, null);
             }
         },
         gse);
@@ -1265,9 +1269,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Tell the clientInterface about a connection adapter.
      */
-    public void bindAdapter(final Connection adapter) {
+    public void bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
         m_cihm.put(adapter.connectionId(),
-                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter,
+                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
                     AdmissionControlGroup.getDummy()));
     }
 
