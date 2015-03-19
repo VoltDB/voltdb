@@ -766,12 +766,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 try {
                     Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                     Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                            int.class,
                             String.class,
                             ClientInterface.class,
                             byte.class,
                             boolean.class,
                             String.class);
                     m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
+                            m_messenger.getHostId(),
                             drProducerHost,
                             m_clientInterface,
                             drConsumerClusterId,
