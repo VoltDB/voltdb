@@ -489,6 +489,9 @@ public class TestSQLParser extends TestCase {
         validateSimpleExec("exec T.insert abcd 123", 3, 25);
         validateSimpleExec("exec T.insert 'abcd' '123'", 3, 26);
 
+        // test that quote parsing preserves AT LEAST well-formed quoted quotes.
+        validateSimpleExec("exec myproc 'ab''cd' '''123' 'XYZ'''", 4, 29);
+
         // These special case tests exercise parseExecuteCallInternal
         // but they validate it against a different query rewriter that purposely
         // recognizes a subset of the valid separators. It uses this handicap as
@@ -498,6 +501,10 @@ public class TestSQLParser extends TestCase {
         // Testing of quoted separators guards against regression of ENG-7927
         validateSpecialExecAssumeSeparator(",", "exec,A.insert,'  ;','a b',';\t; '", 4, 31);
         validateSpecialExecAssumeSeparator(" ", "exec A.upsert '\t\t;'  'a\tb' ';,\t\t'", 4, 32);
+        // test that quote parsing preserves AT LEAST well-formed quoted quotes among separators
+        validateSpecialExecAssumeSeparator(",", "exec,proc,'''  ;','a ''b',';\t; '", 4, 41);
+        validateSpecialExecAssumeSeparator(" ", "exec proc '''\t\t;'  'a\t''b' ';'',\t\t'''", 4, 42);
+
     }
 
     // Allow normal full range of quoted separators -- except for the one specified
@@ -505,7 +512,7 @@ public class TestSQLParser extends TestCase {
     private void validateSpecialExecAssumeSeparator(String separator,
             String query, int num, int testID)
     {
-        String separatorPattern = "["+separator+"]+";
+        String separatorPattern = "[" + separator + "]+";
         validateExec(separatorPattern, query, num, testID);
     }
 
@@ -527,11 +534,11 @@ public class TestSQLParser extends TestCase {
 
         String expected = query.replace("exec", "");
         expected = expected.replaceAll(separatorPattern, "/");
-        expected += " Total:" + numExpected;
+        expected += "/ Total:" + numExpected;
 
         String parsedString = "/" + results.procedure + "/" +
                 Joiner.on("/").join(results.params);
-        parsedString += " Total:" + (results.params.size() + 1);
+        parsedString += "/ Total:" + (results.params.size() + 1);
 
         assertEquals(msg + " '" + expected + "' vs. '" + parsedString + "'",
                 expected, parsedString);
