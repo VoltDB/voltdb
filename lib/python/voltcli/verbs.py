@@ -453,15 +453,16 @@ class ServerBundle(JavaBundle):
                                   None))
 
     def go(self, verb, runner):
+        final_args = None
         if self.subcommand == 'create':
             if runner.opts.replica:
-                self.subcommand = 'replica'
+                final_args = [self.subcommand, 'replica']
         if self.supports_live:
             if runner.opts.block:
                 final_args = [self.subcommand]
             else:
                 final_args = ['live', self.subcommand]
-        else:
+        elif final_args == None:
             final_args = [self.subcommand]
         if self.safemode_available:
             if runner.opts.safemode:
