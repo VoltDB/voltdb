@@ -191,7 +191,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         public String name() {
-            return String.format("%s_SR_%d", m_type.name(), m_id);
+            return String.format("%s_SR_%010d", m_type.name(), m_id);
         }
 
         @Override
@@ -340,9 +340,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private int buildSnapshotNode(String snapshotDirPrefix, byte[] nodeData)
                 throws KeeperException, InterruptedException {
             String nodePath;
-            nodePath = m_zk.create(snapshotDirPrefix, nodeData,
+            nodePath = m_zk.create(snapshotDirPrefix + "/", nodeData,
                     Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
-            String nodeNum = nodePath.substring(snapshotDirPrefix.length());
+            String nodeNum = nodePath.substring(snapshotDirPrefix.length()+1);
             return Integer.valueOf(nodeNum);
         }
 
@@ -387,7 +387,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         private String getPathFromNodeId(String snapshotDirPrefix, int nodeId) {
-            return ZKUtil.joinZKPath(snapshotDirPrefix, Integer.toString(nodeId));
+            return ZKUtil.joinZKPath(snapshotDirPrefix, String.format("%010d", nodeId));
         }
 
         private byte[] getDetailsFromSnapshotNode(String snapshotDirPrefix, int nodeId)
@@ -407,6 +407,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
             // append nodes list in process with current snapshot
             newQueue.put(activeSnapshotdata);
+            newQueue.flip();
             return newQueue;
         }
 
@@ -501,13 +502,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         @Override
         protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {
             assert(success);
-            if (ourProposal) {
+            if (!ourProposal) {
                 // Since all changes are always successful, they were applied when we proposed the change
-                return;
+                processCurrentQueueState(proposedState);
             }
-            processCurrentQueueState(proposedState);
 
-            if (m_bIsSnapshotDaemonLeader) {
+            if (m_bIsSnapshotDaemonLeader && m_activeSnapshot == SNAPSHOT_TYPE.EMPTY && !m_pendingSnapshotsQueue.isEmpty()) {
                 try {
                     lockDistributedLockAndProcessQueue();
                 }
@@ -546,7 +546,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         public SNAPSHOT_TYPE getPendingSnapshotType() {
-            return (SNAPSHOT_TYPE) m_pendingSnapshotsQueue.toArray()[0];
+            SNAPSHOT_TYPE pending = SNAPSHOT_TYPE.EMPTY;
+            if (!m_pendingSnapshotsQueue.isEmpty()) {
+                pending = m_pendingSnapshotsQueue.iterator().next();
+            }
+            return pending;
         }
 
         public void lockDistributedLockAndProcessQueue() throws Exception {
@@ -688,6 +692,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     atHeadType.requestId(requestNodes.firstKey()).name()
                     );
             joRequest.put("requestIdAtHead", requestId);
+            candidate = joRequest.toString(4).getBytes(StandardCharsets.UTF_8);
 
             m_snapshotQueue.initiateNewSnapshot(atHeadType, nodesCount == 1, ByteBuffer.wrap(candidate));
 
@@ -2957,7 +2962,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         JSONObject jo;
         try {
             jo = getActiveSnapshot();
-            if (jo.getString("requestIdAtHead").equals(event.requestId)) {
+            if (jo != null && event.requestId.equals(jo.getString("requestIdAtHead"))) {
                 m_snapshotQueue.lockDistributedLockAndProcessCompletedSnapshot();
             }
         }
@@ -2966,6 +2971,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             e1.printStackTrace();
         }
         catch (Exception e) {
+            e.printStackTrace();
         }
         if (!event.truncationSnapshot || !event.didSucceed) {
             return new CountDownLatch(0);
