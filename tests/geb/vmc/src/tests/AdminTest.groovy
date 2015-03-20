@@ -327,6 +327,27 @@ class AdminTest extends TestBase {
         }
     }
 
+    // export expansion
+
+    def "Overview:Export-Expand and check configurations"() {
+        when:
+        page.overview.export.click()
+        then:
+
+        try {
+            waitFor(30) { page.overview.exportNoConfigAvailable.isDisplayed() }
+            println(page.overview.exportNoConfigAvailable.text())
+        } catch(geb.error.RequiredPageContentNotPresent e ) {
+            waitFor(30) { page.overview.exportConfig.isDisplayed() }
+            println("The export configuration")
+            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
+        } catch (geb.waiting.WaitTimeoutException e ) {
+            waitFor(30) { page.overview.exportConfig.isDisplayed() }
+            println("The export configuration")
+            println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
+        }
+    }
+
     // overview: advanced expansion-Edits
 
     def "Check click Heart Timeout edit and Cancel"() {
@@ -678,7 +699,7 @@ class AdminTest extends TestBase {
 
     }
 
-    def "click security edit button and ok and cancel"(){
+    def "click security edit button and cancel popup"(){
         when:
         at AdminPage
         waitFor(5) { page.securityEdit.isDisplayed() }
@@ -692,7 +713,7 @@ class AdminTest extends TestBase {
         page.securityEditOk.click()
         println("security edit ok clicked!")
         waitFor(10) {
-            page.securityPopup.isDisplayed()
+          //  page.securityPopup.isDisplayed()
             page.securityPopupOk.isDisplayed()
             page.securityPopupCancel.isDisplayed()
             page.securityPopupCancel.click()
@@ -1319,12 +1340,21 @@ class AdminTest extends TestBase {
     //
 
     //download automation test
-    def "when download configuration is clicked"() {
+    def "check download configuration and verify text"() {
+
         when:
         at AdminPage
-        //waitFor(30) { downloadbtn.downloadconfigurationbutton.isDisplayed() }
+
+        waitFor(5) { 	page.downloadconfigurationbutton.isDisplayed() }
+        println("downloadbutton seen")
         then:
-        downloadbtn.downloadconfigurationbutton.click()
+
+        page.downloadconfigurationbutton.text().toLowerCase().equals("Download Configuration".toLowerCase())
+        println("download configuration button text has verified,\n click cannot be performed in firefox")
+        //assert withConfirm(true) { page.downloadconfigurationbutton.click() }
+
+
+
     }
 
     //CLUSTER
@@ -1389,14 +1419,18 @@ class AdminTest extends TestBase {
     }
 
     def "when save for yes"(){
+        def $line
+        new File("src/resources/snapshotpath.txt").withReader 			{ $line = it.readLine() }
+
         when:
+
         at AdminPage
-        waitFor(5) { cluster.savebutton.isDisplayed() }
+        waitFor(15) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(5) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
-        cluster.savedirectory.value("/var/opt/test/manual_snapshots")
+        cluster.savedirectory.value($line)
         cluster.saveok.click()
         println("success in local for yes")
 
@@ -1405,19 +1439,27 @@ class AdminTest extends TestBase {
     }
 
     def "when save for No"(){
+        def $line
+        new File("src/resources/snapshotpath.txt").withReader 			{ $line = it.readLine() }
+
         when:
         at AdminPage
-        waitFor(5) { cluster.savebutton.isDisplayed() }
+        waitFor(15) { cluster.savebutton.isDisplayed() }
         cluster.savebutton.click()
         then:
-        waitFor(5) { cluster.saveconfirmation.isDisplayed() }
+        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
-        cluster.savedirectory.value("abc/bcc/dfg")
+        cluster.savedirectory.value($line)
+        waitFor(5){cluster.savecancel.isDisplayed()}
         cluster.savecancel.click()
-
     }
 
-    def "when restore and ok"(){
+
+
+    def "when restore and cancel"(){
+        def $line
+        new File("src/resources/snapshotpath.txt").withReader 			{ $line = it.readLine() }
+
         when:
         at AdminPage
         waitFor(30) { cluster.restorebutton.isDisplayed() }
@@ -1425,23 +1467,13 @@ class AdminTest extends TestBase {
         then:
         waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
-        cluster.restoredirectory.value("/var/opt/test/manual_snapshots")
+        cluster.restoredirectory.value($line)
         cluster.restoresearch.click()
+        waitFor(5){cluster.restorecancelbutton.isDisplayed()}
         cluster.restorecancelbutton.click()
     }
 
-    def "when restore and cancel"(){
 
-        when:
-        at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed() }
-        cluster.restorebutton.click()
-        then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
-        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
-        cluster.restorecancelbutton.click()
-
-    }
 
     def "when restore and close"(){
         when:

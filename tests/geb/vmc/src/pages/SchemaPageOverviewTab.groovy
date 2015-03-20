@@ -59,6 +59,8 @@ class SchemaPageOverviewTab extends SchemaPage {
         indexCountValue				{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(5) > td:nth-child(2)") }
         procedureCountValue			{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(6) > td:nth-child(2)") }
         sqlStatementCountValue		{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(7) > td:nth-child(2)") }
+        documentationLink 			{ $("#iconDoc") }
+        generatedbytxt				{$("#catalogContainer > div.documentation > span")}
     }
     static at = {
         overviewTab.displayed

@@ -1,6 +1,13 @@
-/* this file is only for username and password so please set username in line 3 and password in line 4*/
+/* this file is only for server listing and searching set server name  in line 3 and accordingly*/
 ----------------enter 1st search in line 3, second search in line 4 and so forth -------------------------------
-deerwalk4
+
+
+#servername
+
+voltdbserver
+
 deerwalk3
+
 deerwalk2
+
 xyz

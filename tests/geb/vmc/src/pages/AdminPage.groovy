@@ -22,8 +22,18 @@ class AdminPage extends VoltDBManagementCenterPage {
         downloadbtn         { module downloadconfigbtn}
         schema              { module schemaTab}
 
-        serverbutton				{ $("#serverName") }
-        serverconfirmation			{ $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
+        serverbutton				    { $("#serverName") }
+        serverconfirmation			    { $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
+        deeerwalkservercancelbutton 	{ $("#StopConfirmCancel") }
+        deerwalkserverstopok        	{ $("#StopConfirmOK") }
+        servernamelist			{$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
+        servername			{$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
+        mainservername			{$("#serverListWrapperAdmin > table > tbody")}
+        serverstopbuttonmain		{$("#stopServer_voltdbserver", text:"Stop")}
+
+        serverresumebuttonmain		{$("#stopServer_voltdbserver", text:"Resume")}
+        serverstopbtndisable   		{$(class:"disableServer", text:"Stop") }
+        serverstopbtnenable			{$(class:"shutdown", text:"Stop")}
 
 
 
@@ -42,7 +52,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         serverstopok			{$("#StopConfirmOK",        text:"Ok")}
         serverstoppopup  		{$("body > div.popup_content34", class:"popup")}
 
-
+        downloadconfigurationbutton	{ $("#downloadAdminConfigurations") }
         //DBmonitor part for server
         dbmonitorbutton{$("#navDbmonitor > a")}
         clusterserverbutton{$("#btnPopServerList")}

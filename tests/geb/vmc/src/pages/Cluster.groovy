@@ -22,20 +22,22 @@ class Cluster extends Module {
         promotecancel				{ $("#promoteConfirmCancel") }
         promoteok					{ $("#promoteConfirmOk") }
         title						{ $("#admin > div.adminWrapper > div.adminLeft > h1") }
-        pausebutton					{ $("#pauseConfirmation") }
-        resumebutton				{ $("#resumeConfirmation") }
+        pausebutton					{ $("#pauseConfirmation", class:"resume", text:"Pause") }
+        resumebutton				{ $("#resumeConfirmation", class:"pause", text:"Resume") }
         resumeok					{ $("#btnResumeConfirmationOk") }
         pauseok						{ $("#btnPauseConfirmationOk") }
         pausecancel					{ $("#btnPauseConfirmationCancel") }
         resumecancel				{ $("#btnResumeConfirmationCancel") }
         resumeconfirmation			{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
-        pauseconfirmation			{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
+        pauseconfirmation			{ $("body > div.popup_cont.14 div.popup div.popup_content14 div.overlay-title.icon-alert") }
         savebutton					{ $("#saveConfirmation") }
         saveconfirmation			{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
         saveclose					{ $("body > div.popup_cont > div.popup_close") }
         savecancel					{ $("#btnSaveSnapshotCancel") }
         saveok						{ $("#btnSaveSnapshots") }
 		// $("#txtSnapshotDirectory")
+        restoredirectory			{$("#txtSearchSnapshots")}
+        restoresearch				{$("#btnSearchSnapshots")}
         savedirectory 				{ $("input", type:"text", name:"txtSnapshotDirectory", id:"txtSnapshotDirectory") }
         wanttosavecloseconfirm		{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
         wantotsaveclosebutton		{ $("body > div.popup_cont > div.popup_close") }

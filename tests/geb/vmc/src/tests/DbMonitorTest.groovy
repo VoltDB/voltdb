@@ -1202,7 +1202,7 @@ class DbMonitorTest extends TestBase {
 
     // ALERT
 
-	def "set alert and check missing"() {
+	def "set alert and replace trigger alert"() {
 		when: 'set alert threshold to zero'
 			page.setAlertThreshold(00)
 		then: 'check at least one alert'

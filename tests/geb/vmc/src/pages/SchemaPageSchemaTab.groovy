@@ -55,6 +55,10 @@ class SchemaPageSchemaTab extends SchemaPage {
         indexes			{ $(class:"tablesorter-header-inner", text:"Indexes" ) }
         pkey			{ $(class:"tablesorter-header-inner", text:"PKey" ) }
         tuplelimit		{ $(class:"tablesorter-header-inner", text:"TupleLimit" ) }
+        expandallcheck	{ $("#s > div > div.dataBlockContent > div > div > label", text:"Expand All")}
+        expandedcheck	{$("#s > div > div.dataBlockContent > div")}
+        documentationLink { $("#iconDoc") }
+        generatedbytxt	{$("#catalogContainer > div.documentation > span")}
 
 
         header          	{ module Header }

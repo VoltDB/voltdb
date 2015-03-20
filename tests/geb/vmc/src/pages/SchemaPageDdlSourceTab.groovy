@@ -33,6 +33,8 @@ class SchemaPageDdlSourceTab extends SchemaPage {
         mainContent { $('#d') }
         downloadButton  { $("#downloadDDL") }
         sourceText  { mainContent.find('.dataBlockContent') }
+        documentationLink 	{ $("#iconDoc") }
+        generatedbytxt		{$("#catalogContainer > div.documentation > span")}
     }
     static at = {
         ddlTab.displayed

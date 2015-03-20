@@ -40,6 +40,10 @@ class SchemaPageProceduresAndSqlTab extends SchemaPage {
         
         ascending		{ $(class:"tablesorter-icon icon-chevron-up") }
         descending		{ $(class:"tablesorter-icon icon-chevron-down") }
+        expandallproc 	{ $("#p > div > div.dataBlockContent > div > div > label", text:"Expand All")}
+        expandedproc	{ $("#p > div > div.dataBlockContent > div")}
+        documentationLink { $("#iconDoc") }
+        generatedbytxt	{$("#catalogContainer > div.documentation > span")}
     }
     static at = {
         proceduresTab.displayed

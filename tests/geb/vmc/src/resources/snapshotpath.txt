@@ -1,0 +1,1 @@
+/var/opt/test/manual_snapshots

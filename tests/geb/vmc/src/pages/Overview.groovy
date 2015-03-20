@@ -97,6 +97,11 @@ class Overview extends Module {
 
         // EXPORT EXPANSION
 
+        export			            { $(class:"labelCollapsed", text:"Export") }
+        exportNoConfigAvailable     { $(class:"configLabel", text:"No configuration available.") }
+        exportConfiguration         { $("#exportConfiguration") }
+        exportConfig                { $(class:"configLabel expoStream", title:"Click to expand/collapse", number) }
+
         // ADVANCED EXPANSION
 
         maxJavaHeap				{ $(class:"configLabel", text:"Max Java Heap") }
