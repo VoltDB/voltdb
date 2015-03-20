@@ -36,11 +36,19 @@ package exportbenchmark;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.spi.SelectorProvider;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
@@ -70,15 +78,18 @@ public class ExportBenchmark {
     final Client client;
     // Validated CLI config
     final ExportBenchConfig config;
+    // Network variables
+    Selector selector;
+    Thread statsThread;
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
-    // Timer for periodic stats
-    Timer timer;
     // Test stats variables
     long insertNumber = 0;
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
+    AtomicBoolean testFinished = new AtomicBoolean(false);
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
 
@@ -132,6 +143,17 @@ public class ExportBenchmark {
     }
 
     /**
+     * Clean way of exiting from an exception
+     * @param message   Message to accompany the exception
+     * @param e         The exception thrown
+     */
+    private void exitWithException(String message, Exception e) {
+        System.err.println(message);
+        System.err.println(e.getLocalizedMessage());
+        System.exit(-1);
+    }
+
+    /**
      * Creates a new instance of the test to be run.
      * Establishes a client connection to a voltdb server, which should already be running
      * @param args The arguments passed to the program
@@ -145,21 +167,6 @@ public class ExportBenchmark {
 
         fullStatsContext = client.createStatsContext();
         periodicStatsContext = client.createStatsContext();
-    }
-
-    /**
-     * Create a Timer task to display performance data on the Vote procedure
-     * It calls printStatistics() every displayInterval seconds
-     */
-    public void schedulePeriodicStats() {
-        timer = new Timer();
-        TimerTask statsPrinting = new TimerTask() {
-            @Override
-            public void run() { printStatistics(); }
-        };
-        timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
     }
 
     /**
@@ -280,7 +287,7 @@ public class ExportBenchmark {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    public void doInserts(Client client) throws NoConnectionsException, InterruptedException {
+    public void doInserts(Client client) {
 
         // Don't track warmup inserts
         System.out.println("Warming up...");
@@ -298,8 +305,6 @@ public class ExportBenchmark {
         // reset the stats after warmup is done
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
-
-        schedulePeriodicStats();
 
         // Insert objects until we've run for long enough
         System.out.println("Running benchmark...");
@@ -319,9 +324,100 @@ public class ExportBenchmark {
                 System.exit(1);
             }
         }
-        client.drain();
+
+        try { client.drain(); } catch (InterruptedException|NoConnectionsException ignore) {}
         System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
+
+        testFinished.set(true);
+        selector.wakeup();
+    }
+
+    private void listenForStats() {
+
+        while (true) {
+            // Wait for an event...
+            try {
+                selector.select();
+            } catch (IOException e) {
+                exitWithException("Can't select a new socket", e);
+            }
+
+            // See if we're done
+            if (testFinished.get() == true) {
+                return;
+            }
+
+            // We have events. Process each one.
+            System.out.println("FOUND ONE");
+            for (SelectionKey key : selector.selectedKeys()) {
+                if (!key.isValid()) {
+                    continue;           // Ignore invalid keys
+                }
+
+                if (key.isReadable()) {
+                    getStatsMessage((DatagramChannel)key.channel());
+                }
+            }
+        }
+    }
+
+    private void getStatsMessage(DatagramChannel channel) {
+        SocketAddress returnAddr = null;
+        String message = null;
+        System.out.println("GOT MESSAGE");
+
+        // Read the data
+        try {
+            buffer.clear();
+            returnAddr = channel.receive(buffer);
+
+            buffer.flip();
+            int messageLength = buffer.get();
+
+            if (messageLength > buffer.capacity()) {
+                System.out.println("WARN: packet exceeds allocate size; message truncated");
+            }
+
+            byte[] localBuf = new byte[messageLength];
+            buffer.get(localBuf, 0, messageLength);
+            message = new String(localBuf);
+        } catch (IOException e) {
+            exitWithException("Couldn't read from socket", e);
+        } catch (BufferUnderflowException e) {
+            System.out.println("WARN: Incomplete UDP packet; some data might be lost");
+            byte[] localBuf = new byte[buffer.remaining()];
+            buffer.get(localBuf, 0, buffer.remaining());
+            message = new String(localBuf);
+        }
+
+        // Print out the stats data
+        System.out.println(message);
+    }
+
+    private void setupSocketListener() {
+        DatagramChannel channel = null;
+
+        // Setup Listener
+        try {
+            selector = SelectorProvider.provider().openSelector();
+            channel = DatagramChannel.open();
+            channel.configureBlocking(false);
+        } catch (IOException e) {
+            exitWithException("Couldn't set up network channels", e);
+        }
+
+        // Bind to port & register with a channel
+        try {
+            InetSocketAddress isa = new InetSocketAddress(
+                                            InetAddress.getLocalHost(),
+                                            5001);
+            channel.socket().setReuseAddress(true);
+            channel.socket().bind(isa);
+            channel.register(selector, SelectionKey.OP_READ);
+        } catch (IOException e) {
+            exitWithException("Couldn't bind to socket", e);
+        }
     }
 
     /**
@@ -345,10 +441,20 @@ public class ExportBenchmark {
         benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
         benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
 
-        // Do the inserts
-        doInserts(client);
+        // Do the inserts in a separate thread
+        Thread writes = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                doInserts(client);
+            }
+        });
+        writes.start();
 
-        timer.cancel();
+        // Listen for stats until we stop
+        setupSocketListener();
+        listenForStats();
+        writes.join();
+
         System.out.println("Client flushed; waiting for export to finish");
 
         // Wait until export is done
