@@ -40,15 +40,13 @@ class Overview extends Module {
         securityEdit				{ $("#securityEdit") }
         securityEditCheckbox		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td.securitytd div.icheckbox_square-aero.checked.customCheckbox ins.iCheck-helper") }
         securityEditOk				{ $("#btnEditSecurityOk") }
-        securityEditCancel			{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-6.hasSubLabel.parent.security td a#btnEditSecurityCancel.editCancel") }
-
+        securityEditCancel			{ $("#btnEditSecurityCancel") }
 
         autoSnapshotsEdit			{ $("#autoSnapshotEdit") }
         autoSnapshotsEditCheckbox1 	{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td#autoSnapshotOption.snapshottd div.icheckbox_square-aero.customCheckbox ins.iCheck-helper") }
-        autoSnapshotsEditCheckbox 	{ $(class:"icheckbox_square-aero customCheckbox") }
 
-        autoSnapshotsEditOk 		{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotOk.editOk") }
-        autoSnapshotsEditCancel 	{ $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotCancel.editCancel") }
+        autoSnapshotsEditOk 		{ $("#btnEditAutoSnapshotOk") }
+        autoSnapshotsEditCancel 	{ $("#btnEditAutoSnapshotCancel") }
 
 
         filePrefixField             { $(id:"txtPrefix") }
@@ -112,6 +110,28 @@ class Overview extends Module {
 		queryTimeoutValue		{ $("#queryTimeOutUnitSpan") }
 		maxTempTableMemoryValue	{ $("#temptablesmaxsizeUnit") }
 		snapshotPriorityValue	{ $("#snapshotpriority") }
+
+        // heartbeat timeout
+        heartTimeoutEdit		{ $("#btnEditHrtTimeOut") }
+        heartTimeoutValue		{ $("#hrtTimeOutSpan") }
+        heartTimeoutField		{ $("#txtHrtTimeOut") }
+        heartTimeoutOk			{ $("#btnEditHeartbeatTimeoutOk") }
+        heartTimeoutCancel		{ $("#btnEditHeartbeatTimeoutCancel") }
+        heartTimeoutPopupOk		{ $("#btnPopupHeartbeatTimeoutOk") }
+        heartTimeoutPopupCancel	{ $("#btnPopupHeartbeatTimeoutCancel") }
+
+        // query timeout
+        queryTimeoutEdit		{ $("#btnEditQueryTimeout") }
+        queryTimeoutValue		{ $("#queryTimeOutSpan") }
+        queryTimeoutField		{ $("#txtQueryTimeout") }
+        queryTimeoutOk			{ $("#btnEditQueryTimeoutOk") }
+        queryTimeoutCancel		{ $("#btnEditQueryTimeoutCancel") }
+        queryTimeoutPopupOk		{ $("#btnPopupQueryTimeoutOk") }
+        queryTimeoutPopupCancel	{ $("#btnPopupQueryTimeoutCancel") }
+
+        // error message
+        errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
+        errorQuery				{ $("#errorQueryTimeout") }
     }
 }
 

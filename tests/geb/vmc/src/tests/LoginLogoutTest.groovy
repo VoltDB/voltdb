@@ -26,13 +26,13 @@ class LoginLogoutTest extends TestBase {
         }
         
         
-       	page.login()
+       	page.loginValid()
        	
        	then:
        	at VoltDBManagementCenterPage
     }
 	
-	def "Login Test Blank Username and Password"() {
+	def "Login Test Invalid Username and Password"() {
         setup: 'Open VMC page'
         to VoltDBManagementCenterPage
         expect: 'to be on VMC page'

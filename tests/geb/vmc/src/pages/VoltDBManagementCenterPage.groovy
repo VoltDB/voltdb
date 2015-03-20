@@ -376,8 +376,14 @@ class VoltDBManagementCenterPage extends Page {
             return false
         }
     }
-	
-	
+
+    def void loginValid(username = "admin", password = "password") {
+        usernameInput = username
+        passwordInput = password
+        loginButton.click()
+        waitFor() { !loginDialog.displayed }
+
+    }
 
 	def void loginEmpty(username = "", password = "") {
         usernameInput = username

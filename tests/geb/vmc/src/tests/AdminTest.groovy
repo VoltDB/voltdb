@@ -15,6 +15,17 @@ import geb.Page.*
  */
 
 class AdminTest extends TestBase {
+    static String initialPrefix
+    static String initialFreq
+    static String initialFreqUnit
+    static String initialRetained
+
+    static String initialHeartTimeout
+    static String initialQueryTimeout
+
+    static boolean revertAutosnapshots = false
+    static boolean revertHeartTimeout = false
+    static boolean revertQueryTimeout = false
 
     def setup() { // called before each test
         setup: 'Open VMC page'
@@ -316,6 +327,317 @@ class AdminTest extends TestBase {
         }
     }
 
+    // overview: advanced expansion-Edits
+
+    def "Check click Heart Timeout edit and Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(30) { page.overview.heartTimeoutCancel.click() }
+        then:
+        waitFor(30) {
+            !page.overview.heartTimeoutField.isDisplayed()
+            !page.overview.heartTimeoutOk.isDisplayed()
+            !page.overview.heartTimeoutCancel.isDisplayed()
+        }
+    }
+
+    def "Check click Heart Timeout edit and click Ok and then Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value("10")
+        waitFor(30) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutPopupOk.isDisplayed()
+            page.overview.heartTimeoutPopupCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(30) { page.overview.heartTimeoutPopupCancel.click() }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutEdit.isDisplayed()
+            !page.overview.heartTimeoutPopupOk.isDisplayed()
+            !page.overview.heartTimeoutPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Check click Heart Timeout edit and click Ok and then Ok"() {
+        when:
+        String heartTimeout = 20
+        page.advanced.click()
+        waitFor(30) {
+            page.overview.heartTimeoutValue.isDisplayed()
+        }
+        initialHeartTimeout = page.overview.heartTimeoutValue.text()
+        println("Initial Heartbeat time "+ initialHeartTimeout)
+        revertHeartTimeout = true
+
+        then:
+        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value(heartTimeout)
+        waitFor(30) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutPopupOk.isDisplayed()
+            page.overview.heartTimeoutPopupCancel.isDisplayed()
+        }
+
+
+        waitFor(30) {
+            try {
+                page.overview.heartTimeoutPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("retrying")
+            }
+
+            page.overview.heartTimeoutEdit.isDisplayed()
+            page.overview.heartTimeoutValue.text().equals(heartTimeout)
+            !page.overview.heartTimeoutPopupOk.isDisplayed()
+            !page.overview.heartTimeoutPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Heartbeat timeout> check error msg if empty data"() {
+        when:
+        String heartTimeout = ""
+        page.advanced.click()
+        then:
+        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value(heartTimeout)
+        waitFor(30) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(30) {
+            page.overview.errorMsgHeartbeat.isDisplayed()
+            page.overview.errorMsgHeartbeat.text().equals("Please enter a valid positive number.")
+        }
+
+    }
+
+    def "Heartbeat timeout > check error msg is value less then 1"() {
+        when:
+        String heartTimeout = "0"
+        page.advanced.click()
+        then:
+        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value(heartTimeout)
+        waitFor(30) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(30) {
+            page.overview.errorMsgHeartbeat.isDisplayed()
+            page.overview.errorMsgHeartbeat.text().equals("Please enter a positive number. Its minimum value should be 1.")
+        }
+
+    }
+
+    // query timeout
+
+    def "Check click Query Timeout edit and Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(30) { page.overview.queryTimeoutCancel.click() }
+        then:
+        waitFor(30) {
+            !page.overview.queryTimeoutField.isDisplayed()
+            !page.overview.queryTimeoutOk.isDisplayed()
+            !page.overview.queryTimeoutCancel.isDisplayed()
+        }
+    }
+
+    def "Check click Query Timeout edit and click Ok and then Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.queryTimeoutField.value("10")
+        waitFor(30) {
+            page.overview.queryTimeoutOk.click()
+        }
+        then:
+        waitFor(30) {
+            page.overview.queryTimeoutPopupOk.isDisplayed()
+            page.overview.queryTimeoutPopupCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(30) { page.overview.queryTimeoutPopupCancel.click() }
+        then:
+        waitFor(30) {
+            page.overview.queryTimeoutEdit.isDisplayed()
+            !page.overview.queryTimeoutPopupOk.isDisplayed()
+            !page.overview.queryTimeoutPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Check click Query Timeout edit and click Ok and then Ok"() {
+        when:
+        String queryTimeout = 20
+        page.advanced.click()
+        waitFor(30) {
+            page.overview.queryTimeoutValue.isDisplayed()
+        }
+        initialQueryTimeout = page.overview.queryTimeoutValue.text()
+        println("Initial Query Timeout " + initialQueryTimeout)
+        revertQueryTimeout = true
+
+        then:
+        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.queryTimeoutField.value(queryTimeout)
+        waitFor(30) {
+            page.overview.queryTimeoutOk.click()
+        }
+        then:
+        waitFor(30) {
+            page.overview.queryTimeoutPopupOk.isDisplayed()
+            page.overview.queryTimeoutPopupCancel.isDisplayed()
+        }
+
+
+        waitFor(30) {
+            try {
+                page.overview.queryTimeoutPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("retrying")
+            }
+
+            page.overview.queryTimeoutEdit.isDisplayed()
+            page.overview.queryTimeoutValue.text().equals(queryTimeout)
+            !page.overview.queryTimeoutPopupOk.isDisplayed()
+            !page.overview.queryTimeoutPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Query timeout> check error msg if empty data"() {
+        when:
+        String queryTimeout = ""
+        page.advanced.click()
+        then:
+        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(30) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.queryTimeoutField.value(queryTimeout)
+        waitFor(30) {
+            page.overview.queryTimeoutOk.click()
+        }
+        then:
+        waitFor(30) {
+            page.overview.errorQuery.isDisplayed()
+            page.overview.errorQuery.text().equals("Please enter a valid positive number.")
+        }
+
+    }
+
     // SECURITY
 
     def "click security button"(){
@@ -550,11 +872,6 @@ class AdminTest extends TestBase {
 
 
     }
-
-	static String initialPrefix
-	static String initialFreq
-	static String initialFreqUnit
-	static String initialRetained
 
     def "click edit and ok to check popup"() {
         String prefix 			= "SNAPSHOTNONCE"
@@ -1278,9 +1595,9 @@ class AdminTest extends TestBase {
     		
     	}
     }
-	
-	def cleanupSpec() {
-    	if (!(page instanceof VoltDBManagementCenterPage)) {
+
+    def cleanupSpec() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
             then: 'to be on VMC page'
@@ -1288,59 +1605,157 @@ class AdminTest extends TestBase {
         }
 
         page.loginIfNeeded()
-        
+
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
         at AdminPage
-        
-		when:
-        page.autoSnapshotsEdit.click()
-        then:
-        waitFor(10) {
-            page.autoSnapshotsEditCheckbox.isDisplayed()
-            page.autoSnapshotsEditOk.isDisplayed()
-            page.autoSnapshotsEditCancel.isDisplayed()
+
+        String initialPrefix 	= "DEFAULT"
+        String initialFreq		= "10"
+        String initialFreqUnit 	= "Hrs"
+        String initialRetained 	= "10"
+
+        String initialHeartTimeout = "10"
+        String initialQueryTimeout = "10"
+
+        // autosnapshot revert
+
+        if (revertAutosnapshots == true) {
+            when:
+            page.autoSnapshotsEdit.click()
+            then:
+            waitFor(10) {
+                page.autoSnapshotsEditCheckbox.isDisplayed()
+                page.autoSnapshotsEditOk.isDisplayed()
+                page.autoSnapshotsEditCancel.isDisplayed()
+            }
+
+            page.filePrefixField.value(initialPrefix)
+            page.frequencyField.value(initialFreq)
+            page.frequencyUnitField.click()
+            page.frequencyUnitField.value(initialFreqUnit)
+            page.retainedField.value(initialRetained)
+
+            if(page.fileprefixEdit.text() != " "){
+                println("fileprefix passed, found non-empty")
+
+                if(
+                page.frequencyEdit.text() != " "){
+                    println("frequency passed, found non-empty")}
+                // page.frequencyUnitField.click()
+                if( page.frequencyUnitField.text() != " "){
+                    println("frequency unit passed, found non-empty")}
+                if ( page.retainedEdit.text() != " "){
+                    println("retained passed, found non-empty")}
+            }
+            page.autoSnapshotsEditOk.click()
+            println("pop up visible")
+
+            when:
+
+            while(true) {
+                page.autosnapshotsconfirmok.click()
+                println("inside ok clicked successfully")
+                if(page.filePrefixField.isDisplayed()== false)
+                    break
+            }
+
+            then:
+
+            waitFor(15){
+                page.filePrefix.text().equals(initialPrefix)
+                page.frequency.text().equals(initialFreq)
+                page.frequencyUnit.text().equals(initialFreqUnit)
+                page.retained.text().equals(initialRetained)
+            }
         }
 
-        page.filePrefixField.value(initialPrefix)
-        page.frequencyField.value(initialFreq)
-        page.frequencyUnitField.click()
-        page.frequencyUnitField.value(initialFreqUnit)
-        page.retainedField.value(initialRetained)
+        // heartbeat timeout revert
 
-        if(page.fileprefixEdit.text() != " "){
-            println("fileprefix passed, found non-empty")
+        if (revertHeartTimeout==false) {
+            when:
+            page.advanced.click()
+            then:
+            waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
 
-            if(
-            page.frequencyEdit.text() != " "){
-                println("frequency passed, found non-empty")}
-            // page.frequencyUnitField.click()
-            if( page.frequencyUnitField.text() != " "){
-                println("frequency unit passed, found non-empty")}
-            if ( page.retainedEdit.text() != " "){
-                println("retained passed, found non-empty")}
+            when:
+            waitFor(30) { page.overview.heartTimeoutEdit.click() }
+            then:
+            waitFor(30) {
+                page.overview.heartTimeoutField.isDisplayed()
+                page.overview.heartTimeoutOk.isDisplayed()
+                page.overview.heartTimeoutCancel.isDisplayed()
+            }
+
+            when:
+            page.overview.heartTimeoutField.value(initialHeartTimeout)
+            waitFor(30) {
+                page.overview.heartTimeoutOk.click()
+            }
+            then:
+            waitFor(30) {
+                page.overview.heartTimeoutPopupOk.isDisplayed()
+                page.overview.heartTimeoutPopupCancel.isDisplayed()
+            }
+
+
+            waitFor(30) {
+                try {
+                    page.overview.heartTimeoutPopupOk.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("retrying")
+                }
+
+                page.overview.heartTimeoutEdit.isDisplayed()
+                page.overview.heartTimeoutValue.text().equals(initialHeartTimeout)
+                !page.overview.heartTimeoutPopupOk.isDisplayed()
+                !page.overview.heartTimeoutPopupCancel.isDisplayed()
+            }
         }
-        page.autoSnapshotsEditOk.click()
-        println("pop up visible")
 
-        when:
+        // query timeout revert
 
-        while(true) {
-            page.autosnapshotsconfirmok.click()
-            println("inside ok clicked successfully")
-            if(page.filePrefixField.isDisplayed()== false)
-                break
+        if (revertQueryTimeout==false) {
+            when:
+            page.advanced.click()
+            then:
+            waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+            when:
+            waitFor(30) { page.overview.queryTimeoutEdit.click() }
+            then:
+            waitFor(30) {
+                page.overview.queryTimeoutField.isDisplayed()
+                page.overview.queryTimeoutOk.isDisplayed()
+                page.overview.queryTimeoutCancel.isDisplayed()
+            }
+
+            when:
+            page.overview.queryTimeoutField.value(initialQueryTimeout)
+            waitFor(30) {
+                page.overview.queryTimeoutOk.click()
+            }
+            then:
+            waitFor(30) {
+                page.overview.queryTimeoutPopupOk.isDisplayed()
+                page.overview.queryTimeoutPopupCancel.isDisplayed()
+            }
+
+
+            waitFor(30) {
+                try {
+                    page.overview.queryTimeoutPopupOk.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("retrying")
+                }
+
+                page.overview.queryTimeoutEdit.isDisplayed()
+                page.overview.queryTimeoutValue.text().equals(initialQueryTimeout)
+                !page.overview.queryTimeoutPopupOk.isDisplayed()
+                !page.overview.queryTimeoutPopupCancel.isDisplayed()
+            }
         }
-
-        then:
-
-        waitFor(15){
-            page.filePrefix.text().equals(initialPrefix)
-            page.frequency.text().equals(initialFreq)
-            page.frequencyUnit.text().equals(initialFreqUnit)
-            page.retained.text().equals(initialRetained)
-        }
-        
     }
+
 }

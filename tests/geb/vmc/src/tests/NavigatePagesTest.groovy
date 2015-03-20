@@ -54,7 +54,7 @@ class NavigatePagesTest extends TestBase {
 
     def 'confirm DB Monitor page open initially'() {
         expect: 'DB Monitor page open initially'
-        page.isDbMonitorPageOpen()
+        waitFor(30) { page.isDbMonitorPageOpen() }
     }
 
     def navigatePages() {

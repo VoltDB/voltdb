@@ -164,7 +164,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         storedProceduresMsg	{ $("#storeProcedureBody") }
         databaseTableMsg	{ $("#tablesBody") }
-        
+
         header          		{ module Header }
         footer          		{ module Footer }
     }
