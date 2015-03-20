@@ -925,7 +925,7 @@ public class SQLParser extends SQLPatternFactory
         // "Safe" strings that don't contain these characters don't need to be masked
         // but they DO need to be found and explicitly skipped so that their closing
         // quotes don't trigger a false positive for the START of an unsafe string.
-        // Skipping as accomplished by resetting paramText to an offset substring
+        // Skipping is accomplished by resetting paramText to an offset substring
         // after copying the skipped (or substituted) text to a string builder.
         ArrayList<String> originalString = new ArrayList<String>();
         Matcher stringMatcher = SingleQuotedString.matcher(paramText);
