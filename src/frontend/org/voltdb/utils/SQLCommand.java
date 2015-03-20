@@ -119,6 +119,7 @@ public class SQLCommand
             // Assert the current DDL AdHoc batch call behavior
             assert(response.getResults().length == 1);
             System.out.println("Batch command succeeded.");
+            loadStoredProcedures(Procedures, Classlist);
         }
         catch (ProcCallException ex) {
             String fixedMessage = patchErrorMessageWithFile(batchFileName, ex.getMessage());

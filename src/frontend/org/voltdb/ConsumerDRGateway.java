@@ -38,9 +38,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
-    public abstract void promotePartition(int partitionId, long maxDRId, long maxUniqueId);
+    public abstract void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId);
 
-    public abstract void notifyOfLastAppliedBinaryLog(int partitionId, long endDRId, long endUniqueId);
+    public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId);
 
     public abstract void assertSequencing(int partitionId, long drId);
 
@@ -66,10 +66,10 @@ public interface ConsumerDRGateway extends Promotable {
         public void shutdown(boolean blocking) {}
 
         @Override
-        public void promotePartition(int partitionId, long maxDRId, long maxUniqueId) {}
+        public void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId) {}
 
         @Override
-        public void notifyOfLastAppliedBinaryLog(int partitionId, long endDRId, long endUniqueId) {
+        public void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId) {
             int dataCenter = (int)(endDRId >> 55);
             if (!ids.containsKey(dataCenter)) {
                 ids.put(dataCenter, new HashMap<Integer, Pair<Long, Long>>());
