@@ -272,6 +272,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
         public SnapshotQueue(SynchronizedStatesManager ssm) throws KeeperException, InterruptedException {
             ssm.super("snapshot_queue", SNAP_LOG);
+            m_leaderQueueProcessor = null;
+
+            // Start with an empty queue
+            registerStateMachineWithManager(ByteBuffer.wrap(m_startQueue));
             m_streamSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "stream_snapshots");
             ssm.addIfMissing(m_streamSnapshotPrefix, CreateMode.PERSISTENT, null);
             m_indexSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "index_snapshots");
@@ -280,10 +284,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             ssm.addIfMissing(m_fileSnapshotPrefix, CreateMode.PERSISTENT, null);
             m_csvSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "csv_snapshots");
             ssm.addIfMissing(m_csvSnapshotPrefix, CreateMode.PERSISTENT, null);
-            m_leaderQueueProcessor = null;
-
-            // Start with an empty queue
-            registerStateMachineWithManager(ByteBuffer.wrap(m_startQueue));
         }
 
         @Override
@@ -292,7 +292,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 return "state is FUBAR";
             }
             ByteBuffer bb = state.asReadOnlyBuffer();
-            bb.flip();
 
             final SNAPSHOT_TYPE [] types = SNAPSHOT_TYPE.values();
             StringBuilder sb = new StringBuilder(512);
@@ -307,7 +306,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 sb.append(types[slot]);
             }
             sb.append("]");
-            if (bb.hasRemaining()) {
+            if (bb.hasRemaining() && bb.remaining() > 1) {
                 sb.append(", activeNode: ");
                 byte [] nb = new byte[bb.remaining()];
                 bb.get(nb);
