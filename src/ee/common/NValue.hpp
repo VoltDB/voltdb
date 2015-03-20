@@ -2848,10 +2848,13 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 throwFatalException("Unexpected number of precision bytes %d", precisionBytes);
             }
         }
-        int64_t *longStorage = reinterpret_cast<int64_t*>(storage);
+        uint64_t *longStorage = reinterpret_cast<uint64_t*>(storage);
         //Reverse order for Java BigDecimal BigEndian
         longStorage[1] = input.readLong();
         longStorage[0] = input.readLong();
+        // Serialize to export serializes them in network byte order, have to reverse them here
+        longStorage[0] = ntohll(longStorage[0]);
+        longStorage[1] = ntohll(longStorage[1]);
         break;
     }
     default:
