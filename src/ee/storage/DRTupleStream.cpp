@@ -171,6 +171,8 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     uint8_t *nullArray =
         reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position() + sizeof(int32_t));
 
+    // Reserve the row header by moving the position beyond the row header.
+    // The row header includes the 4 byte length prefix and the null array.
     const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
 
     // write the tuple's data
