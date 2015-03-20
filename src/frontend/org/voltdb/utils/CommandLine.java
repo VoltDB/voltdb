@@ -29,13 +29,13 @@ import java.util.TreeMap;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StartAction;
-import org.voltdb.VoltDB;
+import org.voltdb.config.Configuration;
 
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
 // Extend that to include test-only parameters, the JVM parameters
 // and a serialization function that produces a legitimate command line.
-public class CommandLine extends VoltDB.Configuration
+public class CommandLine extends Configuration
 {
     // Values for garbage collection roll-over configuration.  For now statically defined, but
     // in the future we could configure them from the UI or VEM command line.

@@ -73,6 +73,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -96,6 +97,7 @@ import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.config.Configuration;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -125,6 +127,8 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
+
+import javax.annotation.PostConstruct;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -160,7 +164,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    private VoltDB.Configuration m_config = new VoltDB.Configuration();
+    @Autowired
+    private Configuration m_config;
+    
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -330,11 +336,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return m_licenseApi;
     }
 
+    @PostConstruct
+    protected void initialize() {
+        new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                initialize(m_config);
+                RealVoltDB.this.run();
+            }
+            
+        }).start();
+    }
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
     @Override
-    public void initialize(VoltDB.Configuration config) {
+    public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
@@ -2202,7 +2220,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     @Override
-    public VoltDB.Configuration getConfig() {
+    public Configuration getConfig() {
         return m_config;
     }
 
