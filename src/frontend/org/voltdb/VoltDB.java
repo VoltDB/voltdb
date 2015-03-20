@@ -415,8 +415,6 @@ public class VoltDB {
                 }
 
                 else if (arg.equals("replica")) {
-                    // We're starting a replica, so we must create a new database.
-                    m_startAction = StartAction.CREATE;
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -479,12 +477,7 @@ public class VoltDB {
 
             // If no action is specified, issue an error.
             if (null == m_startAction) {
-                if (org.voltdb.utils.MiscUtils.isPro()) {
-                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, collect, or compile.");
-                } else
-                {
-                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
-                }
+                hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
                 System.out.println("Please refer to VoltDB documentation for command line usage.");
                 System.out.flush();
                 System.exit(-1);
@@ -519,7 +512,7 @@ public class VoltDB {
 
             if (m_startAction == null) {
                     isValid = false;
-                    hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
+                    hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
                 }
 
             if (m_leader == null) {
