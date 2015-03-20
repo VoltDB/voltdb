@@ -167,11 +167,13 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // has the effect of setting each column non-null.
     ::memset(m_currBlock->mutableDataPtr() + io.position(), 0, rowHeaderSz);
 
-    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
-
     // the nullarray lives in rowheader after the 4 byte header length prefix
     uint8_t *nullArray =
-        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof(int32_t));
+        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position() + sizeof(int32_t));
+
+    // Reserve the row header by moving the position beyond the row header.
+    // The row header includes the 4 byte length prefix and the null array.
+    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
 
     // write the tuple's data
     tuple.serializeToExport(io, 0, nullArray);
