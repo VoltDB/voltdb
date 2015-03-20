@@ -123,6 +123,7 @@ public class SocketExporter extends ExportClientBase {
                            + "\n";
 
             buffer.clear();
+            buffer.put((byte)message.length());
             buffer.put(message.getBytes());
             buffer.flip();
 
