@@ -6,8 +6,9 @@
    <cluster hostcount="1" />
    <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.SocketExporter">
      <configuration>
-       <property name="socketDest">localhost</property>
-       <property name="socketPort">5001</property>
+       <property name="socket.dest">localhost</property>
+       <property name="socket.port">5001</property>
+       <property name="stats.duration">5</property>
      </configuration>
    </export>
    <httpd enabled="true">

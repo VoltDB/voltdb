@@ -34,41 +34,138 @@
 
 package exportbenchmark;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 import java.util.Properties;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 
+/**
+ * Export class for performance measuring.
+ * Export statistics are checked for timestamps, and performance metrics are
+ * periodically pushed to a UDP socket for collection.
+ */
 public class SocketExporter extends ExportClientBase {
+    String host;
+    int port;
+    int statsDuration;
+    InetSocketAddress address;
+    DatagramChannel channel;
 
+    // Statistics
+    long transactions = 0;
+    long totalDecodeTime = 0;
 
     @Override
     public void configure(Properties config) throws Exception {
-        // We have no properties to configure at this point
+        host = config.getProperty("socket.dest", "localhost");
+        port = Integer.parseInt(config.getProperty("socket.port", "5001"));
+        statsDuration = Integer.parseInt(config.getProperty("stats.duration", "5"));
 
+        address = new InetSocketAddress(host, port);
+        channel = DatagramChannel.open();
     }
 
-    static class NoOpExportDecoder extends ExportDecoderBase {
-        NoOpExportDecoder(AdvertisedDataSource source) {
+    class SocketExportDecoder extends ExportDecoderBase {
+        Timer timer;
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+        SocketExportDecoder(AdvertisedDataSource source) {
             super(source);
+
+            schedulePeriodicStats();
+        }
+
+        /**
+         * Periodically print statistics to a UDP socket
+         */
+        public void schedulePeriodicStats() {
+            timer = new Timer();
+            TimerTask statsPrinting = new TimerTask() {
+                @Override
+                public void run() { printStatistics(); }
+            };
+            timer.scheduleAtFixedRate(statsPrinting,
+                                      statsDuration * 1000,
+                                      statsDuration * 1000);
+        }
+
+        /**
+         * Prints performance statistics to a socket. Stats are:
+         *   -Transactions per second
+         *   -Average time for decodeRow() to run
+         *   -Partition ID
+         */
+        public void printStatistics() {
+            // Calculate statistics
+            double tps, averageDecodeTime;
+            try {
+                tps = transactions / statsDuration;
+                averageDecodeTime = totalDecodeTime / transactions;
+            } catch (ArithmeticException e) {
+                // Divide by zero error. No transactions, so nothing to report
+                return;
+            }
+
+            transactions = 0;
+            totalDecodeTime = 0;
+
+            // Create message
+            String message = "tps:" + tps
+                           + ",decodeTime:" + averageDecodeTime
+                           + ",partitionId:" + m_source.partitionId
+                           + "\n";
+
+            buffer.clear();
+            buffer.put(message.getBytes());
+            buffer.flip();
+
+            // Send message over socket
+            try {
+                channel.send(buffer, address);
+            } catch (IOException e) {
+                System.err.println("Couldn't send stats to socket");
+                System.err.println(e.getLocalizedMessage());
+            }
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            // The AdvertiseDataSource is no longer available. If file descriptors
-            // or threads were allocated to handle the source, free them here.
+            timer.cancel();
         }
 
         @Override
+        /**
+         * Logs the transactions, and determines how long it take to decode
+         * the row.
+         */
         public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
-            // We don't want to do anything yet
+            // Transaction count
+            transactions++;
+
+            // Time decodeRow
+            try {
+                long startTime = System.nanoTime();
+                decodeRow(rowData);
+                long endTime = System.nanoTime();
+
+                totalDecodeTime += (endTime - startTime);
+            } catch (IOException e) {
+                System.err.println(e.getLocalizedMessage());
+            }
+
             return true;
         }
     }
 
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-        return new NoOpExportDecoder(source);
+        return new SocketExportDecoder(source);
     }
 }
