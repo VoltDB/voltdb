@@ -326,6 +326,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 path = m_indexSnapshotPrefix;
                 break;
             case FILE:
+            case LOG:
                 path = m_fileSnapshotPrefix;
                 break;
             case CSV:
@@ -609,6 +610,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                SNAP_LOG.error("failed to get request details for " + type, e);
             }
             return ImmutableSortedMap.copyOf(results);
+        }
+
+        public void removeRequestIdNode(String strRequestId) {
+            RequestId reqId = RequestId.valueOf(strRequestId);
+            deleteSnapshotNode(getPathFromType(reqId.getType()), reqId.getId());
         }
 
         public void removeActiveSnapshotNodeList(List<Integer> satisfyingNodes) {
@@ -2963,6 +2969,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             jo = getActiveSnapshot();
             if (jo != null && event.requestId.equals(jo.getString("requestIdAtHead"))) {
+                m_snapshotQueue.removeRequestIdNode(event.requestId);
                 m_snapshotQueue.lockDistributedLockAndProcessCompletedSnapshot();
             }
         }
