@@ -2852,9 +2852,13 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         //Reverse order for Java BigDecimal BigEndian
         longStorage[1] = input.readLong();
         longStorage[0] = input.readLong();
-        // Serialize to export serializes them in network byte order, have to reverse them here
-        longStorage[0] = ntohll(longStorage[0]);
-        longStorage[1] = ntohll(longStorage[1]);
+
+        if (F == TUPLE_SERIALIZATION_DR) {
+            // Serialize to export serializes them in network byte order, have to reverse them here
+            longStorage[0] = ntohll(longStorage[0]);
+            longStorage[1] = ntohll(longStorage[1]);
+        }
+
         break;
     }
     default:
