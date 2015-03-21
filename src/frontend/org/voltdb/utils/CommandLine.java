@@ -32,7 +32,7 @@ import org.voltdb.StartAction;
 import org.voltdb.config.Configuration;
 
 
-// VoltDB.Configuration represents all of the VoltDB command line parameters.
+// Configuration represents all of the VoltDB command line parameters.
 // Extend that to include test-only parameters, the JVM parameters
 // and a serialization function that produces a legitimate command line.
 public class CommandLine extends Configuration
@@ -119,10 +119,10 @@ public class CommandLine extends Configuration
         return cl;
     }
 
-    // PLEASE NOTE The field naming convention: VoltDB.Configuration
+    // PLEASE NOTE The field naming convention: Configuration
     // fields start with "m_". CommandLine fields do not have a
     // prefix. This helps avoid collisions given the raw number
-    // of fields at work. In some cases, the VoltDB.Configuration
+    // of fields at work. In some cases, the Configuration
     // setting is set (for the m_hasLocalServer case) and a CommandLine
     // field is set as well (for the process builder case).
 

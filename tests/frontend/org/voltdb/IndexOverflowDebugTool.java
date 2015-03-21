@@ -25,7 +25,7 @@ package org.voltdb;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -66,7 +66,7 @@ public class IndexOverflowDebugTool extends TestCase {
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("indexoverflow.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("indexoverflow.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("indexoverflow.xml");
         config.m_backend = BackendTarget.NATIVE_EE_IPC;

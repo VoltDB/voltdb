@@ -331,6 +331,9 @@ public class VoltDB {
 
     public static String crashMessage;
 
+
+    private static VoltDBInterface singleton;
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
@@ -397,7 +400,7 @@ public class VoltDB {
 
     /**
      * Initialize the VoltDB server.
-     * @param config  The VoltDB.Configuration to use to initialize the server.
+     * @param config  The Configuration to use to initialize the server.
      */
     public static void initialize(Configuration config) {
         m_config = config;
@@ -412,6 +415,9 @@ public class VoltDB {
      * @return A reference to the underlying VoltDBInterface object.
      */
     public static VoltDBInterface instance() {
+        if(singleton != null) {
+            return singleton;
+        }
         return ctx.getBean(VoltDBInterface.class);
     }
 
@@ -422,11 +428,11 @@ public class VoltDB {
      * VoltDBInterface that is used for testing.
      *
      */
-    /*
+    
     public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
         singleton = testInstance;
     }
-    */
+    
 
     @Override
     public Object clone() throws CloneNotSupportedException {

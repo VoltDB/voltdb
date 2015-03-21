@@ -25,7 +25,7 @@ package org.voltdb;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class IndexOrderPlayground extends TestCase {

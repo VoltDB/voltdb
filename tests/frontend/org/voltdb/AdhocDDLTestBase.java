@@ -30,13 +30,14 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
+import org.voltdb.config.Configuration;
 
 public class AdhocDDLTestBase extends TestCase {
 
     protected ServerThread m_localServer;
     protected Client m_client;
 
-    protected void startSystem(VoltDB.Configuration config) throws Exception
+    protected void startSystem(Configuration config) throws Exception
     {
         startServer(config);
         startClient(null);
@@ -48,7 +49,7 @@ public class AdhocDDLTestBase extends TestCase {
         stopServer();
     }
 
-    protected void startServer(VoltDB.Configuration config) throws Exception
+    protected void startServer(Configuration config) throws Exception
     {
         m_localServer = new ServerThread(config);
         m_localServer.start();

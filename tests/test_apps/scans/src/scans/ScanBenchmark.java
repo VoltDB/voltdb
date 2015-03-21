@@ -315,7 +315,7 @@ public class ScanBenchmark {
      * @see {@link VoterConfig}
      */
     public static void main(String[] args) throws Exception {
-        /*VoltDB.Configuration vconfig = new VoltDB.Configuration();
+        /*Configuration vconfig = new Configuration();
 
         CatalogBuilder cb = new CatalogBuilder();
         cb.addSchema("/Users/jhugg/Documents/workspace/voltdb/tests/test_apps/scans/ddl.sql");

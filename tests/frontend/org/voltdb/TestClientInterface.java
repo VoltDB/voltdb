@@ -75,7 +75,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.AuthSystem;
 import org.voltdb.ClientInterface.ClientInputHandler;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;

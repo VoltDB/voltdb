@@ -28,7 +28,7 @@ import java.util.ArrayList;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -70,7 +70,7 @@ public class SimpleServer {
 
         String[] hostargs = new String[host_manager_args.size()];
 
-        VoltDB.Configuration config = new VoltDB.Configuration(host_manager_args.toArray(hostargs));
+        Configuration config = new Configuration(host_manager_args.toArray(hostargs));
 
         if (config.m_backend != BackendTarget.NATIVE_EE_JNI)
         {

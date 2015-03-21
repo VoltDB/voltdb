@@ -29,7 +29,7 @@ import java.io.IOException;
 import junit.framework.TestCase;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;

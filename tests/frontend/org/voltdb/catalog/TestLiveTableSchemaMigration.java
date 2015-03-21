@@ -32,7 +32,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ServerThread;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -42,6 +41,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.config.Configuration;
 import org.voltdb.utils.MiscUtils;
 
 public class TestLiveTableSchemaMigration extends TestCase {
@@ -92,7 +92,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
             String deployment = depBuilder.getXML();
             File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToDeployment = deploymentFile.getAbsolutePath();
             config.m_pathToCatalog = catPath1;
             config.m_ipcPort = 10000;
@@ -169,7 +169,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
             String deployment = depBuilder.getXML();
             File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToDeployment = deploymentFile.getAbsolutePath();
             config.m_pathToCatalog = catPath1;
             config.m_ipcPort = 10000;

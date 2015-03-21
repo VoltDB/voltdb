@@ -43,7 +43,7 @@ import org.junit.Test;
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.fullddlfeatures.TestDDLFeatures;
@@ -77,7 +77,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
 
@@ -110,7 +110,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
 

@@ -36,6 +36,7 @@ import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.config.Configuration;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -269,7 +270,7 @@ public class LocalCluster implements VoltServerConfig {
             leader("").
             target(m_target).
             startCommand("create").
-            jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
+            jarFileName(Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
             javaLibraryPath(java_library_path).
             classPath(classPath).
@@ -1271,7 +1272,7 @@ public class LocalCluster implements VoltServerConfig {
         return m_cmdLines.get(hostId).adminPort();
     }
 
-    public void setPortsFromConfig(int hostId, VoltDB.Configuration config) {
+    public void setPortsFromConfig(int hostId, Configuration config) {
         CommandLine cl = m_cmdLines.get(hostId);
         assert(cl != null);
         cl.m_port = config.m_port;

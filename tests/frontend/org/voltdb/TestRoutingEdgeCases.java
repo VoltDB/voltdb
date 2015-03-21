@@ -29,7 +29,7 @@ import java.nio.ByteOrder;
 import junit.framework.TestCase;
 
 import org.junit.Test;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
@@ -63,7 +63,7 @@ public class TestRoutingEdgeCases extends TestCase {
             assert(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("edgecases.xml"));
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("edgecases.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("edgecases.xml");
             localServer = new ServerThread(config);

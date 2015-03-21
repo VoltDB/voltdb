@@ -47,7 +47,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -77,7 +77,7 @@ public class MockVoltDB implements VoltDBInterface
     boolean m_noLoadLib = false;
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
-    VoltDB.Configuration voltconfig = null;
+    Configuration voltconfig = null;
     private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
@@ -275,7 +275,7 @@ public class MockVoltDB implements VoltDBInterface
         return null;
     }
 
-    public void setConfig(VoltDB.Configuration config)
+    public void setConfig(Configuration config)
     {
         voltconfig = config;
     }
@@ -285,7 +285,7 @@ public class MockVoltDB implements VoltDBInterface
     {
         if (voltconfig == null)
         {
-            voltconfig = new VoltDB.Configuration();
+            voltconfig = new Configuration();
         }
         return voltconfig;
     }

@@ -27,12 +27,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+import org.voltdb.config.Configuration;
 
 public class TestEELibraryLoader
 {
     @Test
     public void testLoader() {
-        final VoltDB.Configuration configuration = new VoltDB.Configuration();
+        final Configuration configuration = new Configuration();
         configuration.m_noLoadLibVOLTDB = true;
         MockVoltDB mockvolt = new MockVoltDB();
         VoltDB.ignoreCrash = true;

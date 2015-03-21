@@ -25,7 +25,7 @@ package org.voltdb;
 
 import java.io.File;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltCompiler;
@@ -188,7 +188,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         generateCatalogsAndDeployments(false);
 
         // Fire up a cluster with no catalog
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToDeployment = m_pathToDeployment;
 
         try {
@@ -249,7 +249,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         generateCatalogsAndDeployments(true);
 
         // Fire up a cluster with no catalog
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToDeployment = m_pathToDeployment;
 
         try {
@@ -268,7 +268,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         generateCatalogsAndDeployments(false);
 
         // Fire up a cluster with no catalog
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = m_pathToOtherCatalog;
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_replicationRole = ReplicationRole.REPLICA;
@@ -342,7 +342,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         generateCatalogsAndDeployments(true);
 
         // Fire up a cluster with no catalog
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = m_pathToOtherCatalog;
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_replicationRole = ReplicationRole.REPLICA;

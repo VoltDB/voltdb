@@ -165,7 +165,7 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
             if not os.environ.get('VOLTDB_LIB', ''):
                 for subdir in ('lib', os.path.join('lib', 'voltdb')):
                     glob_chk = os.path.join(os.path.realpath(os.path.join(dir, subdir)),
-                                            'zmq*.jar')
+                                            'spring*.jar')
                     lib_search_globs.append(glob_chk)
                     if glob.glob(glob_chk):
                         os.environ['VOLTDB_LIB'] = os.path.join(dir, subdir)

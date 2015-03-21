@@ -40,7 +40,7 @@ import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.ProcInfoData;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
