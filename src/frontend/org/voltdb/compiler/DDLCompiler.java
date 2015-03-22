@@ -2168,7 +2168,7 @@ public class DDLCompiler {
                     continue;
                 }
                 List<AbstractExpression> indexedExprs = null;
-                StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
+                StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName(), 0);
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {

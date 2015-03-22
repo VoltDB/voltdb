@@ -239,19 +239,38 @@ public class ExpressionColumn extends Expression {
 
     void collectObjectNames(Set set) {
 
-        if (opType == OpTypes.SEQUENCE) {
-            HsqlName name = ((NumberSequence) valueData).getName();
+        /************************* Volt DB Extensions *************************/
+        // Implementation is taken from the HSQL 2.3.0
+        switch (opType) {
 
-            set.add(name);
+            case OpTypes.SEQUENCE :
+                HsqlName name = sequence.getName();
 
-            return;
+                set.add(name);
+
+                return;
+
+            case OpTypes.MULTICOLUMN :
+            case OpTypes.DYNAMIC_PARAM :
+            case OpTypes.ASTERISK :
+            case OpTypes.SIMPLE_COLUMN :
+            case OpTypes.COALESCE :
+                break;
+
+            case OpTypes.PARAMETER :
+            case OpTypes.VARIABLE :
+                break;
+
+            case OpTypes.COLUMN :
+                set.add(column.getName());
+
+                if (column.getName().parent != null) {
+                    set.add(column.getName().parent);
+                }
+
+                return;
         }
-
-        set.add(column.getName());
-
-        if (column.getName().parent != null) {
-            set.add(column.getName().parent);
-        }
+        /**********************************************************************/
     }
 
     String getColumnName() {
