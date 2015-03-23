@@ -104,6 +104,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                 );
         builder.addPartitionInfo("BAZ", "ID");
         builder.setUseDDLSchema(useLiveDDL);
+        builder.setDRMasterHost("localhost");
         builder.setDeadHostTimeout(6);
         success = builder.compile(m_pathToOtherCatalog, 2, 1, 0);
         assertTrue("2nd schema compilation failed", success);

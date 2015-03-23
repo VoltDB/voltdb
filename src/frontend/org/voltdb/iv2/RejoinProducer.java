@@ -333,7 +333,7 @@ public class RejoinProducer extends JoinProducerBase {
                     for (Map<Integer, Pair<Long, Long>> ids : event.remoteDCLastIds.values()) {
                         Pair<Long, Long> myDRIds = ids.get(m_partitionId);
                         if (myDRIds != null) {
-                            VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedBinaryLog(m_partitionId, myDRIds.getFirst(), myDRIds.getSecond());
+                            VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedSegmentId(m_partitionId, myDRIds.getFirst(), myDRIds.getSecond());
                         }
                     }
 
