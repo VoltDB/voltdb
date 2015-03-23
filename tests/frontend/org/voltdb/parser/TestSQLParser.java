@@ -28,7 +28,12 @@ import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
+import org.junit.Test;
+import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileOption;
+import org.voltdb.parser.SQLParser.ParseRecallResults;
+
+import com.google_voltpatches.common.base.Joiner;
 
 public class TestSQLParser extends TestCase {
 
@@ -342,6 +347,26 @@ public class TestSQLParser extends TestCase {
         return cleanCommand;
     }
 
+    private void expectFromAll(boolean fudge, String expected, String... candidates) {
+        for (String candidate : candidates) {
+            String got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
+            // Guarding assert to makes breakpoints easier.
+            if (got == null) {
+                if (expected == null) {
+                    continue;
+                }
+            }
+            else if (got.equals(expected)) {
+                continue;
+            }
+            // Retry before reporting failure for chance to debug.
+            got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
+            // sure to fail
+            assertEquals("For input '" + candidate + "'" + (fudge ? " fudging " : " "),
+                         expected, got);
+        }
+    }
+
     public void testParseVoltDBSpecificDDLStatementPreambles() {
 
         expectFromAll(true, "CREATE PROCEDURE",
@@ -372,23 +397,151 @@ public class TestSQLParser extends TestCase {
                 "create role ;");
     }
 
-    private void expectFromAll(boolean fudge, String expected, String... candidates) {
-        for (String candidate : candidates) {
-            String got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
-            // Guarding assert to makes breakpoints easier.
-            if (got == null) {
-                if (expected == null) {
-                    continue;
-                }
-            }
-            else if (got.equals(expected)) {
-                continue;
-            }
-            // Retry before reporting failure for chance to debug.
-            got = parseVoltDBSpecificDdlStatementPreamble(candidate, fudge);
-            // sure to fail
-            assertEquals("For input '" + candidate + "'" + (fudge ? " fudging " : " "),
-                         expected, got);
-        }
+    public void testParseRecall()
+    {
+        parseRecallCase("RECALL 1", 1);
+        parseRecallCase("  RECALL 2 ", 2);
+        parseRecallCase("RECALL 33;", 33);
+        parseRecallCase("recall 99 ;", 99);
+        parseRecallCase("RECALL 100 ; ", 100);
+
+        // Try too short commands.
+        parseRecallErrorCase("RECALL");
+        parseRecallErrorCase("RECALL ");
+        parseRecallErrorCase("Recall;");
+        parseRecallErrorCase("RECALL ;");
+
+        // Try interspersed garbage.
+        parseRecallErrorCase("RECALL abc 1");
+        parseRecallErrorCase("RECALL 2 def");
+        parseRecallErrorCase("RECALL 33;ghi");
+        parseRecallErrorCase("RECALL 44 jkl;");
+
+        parseRecallErrorCase("RECALL mno");
+        parseRecallErrorCase("RECALL; pqr");
+        parseRecallErrorCase("RECALL ;stu");
+
+        // Try invalid keyword terminators
+        parseRecallErrorCase("RECALL,1");
+        parseRecallErrorCase("RECALL. 1");
+        parseRecallErrorCase("RECALL'1;");
+        parseRecallErrorCase("RECALL( 1;");
+        parseRecallErrorCase("RECALL(1);");
+        parseRecallErrorCase("RECALL- 1 ;");
+        parseRecallErrorCase("RECALL,");
+        parseRecallErrorCase("RECALL, ");
+        parseRecallErrorCase("RECALL,;");
+        parseRecallErrorCase("RECALL, ;");
+
+        // Try imaginative usage.
+        parseRecallErrorCase("RECALL 1 3;");
+        parseRecallErrorCase("RECALL 1,3;");
+        parseRecallErrorCase("RECALL 1, 3;");
+        parseRecallErrorCase("RECALL 1-3;");
+        parseRecallErrorCase("RECALL 1..3;");
+
+        // Try invalid numerics
+        parseRecallErrorCase("RECALL 0");
+        parseRecallErrorCase("recall -2;");
+        parseRecallErrorCase("RECALL 101");
+        parseRecallErrorCase("recall 1000;");
+
+        // confirm that the recall command parser does not overstep
+        // its mandate and try to process anything but a recall command.
+        assertNull(SQLParser.parseRecallStatement("RECAL", 99));
+        assertNull(SQLParser.parseRecallStatement("recal 1", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALL1", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALLL", 99));
+        assertNull(SQLParser.parseRecallStatement("RECALLL 1", 99));
+        assertNull(SQLParser.parseRecallStatement("HELP;", 99));
+        assertNull(SQLParser.parseRecallStatement("FILE ddl.sql", 99));
+        assertNull(SQLParser.parseRecallStatement("@RECALL 1", 99));
+        assertNull(SQLParser.parseRecallStatement("--recall 1", 99));
+        assertNull(SQLParser.parseRecallStatement("ECALL 1", 99));
     }
+
+    private void parseRecallCase(String lineText, int lineNumber)
+    {
+        ParseRecallResults result = SQLParser.parseRecallStatement(lineText, 99);
+        assertNotNull(result);
+        assertNull(result.getError());
+        // Line number inputs are 1-based but getLine() results are 0-based
+        assertEquals(lineNumber, result.getLine()+1);
+    }
+
+    private void parseRecallErrorCase(String lineText)
+    {
+        ParseRecallResults result = SQLParser.parseRecallStatement(lineText, 99);
+        assertNotNull(result);
+        assertNotNull(result.getError());
+    }
+
+    // To test the schema-independent parts of SQLParser.parseExecuteCallInternal()
+    @Test
+    public void testParseExecParameters() {
+        // Many of these simple or stupid cases were migrated from TestSqlCmdInterface.
+        // They're more properly SQLParse tests than SQLCommand tests.
+        validateSimpleExec("exec @SystemCatalog tables", 2, 20);
+        validateSimpleExec("exec @SystemCatalog,     tables", 2, 21);
+        validateSimpleExec("exec ,, @SystemCatalog,,,,tables", 2, 22);
+        validateSimpleExec("exec,, @SystemCatalog,,,,tables", 2, 23);
+        validateSimpleExec("exec selectMasterDonner, 0, 1;", 3, 24);
+        validateSimpleExec("exec T.insert abcd 123", 3, 25);
+        validateSimpleExec("exec T.insert 'abcd' '123'", 3, 26);
+
+        // test that quote parsing preserves AT LEAST well-formed quoted quotes.
+        validateSimpleExec("exec myproc 'ab''cd' '''123' 'XYZ'''", 4, 29);
+
+        // These special case tests exercise parseExecuteCallInternal
+        // but they validate it against a different query rewriter that purposely
+        // recognizes a subset of the valid separators. It uses this handicap as
+        // an advantage, properly "failing" to recognize other separators that
+        // just happen to always be quoted in these carefully constructed test
+        // queries.
+        // Testing of quoted separators guards against regression of ENG-7927
+        validateSpecialExecAssumeSeparator(",", "exec,A.insert,'  ;','a b',';\t; '", 4, 31);
+        validateSpecialExecAssumeSeparator(" ", "exec A.upsert '\t\t;'  'a\tb' ';,\t\t'", 4, 32);
+        // test that quote parsing preserves AT LEAST well-formed quoted quotes among separators
+        validateSpecialExecAssumeSeparator(",", "exec,proc,'''  ;','a ''b',';\t; '", 4, 41);
+        validateSpecialExecAssumeSeparator(" ", "exec proc '''\t\t;'  'a\t''b' ';'',\t\t'''", 4, 42);
+
+    }
+
+    // Allow normal full range of quoted separators -- except for the one specified
+    // -- for better testing of quoted string handling.
+    private void validateSpecialExecAssumeSeparator(String separator,
+            String query, int num, int testID)
+    {
+        String separatorPattern = "[" + separator + "]+";
+        validateExec(separatorPattern, query, num, testID);
+    }
+
+    private void validateSimpleExec(String query, int num, int testID) {
+        // Allow normal full range of separators
+        // -- at least when no such characters are being quoted.
+        validateExec("[,\\s]+", query, num, testID);
+    }
+
+    // This is a cleaned up version of an obsolete test helper called
+    // TestSqlCmdInterface.assertThis2
+    private void validateExec(String separatorPattern, String query, int numExpected, int testID)
+    {
+        ExecuteCallResults results = SQLParser.parseExecuteCallWithoutParameterTypes(query);
+        assertNotNull(results);
+        assertNotNull(results.procedure);
+        assertFalse(results.procedure.isEmpty());
+        String msg = "\nTest ID: " + testID + ". ";
+
+        String expected = query.replace("exec", "");
+        expected = expected.replaceAll(separatorPattern, "/");
+        expected += "/ Total:" + numExpected;
+
+        String parsedString = "/" + results.procedure + "/" +
+                Joiner.on("/").join(results.params);
+        parsedString += "/ Total:" + (results.params.size() + 1);
+
+        assertEquals(msg + " '" + expected + "' vs. '" + parsedString + "'",
+                expected, parsedString);
+    }
+
 }

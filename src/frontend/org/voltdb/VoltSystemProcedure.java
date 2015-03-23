@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -171,7 +172,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         assert (txnState != null);
         txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
 
-        VoltTable[] results = new VoltTable[1];
+        final ArrayList<VoltTable> results = new ArrayList<>();
         executeSysProcPlanFragmentsAsync(pfs);
 
         // execute the tasks that just got queued.
@@ -181,14 +182,18 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         if (mapResults != null) {
             List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
             if (matchingTablesForId == null) {
-                assert (mapResults.size() == 0);
-                results[0] = null;
+                if (mapResults.size() != 0 && log.isDebugEnabled()) {
+                    log.debug("Sysproc received a stale fragment response message from before the " +
+                              "transaction restart. This is possible for sysprocs because the dependency " +
+                              "IDs are always the same for a given sysproc. The result of this cannot be " +
+                              "trusted.");
+                }
             } else {
-                results[0] = matchingTablesForId.get(0);
+                results.add(matchingTablesForId.get(0));
             }
         }
 
-        return results;
+        return results.toArray(new VoltTable[0]);
     }
 
     /*
