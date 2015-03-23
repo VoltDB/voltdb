@@ -38,7 +38,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
@@ -46,7 +45,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -90,6 +91,7 @@ public class ExportBenchmark {
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
+    HashMap<Integer, ArrayList<Double>> allStats = new HashMap<Integer, ArrayList<Double>>();
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
 
@@ -114,6 +116,9 @@ public class ExportBenchmark {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
+        @Option (desc = "Port on which to listen for statistics info from export clients")
+        int port = 5001;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -125,6 +130,7 @@ public class ExportBenchmark {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (port < 1 || port > 65535) exitWithMessageAndUsage("stats port must be between 1 and 65535");
         }
     }
 
@@ -333,6 +339,10 @@ public class ExportBenchmark {
         selector.wakeup();
     }
 
+    /**
+     * Listens on a UDP socket for incoming statistics packets, until the
+     * test is finished.
+     */
     private void listenForStats() {
 
         while (true) {
@@ -349,7 +359,6 @@ public class ExportBenchmark {
             }
 
             // We have events. Process each one.
-            System.out.println("FOUND ONE");
             for (SelectionKey key : selector.selectedKeys()) {
                 if (!key.isValid()) {
                     continue;           // Ignore invalid keys
@@ -362,15 +371,17 @@ public class ExportBenchmark {
         }
     }
 
+    /**
+     * Parses a received statistics message & logs the information
+     * @param channel   The channel with the incoming packet
+     */
     private void getStatsMessage(DatagramChannel channel) {
-        SocketAddress returnAddr = null;
         String message = null;
-        System.out.println("GOT MESSAGE");
 
         // Read the data
         try {
             buffer.clear();
-            returnAddr = channel.receive(buffer);
+            channel.receive(buffer);
 
             buffer.flip();
             int messageLength = buffer.get();
@@ -391,10 +402,30 @@ public class ExportBenchmark {
             message = new String(localBuf);
         }
 
-        // Print out the stats data
-        System.out.println(message);
+        // Parse the stats message
+        message = message.trim();
+        String[] stats = message.split(",");
+
+        if (stats.length < 2) {
+            System.err.println("WARN: invalid stats message. Ignoring");
+        }
+
+        Integer partitionId = new Integer(Integer.parseInt(stats[2].split(":")[1]));
+        Double tps = new Double(Double.parseDouble(stats[0].split(":")[1]));
+
+        try {
+            allStats.get(partitionId).add(tps);
+        } catch (NullPointerException e) {
+            // We haven't logged this partition yet
+            ArrayList<Double> newList = new ArrayList<Double>();
+            newList.add(tps);
+            allStats.put(partitionId, newList);
+        }
     }
 
+    /**
+     * Sets up a UDP socket on a certain port to listen for connections.
+     */
     private void setupSocketListener() {
         DatagramChannel channel = null;
 
@@ -411,7 +442,7 @@ public class ExportBenchmark {
         try {
             InetSocketAddress isa = new InetSocketAddress(
                                             InetAddress.getLocalHost(),
-                                            5001);
+                                            config.port);
             channel.socket().setReuseAddress(true);
             channel.socket().bind(isa);
             channel.register(selector, SelectionKey.OP_READ);
@@ -451,6 +482,7 @@ public class ExportBenchmark {
         writes.start();
 
         // Listen for stats until we stop
+        Thread.sleep(config.warmup * 1000);
         setupSocketListener();
         listenForStats();
         writes.join();
@@ -503,6 +535,21 @@ public class ExportBenchmark {
      */
     public synchronized void printResults(long duration) {
         ClientStats stats = fullStatsContext.fetch().getStats();
+
+        // Print server-side TPS
+        for (Integer partition : allStats.keySet()) {
+            ArrayList<Double> thisTps = allStats.get(partition);
+            int average = 0;
+
+            for (int i = 0; i < thisTps.size(); i++) {
+                average += thisTps.get(i).intValue();
+            }
+            average /= thisTps.size();
+
+            System.out.println("Average TPS for partition "
+                                + partition.intValue()
+                                + ": " + average);
+        }
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
