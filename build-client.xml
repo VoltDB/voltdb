@@ -277,6 +277,16 @@ JAR BUILDING
     </jar>
 </target>
 
+<target name="maven-jars"
+        description = "makes extra .jar files that get pushed to maven repo"
+        depends="stage_src, javadoc, buildinfo">
+  <jar destfile="${build.dir}/voltdbclient-${dist.version}-javadoc.jar"
+       basedir="${doc.dir}/javadoc/java-client-api"
+       />
+  <jar destfile="${build.dir}/voltdbclient-${dist.version}-sources.jar"
+       basedir="${build.clientsrc.dir}"
+       />
+</target>
 
 <!--
 ***************************************

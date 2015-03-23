@@ -344,7 +344,7 @@ public class SQLParser extends SQLPatternFactory
             "'" +
             "[^',\\s]*" +  // arbitrary string content NOT matching param separators
             "[,\\s]" +     // the first match for a param separator
-            "[^']" +       // arbitrary string content
+            "[^']*" +      // arbitrary string content
             "'",           // end of string OR start of escaped quote
             Pattern.MULTILINE);
 
@@ -364,6 +364,9 @@ public class SQLParser extends SQLPatternFactory
             "^\\s*" +         // optional indent at start of line
             "help" +          // required HELP command token
             "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that help
+            // command diagnostics can "own" any line starting with the word
+            // help.
             "\\s*" +          // optional whitespace before subcommand
             "([^;\\s]*)" +    // optional subcommand (group 2)
             InitiallyForgivingDirectiveTermination,
@@ -394,6 +397,8 @@ public class SQLParser extends SQLPatternFactory
             "(\\W|$)" +    // require an end to the keyword OR EOL (group 1)
             // Make everything that follows optional so that recall command
             // diagnostics can "own" any line starting with the word recall.
+            "\\s*" +          // extra spaces
+            "([^;\\s]*)" + // (first) non-space non-semicolon garbage word (group 2)
             InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
 
@@ -914,21 +919,41 @@ public class SQLParser extends SQLPatternFactory
     private static List<String> parseExecParameters(String paramText)
     {
         final String SafeParamStringValuePattern = "#(SQL_PARSER_SAFE_PARAMSTRING)";
-        paramText = paramText.trim();
+        // Find all quoted strings.
         // Mask out strings that contain whitespace or commas
         // that must not be confused with parameter separators.
+        // "Safe" strings that don't contain these characters don't need to be masked
+        // but they DO need to be found and explicitly skipped so that their closing
+        // quotes don't trigger a false positive for the START of an unsafe string.
+        // Skipping is accomplished by resetting paramText to an offset substring
+        // after copying the skipped (or substituted) text to a string builder.
         ArrayList<String> originalString = new ArrayList<String>();
-        Matcher stringMatcher = SingleQuotedStringContainingParameterSeparators.matcher(paramText);
+        Matcher stringMatcher = SingleQuotedString.matcher(paramText);
+        StringBuilder safeText = new StringBuilder();
         while (stringMatcher.find()) {
-            originalString.add(stringMatcher.group());
-            paramText = stringMatcher.replaceFirst(SafeParamStringValuePattern);
-            stringMatcher = SingleQuotedStringContainingParameterSeparators.matcher(paramText);
+            // Save anything before the found string.
+            safeText.append(paramText.substring(0, stringMatcher.start()));
+            String asMatched = stringMatcher.group();
+            if (SingleQuotedStringContainingParameterSeparators.matcher(asMatched).matches()) {
+                // The matched string is unsafe, provide cover for it in safeText.
+                originalString.add(asMatched);
+                safeText.append(SafeParamStringValuePattern);
+            } else {
+                // The matched string is safe. Add it to safeText.
+                safeText.append(asMatched);
+            }
+            paramText = paramText.substring(stringMatcher.end());
+            stringMatcher = SingleQuotedString.matcher(paramText);
         }
+        // Save anything after the last found string.
+        safeText.append(paramText);
+
         ArrayList<String> params = new ArrayList<String>();
         int subCount = 0;
         int neededSubs = originalString.size();
         // Split the params at the separators
-        for (String fragment : paramText.split("[\\s,]+")) {
+        String[] split = safeText.toString().split("[\\s,]+");
+        for (String fragment : split) {
             if (fragment.isEmpty()) {
                 continue; // ignore effects of leading or trailing separators
             }
@@ -1476,7 +1501,8 @@ public class SQLParser extends SQLPatternFactory
                 // even near the start
                 commandWordTerminator.equals(",")) {
         ExecuteCallResults results = new ExecuteCallResults();
-        results.params = parseExecParameters(statement.substring(matcher.end()));
+        String rawParams = statement.substring(matcher.end());
+        results.params = parseExecParameters(rawParams);
         results.procedure = results.params.remove(0);
         // TestSqlCmdInterface passes procedures==null because it
         // doesn't need/want the param types.

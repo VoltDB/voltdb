@@ -105,10 +105,15 @@ protected:
      * "delete" here only really calls their virtual destructors (important!)
      * but their no-op delete operator leaves them to be purged in one go with the data pool.
      * Also call own destructor to ensure that the vector is released.
+     *
+     * The order of releasing should be FIFO order, which is the reverse of what
+     * undo does. Think about the case where you insert and delete a bunch of
+     * tuples in a table, then does a truncate. You do not want to delete that
+     * table before all the inserts and deletes are released.
      */
     inline Pool* release() {
-        for (std::vector<UndoAction*>::reverse_iterator i = m_undoActions.rbegin();
-             i != m_undoActions.rend(); ++i) {
+        for (std::vector<UndoAction*>::iterator i = m_undoActions.begin();
+             i != m_undoActions.end(); ++i) {
             UndoAction* goner = *i;
             goner->release();
             delete goner;

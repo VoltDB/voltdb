@@ -377,6 +377,9 @@ public class CatalogDiffEngine {
         else if (suspect instanceof Connector) {
             if (ChangeType.ADDITION == changeType) {
                 for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
+                    if (cti.getTable().getIsdred()) {
+                        return "May not export a DR table";
+                    }
                     trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
                 }
             }
@@ -639,19 +642,10 @@ public class CatalogDiffEngine {
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
 
-        if (suspect instanceof Cluster && field.equals("drClusterId") ||
-                suspect instanceof Cluster && field.equals("drProducerPort")) {
+        if (suspect instanceof Cluster && field.equals("drProducerPort")) {
             // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
             if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
                 restrictionQualifier = " while DR is enabled";
-            }
-            else {
-                return null;
-            }
-        }
-        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
-            if ((Boolean)suspect.getField("drProducerEnabled")) {
-                restrictionQualifier = " active-active and daisy-chained DR unsupported";
             }
             else {
                 return null;
