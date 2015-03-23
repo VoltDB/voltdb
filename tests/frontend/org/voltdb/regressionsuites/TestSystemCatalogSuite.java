@@ -62,13 +62,27 @@ public class TestSystemCatalogSuite extends RegressionSuite {
     public void testTablesSelector() throws IOException, ProcCallException
     {
         Client client = getClient();
-        VoltTable[] results = client.callProcedure("@SystemCatalog", "TABLES").getResults();
-        assertEquals(10, results[0].getColumnCount());
-        System.out.println(results[0]);
-        results[0].advanceRow();
-        assertEquals("{\"partitionColumn\":\"A1\"}", results[0].get("REMARKS", VoltType.STRING));
-        results[0].advanceRow();
-        assertEquals("{\"partitionColumn\":\"A1\",\"sourceTable\":\"T\"}", results[0].get("REMARKS", VoltType.STRING));
+        VoltTable results = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+
+        assertEquals(10, results.getColumnCount());
+
+        // Tables are returned in alphabetical order, because the underlying CatalogMap
+        // is backed by java.util.TreeMap
+        results.advanceRow();
+        assertEquals("AA_T", results.get("TABLE_NAME", VoltType.STRING));
+        assertEquals("{\"partitionColumn\":\"A1\"}", results.get("REMARKS", VoltType.STRING));
+
+        results.advanceRow();
+        assertEquals("BB_V", results.get("TABLE_NAME", VoltType.STRING));
+        assertEquals("{\"partitionColumn\":\"A1\",\"sourceTable\":\"AA_T\"}", results.get("REMARKS", VoltType.STRING));
+
+        results.advanceRow();
+        assertEquals("CC_T_WITH_EXEC_DELETE", results.get("TABLE_NAME", VoltType.STRING));
+        assertEquals("{\"partitionColumn\":\"A1\","
+                + "\"limitPartitionRowsDeleteStmt\":\"DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1 = 0;\"}",
+                results.get("REMARKS", VoltType.STRING));
+
+        assertEquals(false, results.advanceRow());
     }
 
     public void testColumnsSelector() throws IOException, ProcCallException
@@ -186,16 +200,25 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestSystemCatalogSuite.class);
 
+        // Give the tables obviously alphabetized names---they will be returned in alphabetical order
+        // by @SystemCatalog TABLES
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
-                                 "CREATE VIEW V(A1, S) AS SELECT A1, COUNT(*) FROM T GROUP BY A1;");
-        project.addPartitionInfo("T", "A1");
-        project.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
+        project.addLiteralSchema("CREATE TABLE AA_T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1)); " +
+                                 "CREATE VIEW BB_V(A1, S) AS SELECT A1, COUNT(*) FROM AA_T GROUP BY A1; " +
+                                 "CREATE TABLE CC_T_WITH_EXEC_DELETE "
+                                 + "(A1 INTEGER NOT NULL, "
+                                 + " A2 INTEGER, "
+                                 + "LIMIT PARTITION ROWS 5 "
+                                 + "EXECUTE (DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1 = 0));");
+        project.addPartitionInfo("AA_T", "A1");
+        project.addPartitionInfo("CC_T_WITH_EXEC_DELETE", "A1");
+        project.addStmtProcedure("InsertA", "INSERT INTO AA_T VALUES(?,?);", "AA_T.A1: 0");
 
         LocalCluster lcconfig = new LocalCluster("getclusterinfo-cluster.jar", 2, 2, 1,
                                                BackendTarget.NATIVE_EE_JNI);
-        lcconfig.compile(project);
-        builder.addServerConfig(lcconfig);
+
+        assert(lcconfig.compile(project));
+        assert(builder.addServerConfig(lcconfig));
 
         return builder;
     }

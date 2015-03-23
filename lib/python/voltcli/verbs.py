@@ -562,18 +562,13 @@ class BaseClientBundle(ConnectionBundle):
         ConnectionBundle.__init__(self, default_port = default_port, min_count = 1, max_count = 1)
 
     def start(self, verb, runner):
-        try:
-            kwargs = {}
-            if runner.opts.username:
-                kwargs['username'] = runner.opts.username
-                if runner.opts.password:
-                    kwargs['password'] = runner.opts.password
-            runner.client = FastSerializer(runner.opts.host.host, runner.opts.host.port, **kwargs)
-        except Exception, e:
-            utility.abort(e)
+        runner.voltdb_connect(runner.opts.host.host,
+                              runner.opts.host.port,
+                              username=runner.opts.username,
+                              password=runner.opts.password)
 
     def stop(self, verb, runner):
-        runner.client.close()
+        runner.voltdb_disconnect()
 
 #===============================================================================
 class ClientBundle(BaseClientBundle):
