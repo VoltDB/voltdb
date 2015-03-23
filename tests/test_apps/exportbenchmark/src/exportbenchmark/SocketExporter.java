@@ -35,6 +35,7 @@
 package exportbenchmark;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
@@ -68,7 +69,11 @@ public class SocketExporter extends ExportClientBase {
         port = Integer.parseInt(config.getProperty("socket.port", "5001"));
         statsDuration = Integer.parseInt(config.getProperty("stats.duration", "5"));
 
-        address = new InetSocketAddress(host, port);
+        if (host == "localhost") {
+            address = new InetSocketAddress(InetAddress.getLocalHost(), port);
+        } else {
+            address = new InetSocketAddress(host, port);
+        }
         channel = DatagramChannel.open();
     }
 
