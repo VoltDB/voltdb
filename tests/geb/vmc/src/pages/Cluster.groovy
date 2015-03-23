@@ -36,6 +36,7 @@ class Cluster extends Module {
         savecancel					{ $("#btnSaveSnapshotCancel") }
         saveok						{ $("#btnSaveSnapshots") }
 		// $("#txtSnapshotDirectory")
+        restorestatus               {$(class:"restore")}
         restoredirectory			{$("#txtSearchSnapshots")}
         restoresearch				{$("#btnSearchSnapshots")}
         savedirectory 				{ $("input", type:"text", name:"txtSnapshotDirectory", id:"txtSnapshotDirectory") }

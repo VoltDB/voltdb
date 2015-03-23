@@ -1462,12 +1462,16 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(30) { cluster.restorebutton.isDisplayed()
-                      cluster.restorebutton.click()}
+        waitFor(20) {   cluster.restorebutton.isDisplayed()
+                        cluster.restorestatus.isDisplayed()
+                        cluster.restorebutton.click()
+        }
+
+        println("restore button clicked")
 
         then:
-        //waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
-        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+         waitFor(7) {   cluster.restoreconfirmation.isDisplayed() }
+                        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
         cluster.restoredirectory.value($line)
         cluster.restoresearch.click()
         waitFor(5){cluster.restorecancelbutton.isDisplayed()}
@@ -1479,13 +1483,17 @@ class AdminTest extends TestBase {
     def "when restore and close"(){
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed()
-                     cluster.restorebutton.click()}
+        waitFor(7) {    cluster.restorebutton.isDisplayed()
+                        cluster.restorestatus.isDisplayed()
+                        cluster.restorebutton.click()
+        }
+
+        println("restore clicked")
 
         then:
-       // waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
-        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
-        cluster.restoreclosebutton.click()
+          waitFor(7) {  cluster.restoreconfirmation.isDisplayed() }
+                        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
+                        cluster.restoreclosebutton.click()
 
     }
 
@@ -1524,15 +1532,15 @@ class AdminTest extends TestBase {
         def $namelist3
         def $namelist4
         def $lineunused, $lineunused1
-       // new File("src/resources/serversearch.txt").withReader {
-          //  $lineunused = it.readLine()
-          //  $lineunused1 = it.readLine()
-          //  $namelist1 = it.readLine()
-           // $namelist2 = it.readLine()
-          //  $namelist3 = it.readLine()
-          //  $namelist4 = it.readLine()
-       // }
-        when:'clicked server button'
+        // new File("src/resources/serversearch.txt").withReader {
+        //  $lineunused = it.readLine()
+        //  $lineunused1 = it.readLine()
+        //  $namelist1 = it.readLine()
+        // $namelist2 = it.readLine()
+        //  $namelist3 = it.readLine()
+        //  $namelist4 = it.readLine()
+        // }
+        when: 'clicked server button'
         at AdminPage
         page.serverbutton.isDisplayed()
         page.serverbutton.click()
@@ -1540,24 +1548,29 @@ class AdminTest extends TestBase {
         // if($namelist2 ==  page.servernamelist2.text()){println(page.servernamelist2.text())}
         // if($namelist3 ==  page.servernamelist3.text()){println(page.servernamelist3.text())}}
 
-        if(waitFor(10){page.servername.isDisplayed()}){
+        if (waitFor(10) { page.servername.isDisplayed() }) {
 
-            println("server name is displayed as: "+page.servername.text())}
+            println("server name is displayed as: " + page.servername.text())
+        }
 
 
         then:
-
-        waitFor(5){
-            page.serverstopbuttonmain.isDisplayed()
+        if (waitFor(5) { page.serverstopbtndisable.isDisplayed() }) {
+            println("server stop button  displayed for disable mode")
         }
-        println("server stop button displayed")
-        page.serverstopbuttonmain.click()
-        waitFor(5) {page.serverstopcancel.isDisplayed()
-                    page.serverstopok.isDisplayed()}
-        page.serverstopcancel.click()
-        println("server cancel button clicked")
 
-    }
+        /* if (waitFor(5) { !page.serverstopbtnenable.isDisplayed() || page.serverstopbtndisable.isDisplayed() }) {
+             println("since, stop button is disable so cannot proceed to stop popup!")
+         }*/
+        else if( waitFor(5) { page.serverstopbtnenable.isDisplayed() && page.serverstopbtndisable.isDisplayed() }){
+            println("server stop button clicked for  enable mode")
+            page.serverstopbtnenable.click()
+            waitFor(5) { page.serverstopcancel.isDisplayed() }
+            page.serverstopok.isDisplayed()
+            page.serverstopcancel.click()
+            println("server cancel button clicked")
+        }
+ }
 
 
     // Overview Expansion
