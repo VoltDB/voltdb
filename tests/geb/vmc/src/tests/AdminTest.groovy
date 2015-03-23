@@ -1466,7 +1466,7 @@ class AdminTest extends TestBase {
                       cluster.restorebutton.click()}
 
         then:
-        waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
+        //waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
         cluster.restoredirectory.value($line)
         cluster.restoresearch.click()
@@ -1483,7 +1483,7 @@ class AdminTest extends TestBase {
                      cluster.restorebutton.click()}
 
         then:
-        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+       // waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         cluster.restoreclosebutton.click()
 
