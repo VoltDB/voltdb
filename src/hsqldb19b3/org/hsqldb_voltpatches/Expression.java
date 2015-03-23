@@ -37,9 +37,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.NumberType;
@@ -2351,7 +2349,7 @@ public class Expression implements Cloneable {
         // Duplicate the prototype and add any expression particulars needed for the specific opType value,
         // as well as a unique identifier, a possible alias, and child nodes.
         exp = exp.duplicate();
-        exp.attributes.put("id", this.getUniqueId(session));
+        exp.attributes.put("id", this.voltGetUniqueId(session));
 
         if (realAlias != null) {
             exp.attributes.put("alias", realAlias);
@@ -2361,7 +2359,8 @@ public class Expression implements Cloneable {
 
         for (Expression expr : nodes) {
             if (expr != null) {
-                VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
+                VoltXMLElement vxmle = expr.voltGetXML(session,
+                        displayCols, ignoredDisplayColIndexes, startKey, null);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }
@@ -2599,45 +2598,42 @@ public class Expression implements Cloneable {
      * some names.
      * @return simplified expression.
      */
-    public Expression eliminateDuplicates(final Session session) {
+    public Expression voltEliminateDuplicates(final Session session) {
         // First build the map of child expressions joined by the logical AND
         // The key is the expression id and the value is the expression itself
         HashMap<String, Expression> subExprMap = new HashMap<String, Expression>();
-        extractAndSubExpressions(session, this, subExprMap);
+        voltExtractAndSubExpressions(session, this, subExprMap);
         // Reconstruct the expression
-        if (!subExprMap.isEmpty()) {
-            Iterator<Map.Entry<String, Expression>> itExpr = subExprMap.entrySet().iterator();
-            Expression finalExpr = itExpr.next().getValue();
-            while (itExpr.hasNext()) {
-                finalExpr = new ExpressionLogical(OpTypes.AND, finalExpr, itExpr.next().getValue());
-            }
-            return finalExpr;
+        assert(!subExprMap.isEmpty());
+        Expression finalExpr = null;
+        for (Expression nextExpr : subExprMap.values()) {
+            finalExpr = voltCombineWithAnd(finalExpr, nextExpr);
         }
-        return this;
+        return finalExpr;
     }
 
-    protected void extractAndSubExpressions(final Session session, Expression expr,
+    protected void voltExtractAndSubExpressions(final Session session, Expression expr,
             HashMap<String, Expression> subExprMap) {
         // If it is a logical expression AND then traverse down the tree
         if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
-            extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
-            extractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
+            voltExtractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
+            voltExtractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
         } else {
-            String id = expr.getUniqueId(session);
+            String id = expr.voltGetUniqueId(session);
             subExprMap.put(id, expr);
        }
     }
 
-    protected String cached_id = null;
+    protected String volt_cached_id = null;
 
     /**
      * Get the hex address of this Expression Object in memory,
      * to be used as a unique identifier.
      * @return The hex address of the pointer to this object.
      */
-    protected String getUniqueId(final Session session) {
-        if (cached_id != null) {
-            return cached_id;
+    protected String voltGetUniqueId(final Session session) {
+        if (volt_cached_id != null) {
+            return volt_cached_id;
         }
 
         //
@@ -2646,7 +2642,7 @@ public class Expression implements Cloneable {
 
         // this line ripped from the "describe" method
         // seems to help with some types like "equal"
-        cached_id = new String();
+        volt_cached_id = new String();
         int hashCode = 0;
         //
         // If object is a leaf node, then we'll use John's original code...
@@ -2665,7 +2661,7 @@ public class Expression implements Cloneable {
                 public void traverse(Expression exp) {
                     for (Expression expr : exp.nodes) {
                         if (expr != null)
-                            id_list.add(expr.getUniqueId(session));
+                            id_list.add(expr.voltGetUniqueId(session));
                     }
                 }
             }.traverse(this);
@@ -2673,16 +2669,16 @@ public class Expression implements Cloneable {
             if (id_list.size() > 0) {
                 // Flatten the id list, intern it, and then do the same trick from above
                 for (String temp : id_list)
-                    this.cached_id += "+" + temp;
-                hashCode = this.cached_id.intern().hashCode();
+                    this.volt_cached_id += "+" + temp;
+                hashCode = this.volt_cached_id.intern().hashCode();
             }
             else
                 hashCode = super.hashCode();
         }
 
         long id = session.getNodeIdForExpression(hashCode);
-        cached_id = Long.toString(id);
-        return cached_id;
+        volt_cached_id = Long.toString(id);
+        return volt_cached_id;
     }
 
     public VoltXMLElement voltGetExpressionXML(Session session, Table table)

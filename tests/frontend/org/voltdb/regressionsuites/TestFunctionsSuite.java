@@ -115,7 +115,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // TODO: For that reason, it might make sense to break them out into
         // their own suite to make their specific issues easier to isolate.
 
-        /* not yet hsqldb232 -- getting GC and hang?
+        /* not yet hsql232 -- getting GC and hang?
         cr = client.callProcedure("@AdHoc",
                 "select ID from P1 " +
                 "where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 " +
@@ -123,7 +123,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(5, result.getRowCount());
-        // ... not yet hsqldb232 -- getting GC and hang? */
+        ... not yet hsql232 -- getting GC and hang? */
 
         VoltTable r;
         long resultA;
@@ -695,11 +695,11 @@ public class TestFunctionsSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( DESC FROM 2) > 9");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            /* not yet hsqldb232 -- missing parser type check -- and getting runtime type check error!
+            /* not yet hsql232 -- missing parser type check -- and getting runtime type check error!
             //TODO: isolate this as a planner/TestFunctions test case.
             String msg = e.getMessage();
             assertTrue(msg.indexOf("incompatible data type") != -1);
-            // not yet hsqldb232 */
+            ... not yet hsql232 */
             caught = true;
         }
         assertTrue(caught);

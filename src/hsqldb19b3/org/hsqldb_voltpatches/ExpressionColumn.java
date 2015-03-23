@@ -1262,14 +1262,21 @@ public class ExpressionColumn extends Expression {
      */
     VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
     {
-        if (tableName != null) {
-            if (rangeVariable != null && rangeVariable.rangeTable != null &&
-                    rangeVariable.tableAlias != null &&
-                    rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-                exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
-            } else {
-                exp.attributes.put("table", tableName.toUpperCase());
-            }
+        if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                rangeVariable.tableAlias != null &&
+                rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+            exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
+        } 
+        else if (tableName != null) {
+            exp.attributes.put("table", tableName.toUpperCase());
+        }
+        // This case was introduced to cover columns in the where clause of
+        // an update statement.
+        else if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                rangeVariable.rangeTable.tableName != null &&
+                rangeVariable.rangeTable.tableName.getNameString() != null) {
+            exp.attributes.put("table",
+                    rangeVariable.rangeTable.tableName.getNameString().toUpperCase());
         }
         //TODO: also indicate RangeVariable in case table is ambiguus (for self-joins).
         exp.attributes.put("column", columnName.toUpperCase());

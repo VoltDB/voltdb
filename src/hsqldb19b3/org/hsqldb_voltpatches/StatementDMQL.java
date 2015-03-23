@@ -981,7 +981,7 @@ public abstract class StatementDMQL extends Statement {
             VoltXMLElement offset = new VoltXMLElement("offset");
             Expression offsetExpr = limitCondition.getLeftNode();
             if (offsetExpr.isUnresolvedParam()) {
-                offset.attributes.put("offset_paramid", offsetExpr.getUniqueId(session));
+                offset.attributes.put("offset_paramid", offsetExpr.voltGetUniqueId(session));
             }
             else {
                 Integer offsetValue = (Integer)offsetExpr.getValue(session);
@@ -1000,7 +1000,7 @@ public abstract class StatementDMQL extends Statement {
             if (limitExpr != null) {
                 VoltXMLElement limit = new VoltXMLElement("limit");
                 if (limitExpr.isUnresolvedParam()) {
-                    limit.attributes.put("limit_paramid", limitExpr.getUniqueId(session));
+                    limit.attributes.put("limit_paramid", limitExpr.voltGetUniqueId(session));
                 }
                 else {
                     Integer limitValue = (Integer)limitExpr.getValue(session);
@@ -1277,7 +1277,7 @@ public abstract class StatementDMQL extends Statement {
             parameterXML.children.add(parameter);
             parameter.attributes.put("index", String.valueOf(index));
             ++index;
-            parameter.attributes.put("id", expr.getUniqueId(session));
+            parameter.attributes.put("id", expr.voltGetUniqueId(session));
             if (paramType == org.hsqldb_voltpatches.types.NumberType.SQL_NUMERIC_DEFAULT_INT) {
                 parameter.attributes.put("valuetype", "BIGINT");
             } else {

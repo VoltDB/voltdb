@@ -353,7 +353,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     public static String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
     @Test
-    public void not_yet_hsql323_mysterious_hang_testSimple() throws Exception {
+    public void not_yet_hsql232_mysterious_hang_testSimple() throws Exception {
         System.out.println("Starting testSimple");
         TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
         try {

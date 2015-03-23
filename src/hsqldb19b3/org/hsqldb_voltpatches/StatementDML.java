@@ -1655,23 +1655,6 @@ public class StatementDML extends StatementDMQL {
         }
     }
 
-    private void voltAppendCondition(Session session, VoltXMLElement xml)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
-        assert(targetRangeVariables.length > 0);
-        RangeVariable rv = targetRangeVariables[0];
-
-        // AND together all of the WHERE conditions that HSQL spits out
-        // The planner will redo all of the index start/end
-        // smarts that HSQL tried to do.
-        Expression condExpr = rv.voltCombineConditions();
-        if (condExpr != null) {
-            VoltXMLElement condition = new VoltXMLElement("condition");
-            xml.children.add(condition);
-            condition.children.add(condExpr.voltGetXML(session));
-        }
-    }
-
     /**
      * Appends XML for ORDER BY/LIMIT/OFFSET to this statement's XML.
      * */
@@ -1762,7 +1745,6 @@ public class StatementDML extends StatementDMQL {
             xml = new VoltXMLElement("update");
             voltAppendTargetColumns(session, updateColumnMap, updateExpressions, xml);
             voltAppendChildScans(session, xml);
-            voltAppendCondition(session, xml);
             break;
 
         case StatementTypes.DELETE_CURSOR :
@@ -1770,7 +1752,6 @@ public class StatementDML extends StatementDMQL {
             xml = new VoltXMLElement("delete");
             // DELETE has no target columns
             voltAppendChildScans(session, xml);
-            voltAppendCondition(session, xml);
             voltAppendSortAndSlice(session, xml);
             break;
 

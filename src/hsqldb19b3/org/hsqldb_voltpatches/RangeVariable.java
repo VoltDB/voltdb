@@ -2105,14 +2105,14 @@ public class RangeVariable {
         }
 
         if (joinCond != null) {
-            joinCond = joinCond.eliminateDuplicates(session);
+            joinCond = joinCond.voltEliminateDuplicates(session);
             VoltXMLElement joinCondEl = new VoltXMLElement("joincond");
             joinCondEl.children.add(joinCond.voltGetXML(session));
             scan.children.add(joinCondEl);
         }
 
         if (whereCond != null) {
-            whereCond = whereCond.eliminateDuplicates(session);
+            whereCond = whereCond.voltEliminateDuplicates(session);
             VoltXMLElement whereCondEl = new VoltXMLElement("wherecond");
             whereCondEl.children.add(whereCond.voltGetXML(session));
             scan.children.add(whereCondEl);
