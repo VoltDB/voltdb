@@ -1510,27 +1510,8 @@ class AdminTest extends TestBase {
         cluster.shutdownclosebutton.click()
     }
 
-    def "when cluster pause in cancel"() {
-        when:
-        at AdminPage
-        waitFor(30) { cluster.pausebutton.isDisplayed() }
-        cluster.pausebutton.click()
-        then:
-        waitFor(30) { cluster.pauseconfirmation.isDisplayed() }
-        cluster.pauseconfirmation.text().equals("Pause: Confirmation");
-        cluster.pausecancel.click()
-    }
 
-    def "when cluster pause in ok"() {
-        when:
-        at AdminPage
-        waitFor(30) { cluster.pausebutton.isDisplayed() }
-        cluster.pausebutton.click()
-        then:
-        waitFor(30) { cluster.pauseconfirmation.isDisplayed() }
-        cluster.pauseconfirmation.text().equals("Pause: Confirmation");
-        cluster.pauseok.click()
-    }
+
 
     //server test
 
