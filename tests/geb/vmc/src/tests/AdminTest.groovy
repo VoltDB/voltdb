@@ -1462,8 +1462,9 @@ class AdminTest extends TestBase {
 
         when:
         at AdminPage
-        waitFor(30) { cluster.restorebutton.isDisplayed() }
-        cluster.restorebutton.click()
+        waitFor(30) { cluster.restorebutton.isDisplayed()
+                      cluster.restorebutton.click()}
+
         then:
         waitFor(30) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
@@ -1478,8 +1479,9 @@ class AdminTest extends TestBase {
     def "when restore and close"(){
         when:
         at AdminPage
-        waitFor(7) { cluster.restorebutton.isDisplayed() }
-        cluster.restorebutton.click()
+        waitFor(7) { cluster.restorebutton.isDisplayed()
+                     cluster.restorebutton.click()}
+
         then:
         waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
