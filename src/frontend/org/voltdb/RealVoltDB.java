@@ -1802,7 +1802,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 while ((b = (byte) buildstringStream.read()) != -1) {
                     sb.append((char)b);
                 }
-                sb.append("\n");
                 String parts[] = sb.toString().split(" ", 2);
                 if (parts.length == 2) {
                     parts[0] = parts[0].trim();
