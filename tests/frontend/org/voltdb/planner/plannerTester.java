@@ -216,7 +216,7 @@ public class plannerTester {
                 }
             }
             int numTest = m_numPass + m_numFail;
-            String summary = "\nTest: " + numTest + "\nPass: " + m_numPass + "\nFail: " + 
+            String summary = "\nTest: " + numTest + "\nPass: " + m_numPass + "\nFail: " +
                     m_numFail + "\nError: " + numError + "\n";
             System.out.print(summary);
             try {
@@ -239,27 +239,27 @@ public class plannerTester {
     }
 
     public static void printUsage() {
-        System.out.println("-C=configDir1[,configDir2,...]" + 
+        System.out.println("-C=configDir1[,configDir2,...]" +
                         "\nSpecify the path to each config file.\n");
-        System.out.println("-sp=savePath" + 
+        System.out.println("-sp=savePath" +
                         "\nspecify path for newly generated plan files.\n");
-        System.out.println("-b=baselinePath" + 
+        System.out.println("-b=baselinePath" +
                         "\nspecify path for ALL baseline reference plan files. Omit for separate <configDir>/baseline dirs\n");
-        System.out.println("-r=reportFilePath " + 
+        System.out.println("-r=reportFilePath " +
                         "\nSpecify report file path, default will be ./reports, report file name is plannerTester.report.\n");
-        System.out.println("-i=ignorePattern" + 
+        System.out.println("-i=ignorePattern" +
                         "\nSpecify a pattern to ignore, the pattern will not be recorded in the report file.\n");
-        System.out.println("-s" + 
+        System.out.println("-s" +
                         "\nSave compiled queries in the baseline path (<config>/baseline by default.\n");
-        System.out.println("-d" + 
+        System.out.println("-d" +
                         "\nDo the diff between plan files in baseline and the current ones.\n");
-        System.out.println("-re" + 
+        System.out.println("-re" +
                         "\nOutput explained plan along with diff.\n");
-        System.out.println("-rs" + 
+        System.out.println("-rs" +
                         "\nOutput sql statement along with diff.\n");
-        System.out.println("-dv" + 
+        System.out.println("-dv" +
                         "\nSame as -d -re -rs.\n");
-        System.out.println("-sv" + 
+        System.out.println("-sv" +
                         "\nSame as -s -re -rs.\n");
 
     }
@@ -493,7 +493,7 @@ public class plannerTester {
             if (!baseStmt.equalsIgnoreCase(m_stmts.get(i))) {
                 diffPair strPair = new diffPair(baseStmt, m_stmts.get(i));
                 m_reportWriter.write("Statement " + i + " of " + config + "/config:\n" +
-                        "SQL statement is not consistent with the one in baseline :\n" + 
+                        "SQL statement is not consistent with the one in baseline :\n" +
                         strPair.toString() + "\n");
                 m_numFail++;
                 continue;
@@ -543,13 +543,13 @@ public class plannerTester {
                     m_reportWriter.write("\nExplained plan:\n" + pn1.toExplainPlanString() + "\n==>\n" + pn2.toExplainPlanString() + "\n");
                 }
 
-                m_reportWriter.write("Path to the config file :" + config + "\n" + 
-                                     "Path to the baseline file :" + m_baselinePath + config + ".plan" + i + "\n" + 
-                                     "Path to the current plan file :" + m_workPath + config + ".plan" + i + 
+                m_reportWriter.write("Path to the config file :" + config + "\n" +
+                                     "Path to the baseline file :" + m_baselinePath + config + ".plan" + i + "\n" +
+                                     "Path to the current plan file :" + m_workPath + config + ".plan" + i +
                                      "\n\n----------------------------------------------------------------------\n");
             }
         }
-        m_reportWriter.write("===================================================================" + 
+        m_reportWriter.write("===================================================================" +
                             "End " + config + "\n");
         m_reportWriter.flush();
     }
