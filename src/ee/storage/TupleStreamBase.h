@@ -59,6 +59,7 @@ public:
      * to test buffer rollover.
      */
     void setDefaultCapacity(size_t capacity);
+    virtual void setSecondaryCapacity(size_t capacity) {};
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
@@ -69,15 +70,17 @@ public:
     void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);
 
-    void extendBufferChain(size_t minLength);
+    virtual void extendBufferChain(size_t minLength, bool continueTxn = true);
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
-    virtual void beginTransaction(int64_t txnId, int64_t spHandle) {}
-    virtual void endTransaction(int64_t spHandle) {}
+    virtual size_t beginTransaction(int64_t sequenceNumber, int64_t uniqueId) { return m_uso; }
+    virtual size_t endTransaction(int64_t sequenceNumber, int64_t uniqueId) { return m_uso; }
 
-    /** Send committed data to the top end */
-    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, bool sync = false, bool flush = false);
+    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn) { return false; }
+
+    /** Send committed data to the top end. Returns the USO before the BEGIN TXN entry is written, or 0 if not written. */
+    size_t commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
@@ -97,6 +100,10 @@ public:
     /** transaction id of the current (possibly uncommitted) transaction */
     int64_t m_openSpHandle;
 
+    int64_t m_openSequenceNumber;
+
+    int64_t m_openUniqueId;
+
     /** Universal stream offset when current transaction was opened */
     size_t m_openTransactionUso;
 
@@ -105,6 +112,10 @@ public:
 
     /** current committed uso */
     size_t m_committedUso;
+
+    int64_t m_committedSequenceNumber;
+
+    int64_t m_committedUniqueId;
 };
 
 }

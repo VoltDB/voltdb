@@ -50,9 +50,7 @@ function loadAdminPage() {
         commandLogFrequencyTransactions: $("#commandLogFrequencyTxns"),
         commandLogSegmentSize: $("#commandLogSegmentSize"),
         commandLogSegmentSizeLabel: $("#commandLogSegmentSizeUnit"),
-        exports: $("#exports"),
-        exportLabel: $("#txtExportLabel"),
-        target: $("#target"),
+        exportConfiguration: $("#exportConfiguration"),
         properties: $("#properties"),
         maxJavaHeap: $("#maxJavaHeap"),
         maxJavaHeapLabel: $("#maxJavaHeapUnit"),
@@ -165,14 +163,14 @@ function loadAdminPage() {
     var adminValidationRules = {
         numericRules: {
             required: true,
-            min: 0,
+            min: 1,
             max: INT_MAX_VALUE,
             digits: true,
         },
         numericMessages: {
             required: "Please enter a valid positive number.",
-            min: "Please enter a valid positive number.",
-            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            min: "Please enter a positive number. Its minimum value should be 1.",
+            max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
 
@@ -201,7 +199,21 @@ function loadAdminPage() {
         },
         restoreSnapshotMessages: {
             required: "Please select a snapshot to restore."
-        }
+        },
+
+        queryTimeoutRules: {
+            required: true,
+            min: 0,
+            max: INT_MAX_VALUE,
+            digits: true,
+        },
+        queryTimeoutMessages: {
+            required: "Please enter a valid positive number.",
+            min: "Please enter a positive number.",
+            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            digits: "Please enter a positive number without any decimal."
+        },
+
     };
 
     //Admin Page download link
@@ -248,6 +260,17 @@ function loadAdminPage() {
             var parent = $(this).parent();
             parent.siblings('.child-' + parent.attr("id")).toggle();
             parent.find(".labelCollapsed").toggleClass("labelExpanded");
+
+            //Handle export configuration
+            if ($(this).text() == "Export") {
+                //If parent is closed, then hide export configuration
+                if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
+                    adminDOMObjects.exportConfiguration.hide();
+                    //If parent is open, then open the export configuration.
+                } else {
+                    adminDOMObjects.exportConfiguration.show();
+                }
+            }
         });
     $('tr[class^=child-]').hide().children('td');
 
@@ -505,12 +528,12 @@ function loadAdminPage() {
             });
         }
     });
-    
+
 
     $("#loginWarnPopup").popup({
         afterOpen: function (event, ui, ele) {
             var popup = $(this)[0];
-           
+
             $("#btnLoginWarningOk").unbind("click");
             $("#btnLoginWarningOk").on('click', function () {
                 if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
@@ -554,9 +577,6 @@ function loadAdminPage() {
                     txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
-            
-            $("#saveSnapshotConfirm").hide();
-            $("#saveSnapshot").show();
         },
         afterOpen: function (event) {
             var popup = $(this)[0];
@@ -585,29 +605,14 @@ function loadAdminPage() {
                     return;
                 }
 
-                $("#saveSnapshot").hide();
-                $("#saveSnapshotConfirm").show();
-            });
-
-            $("#btnSaveSnapshotCancel").unbind("click");
-            $("#btnSaveSnapshotCancel").on("click", function () {
-                popup.close();
-            });
-            
-            $("#btnSaveSnapshotConfirmCancel").unbind("click");
-            $("#btnSaveSnapshotConfirmCancel").on("click", function () {
-                $("#saveSnapshotConfirm").hide();
-                $("#saveSnapshot").show();
-            });
-            
-            $("#btnSaveSnapshotOk").unbind("click");
-            $("#btnSaveSnapshotOk").on("click", function (e) {
                 var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success, snapshotStatus) {
                     if (success) {
                         if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
-                            showUpdateMessage('Snapshot saved successfully.');
+                            $('#saveSnapshotStatus').html('Snapshot queued successfully');
+                            $('#saveSnapshotMessage').html('To verify snapshot completion, please check the server logs.');
+                            $('#btnSaveSnapshotPopup').click();
                         } else {
                             $('#saveSnapshotStatus').html('Failed to save snapshot');
                             $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
@@ -618,6 +623,11 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
+                popup.close();
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -964,6 +974,10 @@ function loadAdminPage() {
             adminEditObjects.tBoxFilePrefix.hide();
             adminDOMObjects.retainedLabel.hide();
 
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
+
             adminEditObjects.loadingSnapshot.show();
             adminEditObjects.loadingSnapshotFrequency.show();
             adminEditObjects.loadingSnapshotPrefix.show();
@@ -994,6 +1008,9 @@ function loadAdminPage() {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
+            adminEditObjects.errorAutoSnapshotFreq.hide();
+            adminEditObjects.errorAutoSnapshotFilePrefix.hide();
+            adminEditObjects.errorAutoSnapshotRetained.hide();
             adminEditObjects.LinkAutoSnapshotEdit.show();
             adminEditObjects.iconAutoSnapshotOption.show();
             adminDOMObjects.autoSnapshotLabel.show();
@@ -1076,6 +1093,14 @@ function loadAdminPage() {
         },
         messages: {
             txtRetained: adminValidationRules.numericMessages
+        }
+    });
+    $("#formQueryTimeout").validate({
+        rules: {
+            txtQueryTimeout: adminValidationRules.queryTimeoutRules
+        },
+        messages: {
+            txtQueryTimeout: adminValidationRules.queryTimeoutMessages
         }
     });
 
@@ -1317,6 +1342,7 @@ function loadAdminPage() {
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
             adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.errorQueryTimeout.hide();
 
             adminEditObjects.loadingQueryTimeout.show();
         }
@@ -1333,6 +1359,7 @@ function loadAdminPage() {
             adminEditObjects.loadingQueryTimeout.hide();
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.errorQueryTimeout.hide();
             adminEditObjects.LinkQueryTimeoutEdit.show();
 
             adminEditObjects.tBoxQueryTimeout.hide();
@@ -1522,6 +1549,7 @@ function loadAdminPage() {
         this.stoppedServer = "";
         this.runningServerIds = "";
         this.firstResponseReceived = false;
+        this.toggleStates = {};
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1564,6 +1592,13 @@ function loadAdminPage() {
             adminDOMObjects.adminServerList.html(serverList);
         };
 
+        this.escapeHtml = function (value) {
+            if (!value)
+                return "";
+
+            return $('<div/>').text(value).html();
+        };
+
         var configureAdminValues = function (adminConfigValues) {
             adminDOMObjects.siteNumberHeader.text(adminConfigValues.sitesperhost);
             adminDOMObjects.kSafety.text(adminConfigValues.kSafety);
@@ -1590,9 +1625,6 @@ function loadAdminPage() {
             adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions != null ? adminConfigValues.commandLogFrequencyTransactions : "");
             adminDOMObjects.commandLogSegmentSize.text(adminConfigValues.logSegmentSize != null ? adminConfigValues.logSegmentSize : "");
             adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize != null ? "MB" : "");
-            adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
-            adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
-            adminDOMObjects.target.text(adminConfigValues.targets);
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != null ? adminConfigValues.heartBeatTimeout : "");
 
 
@@ -1620,39 +1652,76 @@ function loadAdminPage() {
             adminEditObjects.spanAutoSnapshotFreq.text(snapshotFrequency);
             var spanshotUnit = adminConfigValues.frequency != undefined ? adminConfigValues.frequency.slice(-1) : '';
             setSnapShotUnit(spanshotUnit);
-            getExportProperties(adminConfigValues.properties);
+            getExportProperties(adminConfigValues.configuration);
 
         };
 
         var getExportProperties = function (data) {
+
             var result = "";
             if (data != undefined) {
+
                 for (var i = 0; i < data.length; i++) {
-                    if (i == 0) {
-                        result += '<tr>' +
-                            '<td width="67%">' + data[i].name + '</td>' +
-                            '<td width="33%">' + data[i].value + '</td>' +
+                    var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
+                    var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
+                    var enabled = data[i].enabled;
+                    var streamProperty = data[i].property;
+                    var rowId = 'row-4' + i;
+                    var style = '';
+                    var additionalCss = (VoltDbAdminConfig.toggleStates[rowId] === true) ? 'labelExpanded' : '';
+
+                    if (!VoltDbAdminConfig.toggleStates.hasOwnProperty(rowId) || VoltDbAdminConfig.toggleStates[rowId] === false) {
+                        VoltDbAdminConfig.toggleStates[rowId] = false;
+                        style = 'style = "display:none;"';
+                    }
+
+                    result += '<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
+                            '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + type + '</a>' +
+                            '   </td>' +
+                            '   <td align="right">' +
+                            '       <div class="' + getOnOffClass(enabled) + '"></div>' +
+                            '   </td>' +
+                            '   <td>' + getOnOffText(enabled) + '</td>' +
+                            '   <td>' +
+                            '       <div class="exportDelete" style="display:none;"></div>' +
+                            '   </td>' +
                             '</tr>';
-                    } else if (i == (data.length - 1)) {
-                        result += '<tr class="propertyLast">' +
-                            '<td>' + data[i].name + '</td>' +
-                            '<td>' + data[i].value + '</td>' +
-                            '</tr>';
+
+                    if (streamProperty && streamProperty.length > 0) {
+
+                        for (var j = 0; j < streamProperty.length; j++) {
+                            var name = streamProperty[j].name;
+                            var value = streamProperty[j].value;
+
+                            result += '' +
+                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                                '   <td class="configLabe2">' + name + '</td>' +
+                                '   <td align="right">' + value + '</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '   <td>&nbsp;</td>' +
+                                '</tr>';
+                        }
+
+
                     } else {
-                        result += '<tr>' +
-                            '<td>' + data[i].name + '</td>' +
-                            '<td>' + data[i].value + '</td>' +
+                        result += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
+                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
+                            '   <td width="33%">&nbsp</td>' +
                             '</tr>';
                     }
                 }
             }
+
             if (result == "") {
-                result += '<tr class="propertyLast">' +
-                        '<td width="67%">No properties available.</td>' +
+                result += '<tr class="propertyLast subLabelRow">' +
+                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
             }
-            $('#exportProperties').html(result);
+
+            $('#exportConfiguration').html(result);
 
         };
 
@@ -1785,3 +1854,10 @@ var getOnOffClass = function (isOn) {
     return (isOn) ? "onIcon" : "offIcon";
 };
 
+var toggleProperties = function (ele) {
+    var parent = $(ele).parent();
+    parent.siblings('.childprop-' + parent.attr("id")).toggle();
+    parent.find(".labelCollapsed").toggleClass("labelExpanded");
+
+    VoltDbAdminConfig.toggleStates[parent.attr("id")] = parent.find('td:first-child > a').hasClass('labelExpanded');
+};

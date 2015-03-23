@@ -22,8 +22,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.voltcore.logging.VoltLogger;
-
 /**
  * Provides an API for performing various lexing operations on SQL/DML/DDL text.
  * Ideally it shouldn't be doing "parsing", i.e. language-aware token processing.
@@ -36,8 +34,6 @@ import org.voltcore.logging.VoltLogger;
 public class SQLLexer extends SQLPatternFactory
 {
     //===== Fundamental (not derived) parsing data
-
-    private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
 
     private static class VerbToken
     {
@@ -58,6 +54,7 @@ public class SQLLexer extends SQLPatternFactory
         new VerbToken("drop", true),
         new VerbToken("export", true),
         new VerbToken("partition", true),
+        new VerbToken("dr", true),
         // Unsupported verbs
         new VerbToken("import", false)
     };
@@ -77,6 +74,7 @@ public class SQLLexer extends SQLPatternFactory
     private final static ObjectToken[] OBJECT_TOKENS = {
         // Rename-able objects
         new ObjectToken("table", true),
+        new ObjectToken("column", true),
         new ObjectToken("index", true),
         // Non-rename-able objects
         new ObjectToken("view", false),
@@ -88,7 +86,7 @@ public class SQLLexer extends SQLPatternFactory
         "assumeunique", "unique"
     };
 
-    static final char   BLOCK_DELIMITER_CHAR = '#';
+    static final char BLOCK_DELIMITER_CHAR = '#';
     static final String BLOCK_DELIMITER = "###";
 
     //===== Special non-DDL/DML/SQL patterns
@@ -108,40 +106,42 @@ public class SQLLexer extends SQLPatternFactory
     // Simplest possible SQL DDL token lexer. (set in static block)
     private static Pattern PAT_ANY_DDL_FIRST_TOKEN = null;
 
-    // Generate supported renames (after we know what's allowed).
-    private static Pattern generateRenamePattern(String... renameables)
-    {
-        //TODO: The "anything" (.+) pattern is too forgiving, but will not be long-lived.
-        // Detects ALTER <OBJECT>...RENAME TO, which will recognize more than the
-        // anticipated syntax, but there's no harm since it won't recognize anything
-        // that should be valid right now. Anything rename-ish is blacklisted.
-        // Renames will be fully supported operations in the not-too-distant future.
-        return SPF.statementLeader(
-                    SPF.token("alter"),
-                    SPF.capture(SPF.tokenAlternatives(renameables)),
-                    SPF.optional(SPF.anything()),
-                    SPF.token("rename"), SPF.token("to")).compile();
-    }
-
     // All handled patterns. (set in static block)
-    private static Pattern[] PAT_WHITELISTS = null;
+    private static CheckedPattern[] WHITELISTS = null;
 
     // All rejected patterns. (set in static block)
-    private static Pattern[] PAT_BLACKLISTS = null;
+    private static CheckedPattern[] BLACKLISTS = null;
 
     // Extracts the table name for DDL batch conflicting command checks.
     private static final Pattern PAT_TABLE_DDL_PREAMBLE =
         SPF.statementLeader(
             SPF.capture(SPF.tokenAlternatives("create", "drop")),   // DDL commands we're looking for
             SPF.token("table"),                                     // target is table
-            SPF.capture(SPF.symbol())                               // table name (captured)
-        ).compile();
+            SPF.capture(SPF.databaseObjectName())                        // table name (captured)
+        ).compile("PAT_TABLE_DDL_PREAMBLE");
 
     // Matches the start of a SELECT statement
     private static final Pattern PAT_SELECT_STATEMENT_PREAMBLE =
         SPF.statementLeader(
             SPF.token("select")
-        ).compile();
+        ).compile("PAT_SELECT_STATEMENT_PREAMBLE");
+
+    // Pattern for plausible ALTER...RENAME statements.
+    // Keep the matching loose in order to support clear messaging.
+    private static final Pattern PAT_ALTER_RENAME =
+        SPF.statementLeader(
+            SPF.token("alter"),
+            SPF.capture("parenttype", SPF.databaseObjectTypeName()),
+            SPF.capture("parentname", SPF.databaseObjectName()),
+            SPF.optional(
+                SPF.clause(
+                    SPF.token("alter"),
+                    SPF.capture("childtype", SPF.databaseObjectTypeName()),
+                    SPF.capture("childname", SPF.databaseObjectName())
+                )
+            ),
+            SPF.token("rename"), SPF.token("to")
+        ).compile("PAT_ALTER_RENAME");
 
     //========== Public Methods ==========
 
@@ -240,32 +240,46 @@ public class SQLLexer extends SQLPatternFactory
         return null;
     }
 
-    // Naive filtering for stuff we haven't implemented yet.
-    // Hopefully this gets whittled away and eventually disappears.
-    public static boolean isPermitted(String sql)
+    /**
+     * Naive filtering for stuff we haven't implemented yet.
+     * Hopefully this gets whittled away and eventually disappears.
+     *
+     * @param sql  statement to check
+     * @return     rejection explanation string or null if accepted
+     */
+    public static String checkPermitted(String sql)
     {
+        /*
+         *  IMPORTANT: Black-lists are checked first because they know more about
+         * what they don't like about a statement and can provide a better message.
+         * It requires that black-lists patterns be very selective and that they
+         * don't mind seeing statements that wouldn't pass the white-lists.
+         */
+
+        //=== Check against blacklists, must not be rejected by any.
+
+        for (CheckedPattern cp : BLACKLISTS) {
+            CheckedPattern.Result result = cp.check(sql);
+            if (result.matcher != null) {
+                return String.format("%s, in statement: %s", result.explanation, sql);
+            }
+        }
+
+        //=== Check against whitelists, must be accepted by at least one.
+
         boolean hadWLMatch = false;
-        for (Pattern wl : PAT_WHITELISTS) {
-            Matcher wlMatcher = wl.matcher(sql);
-            if (wlMatcher.matches()) {
+        for (CheckedPattern cp : WHITELISTS) {
+            if (cp.matches(sql)) {
                 hadWLMatch = true;
+                break;
             }
         }
-
         if (!hadWLMatch) {
-            COMPILER_LOG.info("Statement: " + sql + " , failed to match any whitelist");
-            return false;
+            return String.format("AdHoc DDL contains an unsupported statement: %s", sql);
         }
 
-        for (Pattern bl : PAT_BLACKLISTS) {
-            Matcher blMatcher = bl.matcher(sql);
-            if (blMatcher.matches()) {
-                COMPILER_LOG.info("Statement: " + sql + " , failed blacklist: " + blMatcher.toString());
-                return false;
-            }
-        }
-
-        return hadWLMatch;
+        // The statement is permitted.
+        return null;
     }
 
     /**
@@ -428,93 +442,258 @@ public class SQLLexer extends SQLPatternFactory
     static
     {
         // Simplest possible SQL DDL token lexer
-        int supportedVerbCount = 0;
-        int unsupportedVerbCount = 0;
         String[] verbsAll = new String[VERB_TOKENS.length];
         for (int i = 0; i < VERB_TOKENS.length; ++i) {
             verbsAll[i] = VERB_TOKENS[i].token;
-            if (VERB_TOKENS[i].supported) {
-                supportedVerbCount++;
-            }
-            else {
-                unsupportedVerbCount++;
-            }
         }
         PAT_ANY_DDL_FIRST_TOKEN =
             SPF.statementLeader(
                 SPF.capture(SPF.tokenAlternatives(verbsAll)),
                 SPF.anyClause()
-            ).compile();
+            ).compile("PAT_ANY_DDL_FIRST_TOKEN");
 
-        // All handled (white-listed) patterns.
-        int renameableCount = 0;
-        String[] secondTokens = new String[OBJECT_TOKENS.length + MODIFIER_TOKENS.length];
-        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
-            secondTokens[i] = OBJECT_TOKENS[i].token;
-            if (OBJECT_TOKENS[i].renameable) {
-                renameableCount++;
-            }
-        }
-        // Modifier tokens are supported in the place of object tokens following
-        // a verb to allow the "verb modifier object" pattern like "CREATE UNIQUE INDEX".
-        // For simplicity, "CREATE UNIQUE" et. al. are considered sufficient evidence that
-        // the statement is a permitted white-listed DDL statement.
-        // We seem to be more concerned about accidentally permitting
-        // "CREATE <non-permitted-object> ..."
-        // than "CREATE UNIQUE <non-permitted-object> ...".
-        // Otherwise, we'd require the modifiers to be part of a nested
-        // "modifier object" subpattern.
-        for (int j = 0; j < MODIFIER_TOKENS.length; ++j) {
-            secondTokens[OBJECT_TOKENS.length + j] = MODIFIER_TOKENS[j];
-        }
-        String[] verbsSupported = new String[supportedVerbCount];
-        supportedVerbCount = 0;     // Reuse to build supported verb array.
-        for (int i = 0; i < VERB_TOKENS.length; ++i) {
-            if (VERB_TOKENS[i].supported) {
-                verbsSupported[supportedVerbCount++] = VERB_TOKENS[i].token;
-            }
-        }
-        Pattern patSupportedPreambles =
-            SPF.statementLeader(
-                SPF.clause(SPF.tokenAlternatives(verbsSupported), SPF.tokenAlternatives(secondTokens))
-            ).compile();
-        PAT_WHITELISTS = new Pattern[] {
-            patSupportedPreambles
+        // Whitelists for acceptable statement preambles.
+        WHITELISTS = new CheckedPattern[] {
+            new WhitelistSupportedPreamblePattern()
         };
 
-        // All rejected (black-listed) patterns, including unsupported statement preambles
-        // and ALTER...RENAME for tokens we do not accept yet
-        String[] verbsNotSupported = new String[unsupportedVerbCount];
-        unsupportedVerbCount = 0;   // Reuse to build unsupported verb array.
-        for (int i = 0; i < VERB_TOKENS.length; ++i) {
-            if (!VERB_TOKENS[i].supported) {
-                verbsNotSupported[unsupportedVerbCount++] = VERB_TOKENS[i].token;
-            }
-        }
-        String[] renameables = new String[renameableCount];
-        renameableCount = 0;    // Reused as index for assigning tokens
-        for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
-            if (OBJECT_TOKENS[i].renameable) {
-                renameables[renameableCount++] = OBJECT_TOKENS[i].token;
-            }
-        }
-        Pattern patUnsupportedPreambles =
-                SPF.statementLeader(
-                    SPF.capture(SPF.tokenAlternatives(verbsNotSupported))
-                ).compile();
-        PAT_BLACKLISTS = new Pattern[] {
-            patUnsupportedPreambles,
-            generateRenamePattern(renameables)
+        BLACKLISTS = new CheckedPattern[] {
+            new BlacklistUnsupportedPreamblePattern(),
+            new BlacklistRenamePattern()
         };
     }
 
     /** Remove c-style comments from a string aggressively */
-    private static String removeCStyleComments(String ddl) {
+    private static String removeCStyleComments(String ddl)
+    {
         // Avoid Apache commons StringUtils.join() to minimize client dependencies.
         StringBuilder sb = new StringBuilder();
         for (String part : PAT_STRIP_CSTYLE_COMMENTS.split(ddl)) {
             sb.append(part);
         }
         return sb.toString();
+    }
+
+    /**
+     * Find information about an object type token, if it's a known object type.
+     * @param objectTypeName  object type name to look up
+     * @return                object token information or null if it wasn't found
+     */
+    private static ObjectToken findObjectToken(String objectTypeName)
+    {
+        if (objectTypeName != null) {
+            for (ObjectToken ot : OBJECT_TOKENS) {
+                if (ot.token.equalsIgnoreCase(objectTypeName)) {
+                    return ot;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Abstract base for whitelists and blacklists
+     */
+    private static abstract class CheckedPattern
+    {
+        Pattern pattern;
+
+        CheckedPattern(Pattern pattern)
+        {
+            this.pattern = pattern;
+        }
+
+        static class Result
+        {
+            // non-null Matcher with groups() set if it matched
+            Matcher matcher = null;
+            // optional explanation, e.g. blacklist rejection message, or null if it didn't match
+            String explanation = null;
+        }
+
+        /**
+         * Check if statement matches.
+         * @param statement  statement to match against
+         * @return           result object with m
+         */
+        Result check(String statement)
+        {
+            Result result = new Result();
+            Matcher matcher = this.pattern.matcher(statement);
+            if (matcher.matches()) {
+                result.matcher = matcher;
+                result.explanation = this.explainMatch(matcher);
+            }
+            return result;
+        }
+
+        /**
+         * Simplified yes/no match check
+         * @param statement  statement to match against
+         * @return           true if it matches
+         */
+        boolean matches(String statement)
+        {
+            return this.check(statement).matcher != null;
+        }
+
+        // Override to provide an explanation, e.g. for blacklist rejection.
+        abstract String explainMatch(Matcher matcher);
+    }
+
+    /**
+     * Whitelist matcher for supported two token preambles.
+     *
+     * Provides no explanation.
+     */
+    private static class WhitelistSupportedPreamblePattern extends CheckedPattern
+    {
+        private static Pattern initPattern()
+        {
+            // All handled (white-listed) patterns.
+            String[] secondTokens = new String[OBJECT_TOKENS.length + MODIFIER_TOKENS.length];
+            for (int i = 0; i < OBJECT_TOKENS.length; ++i) {
+                secondTokens[i] = OBJECT_TOKENS[i].token;
+            }
+            // Modifier tokens are supported in the place of object tokens following
+            // a verb to allow the "verb modifier object" pattern like "CREATE UNIQUE INDEX".
+            // For simplicity, "CREATE UNIQUE" et. al. are considered sufficient evidence that
+            // the statement is a permitted white-listed DDL statement.
+            // We seem to be more concerned about accidentally permitting
+            // "CREATE <non-permitted-object> ..."
+            // than "CREATE UNIQUE <non-permitted-object> ...".
+            // Otherwise, we'd require the modifiers to be part of a nested
+            // "modifier object" subpattern.
+            for (int j = 0; j < MODIFIER_TOKENS.length; ++j) {
+                secondTokens[OBJECT_TOKENS.length + j] = MODIFIER_TOKENS[j];
+            }
+            int supportedVerbCount = 0;
+            for (int i = 0; i < VERB_TOKENS.length; ++i) {
+                if (VERB_TOKENS[i].supported) {
+                    supportedVerbCount++;
+                }
+            }
+            String[] verbsSupported = new String[supportedVerbCount];
+            supportedVerbCount = 0;     // Reuse to build supported verb array.
+            for (int i = 0; i < VERB_TOKENS.length; ++i) {
+                if (VERB_TOKENS[i].supported) {
+                    verbsSupported[supportedVerbCount++] = VERB_TOKENS[i].token;
+                }
+            }
+            Pattern whitelistPattern =
+                SPF.statementLeader(
+                    SPF.clause(
+                        SPF.tokenAlternatives(verbsSupported),
+                        SPF.tokenAlternatives(secondTokens)
+                    )
+                ).compile("PAT_WHITELISTS-PREAMBLES");
+            return whitelistPattern;
+        }
+
+        WhitelistSupportedPreamblePattern()
+        {
+            super(initPattern());
+        }
+
+        // Whitelist match provides no explanation.
+        @Override
+        String explainMatch(Matcher matcher)
+        {
+            return null;
+        }
+    }
+
+    /**
+     * Blacklists known unsupported statement preambles and explains rejections.
+     */
+    private static class BlacklistUnsupportedPreamblePattern extends CheckedPattern
+    {
+        private static Pattern initPattern()
+        {
+            int unsupportedVerbCount = 0;
+            for (int i = 0; i < VERB_TOKENS.length; ++i) {
+                if (!VERB_TOKENS[i].supported) {
+                    unsupportedVerbCount++;
+                }
+            }
+            String[] verbsNotSupported = new String[unsupportedVerbCount];
+            unsupportedVerbCount = 0;   // Reuse to build unsupported verb array.
+            for (int i = 0; i < VERB_TOKENS.length; ++i) {
+                if (!VERB_TOKENS[i].supported) {
+                    verbsNotSupported[unsupportedVerbCount++] = VERB_TOKENS[i].token;
+                }
+            }
+            Pattern blacklistPattern =
+                SPF.statementLeader(
+                    SPF.capture(SPF.tokenAlternatives(verbsNotSupported))
+                ).compile("PAT_BLACKLISTS-PREAMBLES");
+            return blacklistPattern;
+        }
+
+        BlacklistUnsupportedPreamblePattern()
+        {
+            super(initPattern());
+        }
+
+        /**
+         * Provide a match explanation, assuming it's a rejection.
+         */
+        @Override
+        String explainMatch(Matcher matcher)
+        {
+            return String.format("Statement is not supported: %s", matcher.group(1).toUpperCase());
+        }
+    }
+
+    /**
+     * Blacklists ALTER/RENAME and provides focused rejection explanations.
+     */
+    private static class BlacklistRenamePattern extends CheckedPattern
+    {
+        BlacklistRenamePattern()
+        {
+            super(PAT_ALTER_RENAME);
+        }
+
+        /**
+         * (Internal)
+         * See if there's something to say about a parent or child target object type.
+         * @param typeName   object type name to check
+         * @param isParent   true when a child object is available and this is the parent
+         * @return           explanation string or null when a child still needs checking
+         */
+        private static String getExplanation(String typeName, boolean isParent)
+        {
+            assert typeName != null;
+            ObjectToken token = findObjectToken(typeName);
+            if (token == null) {
+                return String.format("AdHoc DDL ALTER/RENAME refers to an unknown object type '%s'", typeName);
+            }
+            if (isParent) {
+                // The parent is okay, still need to check the child.
+                return null;
+            }
+            if (!token.renameable) {
+                return String.format("AdHoc DDL ALTER/RENAME is not supported for object type '%s'", typeName);
+            }
+            return "AdHoc DDL ALTER/RENAME is not yet supported";
+        }
+
+        /**
+         * Provide a match explanation, assuming it's a rejection.
+         */
+        @Override
+        String explainMatch(Matcher matcher)
+        {
+            String parentType = matcher.group("parenttype");
+            String childType = matcher.group("childtype");
+            // See if there's something to say about the parent object type.
+            String explanation = getExplanation(parentType, childType != null);
+            // If not see if there's something to say about the child type, when applicable.
+            if (explanation == null) {
+                explanation = getExplanation(childType, false);
+            }
+            return explanation;
+        }
     }
 }

@@ -79,6 +79,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
+            childStmt.m_paramsById.putAll(m_paramsById);
             childStmt.parseTablesAndParams(childSQL);
             if (first) {
                 first = false;

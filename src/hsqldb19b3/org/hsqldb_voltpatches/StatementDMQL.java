@@ -1278,7 +1278,11 @@ public abstract class StatementDMQL extends Statement {
             parameter.attributes.put("index", String.valueOf(index));
             ++index;
             parameter.attributes.put("id", expr.getUniqueId(session));
-            parameter.attributes.put("valuetype", paramType.getNameString());
+            if (paramType == org.hsqldb_voltpatches.types.NumberType.SQL_NUMERIC_DEFAULT_INT) {
+                parameter.attributes.put("valuetype", "BIGINT");
+            } else {
+                parameter.attributes.put("valuetype", paramType.getNameString());
+            }
             // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
             // that values passed to parameters such as the one in "col in ?" must be vectors.
             // So, it can just be forwarded as a boolean.

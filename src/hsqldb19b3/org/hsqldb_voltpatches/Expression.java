@@ -34,12 +34,16 @@ package org.hsqldb_voltpatches;
 // A VoltDB extension to transfer Expression structures to the VoltDB planner
 // We DO NOT reorganize imports in hsql code. And we try to keep these structured comments in place.
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.types.NumberType;
+import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
@@ -2426,7 +2430,15 @@ public class Expression implements Cloneable {
             }
 
             // Otherwise just string format the value.
-            exp.attributes.put("value", valueData.toString());
+            String valueString;
+            if (dataType instanceof NumberType && ! dataType.isIntegralType()) {
+                // remove the scentific exponent notation
+                valueString = new BigDecimal(valueData.toString()).toPlainString();
+            }
+            else {
+                valueString = valueData.toString();
+            }
+            exp.attributes.put("value", valueString);
             return exp;
 
         case OpTypes.COLUMN:
