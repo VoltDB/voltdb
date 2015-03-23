@@ -2467,29 +2467,23 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
             }
 
-            Statement stmt = null;
-            try {
-                stmt = tbl.getTuplelimitdeletestmt().iterator().next();
-            }
-            catch (NoSuchElementException nse) {
-            }
+            String stmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(tbl);
 
             if (expectedStmt == null) {
                 assertTrue("Did not expect to find a LIMIT DELETE statement, but found this one:\n"
-                        + (stmt != null ? stmt.getSqltext() : ""),
+                        + (stmt != null ? stmt : ""),
                         stmt == null);
             } else {
                 // Make sure we have the delete statement that we expected
                 assertTrue("Expected to find LIMIT DELETE statement, found none", stmt != null);
 
-                String sql = stmt.getSqltext();
-                if (sql.endsWith(";")) {
+                if (stmt.endsWith(";")) {
                     // We seem to add a semicolon somewhere.  I guess that's okay.
-                    sql = sql.substring(0, sql.length() - 1);
+                    stmt = stmt.substring(0, stmt.length() - 1);
                 }
 
                 assertEquals("Did not find the LIMIT DELETE statement that we expected",
-                        expectedStmt, sql);
+                        expectedStmt, stmt);
             }
         }
     }
