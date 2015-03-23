@@ -112,7 +112,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private boolean finished;
     }
 
-    static enum SNAPSHOT_TYPE {
+    public static enum SNAPSHOT_TYPE {
 
         STREAM(SnapshotFormat.STREAM),
         INDEX(SnapshotFormat.INDEX),
@@ -160,8 +160,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final int m_id;
         final SNAPSHOT_TYPE m_type;
 
-        final static Pattern REQUEST_ID_RE = Pattern
-                .compile("(?<type>STREAM|INDEX|FILE|CSV|LOG)_SR_(?<id>\\d+)");
+        public final static String REQUEST_ID_PATTERN_PREFIX =
+                "(?<type>STREAM|INDEX|FILE|CSV|LOG)_SR_(?<id>\\d+)";
+
+        public final static Pattern REQUEST_ID_RE = Pattern
+                .compile(REQUEST_ID_PATTERN_PREFIX);
 
         public RequestId(SNAPSHOT_TYPE type, int id) {
             Preconditions.checkArgument(type != null, "type is null");
