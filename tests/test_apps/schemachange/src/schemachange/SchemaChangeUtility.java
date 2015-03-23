@@ -50,6 +50,7 @@ public class SchemaChangeUtility
     static ClientResponse callROProcedureWithRetry(Client client, String procName, int timeout, Object... params) {
         long startTime = System.currentTimeMillis();
         long now = startTime;
+        int retry = 0;
 
         while (now - startTime < (timeout * 1000)) {
             ClientResponse cr = null;
@@ -100,14 +101,24 @@ public class SchemaChangeUtility
                     return cr; // caller should always check return status
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
-                    log.error(String.format("Error in procedure call for: %s", procName));
-                    log.error(((ClientResponseImpl)cr).toJSONString());
                     // for starters, I'm assuming these errors can't happen for reads in a sound system
-                    assert(false);
-                    System.exit(-1);
+                    String ss = cr.getStatusString();
+                    if (ss.contains("Statement: select count(*) from")) {
+                        // We might need to retry
+                        log.warn(ss);
+                        if ((ss.matches("(?s).*AdHoc transaction [0-9]+ wasn.t planned against the current catalog version.*") ||
+                                ss.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*")
+                            )) {
+                            log.info("retrying...");
+                        } else {
+                            log.error(String.format("Error in procedure call for: %s", procName));
+                            log.error(((ClientResponseImpl)cr).toJSONString());
+                            assert(false);
+                            System.exit(-1);
+                        }
+                    }
                 }
             }
-
             now = System.currentTimeMillis();
         }
 
