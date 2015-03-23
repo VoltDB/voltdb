@@ -41,10 +41,10 @@ class Cluster extends Module {
         savedirectory 				{ $("input", type:"text", name:"txtSnapshotDirectory", id:"txtSnapshotDirectory") }
         wanttosavecloseconfirm		{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
         wantotsaveclosebutton		{ $("body > div.popup_cont > div.popup_close") }
-        restorebutton				{ $("#restoreConfirmation") }
-        restoreconfirmation			{ $("#restoredPopup > div.overlay-title.icon-alert") }
-        restorecancelbutton			{ $("#btnRestoreCancel") }
-        restoreclosebutton			{ $("body > div.popup_cont > div.popup_close") }
+        restorebutton				{ $("#restoreConfirmation", text:"Restore") }
+        restoreconfirmation			{ $("#restoredPopup > div.overlay-title.icon-alert", text:"Restore") }
+        restorecancelbutton			{ $("#btnRestoreCancel", text:"Cancel") }
+        restoreclosebutton			{ $(class:"popup_close") }
         shutdownbutton				{ $("#shutDownConfirmation") }
         shutdownconfirmation		{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
         shutdowncancelbutton		{ $("#btnShutdownConfirmationCancel") }
