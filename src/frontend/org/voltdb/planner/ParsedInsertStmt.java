@@ -33,6 +33,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  *
@@ -220,9 +221,6 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      */
     public boolean targetTableHasLimitRowsTrigger() {
         assert(m_tableList.size() == 1);
-        CatalogMap<Statement> stmtMap = m_tableList.get(0).getTuplelimitdeletestmt();
-        if (stmtMap != null && stmtMap.size() > 0)
-            return true;
-        return false;
+        return CatalogUtil.getLimitPartitionRowsDeleteStmt(m_tableList.get(0)) != null;
     }
 }
