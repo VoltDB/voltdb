@@ -34,7 +34,7 @@ import vmcTest.pages.*
  * This class contains tests of the 'SQL Query' tab of the VoltDB Management
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
-class SqlQueriesTest extends TestBase {
+class SqlQueriesTest extends SqlQueriesTestBase {
 
     static final int DEFAULT_NUM_ROWS_TO_INSERT = 2
     static final boolean DEFAULT_INSERT_JSON = false
@@ -87,16 +87,11 @@ class SqlQueriesTest extends TestBase {
         // List of all 'genqa' tables should include the 'genqa' test tables
         GENQA_ALL_TABLES.addAll(GENQA_TEST_TABLES)
         // Move contents of the various files into memory
-        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file)) }
+        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false)) }
     }
 
     def setup() { // called before each test
-        // TestBase.setup gets called first (automatically)
-
-        when: 'click the SQL Query link (if needed)'
-        ensureOnSqlQueryPage()
-        then: 'should be on SQL Query page'
-        at SqlQueryPage
+        // SqlQueriesTestBase.setup gets called first (automatically)
 
         // Create tables from the 'genqa' app, needed for testing (e.g.
         // PARTITIONED_TABLE, REPLICATED_TABLE), if they don't already exist
@@ -122,11 +117,6 @@ class SqlQueriesTest extends TestBase {
                 runQuery(page, 'Drop table ' + GENQA_TEST_TABLES.get(i) + ';')
             }
         }
-    }
-
-    def ensureOnSqlQueryPage() {
-        ensureOnVoltDBManagementCenterPage()
-        page.openSqlQueryPage()
     }
 
     /**
@@ -213,61 +203,6 @@ class SqlQueriesTest extends TestBase {
             runningGenqa = getTables(sqp).containsAll(GENQA_ALL_TABLES)
         }
         return runningGenqa
-    }
-
-    /**
-     * Runs, on the specified SqlQueryPage, the specified query, and returns
-     * the result. (Also, if DEBUG is true, prints: the query, the result, an
-     * error message, if any, and the query duration.)
-     * @param sqp - the SqlQueryPage on which to run the query.
-     * @param query - the query to be run.
-     * @return the query result (as a Map of Lists of Strings).
-     */
-    def Map<String,List<String>> runQuery(SqlQueryPage sqp, String query) {
-        sqp.runQuery(query)
-        def qResult = sqp.getQueryResult()
-        def qResText = sqp.getQueryResultText()
-
-        if (qResText.contains("Connect to a datasource first")) {
-            debugPrint "\nQuery : " + query
-            debugPrint "Result Text: " + qResText
-            debugPrint "Result: " + qResult
-            debugPrint "Duration: " + sqp.getQueryDuration()
-            debugPrint "Error : " + sqp.getQueryError()
-            debugPrint "Reloading and trying again..."
-            driver.navigate().refresh()
-            if (!sqp.verifyAtSafely()) {
-                debugPrint "  Moving to VoltDBManagementCenterPage"
-                to VoltDBManagementCenterPage
-                page.loginIfNeeded()
-                debugPrint "  Opening SqlQueryPage"
-                page.openSqlQueryPage()
-            }
-            sqp.verifyAt()
-            sqp.runQuery(query)
-            qResult = sqp.getQueryResult()
-        }
-
-        // If 'sleepSeconds' property is set and greater than zero, sleep
-        int sleepSeconds = getIntSystemProperty("sleepSeconds", 0)
-        if (sleepSeconds > 0) {
-            try {
-                Thread.sleep(1000 * sleepSeconds)
-            } catch (InterruptedException e) {
-                println "\nIn SqlQueriesTest.runQuery, caught:\n  " + e.toString() + "\nSee standard error for stack trace."
-                e.printStackTrace()
-            }
-        }
-
-        debugPrint "\nQuery : " + query
-        debugPrint "Result: " + qResult
-        debugPrint "Duration: " + sqp.getQueryDuration()
-        def error = sqp.getQueryError()
-        if (error != null) {
-            debugPrint "Error : " + error
-        }
-
-        return qResult
     }
 
     /**
