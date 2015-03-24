@@ -1,3 +1,4 @@
+<pre>
 Automated Tests of the VMC (VoltDB Management Center), Using GEB
 ----------------------------------------------------------------
 
@@ -25,6 +26,8 @@ To run these tests of the VMC:
       voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html
    or, if you used Internet Explorer (IE):
       voltdb/tests/geb/vmc/build/reports/ieTest/tests/index.html
+   or, if you used PhantomJS and Ghost Driver:
+      voltdb/tests/geb/vmc/build/reports/phantomjsTest/tests/index.html
 5. Stop the backgrounded server ("voltadmin shutdown" or "kill %1" - or 
    "kill <whatever your actual background job number(s) may be>").
 
@@ -54,7 +57,7 @@ browsers). To do this:
       http://selenium.googlecode.com/git/java/CHANGELOG
 2. In the file voltdb/tests/geb/vmc/build.gradle, change the line:
       def seleniumVersion = "2.44.0"
-   to use the latest version (e.g. "2.45.2").
+   to use the latest version (e.g. "2.45.0").
 
 Note 1: If you want to run these tests on Chrome, using:
       ./gradlew chrome --rerun-tasks
@@ -73,7 +76,16 @@ Note 2: Similarly, if you want to run these tests on Internet Explorer (IE), on 
       https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw
    and you may want to turn off IE's auto-correct (spell checking).
 
-Note 3: If you want to run just one test class or method, you may do so using
+Note 3: If you want to run these tests "headless", without launching a browser,
+   so no GUI is needed (which is particularly useful on a Linux system without
+   X11), using PhantomJS and Ghost Driver:
+      ./gradlew phantomjs --rerun-tasks
+   (you may use 'phantomjs' or 'phantomjsTest'), then you will first need to
+   download PhantomJS, as described here:
+      http://phantomjs.org/download.html
+   (and make sure its bin directory is included in the system PATH).
+
+Note 4: If you want to run just one test class or method, you may do so using
    the --tests argument. For example, to run all of the tests in the
    NavigatePagesTest class (on Firefox), run:
       ./gradlew firefox --tests=*NavigatePages* --rerun-tasks
@@ -83,13 +95,13 @@ Note 3: If you want to run just one test class or method, you may do so using
    voltdb/tests/geb/vmc/src/resources/sqlQueries.txt, as follows:
       ./gradlew firefox --tests=*sqlQueries* --rerun-tasks
 
-Note 4: There are several system properties that can be specified on the
+Note 5: There are several system properties that can be specified on the
    command-line using '-P', as follows:
       ./gradlew -Purl=http://my.server.com:8080/ -PdebugPrint=true -PtimeoutSeconds=10 firefox --rerun-tasks
    Here is a description of all system properties currently available:
       NAME            DEFAULT  DESCRIPTION
       url             http://localhost:8080/  The URL for the VMC to be tested
-      debugPrint      false    Lots of debug output is produced (in the test result HTML pages)
+      debugPrint      false    If true, debug output is produced (in the test result HTML pages)
       timeoutSeconds  5        How long to wait for HTML elements to appear, before giving up
       windowWidth     1500     The width of the browser window
       windowHeight    1000     The height of the browser window
@@ -98,7 +110,7 @@ Note 4: There are several system properties that can be specified on the
       numRowsToInsert 3        How many rows to insert, in each Table
       testTables      PARTITIONED_TABLE,REPLICATED_TABLE  Which Tables to test (or ALL)
       testViews       null     Which Views (if any) to test (or ALL)
-      insertJson      false    
+      insertJson      false    If true, VARCHAR values will be inserted as JSON data
       sleepSeconds    0        Can slow down the tests, to watch what they are doing
    If you are running the 'genqa' test app, then PARTITIONED_TABLE and
    REPLICATED_TABLE are already defined; but if not, they will be created by
@@ -108,16 +120,17 @@ Note 4: There are several system properties that can be specified on the
       voltdb/tests/geb/vmc/src/resources/GebConfig.groovy (timeoutSeconds only)
    So for more info, see there, or the code (especially SqlQueriesTest).
 
-Note 5: If you want to run these tests regularly on your machine, you may want
+Note 6: If you want to run these tests regularly on your machine, you may want
    to set your Firefox Preferences (under Advanced, Update) to something other
    than "Automatically install updates" ("Check for updates, but let me choose
    whether to install them" is a good choice), so that your version of Firefox
    does not get ahead of what Selenium can handle.
 
-Note 6: Running the tests against Safari does not currently work; no other
-   browsers (besides Firefox, Chrome and Internet Explorer) are currently
-   supported. (The browser drivers are specified in
-   voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy.)
-
-Note 7: For now, these tests must be run in a graphical environment, where the
-   browser can be launched, though we hope to add a "headless" option eventually.
+Note 7: Running the tests against Safari does not currently work, nor does
+   running "headless" with HtmlUnit; the browsers currently supported are:
+   Firefox, Chrome, Internet Explorer; or you can run "headless", without a
+   browser, using and PhantomJS and Ghost Driver. The browser drivers are
+   specified in:
+      voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy
+   See also voltdb/tests/geb/vmc/build.gradle.
+</pre>
