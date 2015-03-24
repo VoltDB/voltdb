@@ -164,7 +164,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         StreamSnapshotRequestConfig.Stream stream =
             new StreamSnapshotRequestConfig.Stream(sourceToDests, null);
         StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), false);
+            new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), null);
         return makeSnapshotRequest(config);
     }
 

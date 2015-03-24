@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -105,16 +106,20 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
          */
         final int newPartitionCount = partitionsToAdd.isEmpty() ? context.getNumberOfPartitions() : Collections.max(partitionsToAdd) + 1;
         Callable<Boolean> deferredSetup = null;
-        // Coalesce a truncation snapshot if shouldTruncate is true
-        if (config.shouldTruncate) {
-            deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
-                                           remoteDCLastIds,
-                                           jsData, context, result,
-                                           exportSequenceNumbers,
-                                           drTupleStreamInfo,tracker,
-                                           hashinatorData,
-                                           timestamp,
-                                           newPartitionCount);
+        // Coalesce a truncation snapshot if there is an embedded truncation config
+        if (config.truncationConfig != null) {
+            try {
+                deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
+                                               remoteDCLastIds,
+                                               new JSONObject(config.truncationConfig), context, result,
+                                               exportSequenceNumbers,
+                                               drTupleStreamInfo,tracker,
+                                               hashinatorData,
+                                               timestamp,
+                                               newPartitionCount);
+            } catch (JSONException e) {
+                SNAP_LOG.error("Unable to parse coalesced truncation snapshot config: " + config.truncationConfig);
+            }
         }
 
         // Create post snapshot update hashinator work
