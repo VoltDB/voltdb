@@ -1231,6 +1231,54 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
+    public void testAddDRTableColumn() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A ADD COLUMN C3 INTEGER;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testRemoveDRTableColumn() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A DROP COLUMN C2;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testModifyDRTableColumn() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 INTEGER;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
     public void testConnectorPropertiesChanges() throws Exception {
         if (!MiscUtils.isPro()) { return; } // not supported in community
 

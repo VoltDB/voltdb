@@ -388,6 +388,9 @@ public class CatalogDiffEngine {
         else if (suspect instanceof Connector) {
             if (ChangeType.ADDITION == changeType) {
                 for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
+                    if (cti.getTable().getIsdred()) {
+                        return "May not export a DR table";
+                    }
                     trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
                 }
             }
@@ -436,6 +439,9 @@ public class CatalogDiffEngine {
             }
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return "May not dynamically add, drop, or rename export table columns.";
+            }
+            if (table.getIsdred()) {
+                return "May not dynamically add, drop, or rename DR table columns.";
             }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
@@ -547,6 +553,9 @@ public class CatalogDiffEngine {
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return null;
             }
+            if (table.getIsdred()) {
+                return null;
+            }
             retval[0] = parent.getTypeName();
             retval[1] = String.format(
                     "Unable to add NOT NULL column %s because table %s is not empty and no default value was specified.",
@@ -644,19 +653,10 @@ public class CatalogDiffEngine {
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
 
-        if (suspect instanceof Cluster && field.equals("drClusterId") ||
-                suspect instanceof Cluster && field.equals("drProducerPort")) {
+        if (suspect instanceof Cluster && field.equals("drProducerPort")) {
             // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
             if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
                 restrictionQualifier = " while DR is enabled";
-            }
-            else {
-                return null;
-            }
-        }
-        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
-            if ((Boolean)suspect.getField("drProducerEnabled")) {
-                restrictionQualifier = " active-active and daisy-chained DR unsupported";
             }
             else {
                 return null;
@@ -692,6 +692,9 @@ public class CatalogDiffEngine {
             Table table = (Table) parent;
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return "May not dynamically change the columns of export tables.";
+            }
+            if (table.getIsdred()) {
+                return "May not dynamically modify DR table columns.";
             }
 
             if (field.equals("index")) {
@@ -862,6 +865,9 @@ public class CatalogDiffEngine {
 
             // for now, no changes to export tables
             if (CatalogUtil.isTableExportOnly(db, table)) {
+                return null;
+            }
+            if (table.getIsdred()) {
                 return null;
             }
 

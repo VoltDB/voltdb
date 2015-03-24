@@ -478,6 +478,27 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
+    public void testExportDRTable() {
+        File jarOut = new File("exportDrTables.jar");
+        jarOut.deleteOnExit();
+
+        VoltCompiler compiler = new VoltCompiler();
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(
+        "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+        "DR TABLE T;\n" +
+        "EXPORT TABLE T;");
+        String schemaPath = schemaFile.getPath();
+
+        try {
+            assertFalse(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+
+        // cleanup after the test
+        jarOut.delete();
+    }
+
     public void testNullAnnotation() throws IOException {
 
         Catalog catalog  = new TPCCProjectBuilder().createTPCCSchemaCatalog();

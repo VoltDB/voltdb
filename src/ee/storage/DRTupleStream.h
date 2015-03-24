@@ -72,8 +72,8 @@ public:
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
-    void endTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    size_t beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    size_t endTransaction(int64_t sequenceNumber, int64_t uniqueId);
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn);
 
