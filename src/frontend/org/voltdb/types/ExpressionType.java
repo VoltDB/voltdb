@@ -189,38 +189,4 @@ public enum ExpressionType {
     public String symbol() {
         return m_symbol;
     }
-
-    /**
-     * A map to keep association between a query expression (QE) type and a partial index predicate expression (IE) types
-     * that this expression can cover. During the index selection step, the partial index can be selected only if
-     * its predicate is covered by the QE. For example, a partial index predicate "WHERE COL > 0" is covered
-     * by the query expressions "COL > 0" or  "COL = 3"
-     * Keys are the query expression types
-     * Values are the partial index expression types that can be covered by the query expression type
-    */
-    private final static Map<ExpressionType, ExpressionType[]> PARTIAL_INDEX_COMPARATOR_MAP =
-            new HashMap<ExpressionType, ExpressionType[]>();
-
-    static {
-        // PARTIAL_INDEX_COMPARATOR_MAP initialization block.
-        // Uncomment the other types when non-exact match will be allowed
-        // IN comparison ?
-        PARTIAL_INDEX_COMPARATOR_MAP.put(COMPARE_EQUAL,
-                new ExpressionType[]{COMPARE_EQUAL /*, COMPARE_NOTEQUAL, COMPARE_LESSTHAN, COMPARE_GREATERTHAN,
-                COMPARE_LESSTHANOREQUALTO, COMPARE_GREATERTHANOREQUALTO, COMPARE_LIKE */});
-        PARTIAL_INDEX_COMPARATOR_MAP.put(COMPARE_NOTEQUAL, new ExpressionType[]{COMPARE_NOTEQUAL});
-        PARTIAL_INDEX_COMPARATOR_MAP.put(COMPARE_LESSTHAN,
-                new ExpressionType[]{COMPARE_LESSTHAN /*, COMPARE_LESSTHANOREQUALTO*/});
-        PARTIAL_INDEX_COMPARATOR_MAP.put(COMPARE_GREATERTHAN,
-                new ExpressionType[]{COMPARE_GREATERTHAN /*, COMPARE_GREATERTHANOREQUALTO*/});
-        PARTIAL_INDEX_COMPARATOR_MAP.put(COMPARE_LESSTHANOREQUALTO,
-                new ExpressionType[]{/*COMPARE_LESSTHAN, */COMPARE_LESSTHANOREQUALTO});
-        PARTIAL_INDEX_COMPARATOR_MAP.put(COMPARE_GREATERTHANOREQUALTO,
-                new ExpressionType[]{/*COMPARE_GREATERTHAN, */COMPARE_GREATERTHANOREQUALTO});
-        PARTIAL_INDEX_COMPARATOR_MAP.put(COMPARE_LIKE, new ExpressionType[]{COMPARE_LIKE});
-    }
-
-    public static ExpressionType[] getCoveringPartialIndexComparators(ExpressionType type) {
-        return PARTIAL_INDEX_COMPARATOR_MAP.get(type);
-    }
 }
