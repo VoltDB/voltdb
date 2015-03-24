@@ -44,7 +44,7 @@ class SchemaPageSchemaTab extends SchemaPage {
 
         viewDdlSource		{ $("#ddlSource") }
 
-        searchName			{ $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap thead tr.tablesorter-filter-row.hideme td input.tablesorter-filter", 0) }
+        searchName			{ $(class:"tablesorter-filter", 0) }
 
         test			{ $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap tbody") }
 
@@ -59,6 +59,10 @@ class SchemaPageSchemaTab extends SchemaPage {
         expandedcheck	{$("#s > div > div.dataBlockContent > div")}
         documentationLink { $("#iconDoc") }
         generatedbytxt	{$("#catalogContainer > div.documentation > span")}
+        expandedlist    { $(class:"togglex")}
+        expandedlistbox { $(class:"invert")}
+        expandedlist1   { $(class:"togglex",1)}
+        expandedlist2   { $(class:"togglex",2)}
 
 
         header          	{ module Header }

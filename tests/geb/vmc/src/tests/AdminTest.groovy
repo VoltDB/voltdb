@@ -1226,15 +1226,13 @@ class AdminTest extends TestBase {
     }
 
     def "header username check" () {
-        def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
-
         when:
         at AdminPage
+        String username = page.getUsername()
         then:
         waitFor(30) {
             header.username.isDisplayed()
-            header.username.text().equals($line)
+            header.username.text().equals(username)
         }
     }
 
@@ -1351,7 +1349,7 @@ class AdminTest extends TestBase {
 
         page.downloadconfigurationbutton.text().toLowerCase().equals("Download Configuration".toLowerCase())
         println("download configuration button text has verified,\n click cannot be performed in firefox")
-        //assert withConfirm(true) { page.downloadconfigurationbutton.click() }
+         //page.downloadconfigurationbutton.click()
 
 
 
@@ -1389,7 +1387,7 @@ class AdminTest extends TestBase {
 
     }
 
-    def "check pause ok and resume ok"(){
+    def "check pause and verify resume too"(){
         when:
         at AdminPage
         waitFor(5) { cluster.pausebutton.isDisplayed() }
@@ -1407,7 +1405,9 @@ class AdminTest extends TestBase {
         println("resume for ok has been clicked")
     }
 
-    def "when save for cancel"(){
+
+
+    def "when save and cancel popup"(){
         when:
         at AdminPage
         waitFor(5) { cluster.savebutton.isDisplayed() }
@@ -1418,10 +1418,9 @@ class AdminTest extends TestBase {
         cluster.savecancel.click()
     }
 
-    def "when save for yes"(){
-        def $line
-        new File("src/resources/snapshotpath.txt").withReader 			{ $line = it.readLine() }
 
+    def "when save in empty path"(){
+        String emptyPath = page.getEmptyPath()
         when:
 
         at AdminPage
@@ -1429,18 +1428,39 @@ class AdminTest extends TestBase {
         cluster.savebutton.click()
         then:
         waitFor(15) { cluster.saveconfirmation.isDisplayed() }
-        cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
-        cluster.savedirectory.value($line)
+        cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase())
+        cluster.savedirectory.value(emptyPath)
         cluster.saveok.click()
-        println("success in local for yes")
+        cluster.saveerrormsg.isDisplayed()
+        cluster.saveerrormsg.text().toLowerCase().equals("Please enter a valid directory path.".toLowerCase())
+        println("error message verified")
 
-        // cluster.saveyes.click()
-        // failsavedok.click()
+
     }
 
-    def "when save for No"(){
-        def $line
-        new File("src/resources/snapshotpath.txt").withReader 			{ $line = it.readLine() }
+    def "when save for invalid path"(){
+        String invalidPath = page.getInvalidPath()
+
+        when:
+
+        at AdminPage
+        waitFor(15) { cluster.savebutton.isDisplayed() }
+        cluster.savebutton.click()
+        then:
+        waitFor(15) { cluster.saveconfirmation.isDisplayed() }
+        cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
+        cluster.savedirectory.value(invalidPath)
+        cluster.saveok.click()
+        waitFor(10){cluster.failedsaveok.isDisplayed()}
+        cluster.failedsaveok.click()
+        println("error location for saving verified")
+
+
+    }
+
+
+    def "when save succeeded"(){
+        String validPath = page.getValidPath()
 
         when:
         at AdminPage
@@ -1449,56 +1469,158 @@ class AdminTest extends TestBase {
         then:
         waitFor(15) { cluster.saveconfirmation.isDisplayed() }
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
-        cluster.savedirectory.value($line)
-        waitFor(5){cluster.savecancel.isDisplayed()}
-        cluster.savecancel.click()
+        cluster.savedirectory.value(validPath)
+        cluster.saveok.click()
+        waitFor(15){cluster.savesuccessok.isDisplayed()}
+        cluster.savesuccessok.click()
+        println("save succeeded and clicked!!")
     }
 
 
 
-    def "when restore and cancel"(){
-        def $line
-        new File("src/resources/snapshotpath.txt").withReader 			{ $line = it.readLine() }
-
+    def "when restore button clicked and cancel popup"(){
+        String validPath = page.getValidPath()
         when:
         at AdminPage
         waitFor(20) {   cluster.restorebutton.isDisplayed()
-                        cluster.restorestatus.isDisplayed()
-                        cluster.restorebutton.click()
+            cluster.restorestatus.isDisplayed()
+            cluster.restorebutton.click()
         }
 
         println("restore button clicked")
 
         then:
-         waitFor(7) {   cluster.restoreconfirmation.isDisplayed() }
-                        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
-        cluster.restoredirectory.value($line)
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase());
+        cluster.restoredirectory.value(validPath)
         cluster.restoresearch.click()
         waitFor(5){cluster.restorecancelbutton.isDisplayed()}
         cluster.restorecancelbutton.click()
     }
 
 
-
-    def "when restore and close"(){
+    def "when restore button clicked and close popup"(){
         when:
         at AdminPage
-        waitFor(7) {    cluster.restorebutton.isDisplayed()
-                        cluster.restorestatus.isDisplayed()
-                        cluster.restorebutton.click()
+        waitFor(7) { cluster.restorebutton.isDisplayed()
+            cluster.restorestatus.isDisplayed()
+            cluster.restorebutton.click()
         }
 
         println("restore clicked")
 
         then:
-          waitFor(7) {  cluster.restoreconfirmation.isDisplayed() }
-                        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
-                        cluster.restoreclosebutton.click()
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
+        cluster.restoreclosebutton.click()
+
+    }
+
+    def "when restore clicked and search failed"(){
+        String invalidPath = page.getInvalidPath()
+        when:
+        at AdminPage
+        waitFor(7) { cluster.restorebutton.isDisplayed()
+            cluster.restorestatus.isDisplayed()
+            cluster.restorebutton.click()
+        }
+
+        println("restore clicked")
+
+        then:
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
+
+        // FOR UAT TESTING ENABLE BELOW CODE
+        //    waitFor(10){cluster.restoresearch.isDisplayed()
+        //    cluster.restoredirectory.isDisplayed()}
+        //     cluster.restoredirectory.value(invalidPath)
+        //      cluster.restoresearch.click()
+        //   if(waitFor(10){cluster.restoreerrormsg.isDisplayed()}){
+        //       cluster.restoreerrormsg.text().toLowerCase().equals("Error: Failure getting snapshots.Path is not a directory".toLowerCase())
+        //      println("error message for restore search verified!!")}
+
+    }
+
+    def "when search button clicked in empty path of Restore"(){
+        String emptyPath = page.getEmptyPath()
+        when:
+        waitFor(7) { cluster.restorebutton.isDisplayed()
+            cluster.restorestatus.isDisplayed()
+            cluster.restorebutton.click()
+        }
+        then:
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
+        // FOR UAT TESTING ENABLE BELOW CODE
+        //       waitFor(10){cluster.restoresearch.isDisplayed()
+        //       cluster.restoredirectory.isDisplayed()}
+        //       cluster.restoredirectory.value(emptyPath)
+        //      cluster.restoresearch.click()
+        //      if(waitFor(10){cluster.emptysearchrestore.isDisplayed()}){
+        //          cluster.emptysearchrestore.text().toLowerCase().equals("Please enter a valid directory path.".toLowerCase())
+        //      println("error message for empty restore search verified!!")}
+    }
+
+    def "when restore clicked and verify restore popup for No"(){
+
+
+        when:
+        at AdminPage
+        waitFor(7) { cluster.restorebutton.isDisplayed()
+            cluster.restorestatus.isDisplayed()
+            cluster.restorebutton.click()
+        }
+
+        println("restore clicked")
+
+        then:
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
+
+        // FOR UAT TESTING ENABLE BELOW CODE
+        //   waitFor(10){cluster.buttonrestore.isDisplayed()}
+        //  cluster.buttonrestore.click()
+        //  waitFor(10){cluster.restorepopupno.isDisplayed()
+        //               cluster.restorepopupyes.isDisplayed()}
+        //  cluster.restorepopupno.click()
+        //  println("No clicked for restore popup")
+        // waitFor(10){cluster.restorecancelbutton.isDisplayed()}
+        // cluster.restorecancelbutton.click()
+
+    }
+
+    def "when restore clicked and verify restore popup for Yes"(){
+
+
+        when:
+        at AdminPage
+        waitFor(7) { cluster.restorebutton.isDisplayed()
+            cluster.restorestatus.isDisplayed()
+            cluster.restorebutton.click()
+        }
+
+        println("restore clicked")
+
+        then:
+        waitFor(7) { cluster.restoreconfirmation.isDisplayed() }
+        cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
+
+        // FOR UAT TESTING ENABLE BELOW CODE
+        //  waitFor(10){cluster.buttonrestore.isDisplayed()}
+        //  cluster.buttonrestore.click()
+        //  waitFor(10){cluster.restorepopupno.isDisplayed()
+        //             cluster.restorepopupyes.isDisplayed()}
+        //  cluster.restorepopupyes.click()
+        //  println("Yes clicked for restore popup")
+        //  waitFor(10){cluster.savesuccessok.isDisplayed()}
+        //  cluster.savesuccessok.click()
+        // println("ok clicked and message displayed after restoring")
 
     }
 
 
-    def "when shutdown cancel button"(){
+    def "when shutdown and cancel popup"(){
         when:
         at AdminPage
         waitFor(30) { cluster.shutdownbutton.isDisplayed() }
@@ -1509,7 +1631,7 @@ class AdminTest extends TestBase {
         cluster.shutdowncancelbutton.click()
     }
 
-    def "when shutdown close button"(){
+    def "when shutdown and close popup"(){
         when:
         at AdminPage
         waitFor(30) { cluster.shutdownbutton.isDisplayed() }
@@ -1520,37 +1642,19 @@ class AdminTest extends TestBase {
         cluster.shutdownclosebutton.click()
     }
 
-
-
-
-    //server test
+//server name list test
 
     def "when server is clicked and check server name list and stop cancel"() {
 
-        def $namelist1
-        def $namelist2
-        def $namelist3
-        def $namelist4
-        def $lineunused, $lineunused1
-        // new File("src/resources/serversearch.txt").withReader {
-        //  $lineunused = it.readLine()
-        //  $lineunused1 = it.readLine()
-        //  $namelist1 = it.readLine()
-        // $namelist2 = it.readLine()
-        //  $namelist3 = it.readLine()
-        //  $namelist4 = it.readLine()
-        // }
         when: 'clicked server button'
         at AdminPage
         page.serverbutton.isDisplayed()
         page.serverbutton.click()
-        //if($namelist1 ==  page.servernamelist1.text()){println(page.servernamelist1.text())
-        // if($namelist2 ==  page.servernamelist2.text()){println(page.servernamelist2.text())}
-        // if($namelist3 ==  page.servernamelist3.text()){println(page.servernamelist3.text())}}
 
-        if (waitFor(10) { page.servername.isDisplayed() }) {
+        if (waitFor(10) { page.mainservername.isDisplayed() && page.servername.isDisplayed() }) {
 
-            println("server name is displayed as: " + page.servername.text())
+            println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", " "))
+            println("currently running server is : "+ page.servername.text())
         }
 
 
@@ -1559,19 +1663,15 @@ class AdminTest extends TestBase {
             println("server stop button  displayed for disable mode")
         }
 
-        /* if (waitFor(5) { !page.serverstopbtnenable.isDisplayed() || page.serverstopbtndisable.isDisplayed() }) {
-             println("since, stop button is disable so cannot proceed to stop popup!")
-         }*/
-        else if( waitFor(5) { page.serverstopbtnenable.isDisplayed() && page.serverstopbtndisable.isDisplayed() }){
-            println("server stop button clicked for  enable mode")
-            page.serverstopbtnenable.click()
-            waitFor(5) { page.serverstopcancel.isDisplayed() }
-            page.serverstopok.isDisplayed()
-            page.serverstopcancel.click()
-            println("server cancel button clicked")
-        }
- }
-
+        //   enable below code FOR UAT TESTING
+        //     if( waitFor(5) { page.serverstopbtnenable.isDisplayed() }){
+        //    println("server stop button clicked for  enable mode")
+        //    page.serverstopbtnenable.click()
+        //   waitFor(5) { page.serverstopcancel.isDisplayed() }
+        //   page.serverstopok.isDisplayed()
+        //   page.serverstopcancel.click()
+        //    println("server cancel button clicked")}
+    }
 
     // Overview Expansion
 	

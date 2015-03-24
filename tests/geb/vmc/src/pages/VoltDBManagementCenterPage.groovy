@@ -377,7 +377,10 @@ class VoltDBManagementCenterPage extends Page {
         }
     }
 
-    def void loginValid(username = "admin", password = "voltdb") {
+    String user = getUsername()
+    String pass = getPassword()
+
+    def void loginValid(username = user, password = pass) {
         usernameInput = username
         passwordInput = password
         loginButton.click()
@@ -399,6 +402,30 @@ class VoltDBManagementCenterPage extends Page {
         loginButton.click()
 		waitFor() { !loginDialog.displayed }
    
+    }
+
+    def String getUsername() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/users.txt"))
+        String username
+
+        while((username = br.readLine()) != "#username") {
+        }
+
+        username = br.readLine()
+
+        return username
+    }
+
+    def String getPassword() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/users.txt"))
+        String password
+
+        while((password = br.readLine()) != "#password") {
+        }
+
+        password = br.readLine()
+
+        return password
     }
 
 }

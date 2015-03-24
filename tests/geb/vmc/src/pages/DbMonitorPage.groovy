@@ -171,8 +171,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     static at = {
         dbMonitorTab.displayed
         dbMonitorTab.attr('class') == 'active'
-        showHideGraph.displayed
-        showHideData.displayed
+       // showHideGraph.displayed
+       // showHideData.displayed
     }
 
     /**

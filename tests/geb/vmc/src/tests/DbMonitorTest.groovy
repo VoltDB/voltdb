@@ -228,15 +228,15 @@ class DbMonitorTest extends TestBase {
     }
 
     def "header username check" () {
-        def $line
-        new File("src/pages/users.txt").withReader { $line = it.readLine() }
+
 
         when:
         at DbMonitorPage
+        String username = page.getUsername()
         then:
         waitFor(30) {
             header.username.isDisplayed()
-            header.username.text().equals($line)
+            header.username.text().equals(username)
         }
     }
 

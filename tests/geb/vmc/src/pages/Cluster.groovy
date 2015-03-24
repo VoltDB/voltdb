@@ -11,7 +11,7 @@ import geb.waiting.WaitTimeoutException
 import org.openqa.selenium.JavascriptExecutor
 
 /**
- * Created by anrai on 2/16/15.
+ * Created by lavthaiba on 2/16/15.
  */
 
 class Cluster extends Module {
@@ -35,9 +35,17 @@ class Cluster extends Module {
         saveclose					{ $("body > div.popup_cont > div.popup_close") }
         savecancel					{ $("#btnSaveSnapshotCancel") }
         saveok						{ $("#btnSaveSnapshots") }
-		// $("#txtSnapshotDirectory")
+        savesuccessok               { $("#btnSaveSnapshotStatus", text:"Ok")}
+        saveerrormsg                { $("#errorSnapshotDirectoryPath")}
+
+        emptysearchrestore          {$("#errorSearchSnapshotDirectory")}
+        restorefinalclosepopup      {("body > div.popup_cont.\\34 > div.popup_close")}
+        buttonrestore               {$("#btnRestore", text:"Restore")}
+        restorepopupno              {$("#divConfirm > a.btn.btn-gray.confirmNoRestore", text:"No")}
+        restorepopupyes             {$("#btnRestoreSnapshotOk", text:"Yes")}
         restorestatus               {$(class:"restore")}
         restoredirectory			{$("#txtSearchSnapshots")}
+        restoreerrormsg             {$("#tblSearchList > tbody > tr:nth-child(2) > td")}
         restoresearch				{$("#btnSearchSnapshots")}
         savedirectory 				{ $("input", type:"text", name:"txtSnapshotDirectory", id:"txtSnapshotDirectory") }
         wanttosavecloseconfirm		{ $("body > div.popup_cont > div.popup > div > div.overlay-title.icon-alert") }
@@ -52,7 +60,8 @@ class Cluster extends Module {
         shutdownclosebutton			{ $("body > div.popup_cont > div.popup_close") }
         saveno                      {$("body > div.popup_cont > div.popup > div > div.saveConfirmation > div.overlay-btns > a.btn.btn-gray.confirmNoSave")}
         saveyes                     {$("body > div.popup_cont > div.popup > div > div.saveConfirmation > div.overlay-btns > a.btn.closeBtn")}
-      //  downloadconfigurationbutton	{ $("#downloadAdminConfigurations") }
+        failedsaveok                { $("#btnSaveSnapshotStatus", text:"Ok")}
+        downloadconfigurationbutton	{ $("#downloadAdminConfigurations") }
 
     }
 

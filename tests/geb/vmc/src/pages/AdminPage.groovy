@@ -8,109 +8,104 @@ import geb.navigator.Navigator
 
 class AdminPage extends VoltDBManagementCenterPage {
     static content = {
-        cluster             { $('#admin > div.adminWrapper') }
-        overview            { $('#admin > div.adminContainer > div.adminContentLeft') }
-        networkInterfaces   { $('#admin > div.adminContainer > div.adminContentRight > div.adminPorts') }
-        directories         { $('#admin > div.adminContainer > div.adminContentRight > div.adminDirectories') }
-        networkInterfaces   { module NetworkInterfaces }
-        directories		 	{ module Directories }
-        overview			{ module Overview }
-        cluster				{ module Cluster }
-        header              { module Header }
-        footer              { module Footer }
-        server              { module voltDBclusterserver}
-        downloadbtn         { module downloadconfigbtn}
-        schema              { module schemaTab}
+        cluster                     { $('#admin > div.adminWrapper') }
+        overview                    { $('#admin > div.adminContainer > div.adminContentLeft') }
+        networkInterfaces           { $('#admin > div.adminContainer > div.adminContentRight > div.adminPorts') }
+        directories                 { $('#admin > div.adminContainer > div.adminContentRight > div.adminDirectories') }
+        networkInterfaces           { module NetworkInterfaces }
+        directories		 	        { module Directories }
+        overview			        { module Overview }
+        cluster				        { module Cluster }
+        header                      { module Header }
+        footer                      { module Footer }
+        server                      { module voltDBclusterserver}
+        downloadbtn                 { module downloadconfigbtn}
+        schema                      { module schemaTab}
 
-        serverbutton				    { $("#serverName") }
-        serverconfirmation			    { $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
-        deeerwalkservercancelbutton 	{ $("#StopConfirmCancel") }
-        deerwalkserverstopok        	{ $("#StopConfirmOK") }
-        servernamelist			{$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
-        servername			{$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
-        mainservername			{$("#serverListWrapperAdmin > table > tbody")}
-        serverstopbuttonmain		{$("#stopServer_voltdbserver", text:"Stop")}
+        serverbutton				{ $("#serverName") }
+        serverconfirmation			{ $("#serverConfigAdmin > div > div.slide-pop-title > div.icon-server.searchLeft.searchLeftAdmin") }
 
-        serverresumebuttonmain		{$("#stopServer_voltdbserver", text:"Resume")}
+
+        servernamelist			    {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
+        servername			        {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
+        mainservername			    {$("#serverListWrapperAdmin")}
+
+        serverresumebuttonmain		{$(class:"shutdown", text:"Resume")}
         serverstopbtndisable   		{$(class:"disableServer", text:"Stop") }
         serverstopbtnenable			{$(class:"shutdown", text:"Stop")}
 
-
-
-        //servernamelist			    {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
         servername			        {$("#serverListWrapperAdmin > table > tbody > tr > td.configLabel > a")}
         serverstopbuttonmain		{$("#stopServer_voltdbserver", text:"Stop")}
 
-        servernamelist1			{$("#serverListWrapperAdmin > table > tbody > tr.activeHostMonitoring > td.configLabel > a")}
-        servernamelist2			{$("#serverListWrapperAdmin > table > tbody > tr:nth-child(2) > td.configLabel > a")}
-        servernamelist3			{$("#serverListWrapperAdmin > table > tbody > tr:nth-child(3) > td.configLabel > a")}
+        servernamelist1			    {$("#serverListWrapperAdmin > table > tbody > tr.activeHostMonitoring > td.configLabel > a")}
+        servernamelist2			    {$("#serverListWrapperAdmin > table > tbody > tr:nth-child(2) > td.configLabel > a")}
+        servernamelist3			    {$("#serverListWrapperAdmin > table > tbody > tr:nth-child(3) > td.configLabel > a")}
 
-        serverstopbtn1   		{$("#stopServer_deerwalk3", class:"disableServer", text:"Stop") }
-        serverstopbtn2			{$("#stopServer_deerwalk2", text:"Stop")}
-        serverstopbtn3			{$("#stopServer_deerwalk4", text:"Stop")}
-        serverstopcancel		{$("#StopConfirmCancel",    text:"Cancel")}
-        serverstopok			{$("#StopConfirmOK",        text:"Ok")}
-        serverstoppopup  		{$("body > div.popup_content34", class:"popup")}
-
+        serverstopbtn1   		    {$("#stopServer_deerwalk3", class:"disableServer", text:"Stop") }
+        serverstopbtn2			    {$("#stopServer_deerwalk2", text:"Stop")}
+        serverstopbtn3			    {$("#stopServer_deerwalk4", text:"Stop")}
+        serverstopcancel		    {$("#StopConfirmCancel",    text:"Cancel")}
+        serverstopok			    {$("#StopConfirmOK",        text:"Ok")}
+        serverstoppopup  		    {$("body > div.popup_content34", class:"popup")}
         downloadconfigurationbutton	{ $("#downloadAdminConfigurations") }
         //DBmonitor part for server
-        dbmonitorbutton{$("#navDbmonitor > a")}
-        clusterserverbutton{$("#btnPopServerList")}
-        servernamefourthbtn{$("#serversList > li:nth-child(1) > a")}
-        servernamesecondbtn{$("#serversList > li:nth-child(2) > a")}
-        servernamethirdbtn{$("#serversList > li:nth-child(3) > a")}
-        serveractivechk    {$("#serversList > li.active.monitoring > a")}
-        serversearch{$("input", type: "text", id: "popServerSearch")}
-        checkserverTitle{$("#popServerList > div > div.slide-pop-title > div.icon-server.searchLeft")}
-        setthreshhold{$("#threshold")}
-        clickthreshholdset{$("#saveThreshold")}
+        dbmonitorbutton             {$("#navDbmonitor > a")}
+        clusterserverbutton         {$("#btnPopServerList")}
+        servernamefourthbtn         {$("#serversList > li:nth-child(1) > a")}
+        servernamesecondbtn         {$("#serversList > li:nth-child(2) > a")}
+        servernamethirdbtn          {$("#serversList > li:nth-child(3) > a")}
+        serveractivechk             {$("#serversList > li.active.monitoring > a")}
+        serversearch                {$("input", type: "text", id: "popServerSearch")}
+        checkserverTitle            {$("#popServerList > div > div.slide-pop-title > div.icon-server.searchLeft")}
+        setthreshhold               {$("#threshold")}
+        clickthreshholdset          {$("#saveThreshold")}
 
         // dbmonitor graph
-        servercpudaysmin{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        servercpudaysmax{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        servercpuminutesmin{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        servercpuminutemax{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        servercpusecondmin{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        servercpusecondmax{$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        servercpudaysmin            {$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        servercpudaysmax            {$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        servercpuminutesmin         {$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        servercpuminutemax          {$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        servercpusecondmin          {$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        servercpusecondmax          {$("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
-        selecttypeindrop{$("#graphView")}
-        selecttypedays{$("#graphView > option:nth-child(3)")}
-        selecttypemin{$("#graphView > option:nth-child(2)")}
-        selecttypesec{$("#graphView > option:nth-child(1)")}
+        selecttypeindrop            {$("#graphView")}
+        selecttypedays              {$("#graphView > option:nth-child(3)")}
+        selecttypemin               {$("#graphView > option:nth-child(2)")}
+        selecttypesec               {$("#graphView > option:nth-child(1)")}
 
-        serverramdaysmin{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        serverramdaysmax{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        serverramsecondmin{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        serverramsecondmax{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        serverramminutesmin{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        serverramminutesmax{$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        serverramdaysmin            {$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        serverramdaysmax            {$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        serverramsecondmin          {$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        serverramsecondmax          {$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        serverramminutesmin         {$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        serverramminutesmax         {$("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
-        clusterlatencydaysmin{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clusterlatencydaysmax{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        clusterlatencysecondmin{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clusterlatencysecondmax{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        clusterlatencyminutesmin{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clusterlatencyminutesmax{$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clusterlatencydaysmin       {$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clusterlatencydaysmax       {$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clusterlatencysecondmin     {$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clusterlatencysecondmax     {$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clusterlatencyminutesmin    {$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clusterlatencyminutesmax    {$("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
-        clustertransactiondaysmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clustertransactiondaysmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        clustertransactionsecondmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clustertransactionsecondmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clustertransactiondaysmin   {$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clustertransactiondaysmax   {$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clustertransactionsecondmin {$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clustertransactionsecondmax {$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
         clustertransactionminutesmin{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         clustertransactionminutesmax{$("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
 
         // Network interfaces
-        title1				{ $(text:"Overview") }
-        sitePerHost			{ $(class:"configLabel", text:"Sites Per Host") }
-        ksafety				{ $(class:"configLabel", text:"K-Safety") }
-        partitionDetection	{ $(class:"configLabel", text:"Partition Detection") }
-        security			{ $(class:"labelCollapsed", text:"Security") }
-        httpAccess			{ $(class:"labelCollapsed", text:"HTTP Access") }
-        autoSnapshots		{ $(class:"labelCollapsed", text:"Auto Snapshots") }
-        commandLogging		{ $(class:"labelCollapsed", text:"Command Logging") }
-        export				{ $(class:"labelCollapsed", text:"Export") }
-        advanced			{ $(class:"labelCollapsed", text:"Advanced") }
+        title1				        { $(text:"Overview") }
+        sitePerHost			        { $(class:"configLabel", text:"Sites Per Host") }
+        ksafety				        { $(class:"configLabel", text:"K-Safety") }
+        partitionDetection	        { $(class:"configLabel", text:"Partition Detection") }
+        security			        { $(class:"labelCollapsed", text:"Security") }
+        httpAccess			        { $(class:"labelCollapsed", text:"HTTP Access") }
+        autoSnapshots		        { $(class:"labelCollapsed", text:"Auto Snapshots") }
+        commandLogging		        { $(class:"labelCollapsed", text:"Command Logging") }
+        export				        { $(class:"labelCollapsed", text:"Export") }
+        advanced			        { $(class:"labelCollapsed", text:"Advanced") }
 
 
         sitePerHostValue			{ $("#sitePerHost") }
@@ -205,5 +200,44 @@ class AdminPage extends VoltDBManagementCenterPage {
         return directories.displayed
     }
 
+    def String getValidPath() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/snapshotpath.txt"))
+        String validPath
+
+        while((validPath = br.readLine()) != "#valid_path") {
+        }
+
+        validPath = br.readLine()
+
+        return validPath
+    }
+
+    def String getInvalidPath() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/snapshotpath.txt"))
+        String invalidPath
+
+        while((invalidPath = br.readLine()) != "#invalid_path") {
+        }
+
+        invalidPath = br.readLine()
+
+        return invalidPath
+    }
+
+    def String getEmptyPath() {
+        return ""
+    }
+
+    def String getUsername() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/users.txt"))
+        String username
+
+        while((username = br.readLine()) != "#username") {
+        }
+
+        username = br.readLine()
+
+        return username
+    }
 
 }

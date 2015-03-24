@@ -34,4 +34,6 @@ class Header extends Module {
         logoutPopupCancelButton   { $("#btnCancel") }
     }
 
+
+
 }

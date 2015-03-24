@@ -44,6 +44,9 @@ class SchemaPageProceduresAndSqlTab extends SchemaPage {
         expandedproc	{ $("#p > div > div.dataBlockContent > div")}
         documentationLink { $("#iconDoc") }
         generatedbytxt	{$("#catalogContainer > div.documentation > span")}
+        expandedlistt    { $(class:"togglex")}
+        expandedlisttbox { $(class:"invert")}
+        expandedlistt1   { $(class:"togglex",1)}
     }
     static at = {
         proceduresTab.displayed
