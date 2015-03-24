@@ -280,7 +280,8 @@ public class PlanAssembler {
         assert (parsedStmt.m_tableList.size() == 1);
         Table targetTable = parsedStmt.m_tableList.get(0);
         if (targetTable.getIsreplicated()) {
-            if (m_partitioning.wasSpecifiedAsSingle()) {
+            if (m_partitioning.wasSpecifiedAsSingle()
+                    && !m_partitioning.isReplicatedDmlToRunOnAllPartitions()) {
                 String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
                         + "' in a single-partition procedure.";
                 throw new PlanningErrorException(msg);
