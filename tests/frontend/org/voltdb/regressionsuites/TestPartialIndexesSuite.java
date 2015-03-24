@@ -225,7 +225,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
     public void testPartitionPartialUniqueIndex() throws Exception {
         Client client = getClient();
 
-        if (!isHSQL()) {
+        if (isHSQL()) {
             // HSQL doesn't support partial indexes
             return;
         }
