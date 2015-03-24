@@ -57,8 +57,8 @@ class TestBase extends GebReportingSpec {
         int desiredHeight = getIntSystemProperty("windowHeight", DEFAULT_WINDOW_HEIGHT)
         if (winSize.width != desiredWidth || winSize.height != desiredHeight) {
             driver.manage().window().setSize(new Dimension(desiredWidth, desiredHeight))
-            debugPrint "Window resized, from (" + winSize.width + ", " + winSize.height +
-                       ") to (" + desiredWidth + ", " + desiredHeight + ")"
+            debugPrint 'Window resized, from (' + winSize.width + ', ' + winSize.height +
+                       ') to (' + desiredWidth + ', ' + desiredHeight + ') [in TestBase.setupSpec()]'
         }
     }
 
@@ -76,7 +76,7 @@ class TestBase extends GebReportingSpec {
         // (this is used by NavigatePagesTest)
         if (doesDBMonitorPageOpenFirst == null) {
             doesDBMonitorPageOpenFirst = page.isDbMonitorPageOpen()
-            debugPrint 'DB Monitor page was opened initially: ' + doesDBMonitorPageOpenFirst
+            debugPrint 'DB Monitor page was opened initially: ' + doesDBMonitorPageOpenFirst + ' [in TestBase.setup()]'
         }
 
         page.loginIfNeeded()
@@ -126,7 +126,7 @@ class TestBase extends GebReportingSpec {
             try {
                 return Boolean.parseBoolean(sysPropValue)
             } catch (Throwable e) {
-                println "Property '" + propertyName + "' should be int, not '" + sysPropValue + "'."
+                println "Property '" + propertyName + "' should be boolean, not '" + sysPropValue + "'."
                 return defaultValue
             }
         }
