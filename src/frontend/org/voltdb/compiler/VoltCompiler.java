@@ -1125,12 +1125,19 @@ public class VoltCompiler {
         final CatalogMap<Table> tables = db.getTables();
         for (Table table: tables) {
             String tableName = table.getTypeName();
+
             if (voltDdlTracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
                 String colName = voltDdlTracker.m_partitionMap.get(tableName.toLowerCase());
                 // A null column name indicates a replicated table. Ignore it here
                 // because it defaults to replicated in the catalog.
                 if (colName != null) {
                     assert(tables.getIgnoreCase(tableName) != null);
+                    if (table.getMaterializer() != null) {
+                        msg += "the materialized view is automatically partitioned based on its source table. "
+                                + "Invalid PARTITION statement on view table " + tableName + ".";
+                        throw new VoltCompilerException(msg);
+                    }
+
                     final Column partitionCol = table.getColumns().getIgnoreCase(colName);
                     // make sure the column exists
                     if (partitionCol == null) {
