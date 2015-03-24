@@ -7,12 +7,8 @@
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
             MatchOneQuotedString = /'[^']*'/m,
-            MatchQuotedQuotes = /''/g,
-            QuotedQuoteLiteral = "''",
             MatchDoubleQuotes = /\"/g,
             EscapedDoubleQuoteLiteral = '\\"',
-            MatchDisguisedQuotedQuotes = /#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#/g,
-            DisguisedQuotedQuoteLiteral = "#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#",
             QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
             // That's 900000 strings per statement batch -- that should be enough.
@@ -110,9 +106,6 @@
         // substituting a nonce for each string.
         function disguiseQuotedStrings(src, stringBankOut) {
             var nonceNum, nextString;
-            // Temporarily disguise quoted quotes as non-quotes to simplify the work of
-            // extracting quoted strings.
-            src = src.replace(MatchQuotedQuotes, DisguisedQuotedQuoteLiteral);
 
             // Extract quoted strings to keep their content from getting confused with interesting
             // statement syntax.
@@ -142,8 +135,6 @@
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
                                   stringBank[nonceNum - QuotedStringNonceBase]);
             }
-            // Clean up by restoring the replaced quoted quotes.
-            src = src.replace(MatchDisguisedQuotedQuotes, QuotedQuoteLiteral);
             return src;
         }
 
@@ -155,37 +146,11 @@
             // Eliminate line comments permanently.
             src = src.replace(MatchEndOfLineComments, '');
 
-            // Extract quoted strings to keep their content from getting confused with interesting
-            // statement syntax. This is required for statement splitting even if only at explicit
-            // semi-colon boundaries -- semi-colns might appear in quoted text.
+            // Extract quoted strings to keep their content from getting confused with
+            // interesting statement syntax. This is required for statement splitting at 
+            // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
 
-            // TODO: drop the following section when semi-colon injection is no longer supported
-
-            // Disguise compound keywords temporarily to avoid triggering statement splits.
-            //* Enable this to debug in the browser */ console.log("pre-processed queries:'" + src + "'");
-            src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchCreateView, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchCreateSingleQueryProcedure, GenerateDisguisedCompoundKeywords);
-
-            src = src.replace(MatchLimitPartition, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchRowcountExecute, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchExecuteDelete, GenerateDisguisedCompoundKeywords);
-
-            if (!src.match("^explain")) {
-                // Start a new statement before each remaining statement keyword.
-                src = src.replace(MatchStatementStarts, GenerateSplitStatements);
-                //* Enable this to debug in the browser */ console.log("mid-processed queries:'" + src + "'");
-            }
-
-            // Restore disguised compound keywords post-statement-split.
-            src = src.replace(MatchCompoundKeywordDisguise, '');
-            //* Enable this to debug in the browser */ console.log("post-processed queries:'" + src + "'");
-
-            // TODO: drop the preceding section when semi-colon injection is no longer supported
-
-            // Finally, get to work -- break the input into separate statements for processing.
             splitStmts = src.split(';');
 
             statementBank = [];

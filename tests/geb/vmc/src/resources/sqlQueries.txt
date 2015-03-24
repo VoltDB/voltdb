@@ -197,5 +197,10 @@
 # try to create a view from an undefined table
 {"testName":"DdlCreateViewInvalid","sqlCmd":"create view ddl_no_table_view (gb, ct) as select i, count(*) from ddl_no_table_exists group by i","response":{"result":"ERROR","status":"FAILURE"}}
 #
+# try to create a procedure with an unsupported ddl statement inside it.
+{"testName":"DdlCreateProcInvalidCreate","sqlCmd":"create procedure as create table dynamic_table (i integer)","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"DdlCreateProcInvalidDrop","sqlCmd":"create procedure as drop table dynamic_table if exists","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"DdlCreateProcInvalidAlter","sqlCmd":"create procedure as alter table dynamic_table add column j integer;","response":{"result":"ERROR","status":"FAILURE"}}
+#
 # Finally, drop ddl_table, so test is repeatable.
 {"testName":"DdlDropTable","sqlCmd":"drop table ddl_table","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
