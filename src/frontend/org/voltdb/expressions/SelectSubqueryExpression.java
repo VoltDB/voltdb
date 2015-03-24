@@ -68,6 +68,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
         }
         m_args = new ArrayList<AbstractExpression>();
+        resolveCorrelations();
     }
 
     /**

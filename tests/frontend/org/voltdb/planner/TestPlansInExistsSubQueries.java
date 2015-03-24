@@ -58,7 +58,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         sql = "select p2.c from p2 where p2.a in (select c from r1)";
         failToCompile(sql, errorMsg);
 */
-        //TODO: clarify message to complain about partitioned tables.
+        //TODO: clarify message to complain about use of partitioned tables in subquery.
         errorMsg = "Subquery expressions are only supported in single partition procedures";
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from p1 where p1.c = r2.c)";
         failToCompile(sql, errorMsg);
@@ -377,6 +377,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             // OFFSET prevents In-to-EXISTS transformation
             AbstractPlanNode pn = compile("select r1.d from r1, r2 where r1.a IN " +
                     "(select a from r3 where r3.c = r2.d limit 1 offset 2);");
+            /* enable to debug */ System.out.println(pn.toExplainPlanString());
             pn = pn.getChild(0).getChild(0);
             assertTrue(pn instanceof NestLoopPlanNode);
             AbstractExpression pred = ((NestLoopPlanNode) pn).getJoinPredicate();
@@ -645,8 +646,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
-        //        AbstractPlanNode.enableVerboseExplainForDebugging();
-        //        AbstractExpression.enableVerboseExplainForDebugging();
+        AbstractPlanNode.enableVerboseExplainForDebugging();
+        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
 }

@@ -257,6 +257,7 @@ public class PlanAssembler {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
 
+            // FIXME: is the following scheme/comment obsolete?
             // FIXME: turn it on when we are able to push down DISTINCT
 //            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
 //                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
@@ -279,8 +280,7 @@ public class PlanAssembler {
         assert (parsedStmt.m_tableList.size() == 1);
         Table targetTable = parsedStmt.m_tableList.get(0);
         if (targetTable.getIsreplicated()) {
-            if (m_partitioning.wasSpecifiedAsSingle()
-                    && !m_partitioning.isReplicatedDmlToRunOnAllPartitions()) {
+            if (m_partitioning.wasSpecifiedAsSingle()) {
                 String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
                         + "' in a single-partition procedure.";
                 throw new PlanningErrorException(msg);
@@ -456,6 +456,9 @@ public class PlanAssembler {
 
         failIfNonDeterministicDml(parsedStmt, retval);
 
+////FIXME: This guard code was in place in Mike's original branch.
+//// Is this really safe already, or are we getting ahead of ourselves?
+//// If it's safe, remove this garbage comment:
 ////        if ( ! subqueryExprs.isEmpty() ) {
 ////            if ( ! (m_partitioning.isInferredSingle() ||
 ////                    m_partitioning.wasSpecifiedAsSingle())) {
@@ -1073,6 +1076,8 @@ public class PlanAssembler {
         }
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
+        //FIXME: does this assert need to be relaxed in the face of non-from-clause subquery support?
+        // It was not in Mike A's original branch.
         assert (m_parsedUpdate.m_tableList.size() == 1);
         Table targetTable = m_parsedUpdate.m_tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
@@ -1150,7 +1155,11 @@ public class PlanAssembler {
             retval.replicatedTableDML = true;
         }
 
-        retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
+        //FIXME: This assumption was only safe when we didn't support updates
+        // w/ possibly non-deterministic subqueries.
+        // Is there some way to integrate a "subquery determinism" check here?
+        // because we didn't support updates with limits, either.
+        retval.statementGuaranteesDeterminism(false, true);
 
         return retval;
     }
