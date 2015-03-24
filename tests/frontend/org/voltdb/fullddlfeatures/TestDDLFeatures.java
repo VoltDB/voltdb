@@ -69,6 +69,10 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         teardownSystem();
     }
 
+    public void startClient() throws Exception
+    {
+        startClient(null);
+    }
 
     @Test
     public void testCreateUniqueIndex() throws Exception {
@@ -230,7 +234,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         threw = false;
         try {
-            m_client.callProcedure("T12.insert", 3, 2);
+            m_client.callProcedure("T12.insert", 1, 2);
         } catch (ProcCallException pce) {
             threw = true;
         }
