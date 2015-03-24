@@ -15,19 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
+package org.voltdb;
 
-import java.io.IOException;
-
-/**
- * This class provides a common interface for executing sqlcmd's file
- * command both for files on a disk or "here documents" entered
- * interactively.
- */
-interface SQLCommandLineReader {
-    /**
-     * Read the next line of input from some underlying input stream.
-     * If the underlying stream is interactive, print out the prompt.
-     * */
-    public String readBatchLine() throws IOException;
+public interface ClientInterfaceRepairCallback {
+    public void repairCompleted(int partitionId, long initiatorHSId);
 }

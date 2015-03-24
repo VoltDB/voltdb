@@ -81,7 +81,7 @@ public class Iv2TransactionCreator implements TransactionCreator
 
     @Override
     public void bindAdapter(Connection adapter) {
-        m_ci.bindAdapter(adapter);
+        m_ci.bindAdapter(adapter, null);
     }
 }
 

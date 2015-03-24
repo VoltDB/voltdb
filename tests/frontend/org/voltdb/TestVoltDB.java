@@ -87,10 +87,6 @@ public class TestVoltDB extends TestCase {
         VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
         assertEquals(StartAction.SAFE_RECOVER, cfg16.m_startAction);
 
-        String args17[] = { "replica" };
-        VoltDB.Configuration cfg17 = new VoltDB.Configuration(args17);
-        assertEquals(ReplicationRole.REPLICA, cfg17.m_replicationRole);
-
         // test host:port formats
         String args18[] = {"create", "port", "localhost:5678"};
         VoltDB.Configuration cfg18 = new VoltDB.Configuration(args18);
@@ -159,12 +155,6 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(args8);
         assertTrue(config.validate());
 
-        // replica with default action of create
-        String[] args9 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica"};
-        config = new VoltDB.Configuration(args9);
-        assertTrue(config.validate());
-        assertEquals(StartAction.CREATE, config.m_startAction);
-
         // valid config
         String[] args10 = {"create", "leader", "localhost", "deployment", "te", "catalog", "catalog.jar"};
         config = new VoltDB.Configuration(args10);
@@ -189,6 +179,12 @@ public class TestVoltDB extends TestCase {
         String[] args201 = {"rejoinhost", "localhost"};
         config = new VoltDB.Configuration(args201);
         assertEquals(config.validate(), MiscUtils.isPro());
+
+        // valid rejoin config
+        String[] args300 = {"live", "rejoin", "host", "localhost", "replica"};
+        config = new VoltDB.Configuration(args300);
+        assertEquals(MiscUtils.isPro(), config.validate());
+        assertEquals(StartAction.LIVE_REJOIN, config.m_startAction);
     }
 
     /**

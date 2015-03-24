@@ -335,6 +335,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         TIME_OUT_MILLIS = newLatency;
     }
 
+    public int getTimeoutLatency() {
+        return TIME_OUT_MILLIS;
+    }
+
     public long fragmentProgressUpdate(int indexFromFragmentTask,
             String planNodeName,
             String lastAccessedTable,
@@ -671,13 +675,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param spHandle                 The spHandle of the current transaction
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
+     * @param undoToken                For undo
      * @throws EEException
      */
     public abstract void applyBinaryLog(ByteBuffer log,
                                         long txnId,
                                         long spHandle,
                                         long lastCommittedSpHandle,
-                                        long uniqueId) throws EEException;
+                                        long uniqueId,
+                                        long undoToken) throws EEException;
 
     /**
      * Execute an arbitrary non-transactional task that is described by the task id and
@@ -941,7 +947,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                               long txnId,
                                               long spHandle,
                                               long lastCommittedSpHandle,
-                                              long uniqueId);
+                                              long uniqueId,
+                                              long undoToken);
 
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.
@@ -1026,5 +1033,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     @Deprecated
     public void setInitialLogDurationForTest(long newDuration) {
         INITIAL_LOG_DURATION = newDuration;
+    }
+
+    /**
+     * Useful in unit tests.  Gets the initial frequency with which
+     * the long-running query info message will be logged.
+     */
+    @Deprecated
+    public long getInitialLogDurationForTest() {
+        return INITIAL_LOG_DURATION;
     }
 }

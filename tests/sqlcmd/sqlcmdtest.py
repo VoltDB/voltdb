@@ -112,6 +112,7 @@ def launch_and_wait_on_voltdb(reportout):
             kill_voltdb()
             return
         print "Connection will be retried shortly."
+        sys.stdout.flush()
         # give the server a little more setup time.
         time.sleep(10)
     empty_input.close()
@@ -195,7 +196,7 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
     if os.path.isfile(baselinepath):
         outdiffspath = os.path.join(parent, path + 'diffs')
         diffout = open(outdiffspath, 'w+')
-        gotdiffs = subprocess.call(['diff', cleanedpath, baselinepath],
+        gotdiffs = subprocess.call(['diff', baselinepath, cleanedpath],
                 stdout=diffout)
         if gotdiffs:
             print >> sys.stderr, \

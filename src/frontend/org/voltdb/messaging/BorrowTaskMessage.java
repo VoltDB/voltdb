@@ -22,6 +22,8 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -65,7 +67,11 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
 
     public void addInputDepMap(Map<Integer, List<VoltTable>> inputDeps)
     {
-        m_inputDeps = inputDeps;
+        final ImmutableMap.Builder<Integer, List<VoltTable>> builder = ImmutableMap.builder();
+        for (Map.Entry<Integer, List<VoltTable>> e : inputDeps.entrySet()) {
+            builder.put(e.getKey(), ImmutableList.copyOf(e.getValue()));
+        }
+        m_inputDeps = builder.build();
     }
 
     public Map<Integer, List<VoltTable>> getInputDepMap()

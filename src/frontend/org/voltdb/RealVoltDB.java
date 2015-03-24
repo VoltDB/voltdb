@@ -166,9 +166,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.1EA2";
+    static final String m_defaultVersionString = "5.1";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.1EA2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.1\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -765,12 +765,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 try {
                     Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                     Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                            int.class,
                             String.class,
                             ClientInterface.class,
                             byte.class,
                             boolean.class,
                             String.class);
                     m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
+                            m_messenger.getHostId(),
                             drProducerHost,
                             m_clientInterface,
                             drConsumerClusterId,
@@ -965,56 +967,61 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_configLogger = new Thread(new ConfigLogging());
             m_configLogger.start();
 
-            DailyRollingFileAppender dailyAppender = null;
-            Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
-            while (appenders.hasMoreElements()) {
-                Appender appender = (Appender) appenders.nextElement();
-                if (appender instanceof DailyRollingFileAppender){
-                    dailyAppender = (DailyRollingFileAppender) appender;
-                }
+            scheduleDailyLoggingWorkInNextCheckTime();
+        }
+    }
+
+    class DailyLogTask implements Runnable {
+        @Override
+        public void run() {
+            m_myHostId = m_messenger.getHostId();
+            hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
+            hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+            hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
+            logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+            // log system setting information
+            logSystemSettingFromCatalogContext();
+
+            scheduleDailyLoggingWorkInNextCheckTime();
+        }
+    }
+
+    /**
+     * Get the next check time for a private member in log4j library, which is not a reliable idea.
+     * It adds 30 seconds for the initial delay and uses a periodical thread to schedule the daily logging work
+     * with this delay.
+     * @return
+     */
+    void scheduleDailyLoggingWorkInNextCheckTime() {
+        DailyRollingFileAppender dailyAppender = null;
+        Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
+        while (appenders.hasMoreElements()) {
+            Appender appender = (Appender) appenders.nextElement();
+            if (appender instanceof DailyRollingFileAppender){
+                dailyAppender = (DailyRollingFileAppender) appender;
             }
-            final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
+        }
+        final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
 
-            Field field = null;
-            if (dailyRollingFileAppender != null) {
-                try {
-                    field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
-                    field.setAccessible(true);
-                } catch (NoSuchFieldException e) {
-                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                }
+        Field field = null;
+        if (dailyRollingFileAppender != null) {
+            try {
+                field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
+                field.setAccessible(true);
+            } catch (NoSuchFieldException e) {
+                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
             }
-            final Field nextCheckField = field;
-
-            class DailyLogTask implements Runnable {
-                @Override
-                public void run() {
-                    try {
-                        m_myHostId = m_messenger.getHostId();
-                        hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
-                        hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
-                        hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
-                        logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
-                        // log system setting information
-                        logSystemSettingFromCatalogContext();
-
-                        long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                        scheduleWork(new DailyLogTask(),
-                                nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
-                    } catch (IllegalAccessException e) {
-                        hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                    }
-                }
-            }
-
-            if (dailyRollingFileAppender != null && nextCheckField != null) {
-                try {
-                    long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                    scheduleWork(new DailyLogTask(),
-                            nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
-                } catch (IllegalAccessException e) {
-                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                }
+        }
+        final Field nextCheckField = field;
+        long nextCheck = System.currentTimeMillis();
+        // the next part may throw exception, current time is the default value
+        if (dailyRollingFileAppender != null && nextCheckField != null) {
+            try {
+                nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+                scheduleWork(new DailyLogTask(),
+                        nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
             }
         }
     }
@@ -1337,7 +1344,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     //We will ignore the supplied or default deployment anyways.
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
                         byte[] deploymentHashHere =
-                            CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
+                            CatalogUtil.makeDeploymentHash(deploymentBytes);
                         if (!(Arrays.equals(deploymentHashHere, catalogStuff.getDeploymentHash())))
                         {
                             hostLog.warn("The locally provided deployment configuration did not " +
@@ -1787,42 +1794,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     public static String[] extractBuildInfo(VoltLogger logger) {
         StringBuilder sb = new StringBuilder(64);
-        String buildString = "VoltDB";
-        String versionString = m_defaultVersionString;
-        byte b = -1;
         try {
             InputStream buildstringStream =
                 ClassLoader.getSystemResourceAsStream("buildstring.txt");
-            if (buildstringStream == null) {
-                throw new RuntimeException("Unreadable or missing buildstring.txt file.");
-            }
-            while ((b = (byte) buildstringStream.read()) != -1) {
-                sb.append((char)b);
-            }
-            sb.append("\n");
-            String parts[] = sb.toString().split(" ", 2);
-            if (parts.length != 2) {
-                throw new RuntimeException("Invalid buildstring.txt file.");
-            }
-            versionString = parts[0].trim();
-            buildString = parts[1].trim();
-        } catch (Exception ignored) {
-            try {
-                InputStream buildstringStream = new FileInputStream("version.txt");
-                try {
-                    while ((b = (byte) buildstringStream.read()) != -1) {
-                        sb.append((char)b);
-                    }
-                    versionString = sb.toString().trim();
-                } finally {
-                    buildstringStream.close();
+            if (buildstringStream != null) {
+                byte b;
+                while ((b = (byte) buildstringStream.read()) != -1) {
+                    sb.append((char)b);
+                }
+                String parts[] = sb.toString().split(" ", 2);
+                if (parts.length == 2) {
+                    parts[0] = parts[0].trim();
+                    parts[1] = parts[1].trim();
+                    return parts;
                 }
             }
-            catch (Exception ignored2) {
-                logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+        } catch (Exception ignored) {
+        }
+        try {
+            InputStream versionstringStream = new FileInputStream("version.txt");
+            try {
+                byte b;
+                while ((b = (byte) versionstringStream.read()) != -1) {
+                    sb.append((char)b);
+                }
+                return new String[] { sb.toString().trim(), "VoltDB" };
+            } finally {
+                versionstringStream.close();
             }
         }
-        return new String[] { versionString, buildString };
+        catch (Exception ignored2) {
+            logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+            return new String[] { m_defaultVersionString, "VoltDB" };
+        }
     }
 
     @Override

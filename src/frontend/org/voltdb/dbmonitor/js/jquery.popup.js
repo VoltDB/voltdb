@@ -49,22 +49,24 @@
 	 *
 	 * @param {Object} settings
 	 */
-	$.Popup = function(settings) {
+	var popupCounter = 0;
+	$.Popup = function (settings) {
 
+	    popupCounter++; //For creating unique classes.
 	    var p = this,
 	        defaults = {
 	            // Markup
 	            backClass: 'popup_back',
 	            backOpacity: 0.7,
-	            containerClass: 'popup_cont',
+	            containerClass: 'popup_cont ' + popupCounter,
 	            closeContent: '<div class="popup_close">&times;</div>',
-	            markup: '<div class="popup"><div class="popup_content"/></div>',
-	            contentClass: 'popup_content',
+	            markup: '<div class="popup"><div class="popup_content' + popupCounter + '"/></div>',
+	            contentClass: 'popup_content' + popupCounter,
 	            preloaderContent: '<p class="preloader">Loading</p>',
-	            activeClass: 'popup_active',
+	            activeClass: 'popup_active' + popupCounter,
 	            hideFlash: false,
 	            speed: 200,
-	            popupPlaceholderClass: 'popup_placeholder',
+	            popupPlaceholderClass: 'popup_placeholder' + popupCounter,
 	            keepInlineChanges: true,
 
 	            // Content
@@ -333,29 +335,12 @@
 		            p.close();
 		        });
 		    }
-
-			//save cluster
-			$('.saveBtn').click(function(){
-				$('.saveInfo').hide();
-				$('.saveConfirmation').show();
-			});
-			
-			$('.confirmNoSave').click(function(){
-				$('.saveConfirmation').hide();
-				$('.saveInfo').show();
-			});
-			
-				
-			
-			
 			
 			//admin
 			var closeBtn = $(".closeBtn");
 		    if (closeBtn != undefined) {
 		        closeBtn.unbind('click');
 		        closeBtn.bind('click', function () {
-					$('.saveConfirmation').hide();
-					$('.saveInfo').show();
 					$('.restoreConfirmation').hide();
 					$('.restoreInfo').show();
 		            p.close();

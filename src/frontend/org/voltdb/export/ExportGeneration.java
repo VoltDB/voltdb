@@ -360,6 +360,11 @@ public class ExportGeneration {
         }
 
         String leader = Collections.min(children);
+        String part = m_partitionLeaderZKName.get(partition);
+        if (part == null) {
+            exportLog.error("Unable to start exporting for partition: " + partition);
+            return;
+        }
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
@@ -438,7 +443,7 @@ public class ExportGeneration {
 
                     final ExportDataSource eds = partitionSources.get(signature);
                     if (eds == null) {
-                        exportLog.error("Received an export ack for partition " + partition +
+                        exportLog.warn("Received an export ack for partition " + partition +
                                 " source signature " + signature + " which does not exist on this node");
                         return;
                     }

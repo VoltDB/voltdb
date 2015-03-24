@@ -203,6 +203,7 @@ typedef struct {
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
+    int64_t undoToken;
     char log[0];
 }__attribute__((packed)) apply_binary_log;
 
@@ -1366,11 +1367,12 @@ void VoltDBIPC::pushExportBuffer(
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
         writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
+        // Need the delete in the if statement for valgrind
+        delete [] block->rawPtr();
     } else {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
     }
-    delete [] block->rawPtr();
 }
 
 void VoltDBIPC::executeTask(struct ipc_command *cmd) {
@@ -1395,6 +1397,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
                                  ntohll(params->spHandle),
                                  ntohll(params->lastCommittedSpHandle),
                                  ntohll(params->uniqueId),
+                                 ntohll(params->undoToken),
                                  params->log);
     } catch (const FatalException& e) {
         crashVoltDB(e);
