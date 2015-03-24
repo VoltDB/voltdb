@@ -302,7 +302,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             AbstractExpression le = e.getLeft();
             assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
             AbstractExpression re = e.getRight();
-            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+            assertEquals(ExpressionType.VALUE_PARAMETER, re.getRight().getExpressionType());
         }
         {
             AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
@@ -341,7 +341,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             AbstractExpression le = pred.getLeft();
             assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
             AbstractExpression re = pred.getRight();
-            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+            assertEquals(ExpressionType.VALUE_PARAMETER, re.getRight().getExpressionType());
         }
     }
 
