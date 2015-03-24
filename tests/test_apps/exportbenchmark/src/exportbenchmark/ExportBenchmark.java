@@ -48,6 +48,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -86,12 +88,15 @@ public class ExportBenchmark {
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
+    // Timer for periodic stats
+    Timer timer;
     // Test stats variables
     long insertNumber = 0;
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
-    HashMap<Integer, ArrayList<Double>> allStats = new HashMap<Integer, ArrayList<Double>>();
+    HashMap<Integer, ArrayList<Double>> tpsStats = new HashMap<Integer, ArrayList<Double>>();
+    HashMap<Integer, ArrayList<Double>> decodeStats = new HashMap<Integer, ArrayList<Double>>();
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
 
@@ -108,10 +113,10 @@ public class ExportBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 15;
+        int duration = 25;
 
         @Option(desc = "Warmup duration in seconds.")
-        int warmup = 5;
+        int warmup = 10;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -173,6 +178,21 @@ public class ExportBenchmark {
 
         fullStatsContext = client.createStatsContext();
         periodicStatsContext = client.createStatsContext();
+    }
+
+    /**
+    * Create a Timer task to display performance data on the Vote procedure
+    * It calls printStatistics() every displayInterval seconds
+    */
+    public void schedulePeriodicStats() {
+        timer = new Timer();
+        TimerTask statsPrinting = new TimerTask() {
+            @Override
+            public void run() { printStatistics(); }
+        };
+        timer.scheduleAtFixedRate(statsPrinting,
+                                    config.displayinterval * 1000,
+                                    config.displayinterval * 1000);
     }
 
     /**
@@ -312,6 +332,8 @@ public class ExportBenchmark {
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
+        schedulePeriodicStats();
+
         // Insert objects until we've run for long enough
         System.out.println("Running benchmark...");
         now = System.currentTimeMillis();
@@ -412,14 +434,19 @@ public class ExportBenchmark {
 
         Integer partitionId = new Integer(Integer.parseInt(stats[2].split(":")[1]));
         Double tps = new Double(Double.parseDouble(stats[0].split(":")[1]));
+        Double decode = new Double(Double.parseDouble(stats[1].split(":")[1]));
 
         try {
-            allStats.get(partitionId).add(tps);
+            tpsStats.get(partitionId).add(tps);
+            decodeStats.get(partitionId).add(decode);
         } catch (NullPointerException e) {
             // We haven't logged this partition yet
-            ArrayList<Double> newList = new ArrayList<Double>();
-            newList.add(tps);
-            allStats.put(partitionId, newList);
+            ArrayList<Double> newTps = new ArrayList<Double>();
+            ArrayList<Double> newDecode = new ArrayList<Double>();
+            newTps.add(tps);
+            newDecode.add(decode);
+            tpsStats.put(partitionId, newTps);
+            decodeStats.put(partitionId, newDecode);
         }
     }
 
@@ -487,6 +514,7 @@ public class ExportBenchmark {
         listenForStats();
         writes.join();
 
+        timer.cancel();
         System.out.println("Client flushed; waiting for export to finish");
 
         // Wait until export is done
@@ -537,19 +565,33 @@ public class ExportBenchmark {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // Print server-side TPS
-        for (Integer partition : allStats.keySet()) {
-            ArrayList<Double> thisTps = allStats.get(partition);
-            int average = 0;
+        int highestTps = 0;
+        double averageDecode = 0;
+        for (Integer partition : tpsStats.keySet()) {
+            ArrayList<Double> thisTps = tpsStats.get(partition);
+            ArrayList<Double> thisDecode = decodeStats.get(partition);
+            int averageTps = 0;
+            int averagePartitionDecode = 0;
 
             for (int i = 0; i < thisTps.size(); i++) {
-                average += thisTps.get(i).intValue();
+                averageTps += thisTps.get(i).intValue();
+                averagePartitionDecode += thisDecode.get(i).intValue();
             }
-            average /= thisTps.size();
+            averageTps /= thisTps.size();
+            averagePartitionDecode /= thisTps.size();
 
             System.out.println("Average TPS for partition "
                                 + partition.intValue()
-                                + ": " + average);
+                                + ": " + averageTps);
+            if (averageTps > highestTps) {
+                highestTps = averageTps;
+            }
+            averageDecode += averagePartitionDecode;
         }
+        averageDecode /= (tpsStats.keySet().size());
+
+        System.out.println("\nHighest TPS: " + highestTps);
+        System.out.println("Average export decode time: " + averageDecode);
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -584,10 +626,12 @@ public class ExportBenchmark {
         try {
             if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
                 FileWriter fw = new FileWriter(config.statsfile);
-                fw.append(String.format("%d,%d,%d,0,0,0,0,0,0,0,0,0,0\n",
+                fw.append(String.format("%d,%d,%d,0,0,%f,%d,0,0,0,0,0,0\n",
                                     stats.getStartTimestamp(),
                                     duration,
-                                    successfulInserts.get()));
+                                    successfulInserts.get(),
+                                    averageDecode,
+                                    highestTps));
                 fw.close();
             }
         } catch (IOException e) {
