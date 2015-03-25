@@ -322,6 +322,14 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                 "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);" +
+                "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T WHERE D1 > 3 " +
                 "GROUP BY D1 + D2, ABS(D3);",
 
                 // schema with indexes (should have no warnings)
@@ -394,7 +402,7 @@ public class TestDDLCompiler extends TestCase {
                 "GROUP BY D1, D2-D3, D3;",
         };
 
-        int expectWarning[] = { 2, 0, 0, 2, 2 };
+        int expectWarning[] = { 4, 0, 0, 2, 2 };
         // boilerplate for making a project
         final String simpleProject =
                 "<?xml version=\"1.0\"?>\n" +

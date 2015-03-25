@@ -22,3 +22,5 @@ CREATE TABLE P1
 );
 PARTITION TABLE P1 ON COLUMN a;
 CREATE UNIQUE INDEX p1_pidx_1 ON P1 (a) where b is not null;
+CREATE UNIQUE INDEX p1_pidx_2 ON P1 (a) where a > 4;
+CREATE UNIQUE INDEX p1_pidx_3 ON P1 (a) where a > c and d > 3;

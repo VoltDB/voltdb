@@ -36,7 +36,6 @@ import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
 
@@ -317,7 +316,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pn.toExplainPlanString().contains("using its primary key index (for deterministic order only)"));
     }
 
-    public void testPartialIndexNULLPredicate() {
+    public void testPartialIndexNULLPredicate()
+    {
         {
             AbstractPlanNode pn = compile("select * from c where a > 0;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
@@ -384,14 +384,14 @@ public class TestIndexSelection extends PlannerTestCase {
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
         }
         {
-            // CREATE INDEX partial_idx_1 ON c (b) where abs(e) > 1;
-            AbstractPlanNode pn = compile("select * from c where b = 0 and abs(e) > 1;");
+            // CREATE INDEX partial_idx_1 ON c (abs(b)) where abs(e) > 1;
+            AbstractPlanNode pn = compile("select * from c where abs(b) = 1 and abs(e) > 1;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_1\"");
             checkIndexPredicateIsNull(pn);
         }
         {
-            // CREATE INDEX partial_idx_1 ON c (b) where abs(e) > 1;
-            AbstractPlanNode pn = compile("select * from c where b > 0 and 1 < abs(e);");
+            // CREATE INDEX partial_idx_1 ON c (abs(b)) where abs(e) > 1;
+            AbstractPlanNode pn = compile("select * from c where abs(b) > 1 and 1 < abs(e);");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_1\"");
             checkIndexPredicateIsNull(pn);
         }
@@ -427,51 +427,53 @@ public class TestIndexSelection extends PlannerTestCase {
             // CREATE INDEX partial_idx_5 ON c (b) where d > f;
             AbstractPlanNode pn = compile("select * from c where b > 0 and d > f;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_5\"");
-            String[] columns = {"F"};
             checkIndexPredicateIsNull(pn);
         }
         {
             // CREATE INDEX partial_idx_5 ON c (b) where d > f;
             AbstractPlanNode pn = compile("select * from c where b > 0 and f < d;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_5\"");
-            String[] columns = {"F"};
             checkIndexPredicateIsNull(pn);
         }
     }
 
     public void testPartialIndexComparisonPredicateNonExactMatch()
+    {
+        // At the moment an index filter must exactly match a query filter expression (or sub-expression)
+        // to be selected
         {
-        // At the moment expression exact match only
-        {
-            AbstractPlanNode pn = compile("select * from c where a > 0 and e > 0 or d < 5;");
+            // CREATE INDEX partial_idx_1 ON c (abs(b)) where abs(e) > 1; Not exact match
+            AbstractPlanNode pn = compile("select * from c where abs(b) > 1 and 2 <  abs(e);");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
         }
         {
-            AbstractPlanNode pn = compile("select * from c where b > 0 and e = 0;");
+            // CREATE INDEX partial_idx_3 ON c (b) where d > 0; Not exact match
+            AbstractPlanNode pn = compile("select * from c where b > 0 and d > 3;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
-//            checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_1\"");
         }
         {
-            AbstractPlanNode pn = compile("select * from c where b > 0 and f > 3;");
+            // CREATE INDEX partial_idx_5 ON c (b) where d > f;  Not exact match
+            AbstractPlanNode pn = compile("select * from c where b > 0 and f + 1 < d;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
-//          checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\"");
-        }
-        {
-            AbstractPlanNode pn = compile("select * from c where b > 0 and 3 < f;");
-            checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
-//          checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\"");
         }
     }
 
-    public void testParameterizedQueryPartialIndex() {
+    public void testParameterizedQueryPartialIndex()
+    {
         {
             // CREATE INDEX partial_idx_4 ON c (a, b) where 0 < f; - not selected because of the parameter
             AbstractPlanNode pn = compile("select * from c where a > 0 and b > 0 and ? < f;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
         }
+        {
+            // CREATE INDEX partial_idx_1 ON c (abs(b)) where abs(e) > 1; not selected because of the parameter
+            AbstractPlanNode pn = compile("select * from c where abs(b) = 1 and abs(e) > ?;");
+            checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
+        }
     }
 
-    private void checkIndexName(AbstractPlanNode pn, String targetIndexName) {
+    private void checkIndexName(AbstractPlanNode pn, String targetIndexName)
+    {
         assertEquals(1, pn.getChildCount());
         pn = pn.getChild(0);
         String json = pn.toJSONString();
@@ -480,7 +482,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(json.contains(targetIndexName));
     }
 
-    private void checkIndexPredicateIsNull(AbstractPlanNode pn) {
+    private void checkIndexPredicateIsNull(AbstractPlanNode pn)
+    {
         assertEquals(1, pn.getChildCount());
         pn = pn.getChild(0);
         assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
@@ -489,7 +492,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pred == null);
     }
 
-    private void checkIndexPredicateContains(AbstractPlanNode pn, String[] columns) {
+    private void checkIndexPredicateContains(AbstractPlanNode pn, String[] columns)
+    {
         assertEquals(1, pn.getChildCount());
         pn = pn.getChild(0);
         assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
@@ -508,8 +512,8 @@ public class TestIndexSelection extends PlannerTestCase {
         }
     }
 
-
-    private void checkIndexPredicateDoesNotHave(AbstractPlanNode pn, String[] columns) {
+    private void checkIndexPredicateDoesNotHave(AbstractPlanNode pn, String[] columns)
+    {
         assertEquals(1, pn.getChildCount());
         pn = pn.getChild(0);
         assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
