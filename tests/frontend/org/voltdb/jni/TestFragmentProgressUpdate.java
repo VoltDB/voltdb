@@ -56,11 +56,50 @@ public class TestFragmentProgressUpdate extends TestCase {
     private final long READ_ONLY_TOKEN = Long.MAX_VALUE;
     private final long WRITE_TOKEN = 0;
 
+    /**
+     * This local class is intended to make it easy to preserve default
+     * EE settings for initial log duration (the time required for a fragment
+     * to execute before an initial warning is written to the log),
+     * and the timeout latency (time after which long-running read-only queries
+     * will be canceled.)
+     *
+     * This avoids the situation where tests fail because a previous test tweaked
+     * an EE setting.
+     */
+    @SuppressWarnings("deprecation")
+    private class AutoEngineSettings implements AutoCloseable {
+
+        private final int m_origTimeoutLatency;
+        private final long m_origInitialLogDuration;
+
+        AutoEngineSettings() {
+            m_origTimeoutLatency = m_ee.getTimeoutLatency();
+            m_origInitialLogDuration = m_ee.getInitialLogDurationForTest();
+        }
+
+        public void setTimeoutLatency(int timeoutLatency) {
+            m_ee.setTimeoutLatency(timeoutLatency);
+        }
+
+        public void setInitialLogDuration(long initialLogDuration) {
+            m_ee.setInitialLogDurationForTest(initialLogDuration);
+        }
+
+        // Sets execution engine settings back to what they were.
+        @Override
+        public void close() throws Exception {
+            m_ee.setTimeoutLatency(m_origTimeoutLatency);
+            m_ee.setInitialLogDurationForTest(m_origInitialLogDuration);
+        }
+
+    }
+
+    @SuppressWarnings("deprecation")
     public void testFragmentProgressUpdate() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
         int tableSize = 5001;
-        m_longOpthreshold = 10000;
+        int longOpthreshold = 10000;
         m_warehousedata.clearRowData();
 
         for (int i = 0; i < tableSize; ++i) {
@@ -98,7 +137,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
-        assertEquals(m_longOpthreshold, m_ee.m_lastTuplesAccessed);
+        assertEquals(longOpthreshold, m_ee.m_lastTuplesAccessed);
         assertTrue(450000 < m_ee.m_currMemoryInBytes);
         assertTrue(550000 > m_ee.m_currMemoryInBytes);
         assertTrue(450000 < m_ee.m_peakMemoryInBytes);
@@ -106,11 +145,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertTrue(m_ee.m_peakMemoryInBytes >= m_ee.m_currMemoryInBytes);
     }
 
+    @SuppressWarnings("deprecation")
     public void testTwoUpdates() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
         int tableSize = 10000;
-        m_longOpthreshold = 10000;
+        int longOpthreshold = 10000;
         m_warehousedata.clearRowData();
 
         for (int i = 0; i < tableSize; ++i) {
@@ -151,7 +191,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
         assertEquals(2, m_ee.m_callsFromEE);
-        assertEquals(m_longOpthreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
+        assertEquals(longOpthreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
         assertTrue(900000 < m_ee.m_currMemoryInBytes);
         assertTrue(1100000 > m_ee.m_currMemoryInBytes);
         assertTrue(900000 < m_ee.m_peakMemoryInBytes);
@@ -200,7 +240,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 3, 3, 2, 42, Long.MAX_VALUE);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
-        assertEquals(m_longOpthreshold, m_ee.m_lastTuplesAccessed);
+        assertEquals(longOpthreshold, m_ee.m_lastTuplesAccessed);
         assertTrue(450000 < m_ee.m_currMemoryInBytes);
         assertTrue(550000 > m_ee.m_currMemoryInBytes);
         assertTrue(450000 < m_ee.m_peakMemoryInBytes);
@@ -211,11 +251,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertTrue(m_ee.m_peakMemoryInBytes < previousPeakMemory);
     }
 
+    @SuppressWarnings("deprecation")
     public void testPeakLargerThanCurr() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
         int tableSize = 20000;
-        m_longOpthreshold = 10000;
+        int longOpthreshold = 10000;
         m_warehousedata.clearRowData();
 
         for (int i = 0; i < tableSize; ++i) {
@@ -251,60 +292,36 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, READ_ONLY_TOKEN);
 
         // If want to see the stats, please uncomment the following line.
         // It is '8 393216 262144' on my machine.
         //System.out.println(m_ee.m_callsFromEE +" " + m_ee.m_peakMemoryInBytes + " "+ m_ee.m_currMemoryInBytes);
-        assertEquals(m_longOpthreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
+        assertEquals(longOpthreshold * m_ee.m_callsFromEE, m_ee.m_lastTuplesAccessed);
         assertTrue(m_ee.m_peakMemoryInBytes > m_ee.m_currMemoryInBytes);
     }
 
-    @SuppressWarnings("deprecation")
     public void testProgressUpdateLogSqlStmt() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        m_ee.setInitialLogDurationForTest(1);
-
         verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.SQL_STATEMENT);
     }
 
-    @SuppressWarnings("deprecation")
     public void testProgressUpdateLogNoSqlStmt() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        m_ee.setInitialLogDurationForTest(1);
-
         verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.NO_STATEMENT);
     }
 
-    @SuppressWarnings("deprecation")
     public void testProgressUpdateLogSqlStmtList() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        m_ee.setInitialLogDurationForTest(1);
-
         verifyLongRunningQueries(50, 0, "item_crazy_join", 5, true, SqlTextExpectation.STATEMENT_LIST);
     }
 
-    @SuppressWarnings("deprecation")
     public void testProgressUpdateLogSqlStmtRW() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        m_ee.setInitialLogDurationForTest(1);
-
         verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.SQL_STATEMENT);
     }
 
-    @SuppressWarnings("deprecation")
     public void testProgressUpdateLogNoSqlStmtRW() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        m_ee.setInitialLogDurationForTest(1);
-
         verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.NO_STATEMENT);
     }
 
-    @SuppressWarnings("deprecation")
     public void testProgressUpdateLogSqlStmtListRW() throws Exception {
-        // Set the log duration to be very short, to ensure that a message will be logged.
-        m_ee.setInitialLogDurationForTest(1);
-
         verifyLongRunningQueries(50, 0, "item_crazy_join", 5, false, SqlTextExpectation.STATEMENT_LIST);
     }
 
@@ -418,9 +435,11 @@ public class TestFragmentProgressUpdate extends TestCase {
         VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
         ExecutionEngine.setVoltLoggerForTest(mockedLogger);
 
-        m_ee.setTimeoutLatency(timeout);
-
-        try {
+        try (AutoEngineSettings aes = new AutoEngineSettings()) {
+            // Set the log duration to be short to ensure that a message will be logged
+            // for long-running queries
+            aes.setInitialLogDuration(1);
+            aes.setTimeoutLatency(timeout);
 
             // NOTE: callers of this method specify something other than SQL_STATEMENT
             // in order to prove that we don't crash if the sqlTexts array passed to
@@ -516,23 +535,18 @@ public class TestFragmentProgressUpdate extends TestCase {
         verifyLongRunningQueries(300, 0, procName, true);
         tearDown(); setUp();
 
-
         //
         // Write query (negative)
         //
         procName = "item_big_del";
-        m_ee.setInitialLogDurationForTest(1);
-
         verifyLongRunningQueries(50000, 0, procName, false);
         tearDown(); setUp();
-        m_ee.setInitialLogDurationForTest(1);
 
         verifyLongRunningQueries(50000, 100, procName, false);
         tearDown(); setUp();
     }
 
     private ExecutionEngine m_ee;
-    private int m_longOpthreshold;
     private VoltTable m_warehousedata;
     private VoltTable m_itemData;
     private Catalog m_catalog;
