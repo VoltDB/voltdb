@@ -39,20 +39,10 @@ public class TestPartialIndexesSuite extends RegressionSuite {
 
     private final String [] partitioned_tbs =  {"P1"};
     private final String [] replicated_tbs =  {"R1"};
-    private final String [] index_columns = {"A", "C"};
 
     private void emptyTable(Client client, String tb) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = client.callProcedure("@AdHoc", "delete from " + tb);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-    }
-
-    private boolean isReplicatedTable(String table) {
-        for (String repTable : replicated_tbs) {
-            if (repTable.equals(table)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -259,6 +249,61 @@ public class TestPartialIndexesSuite extends RegressionSuite {
                     " where a > 0 and b > 0 order by a").getResults()[0];
             validateTableOfLongs(vt, new long[][] { {2,2} });
         }
+        // CREATE UNIQUE INDEX p1_pidx_2 ON P1 (a) where a > 4;
+        // CREATE UNIQUE INDEX p1_pidx_3 ON P1 (a) where a > c and d > 3;
+        for (String tb : partitioned_tbs) {
+            emptyTable(client, tb);
+            // p1_pidx_3
+            ClientResponse cr =
+                    client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(1, NULL, 0, 4);");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            try {
+                // Rejected by p1_pidx_3
+                client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(1, NULL, -1, 4);");
+                fail("Shouldn't reach there");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
+            }
+
+            // No index
+            cr = client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(1, NULL, 0, 0);");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+            // p1_pidx_2
+            cr = client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(5, NULL, 10, 0);");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            try {
+                // Rejected by p1_pidx_2
+                client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(5, NULL, 4, 0);");
+                fail("Shouldn't reach there");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
+            }
+
+            // p1_pidx_2 and p1_pidx_3
+            cr = client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(10, NULL, 9, 4);");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            try {
+                // Rejected by p1_pidx_2 and p1_pidx_3
+                client.callProcedure("@AdHoc","INSERT INTO " + tb + " VALUES(10, NULL, 8, 4);");
+                fail("Shouldn't reach there");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
+            }
+            // No Index
+            VoltTable vt = client.callProcedure("@AdHoc", "select a, c, d from " + tb + " order by a, c, d").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {1, 0, 0}, {1, 0, 4}, {5, 10, 0}, {10, 9, 4} });
+
+            // p1_pidx_2
+            vt = client.callProcedure("@AdHoc", "select a, c, d from " + tb +
+                    " where a > 4 order by a, c, d").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {5, 10, 0}, {10, 9, 4} });
+
+            // p1_pidx_3
+            vt = client.callProcedure("@AdHoc", "select a, c, d from " + tb +
+                    " where a > 0 and a > c and d > 3 order by a, c, d").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {1, 0, 4}, {10, 9, 4} });
+}
     }
 
     public void testPartialIndex() throws Exception {
