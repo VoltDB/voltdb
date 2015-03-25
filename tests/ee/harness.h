@@ -247,6 +247,14 @@ do { \
     } \
 } while (0)
 
+#define ASSERT_TRUE_MSG(value, msg)                     \
+do { \
+    if (!(value)) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, msg); \
+        return; \
+    } \
+} while (0)
 
 namespace stupidunit {
 
