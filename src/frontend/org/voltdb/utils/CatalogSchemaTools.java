@@ -281,10 +281,8 @@ public abstract class CatalogSchemaTools {
 
         if (catalog_tbl.getTuplelimit() != Integer.MAX_VALUE) {
             table_sb.append(add + spacer + "LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
-            CatalogMap<Statement> deleteMap = catalog_tbl.getTuplelimitdeletestmt();
-            if (deleteMap.size() > 0) {
-                assert(deleteMap.size() == 1);
-                String deleteStmt = deleteMap.iterator().next().getSqltext();
+            String deleteStmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(catalog_tbl);
+            if (deleteStmt != null) {
                 if (deleteStmt.endsWith(";")) {
                     // StatementCompiler appends the semicolon, we don't want it here.
                     deleteStmt = deleteStmt.substring(0, deleteStmt.length() - 1);

@@ -360,6 +360,11 @@ public class ExportGeneration {
         }
 
         String leader = Collections.min(children);
+        String part = m_partitionLeaderZKName.get(partition);
+        if (part == null) {
+            exportLog.error("Unable to start exporting for partition: " + partition);
+            return;
+        }
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
