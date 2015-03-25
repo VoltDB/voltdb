@@ -122,7 +122,7 @@ public class ExportBenchmark {
         String servers = "localhost";
 
         @Option (desc = "Port on which to listen for statistics info from export clients")
-        int port = 5001;
+        int statsPort = 5001;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -135,7 +135,7 @@ public class ExportBenchmark {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (port < 1 || port > 65535) exitWithMessageAndUsage("stats port must be between 1 and 65535");
+            if (statsPort < 1 || statsPort > 65535) exitWithMessageAndUsage("stats port must be between 1 and 65535");
         }
     }
 
@@ -469,7 +469,7 @@ public class ExportBenchmark {
         try {
             InetSocketAddress isa = new InetSocketAddress(
                                             InetAddress.getLocalHost(),
-                                            config.port);
+                                            config.statsPort);
             channel.socket().setReuseAddress(true);
             channel.socket().bind(isa);
             channel.register(selector, SelectionKey.OP_READ);
@@ -566,19 +566,15 @@ public class ExportBenchmark {
 
         // Print server-side TPS
         int highestTps = 0;
-        double averageDecode = 0;
         for (Integer partition : tpsStats.keySet()) {
             ArrayList<Double> thisTps = tpsStats.get(partition);
             ArrayList<Double> thisDecode = decodeStats.get(partition);
             int averageTps = 0;
-            int averagePartitionDecode = 0;
 
             for (int i = 0; i < thisTps.size(); i++) {
                 averageTps += thisTps.get(i).intValue();
-                averagePartitionDecode += thisDecode.get(i).intValue();
             }
             averageTps /= thisTps.size();
-            averagePartitionDecode /= thisTps.size();
 
             System.out.println("Average TPS for partition "
                                 + partition.intValue()
@@ -586,6 +582,19 @@ public class ExportBenchmark {
             if (averageTps > highestTps) {
                 highestTps = averageTps;
             }
+        }
+
+        // Print average decode time
+        double averageDecode = 0;
+        for (Integer partition : decodeStats.keySet()) {
+            ArrayList<Double> thisDecode = decodeStats.get(partition);
+            int averagePartitionDecode = 0;
+
+            for (int i = 0; i < thisDecode.size(); i++) {
+                averagePartitionDecode += thisDecode.get(i).intValue();
+            }
+            averagePartitionDecode /= thisDecode.size();
+
             averageDecode += averagePartitionDecode;
         }
         averageDecode /= (tpsStats.keySet().size());
