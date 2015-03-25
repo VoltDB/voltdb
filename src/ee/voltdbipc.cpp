@@ -1366,6 +1366,8 @@ void VoltDBIPC::pushExportBuffer(
     if (block != NULL) {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
+        // Memset the first 8 bytes to initialize the MAGIC_HEADER_SPACE_FOR_JAVA
+        ::memset(block->rawPtr(), 0, 8);
         writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
         // Need the delete in the if statement for valgrind
         delete [] block->rawPtr();
