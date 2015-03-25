@@ -42,7 +42,9 @@ import java.nio.channels.DatagramChannel;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -53,6 +55,9 @@ import org.voltdb.exportclient.ExportDecoderBase;
  * periodically pushed to a UDP socket for collection.
  */
 public class SocketExporter extends ExportClientBase {
+
+    private static final VoltLogger m_logger = new VoltLogger("ExportClient");
+
     String host;
     int port;
     int statsDuration;
@@ -60,8 +65,8 @@ public class SocketExporter extends ExportClientBase {
     DatagramChannel channel;
 
     // Statistics
-    long transactions = 0;
-    long totalDecodeTime = 0;
+    AtomicLong transactions = new AtomicLong();
+    AtomicLong totalDecodeTime = new AtomicLong();
 
     @Override
     public void configure(Properties config) throws Exception {
@@ -79,7 +84,6 @@ public class SocketExporter extends ExportClientBase {
 
     class SocketExportDecoder extends ExportDecoderBase {
         Timer timer;
-        ByteBuffer buffer = ByteBuffer.allocate(1024);
 
         SocketExportDecoder(AdvertisedDataSource source) {
             super(source);
@@ -94,7 +98,7 @@ public class SocketExporter extends ExportClientBase {
             timer = new Timer();
             TimerTask statsPrinting = new TimerTask() {
                 @Override
-                public void run() { printStatistics(); }
+                public void run() { sendStatistics(); }
             };
             timer.scheduleAtFixedRate(statsPrinting,
                                       statsDuration * 1000,
@@ -107,19 +111,21 @@ public class SocketExporter extends ExportClientBase {
          *   -Average time for decodeRow() to run
          *   -Partition ID
          */
-        public void printStatistics() {
+        public void sendStatistics() {
+            ByteBuffer buffer = ByteBuffer.allocate(1024);
+
             // Calculate statistics
             double tps, averageDecodeTime;
             try {
-                tps = transactions / statsDuration;
-                averageDecodeTime = totalDecodeTime / transactions;
+                tps = transactions.get() / statsDuration;
+                averageDecodeTime = totalDecodeTime.get() / transactions.get();
             } catch (ArithmeticException e) {
                 // Divide by zero error. No transactions, so nothing to report
                 return;
             }
 
-            transactions = 0;
-            totalDecodeTime = 0;
+            transactions.set(0);
+            totalDecodeTime.set(0);
 
             // Create message
             String message = "tps:" + tps
@@ -134,16 +140,22 @@ public class SocketExporter extends ExportClientBase {
 
             // Send message over socket
             try {
-                channel.send(buffer, address);
+                int sent = channel.send(buffer, address);
+                if (sent != message.getBytes().length+1) {
+                    // Should always send the whole packet.
+                    m_logger.error("Error sending entire stats message");
+                }
             } catch (IOException e) {
-                System.err.println("Couldn't send stats to socket");
-                System.err.println(e.getLocalizedMessage());
+                m_logger.error("Couldn't send stats to socket");
             }
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             timer.cancel();
+            try {
+                channel.close();
+            } catch (IOException ignore) {}
         }
 
         @Override
@@ -153,7 +165,7 @@ public class SocketExporter extends ExportClientBase {
          */
         public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
             // Transaction count
-            transactions++;
+            transactions.incrementAndGet();
 
             // Time decodeRow
             try {
@@ -161,9 +173,9 @@ public class SocketExporter extends ExportClientBase {
                 decodeRow(rowData);
                 long endTime = System.nanoTime();
 
-                totalDecodeTime += (endTime - startTime);
+                totalDecodeTime.addAndGet(endTime - startTime);
             } catch (IOException e) {
-                System.err.println(e.getLocalizedMessage());
+                m_logger.error(e.getLocalizedMessage());
             }
 
             return true;
