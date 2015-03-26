@@ -1,7 +1,6 @@
-<pre>
 Automated Tests of the VMC (VoltDB Management Center), Using GEB
-----------------------------------------------------------------
-
+================================================================
+<pre>
 This file describes the GEB automated tests of the VMC (VoltDB Management
 Center), which is the new UI, replacing the old Web Studio. These automated
 tests are believed to provide more than the level of coverage of the old
@@ -42,19 +41,19 @@ To add to or modify the existing tests:
    voltdb/tests/geb/vmc/src/pages/ and voltdb/tests/geb/vmc/src/tests/
    directories, which contain most of the actual Groovy / GEB code.
 3. For more info on GEB, see:
-      http://www.gebish.org/
-      http://www.gebish.org/manual/current/
+      [http://www.gebish.org/](http://www.gebish.org/)
+      [http://www.gebish.org/manual/current/](http://www.gebish.org/manual/current/)
    For more info on Spock (which is also used), see:
-      http://docs.spockframework.org/en/latest/
-      https://code.google.com/p/spock/wiki/SpockBasics
+      [http://docs.spockframework.org/en/latest/](http://docs.spockframework.org/en/latest/)
+      [https://code.google.com/p/spock/wiki/SpockBasics](https://code.google.com/p/spock/wiki/SpockBasics)
 
 Periodically, it is necessary to update the version of Selenium being used
 by these tests, in order to support the latest version of Firefox (or other
 browsers). To do this:
 1. Check the most recent version of Selenium (with Java) here:
-      http://www.seleniumhq.org/download/
+      [http://www.seleniumhq.org/download/](http://www.seleniumhq.org/download/)
    Also, you may wish to confirm which version(s) of Firefox it supports here:
-      http://selenium.googlecode.com/git/java/CHANGELOG
+      [http://selenium.googlecode.com/git/java/CHANGELOG](http://selenium.googlecode.com/git/java/CHANGELOG)
 2. In the file voltdb/tests/geb/vmc/build.gradle, change the line:
       def seleniumVersion = "2.44.0"
    to use the latest version (e.g. "2.45.0").
@@ -63,7 +62,7 @@ Note 1: If you want to run these tests on Chrome, using:
       ./gradlew chrome --rerun-tasks
    (you may use 'chrome' or 'chromeTest'), then you will first need to download
    the Chrome Driver, as described here:
-      https://code.google.com/p/selenium/wiki/ChromeDriver
+      [https://code.google.com/p/selenium/wiki/ChromeDriver](https://code.google.com/p/selenium/wiki/ChromeDriver)
    (mainly, make sure it's in a directory included in the system PATH).
 
 Note 2: Similarly, if you want to run these tests on Internet Explorer (IE), on a
@@ -71,9 +70,9 @@ Note 2: Similarly, if you want to run these tests on Internet Explorer (IE), on 
       gradlew ie --rerun-tasks
    (you may use 'ie' or 'ieTest'), then you will first need to download the IE
    driver, as described here (under 'The Internet Explorer Driver Server'):
-      http://docs.seleniumhq.org/download/
+      [http://docs.seleniumhq.org/download/](http://docs.seleniumhq.org/download/)
    but also be aware of this recent issue:
-      https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw
+      [https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw](https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw)
    and you may want to turn off IE's auto-correct (spell checking).
 
 Note 3: If you want to run these tests "headless", without launching a browser,
@@ -82,7 +81,7 @@ Note 3: If you want to run these tests "headless", without launching a browser,
       ./gradlew phantomjs --rerun-tasks
    (you may use 'phantomjs' or 'phantomjsTest'), then you will first need to
    download PhantomJS, as described here:
-      http://phantomjs.org/download.html
+      [http://phantomjs.org/download.html](http://phantomjs.org/download.html)
    (and make sure its bin directory is included in the system PATH).
 
 Note 4: If you want to run just one test class or method, you may do so using
