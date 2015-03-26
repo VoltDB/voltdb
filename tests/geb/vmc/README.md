@@ -41,28 +41,30 @@ To add to or modify the existing tests:
    voltdb/tests/geb/vmc/src/pages/ and voltdb/tests/geb/vmc/src/tests/
    directories, which contain most of the actual Groovy / GEB code.
 3. For more info on GEB, see:
-      [http://www.gebish.org/](http://www.gebish.org/)
-      [http://www.gebish.org/manual/current/](http://www.gebish.org/manual/current/)
+      </pre>http://www.gebish.org/<pre>
+      </pre>http://www.gebish.org/manual/current/<pre>
    For more info on Spock (which is also used), see:
-      [http://docs.spockframework.org/en/latest/](http://docs.spockframework.org/en/latest/)
-      [https://code.google.com/p/spock/wiki/SpockBasics](https://code.google.com/p/spock/wiki/SpockBasics)
+      </pre>http://docs.spockframework.org/en/latest/<pre>
+      </pre>https://code.google.com/p/spock/wiki/SpockBasics<pre>
 
-Periodically, it is necessary to update the version of Selenium being used
-by these tests, in order to support the latest version of Firefox (or other
+Periodically, it is necessary to update the (default) version of Selenium being
+used by these tests, in order to support the latest version of Firefox (or other
 browsers). To do this:
 1. Check the most recent version of Selenium (with Java) here:
-      [http://www.seleniumhq.org/download/](http://www.seleniumhq.org/download/)
+      </pre>http://www.seleniumhq.org/download/<pre>
    Also, you may wish to confirm which version(s) of Firefox it supports here:
-      [http://selenium.googlecode.com/git/java/CHANGELOG](http://selenium.googlecode.com/git/java/CHANGELOG)
+      </pre>http://selenium.googlecode.com/git/java/CHANGELOG<pre>
 2. In the file voltdb/tests/geb/vmc/build.gradle, change the line:
-      def seleniumVersion = "2.44.0"
-   to use the latest version (e.g. "2.45.0").
+      def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.45.0")
+   to use the latest version (e.g. "2.46.2").
+Also, see Note 5 below, about how to change which version of Selenium (and
+other things) is used for a particular run.
 
 Note 1: If you want to run these tests on Chrome, using:
       ./gradlew chrome --rerun-tasks
    (you may use 'chrome' or 'chromeTest'), then you will first need to download
    the Chrome Driver, as described here:
-      [https://code.google.com/p/selenium/wiki/ChromeDriver](https://code.google.com/p/selenium/wiki/ChromeDriver)
+      </pre>https://code.google.com/p/selenium/wiki/ChromeDriver<pre>
    (mainly, make sure it's in a directory included in the system PATH).
 
 Note 2: Similarly, if you want to run these tests on Internet Explorer (IE), on a
@@ -70,9 +72,9 @@ Note 2: Similarly, if you want to run these tests on Internet Explorer (IE), on 
       gradlew ie --rerun-tasks
    (you may use 'ie' or 'ieTest'), then you will first need to download the IE
    driver, as described here (under 'The Internet Explorer Driver Server'):
-      [http://docs.seleniumhq.org/download/](http://docs.seleniumhq.org/download/)
+      </pre>http://docs.seleniumhq.org/download/<pre>
    but also be aware of this recent issue:
-      [https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw](https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw)
+      </pre>https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw<pre>
    and you may want to turn off IE's auto-correct (spell checking).
 
 Note 3: If you want to run these tests "headless", without launching a browser,
@@ -81,7 +83,7 @@ Note 3: If you want to run these tests "headless", without launching a browser,
       ./gradlew phantomjs --rerun-tasks
    (you may use 'phantomjs' or 'phantomjsTest'), then you will first need to
    download PhantomJS, as described here:
-      [http://phantomjs.org/download.html](http://phantomjs.org/download.html)
+      </pre>http://phantomjs.org/download.html<pre>
    (and make sure its bin directory is included in the system PATH).
 
 Note 4: If you want to run just one test class or method, you may do so using
@@ -98,19 +100,23 @@ Note 5: There are several system properties that can be specified on the
    command-line using '-P', as follows:
       ./gradlew -Purl=http://my.server.com:8080/ -PdebugPrint=true -PtimeoutSeconds=10 firefox --rerun-tasks
    Here is a description of all system properties currently available:
-      NAME            DEFAULT  DESCRIPTION
-      url             http://localhost:8080/  The URL for the VMC to be tested
-      debugPrint      false    If true, debug output is produced (in the test result HTML pages)
-      timeoutSeconds  5        How long to wait for HTML elements to appear, before giving up
-      windowWidth     1500     The width of the browser window
-      windowHeight    1000     The height of the browser window
+      NAME             DEFAULT  DESCRIPTION
+      url              http://localhost:8080/  The URL for the VMC to be tested
+      debugPrint       false    If true, debug output is produced (in the test result HTML pages)
+      timeoutSeconds   5        How long to wait for HTML elements to appear, before giving up
+      windowWidth      1500     The width of the browser window
+      windowHeight     1000     The height of the browser window
+      gebVersion       0.10.0   The version of GEB to use
+      spockVersion     0.7-groovy-2.0  The version of Spock to use
+      seleniumVersion  2.45.0   The version of Selenium to use
+      phantomjsVersion 1.2.1    The version of PhantomJS Ghost Driver to use (if any)
    These are used only in the SqlQueriesTest class, mainly in the
    insertQueryCountAndDeleteForTablesAndViews test method:
-      numRowsToInsert 3        How many rows to insert, in each Table
-      testTables      PARTITIONED_TABLE,REPLICATED_TABLE  Which Tables to test (or ALL)
-      testViews       null     Which Views (if any) to test (or ALL)
-      insertJson      false    If true, VARCHAR values will be inserted as JSON data
-      sleepSeconds    0        Can slow down the tests, to watch what they are doing
+      numRowsToInsert  3        How many rows to insert, in each Table
+      testTables       PARTITIONED_TABLE,REPLICATED_TABLE  Which Tables to test (or ALL)
+      testViews        null     Which Views (if any) to test (or ALL)
+      insertJson       false    If true, VARCHAR values will be inserted as JSON data
+      sleepSeconds     0        Can slow down the tests, to watch what they are doing
    If you are running the 'genqa' test app, then PARTITIONED_TABLE and
    REPLICATED_TABLE are already defined; but if not, they will be created by
    the SqlQueriesTest class, and then dropped at the end. The system properties
