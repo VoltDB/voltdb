@@ -97,7 +97,7 @@ void TupleStreamBase::cleanupManagedBuffers()
  */
 size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
 {
-    size_t beginUso = 0;
+    size_t beginUso = SIZE_MAX;
 
     if (currentSpHandle < m_openSpHandle)
     {
