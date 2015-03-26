@@ -265,7 +265,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     // Intentionally ignore the fact that a rollback wouldn't have actually advanced the
     // lastCommittedSpHandle. Our goal is to tick such that, if data had been produced,
     // it would flush itself out now
-    flushAndApply(99);
+    ASSERT_FALSE(flush(99));
 
     EXPECT_EQ(-1, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
