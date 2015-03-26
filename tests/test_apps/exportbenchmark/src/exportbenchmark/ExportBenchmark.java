@@ -146,7 +146,7 @@ public class ExportBenchmark {
      */
     class ExportCallback implements ProcedureCallback {
         @Override
-        public void clientCallback(ClientResponse response) throws Exception {
+        public void clientCallback(ClientResponse response) {
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 successfulInserts.incrementAndGet();
             } else {
@@ -200,7 +200,9 @@ public class ExportBenchmark {
     /**
      * Checks the export table to make sure that everything has been successfully
      * processed.
-     * @throws Exception
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws InterruptedException
      */
     public boolean waitForStreamedAllocatedMemoryZero() throws ProcCallException,IOException,InterruptedException {
         boolean passed = false;
@@ -272,9 +274,9 @@ public class ExportBenchmark {
                 client.createConnection(server);
                 break;
             }
-            catch (Exception e) {
+            catch (IOException e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                try { Thread.sleep(sleep); } catch (InterruptedException interruted) {}
                 if (sleep < 8000) sleep += sleep;
             }
         }
@@ -348,7 +350,7 @@ public class ExportBenchmark {
                 if (!success) {
                     System.err.println("Stored procedure not queuing");
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
                 System.err.println("Couldn't insert into VoltDB\n");
                 e.printStackTrace();
                 System.exit(1);
@@ -541,9 +543,12 @@ public class ExportBenchmark {
         boolean success = false;
         try {
             success = waitForStreamedAllocatedMemoryZero();
-        } catch (Exception e) {
+        } catch (IOException e) {
             System.err.println("Error while waiting for export: ");
-            e.printStackTrace();
+            e.getLocalizedMessage();
+        } catch (ProcCallException e) {
+            System.err.println("Error while calling procedures: ");
+            e.getLocalizedMessage();
         }
 
         System.out.println("Finished benchmark");
