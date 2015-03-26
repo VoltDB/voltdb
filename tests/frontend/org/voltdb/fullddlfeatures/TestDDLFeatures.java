@@ -68,12 +68,12 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     {
         teardownSystem();
     }
-/*  Temporarily (?) comment this out, to see if it was somehow causing test failures
+
     public void startClient() throws Exception
     {
         startClient(null);
     }
-*/
+
     @Test
     public void testCreateUniqueIndex() throws Exception {
         assertTrue(findTableInSystemCatalogResults("T17"));
@@ -234,8 +234,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         threw = false;
         try {
-            // Temporarily switch this back to using '3' (not '1'), to see effect on tests
-            m_client.callProcedure("T12.insert", 3, 2);
+            m_client.callProcedure("T12.insert", 1, 2);
         } catch (ProcCallException pce) {
             threw = true;
         }
