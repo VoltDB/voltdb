@@ -27,13 +27,13 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.Connector;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -51,6 +51,7 @@ public class JdbcDatabaseMetaDataGenerator
     public static final String JSON_PARTITION_COLUMN = "partitionColumn";
     public static final String JSON_SOURCE_TABLE = "sourceTable";
     public static final String JSON_LIMIT_PARTITION_ROWS_DELETE_STMT = "limitPartitionRowsDeleteStmt";
+    public static final String JSON_DRED_TABLE = "drEnabled";
     public static final String JSON_ERROR = "error";
 
     static public final ColumnInfo[] TABLE_SCHEMA =
@@ -64,7 +65,7 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("TYPE_SCHEM", VoltType.STRING),
                           new ColumnInfo("TYPE_NAME", VoltType.STRING),
                           new ColumnInfo("SELF_REFERENCING_COL_NAME", VoltType.STRING),
-                          new ColumnInfo("REF_GENERATION", VoltType.STRING),
+                          new ColumnInfo("REF_GENERATION", VoltType.STRING)
                          };
 
     static public final ColumnInfo[] COLUMN_SCHEMA =
@@ -283,6 +284,10 @@ public class JdbcDatabaseMetaDataGenerator
                 String deleteStmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(table);
                 if (deleteStmt != null) {
                     jsObj.put(JSON_LIMIT_PARTITION_ROWS_DELETE_STMT, deleteStmt);
+                }
+
+                if (table.getIsdred()) {
+                    jsObj.put(JSON_DRED_TABLE, "true");
                 }
 
                 remark = jsObj.length() > 0 ? jsObj.toString() : null;
