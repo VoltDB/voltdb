@@ -54,6 +54,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -82,7 +84,7 @@ public class ExportBenchmark {
     // Validated CLI config
     final ExportBenchConfig config;
     // Network variables
-    Selector selector;
+    Selector statsSocketSelector;
     Thread statsThread;
     ByteBuffer buffer = ByteBuffer.allocate(1024);
     // Statistics manager objects from the client
@@ -181,7 +183,7 @@ public class ExportBenchmark {
     }
 
     /**
-    * Create a Timer task to display performance data on the Vote procedure
+    * Create a Timer task to display performance data.
     * It calls printStatistics() every displayInterval seconds
     */
     public void schedulePeriodicStats() {
@@ -358,7 +360,7 @@ public class ExportBenchmark {
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
 
         testFinished.set(true);
-        selector.wakeup();
+        statsSocketSelector.wakeup();
     }
 
     /**
@@ -370,7 +372,7 @@ public class ExportBenchmark {
         while (true) {
             // Wait for an event...
             try {
-                selector.select();
+                statsSocketSelector.select();
             } catch (IOException e) {
                 exitWithException("Can't select a new socket", e);
             }
@@ -381,7 +383,7 @@ public class ExportBenchmark {
             }
 
             // We have events. Process each one.
-            for (SelectionKey key : selector.selectedKeys()) {
+            for (SelectionKey key : statsSocketSelector.selectedKeys()) {
                 if (!key.isValid()) {
                     continue;           // Ignore invalid keys
                 }
@@ -425,28 +427,41 @@ public class ExportBenchmark {
         }
 
         // Parse the stats message
-        message = message.trim();
-        String[] stats = message.split(",");
-
-        if (stats.length < 2) {
-            System.err.println("WARN: invalid stats message. Ignoring");
+        JSONObject json;
+        try {
+            json = new JSONObject(message);
+        } catch (JSONException e) {
+            System.err.println("Received invalid JSON: " + e.getLocalizedMessage());
+            return;
         }
 
-        Integer partitionId = new Integer(Integer.parseInt(stats[2].split(":")[1]));
-        Double tps = new Double(Double.parseDouble(stats[0].split(":")[1]));
-        Double decode = new Double(Double.parseDouble(stats[1].split(":")[1]));
-
+        Integer partitionId = null;
+        Double tps = null;
+        Double decode = null;
         try {
-            tpsStats.get(partitionId).add(tps);
-            decodeStats.get(partitionId).add(decode);
-        } catch (NullPointerException e) {
-            // We haven't logged this partition yet
+            partitionId = new Integer(json.getInt("partitionId"));
+            tps = new Double(json.getDouble("tps"));
+            decode = new Double(json.getDouble("decodeTime"));
+        } catch (JSONException e) {
+            System.err.println("Unable to parse JSON " + e.getLocalizedMessage());
+            return;
+        }
+
+        // Add new stats
+        if (tpsStats.get(partitionId) == null) {
             ArrayList<Double> newTps = new ArrayList<Double>();
-            ArrayList<Double> newDecode = new ArrayList<Double>();
             newTps.add(tps);
-            newDecode.add(decode);
             tpsStats.put(partitionId, newTps);
+        } else {
+            tpsStats.get(partitionId).add(tps);
+        }
+
+        if (decodeStats.get(partitionId) == null) {
+            ArrayList<Double> newDecode = new ArrayList<Double>();
+            newDecode.add(decode);
             decodeStats.put(partitionId, newDecode);
+        } else {
+            decodeStats.get(partitionId).add(decode);
         }
     }
 
@@ -458,7 +473,7 @@ public class ExportBenchmark {
 
         // Setup Listener
         try {
-            selector = SelectorProvider.provider().openSelector();
+            statsSocketSelector = SelectorProvider.provider().openSelector();
             channel = DatagramChannel.open();
             channel.configureBlocking(false);
         } catch (IOException e) {
@@ -472,7 +487,7 @@ public class ExportBenchmark {
                                             config.statsPort);
             channel.socket().setReuseAddress(true);
             channel.socket().bind(isa);
-            channel.register(selector, SelectionKey.OP_READ);
+            channel.register(statsSocketSelector, SelectionKey.OP_READ);
         } catch (IOException e) {
             exitWithException("Couldn't bind to socket", e);
         }
@@ -568,7 +583,6 @@ public class ExportBenchmark {
         int highestTps = 0;
         for (Integer partition : tpsStats.keySet()) {
             ArrayList<Double> thisTps = tpsStats.get(partition);
-            ArrayList<Double> thisDecode = decodeStats.get(partition);
             int averageTps = 0;
 
             for (int i = 0; i < thisTps.size(); i++) {
