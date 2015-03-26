@@ -44,6 +44,8 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
@@ -128,20 +130,25 @@ public class SocketExporter extends ExportClientBase {
             totalDecodeTime.set(0);
 
             // Create message
-            String message = "tps:" + tps
-                           + ",decodeTime:" + averageDecodeTime
-                           + ",partitionId:" + m_source.partitionId
-                           + "\n";
+            JSONObject message = new JSONObject();
+            try {
+                message.put("tps", tps);
+                message.put("decodeTime", averageDecodeTime);
+                message.put("partitionId", m_source.partitionId);
+            } catch (JSONException e) {
+                m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
+            }
 
+            String messageString = message.toString();
             buffer.clear();
-            buffer.put((byte)message.length());
-            buffer.put(message.getBytes());
+            buffer.put((byte)messageString.length());
+            buffer.put(messageString.getBytes());
             buffer.flip();
 
             // Send message over socket
             try {
                 int sent = channel.send(buffer, address);
-                if (sent != message.getBytes().length+1) {
+                if (sent != messageString.getBytes().length+1) {
                     // Should always send the whole packet.
                     m_logger.error("Error sending entire stats message");
                 }
