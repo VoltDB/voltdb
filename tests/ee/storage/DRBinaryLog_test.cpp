@@ -56,6 +56,7 @@ class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest() : m_undoToken(0), m_context(new ExecutorContext( 1, 1, NULL, &m_topend, &m_pool, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream)) {
         m_drStream.m_enabled = true;
+        m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
         *reinterpret_cast<int64_t*>(replicatedTableHandle) = 24;
 
@@ -145,7 +146,7 @@ public:
         return m_topend.receivedDRBuffer;
     }
 
-    void flushAndApply(int64_t lastCommittedSpHandle) {
+    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
         ASSERT_TRUE(flush(lastCommittedSpHandle));
 
         m_context->setupForPlanFragments(m_undoLog.generateUndoQuantum(m_undoToken));
@@ -167,8 +168,9 @@ public:
             m_drReplicatedStream.m_enabled = true;
         }
         m_topend.receivedDRBuffer = false;
-        m_undoLog.release(m_undoToken++);
+        endTxn(success);
     }
+
 
 protected:
     DRTupleStream m_drStream;
@@ -226,13 +228,10 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     ASSERT_FALSE(flush(100));
 
     second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
-    // temp tuple should contain the value of the second tuple; stash it to look up after a delete
-    TableTuple temp_tuple = m_table->tempTuple();
-    EXPECT_EQ(0, second_tuple.compare(temp_tuple));
     endTxn(true);
 
     // delete the second row inserted in the last write
-    beginTxn(112, 102, 101, 72);
+    beginTxn(112, 102, 101, 73);
     TableTuple tuple_to_delete = m_table->lookupTupleByValues(second_tuple);
     ASSERT_FALSE(tuple_to_delete.isNullTuple());
     m_table->deleteTuple(tuple_to_delete, true);
@@ -243,7 +242,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     EXPECT_EQ(4, m_tableReplica->activeTupleCount());
     tuple = m_tableReplica->lookupTupleByValues(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleByValues(temp_tuple);
+    tuple = m_tableReplica->lookupTupleByValues(prepareTempTuple(m_table, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
     ASSERT_FALSE(tuple.isNullTuple());
 
     // Propagate the delete
@@ -253,6 +252,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     ASSERT_FALSE(tuple.isNullTuple());
     tuple = m_tableReplica->lookupTupleByValues(second_tuple);
     ASSERT_TRUE(tuple.isNullTuple());
+
+    EXPECT_EQ(3, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    EXPECT_EQ(-1, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
@@ -260,8 +262,12 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     TableTuple source_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
     endTxn(false);
 
+    // Intentionally ignore the fact that a rollback wouldn't have actually advanced the
+    // lastCommittedSpHandle. Our goal is to tick such that, if data had been produced,
+    // it would flush itself out now
     flushAndApply(99);
 
+    EXPECT_EQ(-1, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
 
     beginTxn(100, 100, 99, 71);
@@ -277,6 +283,8 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
     TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
+
+    EXPECT_EQ(0, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
 }
 
 TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
@@ -325,10 +333,13 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     EXPECT_EQ(3, m_replicatedTableReplica->activeTupleCount());
     tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
+
+    EXPECT_EQ(0, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    EXPECT_EQ(2, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
 }
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
-    beginTxn(99, 99, 98, 70);
+    beginTxn(109, 99, 98, 70);
     TableTuple temp_tuple = m_replicatedTable->tempTuple();
     temp_tuple.setNValue(0, NValue::getNullValue(VALUE_TYPE_TINYINT));
     temp_tuple.setNValue(1, ValueFactory::getBigIntValue(489735));
@@ -360,7 +371,7 @@ TEST_F(DRBinaryLogTest, SerializeNulls) {
 }
 
 TEST_F(DRBinaryLogTest, RollbackNulls) {
-    beginTxn(99, 99, 98, 70);
+    beginTxn(109, 99, 98, 70);
     TableTuple temp_tuple = m_replicatedTable->tempTuple();
     temp_tuple.setNValue(0, NValue::getNullValue(VALUE_TYPE_TINYINT));
     temp_tuple.setNValue(1, ValueFactory::getBigIntValue(489735));
@@ -372,7 +383,7 @@ TEST_F(DRBinaryLogTest, RollbackNulls) {
     insertTuple(m_replicatedTable, temp_tuple);
     endTxn(false);
 
-    beginTxn(100, 100, 99, 71);
+    beginTxn(110, 100, 99, 71);
     TableTuple source_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
     endTxn(true);
 
@@ -380,6 +391,48 @@ TEST_F(DRBinaryLogTest, RollbackNulls) {
 
     EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
     TableTuple tuple = m_replicatedTableReplica->lookupTupleByValues(source_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+}
+
+TEST_F(DRBinaryLogTest, RollbackOnReplica) {
+    // single row write transaction
+    beginTxn(99, 99, 98, 70);
+    insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    endTxn(true);
+
+    // try and fail to apply this on the replica
+    flushAndApply(99, false);
+
+    EXPECT_EQ(0, m_tableReplica->activeTupleCount());
+
+    // successfully apply some data for, I don't know, verisimilitude?
+    beginTxn(100, 100, 99, 71);
+    TableTuple source_tuple = insertTuple(m_table, prepareTempTuple(m_table, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(true);
+
+    flushAndApply(100);
+
+    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+
+    // inserts followed by some deletes
+    beginTxn(101, 101, 100, 72);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 11, 34534, "3453.4545", "another", "blah blah blah blah blah blah", 2344));
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    TableTuple temp_tuple = m_table->lookupTupleByValues(first_tuple);
+    ASSERT_FALSE(temp_tuple.isNullTuple());
+    m_table->deleteTuple(temp_tuple, true);
+    temp_tuple = m_table->lookupTupleByValues(second_tuple);
+    ASSERT_FALSE(temp_tuple.isNullTuple());
+    m_table->deleteTuple(temp_tuple, true);
+    endTxn(true);
+
+    flushAndApply(101, false);
+
+    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+    tuple = m_tableReplica->lookupTupleByValues(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
