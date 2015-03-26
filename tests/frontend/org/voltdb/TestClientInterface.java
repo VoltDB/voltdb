@@ -750,7 +750,7 @@ public class TestClientInterface {
 
             //Change the bytes of the topology results and expect a topology update
             //to make its way to the client
-            ByteBuffer expectedBuf = getClientResponse("foo1");
+            ByteBuffer expectedBuf = getClientResponse("bar");
             statsAnswers.offer(dsOf(expectedBuf));
             DeferredSerialization ds = responsesDS.take();
             ByteBuffer actualBuf = ByteBuffer.allocate(ds.getSerializedSize());

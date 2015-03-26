@@ -2460,12 +2460,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (ds != null) {
                         oldValue = ByteBuffer.allocate(ds.getSerializedSize());
                         ds.serialize(oldValue);
-                        //oldValue.flip();
+                        oldValue.flip();
                     }
 
-                    if (buf.equals(oldValue)) {
-                        return;
-                    }
+                    if (buf.equals(oldValue)) return;
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
