@@ -67,7 +67,7 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
 dependencies {
     def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.10.0")
     def spockVersion = getProjectPropertyOrDefaultValue("spockVersion", "0.7-groovy-2.0")
-    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.44.0")
+    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.45.0")
     def phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.2.1")
     
     // GEB & Spock
@@ -75,30 +75,30 @@ dependencies {
     testCompile "org.spockframework:spock-core:$spockVersion"
     testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
 
-    // Apache commons (needed by HtmlUnitDriver)
+    // Apache commons (needed by HtmlUnitDriver?)
     //classpath "commons-lang3:commons-lang3:3.3.2"
     //classpath 'org.apache.commons:commons-lang3:3.0'
     
     // Selenium Drivers
+    println "Allowed browser-drivers (some work better than others):\n" + drivers
     drivers.each { driver ->
         if (driver == "phantomjs") {
             // TODO: switch back to the official 'detro' version, after issue
             // http://code.google.com/p/selenium/issues/detail?id=8102 is fixed
             testCompile "com.codeborne:phantomjsdriver:$phantomjsVersion"
             //testCompile "com.github.detro:phantomjsdriver:$phantomjsVersion"
-        //} else if (driver == "htmlunit") {
-            //testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion" {
-            //    exclude 'xml-apis'
-            //testCompile "org.seleniumhq.selenium:selenium-htmlunit-driver:$seleniumVersion" {
-            //    exclude 'xml-apis'
-            //}
+/*
+        } else if (driver == "htmlunit") {
+            testCompile "org.seleniumhq.selenium:selenium-htmlunit-driver:$seleniumVersion" {
+                exclude 'xml-apis'
+            }
+*/
         } else {
             testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
         }
     }
-    println "drivers: " + drivers
 
-    // TODO
+    // Include class files needed by (FullDdlSqlTest) tests
     compile files('../../../obj/release/test')
     compile files('../../../obj/release/clientobj')
     compile files('../../../obj/release/prod')
