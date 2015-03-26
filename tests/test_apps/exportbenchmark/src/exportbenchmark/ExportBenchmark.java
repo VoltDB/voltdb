@@ -355,7 +355,12 @@ public class ExportBenchmark {
             }
         }
 
-        try { client.drain(); } catch (InterruptedException|NoConnectionsException ignore) {}
+        try {
+            client.drain();
+        } catch (IOException ignore) {
+        } catch (InterruptedException ignore) {
+        }
+
         System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
 
@@ -498,7 +503,7 @@ public class ExportBenchmark {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    private void runTest() throws NoConnectionsException, InterruptedException {
+    private void runTest() throws InterruptedException {
         // Connect to servers
         try {
             System.out.println("Test initialization");
@@ -676,10 +681,8 @@ public class ExportBenchmark {
         try {
             ExportBenchmark bench = new ExportBenchmark(config);
             bench.runTest();
-        } catch (NoConnectionsException|InterruptedException e) {
-            System.err.println("VoltDB client error");
-            e.printStackTrace();
-            System.exit(1);
+        } catch (InterruptedException ignore) {
+            // Shouldn't get this
         }
     }
 }
