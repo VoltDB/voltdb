@@ -233,18 +233,18 @@ public class Tokenizer extends AbstractTokenizer {
 		/*
 		 * QUOTE_MODE (within quotes).
 		 */
-        if( sawNewLineInQuote ) {
-            if( currentColumn.length() > columnSizeLimit ) {
-                state = TokenizerState.NORMAL;
-                sawNewLineInQuote = false;
-                throw new SuperCsvException(
-                        String
-                        .format(
-                                "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
-                                "See --columnsizelimit.",
-                                columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
-            }
-        }
+                if( sawNewLineInQuote ) {
+                    if( currentColumn.length() > columnSizeLimit ) {
+                        state = TokenizerState.NORMAL;
+                        sawNewLineInQuote = false;
+                        throw new SuperCsvException(
+                                String
+                                .format(
+                                        "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
+                                        "See --columnsizelimit.",
+                                        columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
+                    }
+                }
 		if( c == NEWLINE ) {
 
 		    /*
@@ -299,6 +299,18 @@ public class Tokenizer extends AbstractTokenizer {
 			state = TokenizerState.NORMAL;
 			sawNewLineInQuote = false;
 			quoteScopeStartingLine = -1; // reset ready for next multi-line cell
+
+			// Check that we haven't gone over the column size limit
+			if( currentColumn.length() > columnSizeLimit ) {
+                state = TokenizerState.NORMAL;
+                sawNewLineInQuote = false;
+                throw new SuperCsvException(
+                        String
+                        .format(
+                                "oversized column while reading quoted column %d beginning on line %d and ending on line %d. " +
+                                "See --columnsizelimit.",
+                                columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
+            }
 		    }
 		} else {
 		    /*

@@ -2306,6 +2306,26 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
+
+        String errorMsg = "In database, the materialized view is automatically "
+                + "partitioned based on its source table. Invalid PARTITION statement on view table MY_VIEW.";
+
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "partition table t on column num;\n" +
+                "create view my_view as select num, count(*) from t group by num;\n" +
+                "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "partition table t on column num;" +
+                "create view my_view as select num, count(*) as ct from t group by num;" +
+                "partition table my_view on column ct;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "create view my_view as select num, count(*) from t group by num;" +
+                "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
     }
 
     public void testDDLCompilerTableLimit()
@@ -2467,29 +2487,23 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
             }
 
-            Statement stmt = null;
-            try {
-                stmt = tbl.getTuplelimitdeletestmt().iterator().next();
-            }
-            catch (NoSuchElementException nse) {
-            }
+            String stmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(tbl);
 
             if (expectedStmt == null) {
                 assertTrue("Did not expect to find a LIMIT DELETE statement, but found this one:\n"
-                        + (stmt != null ? stmt.getSqltext() : ""),
+                        + (stmt != null ? stmt : ""),
                         stmt == null);
             } else {
                 // Make sure we have the delete statement that we expected
                 assertTrue("Expected to find LIMIT DELETE statement, found none", stmt != null);
 
-                String sql = stmt.getSqltext();
-                if (sql.endsWith(";")) {
+                if (stmt.endsWith(";")) {
                     // We seem to add a semicolon somewhere.  I guess that's okay.
-                    sql = sql.substring(0, sql.length() - 1);
+                    stmt = stmt.substring(0, stmt.length() - 1);
                 }
 
                 assertEquals("Did not find the LIMIT DELETE statement that we expected",
-                        expectedStmt, sql);
+                        expectedStmt, stmt);
             }
         }
     }
