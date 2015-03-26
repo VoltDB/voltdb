@@ -234,7 +234,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         threw = false;
         try {
-            m_client.callProcedure("T12.insert", 1, 2);
+            // Temporarily switch this back to using '3' (not '1'), to see effect on tests
+            m_client.callProcedure("T12.insert", 3, 2);
         } catch (ProcCallException pce) {
             threw = true;
         }
