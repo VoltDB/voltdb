@@ -91,12 +91,13 @@ public class ExportBenchmark {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
     // Timer for periodic stats
-    Timer timer;
+    Timer periodicStatsTimer;
     // Test stats variables
-    long insertNumber = 0;
+    long totalInserts = 0;
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
+    // Server-side stats
     HashMap<Integer, ArrayList<Double>> tpsStats = new HashMap<Integer, ArrayList<Double>>();
     HashMap<Integer, ArrayList<Double>> decodeStats = new HashMap<Integer, ArrayList<Double>>();
     // Test timestamp markers
@@ -187,12 +188,12 @@ public class ExportBenchmark {
     * It calls printStatistics() every displayInterval seconds
     */
     public void schedulePeriodicStats() {
-        timer = new Timer();
+        periodicStatsTimer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
         };
-        timer.scheduleAtFixedRate(statsPrinting,
+        periodicStatsTimer.scheduleAtFixedRate(statsPrinting,
                                     config.displayinterval * 1000,
                                     config.displayinterval * 1000);
     }
@@ -324,8 +325,8 @@ public class ExportBenchmark {
         long now = System.currentTimeMillis();
         while (benchmarkWarmupEndTS > now) {
             try {
-                client.callProcedure(new NullCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                if (++insertNumber % 50 == 0) {
+                client.callProcedure(new NullCallback(), "ExportInsert", totalInserts, 1, 53, 64, 2.452, "String", 48932098, "aa");
+                if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
                 }
             } catch (IOException ignore) {}
@@ -343,8 +344,8 @@ public class ExportBenchmark {
         now = System.currentTimeMillis();
         while (benchmarkEndTS > now) {
             try {
-                boolean success = client.callProcedure(new ExportCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                if (++insertNumber % 50 == 0) {
+                boolean success = client.callProcedure(new ExportCallback(), "ExportInsert", totalInserts, 1, 53, 64, 2.452, "String", 48932098, "aa");
+                if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
                 }
                 if (!success) {
@@ -534,9 +535,9 @@ public class ExportBenchmark {
         Thread.sleep(config.warmup * 1000);
         setupSocketListener();
         listenForStats();
-        writes.join();
 
-        timer.cancel();
+        writes.join();
+        periodicStatsTimer.cancel();
         System.out.println("Client flushed; waiting for export to finish");
 
         // Wait until export is done
@@ -558,7 +559,7 @@ public class ExportBenchmark {
         client.close();
 
         if (!success) {
-            System.exit(1);
+            System.exit(-1);
         }
     }
 
