@@ -48,18 +48,19 @@ voltdb/tests/geb/vmc/src/pages/ and voltdb/tests/geb/vmc/src/tests/
 directories, which contain most of the actual Groovy / GEB code.
 3. For more info on GEB, see:
     http://www.gebish.org/  and
-    http://www.gebish.org/manual/current/
+    http://www.gebish.org/manual/current/.
 For more info on Spock (which is also used), see:
     http://docs.spockframework.org/en/latest/  and
-    https://code.google.com/p/spock/wiki/SpockBasics
+    https://code.google.com/p/spock/wiki/SpockBasics.
 
 Periodically, it is necessary to update the (default) version of Selenium being
 used by these tests, in order to support the latest version of Firefox (or other
 browsers). To do this:
+
 1. Check the most recent version of Selenium (with Java) in:
-    http://www.seleniumhq.org/download/
+    http://www.seleniumhq.org/download/.
 Also, you may wish to confirm which version(s) of Firefox it supports, in:
-    http://selenium.googlecode.com/git/java/CHANGELOG
+    http://selenium.googlecode.com/git/java/CHANGELOG.
 2. In the file voltdb/tests/geb/vmc/build.gradle, change the line:
 <pre>      def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.45.0")</pre>
 to use the latest version (e.g. "2.46.2").
