@@ -614,13 +614,27 @@ SnapshotCompletionInterest, Promotable
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
             if (m_replayAgent.getInstanceId() != null && info != null &&
                 !m_replayAgent.getInstanceId().equals(info.instanceId)) {
+                // Exceptions are not well tolerated here, so don't throw over something
+                // as trivial as error message formatting.
+                String agentIdString;
+                String infoIdString;
+                try {
+                    agentIdString = m_replayAgent.getInstanceId().serializeToJSONObject().toString();
+                } catch (JSONException e1) {
+                    agentIdString = "<failed to serialize id>";
+                }
+                try {
+                    infoIdString = info.instanceId.serializeToJSONObject().toString();
+                } catch (JSONException e1) {
+                    infoIdString = "<failed to serialize id>";
+                }
                 m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                .append(info.nonce)
-                                .append(" due to mismatching instance IDs.")
-                                .append(" Command log ID: ")
-                                .append(m_replayAgent.getInstanceId().serializeToJSONObject().toString())
-                                .append(" Snapshot ID: ")
-                                .append(info.instanceId.serializeToJSONObject().toString());
+                .append(info.nonce)
+                .append(" due to mismatching instance IDs.")
+                .append(" Command log ID: ")
+                .append(agentIdString)
+                .append(" Snapshot ID: ")
+                .append(infoIdString);
                 continue;
             }
             if (info != null) {
