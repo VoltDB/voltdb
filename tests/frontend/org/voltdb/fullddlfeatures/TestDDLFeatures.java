@@ -68,12 +68,12 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     {
         teardownSystem();
     }
-
+/*  Temporarily (?) comment this out, to see if it was somehow causing test failures
     public void startClient() throws Exception
     {
         startClient(null);
     }
-
+*/
     @Test
     public void testCreateUniqueIndex() throws Exception {
         assertTrue(findTableInSystemCatalogResults("T17"));
