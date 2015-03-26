@@ -205,10 +205,24 @@ public class TestPartialIndexesSuite extends RegressionSuite {
             } catch (ProcCallException e) {
                 assertTrue(e.getMessage().contains("Constraint Type UNIQUE"));
             }
-            vt = client.callProcedure("@AdHoc", "select a, b, c from " + tb +" where a > 0 and b > 0 order by a,c;").getResults()[0];
+            String sql = "select a, b, c from " + tb +" where a > 0 and b > 0 order by a,b,c;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] { {6, 1, 3} });
-            vt = client.callProcedure("@AdHoc", "select a, b, c from " + tb +" where c = 3 and b > 0 order by a,c;").getResults()[0];
+            // Verify AdHoc plans
+            VoltTable explain = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_1"));
+
+            sql = "select a, b, c from " + tb +" where c = 3 and b > 0 order by a,b,c;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] { {6, 1, 3} });
+            explain = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_HASH_1"));
+
+            // The Ad-Hoc parameterized query can use a partial index with "where b is not null"
+            // predicate - "b > ?" expression is NULL rejecting
+            explain = client.callProcedure("@Explain", "select a, b, c from " + tb +" where c = 3 and b > ? order by a,b,c;", 0).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_HASH_1"));
+
         }
     }
 
@@ -245,9 +259,17 @@ public class TestPartialIndexesSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc","DELETE FROM " + tb + " WHERE A = 1;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-            vt = client.callProcedure("@AdHoc", "select a, b from " + tb +
-                    " where a > 0 and b > 0 order by a").getResults()[0];
+            String sql = "select a, b from " + tb + " where a > 0 and b > 0 order by a, b";
+            vt = client.callProcedure("@AdHoc",  sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] { {2,2} });
+            // Verify AdHoc plans
+            VoltTable explain = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_1"));
+
+            // The Ad-Hoc parameterized query can use a partial index with "where b is not null"
+            // predicate - "b > ?" expression is NULL rejecting
+            explain = client.callProcedure("@Explain", "select a, b from " + tb + " where a > 0 and b > ? order by a, b", 0).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_1"));
         }
         // CREATE UNIQUE INDEX p1_pidx_2 ON P1 (a) where a > 4;
         // CREATE UNIQUE INDEX p1_pidx_3 ON P1 (a) where a > c and d > 3;
@@ -295,15 +317,25 @@ public class TestPartialIndexesSuite extends RegressionSuite {
             validateTableOfLongs(vt, new long[][] { {1, 0, 0}, {1, 0, 4}, {5, 10, 0}, {10, 9, 4} });
 
             // p1_pidx_2
-            vt = client.callProcedure("@AdHoc", "select a, c, d from " + tb +
-                    " where a > 4 order by a, c, d").getResults()[0];
+            String sql = "select a, c, d from " + tb + " where a > 4 order by a, c, d";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] { {5, 10, 0}, {10, 9, 4} });
+            // Verify AdHoc plans
+            VoltTable explain = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_2"));
 
             // p1_pidx_3
-            vt = client.callProcedure("@AdHoc", "select a, c, d from " + tb +
-                    " where a > 0 and a > c and d > 3 order by a, c, d").getResults()[0];
+            sql = "select a, c, d from " + tb + " where a > 0 and a > c and d > 3 order by a, c, d";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] { {1, 0, 4}, {10, 9, 4} });
-}
+            explain = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_3"));
+
+            // Ad-Hoc parameterized query can not use the partial index
+            explain = client.callProcedure("@Explain", "select a, c, d from " + tb + " where a > 0 and a > c and d > ? order by a, c, d", 3).getResults()[0];
+            assertTrue(!explain.toString().contains(tb + "_PIDX_3"));
+
+        }
     }
 
     public void testPartialIndex() throws Exception {
@@ -394,6 +426,26 @@ public class TestPartialIndexesSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = client.callProcedure("@AdHoc", "select a, d from " + tb + " where d = 2 and a < 0 order by a, d").getResults()[0];
             validateTableOfLongs(vt, new long[][] { {-2, 2} });
+
+            // r1_pidx_2
+            String sql = "select a, c, d from " + tb + " where d > 0 and a > 0 order by a, c, d";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {3, 3, 1} });
+            // Verify AdHoc plans
+            VoltTable explain = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_2"));
+
+            // r1_pidx_hash_2
+            sql = "select a, c, d from " + tb + " where d = 2 and a < 0 order by a, c, d";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {-2, 2, 2} });
+            // Verify AdHoc plans
+            explain = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(explain.toString().contains(tb + "_PIDX_HASH_2"));
+
+            // Ad-Hoc parameterized query can not use the partial index
+            explain = client.callProcedure("@Explain", "select a, c, d from " + tb + " where d = 2 and a < ? order by a, c, d", 0).getResults()[0];
+            assertTrue(!explain.toString().contains(tb + "_PIDX_HASH_2"));
 
         }
     }
