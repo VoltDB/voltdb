@@ -532,17 +532,10 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     /**
-     *  Tests all the SQL queries specified in a text file. Note that these
-     *  queries only work if you are running against the 'genqa' test app;
-     *  otherwise, they will fail immediately.
+     * Tests all the SQL queries specified in the sqlQueries.txt file.
      */
     @Unroll // performs this method for each test in the SQL Query text file
     def '#sqlQueriesTestName'() {
-
-        if (!isRunningGenqa(page) && expectedResponse.status == "SUCCESS") {
-            println ("\nWARNING: Apparently not running against the 'genqa' test "
-                    + "app, so this test (" + sqlQueriesTestName + ") may fail.")
-        }
 
         setup: 'execute the next query (or queries)'
         runQuery(page, query)
