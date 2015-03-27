@@ -62,13 +62,13 @@ should also be Dropped.
 2. More substantial changes to the tests can be made in the
 voltdb/tests/geb/vmc/src/pages/ and voltdb/tests/geb/vmc/src/tests/
 directories, which contain most of the actual Groovy / GEB code.
-3. For more info on GEB, see:
-    http://www.gebish.org  and
-    http://www.gebish.org/manual/current/
+3. For more info on GEB, see:  <br>
+    http://www.gebish.org  <br>
+    http://www.gebish.org/manual/current/  <br>
 (especially the latter).
-For more info on Spock (which is also used), see:
-    http://spockframework.github.io/spock/docs/  and
-    https://code.google.com/p/spock/wiki/SpockBasics
+For more info on Spock (which is also used), see:  <br>
+    http://spockframework.github.io/spock/docs/  <br>
+    https://code.google.com/p/spock/wiki/SpockBasics  <br>
 (especially the latter, which explains the use of 'setup', 'cleanup', 'when:',
 'then:', 'and:', 'expect:' and 'where:', etc.).
 
@@ -76,10 +76,10 @@ Periodically, it is necessary to update the (default) version of Selenium being
 used by these tests, in order to support the latest version of Firefox (or other
 browsers). To do this:
 
-1. Check the most recent version of Selenium (with Java) in:
-    http://www.seleniumhq.org/download/.
-Also, you may wish to confirm which version(s) of Firefox it supports, in:
-    http://selenium.googlecode.com/git/java/CHANGELOG.
+1. Check the most recent version of Selenium (with Java) in:  <br>
+    http://www.seleniumhq.org/download/  <br>
+Also, you may wish to confirm which version(s) of Firefox it supports, in:  <br>
+    http://selenium.googlecode.com/git/java/CHANGELOG  <br>
 2. In the file voltdb/tests/geb/vmc/build.gradle, change the line:
 <pre>
     def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.45.0")
@@ -95,8 +95,8 @@ Notes:
     ./gradlew chrome --rerun-tasks
 </pre>
 (you may use 'chrome' or 'chromeTest'), then you will first need to download
-the Chrome Driver, as described in:
-    https://code.google.com/p/selenium/wiki/ChromeDriver
+the Chrome Driver, as described in:  <br>
+    https://code.google.com/p/selenium/wiki/ChromeDriver  <br>
 (mainly, make sure it's in a directory included in the system PATH).
 
 2. Similarly, if you want to run these tests on Internet Explorer (IE), on a
@@ -105,10 +105,10 @@ Windows system, using ('gradlew' here refers to gradlew.bat):
     gradlew ie --rerun-tasks
 </pre>
 (you may use 'ie' or 'ieTest'), then you will first need to download the IE
-driver, as described here (under 'The Internet Explorer Driver Server'):
-    http://docs.seleniumhq.org/download/
-but also be aware of this recent issue:
-    https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw
+driver, as described here (under 'The Internet Explorer Driver Server'):  <br>
+    http://docs.seleniumhq.org/download/  <br>
+but also be aware of this recent issue:  <br>
+    https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw  <br>
 and you may want to turn off IE's auto-correct (spell checking).
 
 3. If you want to run these tests on Safari, on a Mac, using:
@@ -116,8 +116,8 @@ and you may want to turn off IE's auto-correct (spell checking).
     ./gradlew safari --rerun-tasks
 </pre>
 (you may use 'safari' or 'safariTest'), then you will first need to follow the
-instructions here:
-    https://github.com/SeleniumHQ/selenium/wiki/SafariDriver
+instructions here:  <br>
+    https://github.com/SeleniumHQ/selenium/wiki/SafariDriver  <br>
 about opening the latest version of SafariDriver.safariextz, and clicking the
 "install" button.
 
@@ -178,9 +178,9 @@ insertQueryCountAndDeleteForTablesAndViews test method:
 If you are running the 'genqa' test app, then PARTITIONED_TABLE and
 REPLICATED_TABLE are already defined; but if not, they will be created by
 the SqlQueriesTest class, and then dropped at the end. The system properties
-that are available are defined in:<br>
-    [voltdb/tests/geb/vmc/build.gradle](/tests/geb/vmc/build.gradle) (all except one)<br>
-    [voltdb/tests/geb/vmc/src/resources/GebConfig.groovy](/tests/geb/vmc/src/resources/GebConfig.groovy) (timeoutSeconds only)<br>
+that are available are defined in:  <br>
+    [voltdb/tests/geb/vmc/build.gradle](/tests/geb/vmc/build.gradle) (all except one)  <br>
+    [voltdb/tests/geb/vmc/src/resources/GebConfig.groovy](/tests/geb/vmc/src/resources/GebConfig.groovy) (timeoutSeconds only)  <br>
 So for more info, see there, or the code (especially SqlQueriesTest).
 
 7. If you want to run these tests regularly on your machine, you may want
@@ -191,7 +191,7 @@ does not get ahead of what Selenium can handle.
 
 8. Running the tests "headless" with HtmlUnit does not currently work; however,
 you can run "headless", without a browser, using PhantomJS / Ghost Driver.
-The browser drivers are specified in:
-    [voltdb/tests/geb/vmc/src/resources/GebConfig.groovy](/tests/geb/vmc/src/resources/GebConfig.groovy)
-See also:
-    [voltdb/tests/geb/vmc/build.gradle](/tests/geb/vmc/build.gradle).
+The browser drivers are specified in:  <br>
+    [voltdb/tests/geb/vmc/src/resources/GebConfig.groovy](/tests/geb/vmc/src/resources/GebConfig.groovy)  <br>
+See also:  <br>
+    [voltdb/tests/geb/vmc/build.gradle](/tests/geb/vmc/build.gradle)
