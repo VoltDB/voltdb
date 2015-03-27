@@ -652,4 +652,42 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertFalse(isColumnNullable("T54", "C1"));
         assertTrue(isColumnNullable("T54", "C2"));
     }
+
+
+    @Test
+    public void testTableDR() throws Exception
+    {
+        // Test for T56 (DR table exists)
+        assertTrue(findTableInSystemCatalogResults("T56"));
+        assertTrue(doesColumnExist("T56", "C1" ));
+        assertTrue(doesColumnExist("T56", "C2" ));
+        assertTrue(isColumnNullable("T56", "C2"));
+        assertTrue(isDRedTable("T56"));
+
+        // Test for T57 (DR partitioned table exists)
+        assertTrue(findTableInSystemCatalogResults("T57"));
+        assertTrue(doesColumnExist("T57", "C1" ));
+        assertTrue(doesColumnExist("T57", "C2" ));
+        assertTrue(isColumnPartitionColumn("T57", "C2"));
+        assertTrue(isDRedTable("T57"));
+
+        // Test that T58 and T59 have been dropped
+        assertFalse(findTableInSystemCatalogResults("T58"));
+        assertFalse(findTableInSystemCatalogResults("T59"));
+
+        // Test that the DR flag is false for T60 and T61 (after disable)
+        assertTrue(findTableInSystemCatalogResults("T60"));
+        assertTrue(doesColumnExist("T60", "C1" ));
+        assertTrue(doesColumnExist("T60", "C2" ));
+        assertTrue(doesColumnExist("T60", "C3" ));
+        assertTrue(verifyTableColumnType("T60", "C3", "INTEGER"));
+        assertFalse(isDRedTable("T60"));
+        assertTrue(findTableInSystemCatalogResults("T61"));
+        assertTrue(doesColumnExist("T61", "C1" ));
+        assertTrue(doesColumnExist("T61", "C2" ));
+        assertTrue(doesColumnExist("T61", "C3" ));
+        assertTrue(isColumnPartitionColumn("T61", "C3"));
+        assertTrue(verifyTableColumnType("T61", "C3", "INTEGER"));
+        assertFalse(isDRedTable("T61"));
+    }
 }
