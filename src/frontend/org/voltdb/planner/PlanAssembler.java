@@ -614,7 +614,7 @@ public class PlanAssembler {
         }
 
         if (commonPartitioning != null) {
-            m_partitioning = commonPartitioning;
+            m_partitioning.setFrom(commonPartitioning);
         }
 
         // need to reset plan id for the entire UNION

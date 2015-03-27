@@ -17,6 +17,8 @@
 
 package org.voltdb.planner;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -557,6 +559,27 @@ public class StatementPartitioning implements Cloneable{
         m_isDML = false;
         m_joinValid = true;
         m_partitionColForDML = null;
+    }
+    
+    /**
+     * Loads data from sourcePartitioning instance.
+     * 
+     * @param sourcePartitioning
+     */
+    public void setFrom(StatementPartitioning sourcePartitioning) {
+        if(sourcePartitioning == null) {
+            throw new NullPointerException("Source partitioning structure is null");
+        }
+        try {
+            for(Field field: getClass().getDeclaredFields()) {
+                if(!Modifier.isStatic(field.getModifiers())) {
+                    field.setAccessible(true);
+                    field.set(this, field.get(sourcePartitioning));
+                }
+            }
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Cannot copy patitioning information from class " + sourcePartitioning.getClass(), e);
+        }
     }
 
 }
