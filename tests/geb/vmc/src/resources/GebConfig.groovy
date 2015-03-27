@@ -29,7 +29,7 @@ import org.openqa.selenium.htmlunit.HtmlUnitDriver
 import org.openqa.selenium.ie.InternetExplorerDriver
 import org.openqa.selenium.phantomjs.PhantomJSDriver
 import org.openqa.selenium.safari.SafariDriver
-//*
+
 // Returns the specified project property value, if it is defined; otherwise,
 // returns the specified default value
 def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultValue) {
@@ -39,7 +39,8 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
         return defaultValue
     }
 }
-//*/
+
+// Possible future work: get 'includes' like this working
 //apply from: GetPropertyValues.gradle
 
 waiting {
@@ -61,7 +62,7 @@ environments {
     }
 
     htmlunit {
-        driver = { new HtmlUnitDriver(BrowserVersion.FIREFOX) }
+        driver = { new HtmlUnitDriver(true) }
     }
 
     phantomjs {
