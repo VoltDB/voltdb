@@ -83,8 +83,8 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         debugPrint '\nNew User Stored Procedures (to be dropped):\n' + newStoredProcs
         debugPrint '\nNew Roles (to be dropped):\n' + newRoles
 
-        // Drop all the new tables, views & (user) Stored Procs that were
-        // created by this test
+        // Drop all the new roles, tables, export tables, views & (user) Stored
+        // Procedures that were created by this test
         newStoredProcs.each { runQuery(page, 'Drop procedure ' + it + ' if exists') }
         newViews.each { runQuery(page, 'Drop view ' + it + ' if exists') }
         newTables.each { runQuery(page, 'Drop table ' + it + ' if exists') }
@@ -93,49 +93,36 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     }
 
     /**
-     * TODO
+     * Returns the 'name' within a specified (DDL) query, following a specified
+     * part of that query; for example, the name of the role in a CREATE ROLE
+     * query, or the name of the table in an EXPORT TABLE query.
+     * @param query - the complete (DDL) query that contains the name.
+     * @param afterThis - the word, within the <i>query</i>, after which the
+     * name is to be found.
+     * @return the next identifier that follows <i>afterThis</i>, within the
+     * <i>query</i>.
      */
-    private boolean isValidNameChar(char c) {
-        if (c >= 'A' && c <= 'Z') {
-            return true
-        } else if (c >= 'a' && c <= 'z') {
-            return true
-        } else if (c >= '0' && c <= '9') {
-            return true
-        } else if (c == '$' || c == '_') {
-            return true
-        } else {
-            return false
-        }
-    }
-    
-    /**
-     * TODO
-     */
-    private String getName(String command, String afterThis) {
-        println '\nFound a ' + afterThis + ' command...'
-        println '  ' + command
-        int start = command.toUpperCase().indexOf(afterThis) + afterThis.length()
-        int end = command.length();
+    private String getName(String query, String afterThis) {
+        int start = query.toUpperCase().indexOf(afterThis) + afterThis.length()
+        int end = query.length();
         for (int i=start; i < end; i++) {
-            if (isValidNameChar(command.charAt(i))) {
+            if (Character.isJavaIdentifierStart(query.charAt(i))) {
                 start = i
                 break
             }
         }
-        for (int i=start; i < command.length(); i++) {
-            if (!isValidNameChar(command.charAt(i))) {
+        for (int i=start; i < query.length(); i++) {
+            if (!Character.isJavaIdentifierPart(query.charAt(i))) {
                 end = i
                 break
             }
         }
-        println '  start, end: ' + start + ', ' + end
-        println '  substring : ' + command.substring(start, end)
-        return command.substring(start, end)
+        return query.substring(start, end)
     }
 
     /**
-     * TODO
+     * Tests all the SQL queries specified in the fullDDL.sql file; and runs
+     * the related JUnit tests in TestDDLFeatures.java.
      */
     def runFullDdlSqlFile() {
         // Get the lines of the fullDDL.sql file (ignoring comment lines
@@ -151,12 +138,6 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
                 for (int j=startCommandAtLine+1; j <= i; j++) {
                     command += '\n' + lines[j]
                 }
-                // Kludge for ENG-7869 (for named LIMIT PARTITION ROWS commands)
-                if (command.contains('DROP CONSTRAINT lpr39A')) {
-                    println '\nReplacing command:\n' + command
-                    command = command.replace('DROP CONSTRAINT lpr39A', 'DROP LIMIT PARTITION ROWS')
-                    println 'With command:\n' + command
-                }
                 commands.add(command)
                 startCommandAtLine = i + 1
             }
@@ -166,7 +147,8 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         commands.each {
             String commandUpperCase = it.toUpperCase()
 
-            // TODO
+            // Skip any 'CREATE PROCEDURE ... FROM CLASS ...' commands: there
+            // is currently no way to load these, in this client-side test
             if (commandUpperCase.contains('CREATE') && commandUpperCase.contains('PROCEDURE') &&
                 commandUpperCase.contains('FROM') && commandUpperCase.contains('CLASS')) {
                 println '\nSkipping command:\n' + it
