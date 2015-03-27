@@ -103,7 +103,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     m_currBlock->consumed(io.position());
 
     // No BEGIN TXN entry was written, use the current USO
-    if (startingUso == 0) {
+    if (startingUso == SIZE_MAX) {
         startingUso = m_uso;
     }
     // update uso.
@@ -195,7 +195,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     m_currBlock->consumed(io.position());
 
     // No BEGIN TXN entry was written, use the current USO
-    if (startingUso == 0) {
+    if (startingUso == SIZE_MAX) {
         startingUso = m_uso;
     }
     // update uso.

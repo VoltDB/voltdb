@@ -79,7 +79,7 @@ public:
         string columnNamesArray[COLUMN_COUNT] = {
             "C_TINYINT", "C_SMALLINT", "C_INTEGER", "C_BIGINT", "C_DOUBLE", "C_DECIMAL",
             "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP" };
-        const vector<string> columnNames(columnNamesArray, columnNamesArray + 11 );
+        const vector<string> columnNames(columnNamesArray, columnNamesArray + COLUMN_COUNT);
 
         m_table = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schema, columnNames, tableHandle, false, 0));
         m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schemaReplica, columnNames, tableHandle, false, 0));
@@ -154,10 +154,10 @@ public:
         tables[42] = m_tableReplica;
         tables[24] = m_replicatedTableReplica;
 
-        for (int i = (m_topend.blocks.size() - 1); i >=0; i--) {
-            boost::shared_ptr<StreamBlock> sb = m_topend.blocks[i];
+        for (int i = m_topend.blocks.size(); i > 0; i--) {
+            boost::shared_ptr<StreamBlock> sb = m_topend.blocks[i - 1];
             m_topend.blocks.pop_back();
-            boost::shared_array<char> data = m_topend.data[i];
+            boost::shared_array<char> data = m_topend.data[i - 1];
             m_topend.data.pop_back();
 
             *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
@@ -265,7 +265,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     // Intentionally ignore the fact that a rollback wouldn't have actually advanced the
     // lastCommittedSpHandle. Our goal is to tick such that, if data had been produced,
     // it would flush itself out now
-    flushAndApply(99);
+    ASSERT_FALSE(flush(99));
 
     EXPECT_EQ(-1, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
