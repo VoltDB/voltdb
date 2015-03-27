@@ -178,11 +178,9 @@ insertQueryCountAndDeleteForTablesAndViews test method:
 If you are running the 'genqa' test app, then PARTITIONED_TABLE and
 REPLICATED_TABLE are already defined; but if not, they will be created by
 the SqlQueriesTest class, and then dropped at the end. The system properties
-that are available are defined in:
-<pre>
-    voltdb/tests/geb/vmc/build.gradle (all except one)
-    voltdb/tests/geb/vmc/src/resources/GebConfig.groovy (timeoutSeconds only)
-</pre>
+that are available are defined in:<br>
+    [voltdb/tests/geb/vmc/build.gradle](/tests/geb/vmc/build.gradle) (all except one)<br>
+    [voltdb/tests/geb/vmc/src/resources/GebConfig.groovy](/tests/geb/vmc/src/resources/GebConfig.groovy) (timeoutSeconds only)<br>
 So for more info, see there, or the code (especially SqlQueriesTest).
 
 7. If you want to run these tests regularly on your machine, you may want
@@ -194,6 +192,6 @@ does not get ahead of what Selenium can handle.
 8. Running the tests "headless" with HtmlUnit does not currently work; however,
 you can run "headless", without a browser, using PhantomJS / Ghost Driver.
 The browser drivers are specified in:
-    [voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy](/src/test/resources/GebConfig.groovy)
+    [voltdb/tests/geb/vmc/src/resources/GebConfig.groovy](/tests/geb/vmc/src/resources/GebConfig.groovy)
 See also:
-    [voltdb/tests/geb/vmc/build.gradle](/build.gradle).
+    [voltdb/tests/geb/vmc/build.gradle](/tests/geb/vmc/build.gradle).
