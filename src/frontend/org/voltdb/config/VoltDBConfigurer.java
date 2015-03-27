@@ -3,45 +3,14 @@
  */
 package org.voltdb.config;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.CatalogContext;
 import org.voltdb.RealVoltDB;
-import org.voltdb.StartAction;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
-import org.voltdb.VoltDB;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
-import org.voltdb.compiler.ClusterConfig;
-import org.voltdb.compiler.PlannerTool;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.iv2.Cartographer;
-import org.voltdb.iv2.Initiator;
-import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.TxnEgo;
-import org.voltdb.rejoin.Iv2RejoinCoordinator;
-import org.voltdb.rejoin.JoinCoordinator;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.MiscUtils;
-
-import java.io.ByteArrayInputStream;
-import java.lang.reflect.Constructor;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * @author black
@@ -56,6 +25,29 @@ public class VoltDBConfigurer {
     @Bean
     public RealVoltDB realVoltDB() {
         return new RealVoltDB();
+    }
+    
+    @Bean
+    public HostMessenger hostMessenger(org.voltdb.config.Configuration m_config) {
+        final String leaderAddress = m_config.m_leader;
+        String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
+        int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
+
+        org.voltcore.messaging.HostMessenger.Config hmconfig;
+
+        hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
+        hmconfig.internalPort = m_config.m_internalPort;
+        if (m_config.m_internalPortInterface != null && m_config.m_internalPortInterface.trim().length() > 0) {
+            hmconfig.internalInterface = m_config.m_internalPortInterface.trim();
+        } else {
+            hmconfig.internalInterface = m_config.m_internalInterface;
+        }
+        hmconfig.zkInterface = m_config.m_zkInterface;
+        hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
+        hmconfig.factory = new VoltDbMessageFactory();
+        hmconfig.coreBindIds = m_config.m_networkCoreBindings;
+
+        return new org.voltcore.messaging.HostMessenger(hmconfig);
     }
     
     

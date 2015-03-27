@@ -97,7 +97,9 @@ import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.config.CatalogContextProvider;
 import org.voltdb.config.Configuration;
+import org.voltdb.config.DeploymentTypeProvider;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -167,10 +169,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Autowired
     private Configuration m_config;
     
+    @Autowired
+    private DeploymentTypeProvider deploymentProvider;
+    
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
+    
+    @Autowired
+    private CatalogContextProvider catalogContextProvider;
     volatile CatalogContext m_catalogContext;
+    
     private String m_buildString;
     static final String m_defaultVersionString = "5.1EA3";
     // by default set the version to only be compatible with itself
@@ -178,7 +187,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
-    HostMessenger m_messenger = null;
+    
+    @Autowired
+    HostMessenger m_messenger;
+    
     private ClientInterface m_clientInterface = null;
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
@@ -385,7 +397,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_clientInterface = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
-            m_messenger = null;
+            //m_messenger = null;
             m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
@@ -1328,6 +1340,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
          * Debate with the cluster what the deployment file should be
          */
         try {
+            
+            /*
             ZooKeeper zk = m_messenger.getZK();
             byte deploymentBytes[] = null;
 
@@ -1384,6 +1398,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
             DeploymentType deployment =
                 CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+            */
+            
+            DeploymentType deployment = deploymentProvider.getDeploymentType(deploymentProvider.getDeploymentBytes());
             // wasn't a valid xml deployment file
             if (deployment == null) {
                 hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
@@ -1486,6 +1503,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 }
             }
 
+            /*
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();
             // Need these in the dummy catalog
@@ -1507,7 +1525,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             new byte[] {},
                             deploymentBytes,
                             0);
+                            */
 
+            m_catalogContext = catalogContextProvider.getCatalogContext();
             return deployment.getCluster().getHostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -1626,6 +1646,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      * site are synched to the existing cluster.
      */
     void buildClusterMesh(boolean isRejoin) {
+        /*
         final String leaderAddress = m_config.m_leader;
         String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
         int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
@@ -1653,8 +1674,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
-
         VoltZK.createPersistentZKNodes(m_messenger.getZK());
+        */
+
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
