@@ -154,7 +154,7 @@ public:
         tables[42] = m_tableReplica;
         tables[24] = m_replicatedTableReplica;
 
-        for (int i = m_topend.blocks.size(); i > 0; i--) {
+        for (int i = static_cast<int>(m_topend.blocks.size()); i > 0; i--) {
             boost::shared_ptr<StreamBlock> sb = m_topend.blocks[i - 1];
             m_topend.blocks.pop_back();
             boost::shared_array<char> data = m_topend.data[i - 1];
