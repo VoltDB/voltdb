@@ -137,8 +137,8 @@ class TestBase extends GebReportingSpec {
      * @param file - the file whose lines are to be returned.
      * @param commentChars - the character(s) that indicate the beginning of a
      * comment, which should be ignored (default is '#').
-     * @param includeBlankLines - whether or not to include blank lines in the
-     * output (default is true).
+     * @param includeBlankLines - whether or not to include blank (or
+     * white-space only) lines in the output (default is true).
      * @return a list of lines from the specified file.
      */
     def List<String> getFileLines(File file, String commentChars='#',
@@ -146,8 +146,9 @@ class TestBase extends GebReportingSpec {
         def lines = []
         if (file.size() > 0) {
             file.eachLine { line ->
-                if ((includeBlankLines || !line.isEmpty()) &&
-                    !line.trim().startsWith(commentChars)) { lines.add(line) }
+                def trimmedLine = line.trim()
+                if ((includeBlankLines || !trimmedLine.isEmpty()) &&
+                    !trimmedLine.startsWith(commentChars)) { lines.add(line) }
             }
         }
         return lines
