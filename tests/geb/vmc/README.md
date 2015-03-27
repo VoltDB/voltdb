@@ -43,7 +43,7 @@ or, if you used Safari:
 <pre>
     voltdb/tests/geb/vmc/build/reports/safariTest/tests/index.html
 </pre>
-or, if you used PhantomJS and Ghost Driver:
+or, if you used PhantomJS / Ghost Driver:
 <pre>
     voltdb/tests/geb/vmc/build/reports/phantomjsTest/tests/index.html
 </pre>
@@ -123,7 +123,7 @@ about opening the latest version of SafariDriver.safariextz, and clicking the
 
 4. If you want to run these tests "headless", without launching a browser,
 so no GUI is needed (which is particularly useful on a Linux system without
-X11), using PhantomJS and Ghost Driver:
+X11), using PhantomJS / Ghost Driver:
 <pre>
     ./gradlew phantomjs --rerun-tasks
 </pre>
@@ -192,9 +192,8 @@ whether to install them" is a good choice), so that your version of Firefox
 does not get ahead of what Selenium can handle.
 
 8. Running the tests "headless" with HtmlUnit does not currently work; however,
-you can run "headless", without a browser, using and PhantomJS and Ghost Driver.
+you can run "headless", without a browser, using PhantomJS / Ghost Driver.
 The browser drivers are specified in:
-<pre>
-    voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy
-</pre>
-See also voltdb/tests/geb/vmc/build.gradle.
+    [voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy](/src/test/resources/GebConfig.groovy)
+See also:
+    [voltdb/tests/geb/vmc/build.gradle](/build.gradle).
