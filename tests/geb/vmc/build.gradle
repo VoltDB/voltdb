@@ -28,7 +28,8 @@
 apply plugin: 'groovy'
 //apply plugin: 'java'
 
-//apply from: src/resources/Downloads.gradle
+// Possible future work: download Chrome driver & PhantomJS automatically
+//apply from: "src/resources/Downloads.gradle"
 //apply from: "src/resources/GetPropertyValues.gradle"
 
 // The drivers to use
@@ -75,6 +76,12 @@ dependencies {
     testCompile "org.spockframework:spock-core:$spockVersion"
     testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
 
+    // Print (GEB, Spock, Selenium, PhantomJS/Ghost Driver) versions being used:
+    println "Running with:\nGEB version     : " + gebVersion
+    println "Spock version   : " + spockVersion
+    println "Selenium version: " + seleniumVersion
+    println "PhantomJS (Ghost Driver) version: " + phantomjsVersion
+
     // Apache commons (needed by HtmlUnitDriver?)
     //classpath "commons-lang3:commons-lang3:3.3.2"
     //classpath 'org.apache.commons:commons-lang3:3.0'
@@ -83,7 +90,8 @@ dependencies {
     println "Allowed browser-drivers (some work better than others):\n" + drivers
     drivers.each { driver ->
         if (driver == "phantomjs") {
-            // TODO: switch back to the official 'detro' version, after issue
+            // TODO: switch back to the official 'com.github.detro' version
+            // (commented out below), after issue
             // http://code.google.com/p/selenium/issues/detail?id=8102 is fixed
             testCompile "com.codeborne:phantomjsdriver:$phantomjsVersion"
             //testCompile "com.github.detro:phantomjsdriver:$phantomjsVersion"
@@ -133,7 +141,6 @@ drivers.each { driver ->
         systemProperty "debugPrint", getProjectPropertyOrDefaultValue("debugPrint", false)
         systemProperty "windowWidth", getProjectPropertyOrDefaultValue("windowWidth", 1500)
         systemProperty "windowHeight", getProjectPropertyOrDefaultValue("windowHeight", 1000)
-        //systemProperty "reusePage", getProjectPropertyOrDefaultValue("reusePage", false)
         systemProperty "sleepSeconds", getProjectPropertyOrDefaultValue("sleepSeconds", 0)
         systemProperty "numRowsToInsert", getProjectPropertyOrDefaultValue("numRowsToInsert", 3)
         systemProperty "testTables", getProjectPropertyOrDefaultValue("testTables", "PARTITIONED_TABLE,REPLICATED_TABLE")
