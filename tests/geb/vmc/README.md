@@ -27,26 +27,16 @@ script for the automated tests:
 (You may use 'firefox' or 'firefoxTest'.)
 
 4. Scan the console output for highlighted FAILED messages or failed test
-counts and/or browse the test result summary rooted in:
-<pre>
-    voltdb/tests/geb/vmc/build/reports/firefoxTest/tests/index.html
-</pre>
-or, if you used Chrome:
-<pre>
-    voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html
-</pre>
-or, if you used Internet Explorer (IE):
-<pre>
-    voltdb/tests/geb/vmc/build/reports/ieTest/tests/index.html
-</pre>
-or, if you used Safari:
-<pre>
-    voltdb/tests/geb/vmc/build/reports/safariTest/tests/index.html
-</pre>
-or, if you used PhantomJS / Ghost Driver:
-<pre>
-    voltdb/tests/geb/vmc/build/reports/phantomjsTest/tests/index.html
-</pre>
+counts and/or browse the test result summary rooted in:  <br>
+    voltdb/tests/geb/vmc/build/reports/firefoxTest/tests/index.html  <br>
+or, if you used Chrome:  <br>
+    voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html  <br>
+or, if you used Internet Explorer (IE):  <br>
+    voltdb/tests/geb/vmc/build/reports/ieTest/tests/index.html  <br>
+or, if you used Safari:  <br>
+    voltdb/tests/geb/vmc/build/reports/safariTest/tests/index.html  <br>
+or, if you used PhantomJS / Ghost Driver:  <br>
+    voltdb/tests/geb/vmc/build/reports/phantomjsTest/tests/index.html  <br>
 
 5. Stop the backgrounded server ("voltadmin shutdown" or "kill %1" - or 
 "kill <whatever your actual background job number(s) may be>").
