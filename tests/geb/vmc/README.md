@@ -39,6 +39,10 @@ or, if you used Internet Explorer (IE):
 <pre>
     voltdb/tests/geb/vmc/build/reports/ieTest/tests/index.html
 </pre>
+or, if you used Safari:
+<pre>
+    voltdb/tests/geb/vmc/build/reports/safariTest/tests/index.html
+</pre>
 or, if you used PhantomJS and Ghost Driver:
 <pre>
     voltdb/tests/geb/vmc/build/reports/phantomjsTest/tests/index.html
@@ -81,7 +85,7 @@ Also, you may wish to confirm which version(s) of Firefox it supports, in:
     def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.45.0")
 </pre>
 to use the latest version (e.g. "2.46.2").
-Also, see Note 5 below, about how to change which version of Selenium (and
+Also, see Note 6 below, about how to change which version of Selenium (and
 other things) is used for a particular run.
 
 Notes:
@@ -107,7 +111,17 @@ but also be aware of this recent issue:
     https://groups.google.com/forum/m/#!topic/selenium-users/TdY_rRNF-gw
 and you may want to turn off IE's auto-correct (spell checking).
 
-3. If you want to run these tests "headless", without launching a browser,
+3. If you want to run these tests on Safari, on a Mac, using:
+<pre>
+    ./gradlew safari --rerun-tasks
+</pre>
+(you may use 'safari' or 'safariTest'), then you will first need to follow the
+instructions here:
+    https://github.com/SeleniumHQ/selenium/wiki/SafariDriver
+about opening the latest version of SafariDriver.safariextz, and clicking the
+"install" button.
+
+4. If you want to run these tests "headless", without launching a browser,
 so no GUI is needed (which is particularly useful on a Linux system without
 X11), using PhantomJS and Ghost Driver:
 <pre>
@@ -118,7 +132,7 @@ download PhantomJS, as described here:
     http://phantomjs.org/download.html
 (and make sure its bin directory is included in the system PATH).
 
-4. If you want to run just one test class or method, you may do so using
+5. If you want to run just one test class or method, you may do so using
 the --tests argument. For example, to run all of the tests in the
 NavigatePagesTest class (on Firefox), run:
 <pre>
@@ -134,7 +148,7 @@ voltdb/tests/geb/vmc/src/resources/sqlQueries.txt, as follows:
     ./gradlew firefox --tests=*sqlQueries* --rerun-tasks
 </pre>
 
-5. There are several system properties that can be specified on the
+6. There are several system properties that can be specified on the
 command-line using '-P', as follows:
 <pre>
     ./gradlew -Purl=http://my.server.com:8080/ -PdebugPrint=true -PtimeoutSeconds=10 firefox --rerun-tasks
@@ -171,17 +185,15 @@ that are available are defined in:
 </pre>
 So for more info, see there, or the code (especially SqlQueriesTest).
 
-6. If you want to run these tests regularly on your machine, you may want
+7. If you want to run these tests regularly on your machine, you may want
 to set your Firefox Preferences (under Advanced, Update) to something other
 than "Automatically install updates" ("Check for updates, but let me choose
 whether to install them" is a good choice), so that your version of Firefox
 does not get ahead of what Selenium can handle.
 
-7. Running the tests against Safari does not currently work, nor does
-running "headless" with HtmlUnit; the browsers currently supported are:
-Firefox, Chrome, Internet Explorer; or you can run "headless", without a
-browser, using and PhantomJS and Ghost Driver. The browser drivers are
-specified in:
+8. Running the tests "headless" with HtmlUnit does not currently work; however,
+you can run "headless", without a browser, using and PhantomJS and Ghost Driver.
+The browser drivers are specified in:
 <pre>
     voltdb/tests/geb/vmc/src/test/resources/GebConfig.groovy
 </pre>
