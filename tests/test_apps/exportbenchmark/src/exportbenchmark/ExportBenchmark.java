@@ -36,7 +36,6 @@ package exportbenchmark;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -56,6 +55,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -491,7 +491,7 @@ public class ExportBenchmark {
         // Bind to port & register with a channel
         try {
             InetSocketAddress isa = new InetSocketAddress(
-                                            InetAddress.getLocalHost(),
+                                            CoreUtils.getLocalAddress(),
                                             config.statsPort);
             channel.socket().setReuseAddress(true);
             channel.socket().bind(isa);
@@ -557,6 +557,12 @@ public class ExportBenchmark {
         // Print results & close
         printResults(benchmarkEndTS-benchmarkWarmupEndTS);
         client.close();
+
+        // Make sure we got serverside stats
+        if (tpsStats.size() == 0 || decodeStats.size() == 0) {
+            System.err.println("ERROR: Never received stats from export clients");
+            success = false;
+        }
 
         if (!success) {
             System.exit(-1);
