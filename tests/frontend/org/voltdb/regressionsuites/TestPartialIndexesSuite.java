@@ -450,6 +450,34 @@ public class TestPartialIndexesSuite extends RegressionSuite {
         }
     }
 
+    public void testPartialIndexPlanCache() throws Exception {
+        if (isHSQL()) {
+            // HSQL doesn't support partial indexes
+            return;
+        }
+        Client client = getClient();
+
+        //CREATE INDEX r1_pidx_2 ON R1 (d) where a > 0;
+        String sql = "select a from r1 where d > 2 and a > 0;";
+        VoltTable explain = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(explain.toString().contains("R1_PIDX_2"));
+        // Same
+        sql = "select a from r1 where d > 3 and a > 0;";
+        explain = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(explain.toString().contains("R1_PIDX_2"));
+
+        // Index R1_PIDX_2 is not eligible. Can't use the previously cached plan
+        sql = "select a from r1 where d > 2 and a > 1;";
+        explain = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(!explain.toString().contains("R1_PIDX_2"));
+
+        // Index R1_PIDX_2 is again eligible.
+        sql = "select a from r1 where d > 2 and a > 0;";
+        explain = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(explain.toString().contains("R1_PIDX_2"));
+
+    }
+
     /**
      * Build a list of the tests that will be run when TestIndexColumnLess gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

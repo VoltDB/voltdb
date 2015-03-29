@@ -39,6 +39,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -800,6 +801,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public void setEliminatedPostFilters(List<AbstractExpression> exprs) {
         for (AbstractExpression expr : exprs) {
             m_eliminatedPostFilterExpressions.add((AbstractExpression)expr.clone());
+            // Add eliminated PVEs to the bindings. They will be used by the PlannerTool to compare
+            // bound plans in the cache
+            List<AbstractExpression> pves = expr.findAllSubexpressionsOfClass(ParameterValueExpression.class);
+            m_bindings.addAll(pves);
         }
     }
 

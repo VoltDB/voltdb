@@ -461,6 +461,14 @@ public class TestIndexSelection extends PlannerTestCase {
     public void testParameterizedQueryPartialIndex()
     {
         {
+            // CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
+            // range-scan covering from (A > 0) to end Z_FULL_IDX_A has higher cost
+            AbstractPlanNode pn = compile("select * from c where a > 0 and e = ?;");
+            checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"A_PARTIAL_IDX_NOT_NULL_E\"");
+            String[] columns = {"E"};
+            checkIndexPredicateContains(pn, columns);
+        }
+        {
             // CREATE INDEX partial_idx_4 ON c (a, b) where 0 < f; - not selected because of the parameter
             AbstractPlanNode pn = compile("select * from c where a > 0 and b > 0 and ? < f;");
             checkIndexName(pn, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
