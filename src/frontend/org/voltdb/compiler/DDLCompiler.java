@@ -791,6 +791,10 @@ public class DDLCompiler {
                     }
                 }
             }
+            else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "While configuring dr, table %s was not present in the catalog.", tableName));
+            }
             return true;
         }
 
