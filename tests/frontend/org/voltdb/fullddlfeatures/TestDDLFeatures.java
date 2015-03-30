@@ -69,6 +69,14 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         teardownSystem();
     }
 
+    /**
+     * A (public) method used to start the client, without also starting the
+     * server; needed by FullDdlSqlTest.java, in the GEB/VMC tests.
+     */
+    public void startClient() throws Exception
+    {
+        startClient(null);
+    }
 
     @Test
     public void testCreateUniqueIndex() throws Exception {
@@ -230,7 +238,12 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         threw = false;
         try {
-            m_client.callProcedure("T12.insert", 3, 2);
+            // Attempt to add an identical row: using the same partition key
+            // guarantees that this will go to the same partition as the earlier
+            // insert; using the the same constraint key (in the same partition)
+            // means that the ASSUMEUNIQUE constraint will be violoated, so an
+            // exception should be thrown
+            m_client.callProcedure("T12.insert", 1, 2);
         } catch (ProcCallException pce) {
             threw = true;
         }

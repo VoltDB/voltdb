@@ -745,6 +745,9 @@ public class TestClientInterface {
             //Shouldn't get anything
             assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
 
+            statsAnswers.offer(dsOf(getClientResponse("foo")));
+            assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
+
             //Change the bytes of the topology results and expect a topology update
             //to make its way to the client
             ByteBuffer expectedBuf = getClientResponse("bar");

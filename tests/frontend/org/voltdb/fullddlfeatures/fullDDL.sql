@@ -717,7 +717,10 @@ CREATE TABLE T39
     C INTEGER
 ,   CONSTRAINT lpr39A LIMIT PARTITION ROWS 1
 );
-ALTER TABLE T39 DROP CONSTRAINT lpr39A;
+-- Once ENG-7869 is fixed, switch this back to drop the constraint by name
+-- (or, better, should test both, with a table 'T39A'):
+ALTER TABLE T39 DROP LIMIT PARTITION ROWS;
+--ALTER TABLE T39 DROP CONSTRAINT lpr39A;
 
 -- ALTER TABLE ADD CONSTRAINT
 CREATE TABLE T40
