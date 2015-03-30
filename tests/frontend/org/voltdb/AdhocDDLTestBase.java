@@ -223,14 +223,16 @@ public class AdhocDDLTestBase extends TestCase {
     protected boolean isDRedTable(String table) throws Exception
     {
         VoltTable tableinfo = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
-        for(int i = 0; i < tableinfo.m_rowCount; i++)
-        {
+        for(int i = 0; i < tableinfo.m_rowCount; i++) {
             tableinfo.advanceToRow(i);
             String tablename = (String) tableinfo.get(2, VoltType.STRING);
-            if(tablename.equals(table))
-            {
+            if(tablename.equals(table)) {
                 try {
-                    JSONObject jsEntry = new JSONObject((String) tableinfo.get(4, VoltType.STRING));
+                    String remarks = (String)tableinfo.get(4, VoltType.STRING);
+                    if (remarks == null) {
+                        return false;
+                    }
+                    JSONObject jsEntry = new JSONObject(remarks);
                     return Boolean.valueOf(jsEntry.getString(JdbcDatabaseMetaDataGenerator.JSON_DRED_TABLE));
                 } catch (JSONException e) {
                     return false;
