@@ -3,12 +3,31 @@
  */
 package org.voltdb.config;
 
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface;
 import org.voltdb.RealVoltDB;
+import org.voltdb.VoltDB;
+import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.config.topo.DummyEJoinTopologyProvider;
+import org.voltdb.config.topo.PartitionsInformer;
+import org.voltdb.config.topo.RejoinTopologyProvider;
+import org.voltdb.config.topo.StartupTopologyProvider;
+import org.voltdb.config.topo.TopologyProvider;
+import org.voltdb.config.topo.TopologyProviderFactory;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.MiscUtils;
 
@@ -49,6 +68,17 @@ public class VoltDBConfigurer {
 
         return new org.voltcore.messaging.HostMessenger(hmconfig);
     }
-    
+
+    @Bean
+    public List<TopologyProvider> topologyProvidersChain(
+    		DummyEJoinTopologyProvider joinProvider,
+    		RejoinTopologyProvider rejoinProvider,
+    		StartupTopologyProvider defaultProvider) {
+    	List<TopologyProvider> providers = new ArrayList<TopologyProvider>();
+    	providers.add(joinProvider);
+    	providers.add(rejoinProvider);
+    	providers.add(defaultProvider);
+    	return providers;
+    }
     
 }

@@ -199,7 +199,7 @@ public class VoltDB {
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
-    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+    public static RuntimeException crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
         try {
             OnDemandBinaryLogger.flush();
         } catch (Throwable e) {}
@@ -319,6 +319,8 @@ public class VoltDB {
             ShutdownHooks.useOnlyCrashHooks();
             System.exit(-1);
         }
+        
+        throw new RuntimeException();
     }
 
     /*

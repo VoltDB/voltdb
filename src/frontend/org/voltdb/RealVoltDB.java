@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -58,6 +57,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -85,9 +86,6 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
@@ -97,9 +95,13 @@ import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.config.CartographerProvider;
 import org.voltdb.config.CatalogContextProvider;
+import org.voltdb.config.ClientInterfaceProvider;
 import org.voltdb.config.Configuration;
 import org.voltdb.config.DeploymentTypeProvider;
+import org.voltdb.config.topo.PartitionsInformer;
+import org.voltdb.config.topo.TopologyProviderFactory;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -115,13 +117,11 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -129,8 +129,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
-
-import javax.annotation.PostConstruct;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -172,6 +170,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Autowired
     private DeploymentTypeProvider deploymentProvider;
     
+    @Autowired
+    private PartitionsInformer partitionsInformer;
+    
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -191,7 +192,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Autowired
     HostMessenger m_messenger;
     
+    @Autowired
+    private ClientInterfaceProvider clientInterfaceProvider;
     private ClientInterface m_clientInterface = null;
+    
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
@@ -202,6 +206,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
     private StatsManager m_statsManager = null;
+    @Autowired
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     // These are unused locally, but they need to be registered with the StatsAgent so they're
     // globally available
@@ -214,7 +219,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     // IV2 things
     List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
-    Cartographer m_cartographer = null;
+    @Autowired
+    private CartographerProvider cartographerProvider;
+    
+    Cartographer m_cartographer;
+    
+    @Autowired
+    private TopologyProviderFactory topologyProvider;
+    
     LeaderAppointer m_leaderAppointer = null;
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
@@ -386,7 +398,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // set the mode first thing
             m_mode = OperationMode.INITIALIZING;
-            m_config = config;
+            //m_config = config;
             m_startMode = null;
             m_consumerDRGateway = new ConsumerDRGateway.DummyConsumerDRGateway();
 
@@ -394,15 +406,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // which reusue the process
             m_safeMpTxnId = Long.MAX_VALUE;
             m_lastSeenMpTxnId = Long.MIN_VALUE;
-            m_clientInterface = null;
+            //m_clientInterface = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
             //m_messenger = null;
             m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
-            m_snapshotCompletionMonitor = null;
-            m_catalogContext = null;
+            //m_snapshotCompletionMonitor = null;
+            //m_catalogContext = null;
             m_partitionCountStats = null;
             m_ioStats = null;
             m_memoryStats = null;
@@ -570,16 +582,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
+            JSONObject topo = topologyProvider.getTopo();
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Integer>();
             try {
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
                 m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
+                
+                
+                /*
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
-                List<Integer> partitions = null;
-                if (isRejoin) {
+                        */
+                m_cartographer = cartographerProvider.getCartographer();
+                m_configuredNumberOfPartitions = partitionsInformer.getNumberOfPartitions();
+                List<Integer> partitions = partitionsInformer.getPartitions();
+                /*if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                                                           clusterConfig.getSitesPerHost());
@@ -593,7 +611,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 else {
                     m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
                     partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                }
+                }*/
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
@@ -751,6 +769,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_opsRegistrar.setDummyMode(false);
 
             // Create the client interface
+            /*
             try {
                 InetAddress clientIntf = null;
                 InetAddress adminIntf = null;
@@ -777,6 +796,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
+            */
+            m_clientInterface = clientInterfaceProvider.getClientInterface();
 
             boolean usingCommandLog = m_config.m_isEnterprise &&
                     m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
@@ -1208,6 +1229,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    /*
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
     private JSONObject getTopology(StartAction startAction, JoinCoordinator joinCoordinator)
@@ -1239,6 +1261,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
         return topo;
     }
+    */
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions,
                                                 StartAction startAction,
@@ -1255,43 +1278,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return initiators;
     }
 
-    private JSONObject registerClusterConfig(ClusterConfig config)
-    {
-        // First, race to write the topology to ZK using Highlander rules
-        // (In the end, there can be only one)
-        JSONObject topo = null;
-        try
-        {
-            topo = config.getTopology(m_messenger.getLiveHostIds());
-            byte[] payload = topo.toString(4).getBytes("UTF-8");
-            m_messenger.getZK().create(VoltZK.topology, payload,
-                    Ids.OPEN_ACL_UNSAFE,
-                    CreateMode.PERSISTENT);
-        }
-        catch (KeeperException.NodeExistsException nee)
-        {
-            // It's fine if we didn't win, we'll pick up the topology below
-        }
-        catch (Exception e)
-        {
-            VoltDB.crashLocalVoltDB("Unable to write topology to ZK, dying",
-                    true, e);
-        }
-
-        // Then, have everyone read the topology data back from ZK
-        try
-        {
-            byte[] data = m_messenger.getZK().getData(VoltZK.topology, false, null);
-            topo = new JSONObject(new String(data, "UTF-8"));
-        }
-        catch (Exception e)
-        {
-            VoltDB.crashLocalVoltDB("Unable to read topology from ZK, dying",
-                    true, e);
-        }
-        return topo;
-    }
-
+    
     private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
     /**
      * Schedule all the periodic works
