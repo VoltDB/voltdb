@@ -717,9 +717,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
-            // Need to register the OpsAgents right before we turn on the client interface
-            m_opsRegistrar.setDummyMode(false);
-
             // Create the client interface
             try {
                 InetAddress clientIntf = null;
@@ -963,6 +960,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_restoreAgent != null) {
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterface));
             }
+
+            // Start the stats agent at the end, after everything has been constructed
+            m_opsRegistrar.setDummyMode(false);
 
             m_configLogger = new Thread(new ConfigLogging());
             m_configLogger.start();
