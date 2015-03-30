@@ -20,10 +20,13 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -160,18 +163,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate(int nextKeyIndex) {
+        m_skip_null_predicate = buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+    }
 
-        String exprsjson = m_catalogIndex.getExpressionsjson();
+    public static AbstractExpression buildSkipNullPredicate(
+            int nextKeyIndex, Index catalogIndex, StmtTableScan tableScan,
+            List<AbstractExpression> searchkeyExpressions) {
+
+        String exprsjson = catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
         if (exprsjson.isEmpty()) {
             indexedExprs = new ArrayList<AbstractExpression>();
 
-            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
             assert(nextKeyIndex < indexedColRefs.size());
             for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
-                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
+                TupleValueExpression tve = new TupleValueExpression(tableScan.getTableName(), tableScan.getTableAlias(),
                         col.getTypeName(), col.getTypeName());
                 tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
 
@@ -179,7 +188,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
                 assert(nextKeyIndex < indexedExprs.size());
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -187,19 +196,42 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-        for (int i = 0; i < nextKeyIndex; i++) {
-            AbstractExpression idxExpr = indexedExprs.get(i);
-            AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
-            exprs.add(expr);
+        // For a partial index extract all TVE expressions from it predicate if it's NULL-rejecting expression
+        // These TVEs do not need to be added to the skipNUll predicate because it's redundant.
+        AbstractExpression indexPredicate = null;
+        Set<TupleValueExpression> notNullTves = null;
+        String indexPredicateJson = catalogIndex.getPredicatejson();
+        if (!StringUtil.isEmpty(indexPredicateJson)) {
+            try {
+                indexPredicate = AbstractExpression.fromJSONString(indexPredicateJson, tableScan);
+                assert(indexPredicate != null);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+            if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
+                notNullTves = new HashSet<TupleValueExpression>();
+                notNullTves.addAll(ExpressionUtil.getTupleValueExpressions(indexPredicate));
+            }
         }
-        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
-        AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
-        exprs.add(expr);
 
-        m_skip_null_predicate = ExpressionUtil.combine(exprs);
-        m_skip_null_predicate.finalizeValueTypes();
+        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        AbstractExpression skipNullPredicate = null;
+        if (notNullTves == null || !notNullTves.contains(nullExpr)) {
+            List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+            for (int i = 0; i < nextKeyIndex; i++) {
+                AbstractExpression idxExpr = indexedExprs.get(i);
+                AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                        idxExpr, (AbstractExpression) searchkeyExpressions.get(i).clone());
+                exprs.add(expr);
+            }
+            AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+            exprs.add(expr);
+
+            skipNullPredicate = ExpressionUtil.combine(exprs);
+            skipNullPredicate.finalizeValueTypes();
+        }
+        return skipNullPredicate;
     }
 
     @Override

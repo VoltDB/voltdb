@@ -47,7 +47,8 @@ CREATE TABLE c
   c bigint not null,
   d bigint not null,
   e bigint,
-  f bigint not null
+  f bigint not null,
+  g bigint
 );
 CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
 CREATE INDEX a_partial_idx_not_null_d_e ON c (a + b) where (d + e) is not null;
@@ -60,3 +61,4 @@ CREATE INDEX partial_idx_2 ON c (b) where d > 0 and d < 5;
 CREATE INDEX partial_idx_3 ON c (b) where d > 0;
 CREATE INDEX partial_idx_4 ON c (a, b) where 0 < f;
 CREATE INDEX partial_idx_5 ON c (b) where d > f;
+CREATE INDEX partial_idx_6 ON c (g) where g is not null;

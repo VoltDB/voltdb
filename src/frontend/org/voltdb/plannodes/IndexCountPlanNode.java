@@ -33,14 +33,11 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
@@ -160,47 +157,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if (nextKeyIndex < 0) {
             return ;
         }
-
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-
-        String exprsjson = m_catalogIndex.getExpressionsjson();
-        List<AbstractExpression> indexedExprs = null;
-        if (exprsjson.isEmpty()) {
-            indexedExprs = new ArrayList<AbstractExpression>();
-
-            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
-            for (int i = 0; i <= nextKeyIndex; i++) {
-                ColumnRef colRef = indexedColRefs.get(i);
-                Column col = colRef.getColumn();
-                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
-                        col.getTypeName(), col.getTypeName());
-
-                tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
-
-                tve.resolveForTable((Table)m_catalogIndex.getParent());
-                indexedExprs.add(tve);
-            }
-        } else {
-            try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
-            } catch (JSONException e) {
-                e.printStackTrace();
-                assert(false);
-            }
-
-        }
-        AbstractExpression expr;
-        for (int i = 0; i < nextKeyIndex; i++) {
-            AbstractExpression idxExpr = indexedExprs.get(i);
-            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
-            exprs.add(expr);
-        }
-        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
-        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
-        exprs.add(expr);
-        m_skip_null_predicate = ExpressionUtil.combine(exprs);
-        m_skip_null_predicate.finalizeValueTypes();
+        m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
     }
 
     // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
