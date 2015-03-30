@@ -118,6 +118,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import org.voltdb.client.ClientAuthHashScheme;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -620,13 +621,29 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
 
-            message.flip().position(1);//skip version
+            message.flip();
+            int aversion = message.get(); //Get version
+            ClientAuthHashScheme hashScheme = ClientAuthHashScheme.HASH_SHA1;
+            //If auth version is more than zero we read auth hashing scheme.
+            if (aversion > 0) {
+                try {
+                    hashScheme = ClientAuthHashScheme.get(message.get());
+                } catch (IllegalArgumentException ex) {
+                    authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
+                    //Send negative response
+                    responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                    socket.write(responseBuffer);
+                    socket.close();
+                    return null;
+                }
+            }
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
             final String username = fds.readString();
-            final byte password[] = new byte[20];
-            //We should be left with SHA-1 bytes only.
-            if (message.remaining() != 20) {
+            final int digestLen = ClientAuthHashScheme.getDigestLength(hashScheme);
+            final byte password[] = new byte[digestLen];
+            //We should be left with SHA bytes only which varies based on scheme.
+            if (message.remaining() != digestLen) {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress()
                         + "): user " + username + " failed authentication.");
                 //Send negative response
@@ -667,12 +684,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (ap == AuthProvider.KERBEROS) {
                     arq = context.authSystem.new KerberosAuthenticationRequest(socket);
                 } else {
-                    arq = context.authSystem.new HashAuthenticationRequest(username, password);
+                    arq = context.authSystem.new HashAuthenticationRequest(username, password, hashScheme);
                 }
                 /*
                  * Authenticate the user.
                  */
-                boolean authenticated = arq.authenticate();
+                boolean authenticated = arq.authenticate(hashScheme);
 
                 if (!authenticated) {
                     Exception faex = arq.getAuthenticationFailureException();

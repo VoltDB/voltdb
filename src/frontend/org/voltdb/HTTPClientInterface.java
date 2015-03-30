@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.http.HttpServletResponse;
@@ -317,27 +316,31 @@ public class HTTPClientInterface {
         if (password != null) {
             try {
                 // Create a MessageDigest every time because MessageDigest is not thread safe (ENG-5438)
-                MessageDigest md = MessageDigest.getInstance("SHA-1");
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
                 hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
-            } catch (NoSuchAlgorithmException e) {
+            } catch (Exception e) {
                 return new AuthenticationResult(null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority
         // Hashedassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded)
+        // OR
+        // Hashedassword must be a 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)
         if (hashedPassword != null) {
-            if (hashedPassword.length() != 40) {
-                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+            if (hashedPassword.length() != 40 && hashedPassword.length() != 64) {
+                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                        + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
             try {
                 hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
             }
             catch (Exception e) {
-                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                        + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
         }
 
-        assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20));
+        assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20) || (hashedPasswordBytes.length == 32));
 
         try {
             // get a connection to localhost from the pool
