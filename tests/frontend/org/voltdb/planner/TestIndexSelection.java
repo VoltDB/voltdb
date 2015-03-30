@@ -483,46 +483,60 @@ public class TestIndexSelection extends PlannerTestCase {
 
     public void testSkipNullPartialIndex() {
         {
-            //CREATE INDEX partial_idx_6 ON c (g) where g is not null;
+            //CREATE INDEX partial_idx_7 ON c (g) where g is not null;
             // skipNull predicate is redundant and eliminated
             AbstractPlanNode pn = compile("select count(*) from c where g > 0;");
-            checkIndexName(pn, PlanNodeType.INDEXCOUNT, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_6\"");
-            checkIndexSkipNullPredicateIsNull(pn, true);
+            checkIndexName(pn, PlanNodeType.INDEXCOUNT, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_7\"");
+            checkIndexSkipNullPredicateIsNull(pn, false);
         }
         {
-            //CREATE INDEX partial_idx_6 ON c (g) where g is not null;
+            //CREATE INDEX partial_idx_7 ON c (g) where g is not null;
             // skipNull predicate is redundant and eliminated
             AbstractPlanNode pn = compile("select e from c where g > 0;");
+            checkIndexName(pn, PlanNodeType.INDEXSCAN, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_7\"");
+            checkIndexSkipNullPredicateIsNull(pn, false);
+        }
+        {
+            //CREATE INDEX partial_idx_6 ON c (g) where g < 0;
+            // skipNull predicate is redundant and eliminated
+            AbstractPlanNode pn = compile("select count(*) from c where g < 0;");
+            checkIndexName(pn, PlanNodeType.INDEXCOUNT, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_6\"");
+            checkIndexSkipNullPredicateIsNull(pn, false);
+        }
+        {
+            //CREATE INDEX partial_idx_6 ON c (g) where g < 0;
+            // skipNull predicate is redundant and eliminated
+            AbstractPlanNode pn = compile("select g from c where g < 0;");
             checkIndexName(pn, PlanNodeType.INDEXSCAN, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_6\"");
-            checkIndexSkipNullPredicateIsNull(pn, true);
+            checkIndexSkipNullPredicateIsNull(pn, false);
         }
         {
             // CREATE UNIQUE INDEX z_full_idx_a ON c (a);
             // skipNull is required - full index
             AbstractPlanNode pn = compile("select count(*) from c where a > 0;");
             checkIndexName(pn, PlanNodeType.INDEXCOUNT, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
-            checkIndexSkipNullPredicateIsNull(pn, false);
+            checkIndexSkipNullPredicateIsNull(pn, true);
         }
         {
             // CREATE UNIQUE INDEX z_full_idx_a ON c (a);
             // skipNull is required - full index
             AbstractPlanNode pn = compile("select e from c where a > 0;");
             checkIndexName(pn, PlanNodeType.INDEXSCAN, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
-            checkIndexSkipNullPredicateIsNull(pn, false);
+            checkIndexSkipNullPredicateIsNull(pn, true);
         }
         {
             // CREATE INDEX partial_idx_3 ON c (b) where d > 0;
             // skipNull is required - index predicate is not NULL-rejecting for column B
             AbstractPlanNode pn = compile("select count(*) from c where b > 0 and d > 0;");
             checkIndexName(pn, PlanNodeType.INDEXCOUNT, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\"");
-            checkIndexSkipNullPredicateIsNull(pn, false);
+            checkIndexSkipNullPredicateIsNull(pn, true);
         }
         {
             // CREATE INDEX partial_idx_3 ON c (b) where d > 0;
             // skipNull is required - index predicate is not NULL-rejecting for column B
             AbstractPlanNode pn = compile("select b from c where b > 0 and d > 0;");
             checkIndexName(pn, PlanNodeType.INDEXSCAN, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\"");
-            checkIndexSkipNullPredicateIsNull(pn, false);
+            checkIndexSkipNullPredicateIsNull(pn, true);
         }
     }
 
@@ -561,7 +575,7 @@ public class TestIndexSelection extends PlannerTestCase {
                     break;
                 }
             }
-            assertTrue(match == true);
+            assertEquals(true, match);
         }
     }
 
@@ -581,16 +595,16 @@ public class TestIndexSelection extends PlannerTestCase {
         }
     }
 
-    private void checkIndexSkipNullPredicateIsNull(AbstractPlanNode pn, boolean isTrue) {
+    private void checkIndexSkipNullPredicateIsNull(AbstractPlanNode pn, boolean hasSkipNullPredicate) {
         assertEquals(1, pn.getChildCount());
         pn = pn.getChild(0);
         String json = pn.toJSONString();
         if (pn instanceof IndexCountPlanNode) {
-            assertTrue(isTrue == (!json.contains("SKIP_NULL_PREDICATE")));
+            assertEquals(hasSkipNullPredicate, json.contains("SKIP_NULL_PREDICATE"));
         } else {
             // index scan
             AbstractExpression skipNull = ((IndexScanPlanNode) pn).getSkipNullPredicate();
-            assertTrue(isTrue == (skipNull == null));
+            assertEquals(hasSkipNullPredicate, skipNull != null);
         }
     }
 }
