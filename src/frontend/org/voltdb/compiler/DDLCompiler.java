@@ -743,16 +743,15 @@ public class DDLCompiler {
                     checkIdentifierStart(statementMatcher.group(2), statement) :
                     Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
 
-            if (m_tracker.getDRedTables().containsKey(tableName) &&
-                m_tracker.getDRedTables().get(tableName).equalsIgnoreCase("ENABLE")) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                "Invalid EXPORT statement: table %s is a DR table.", tableName
-                ));
-            }
-
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
-                tableXML.attributes.put("export", targetName);
+                if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid EXPORT statement: table %s is a DR table.", tableName));
+                }
+                else {
+                    tableXML.attributes.put("export", targetName);
+                }
             }
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
@@ -778,16 +777,19 @@ public class DDLCompiler {
             }
 
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-            if (tableXML != null && tableXML.attributes.containsKey("export")) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                "Invalid DR statement: table %s is an export table", tableName
-                ));
-            }
-
-            if (statementMatcher.group(2) != null) {
-                m_tracker.addDRedTable(tableName, "DISABLE");
-            } else {
-                m_tracker.addDRedTable(tableName, "ENABLE");
+            if (tableXML != null) {
+                if (tableXML.attributes.containsKey("export")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid DR statement: table %s is an export table", tableName));
+                }
+                else {
+                    if ((statementMatcher.group(2) != null)) {
+                        tableXML.attributes.put("drTable", "DISABLE");
+                    }
+                    else {
+                        tableXML.attributes.put("drTable", "ENABLE");
+                    }
+                }
             }
             return true;
         }
@@ -956,6 +958,7 @@ public class DDLCompiler {
                 String tableName = e.attributes.get("name");
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
+                String drTable = e.attributes.get("drTable");
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
                 }
@@ -967,6 +970,9 @@ public class DDLCompiler {
                 }
                 else {
                     m_tracker.removeExportedTable(tableName);
+                }
+                if (drTable != null) {
+                    m_tracker.addDRedTable(tableName, drTable);
                 }
             }
         }
