@@ -19,6 +19,7 @@
 #define COMPACTINGMAP_H_
 
 #include "ContiguousAllocator.h"
+#include "NormalKeyValuePair.h"
 
 #include <cstdlib>
 #include <stdint.h>
@@ -42,24 +43,6 @@ typedef u_int32_t NodeCount;
 #endif
 
 namespace voltdb {
-
-template <typename T> inline void setPointerValue(T& t, const void * v) {}
-
-// the template for KeyTypes don't contain a pointer to the tuple
-template <typename Key, typename Data = const void*>
-class NormalKeyValuePair : public std::pair<Key, Data> {
-public:
-    NormalKeyValuePair() {}
-    NormalKeyValuePair(const Key &key, const Data &value) : std::pair<Key, Data>(key, value) {}
-
-    const Key& getKey() const { return std::pair<Key, Data>::first; }
-    const Data& getValue() const { return std::pair<Key, Data>::second; }
-    void setKey(const Key &key) { std::pair<Key, Data>::first = key; }
-    void setValue(const Data &value) { std::pair<Key, Data>::second = value; }
-
-    // This function does nothing, and is only to offer the same API as PointerKeyValuePair.
-    const void *setPointerValue(const void *value) { return NULL; }
-};
 
 /**
  * Basic Red-Black tree that is based on the pseudo-code from
