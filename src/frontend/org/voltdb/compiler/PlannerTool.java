@@ -219,6 +219,9 @@ public class PlannerTool {
                 // If not caching or there was no cache hit, do the expensive full planning.
                 plan = planner.plan();
                 assert(plan != null);
+                if (plan != null && plan.getStatementPartitioning() != null) {
+                    partitioning = plan.getStatementPartitioning();
+                }
             } catch (Exception e) {
                 throw new RuntimeException("Error compiling query: " + e.toString(), e);
             }
