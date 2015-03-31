@@ -792,6 +792,10 @@ public abstract class CatalogUtil {
                 PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
                 paths.setExportoverflow(exp);
             }
+        if (paths.getDroverflow() == null) {
+            final PathsType.Droverflow droverflow = new PathsType.Droverflow();
+            paths.setDroverflow(droverflow);
+        }
 
             //Command log info
             if (deployment.getCommandlog() == null) {
@@ -1299,6 +1303,8 @@ public abstract class CatalogUtil {
         //Also set the export overflow directory
         cluster.setExportoverflow(exportOverflowPath.getPath());
 
+        cluster.setDroverflow(getDROverflow(paths.getDroverflow(), voltDbRoot).getPath());
+
         //Set the command log paths, also creates the command log entry in the catalog
         final org.voltdb.catalog.CommandLog commandLogConfig = cluster.getLogconfig().add("log");
         commandLogConfig.setInternalsnapshotpath(commandLogSnapshotPath.getPath());
@@ -1431,6 +1437,27 @@ public abstract class CatalogUtil {
         }
         validateDirectory("export overflow", exportOverflowPath);
         return exportOverflowPath;
+
+    }
+
+    public static File getDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
+        File drOverflowPath;
+        drOverflowPath = new File(paths.getPath());
+        if (!drOverflowPath.isAbsolute())
+        {
+            drOverflowPath = new VoltFile(voltDbRoot, paths.getPath());
+        }
+
+        if (!drOverflowPath.exists()) {
+            hostLog.info("Creating DR overflow directory: " +
+                         drOverflowPath.getAbsolutePath());
+            if (!drOverflowPath.mkdirs()) {
+                hostLog.fatal("Failed to create DR overflow path directory \"" +
+                              drOverflowPath + "\"");
+            }
+        }
+        validateDirectory("DR overflow", drOverflowPath);
+        return drOverflowPath;
 
     }
 

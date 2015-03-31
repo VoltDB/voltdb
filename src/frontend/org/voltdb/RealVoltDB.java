@@ -641,11 +641,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    File drOverflowDir;
-                    drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
                     ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
-                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
+                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
                                                                                    m_replicationActive,
                                                                                    m_configuredNumberOfPartitions,
                                                                                    m_catalogContext.getDeployment().getCluster().getHostcount());
