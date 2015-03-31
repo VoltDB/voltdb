@@ -25,18 +25,10 @@ package vmcTest.config
  
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.firefox.FirefoxDriver
-//import org.openqa.selenium.htmlunit.HtmlUnitDriver
+import org.openqa.selenium.htmlunit.HtmlUnitDriver
 import org.openqa.selenium.ie.InternetExplorerDriver
-//import org.openqa.selenium.phantomjs.PhantomJSDriver
+import org.openqa.selenium.phantomjs.PhantomJSDriver
 import org.openqa.selenium.safari.SafariDriver
-
-/*
-import org.openqa.selenium.remote.DesiredCapabilities
-import org.openqa.selenium.remote.RemoteWebDriver
-//import com.thoughtworks.selenium.DefaultSelenium
-import org.openqa.selenium.remote.CommandExecutor
-//import org.openqa.selenium.SeleneseCommandExecutor
-*/
 
 // Returns the specified project property value, if it is defined; otherwise,
 // returns the specified default value
@@ -47,6 +39,9 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
         return defaultValue
     }
 }
+
+// Possible future work: get 'includes' like this working
+//apply from: GetPropertyValues.gradle
 
 waiting {
     timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 20)
@@ -65,7 +60,7 @@ environments {
     ie {
         driver = { new InternetExplorerDriver() }
     }
-/*
+
     htmlunit {
         driver = { new HtmlUnitDriver(true) }
     }
@@ -73,7 +68,7 @@ environments {
     phantomjs {
         driver = { new PhantomJSDriver() }
     }
-*/
+
     safari {
 /*
         baseURL = "http://localhost:8080/"
