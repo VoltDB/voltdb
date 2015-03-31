@@ -1,4 +1,4 @@
-﻿var ispopupRevoked = false;
+var ispopupRevoked = false;
 
 $(document).ready(function () {
     var rv = -1;

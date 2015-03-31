@@ -1,4 +1,4 @@
-﻿
+
 (function(window) {
 
     var IMonitorGraphUI = (function () {
