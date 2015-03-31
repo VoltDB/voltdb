@@ -41,7 +41,10 @@ class SchemaPage extends VoltDBManagementCenterPage {
         sizeLink    (to: SchemaPageSizeWorksheetTab){ sizeTab.find('a') }
         ddlLink     (to: SchemaPageDdlSourceTab)    { ddlTab.find('a') }
         voltDbDocumentationLink { $('a#iconDoc') }
+        refreshbutton 		{ $(class:"refreshBtn schm", text:"Refresh") }
     }
+
+
     static at = {
         schemaTab.displayed
         schemaTab.attr('class') == 'active'
@@ -179,4 +182,75 @@ class SchemaPage extends VoltDBManagementCenterPage {
         }
     }
 
+
+
+    /*
+     * get query to create a table
+     */
+    def String getQueryToCreateTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#create") {
+        }
+
+        while ((line = br.readLine()) != "#delete") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * get query to delete a table
+     */
+    def String getQueryToDeleteTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * get tablename that is created and deleted
+     */
+    def String getTablename() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#name") {
+        }
+
+        while ((line = br.readLine()) != null) {
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * click SQL query to go to SQL query
+     */
+    def boolean gotoSqlQuery() {
+        header.tabSQLQuery.click()
+    }
+
+    /*
+     * click schema tab to go to Schema tab
+     */
+    def boolean gotoSchemaSubTab() {
+        schemaSubLink.click()
+    }
 }

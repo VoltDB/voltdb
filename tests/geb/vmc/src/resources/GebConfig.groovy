@@ -44,7 +44,7 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
 //apply from: GetPropertyValues.gradle
 
 waiting {
-    timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 5)
+    timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 20)
 }
 
 environments {

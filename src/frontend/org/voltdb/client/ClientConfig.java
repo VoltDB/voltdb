@@ -287,7 +287,7 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Experimental: Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
+     * <p>Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
      *
      * @param on Enable or disable the reconnection feature. Default is off.
      */
