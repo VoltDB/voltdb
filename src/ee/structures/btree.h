@@ -125,11 +125,16 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
-#include <type_traits>
 #include <new>
 #include <ostream>
 #include <string>
 #include <utility>
+
+#include <boost/type_traits/remove_const.hpp>
+#include <boost/type_traits/is_convertible.hpp>
+#include <boost/type_traits/is_integral.hpp>
+#include <boost/type_traits/is_same.hpp>
+#include <boost/type_traits/is_floating_point.hpp>
 
 #ifndef NDEBUG
 #define NDEBUG 1
@@ -195,7 +200,7 @@ struct btree_key_compare_to_tag {
 // btree_key_compare_to_tag.
 template <typename Compare>
 struct btree_is_key_compare_to
-    : public std::is_convertible<Compare, btree_key_compare_to_tag> {
+    : public boost::is_convertible<Compare, btree_key_compare_to_tag> {
 };
 
 // A helper class to convert a boolean comparison into a three-way
@@ -349,8 +354,8 @@ template <typename Key, typename Compare, typename Alloc, int TargetNodeSize>
 struct btree_set_params
     : public btree_common_params<Key, Compare, Alloc, TargetNodeSize,
                                  sizeof(Key)> {
-  typedef std::false_type data_type;
-  typedef std::false_type mapped_type;
+  typedef boost::false_type data_type;
+  typedef boost::false_type mapped_type;
   typedef Key value_type;
   typedef value_type mutable_value_type;
   typedef value_type* pointer;
@@ -480,8 +485,8 @@ class btree_node {
   // is faster than binary search for such types. Might be wise to also
   // configure linear search based on node-size.
   typedef typename if_<
-    std::is_integral<key_type>::value ||
-    std::is_floating_point<key_type>::value,
+    boost::is_integral<key_type>::value ||
+    boost::is_floating_point<key_type>::value,
     linear_search_type, binary_search_type>::type search_type;
 
   struct base_fields {
@@ -758,7 +763,7 @@ struct btree_iterator {
   typedef typename Node::params_type params_type;
 
   typedef Node node_type;
-  typedef typename std::remove_const<Node>::type normal_node;
+  typedef typename boost::remove_const<Node>::type normal_node;
   typedef const Node const_node;
   typedef typename params_type::value_type value_type;
   typedef typename params_type::pointer normal_pointer;
@@ -1401,8 +1406,8 @@ class btree : public Params::key_compare {
   template <typename R>
   static typename if_<
    if_<is_key_compare_to::value,
-             std::is_same<R, int>,
-             std::is_same<R, bool> >::type::value,
+             boost::is_same<R, int>,
+             boost::is_same<R, bool> >::type::value,
    big_, small_>::type key_compare_checker(R);
 
   // A never instantiated helper function that returns the key comparison
