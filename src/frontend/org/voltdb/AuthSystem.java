@@ -191,7 +191,7 @@ public class AuthSystem {
          */
         private final byte[] m_sha1ShadowPassword;
         /**
-         * SHA-1 double hashed copy of the users clear text password
+         * SHA-2 double hashed copy of the users clear text password
          */
         private final byte[] m_sha2ShadowPassword;
 
@@ -200,7 +200,7 @@ public class AuthSystem {
          */
         private final String m_bcryptShadowPassword;
         /**
-         * SHA-1 hashed and then bcrypted copy of the users clear text password
+         * SHA-2 hashed and then bcrypted copy of the users clear text password
          */
         private final String m_bcryptSha2ShadowPassword;
 
