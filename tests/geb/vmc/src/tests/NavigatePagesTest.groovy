@@ -52,9 +52,15 @@ class NavigatePagesTest extends TestBase {
         browser.registerPageChangeListener(listener)
     }
 
+<<<<<<< HEAD
+    def 'confirm DB Monitor page open initially'() {
+        expect: 'DB Monitor page open initially'
+        waitFor(30) { page.isDbMonitorPageOpen() }
+=======
     def 'confirm DB Monitor page opens initially'() {
         expect: 'DB Monitor page was open initially'
         doesDBMonitorPageOpenFirst
+>>>>>>> upstream/master
     }
 
     def navigatePages() {
