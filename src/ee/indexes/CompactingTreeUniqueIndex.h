@@ -79,9 +79,6 @@ class CompactingTreeUniqueIndex : public TableIndex
         return *reinterpret_cast<MapConstIterator*> (cursor.m_keyIter);
     }
 
-    /**
-     * Slower than VoltDB map's isEnd() ?
-     */
     bool isEnd(MapConstIterator &mapIter) const {
         return mapIter == m_entries.end();
     }
@@ -315,8 +312,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     int64_t getMemoryEstimate() const
     {
-//        return m_entries.bytesAllocated();
-        return getSize();
+        return m_entries.bytes_used();
     }
 
     std::string debug() const

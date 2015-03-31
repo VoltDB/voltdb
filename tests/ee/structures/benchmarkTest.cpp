@@ -33,7 +33,7 @@
 #include "harness.h"
 #include "structures/CompactingMap.h"
 #include "structures/CompactingHashTable.h"
-#include "structures/btree_map.h"
+#include "structures/btree.h"
 
 
 using namespace voltdb;
@@ -161,14 +161,17 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     // tree map and hash map
     voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, false> voltMap(false, IntComparator());
     std::multimap<int,int> stlMap;
-    btree::btree_multimap<int, int, less<int>, allocator<int>, 256> btreeMap;
+
+    less<int> comp = less<int>();
+    std::allocator<int> alloc = std::allocator<int>();
+    btree::btree<btree::btree_map_params<int, int, less<int>, std::allocator<int>, 256> > btreeMap(comp, alloc);
     boost::unordered_multimap<int, int> boostMap;
     voltdb::CompactingHashTable<int,int> voltHash(false);
 
     // Iterators
     voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, false>::iterator iter_volt_map;
     std::multimap<int, int>::const_iterator iter_stl;
-    btree::btree_multimap<int, int, less<int>, allocator<int>, 256>::iterator iter_btree;
+    btree::btree<btree::btree_map_params<int, int, less<int>, std::allocator<int>, 256> >::iterator iter_btree;
     boost::unordered_multimap<int,int>::iterator iter_boost_map;
     voltdb::CompactingHashTable<int,int>::iterator iter_volt_hash;
 
@@ -199,7 +202,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benBtree.start();
     for (int i = 0; i < NUM_OF_VALUES; i++) {
         int val = input[i];
-        btreeMap.insert(std::pair<int,int>(val, val));
+        btreeMap.insert_multi(std::pair<int,int>(val, val));
     }
     benBtree.stop();
     result.push_back(benBtree);
@@ -274,7 +277,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benBtree.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = keys[i];
-        iter_btree = btreeMap.find(val);
+        iter_btree = btreeMap.find_multi(val);
     }
     benBtree.stop();
     result.push_back(benBtree);
@@ -320,7 +323,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benBtree.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = deletes[i];
-        btreeMap.erase(val);
+        btreeMap.erase_multi(val);
     }
     benBtree.stop();
     result.push_back(benBtree);
