@@ -1,8 +1,7 @@
-﻿function QueryUI(queryString) {
+function QueryUI(queryString, userName) {
     "use strict";
     var CommandParser,
-        queryToRun=queryString,
-        DataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        queryToRun = queryString;
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -15,92 +14,10 @@
             MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
             QuotedStringNonceBase = 100000,
 
-            // TODO: drop the remaining vars when semi-colon injection is no longer supported
-
-            // Normally, statement boundaries are guessed by the parser, which inserts semicolons as needed.
-            // The guessing is based on the assumption that the user is smart enough to not use SQL statement
-            // keywords as schema names.  To err on the safe side, avoid splitting (require a semicolon) before
-            // VoltDB proprietary non-SQL statement keywords, ("partition", "explain", "explainproc", "exec",
-            // and "execute") because they could theoretically occur mid-statement as (legacy?) names in user
-            // schema. Take a chance that they are not using SQL statement keywords like "select" and "delete"
-            // as unquoted names in queries.
-            // Similarly, do not enable statement splitting before "alter" or "drop" because it would be more
-            // trouble than it is worth to disable it when these keywords occur in the
-            // middle of an "alter table ... alter|drop column ..." statement.
-            // The intent is to avoid writing another full sql parser, here.
-            // Any statement keyword that does not get listed here simply requires an explicit semicolon before
-            // it to mark the end of the preceding statement.
-            // Note on            (?!\s+on) :
-            // This subpattern consumes no input itself but ensures that the next
-            // character is not 'on'.
-            MatchStatementStarts =
-                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition(?!\s+on)|exec|execute|explain|explainproc)\s/gim,
-            //     ($1--------------------------------------------------------------------------------------------------------------------)
-            GenerateSplitStatements = ';$1 ',
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
-            MatchParameterSeparators = /[\s,]+/g,
+            MatchParameterSeparators = /[\s,]+/g;
 
-            // There are some easily recognizable patterns that contain statement keywords mid-statement.
-            // As suggested above, cases like "alter" and "drop" that are not so easily recognized are
-            // always ignored by the statement splitter -- the user must separate them from the prior
-            // statement with a semicolon.
-            // For these other keywords, the usual statement splitting can be easily disabled in special
-            // cases:
-            // - Any "select" that occurs in "insert into ... select"
-            //   -- handled with its own more elaborate pattern: insert into <table-identifier> [(<column-list>)] select
-            // - Any SQL statement keyword after "explain ".
-            // - Any "select " that follows open parentheses (with optional whitespace)
-            //   -- these could either be subselects or the select statement arguments to a setop
-            //      (e.g. union).
-            // - Any "select " that follows a trailing setop keyword:
-            //   "union", "intersect", "except", or "all"
-            //   -- actually for ease of implementation (pattern simplicity) also disable command
-            //      splitting for the unlikely case of a setop followed by other statements:
-            //      "insert", "update", "delete", "truncate"
-            //
-            // The pattern grouping uses "(?:" anonymous pattern groups to preserve $1 as the prefix
-            // pattern and $2 as the suffix keyword. The intent is to temporarily disguise the suffix
-            // keyword to prevent a statement-splitting semicolon from getting inserted before it.
-            // If "explain" on ddl statements (?) (create|partition) is ever supported,
-            // add them as options to the $2 suffix keyword pattern.
-            MatchNonBreakingInsertIntoSelect =
-                /(\s*(?:insert|upsert)\s+into(?=\"|\s)\s*(?:[a-z][a-z0-9_]*|\"(?:[^\"]|\"\")+\")\s*(?:\((?:\"(?:[^\"]|\"\")+\"|[^\")])+\))?[(\s]*)(select)/gim,
-            //   ($1-----------------------------------------------------------------------------------------------------------------------------)($2----)
-            // Note on            (?=\"|\s) :
-            // This subpattern consumes no input itself but ensures that the next
-            // character is either whitespace or a double quote. This is handy
-            // when a keyword is followed by an identifier:
-            //   INSERT INTO"Foo"SELECT ...
-            // HSQL doesn't require whitespace between keywords and quoted
-            // identifiers.
-            // A more detailed explanation of the MatchNonBreakingInsertIntoSelect pattern
-            // can be found in the comments for the functionally identical InsertIntoSelect
-            // variable and related pattern variables in SQLCommand.java.
-            MatchNonBreakingCompoundKeywords =
-                /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
-            //   ($1------------------------------------------------)   ($2------------------------------------------------------)
-            // Note on           ([\s\S])
-            // It matches the any character including the new line character
-            MatchCreateView = /(\s*(?:create\s+view\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)(select)/gim,
-            //                 ($1-----------------------------------------------------------------------)($2----)
-            MatchCreateSingleQueryProcedure =
-                /(\s*(?:create\s+procedure\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
-            //   ($1----------------------------------------------------------------------------)($2------------------------------------------------------)
-
-            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
-            // There are three keywords that may start statements to escape:
-            //
-            //   partition, execute, and delete
-            //
-            // They require escaping when they are immediately preceded by
-            // "limit", "rows <n>", and "execute(", respectively.
-            MatchLimitPartition = /(\s*limit\s+)(partition)/gim,
-            MatchRowcountExecute = /(\s*rows\s+\d+\s+)(execute)/gim,
-            MatchExecuteDelete = /(\s*execute\s*\(\s*)(delete)/gim,
-
-            MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
-            GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 
         // Avoid false positives for statement grammar inside quoted strings by
         // substituting a nonce for each string.
@@ -218,9 +135,42 @@
         $(targetMonospace).html('');
 
         function callback(response) {
-            processResponse('HTML', targetHtml, Id + '_html', response);
-            processResponse('CSV', targetCsv, Id + '_csv', response);
-            processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+
+            var processResponseForAllViews = function() {
+                processResponse('HTML', targetHtml, Id + '_html', response);
+                processResponse('CSV', targetCsv, Id + '_csv', response);
+                processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+            };
+            
+            var handlePortSwitchingOption = function (isPaused) {
+                
+                if (isPaused) {
+                    //Show error message with an option to allow admin port switching
+                    $("#queryDatabasePausedErrorPopupLink").click();
+                } else {
+                    processResponseForAllViews();
+                }
+            };
+            
+            //Handle the case when Database is paused
+            if (response.status == -5 && VoltDbAdminConfig.isAdmin && !SQLQueryRender.useAdminPortCancelled) {
+
+                if (!VoltDbAdminConfig.isDbPaused) {
+
+                    //Refresh cluster state to display latest status.
+                    var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
+                        VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
+                        handlePortSwitchingOption(VoltDbAdminConfig.isDbPaused);
+                    };
+                    voltDbRenderer.GetSystemInformation(function() {}, loadAdminTabPortAndOverviewDetails, function(data) {});
+                } else {
+                    handlePortSwitchingOption(true);
+                }
+                
+            } else {
+                processResponseForAllViews();
+            }
+            SQLQueryRender.useAdminPortCancelled = false;
         }
         this.Callback = callback;
     }
@@ -228,13 +178,14 @@
     function executeMethod() {
         var target = $('.queryResult');
         var format = $('#exportType').val();
-        
-        if (!VoltDBCore.connections.hasOwnProperty(DataSource)) {
+
+        var dataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
             return;
         }
 
-        var connection = VoltDBCore.connections[DataSource];
+        var connection = VoltDBCore.connections[dataSource];
         var source = '';
         source = queryToRun;
         source = source.replace(/^\s+|\s+$/g, '');
