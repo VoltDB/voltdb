@@ -124,6 +124,7 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import org.voltdb.client.ClientAuthHashScheme;
 
 /**
  *
@@ -1454,8 +1455,10 @@ public abstract class CatalogUtil {
         for (UsersType.User user : users.getUser()) {
 
             String sha1hex = user.getPassword();
+            String sha256hex = user.getPassword();
             if (user.isPlaintext()) {
-                sha1hex = extractPassword(user.getPassword());
+                sha1hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA1);
+                sha256hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA256);
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
@@ -1463,7 +1466,12 @@ public abstract class CatalogUtil {
                     BCrypt.hashpw(
                             sha1hex,
                             BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+            String hashedPW256 =
+                    BCrypt.hashpw(
+                            sha256hex,
+                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
             catUser.setShadowpassword(hashedPW);
+            catUser.setSha256shadowpassword(hashedPW256);
 
             // process the @groups and @roles comma separated list
             for (final String role : extractUserRoles(user)) {
@@ -1527,13 +1535,13 @@ public abstract class CatalogUtil {
     }
 
     /** Read a hashed password from password.
-     *  SHA-1 hash it once to match what we will get from the wire protocol
+     *  SHA* hash it once to match what we will get from the wire protocol
      *  and then hex encode it
      * */
-    private static String extractPassword(String password) {
+    private static String extractPassword(String password, ClientAuthHashScheme scheme) {
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance("SHA-1");
+            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
         } catch (final NoSuchAlgorithmException e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
