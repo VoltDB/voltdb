@@ -95,6 +95,7 @@ end
 begin User javaonly
   GroupRef* groups
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
+  string sha256ShadowPassword "SHA-256 double hashed hex encoded version of the password"
 end
 
 begin Program javaonly "The name of a program with access (effectively a username for an app server)"
