@@ -218,7 +218,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
 
     @PostConstruct
-    protected void init() {
+    public void init() {
         hostLog.info(String.format("Beginning inter-node communication on port %d.", vConfig.m_internalPort));
 
         try {

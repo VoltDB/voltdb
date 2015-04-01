@@ -100,6 +100,8 @@ import org.voltdb.config.CatalogContextProvider;
 import org.voltdb.config.ClientInterfaceProvider;
 import org.voltdb.config.Configuration;
 import org.voltdb.config.DeploymentTypeProvider;
+import org.voltdb.config.state.VoltStateManager;
+import org.voltdb.config.state.VoltState;
 import org.voltdb.config.topo.PartitionsInformer;
 import org.voltdb.config.topo.TopologyProviderFactory;
 import org.voltdb.dtxn.InitiatorStats;
@@ -179,6 +181,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     
     @Autowired
     private CatalogContextProvider catalogContextProvider;
+    
+    @Autowired
+    private VoltStateManager voltStateManager;
+    
     volatile CatalogContext m_catalogContext;
     
     private String m_buildString;
@@ -233,12 +239,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<Integer, Long>();
 
 
-    // Should the execution sites be started in recovery mode
-    // (used for joining a node to an existing cluster)
-    // If CL is enabled this will be set to true
-    // by the CL when the truncation snapshot completes
-    // and this node is viable for replay
-    volatile boolean m_rejoining = false;
     // Need to separate the concepts of rejoin data transfer and rejoin
     // completion.  This boolean tracks whether or not the data transfer
     // process is done.  CL truncation snapshots will not flip the all-complete
@@ -301,7 +301,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private volatile boolean m_isRunning = false;
 
     @Override
-    public boolean rejoining() { return m_rejoining; }
+    public boolean rejoining() { return voltStateManager.getCurrentState() == VoltState.REJOIN; }
 
     @Override
     public boolean rejoinDataPending() { return m_rejoinDataPending; }
@@ -366,7 +366,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             @Override
             public void run() {
-                initialize(m_config);
+                initialize(m_config);//TODO: parameter is not needed 
                 RealVoltDB.this.run();
             }
             
@@ -379,52 +379,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
-            // check that this is a 64 bit VM
-            if (System.getProperty("java.vm.name").contains("64") == false) {
-                hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
-                System.exit(-1);
-            }
+        	checkStartupCondition();
+        	
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
-            // If there's no deployment provide a default and put it under voltdbroot.
-            if (config.m_pathToDeployment == null) {
-                try {
-                    config.m_pathToDeployment = setupDefaultDeployment(hostLog);
-                    config.m_deploymentDefault = true;
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
-                }
-            }
+        	initFields();
 
-            // set the mode first thing
-            m_mode = OperationMode.INITIALIZING;
-            //m_config = config;
-            m_startMode = null;
-            m_consumerDRGateway = new ConsumerDRGateway.DummyConsumerDRGateway();
-
-            // set a bunch of things to null/empty/new for tests
-            // which reusue the process
-            m_safeMpTxnId = Long.MAX_VALUE;
-            m_lastSeenMpTxnId = Long.MIN_VALUE;
-            //m_clientInterface = null;
-            m_adminListener = null;
-            m_commandLog = new DummyCommandLog();
-            //m_messenger = null;
-            m_startMode = null;
-            m_opsRegistrar = new OpsRegistrar();
-            m_asyncCompilerAgent = new AsyncCompilerAgent();
-            //m_snapshotCompletionMonitor = null;
-            //m_catalogContext = null;
-            m_partitionCountStats = null;
-            m_ioStats = null;
-            m_memoryStats = null;
-            m_statsManager = null;
-            m_restoreAgent = null;
-            m_recoveryStartTime = System.currentTimeMillis();
-            m_hostIdWithStartupCatalog = 0;
-            m_pathToStartupCatalog = m_config.m_pathToCatalog;
-            m_replicationActive = false;
-            m_configLogger = null;
             ActivePlanRepository.clear();
 
             // set up site structure
@@ -436,12 +396,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            boolean isRejoin = false;
             if (config.m_startAction.doesRejoin()) {
-                isRejoin = true;
+                voltStateManager.moveState(VoltState.REJOIN);
             }
-            m_rejoining = isRejoin;
-            m_rejoinDataPending = isRejoin || config.m_startAction == StartAction.JOIN;
+            
+            m_rejoinDataPending = rejoining() || config.m_startAction == StartAction.JOIN;
 
             m_joining = config.m_startAction == StartAction.JOIN;
 
@@ -454,7 +413,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 System.exit(-1);
             }
 
-            m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
+            //m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
@@ -482,7 +441,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
             }
 
-            buildClusterMesh(isRejoin || m_joining);
+            buildClusterMesh(rejoining() || m_joining);
 
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
@@ -497,7 +456,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             validateStartAction();
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!isRejoin && !m_joining) {
+            if (!rejoining() && !m_joining) {
                 m_messenger.waitForGroupJoin(numberOfNodes);
             }
 
@@ -640,7 +599,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     }
                 }
                 OnDemandBinaryLogger.path = m_catalogContext.cluster.getVoltroot();
-                if (isRejoin) {
+                if (rejoining()) {
                     SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
                     hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
 
@@ -749,7 +708,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             else {
                 consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForNoLogging.name(), null);
             }
-            if (m_commandLog != null && (isRejoin || m_joining)) {
+            if (m_commandLog != null && (rejoining() || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
@@ -914,7 +873,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
 
-            if (!isRejoin && !m_joining) {
+            if (!rejoining() && !m_joining) {
                 try {
                     m_messenger.waitForAllHostsToBeReady(m_catalogContext.getDeployment().getCluster().getHostcount());
                 } catch (Exception e) {
@@ -1020,7 +979,57 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
-    class DailyLogTask implements Runnable {
+    private void initFields() {
+        // If there's no deployment provide a default and put it under voltdbroot.
+        if (m_config.m_pathToDeployment == null) {
+            try {
+            	m_config.m_pathToDeployment = setupDefaultDeployment(hostLog);
+            	m_config.m_deploymentDefault = true;
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+            }
+        }
+
+        // set the mode first thing
+        m_mode = OperationMode.INITIALIZING;
+        //m_config = config;
+        m_startMode = null;
+        m_consumerDRGateway = new ConsumerDRGateway.DummyConsumerDRGateway();
+
+        // set a bunch of things to null/empty/new for tests
+        // which reusue the process
+        m_safeMpTxnId = Long.MAX_VALUE;
+        m_lastSeenMpTxnId = Long.MIN_VALUE;
+        //m_clientInterface = null;
+        m_adminListener = null;
+        m_commandLog = new DummyCommandLog();
+        //m_messenger = null;
+        m_startMode = null;
+        m_opsRegistrar = new OpsRegistrar();
+        m_asyncCompilerAgent = new AsyncCompilerAgent();
+        //m_snapshotCompletionMonitor = null;
+        //m_catalogContext = null;
+        m_partitionCountStats = null;
+        m_ioStats = null;
+        m_memoryStats = null;
+        m_statsManager = null;
+        m_restoreAgent = null;
+        m_recoveryStartTime = System.currentTimeMillis();
+        m_hostIdWithStartupCatalog = 0;
+        m_pathToStartupCatalog = m_config.m_pathToCatalog;
+        m_replicationActive = false;
+        m_configLogger = null;
+	}
+
+	private void checkStartupCondition() {
+        // check that this is a 64 bit VM
+        if (System.getProperty("java.vm.name").contains("64") == false) {
+            hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
+            System.exit(-1);
+        }
+	}
+
+	class DailyLogTask implements Runnable {
         @Override
         public void run() {
             m_myHostId = m_messenger.getHostId();
@@ -1683,7 +1692,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         String startAction = m_config.m_startAction.toString();
         String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
                 startAction.substring(1).toLowerCase()) + ".";
-        if (!m_rejoining) {
+        if (!rejoining()) {
             hostLog.info(startActionLog);
         }
         hostLog.info("PID of this Volt process is " + CLibrary.getpid());
@@ -2408,7 +2417,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // above to finish.
             if (logRecoveryCompleted || m_joining) {
                 String actionName = m_joining ? "join" : "rejoin";
-                m_rejoining = false;
+                voltStateManager.moveState(VoltState.OPERATE);
                 m_joining = false;
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
@@ -2531,7 +2540,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_leaderAppointer.onReplayCompletion();
         }
 
-        if (!m_rejoining && !m_joining) {
+        if (!rejoining() && !m_joining) {
             if (m_clientInterface != null) {
                 try {
                     m_clientInterface.startAcceptingConnections();
@@ -2577,12 +2586,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     public synchronized void recoveryComplete(String requestId) {
         assert(m_rejoinDataPending == false);
 
-        if (m_rejoining) {
+        if (rejoining()) {
             if (m_rejoinTruncationReqId.compareTo(requestId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
-                m_rejoining = false;
+                voltStateManager.moveState(VoltState.OPERATE);
+                //m_rejoining = false;
             }
             else {
                 // If we saw some other truncation request ID, then try the same one again.  As long as we
