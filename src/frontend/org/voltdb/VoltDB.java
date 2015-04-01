@@ -17,19 +17,8 @@
 
 package org.voltdb;
 
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.support.BeanDefinitionBuilder;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.OnDemandBinaryLogger;
-import org.voltcore.utils.ShutdownHooks;
-import org.voltdb.config.Configuration;
-import org.voltdb.config.VoltDBConfigurer;
-import org.voltdb.types.TimestampType;
-import org.voltdb.utils.PlatformProperties;
-
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
@@ -40,11 +29,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.OnDemandBinaryLogger;
+import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.config.Configuration;
+import org.voltdb.config.VoltDBConfigurer;
+import org.voltdb.types.TimestampType;
+import org.voltdb.utils.PlatformProperties;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+
 /**
  * VoltDB provides main() for the VoltDB server
  */
 public class VoltDB {
-    private static AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
 
 
     /** Global constants */
@@ -335,6 +336,7 @@ public class VoltDB {
 
 
     private static VoltDBInterface singleton;
+	private static Injector injector;
 
     /**
      * Exit the process with an error message, optionally with a stack trace.
@@ -369,29 +371,25 @@ public class VoltDB {
     /**
      * Entry point for the VoltDB server process.
      * @param args Requires catalog and deployment file locations.
+     * @throws IOException 
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
-        Configuration config = new Configuration(args);
+        final Configuration config = new Configuration(args);
         try {
             if (!config.validate()) {
                 System.exit(-1);
             } else {
-                
-                ctx.register(VoltDBConfigurer.class);
-                ctx.getBeanFactory().registerSingleton("configuration", config);
-                /*
-                BeanDefinition configurationDefinition = BeanDefinitionBuilder //
-                        .rootBeanDefinition(Configuration.class) //
-                        .addConstructorArgValue(args) //
-                        .getBeanDefinition();
-                ctx.registerBeanDefinition("configuration", configurationDefinition);
-                */
-                ctx.refresh();
-/*
-                initialize(config);
-                instance().run();
-                */
+            	
+            	injector = Guice.createInjector(new VoltDBConfigurer(), new AbstractModule() {
+					
+					@Override
+					protected void configure() {
+						bind(Configuration.class).toInstance(config);
+						
+					}
+				});
+            	
             }
         }
         catch (OutOfMemoryError e) {
@@ -420,7 +418,7 @@ public class VoltDB {
         if(singleton != null) {
             return singleton;
         }
-        return ctx.getBean(VoltDBInterface.class);
+        return injector.getInstance(VoltDBInterface.class);
     }
 
     /**

@@ -7,8 +7,8 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import javax.inject.Inject;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -20,14 +20,14 @@ import org.voltdb.config.CatalogContextProvider;
  * @author black
  *
  */
-@Component
+
 public class StartupTopologyProvider implements TopologyProvider {
 
 
-	@Autowired
+	@Inject
 	private CatalogContextProvider catalogContextProvider;
 	
-	@Autowired
+	@Inject
 	private HostMessenger m_messenger;
 
 	@Override

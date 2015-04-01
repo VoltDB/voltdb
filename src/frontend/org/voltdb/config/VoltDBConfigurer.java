@@ -3,30 +3,46 @@
  */
 package org.voltdb.config;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Singleton;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.OpsRegistrar;
 import org.voltdb.RealVoltDB;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SnapshotIOAgent;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
+import org.voltdb.config.state.VoltStateManager;
 import org.voltdb.config.topo.DummyEJoinTopologyProvider;
+import org.voltdb.config.topo.PartitionsInformer;
 import org.voltdb.config.topo.RejoinTopologyProvider;
 import org.voltdb.config.topo.StartupTopologyProvider;
 import org.voltdb.config.topo.TopologyProvider;
+import org.voltdb.config.topo.TopologyProviderFactory;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.MiscUtils;
 
+import com.google.inject.AbstractModule;
+import com.google.inject.Injector;
+import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
+import com.google.inject.matcher.Matchers;
+import com.google.inject.spi.InjectionListener;
+import com.google.inject.spi.TypeEncounter;
+import com.google.inject.spi.TypeListener;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -34,19 +50,16 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  * @author black
  *
  */
-@Configuration
-@ComponentScan({"org.voltdb", "org.voltcore"})
-public class VoltDBConfigurer {
+
+public class VoltDBConfigurer extends AbstractModule {
     private final VoltLogger log = new VoltLogger("CONFIG");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    @Bean
-    public RealVoltDB realVoltDB() {
-        return new RealVoltDB();
-    }
-    
-    @Bean
-    public HostMessenger hostMessenger(org.voltdb.config.Configuration m_config) {
+    @Inject
+    private Injector injector;
+
+    @Provides @Inject @Singleton
+    public HostMessenger hostMessenger(org.voltdb.config.Configuration m_config, Injector injector) {
         final String leaderAddress = m_config.m_leader;
         String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
         int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
@@ -65,10 +78,12 @@ public class VoltDBConfigurer {
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
 
-        return new org.voltcore.messaging.HostMessenger(hmconfig);
+        HostMessenger hm = new org.voltcore.messaging.HostMessenger(hmconfig);
+        injector.injectMembers(hm);
+        return hm;
     }
 
-    @Bean
+    @Provides @Singleton
     @Named("computation")
     public ListeningExecutorService computationExecutionService(org.voltdb.config.Configuration m_config) {
     	final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
@@ -78,24 +93,24 @@ public class VoltDBConfigurer {
     }
     
 
-    @Bean
+    @Provides @Singleton
     @Named("periodicVoltThread")
     public ScheduledThreadPoolExecutor periodicVoltThread(org.voltdb.config.Configuration m_config) {
     	return CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
    }
-    @Bean
+    @Provides @Singleton
     @Named("periodicPriorityVoltThread")
     public ScheduledThreadPoolExecutor periodicPriorityVoltThread(org.voltdb.config.Configuration m_config) {
     	return CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
    }
-    @Bean
+    @Provides @Singleton
     @Named("startActionWatcherES")
     public ListeningExecutorService startActionWatcherExecutionService(org.voltdb.config.Configuration m_config) {
     	return CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
     }
     
     
-    @Bean
+    @Provides @Singleton
     public SnapshotIOAgent snapshotIOAgent (HostMessenger m_messenger) {
         Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", true);
         if (snapshotIOAgentClass != null) {
@@ -126,7 +141,8 @@ public class VoltDBConfigurer {
 
     }
     
-    @Bean
+
+    @Provides
     public List<TopologyProvider> topologyProvidersChain(
     		DummyEJoinTopologyProvider joinProvider,
     		RejoinTopologyProvider rejoinProvider,
@@ -137,5 +153,52 @@ public class VoltDBConfigurer {
     	providers.add(defaultProvider);
     	return providers;
     }
+
+	@Override
+	protected void configure() {
+		
+		bind(DummyEJoinTopologyProvider.class).asEagerSingleton();
+		bind(RejoinTopologyProvider.class).asEagerSingleton();
+		bind(StartupTopologyProvider.class).asEagerSingleton();
+		bind(TopologyProviderFactory.class).asEagerSingleton();
+
+		bind(VoltStateManager.class).asEagerSingleton();
+		bind(PartitionsInformer.class).asEagerSingleton();
+		bind(CartographerProvider.class).asEagerSingleton();
+		bind(CatalogContextProvider.class).asEagerSingleton();
+		bind(ClientInterfaceProvider.class).asEagerSingleton();
+		bind(DeploymentTypeProvider.class).asEagerSingleton();
+		bind(OpsRegistrar.class).asEagerSingleton();
+		bind(SnapshotCompletionMonitor.class).asEagerSingleton();
+		bind(VoltDBInterface.class).to(RealVoltDB.class).asEagerSingleton();
+		
+		
+		binder().bindListener(Matchers.any(), new TypeListener() {
+		    @Override
+		    public <I> void hear(final TypeLiteral<I> typeLiteral, TypeEncounter<I> typeEncounter) {
+		    	final Class<?> target = (Class<?>) typeLiteral.getType();
+		    	if(HostMessenger.class.isAssignableFrom(target)) {
+		    		System.out.print("");
+		    	}
+		    	for(final Method m: target.getDeclaredMethods()) {
+		    		for(Annotation a:m.getAnnotations()) {
+		    			if(a instanceof PostConstruct) {
+		    		        typeEncounter.register(new InjectionListener<I>() {
+		    		            @Override
+		    		            public void afterInjection(Object i) {
+		    		            	try {
+		    		            		m.setAccessible(true);
+										m.invoke(i);
+									} catch (Exception e) {
+										throw new RuntimeException("Error calling post-construct method " + target.getSimpleName() + "." + m.getName(), e);//TODO: specialized exception
+									}
+		    		            }
+		    		        });
+		    			}
+		    		}
+		    	}
+		    }
+		});
+	}
     
 }

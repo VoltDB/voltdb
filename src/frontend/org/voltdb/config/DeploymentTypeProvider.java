@@ -5,8 +5,8 @@ package org.voltdb.config;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import javax.inject.Inject;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.VoltDB;
@@ -21,14 +21,14 @@ import java.util.Arrays;
  * @author black
  *
  */
-@Component
+
 public class DeploymentTypeProvider {
     private final VoltLogger hostLog = new VoltLogger("HOST");
 
-    @Autowired
+    @Inject
     private Configuration m_config;
     
-    @Autowired
+    @Inject
     private HostMessenger m_messenger;
     
     private volatile byte[] cachedBytes;

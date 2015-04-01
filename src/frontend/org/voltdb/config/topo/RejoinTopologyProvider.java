@@ -5,8 +5,8 @@ package org.voltdb.config.topo;
 
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import javax.inject.Inject;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -17,12 +17,11 @@ import org.voltdb.config.Configuration;
  * @author black
  *
  */
-@Component
 public class RejoinTopologyProvider implements TopologyProvider {
 
-	@Autowired
+	@Inject
 	private HostMessenger m_messenger;
-	@Autowired
+	@Inject
 	private Configuration config;
 
 

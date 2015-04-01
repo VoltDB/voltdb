@@ -5,8 +5,8 @@ package org.voltdb.config;
 
 import java.net.InetAddress;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import javax.inject.Inject;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -19,19 +19,19 @@ import org.voltdb.iv2.Cartographer;
  * @author black
  *
  */
-@Component
+
 public class ClientInterfaceProvider {
-	@Autowired
+	@Inject
 	private org.voltdb.config.Configuration m_config;
-	@Autowired
+	@Inject
 	private CartographerProvider cartographerProvider;
-	@Autowired
+	@Inject
 	private HostMessenger m_messenger;
-	@Autowired
+	@Inject
 	private PartitionsInformer partitionsInformer;
-	@Autowired
+	@Inject
 	private TopologyProviderFactory topologyProviderFactory;
-	@Autowired
+	@Inject
 	private CatalogContextProvider catalogContextProvider;
 	
 	public ClientInterface getClientInterface() {

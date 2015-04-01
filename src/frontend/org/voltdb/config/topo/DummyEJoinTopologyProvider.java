@@ -3,9 +3,9 @@
  */
 package org.voltdb.config.topo;
 
+import javax.inject.Inject;
+
 import org.json_voltpatches.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import org.voltdb.StartAction;
 import org.voltdb.config.Configuration;
 
@@ -13,10 +13,10 @@ import org.voltdb.config.Configuration;
  * @author black
  *
  */
-@Component
+
 public class DummyEJoinTopologyProvider implements TopologyProvider {
 
-	@Autowired
+	@Inject
 	private Configuration config;
 
 	@Override

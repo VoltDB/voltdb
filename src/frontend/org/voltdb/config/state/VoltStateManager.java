@@ -3,13 +3,13 @@
  */
 package org.voltdb.config.state;
 
-import org.springframework.stereotype.Component;
+
 
 /**
  * @author black
  *
  */
-@Component
+
 public class VoltStateManager {
 	private volatile VoltState currentState = VoltState.INITIAL;
 	

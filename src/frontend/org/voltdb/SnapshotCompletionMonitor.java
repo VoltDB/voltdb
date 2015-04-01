@@ -34,7 +34,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
-import org.springframework.stereotype.Component;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -42,7 +42,7 @@ import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
-@Component
+
 public class SnapshotCompletionMonitor {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     final CopyOnWriteArrayList<SnapshotCompletionInterest> m_interests =

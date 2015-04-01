@@ -6,8 +6,8 @@ package org.voltdb.config;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import javax.inject.Inject;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.compiler.ClusterConfig;
@@ -18,15 +18,15 @@ import org.voltdb.iv2.Cartographer;
  * @author black
  *
  */
-@Component
+
 public class CartographerProvider {
-	@Autowired
+	@Inject
 	private HostMessenger m_messenger;
 	
-	@Autowired
+	@Inject
 	private CatalogContextProvider catalogContextProvider;
 	
-	@Autowired
+	@Inject
 	private TopologyProviderFactory topologyProviderFactory;
 	
 	public Cartographer getCartographer() {

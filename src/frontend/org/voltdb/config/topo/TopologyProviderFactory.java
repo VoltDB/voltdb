@@ -6,17 +6,17 @@ package org.voltdb.config.topo;
 import java.util.List;
 
 import org.json_voltpatches.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import javax.inject.Inject;
+
 
 /**
  * @author black
  *
  */
-@Component
+
 public class TopologyProviderFactory {
 
-	@Autowired
+	@Inject
 	private List<TopologyProvider> topologyProvidersChain;
 
 	/**

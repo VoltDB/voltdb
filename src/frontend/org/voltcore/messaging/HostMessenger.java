@@ -42,7 +42,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.inject.Inject;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.common.Constants;
@@ -183,7 +183,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private final Config m_config;
     
-    @Autowired
+    @Inject
     private Configuration vConfig;
     
     private final SocketJoiner m_joiner;

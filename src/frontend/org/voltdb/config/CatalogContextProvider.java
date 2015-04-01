@@ -6,8 +6,8 @@ package org.voltdb.config;
 import javax.annotation.PostConstruct;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import javax.inject.Inject;
+
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
@@ -22,9 +22,9 @@ import org.voltdb.utils.CatalogUtil;
  * @author black
  *
  */
-@Component
+
 public class CatalogContextProvider {
-	@Autowired
+	@Inject
 	private DeploymentTypeProvider deplTypeProvider;
 	
 	private volatile CatalogContext cached;
