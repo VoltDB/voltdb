@@ -3,33 +3,32 @@
  */
 package org.voltdb.config;
 
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
+import javax.inject.Named;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.CatalogContext;
-import org.voltdb.ClientInterface;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.RealVoltDB;
+import org.voltdb.SnapshotIOAgent;
 import org.voltdb.VoltDB;
-import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.config.topo.DummyEJoinTopologyProvider;
-import org.voltdb.config.topo.PartitionsInformer;
 import org.voltdb.config.topo.RejoinTopologyProvider;
 import org.voltdb.config.topo.StartupTopologyProvider;
 import org.voltdb.config.topo.TopologyProvider;
-import org.voltdb.config.topo.TopologyProviderFactory;
-import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /**
  * @author black
@@ -69,6 +68,64 @@ public class VoltDBConfigurer {
         return new org.voltcore.messaging.HostMessenger(hmconfig);
     }
 
+    @Bean
+    @Named("computation")
+    public ListeningExecutorService computationExecutionService(org.voltdb.config.Configuration m_config) {
+    	final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
+    	return CoreUtils.getListeningExecutorService(
+                "Computation service thread",
+                computationThreads, m_config.m_computationCoreBindings);
+    }
+    
+
+    @Bean
+    @Named("periodicVoltThread")
+    public ScheduledThreadPoolExecutor periodicVoltThread(org.voltdb.config.Configuration m_config) {
+    	return CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
+   }
+    @Bean
+    @Named("periodicPriorityVoltThread")
+    public ScheduledThreadPoolExecutor periodicPriorityVoltThread(org.voltdb.config.Configuration m_config) {
+    	return CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
+   }
+    @Bean
+    @Named("startActionWatcherES")
+    public ListeningExecutorService startActionWatcherExecutionService(org.voltdb.config.Configuration m_config) {
+    	return CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
+    }
+    
+    
+    @Bean
+    public SnapshotIOAgent snapshotIOAgent (HostMessenger m_messenger) {
+        Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", true);
+        if (snapshotIOAgentClass != null) {
+            try {
+            	SnapshotIOAgent m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
+                        .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
+                m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
+                return m_snapshotIOAgent;
+            } catch (Exception e) {
+                throw VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
+            }
+        } else {
+        	return new SnapshotIOAgent(null, 0) {
+				@Override
+				public void deliver(VoltMessage message) {
+				}
+				
+				@Override
+				public <T> ListenableFuture<T> submit(Callable<T> work) {
+					throw new UnsupportedOperationException("Snapshots are not supported");
+				}
+				
+				@Override
+				public void shutdown() throws InterruptedException {
+				}
+			};
+        }
+
+    }
+    
     @Bean
     public List<TopologyProvider> topologyProvidersChain(
     		DummyEJoinTopologyProvider joinProvider,

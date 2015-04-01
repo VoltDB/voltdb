@@ -58,6 +58,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
@@ -74,7 +76,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -166,23 +168,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    @Autowired
+    @Inject
     private Configuration m_config;
     
-    @Autowired
+    @Inject
     private DeploymentTypeProvider deploymentProvider;
     
-    @Autowired
+    @Inject
     private PartitionsInformer partitionsInformer;
     
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     
-    @Autowired
+    @Inject
     private CatalogContextProvider catalogContextProvider;
     
-    @Autowired
+    @Inject
     private VoltStateManager voltStateManager;
     
     volatile CatalogContext m_catalogContext;
@@ -195,15 +197,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
     
-    @Autowired
+    @Inject
     HostMessenger m_messenger;
     
-    @Autowired
+    @Inject
     private ClientInterfaceProvider clientInterfaceProvider;
     private ClientInterface m_clientInterface = null;
     
     HTTPAdminListener m_adminListener;
-    private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
+    
+    @Inject
+    private OpsRegistrar m_opsRegistrar;
 
     private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
@@ -212,7 +216,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
     private StatsManager m_statsManager = null;
-    @Autowired
+    
+    @Inject
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     // These are unused locally, but they need to be registered with the StatsAgent so they're
     // globally available
@@ -225,12 +230,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     // IV2 things
     List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
-    @Autowired
+    @Inject
     private CartographerProvider cartographerProvider;
     
     Cartographer m_cartographer;
     
-    @Autowired
+    @Inject
     private TopologyProviderFactory topologyProvider;
     
     LeaderAppointer m_leaderAppointer = null;
@@ -273,7 +278,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private ElasticJoinService m_elasticJoinService = null;
 
     // Snapshot IO agent
-    private SnapshotIOAgent m_snapshotIOAgent = null;
+    @Inject
+    private SnapshotIOAgent m_snapshotIOAgent;
 
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
@@ -296,7 +302,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     RestoreAgent m_restoreAgent = null;
 
-    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
+    @Inject
+    @Named("startActionWatcherES")
+    private ListeningExecutorService m_es;
 
     private volatile boolean m_isRunning = false;
 
@@ -334,6 +342,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     volatile String m_localMetadata = "";
 
+    @Inject
+    @Named("computation")
     private ListeningExecutorService m_computationService;
 
     private Thread m_configLogger;
@@ -346,7 +356,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    @Inject
+    @Named("periodicVoltThread")
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
+
+    @Inject
+    @Named("periodicPriorityVoltThread")
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
     // The configured license api: use to decide enterprise/community edition feature enablement
@@ -362,6 +377,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     @PostConstruct
     protected void initialize() {
+    	logStartupCommand();
+    	checkStartupCondition();
+    	setConsoleUtf8Encoding();
         new Thread(new Runnable() {
 
             @Override
@@ -372,15 +390,43 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             
         }).start();
     }
-    /**
+    
+    private void logStartupCommand() {
+        // Replay command line args that we can see
+        StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+        sb.append(System.getProperty("sun.java.command", "[not available]"));
+        hostLog.info(sb.toString());
+
+        List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
+        sb.delete(0, sb.length()).append("Command line JVM arguments:");
+        for (String iarg : iargs)
+            sb.append(" ").append(iarg);
+        if (iargs.size() > 0) hostLog.info(sb.toString());
+        else hostLog.info("No JVM command line args known.");
+
+        sb.delete(0, sb.length()).append("Command line JVM classpath: ");
+        sb.append(System.getProperty("java.class.path", "[not available]"));
+        hostLog.info(sb.toString());
+	}
+
+	private void setConsoleUtf8Encoding() {
+        // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
+        try {
+            System.setOut(new PrintStream(System.out, true, "UTF-8"));
+            System.setErr(new PrintStream(System.err, true, "UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB. This means you are likely running an unsupported JVM. Exiting.");
+            System.exit(-1);
+        }
+	}
+
+	/**
      * Initialize all the global components, then initialize all the m_sites.
      */
     @Override
     public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
-        	checkStartupCondition();
-        	
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
         	initFields();
@@ -388,64 +434,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             ActivePlanRepository.clear();
 
             // set up site structure
+            /*
             final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
             m_computationService =
                     CoreUtils.getListeningExecutorService(
                             "Computation service thread",
                             computationThreads, m_config.m_computationCoreBindings);
+                            */
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             if (config.m_startAction.doesRejoin()) {
                 voltStateManager.moveState(VoltState.REJOIN);
             }
-            
             m_rejoinDataPending = rejoining() || config.m_startAction == StartAction.JOIN;
-
             m_joining = config.m_startAction == StartAction.JOIN;
-
-            // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
-            try {
-                System.setOut(new PrintStream(System.out, true, "UTF-8"));
-                System.setErr(new PrintStream(System.err, true, "UTF-8"));
-            } catch (UnsupportedEncodingException e) {
-                hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB. This means you are likely running an unsupported JVM. Exiting.");
-                System.exit(-1);
-            }
 
             //m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
-            // Replay command line args that we can see
-            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
-            sb.append(System.getProperty("sun.java.command", "[not available]"));
-            hostLog.info(sb.toString());
-
-            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-            sb.delete(0, sb.length()).append("Command line JVM arguments:");
-            for (String iarg : iargs)
-                sb.append(" ").append(iarg);
-            if (iargs.size() > 0) hostLog.info(sb.toString());
-            else hostLog.info("No JVM command line args known.");
-
-            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
-            sb.append(System.getProperty("java.class.path", "[not available]"));
-            hostLog.info(sb.toString());
-
-            // use CLI overrides for testing hotfix version compatibility
-            if (m_config.m_versionStringOverrideForTest != null) {
-                m_versionString = m_config.m_versionStringOverrideForTest;
-            }
-            if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
-                m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
-            }
-
             buildClusterMesh(rejoining() || m_joining);
 
             //Register dummy agents immediately
-            m_opsRegistrar.registerMailboxes(m_messenger);
-
+            //m_opsRegistrar.registerMailboxes(m_messenger);
 
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
@@ -455,17 +467,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!rejoining() && !m_joining) {
-                m_messenger.waitForGroupJoin(numberOfNodes);
-            }
+            waitForGroupJoin();
 
             // Create the thread pool here. It's needed by buildClusterMesh()
-            m_periodicWorkThread =
+            /*m_periodicWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
             m_periodicPriorityWorkThread =
-                    CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
+                    CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);*/
 
+            /*
             Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", true);
             if (snapshotIOAgentClass != null) {
                 try {
@@ -475,7 +485,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
                 }
-            }
+            }*/
 
             if (m_config.m_pathToLicense == null) {
                 m_licenseApi = MiscUtils.licenseApiFactory();
@@ -979,7 +989,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
-    private void initFields() {
+    private void waitForGroupJoin() {
+        final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
+        if (!rejoining() && !m_joining) {
+            m_messenger.waitForGroupJoin(numberOfNodes);
+        }
+	}
+
+	private void initFields() {
         // If there's no deployment provide a default and put it under voltdbroot.
         if (m_config.m_pathToDeployment == null) {
             try {
@@ -1005,7 +1022,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         m_commandLog = new DummyCommandLog();
         //m_messenger = null;
         m_startMode = null;
-        m_opsRegistrar = new OpsRegistrar();
+        //m_opsRegistrar = new OpsRegistrar();
         m_asyncCompilerAgent = new AsyncCompilerAgent();
         //m_snapshotCompletionMonitor = null;
         //m_catalogContext = null;
@@ -1019,6 +1036,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         m_pathToStartupCatalog = m_config.m_pathToCatalog;
         m_replicationActive = false;
         m_configLogger = null;
+        
+        // use CLI overrides for testing hotfix version compatibility
+        if (m_config.m_versionStringOverrideForTest != null) {
+            m_versionString = m_config.m_versionStringOverrideForTest;
+        }
+        if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
+            m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
+        }
 	}
 
 	private void checkStartupCondition() {

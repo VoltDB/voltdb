@@ -21,13 +21,21 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+
+import org.springframework.stereotype.Component;
 import org.voltcore.messaging.HostMessenger;
 
 /**
  * This class centralizes construction of and access to much of the OpsAgent machinery.
  */
+@Component
 public class OpsRegistrar {
     private Map<OpsSelector, OpsAgent> m_agents;
+    
+    @Inject
+	private HostMessenger m_messenger;
 
     /**
      * Construct an OpsRegistrar.  Will iterate through the OpsSelectors and instantiate one
@@ -50,6 +58,11 @@ public class OpsRegistrar {
         }
     }
 
+    @PostConstruct
+    void init() {
+    	registerMailboxes(m_messenger);
+    }
+    
     /**
      * Register the local mailboxes for each local OpsAgent.  Needs to be separated from
      * construction so that any additional operations to make the OpsAgent ready for access
