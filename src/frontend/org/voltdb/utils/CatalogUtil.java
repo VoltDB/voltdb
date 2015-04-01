@@ -717,121 +717,125 @@ public abstract class CatalogUtil {
     }
 
     public static void populateDefaultDeployment(DeploymentType deployment) {
-            //partition detection
-            PartitionDetectionType pd = deployment.getPartitionDetection();
-            if (pd == null) {
-                pd = new PartitionDetectionType();
-                deployment.setPartitionDetection(pd);
-            }
-            if (pd.getSnapshot() == null) {
-                PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
-                pd.setSnapshot(sshot);
-            }
-            //admin mode
-            if (deployment.getAdminMode() == null) {
-                AdminModeType amode = new AdminModeType();
-                deployment.setAdminMode(amode);
-            }
-            //heartbeat
-            if (deployment.getHeartbeat() == null) {
-                HeartbeatType hb = new HeartbeatType();
-                deployment.setHeartbeat(hb);
-            }
-            //httpd
-            HttpdType httpd = deployment.getHttpd();
-            if (httpd == null) {
-                httpd = new HttpdType();
-                // Find next available port starting with the default
-                httpd.setPort(Constants.HTTP_PORT_AUTO);
-                deployment.setHttpd(httpd);
-            }
-            //jsonApi
-            HttpdType.Jsonapi jsonApi = httpd.getJsonapi();
-            if (jsonApi == null) {
-                jsonApi = new HttpdType.Jsonapi();
-                httpd.setJsonapi(jsonApi);
-            }
-            //snapshot
-            if (deployment.getSnapshot() == null) {
-                SnapshotType snap = new SnapshotType();
-                snap.setEnabled(false);
-                deployment.setSnapshot(snap);
-            }
-            //Security
-            if (deployment.getSecurity() == null) {
-                SecurityType sec = new SecurityType();
-                deployment.setSecurity(sec);
-            }
-            //Paths
-            if (deployment.getPaths() == null) {
-                PathsType paths = new PathsType();
-                deployment.setPaths(paths);
-            }
-            //create paths entries
-            PathsType paths = deployment.getPaths();
-            if (paths.getVoltdbroot() == null) {
-                PathsType.Voltdbroot root = new PathsType.Voltdbroot();
-                paths.setVoltdbroot(root);
-            }
-            //snapshot
-            if (paths.getSnapshots() == null) {
-                PathsType.Snapshots snap = new PathsType.Snapshots();
-                paths.setSnapshots(snap);
-            }
-            if (paths.getCommandlog() == null) {
-                //cl
-                PathsType.Commandlog cl = new PathsType.Commandlog();
-                paths.setCommandlog(cl);
-            }
-            if (paths.getCommandlogsnapshot() == null) {
-                //cl snap
-                PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
-                paths.setCommandlogsnapshot(clsnap);
-            }
-            if (paths.getExportoverflow() == null) {
-                //export overflow
-                PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
-                paths.setExportoverflow(exp);
-            }
+        //partition detection
+        PartitionDetectionType pd = deployment.getPartitionDetection();
+        if (pd == null) {
+            pd = new PartitionDetectionType();
+            deployment.setPartitionDetection(pd);
+        }
+        if (pd.getSnapshot() == null) {
+            PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
+            pd.setSnapshot(sshot);
+        }
+        //admin mode
+        if (deployment.getAdminMode() == null) {
+            AdminModeType amode = new AdminModeType();
+            deployment.setAdminMode(amode);
+        }
+        //heartbeat
+        if (deployment.getHeartbeat() == null) {
+            HeartbeatType hb = new HeartbeatType();
+            deployment.setHeartbeat(hb);
+        }
+        //httpd
+        HttpdType httpd = deployment.getHttpd();
+        if (httpd == null) {
+            httpd = new HttpdType();
+            // Find next available port starting with the default
+            httpd.setPort(Constants.HTTP_PORT_AUTO);
+            deployment.setHttpd(httpd);
+        }
+        //jsonApi
+        HttpdType.Jsonapi jsonApi = httpd.getJsonapi();
+        if (jsonApi == null) {
+            jsonApi = new HttpdType.Jsonapi();
+            httpd.setJsonapi(jsonApi);
+        }
+        //snapshot
+        if (deployment.getSnapshot() == null) {
+            SnapshotType snap = new SnapshotType();
+            snap.setEnabled(false);
+            deployment.setSnapshot(snap);
+        }
+        //Security
+        if (deployment.getSecurity() == null) {
+            SecurityType sec = new SecurityType();
+            deployment.setSecurity(sec);
+        }
+        //Paths
+        if (deployment.getPaths() == null) {
+            PathsType paths = new PathsType();
+            deployment.setPaths(paths);
+        }
+        //create paths entries
+        PathsType paths = deployment.getPaths();
+        if (paths.getVoltdbroot() == null) {
+            PathsType.Voltdbroot root = new PathsType.Voltdbroot();
+            paths.setVoltdbroot(root);
+        }
+        //snapshot
+        if (paths.getSnapshots() == null) {
+            PathsType.Snapshots snap = new PathsType.Snapshots();
+            paths.setSnapshots(snap);
+        }
+        if (paths.getCommandlog() == null) {
+            //cl
+            PathsType.Commandlog cl = new PathsType.Commandlog();
+            paths.setCommandlog(cl);
+        }
+        if (paths.getCommandlogsnapshot() == null) {
+            //cl snap
+            PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
+            paths.setCommandlogsnapshot(clsnap);
+        }
+        if (paths.getExportoverflow() == null) {
+            //export overflow
+            PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
+            paths.setExportoverflow(exp);
+        }
+        if (paths.getDroverflow() == null) {
+            final PathsType.Droverflow droverflow = new PathsType.Droverflow();
+            paths.setDroverflow(droverflow);
+        }
 
-            //Command log info
-            if (deployment.getCommandlog() == null) {
-                boolean enabled = false;
-                if (MiscUtils.isPro()) {
-                    enabled = true;
-                }
-                CommandLogType cl = new CommandLogType();
-                cl.setEnabled(enabled);
-                Frequency freq = new Frequency();
-                cl.setFrequency(freq);
-                deployment.setCommandlog(cl);
+        //Command log info
+        if (deployment.getCommandlog() == null) {
+            boolean enabled = false;
+            if (MiscUtils.isPro()) {
+                enabled = true;
             }
-            //System settings
-            SystemSettingsType ss = deployment.getSystemsettings();
-            if (deployment.getSystemsettings() == null) {
-                ss = new SystemSettingsType();
-                deployment.setSystemsettings(ss);
-            }
-            SystemSettingsType.Elastic sse = ss.getElastic();
-            if (sse == null) {
-               sse = new SystemSettingsType.Elastic();
-               ss.setElastic(sse);
-            }
-            SystemSettingsType.Query query = ss.getQuery();
-            if (query == null) {
-               query = new SystemSettingsType.Query();
-               ss.setQuery(query);
-            }
-            SystemSettingsType.Snapshot snap = ss.getSnapshot();
-            if (snap == null) {
-               snap = new SystemSettingsType.Snapshot();
-               ss.setSnapshot(snap);
-            }
-            SystemSettingsType.Temptables tt = ss.getTemptables();
-            if (tt == null) {
-               tt = new SystemSettingsType.Temptables();
-               ss.setTemptables(tt);
-            }
+            CommandLogType cl = new CommandLogType();
+            cl.setEnabled(enabled);
+            Frequency freq = new Frequency();
+            cl.setFrequency(freq);
+            deployment.setCommandlog(cl);
+        }
+        //System settings
+        SystemSettingsType ss = deployment.getSystemsettings();
+        if (deployment.getSystemsettings() == null) {
+            ss = new SystemSettingsType();
+            deployment.setSystemsettings(ss);
+        }
+        SystemSettingsType.Elastic sse = ss.getElastic();
+        if (sse == null) {
+            sse = new SystemSettingsType.Elastic();
+            ss.setElastic(sse);
+        }
+        SystemSettingsType.Query query = ss.getQuery();
+        if (query == null) {
+            query = new SystemSettingsType.Query();
+            ss.setQuery(query);
+        }
+        SystemSettingsType.Snapshot snap = ss.getSnapshot();
+        if (snap == null) {
+            snap = new SystemSettingsType.Snapshot();
+            ss.setSnapshot(snap);
+        }
+        SystemSettingsType.Temptables tt = ss.getTemptables();
+        if (tt == null) {
+            tt = new SystemSettingsType.Temptables();
+            ss.setTemptables(tt);
+        }
     }
 
     /**
@@ -1300,6 +1304,8 @@ public abstract class CatalogUtil {
         //Also set the export overflow directory
         cluster.setExportoverflow(exportOverflowPath.getPath());
 
+        cluster.setDroverflow(getDROverflow(paths.getDroverflow(), voltDbRoot).getPath());
+
         //Set the command log paths, also creates the command log entry in the catalog
         final org.voltdb.catalog.CommandLog commandLogConfig = cluster.getLogconfig().add("log");
         commandLogConfig.setInternalsnapshotpath(commandLogSnapshotPath.getPath());
@@ -1432,6 +1438,27 @@ public abstract class CatalogUtil {
         }
         validateDirectory("export overflow", exportOverflowPath);
         return exportOverflowPath;
+
+    }
+
+    public static File getDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
+        File drOverflowPath;
+        drOverflowPath = new File(paths.getPath());
+        if (!drOverflowPath.isAbsolute())
+        {
+            drOverflowPath = new VoltFile(voltDbRoot, paths.getPath());
+        }
+
+        if (!drOverflowPath.exists()) {
+            hostLog.info("Creating DR overflow directory: " +
+                         drOverflowPath.getAbsolutePath());
+            if (!drOverflowPath.mkdirs()) {
+                hostLog.fatal("Failed to create DR overflow path directory \"" +
+                              drOverflowPath + "\"");
+            }
+        }
+        validateDirectory("DR overflow", drOverflowPath);
+        return drOverflowPath;
 
     }
 
