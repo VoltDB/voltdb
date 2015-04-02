@@ -388,9 +388,6 @@ public class CatalogDiffEngine {
         else if (suspect instanceof Connector) {
             if (ChangeType.ADDITION == changeType) {
                 for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
-                    if (cti.getTable().getIsdred()) {
-                        return "May not export a DR table";
-                    }
                     trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
                 }
             }

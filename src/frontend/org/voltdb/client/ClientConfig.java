@@ -33,6 +33,7 @@ public class ClientConfig {
     static final long DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS = 1000; // default initial connection retry interval is 1 second
     static final long DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS = 8000; // default max connection retry interval is 8 seconds
 
+    final ClientAuthHashScheme m_hashScheme;
     final String m_username;
     final String m_password;
     final boolean m_cleartext;
@@ -59,6 +60,7 @@ public class ClientConfig {
         m_password = "";
         m_listener = null;
         m_cleartext = true;
+        m_hashScheme = ClientAuthHashScheme.HASH_SHA256;
     }
 
     /**
@@ -69,7 +71,7 @@ public class ClientConfig {
      * @param password Cleartext password.
      */
     public ClientConfig(String username, String password) {
-        this(username, password, true, (ClientStatusListenerExt) null);
+        this(username, password, true, (ClientStatusListenerExt) null, ClientAuthHashScheme.HASH_SHA256);
     }
 
     /**
@@ -80,11 +82,12 @@ public class ClientConfig {
      * in
      * @param username Cleartext username.
      * @param password Cleartext password.
+     * @param scheme Client password hash scheme
      * @param listener {@link ClientStatusListener} implementation to receive callbacks.
      */
     @Deprecated
-    public ClientConfig(String username, String password, ClientStatusListener listener) {
-        this(username, password, true, new ClientStatusListenerWrapper(listener));
+    public ClientConfig(String username, String password, ClientStatusListener listener, ClientAuthHashScheme scheme) {
+        this(username, password, true, new ClientStatusListenerWrapper(listener), scheme);
     }
 
     /**
@@ -96,7 +99,20 @@ public class ClientConfig {
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener) {
-        this(username,password,true,listener);
+        this(username,password,true,listener, ClientAuthHashScheme.HASH_SHA256);
+    }
+
+    /**
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password Cleartext password.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param scheme Client password hash scheme
+     */
+    public ClientConfig(String username, String password, ClientStatusListenerExt listener, ClientAuthHashScheme scheme) {
+        this(username,password,true,listener, scheme);
     }
 
     /**
@@ -109,6 +125,19 @@ public class ClientConfig {
      * @param cleartext Whether the password is hashed.
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener) {
+        this(username, password, cleartext, listener, ClientAuthHashScheme.HASH_SHA256);
+    }
+    /**
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password A cleartext or hashed passowrd.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param cleartext Whether the password is hashed.
+     * @param scheme Client password hash scheme
+     */
+    public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthHashScheme scheme) {
         if (username == null) {
             m_username = "";
         } else {
@@ -121,6 +150,7 @@ public class ClientConfig {
         }
         m_listener = listener;
         m_cleartext = cleartext;
+        m_hashScheme = scheme;
     }
 
     /**
@@ -257,7 +287,7 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Experimental: Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
+     * <p>Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
      *
      * @param on Enable or disable the reconnection feature. Default is off.
      */
