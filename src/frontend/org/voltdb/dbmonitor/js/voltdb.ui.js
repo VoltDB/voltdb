@@ -1,6 +1,9 @@
 ﻿var ispopupRevoked = false;
-
+var table = '';
 $(document).ready(function () {
+    
+    localStorage.clear(); //clear the localStorage for DataTables in DR Section
+
     var rv = -1;
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
@@ -234,6 +237,8 @@ $(document).ready(function () {
             $('#styleThemeBootstrap').prop("disabled", true);
         }
     };
+
+    
 
     refreshCss();
     var navLeft = $("#nav").css("left");
@@ -1001,6 +1006,65 @@ var loadPage = function (serverName, portid) {
 
     };
 
+    var refreshDRSection = function () {
+        var url = 'http://192.168.0.213:8080/api/1.0/?Procedure=%40SystemCatalog&Parameters=%5B%22TABLES%22%5D&User=deerwalk&Password=deerwalk&admin=true&jsonp=?';
+        $.ajax(
+               {
+
+                   url: url,
+                   type: "get",
+                   dataType: "jsonp",
+                   error: function () {
+
+                   },
+                   success: function (strData) {
+
+
+                       response = strData.results[0].data;
+                       var htmlcontent = "";
+                       //for (var x = 0; x <= 6; x++) {
+                       for (var i = 0; i <= response.length - 1 ; i++) {
+                           htmlcontent = htmlcontent + "<tr>";
+                           for (var j = 0; j <= 5; j++) {
+                               htmlcontent = htmlcontent + "<td>" + response[i][j] + "</td>";
+                           }
+                           htmlcontent = htmlcontent + "</tr>";
+                       }
+                       // }
+
+                       $("#tblDrMAster").find("tbody").html('');
+                       $("#tblDrMAster").find("tbody").append(htmlcontent);
+
+                       table = $("#tblDrMAster").DataTable({
+                           destroy: true, stateSave: true, pageLength: 2, "sPaginationType": "extStyleLF",
+                           "bAutoWidth": false,
+                           "fnDrawCallback": function () {
+                               var length = this.fnGetData().length;
+                               if (length <= this.fnPagingInfo().iLength) {
+                                   $(this).parent().children(".dataTables_paginate").hide();
+                               }
+                               $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                               $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                           },
+                           "sDom": '<"clear">ilprtp'
+                       });
+                       $("#tblDrMAster_info").hide();
+                       $("#tblDrMAster_length").hide();
+
+
+                   },
+                   complete: function () {
+
+                         //setTimeout(loadDrMasterInfo, 5000);
+                   }
+               }
+               );
+
+        $('#filterStoredProc1').on('keyup', function () {
+            table.search(this.value).draw();
+        });
+    };
+
     var setPaginationIndicesOfProcedures = function (isProcedureSearch) {
         if (isProcedureSearch) {
             if (voltDbRenderer.procedureSearchDataSize > 0) {
@@ -1423,6 +1487,7 @@ var loadPage = function (serverName, portid) {
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
+        refreshDRSection();
     }, 5000);
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));

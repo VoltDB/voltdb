@@ -37,6 +37,14 @@
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
+    <link href="css/resources/datatables/demo_page.css" rel="stylesheet" />
+    <link href="css/resources/datatables/demo_table.css" rel="stylesheet" />
+    <link href="css/resources/datatables/jquery.dataTables.css" rel="stylesheet" />
+    <!--<link href="css/resources/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
+    <link href="css/resources/datatables/theme.default.min.css" rel="stylesheet" />
+    <script src="js/jquery.dataTables.min.js"></script>
+    <script src="js/jqueryDatatablePlugins.js"></script>
+ 
 
 </head>
 <body>
@@ -317,7 +325,7 @@
                                     <div class="clear"></div>
                                 </div>
                                 <div class="tblScroll">
-                                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl drTbl">
+                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="storeTbl drTbl">
                                         <thead>
                                             <tr>
                                                 <th id="Th1" width="25%" data-name="none">Partition ID</th>
@@ -336,7 +344,7 @@
                                                 <td>100</td>
                                                 <td>10</td>
                                                 <td>20</td>
-            
+
                                             </tr>
                                         </tbody>
                                     </table>
