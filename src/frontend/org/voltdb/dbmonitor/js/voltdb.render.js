@@ -430,6 +430,39 @@ function alertNodeClicked(obj) {
 
         };
 
+        //Check if DR is enable or not
+        this.GetDrInformation = function (onInformationLoaded) {
+            var drStatus = {};
+
+            VoltDBService.GetDrInformation(function (connection) {
+                getDrDetails(connection, drStatus);
+                onInformationLoaded(drStatus);
+            });
+        };
+        //
+
+        //Check if cluster is replica or not
+        this.GetClusterReplicaInformation = function (onInformationLoaded) {
+            var replicationStatus = {};
+
+            VoltDBService.GetClusterReplicaInformation(function (connection) {
+                getReplicationDetails(connection, replicationStatus, "CLUSTER_REPLICA_INFORMATION");
+                onInformationLoaded(replicationStatus);
+            });
+        };
+        //
+
+        //Render DR Replication Graph
+        this.GetClusterReplicaInformation = function (onInformationLoaded) {
+            var replicationStatus = {};
+
+            VoltDBService.GetClusterReplicaInformation(function (connection) {
+                getReplicationDetails(connection, replicationStatus, "CLUSTER_REPLICA_INFORMATION");
+                onInformationLoaded(replicationStatus);
+            });
+        };
+        //
+
         //Render Cluster Transaction Graph
         this.GetTransactionInformation = function (onInformationLoaded) {
             var transactionDetails = {};
@@ -1884,6 +1917,66 @@ function alertNodeClicked(obj) {
                 sysMemory[hostName]["PERCENT_USED"] = info[colIndex["PERCENT_USED"]];
             });
         };
+
+        //Get DR Information
+        var getDrDetails = function (connection, drDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_DR'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DR_completeData'][1].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "ENABLED" || columnInfo["name"] == "TIMESTAMP")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+
+            connection.Metadata['@Statistics_DR_completeData'][1].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!drDetails.hasOwnProperty(hostName)) {
+                    drDetails[hostName] = {};
+                }
+                drDetails[hostName]["ENABLED"] = info[colIndex["ENABLED"]];
+            });
+        };
+        //
+
+        //Get Replication Information
+        var getReplicationDetails = function (connection, replicationDetails, processName) {
+            var colIndex = {};
+            var counter = 0;
+            var replicaStatus = false;
+            var hostName = "";
+            var suffix = "_" + processName;
+            if (connection.Metadata['@SystemInformation_Overview' + suffix] == null) {
+                return;
+            }
+
+            connection.Metadata['@SystemInformation_Overview' + suffix].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "KEY" || columnInfo["name"] == "VALUE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+
+            connection.Metadata['@SystemInformation_Overview' + suffix].data.forEach(function (info) {
+                if (info[colIndex["KEY"]] == "HOSTNAME") {
+                    hostName = info[colIndex["VALUE"]];
+                }
+                if (info[colIndex["KEY"]] == "REPLICATIONROLE") {
+                    replicaStatus = info[colIndex["VALUE"]];
+                    if (!replicationDetails.hasOwnProperty(hostName)) {
+                        replicationDetails[hostName] = {};
+                    }
+                    replicationDetails[hostName]["status"] = replicaStatus;
+                }
+                
+            });
+        };
+        //
 
         var getPartitionIdleTimeDetails = function (connection, partitionDetail) {
             var colIndex = {};

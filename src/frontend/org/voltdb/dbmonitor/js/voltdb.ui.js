@@ -690,6 +690,20 @@ var loadPage = function (serverName, portid) {
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
+        voltDbRenderer.GetClusterReplicaInformation(function(replicaDetail) {
+            if (getCurrentServer() != undefined) {
+                var currentServer = getCurrentServer();
+                VoltDbAdminConfig.drReplicationRole = replicaDetail[currentServer]['status'];
+            }
+        });
+
+        voltDbRenderer.GetDrInformation(function(drDetails) {
+            if (getCurrentServer() != undefined) {
+                var currentServer = getCurrentServer();
+                VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
+            }
+        });
+        
         var loadProcedureInformations = function (procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
                 voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (traverse, htmlData) {
