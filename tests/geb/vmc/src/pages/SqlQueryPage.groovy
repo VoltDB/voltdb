@@ -63,6 +63,20 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryTables  (required: false) { queryResHtml.find('table') }
         queryErrHtml (required: false) { queryResHtml.find('span') }
         queryDurHtml { $('#queryResults') }
+
+        //popup query ok and cancel
+        cancelpopupquery        { $("#btnQueryDatabasePausedErrorCancel", text:"Cancel")}
+        okpopupquery            { $("#btnQueryDatabasePausedErrorOk", text:"Ok")}
+        switchadminport         { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(3) > span")}
+        queryexecutionerror     { $("#queryDatabasePausedInnerErrorPopup > div.overlay-title", text:"Query Execution Error")}
+        queryerrortxt           { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(1)")}
+
+        htmltableresult 	{ $("#table_r0_html_0")}
+        createerrorresult	{ $("#resultHtml > span")}
+        htmlresultallcolumns	{ $("#table_r0_html_0 > thead")}
+
+        htmlresultselect	{ $("#table_r0_html_0 > thead > tr")}
+        refreshquery		{ $("#tabMain > button", text:"Refresh")}
 		
 		//options
         htmlOptions				{ $("option", text:"HTML") }
