@@ -151,7 +151,7 @@ public class VoltDB {
         public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
 
         /** port number to use for DR channel (override in the deployment file) */
-        public int m_drAgentPortStart = -1;
+        public int m_drAgentPortStart = DEFAULT_DR_PORT;
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
@@ -917,6 +917,24 @@ public class VoltDB {
      */
     public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
         singleton = testInstance;
+    }
+
+    /**
+     * Selects the a specified m_drInterface over a specified m_externalInterface from m_config
+     * @return an empty string when neither are specified
+     */
+    public static String getDefaultReplicationInterface() {
+        if (m_config.m_drInterface == null || m_config.m_drInterface.isEmpty()) {
+            if (m_config.m_externalInterface == null) {
+                return "";
+            }
+            else {
+                return m_config.m_externalInterface;
+            }
+        }
+        else {
+            return m_config.m_drInterface;
+        }
     }
 
     @Override

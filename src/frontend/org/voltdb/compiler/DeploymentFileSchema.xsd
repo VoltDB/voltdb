@@ -89,6 +89,11 @@
               <xs:attribute name="path" type="xs:string" default="export_overflow"/>
             </xs:complexType>
         </xs:element>
+        <xs:element name="droverflow" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="dr_overflow"/>
+            </xs:complexType>
+        </xs:element>
         <xs:element name="commandlog" minOccurs="0" maxOccurs="1">
             <xs:complexType>
               <xs:attribute name="path" type="xs:string" default="command_log"/>
@@ -343,7 +348,7 @@
     </xs:sequence>
     <xs:attribute name="id" type="clusterIdType" use="required"/>
     <xs:attribute name="listen" type="xs:boolean" default="false" />
-    <xs:attribute name="port" type="xs:int" default="5555"/>
+    <xs:attribute name="port" type="xs:int" default="0"/>
   </xs:complexType>
 
   <xs:complexType name="connectionType">
