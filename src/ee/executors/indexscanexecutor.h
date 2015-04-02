@@ -88,7 +88,6 @@ private:
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
     IndexScanPlanNode *m_node;
-    int m_numOfColumns;
     int m_numOfSearchkeys;
 
     // Inline Projection
