@@ -189,12 +189,11 @@
                                 </div>
                               <svg id="visualisationPartitionIdleTime" width="100%" height="400"></svg>
                             </div>
-                            <div id="" class="chart right" style="display: none;">
+                            <div id="ChartDrReplicationRate" class="chart right" >
                                 <div class="chartHeader">
-                                    <h1>Data replicated over time </h1>
+                                    <h1>Data Replication Rate</h1>
                                 </div>
-                                <svg id="" width="100%" height="400"></svg>
-                            </div>
+                                <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg> </div>
                             <div class="clear"></div>
                         </div>
                     </div>
@@ -274,6 +273,112 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="drWrapper">
+                        <div class="content drHeader" id="drHeader">
+                            <div class="leftShowhide">
+                                <div class="dr">
+                                    <h1 class="headText1">
+                                        <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide DR</a></h1>
+                                </div>
+                            </div>
+                            <div class="rightShowhide">
+                                <ul class="drList">
+                                    <li>Mode</li>
+                                    <li class="drArrow">Master</li>
+                                </ul>
+            
+                                <ul class="drList">
+                                    <li>State</li>
+                                    <li class="drArrow">On</li>
+                                    <li class="alertIcon warningDr">
+                                        <a id="drWarning" href="#myWarning" class="drWarning">
+                                            <span style="margin:0 0 0 24px">Warning</span></a></li>
+                                </ul>
+         
+            
+             
+                                <div class="clear"></div>
+                            </div>
+                            <div class="clear"></div>
+                        </div>
+                        <div id="drMasterSection" class="drShowHide" style="display:none;">
+                            <div id="Div5" class="masterWrapper">
+                                <div class="tabs-filter-wrapper">
+                                    <div class="tableTitle icon-master">Master</div>
+                                    <div class="filter">
+                                        <input name="filter" id="filterStoredProc1" type="text" class="search-box" onblur="" placeholder="Search Partition ID" />
+                                        <a id="searchDrMasterData" href="javascript:void(0)" class="icon-search" title="Search">search</a> </div>
+                                    <div class="pagination"> <a id="previousDrMasterPage" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
+                                        <label>1</label>
+                                        of
+                                        <label>1</label>
+                                        <a id="nextDrMasterPage" href="javascript:void(0)" class="next" title="Next Page">Next</a> </div>
+                                    <div class="clear"></div>
+                                </div>
+                                <div class="tblScroll">
+                                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl drTbl">
+                                        <thead>
+                                            <tr>
+                                                <th id="Th1" width="25%" data-name="none">Partition ID</th>
+                                                <th id="Th2" width="20%" data-name="none">Status</th>
+                                                <th id="Th3" width="10%" data-name="none">Total Buffer</th>
+                                                <th id="Th4" width="10%" data-name="none">Buffer on disk</th>
+                                                <th id="Th5" width="15%" data-name="none">Replica Latency (ms)</th>
+                                                <th id="Th6" width="20%" data-name="none">Replica latency (in transactions)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>1</td>
+                                                <td>on</td>
+                                                <td>20</td>
+                                                <td>100</td>
+                                                <td>10</td>
+                                                <td>20</td>
+            
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div id="drReplicaSection" class="replicaWrapper">
+                                <div class="tabs-filter-wrapper">
+                                    <div class="tableTitle icon-replica">Replica</div>
+                                    <div class="filter">
+                                        <input name="filter" id="Text1" type="text" class="search-box" onblur="" placeholder="Search Host ID" />
+                                        <a id="searchDrReplicaData" href="javascript:void(0)" class="icon-search" title="Search">search</a> </div>
+                                    <div class="pagination"> <a id="previousDrReplicaPage" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
+                                        <label id="Label1">1</label>
+                                        of
+                                        <label id="Label2">1</label>
+                                        <a id="nextDrReplicaPage" href="javascript:void(0)" class="next" title="Next Page">Next</a> </div>
+                                    <div class="clear"></div>
+                                </div>
+                                <div class="tblScroll">
+                                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl drTbl">
+                                        <thead>
+                                            <tr>
+                                                <th id="Th7" width="25%" data-name="none">Host ID</th>
+                                                <th id="Th8" width="25%" data-name="none">Status</th>
+                                                <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>
+                                                <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>1</td>
+                                                <td>off</td>
+                                                <td>100</td>
+                                                <td>200</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -386,18 +491,18 @@
                                             <div class="loading-small loadingSecurity" ></div>
                                         </div>
                                         <div class="securWrapper" id="UsersList">
-                                           <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
-                                                <tr>
-                                                    <th>Username</th>
-                                                    <th>Password</th>
-                                                    <th>Role</th>
-                                                </tr>
-                                                <tr>
-                                                    <td>Test</td>
-                                                    <td>Test</td>
-                                                    <td>User</td>
-                                                </tr>
-                                            </table>-->
+                                            <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                                    <tr>
+                                                        <th>Username</th>
+                                                        <th>Password</th>
+                                                        <th>Role</th>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Test</td>
+                                                        <td>Test</td>
+                                                        <td>User</td>
+                                                    </tr>
+                                                </table>-->
                                         </div>
                                         <div class="securWrapper" id="UsersListEditable" style="display: none;">
                                             <div class="userName">Users</div>
@@ -591,6 +696,75 @@
                                 </tr>
                             </table>
                         </div>
+                        
+                        <div class="drWrapperAdmin"> 
+                            <div class="headerAdminContent">
+                                <h1>
+                                    <div class="drAdminHeaderLeft">DR</div>
+                                    <div class="drAdminHeaderRight">
+                                        <ul class="drList">
+                                            <li>Mode</li>
+                                            <li class="drArrow">Master</li>
+                                        </ul>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <div class="drContent">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
+                                    <tr>
+                                        <td width="62%" class="configLabel">State</td>
+                                        <td width="20%" align="right"><div id="drStateIcon" class="onIcon"></div>
+                                            <input style="display: none;" type="checkbox" id="chkDrState" checked="checked" class="drstate" />
+                                            <div id="loadingDrState" class="loading-small" style="display: none"></div></td>
+                                        <!--</td>-->
+                                        <td width="2%"><div id="txtDrState" class="drStateOn">On</div></td>
+                                        <td width="16%"><a id="btnEditDrStateOk" href="#drStatePop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrStateCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="drStateEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                    </tr>
+                                    <tr>
+                                        <td width="62%" class="configLabel">ID</td>
+                                        <td width="20%" align="right">4</td>
+                                        <td width="2%">&nbsp;</td>
+                                        <td width="16%">&nbsp;</td>
+                                    </tr>
+                                    <tr>
+                
+                                        <td class="configLabel">Master</td>
+                                        <td align="right"><div id="drMasterIcon" class="onIcon"></div>
+                                            <input style="display: none;" type="checkbox" checked="checked" id="chkDrMaster" />
+                                            <div id="loadingDrMaster" class="loading-small" style="display: none"></div></td>
+                                        <td><div id="txtDrMaster" class="drMasterOn">On</div></td>
+                                        <td><a id="btnEditDrMasterOk" href="#drMasterPop" class="editOk" title="Save" style="">Ok</a>
+                                            <a id="btnEditDrMasterCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> 
+                                            <a href="javascript:void(0);" id="drMasterEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                    </tr>
+                        
+                                    <tr class="hasSubLabel parent" id="row-8">
+                                        <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Replica</a></td>
+                                        <td align="right"><div id="drReplicaIcon" class="onIcon"></div>
+                                            <input style="display: none;" type="checkbox" id="chkDrReplica" checked="checked" />
+                                            <div id="loadingDrReplica" class="loading-small" style="display: none"></div></td>
+                                        <td><div id="txtDrReplica" class="drReplicaOn">On</div></td>
+                                        <td><a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                    </tr>
+              
+                                    <tr class="child-row-8 subLabelRow" id="Tr1">
+                                        <td class="configLabel">Source </td>
+                                        <td align="right" class="">
+                                            <div id="loadingDrSource" class="loading-small" style="display: none;"></div>
+                                            <span id="drSourceSpan">serverBz</span>
+                                            <input id="txtDrSource" name="txtDrSource" class="exitableTxtDr" value="serverBz" type="text" style="display: none" />
+                                        </td>
+                                        <td>&nbsp;</td>
+                                        <td>&nbsp;</td>
+                                    </tr>
+           
+                                </table>
+             
+                            </div>
+                        </div>
+
                     </div>
                     <div class="adminContentRight">
                         <div class="adminPorts">
@@ -1450,6 +1624,52 @@
         </div>
     </div>
     
+        <!--DR warning POPUP  -->
+    <div id="myWarning" style="display: none">
+    <div class="overlay-title"><div class="warninghead"><img src="css/resources/images/Information.png" />Warning</div></div>
+    <div class="clear"></div> 
+    <div class="overlay-content warning">
+    <p>Two partation are uncovered.</p>
+    <div class="overlay-btns" style="padding:0;"><button class="btn">Ok</button>
+    <div class="clear"></div>
+    </div>
+    </div>
+    
+    </div>
+    <!-- DR warning POPUP end  -->
+
+    <!-- POPUP DRStatePop -->
+    <div id="drStatePop" style="display: none">
+        <div class="overlay-title icon-alert">DR State</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveDrState" class="btn">Ok</a> <a id="btnPopupDrStateCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP DRStatePop -->
+
+    <!-- POPUP DRMasterPop -->
+    <div id="drMasterPop" style="display: none">
+        <div class="overlay-title icon-alert">DR Master</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveDrMaster" class="btn">Ok</a> <a id="btnPopupDrMasterCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP DRStatePop -->
+
+    <!-- POPUP DRReplicaPop -->
+    <div id="drReplicaPop" style="display: none">
+        <div class="overlay-title icon-alert">DR Replica</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveDrReplica" class="btn">Ok</a> <a id="btnPopupDrReplicaCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP DRReplicaPop -->
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>

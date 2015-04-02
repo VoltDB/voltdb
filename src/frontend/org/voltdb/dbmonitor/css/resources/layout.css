@@ -40,7 +40,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring, 
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig 
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 ul.servers-list li.pauseActiveMonitoring{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;background-color: #f0f3f4}
 
@@ -839,7 +839,7 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-786
 .setServer {/*float:left;*/ float:right;}
 .adminIcons { /*background-position:-225px -13px; width:30px; height:28px;*/ background-position: -225px -14px;height: 28px; width: 30px;}
 .adminContainer { margin:0; padding:20px 0; font-size:13px;}
-.adminContentLeft { float:left; width:49%; background:#FFFFFF; margin:0 2% 0 0 }
+.adminContentLeft { float:left; width:49%; margin:0 2% 0 0 }
 .adminContentRight { float:left;width:49%;}
 .headerAdminContent {height:53px;position: relative; background:#fbfbfb; border-bottom:1px solid #aaa;}
 .adminDirectories { background:#FFFFFF; margin:20px 0 0 0;}
@@ -1040,6 +1040,39 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .iconDeleteAddConfig {background-position:0px -1570px; width:20px; height:20px; float:left; position:relative; top:6px;}
 
 /****Export details Ends*******/
+
+/****DR *******/
+.drWrapper { margin:20px 0 0 0;}
+.drWrapper .content {margin-bottom:2px}
+.drShowHide { background:#FFFFFF; padding:20px;}
+.masterWrapper{ margin-bottom:20px;}
+.replicaWrapper {}
+ul.drList { margin:0 20px 0 0; padding:0; float:left; height: 28px;line-height: 30px;}
+ul.drList li { margin:0 0 0 10px; padding:0; float:left; font-size:14px;}
+
+ul.drList li.drArrow {
+    background-position: left -456px;
+    color: #76bd1d;
+    padding-left: 15px;
+}
+.drTbl tr td { text-align:center}
+.drTbl tr td:first-child { text-align:left;}
+.overviewTbl {background:#FFFFFF;}
+.drWrapperAdmin { margin:20px 0 0 0;}
+.drContent {background:#FFFFFF;}
+.drContent table td{white-space:nowrap !important}
+
+tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
+.drAdminHeaderLeft { float:left;}
+.drAdminHeaderRight { float:right; position:relative; top:-6px;}
+.icon-master{ background-position:left -1604px;}
+.icon-replica{ background-position:left -1653px;}
+.warningDr {display: block; width: 73px;}
+.warninghead { margin:0; padding:0;}
+.warninghead img { margin:5px 5px 0 0; position:relative;top:2px;}
+
+/****DR Ends*******/
+
 a.changePsd {color: #0079bb;}
 a:hover.changePsd { text-decoration: underline; }
 

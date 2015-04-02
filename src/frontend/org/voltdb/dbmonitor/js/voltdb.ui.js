@@ -146,10 +146,30 @@ $(document).ready(function () {
             }
         }
     });
+    
+    //DR Show/hide toggle	
+    // Show Hide Graph Block
+    $('#showHideDrBlock').click(function () {
+        $(".drShowHide").toggle();
+        var $this = $(this);
+        var drState = $(".drShowHide").css('display');
+        if (drState == 'none') {
+            $this.removeClass('expanded');
+            $this.addClass('collapsed');
+
+        } else {
+            $this.removeClass('collapsed');
+            $this.addClass('expanded');
+
+        }
+
+
+    });
 
     // Shows memory alerts
     $('#showMemoryAlerts').popup();
-
+    $('.drWarning').popup();
+    
     //Logout popup
     $('#logOut').popup();
     $('#btnlogOut').popup();
