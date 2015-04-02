@@ -23,6 +23,7 @@
 
 #include <getopt.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
@@ -42,6 +43,7 @@
 #include "common/tabletuple.h"
 #include "executors/OptimizedProjector.hpp"
 #include "expressions/abstractexpression.h"
+#include "expressions/operatorexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
@@ -398,16 +400,52 @@ TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
 
     cout << "\n          " << "VARCHAR columns (outlined):\n";
     runProjectionTest(outlinedVarcharColumns, outlinedVarcharColumns, projector);
-
-    BOOST_FOREACH(TupleValueExpression* e, exprs) {
+    BOOST_FOREACH(AbstractExpression* e, exprs) {
         delete e;
     }
+}
 
-    // Still to test:
-    //   Different data types
-    //   Different expressions
-    //   Implicit casts between types
-    //   Combinations of above
+TEST_F(OptimizedProjectorTest, ProjectNonTVE)
+{
+    std::vector<AbstractExpression*> exprs;
+
+    // Create a expr vector for a projection like
+    // (for NUM_COLS == 4)
+    //
+    //   TVE       TVE        ADD   TVE
+    //
+    for (int i = 0; i < NUM_COLS; ++i) {
+        if (i == NUM_COLS / 2) {
+            TupleValueExpression* lhs = new TupleValueExpression(0, i - 1);
+            TupleValueExpression* rhs = new TupleValueExpression(0, i);
+            OperatorExpression<OpPlus>* plus =
+                new OperatorExpression<OpPlus>(EXPRESSION_TYPE_OPERATOR_PLUS, lhs, rhs);
+            exprs.push_back(plus);
+        }
+        else {
+            exprs.push_back(new TupleValueExpression(0, i));
+        }
+    }
+
+    std::vector<TypeAndSize> types(NUM_COLS, BIGINT);
+    TupleSchema* schema = createSchemaEz(types);
+
+    OptimizedProjector projector(exprs);
+    projector.optimize(schema, schema);
+
+    // There should be at most 3 steps. The plus operator in the
+    // middle of the tuple will break up the memcpy steps.  The steps
+    // in the optimized projection will look like this:
+    //
+    //   [memcpy 2 fields]    ADD   [memcpy 1 field]
+
+    size_t expectedNumSteps = std::min(int64_t(3), NUM_COLS);
+    ASSERT_EQ(expectedNumSteps, projector.numSteps());
+
+    TupleSchema::freeTupleSchema(schema);
+    BOOST_FOREACH(AbstractExpression* e, exprs) {
+        delete e;
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -419,13 +457,13 @@ int main(int argc, char* argv[]) {
             break;
         case 'c': {
             unsigned long val = boost::lexical_cast<unsigned long>(optarg);
-
+            // number of column must be a power of two.
             assert (std::bitset<64>(val).count() == 1);
             NUM_COLS = static_cast<int64_t>(val);
             break;
         }
         default:
-            cerr << "Usage: " << argv[0] << " [-r <num_rows> ] [-c <num_cols>]\n";
+            cerr << "Usage: " << argv[0] << " [-r <num_rows>] [-c <num_cols>]\n";
             exit(1);
         }
     }
