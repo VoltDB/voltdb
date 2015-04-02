@@ -64,15 +64,6 @@ public:
         return DATABASE_ID;
     }
 
-    static void init() {
-        if (ExecutorContext::getExecutorContext() == NULL) {
-            Pool* testPool = new Pool();
-            UndoQuantum* wantNoQuantum = NULL;
-            Topend* topless = NULL;
-            (void)new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
-        }
-    }
-
     enum TypeAndSize {
         TINYINT,
         SMALLINT,
@@ -196,7 +187,8 @@ public:
         TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
 
         for (int64_t i = 0; i < numRows; ++i) {
-            for (int j = 0; j < schema->columnCount(); ++j) {
+            int numCols = schema->columnCount();
+            for (int j = 0; j < numCols; ++j) {
                 uint32_t length = schema->getColumnInfo(j)->length;
                 ValueType vt = schema->columnType(j);
                 NValue nval;
@@ -206,10 +198,10 @@ public:
                     break;
                 }
                 case VALUE_TYPE_VARCHAR:
-                    nval = ValueFactory::getStringValue(randomString(length));
+                    nval = ValueFactory::getTempStringValue(randomString(length));
                     break;
                 case VALUE_TYPE_VARBINARY:
-                    nval = ValueFactory::getBinaryValue(randomString(length));
+                    nval = ValueFactory::getTempBinaryValue(randomString(length));
                     break;
                 default:
                     assert(false);
@@ -217,6 +209,7 @@ public:
 
                 srcTuple.setNValue(j, nval);
             }
+
             tbl->insertTuple(srcTuple);
         }
     }
@@ -437,6 +430,13 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    OptimizedProjectorTest::init();
+    assert (ExecutorContext::getExecutorContext() == NULL);
+
+    boost::scoped_ptr<Pool> testPool(new Pool());
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    boost::scoped_ptr<ExecutorContext> executorContext(new ExecutorContext(0, 0, wantNoQuantum, topless, testPool.get(),
+                                                                           NULL, "", 0, NULL, NULL));
+
     return TestSuite::globalInstance()->runAll();
 }
