@@ -33,6 +33,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
@@ -158,6 +159,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             return ;
         }
         m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+        if (m_skip_null_predicate != null) {
+            m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());
+        }
     }
 
     // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
