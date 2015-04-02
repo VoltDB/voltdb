@@ -697,7 +697,7 @@ var loadPage = function (serverName, portid) {
             }
         });
 
-        voltDbRenderer.GetDrInformation(function(drDetails) {
+        voltDbRenderer.GetDrStatusInformation(function(drDetails) {
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
                 VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];

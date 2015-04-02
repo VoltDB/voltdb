@@ -431,10 +431,10 @@ function alertNodeClicked(obj) {
         };
 
         //Check if DR is enable or not
-        this.GetDrInformation = function (onInformationLoaded) {
+        this.GetDrStatusInformation = function (onInformationLoaded) {
             var drStatus = {};
 
-            VoltDBService.GetDrInformation(function (connection) {
+            VoltDBService.GetDrStatusInformation(function (connection) {
                 getDrDetails(connection, drStatus);
                 onInformationLoaded(drStatus);
             });
@@ -453,11 +453,11 @@ function alertNodeClicked(obj) {
         //
 
         //Render DR Replication Graph
-        this.GetClusterReplicaInformation = function (onInformationLoaded) {
+        this.GetDrReplicationInformation = function (onInformationLoaded) {
             var replicationStatus = {};
 
-            VoltDBService.GetClusterReplicaInformation(function (connection) {
-                getReplicationDetails(connection, replicationStatus, "CLUSTER_REPLICA_INFORMATION");
+            VoltDBService.GetDrReplicationInformation(function (connection) {
+                //getReplicationDetails(connection, replicationStatus, "CLUSTER_REPLICA_INFORMATION");
                 onInformationLoaded(replicationStatus);
             });
         };

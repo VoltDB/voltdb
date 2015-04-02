@@ -1021,7 +1021,7 @@
         };
         
         //Check if DR is enable or not
-        this.GetDrInformation = function (onConnectionAdded) {
+        this.GetDrStatusInformation = function (onConnectionAdded) {
             try {
                 var processName = "DR_INFORMATION";
                 var procedureNames = ['@Statistics'];
