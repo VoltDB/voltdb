@@ -197,6 +197,7 @@ begin Index              "A index structure on a database table's columns"
   int type               "What data structure is the index using and what kinds of keys does it support?"
   ColumnRef* columns     "Columns referenced by the index"
   string expressionsjson "A serialized representation of the optional expression trees"
+  string predicatejson   "A serialized representation of the optional predicate for partial indexes"
 end
 
 begin ColumnRef    "A reference to a table column"
