@@ -64,6 +64,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryErrHtml (required: false) { queryResHtml.find('span') }
         queryDurHtml { $('#queryResults') }
 
+
         //popup query ok and cancel
         cancelpopupquery        { $("#btnQueryDatabasePausedErrorCancel", text:"Cancel")}
         okpopupquery            { $("#btnQueryDatabasePausedErrorOk", text:"Ok")}

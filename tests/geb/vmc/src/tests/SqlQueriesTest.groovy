@@ -669,7 +669,6 @@ class SqlQueriesTest extends TestBase {
         then: 'run the query'
         page.runQuery()
 
-
         try {
             waitFor(10) {
                 page.cancelpopupquery.isDisplayed()
