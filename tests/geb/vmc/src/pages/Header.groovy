@@ -34,6 +34,28 @@ class Header extends Module {
         logoutPopupCancelButton   { $("#btnCancel") }
     }
 
+	def String getUsername() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/users.txt"))
+        String user
 
+        while((user = br.readLine()) != "#username") {
+        }
+
+        user = br.readLine()
+
+        return user
+    }
+    
+    def String getPassword() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/users.txt"))
+        String password
+
+        while((password = br.readLine()) != "#password") {
+        }
+
+        password = br.readLine()
+
+        return password
+    }
 
 }

@@ -236,13 +236,9 @@ class AdminSecurityUser extends TestBase {
 				insideCount = 0
 				while(insideCount < numberOfTrials) {
 					insideCount ++
+					int smallCount = 0
 					
-					when: 'Security button is clicked'
-					page.overview.expandSecurity()
-					then: 'Check if Security expanded or nots'
-					page.overview.checkIfSecurityIsExpanded()
-					
-					when: 'Click Edit User button'
+					when: 'Open Edit'
 					page.overview.openEditUserNext()
 					then: 'Edit User popup is displayed'
 					page.overview.checkSecurityEditOpen()
@@ -283,7 +279,8 @@ class AdminSecurityUser extends TestBase {
 			assert false
 		}
 	}
-    /*
+	
+	
     def cleanupSpec() {
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
@@ -304,34 +301,40 @@ class AdminSecurityUser extends TestBase {
         then: 'Check if Security expanded or nots'
         page.overview.checkIfSecurityIsExpanded()
 
+		boolean loopStatus = false
+        String usernameTwo = page.overview.getUsernameTwoForSecurity()
+        int insideCount = 0
+        
+        while(insideCount < numberOfTrials) {
+            insideCount ++
 
-        try {
-            insideCount = 0
-            while(insideCount < numberOfTrials) {
-                insideCount ++
+            when: 'Security button is clicked'
+            page.overview.expandSecurity()
+            then: 'Check if Security expanded or nots'
+            page.overview.checkIfSecurityIsExpanded()
 
-                when: 'Security button is clicked'
-                page.overview.expandSecurity()
-                then: 'Check if Security expanded or nots'
-                page.overview.checkIfSecurityIsExpanded()
-
-                when: 'Click Edit User button'
-                page.overview.openEditUserNext()
-                then: 'Edit User popup is displayed'
-                page.overview.checkSecurityEditOpen()
-
-                when: 'User was deleted'
-                page.overview.deleteUserSecurityPopup()
-                then: 'check for the user'
-                if(overview.checkListForUsers(usernameTwo) == false) {
-                    println("deletion successful")
-                    loopStatus = true
-                    break
-                }
+            when: 'Click Edit User button'
+            try {
+            	waitFor(waitTime) { page.overview.editUserNext.isDisplayed() }
+            	page.overview.openEditUserNext()
+            } catch (geb.error.RequiredPageContentNotPresent e) {
+                println("Already deleted")
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already deleted")
+                break
             }
-        } catch(geb.error.RequiredPageContentNotPresent e) {
-            println("Already deleted")
+            then: 'Edit User popup is displayed'
+            page.overview.checkSecurityEditOpen()
+
+            when: 'User was deleted'
+            page.overview.deleteUserSecurityPopup()
+            then: 'check for the user'
+            if(overview.checkListForUsers(usernameTwo) == false) {
+                println("Deletion successful")
+                loopStatus = true
+                break
+            }
         }
     }
-	*/
 }
