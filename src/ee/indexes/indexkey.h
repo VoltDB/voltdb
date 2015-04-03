@@ -51,6 +51,8 @@
 
 #include "expressions/abstractexpression.h"
 
+#include "structures/btree.h"
+
 #include <cassert>
 #include <iostream>
 #include <sstream>
@@ -867,6 +869,13 @@ public:
 
 private:
     first_type k;
+};
+
+template <typename CompareType>
+class BtreeTagComparator: public CompareType, public btree::btree_key_compare_to_tag {
+public:
+    BtreeTagComparator(const TupleSchema *keySchema) : CompareType(keySchema) {}
+
 };
 
 }

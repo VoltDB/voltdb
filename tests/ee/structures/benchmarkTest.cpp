@@ -52,7 +52,7 @@ public:
     }
 };
 
-class IntComparator {
+class IntComparator : public btree::btree_key_compare_to_tag {
 public:
     inline int operator()(const int &lhs, const int &rhs) const {
         if (lhs > rhs) return 1;
@@ -118,7 +118,6 @@ public:
     }
 
     void start() {
-//        printf("\n%s benchmark starts...", mapCategoryToString(m_name).c_str());
         m_start = getMicrosNow();
         m_duration = 0;
     }
@@ -126,11 +125,11 @@ public:
     void stop() {
         m_duration += getMicrosNow() - m_start;
         m_start = getMicrosNow();
-//        printf("\n%s benchmark stops...", mapCategoryToString(m_name).c_str());
     }
 
     void print() {
-        printf("%s finished in %lld microseconds\n", mapCategoryToString(m_name).c_str(), m_duration);
+        std::cout << mapCategoryToString(m_name) << " finished in " << m_duration << " microseconds\n";
+        std::cout.flush();
     }
 private:
     int m_name;
@@ -140,14 +139,15 @@ private:
 };
 
 void resultPrinter(std::string name, int scale, std::vector<Benchmark> result) {
-    printf("\n\nBenchmark: %s, scale size %d\n", name.c_str(), scale);
+    std::cout << "\n\nBenchmark: " << name << ", scale size " << scale << std::endl;
 
     for (int i = 0; i < result.size(); i++) {
         Benchmark ben = result[i];
         ben.print();
     }
 
-    printf("\n");
+    std::cout << std::endl;
+    std::cout.flush();
 }
 
 void BenchmarkRun(int NUM_OF_VALUES) {
@@ -162,16 +162,15 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, false> voltMap(false, IntComparator());
     std::multimap<int,int> stlMap;
 
-    less<int> comp = less<int>();
     std::allocator<int> alloc = std::allocator<int>();
-    btree::btree<btree::btree_map_params<int, int, less<int>, std::allocator<int>, 256> > btreeMap(comp, alloc);
+    btree::btree<btree::btree_map_params<int, int, IntComparator, std::allocator<int>, 256> > btreeMap(IntComparator(), alloc);
     boost::unordered_multimap<int, int> boostMap;
     voltdb::CompactingHashTable<int,int> voltHash(false);
 
     // Iterators
     voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, false>::iterator iter_volt_map;
     std::multimap<int, int>::const_iterator iter_stl;
-    btree::btree<btree::btree_map_params<int, int, less<int>, std::allocator<int>, 256> >::iterator iter_btree;
+    btree::btree<btree::btree_map_params<int, int, IntComparator, std::allocator<int>, 256> >::iterator iter_btree;
     boost::unordered_multimap<int,int>::iterator iter_boost_map;
     voltdb::CompactingHashTable<int,int>::iterator iter_volt_hash;
 
@@ -307,7 +306,10 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benVoltMap.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = deletes[i];
-        voltMap.erase(val);
+        iter_volt_map = voltMap.find(val);
+        if (!iter_volt_map.isEnd()) {
+            voltMap.erase(iter_volt_map);
+        }
     }
     benVoltMap.stop();
     result.push_back(benVoltMap);
@@ -315,7 +317,10 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benStl.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = deletes[i];
-        stlMap.erase(val);
+        iter_stl = stlMap.find(val);
+        if (iter_stl != stlMap.end()) {
+            stlMap.erase(iter_stl);
+        }
     }
     benStl.stop();
     result.push_back(benStl);
@@ -323,7 +328,10 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benBtree.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = deletes[i];
-        btreeMap.erase_multi(val);
+        iter_btree = btreeMap.find_multi(val);
+        if (iter_btree != btreeMap.end()) {
+            btreeMap.erase(iter_btree);
+        }
     }
     benBtree.stop();
     result.push_back(benBtree);
@@ -331,7 +339,10 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benBoost.start();
     for (int i = 0; i < NUM_OF_VALUES; i++) {
         int val = input[i];
-        boostMap.erase(val);
+        iter_boost_map = boostMap.find(val);
+        if (iter_boost_map != boostMap.end()) {
+            boostMap.erase(iter_boost_map);
+        }
     }
     benBoost.stop();
     result.push_back(benBoost);
@@ -339,7 +350,10 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benVoltHash.start();
     for (int i = 0; i < NUM_OF_VALUES; i++) {
         int val = input[i];
-        voltHash.erase(val, val);
+        iter_volt_hash = voltHash.find(val);
+        if (!iter_volt_hash.isEnd()) {
+            voltHash.erase(iter_volt_hash);
+        }
     }
     benVoltHash.stop();
     result.push_back(benVoltHash);
@@ -349,8 +363,9 @@ void BenchmarkRun(int NUM_OF_VALUES) {
 }
 
 TEST_F(CompactingMapBenchTest, RandomInsert) {
-    int length = 7;
-    int scales[] = {10, 100, 1000, 10000, 100000, 1000000, 10000000};
+    // change this number to 6 to run full benchmark tests
+    int length = 0;
+    int scales[] = {100, 1000, 10000, 100000, 1000000, 10000000};
 
     for (int i = 0; i < length; i++) {
         int scale = scales[i];
@@ -358,7 +373,6 @@ TEST_F(CompactingMapBenchTest, RandomInsert) {
         BenchmarkRun(scale);
         printf("=============\nBenchmark Finishes\n\n");
     }
-
 }
 
 int main() {

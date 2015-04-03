@@ -65,7 +65,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
 {
     typedef typename KeyValuePair::first_type KeyType;
     typedef typename KeyValuePair::second_type ValueType;
-    typedef typename KeyType::KeyComparator KeyComparator;
+    typedef BtreeTagComparator<typename KeyType::KeyComparator> KeyComparator;
     typedef typename std::allocator<std::pair<const KeyType, ValueType> > Allocator;
     typedef btree::btree<btree::btree_map_params<KeyType, ValueType, KeyComparator, Allocator, 256> > MapType;
     typedef typename MapType::iterator MapIterator;
@@ -87,6 +87,20 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return mapIter == m_entries.end();
     }
 
+    void movePrev(MapConstIterator &mapIter) const {
+        if (mapIter != m_entries.begin()) {
+            mapIter--;
+        } else {
+            mapIter = m_entries.end();
+        }
+    }
+
+    void moveNext(MapConstIterator &mapIter) const {
+        if (mapIter != m_entries.end()) {
+            mapIter++;
+        }
+    }
+
     bool addEntry(const TableTuple *tuple)
     {
         ++m_inserts;
@@ -101,8 +115,8 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (iter == m_entries.end()) {
             return false;
         }
-
-        return m_entries.erase(iter) != m_entries.end();
+        m_entries.erase(iter);
+        return true;
     }
 
     /**
@@ -176,7 +190,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
             moveToEnd(false, cursor);
         } else {
             cursor.m_forward = false;
-            mapIter--;
+            movePrev(mapIter);
         }
     }
 
@@ -190,14 +204,15 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isEnd(mapIter)) {
 //            mapIter = m_entries.rbegin();
             mapIter = m_entries.end();
+            movePrev(mapIter);
         } else {
             // go back 2 entries
             // entries: [..., A, B, C, ...], currently m_keyIter = C (not NULL if reach here)
             // B is the entry we just evaluated and didn't pass initial_expression test (can not be NULL)
             // so A is the correct starting point (can be NULL)
-            mapIter--;
+            movePrev(mapIter);
         }
-        mapIter--;
+        movePrev(mapIter);
     }
 
     void moveToEnd(bool begin, IndexCursor& cursor) const
@@ -210,6 +225,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         else {
 //          mapIter = m_entries.rbegin();
             mapIter = m_entries.end();
+            movePrev(mapIter);
         }
     }
 
@@ -221,9 +237,9 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (! isEnd(mapIter)) {
             retval.move(const_cast<void*>(mapIter->second));
             if (cursor.m_forward) {
-                mapIter++;
+                moveNext(mapIter);
             } else {
-                mapIter--;
+                movePrev(mapIter);
             }
         }
 
@@ -258,8 +274,8 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
         cursor.m_forward = true;
         MapConstRange iter_pair = m_entries.equal_range(mapEndIter.key());
-        mapEndIter = iter_pair.second;
         mapIter = iter_pair.first;
+        mapEndIter = iter_pair.second;
 
         if (isEnd(mapIter)) {
             cursor.m_match.move(NULL);
@@ -356,7 +372,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (m_cmp(rvKey, tempKey) <= 0) {
             return rv;
         }
-        return MapConstIterator();
+        return m_entries.end();
     }
 
     MapConstIterator findTuple(const TableTuple &originalTuple) const
@@ -364,12 +380,12 @@ class CompactingTreeMultiMapIndex : public TableIndex
         // TODO: couldn't remove this, because of CompactingTreeMultiIndexTest in eecheck
         // code will force to use non-pointer-key.
         if (KeyType::keyDependsOnTupleAddress()) {
-            return m_entries.lower_bound(setKeyFromTuple(&originalTuple));
+            return m_entries.find_multi(setKeyFromTuple(&originalTuple));
         }
 
         for (MapConstRange iter_pair = m_entries.equal_range(setKeyFromTuple(&originalTuple));
-             iter_pair.first != iter_pair.second;
-             iter_pair.first++) {
+                iter_pair.first != iter_pair.second;
+                iter_pair.first++) {
             if (iter_pair.first->second == originalTuple.address()) {
                 return iter_pair.first;
             }
@@ -382,12 +398,12 @@ class CompactingTreeMultiMapIndex : public TableIndex
         // TODO: couldn't remove this, because of CompactingTreeMultiIndexTest in eecheck
         // code will force to use non-pointer-key.
         if (KeyType::keyDependsOnTupleAddress()) {
-            return m_entries.lower_bound(setKeyFromTuple(&originalTuple));
+            return m_entries.find_multi(setKeyFromTuple(&originalTuple));
         }
 
         for (MapRange iter_pair = m_entries.equal_range(setKeyFromTuple(&originalTuple));
-             iter_pair.first != iter_pair.second;
-             iter_pair.first++) {
+                iter_pair.first != iter_pair.second;
+                iter_pair.first++) {
             if (iter_pair.first->second == originalTuple.address()) {
                 return iter_pair.first;
             }

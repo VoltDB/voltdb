@@ -67,7 +67,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 {
     typedef typename KeyValuePair::first_type KeyType;
     typedef typename KeyValuePair::second_type ValueType;
-    typedef typename KeyType::KeyComparator KeyComparator;
+    typedef BtreeTagComparator<typename KeyType::KeyComparator> KeyComparator;
     typedef typename std::allocator<std::pair<const KeyType, ValueType> > Allocator;
     typedef btree::btree<btree::btree_map_params<KeyType, ValueType, KeyComparator, Allocator, 256> > MapType;
     typedef typename MapType::iterator MapIterator;
@@ -81,6 +81,20 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     bool isEnd(MapConstIterator &mapIter) const {
         return mapIter == m_entries.end();
+    }
+
+    void movePrev(MapConstIterator &mapIter) const {
+        if (mapIter != m_entries.begin()) {
+            mapIter--;
+        } else {
+            mapIter = m_entries.end();
+        }
+    }
+
+    void moveNext(MapConstIterator &mapIter) const {
+        if (mapIter != m_entries.end()) {
+            mapIter++;
+        }
     }
 
     bool addEntry(const TableTuple *tuple)
@@ -174,7 +188,7 @@ class CompactingTreeUniqueIndex : public TableIndex
             moveToEnd(false, cursor);
         } else {
             cursor.m_forward = false;
-            mapIter--;
+            movePrev(mapIter);
         }
     }
 
@@ -186,15 +200,17 @@ class CompactingTreeUniqueIndex : public TableIndex
         MapConstIterator &mapIter = castToIter(cursor);
 
         if (isEnd(mapIter)) {
+            //mapIter = m_entries.rbegin();
             mapIter = m_entries.end();
+            movePrev(mapIter);
         } else {
             // go back 2 entries
             // entries: [..., A, B, C, ...], currently mapIter = C (not NULL if reach here)
             // B is the entry we just evaluated and didn't pass initial_expression test (can not be NULL)
             // so A is the correct starting point (can be NULL)
-            mapIter--;
+            movePrev(mapIter);
         }
-        mapIter--;
+        movePrev(mapIter);
     }
 
     void moveToEnd(bool begin, IndexCursor& cursor) const
@@ -202,10 +218,13 @@ class CompactingTreeUniqueIndex : public TableIndex
         cursor.m_forward = begin;
         MapConstIterator &mapIter = castToIter(cursor);
 
-        if (begin)
+        if (begin) {
             mapIter = m_entries.begin();
-        else
+        } else {
+            //mapIter = m_entries.rbegin();
             mapIter = m_entries.end();
+            movePrev(mapIter);
+        }
     }
 
     TableTuple nextValue(IndexCursor& cursor) const
@@ -217,9 +236,9 @@ class CompactingTreeUniqueIndex : public TableIndex
         if (! isEnd(mapIter)) {
             retval.move(const_cast<void*>(mapIter->second));
             if (cursor.m_forward) {
-                mapIter++;
+                moveNext(mapIter);
             } else {
-                mapIter--;
+                movePrev(mapIter);
             }
         }
 
@@ -238,10 +257,11 @@ class CompactingTreeUniqueIndex : public TableIndex
         MapConstIterator &mapIter = castToIter(cursor);
 
         if (cursor.m_forward) {
-            mapIter++;
+            moveNext(mapIter);
         } else {
-            mapIter--;
+            movePrev(mapIter);
         }
+
         if (isEnd(mapIter))
         {
             cursor.m_match.move(NULL);
