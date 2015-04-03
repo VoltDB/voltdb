@@ -59,10 +59,10 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         qrFormatDropDown    { $('#exportType') }
         qrfddOptions    { qrFormatDropDown.find('option') }
         qrfddSelected   { qrFormatDropDown.find('option', selected: "selected") }
-        queryResHtml { $('#resultHtml') }
-        queryTables  (required: false) { queryResHtml.find('table') }
-        queryErrHtml (required: false) { queryResHtml.find('span') }
-        queryDurHtml { $('#queryResults') }
+        queryResHtml    { $('#resultHtml') }
+        queryTables     (required: false) { queryResHtml.find('table') }
+        queryErrHtml    (required: false) { queryResHtml.find('span') }
+        queryDurHtml    { $('#queryResults') }
 
 
         //popup query ok and cancel

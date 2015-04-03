@@ -850,14 +850,12 @@ class SqlQueriesTest extends TestBase {
         }catch (geb.waiting.WaitTimeoutException e) {println("couldn't check due to server not online error or waiting time error")}
 
 
-
         when: 'set delete query in the box'
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
 
     }
-
 
 
 
