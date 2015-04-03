@@ -355,7 +355,7 @@ public class TableWorks {
                                                           null, null, true,
                                                           true, false);
                     // A VoltDB extension to support the assume unique attribute
-                    index = index.setAssumeUnique(c.assumeUnique);
+                    index = index.setAssumeUnique(c.voltAssumeUnique);
                     // End of VoltDB extension
                     c.core.mainTable = tn;
                     c.core.mainIndex = index;
@@ -678,7 +678,7 @@ public class TableWorks {
             new Constraint(name, table, index,
                            SchemaObject.ConstraintTypes.UNIQUE);
         // A VoltDB extension to support the assume unique attribute
-        constraint = constraint.setAssumeUnique(assumeUnique);
+        constraint = constraint.voltSetAssumeUnique(assumeUnique);
         // End of VoltDB extension
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, index, -1, 0, emptySet,
@@ -1444,7 +1444,7 @@ public class TableWorks {
         Index exprIndex = table.createIndexStructure(indexname, cols, null, null, true, true, false);
         exprIndex = exprIndex.withExpressions(indexExprs);
         Constraint constraint = new Constraint(name, table,
-                exprIndex, SchemaObject.ConstraintTypes.UNIQUE).setAssumeUnique(assumeUnique);
+                exprIndex, SchemaObject.ConstraintTypes.UNIQUE).voltSetAssumeUnique(assumeUnique);
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, exprIndex, -1, 0, emptySet, emptySet);
 

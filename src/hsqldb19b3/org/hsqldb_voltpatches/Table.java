@@ -1024,7 +1024,7 @@ public class Table extends TableBase implements SchemaObject {
         for (int i = 0, size = constraintList.length; i < size; i++) {
             Constraint c = constraintList[i];
             // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
-            if (c.hasExprs()) {
+            if (c.voltHasExprs()) {
                 continue;
             }
             // End of VoltDB extension
@@ -3024,7 +3024,7 @@ public class Table extends TableBase implements SchemaObject {
         for (int i = 0, size = constraintList.length; i < size; i++) {
             Constraint exprc = constraintList[i];
 
-            if (exprc.isUniqueWithExprs(indexExprs)) {
+            if (exprc.voltIsUniqueWithExprs(indexExprs)) {
                 return exprc;
             }
         }

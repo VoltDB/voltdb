@@ -2060,9 +2060,13 @@ public class RangeVariable {
                             "SQL Syntax error: Every derived table must have its own alias.");
                 }
                 scan.attributes.put("table", tableAlias.name.toUpperCase());
-                // This used to work when dataExpression was a volt-specific member of TableDerived. Does it still do the right thing now that HSQL has defined a member by this name?
-                VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
+                // not yet hsql232 subquery parsing is going to take some figuring out
+                // ((TableDerived) rangeTable).queryExpression MAY be a start?
+                QuerySpecification qs = (QuerySpecification)((TableDerived) rangeTable).queryExpression;
+                // but it's probably nothing like this easy...
+                VoltXMLElement subQuery = qs.rowExpression.voltGetXML(session);
                 scan.children.add(subQuery);
+                // not yet hsql232 */
             }
         } else {
             scan.attributes.put("table", rangeTable.getName().name.toUpperCase());

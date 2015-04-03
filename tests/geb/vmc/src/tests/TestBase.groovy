@@ -36,7 +36,7 @@ import vmcTest.pages.*
 
 /**
  * This class is the base class for all of the test classes; it provides
- * initialization and convenience method(s).
+ * initialization and convenience methods.
  */
 class TestBase extends GebReportingSpec {
     @Rule public TestName tName = new TestName()
@@ -47,6 +47,7 @@ class TestBase extends GebReportingSpec {
     static final int DEFAULT_WINDOW_HEIGHT = 1000
     static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
+    static Boolean doesDBMonitorPageOpenFirst = null
     @Shared boolean firstDebugMessage = true
 
     def setupSpec() { // called once (per test class), before any tests
@@ -56,8 +57,8 @@ class TestBase extends GebReportingSpec {
         int desiredHeight = getIntSystemProperty("windowHeight", DEFAULT_WINDOW_HEIGHT)
         if (winSize.width != desiredWidth || winSize.height != desiredHeight) {
             driver.manage().window().setSize(new Dimension(desiredWidth, desiredHeight))
-            debugPrint "Window resized, from (" + winSize.width + ", " + winSize.height +
-                       ") to (" + desiredWidth + ", " + desiredHeight + ")"
+            debugPrint 'Window resized, from (' + winSize.width + ', ' + winSize.height +
+                       ') to (' + desiredWidth + ', ' + desiredHeight + ') [in TestBase.setupSpec()]'
         }
     }
 
@@ -67,8 +68,15 @@ class TestBase extends GebReportingSpec {
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
-            then: 'to be on VMC page'
+            then: 'should be on VMC page'
             at VoltDBManagementCenterPage
+        }
+
+        // Confirm that the 'DB Monitor' page opens initially, the first time
+        // (this is used by NavigatePagesTest)
+        if (doesDBMonitorPageOpenFirst == null) {
+            doesDBMonitorPageOpenFirst = page.isDbMonitorPageOpen()
+            debugPrint 'DB Monitor page was opened initially: ' + doesDBMonitorPageOpenFirst + ' [in TestBase.setup()]'
         }
 
         page.loginIfNeeded()
@@ -118,7 +126,7 @@ class TestBase extends GebReportingSpec {
             try {
                 return Boolean.parseBoolean(sysPropValue)
             } catch (Throwable e) {
-                println "Property '" + propertyName + "' should be int, not '" + sysPropValue + "'."
+                println "Property '" + propertyName + "' should be boolean, not '" + sysPropValue + "'."
                 return defaultValue
             }
         }
@@ -127,13 +135,20 @@ class TestBase extends GebReportingSpec {
     /**
      * Returns a list of lines from the specified file.
      * @param file - the file whose lines are to be returned.
+     * @param commentChars - the character(s) that indicate the beginning of a
+     * comment, which should be ignored (default is '#').
+     * @param includeBlankLines - whether or not to include blank (or
+     * white-space only) lines in the output (default is true).
      * @return a list of lines from the specified file.
      */
-    def List<String> getFileLines(File file) {
+    def List<String> getFileLines(File file, String commentChars='#',
+                                  boolean includeBlankLines=true) {
         def lines = []
         if (file.size() > 0) {
-            file.eachLine {
-                line -> if (!line.trim().startsWith('#')) { lines.add(line) }
+            file.eachLine { line ->
+                def trimmedLine = line.trim()
+                if ((includeBlankLines || !trimmedLine.isEmpty()) &&
+                    !trimmedLine.startsWith(commentChars)) { lines.add(line) }
             }
         }
         return lines

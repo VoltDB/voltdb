@@ -742,7 +742,7 @@ public class TestCSVLoader {
                 "3,1,1,1,third,1.10,1.11,7777-12-25 14:35:26",
                 "4,1,1,1,\"fourthfourthfourth\",1.10,1.11,7777-12-25 14:35:26"
         };
-        int invalidLineCnt = 1;
+        int invalidLineCnt = 2;
         int validLineCnt = myData.length - invalidLineCnt;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }

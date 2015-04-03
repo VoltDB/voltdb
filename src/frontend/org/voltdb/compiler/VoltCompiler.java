@@ -884,7 +884,7 @@ public class VoltCompiler {
         return m_procInfoOverrides.get(procName);
     }
 
-    public String getCanonicalDDL() {
+    public static String getCanonicalDdlForTest() {
         if(m_canonicalDDL == null) {
             throw new RuntimeException();
         }

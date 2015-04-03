@@ -204,6 +204,13 @@ public final class Constraint implements SchemaObject {
         copy.notNullColumnIndex = notNullColumnIndex;
         copy.rangeVariable      = rangeVariable;
 
+        // A VoltDB extension to support indexed expressions, assumeunique,
+        // and LIMIT PARTITION ROWS
+        copy.voltIndexedExprs = voltIndexedExprs;
+        copy.voltAssumeUnique = voltAssumeUnique;
+        copy.voltRowsLimit = voltRowsLimit;
+        copy.voltRowLimitDeleteStmt = voltRowLimitDeleteStmt;
+        // End of VoltDB extension
         return copy;
     }
 
@@ -342,8 +349,13 @@ public final class Constraint implements SchemaObject {
                 sb.append(Tokens.T_UNIQUE);
 
                 // A VoltDB extension to support indexed expressions
-                if (indexExprs != null) {
-                    return getExprList(sb);
+                if (voltIndexedExprs != null) {
+                    String sep = "";
+                    for (Expression ex : voltIndexedExprs) {
+                        sb.append(sep).append(ex.getSQL());
+                        sep = ", ";
+                    }
+                    break;
                 }
                 // End of VoltDB extension
                 int[] col = getMainColumns();
@@ -1039,22 +1051,22 @@ public final class Constraint implements SchemaObject {
     // NEED TO MAKE SURE THEY GET ADDED TO Constraint.duplicate()
     // AT THE TOP OF THE FILE OR ALTER WILL HATE YOU --izzy
 
-    Expression[] indexExprs; // For VoltDB, support indexed expressions, not just columns
-    boolean assumeUnique = false; // For VoltDB, support the assume unique attribute.
-    int rowsLimit = Integer.MAX_VALUE; // For VoltDB, support LIMIT PARTITION ROWS syntax
-    String rowsLimitDeleteStmt;
+    Expression[] voltIndexedExprs; // For VoltDB, support indexed expressions, not just columns
+    boolean voltAssumeUnique = false; // For VoltDB, support the assume unique attribute.
+    int voltRowsLimit = Integer.MAX_VALUE; // For VoltDB, support LIMIT PARTITION ROWS syntax
+    String voltRowLimitDeleteStmt; // For VoltDB, support LIMIT PARTITION ROWS syntax
 
     // VoltDB support for indexed expressions
     // and new kinds of constraints
-    public Constraint withExpressions(Expression[] exprs) {
-        indexExprs = exprs;
+    Constraint voltWithExpressions(Expression[] exprs) {
+        voltIndexedExprs = exprs;
         return this;
     }
 
     /**
      * @return The name of this constraint instance's type.
      */
-    String getTypeName() {
+    private String voltGetTypeName() {
         switch (constType) {
             case SchemaObject.ConstraintTypes.FOREIGN_KEY: return "FOREIGN_KEY";
             case SchemaObject.ConstraintTypes.MAIN: return "MAIN";
@@ -1084,11 +1096,11 @@ public final class Constraint implements SchemaObject {
         // WARNING: the name attribute setting is tentative, subject to reset in the
         // calling function, Table.voltGetTableXML.
         constraint.attributes.put("name", getName().name);
-        constraint.attributes.put("constrainttype", getTypeName());
-        constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
-        constraint.attributes.put("rowslimit", String.valueOf(rowsLimit));
-        if (rowsLimitDeleteStmt != null) {
-            constraint.attributes.put("rowslimitdeletestmt", rowsLimitDeleteStmt);
+        constraint.attributes.put("constrainttype", voltGetTypeName());
+        constraint.attributes.put("assumeunique", voltAssumeUnique ? "true" : "false");
+        constraint.attributes.put("rowslimit", String.valueOf(voltRowsLimit));
+        if (voltRowLimitDeleteStmt != null) {
+            constraint.attributes.put("rowslimitdeletestmt", voltRowLimitDeleteStmt);
         }
 
         // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
@@ -1104,9 +1116,9 @@ public final class Constraint implements SchemaObject {
     }
 
     // VoltDB support for indexed expressions
-    public boolean isUniqueWithExprs(Expression[] indexExprs2) {
+    boolean voltIsUniqueWithExprs(Expression[] indexExprs2) {
         if (constType != SchemaObject.ConstraintTypes.UNIQUE ||
-                (indexExprs == null) || ! indexExprs.equals(indexExprs2)) {
+                (voltIndexedExprs == null) || ! voltIndexedExprs.equals(indexExprs2)) {
             return false;
         }
         return true;
@@ -1114,32 +1126,20 @@ public final class Constraint implements SchemaObject {
 
     // VoltDB support for indexed expressions
     // Is this for temp constraints only? What's a temp constraint?
-    public boolean hasExprs() {
-        return indexExprs != null;
-    }
+    boolean voltHasExprs() { return voltIndexedExprs != null; }
 
-    // VoltDB support for indexed expressions
-    public String getExprList(StringBuffer sb) {
-        String sep = "";
-        for(Expression ex : indexExprs) {
-            sb.append(sep).append(ex.getSQL());
-            sep = ", ";
-        }
-        return sb.toString();
-    }
-
-    public Constraint setAssumeUnique(boolean assumeUnique) {
-        this.assumeUnique = assumeUnique;
+    Constraint voltSetAssumeUnique(boolean assumeUnique) {
+        this.voltAssumeUnique = assumeUnique;
         return this;
     }
 
     @Override
     public String toString() {
-        String str = "CONSTRAINT " + getName().name + " " + getTypeName();
+        String str = "CONSTRAINT " + getName().name + " " + voltGetTypeName();
         if (constType == SchemaObject.ConstraintTypes.LIMIT) {
-            str += " " + rowsLimit;
-            if (rowsLimitDeleteStmt != null) {
-                str += " EXECUTE (" + rowsLimitDeleteStmt + ")";
+            str += " " + voltRowsLimit;
+            if (voltRowLimitDeleteStmt != null) {
+                str += " EXECUTE (" + voltRowLimitDeleteStmt + ")";
             }
         }
 

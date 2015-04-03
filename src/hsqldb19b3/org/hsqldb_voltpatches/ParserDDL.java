@@ -1396,9 +1396,9 @@ public class ParserDDL extends ParserRoutine {
                     c.setColumnsIndexes(table);
 
                     // A VoltDB extension to support indexed expressions and the assume unique attribute
-                    if (c.indexExprs != null) {
+                    if (c.voltIndexedExprs != null) {
                         // Special case handling for VoltDB indexed expressions
-                        if (table.getUniqueConstraintForExprs(c.indexExprs) != null) {
+                        if (table.getUniqueConstraintForExprs(c.voltIndexedExprs) != null) {
                             throw Error.error(ErrorCode.X_42522);
                         }
                     }
@@ -1416,13 +1416,13 @@ public class ParserDDL extends ParserRoutine {
 
                     // A VoltDB extension to support indexed expressions and the assume unique attribute
                     Index index = null;
-                    if (c.indexExprs != null) {
+                    if (c.voltIndexedExprs != null) {
                         // Special case handling for VoltDB indexed expressions
                         index = table.createAndAddExprIndexStructure(session, indexName,
-                            c.core.mainCols, c.indexExprs, true, true).setAssumeUnique(c.assumeUnique);
+                            c.core.mainCols, c.voltIndexedExprs, true, true).setAssumeUnique(c.voltAssumeUnique);
                     } else {
                         index = table.createAndAddIndexStructure(session, indexName,
-                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.assumeUnique);
+                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.voltAssumeUnique);
                     }
                     /* disable 3 lines ...
                     Index index = table.createAndAddIndexStructure(session,
@@ -1433,7 +1433,7 @@ public class ParserDDL extends ParserRoutine {
                     Constraint newconstraint = new Constraint(c.getName(),
                         table, index, SchemaObject.ConstraintTypes.UNIQUE);
                     // A VoltDB extension to support the assume unique attribute
-                    newconstraint = newconstraint.setAssumeUnique(c.assumeUnique);
+                    newconstraint = newconstraint.voltSetAssumeUnique(c.voltAssumeUnique);
                     // End of VoltDB extension
 
                     table.addConstraint(newconstraint);
@@ -3117,9 +3117,9 @@ public class ParserDDL extends ParserRoutine {
                     new Constraint(constName, set,
                                    SchemaObject.ConstraintTypes.UNIQUE);
                 // A VoltDB extension to support indexed expressions and assume unique attribute.
-                c.setAssumeUnique(assumeUnique);
+                c.voltSetAssumeUnique(assumeUnique);
                 if (hasNonColumnExprs) {
-                    c = c.withExpressions(indexExprs.toArray(new Expression[indexExprs.size()]));
+                    c = c.voltWithExpressions(indexExprs.toArray(new Expression[indexExprs.size()]));
                 }
                 // End of VoltDB extension
 
@@ -3278,7 +3278,7 @@ public class ParserDDL extends ParserRoutine {
                         new Constraint(constName, set,
                                        SchemaObject.ConstraintTypes.UNIQUE);
                     // A VoltDB extension to support indexed expressions and the assume unique attribute
-                    c.setAssumeUnique(assumeUnique);
+                    c.voltSetAssumeUnique(assumeUnique);
                     // End of VoltDB extension
 
                     constraintList.add(c);
@@ -3899,7 +3899,7 @@ public class ParserDDL extends ParserRoutine {
         Constraint c = new Constraint(name, table, index,
                                       SchemaObject.ConstraintTypes.UNIQUE);
         // A VoltDB extension to support the assume unique attribute
-        c.setAssumeUnique(assumeUnique);
+        c.voltSetAssumeUnique(assumeUnique);
         // End of VoltDB extension
         String   sql  = getLastPart();
         Object[] args = new Object[] {
@@ -4225,7 +4225,6 @@ public class ParserDDL extends ParserRoutine {
             }
         } else {
             type = readTypeDefinition(true, true);
-
             switch (token.tokenType) {
 
                 case Tokens.IDENTITY : {
@@ -4252,42 +4251,39 @@ public class ParserDDL extends ParserRoutine {
                     // This replicates parser code from the CREATE TABLE column clause.
                     // VoltDB may need to make a decision about adopting MySQL or Oracle
                     // syntax compatibility or both as a hard-coded feature or as an option.
-                    ////if (database.sqlSyntaxMys) {
-                        switch (token.tokenType) {
-
-                            case Tokens.NULL :
-                                read();
-                                break;
-
-                            case Tokens.NOT :
-                                read();
-                                readThis(Tokens.NULL);
-
-                                isNullable = false;
-                                break;
-
-                            default :
-                        }
-                    ////}
-
                     switch (token.tokenType) {
 
                     case Tokens.WITH : {
-                        if (database.sqlSyntaxDb2) {
+                        ////if (database.sqlSyntaxDb2) {
                             read();
-                        } else {
-                            throw unexpectedToken();
-                        }
+                        ////} else {
+                        ////    throw unexpectedToken();
+                        ////}
                     }
 
                     // fall through
                     case Tokens.DEFAULT : {
                         read();
                         defaultExpr = readDefaultClause(type);
+                    }
+                    }
+                    
+                    ////if (database.sqlSyntaxMys) {
+                    switch (token.tokenType) {
+
+                    case Tokens.NULL :
+                        read();
+                        break;
+
+                    case Tokens.NOT :
+                        read();
+                        readThis(Tokens.NULL);
+
+                        isNullable = false;
                         break;
                     }
-                }
-                // End of VoltDB extension
+                    ////}
+                    // End of VoltDB extension
             }
         }
 
@@ -5510,7 +5506,7 @@ public class ParserDDL extends ParserRoutine {
         readThis(Tokens.ROWS);
 
         int rowsLimit = readInteger();
-        c.rowsLimit = rowsLimit;
+        c.voltRowsLimit = rowsLimit;
 
         // The optional EXECUTE (DELETE ...) clause
         if (readIfThis(Tokens.EXECUTE)) {
@@ -5546,7 +5542,7 @@ public class ParserDDL extends ParserRoutine {
             }
 
             // This captures the DELETE statement exactly, including embedded whitespace, etc.
-            c.rowsLimitDeleteStmt = getLastPart(position);
+            c.voltRowLimitDeleteStmt = getLastPart(position);
             readThis(Tokens.CLOSEBRACKET);
         }
     }

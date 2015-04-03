@@ -92,13 +92,13 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Column from USING expression can not have qualifier in the SELECT clause
         failToCompile("select R1.C FROM R1 JOIN R2 USING(C)",
-                      "user lacks privilege or object not found: R1.C");
+                      "object not found: R1.C");
         failToCompile("select R2.C FROM R1 JOIN R2 USING(C)",
-                      "user lacks privilege or object not found: R2.C");
+                      "object not found: R2.C");
         failToCompile("select R2.C FROM R1 JOIN R2 USING(X)",
-                      "user lacks privilege or object not found: X");
+                      "object not found: X");
         failToCompile("select R2.C FROM R1 JOIN R2 ON R1.X = R2.X",
-                      "user lacks privilege or object not found: R1.X");
+                      "object not found: R1.X");
     }
 
     public void testBasicThreeTableInnerJoin() {
@@ -130,7 +130,7 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals(1, pn.getOutputSchema().getColumns().size());
 
         failToCompile("select C, R3.C FROM R1 INNER JOIN R2 USING (C) INNER JOIN R3 ON R1.C = R3.C",
-                      "user lacks privilege or object not found: R1.C");
+                      "object not found: R1.C");
     }
 
     public void testScanJoinConditions() {
@@ -465,7 +465,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // USING expression can have only comma separated list of column names
         failToCompile("select * FROM R1 JOIN R2 USING (ABS(A))",
-                      "user lacks privilege or object not found: ABS");
+                      "object not found: ABS");
     }
 
     public void testIndexJoinConditions() {
@@ -1082,7 +1082,7 @@ public class TestPlansJoin extends PlannerTestCase {
    public void testNonSupportedJoin() {
        // JOIN with parentheses (HSQL limitation)
        failToCompile("select R2.C FROM (R1 JOIN R2 ON R1.C = R2.C) JOIN R3 ON R1.C = R3.C",
-                     "user lacks privilege or object not found: R1.C");
+                     "object not found: R1.C");
        // JOIN with join hierarchy (HSQL limitation)
        failToCompile("select * FROM R1 JOIN R2 JOIN R3 ON R1.C = R2.C ON R1.C = R3.C",
                      "unexpected token");

@@ -81,11 +81,11 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "export table Export2 to stream foo;" +
             "create procedure sample as select * from Table1;";
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().serialize());
+        //* enable to debug */ System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable tables = dut.getMetaData("tables");
-        System.out.println(tables);
+        //* enable to debug */ System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
         assertEquals(6, tables.getRowCount());
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table1"));
@@ -109,22 +109,17 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 
     private void assertWithNullCheck(Object expected, Object value, VoltTable table)
     {
-        if (table.wasNull())
-        {
+        if (table.wasNull()) {
             assertTrue(expected == null);
         }
-        else if (expected == null)
-        {
+        else if (expected == null) {
             assertTrue(table.wasNull());
         }
-        else
-        {
-            if (expected instanceof String)
-            {
+        else {
+            if (expected instanceof String) {
                 assertTrue(((String)expected).equals(value));
             }
-            else
-            {
+            else {
                 assertEquals(expected, value);
             }
         }
@@ -135,7 +130,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                   Object[] expected)
     {
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(columns, "COLUMN_NAME", columnName));
-        assertEquals(expected[0], columns.get("DATA_TYPE", VoltType.INTEGER));
+        assertEquals("unexpected type for column:" + columnName, expected[0], columns.get("DATA_TYPE", VoltType.INTEGER));
         assertTrue("SQL Typename mismatch",
                    columns.get("TYPE_NAME", VoltType.STRING).equals(expected[1]));
         assertWithNullCheck(expected[2],
@@ -274,9 +269,9 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                  200,
                                                  1,
                                                  "YES"});
-        refcolumns.put("Column11", new Object[] {java.sql.Types.INTEGER,
-                                                 "INTEGER",
-                                                 31,
+        refcolumns.put("Column11", new Object[] {java.sql.Types.BIGINT, // counts are bigint as of hsql232
+                                                 "BIGINT",
+                                                 63,
                                                  null,
                                                  2,
                                                  java.sql.DatabaseMetaData.columnNullable,
@@ -319,15 +314,14 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure sample as select * from Table1;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().serialize());
+        //* enable to debug */ System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable columns = dut.getMetaData("ColUmns");
-        System.out.println(columns);
+        /* enable to debug */ System.out.println(columns);
         assertEquals(23, columns.getColumnCount());
         assertEquals(13, columns.getRowCount());
-        for (Map.Entry<String, Object[]> entry : refcolumns.entrySet())
-        {
+        for (Map.Entry<String, Object[]> entry : refcolumns.entrySet()) {
             verifyColumnData(entry.getKey(), columns, entry.getValue());
         }
     }
@@ -343,11 +337,11 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure sample as select * from Table1;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().serialize());
+        //* enable to debug */ System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable indexes = dut.getMetaData("IndexInfo");
-        System.out.println(indexes);
+        //* enable to debug */ System.out.println(indexes);
         assertEquals(13, indexes.getColumnCount());
         assertEquals(7, indexes.getRowCount());
         assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column2"));
@@ -415,11 +409,11 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure sample as select * from Table1;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().serialize());
+        //* enable to debug */ System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable pkeys = dut.getMetaData("PrimaryKeys");
-        System.out.println(pkeys);
+        //* enable to debug */ System.out.println(pkeys);
         assertEquals(6, pkeys.getColumnCount());
         assertEquals(4, pkeys.getRowCount());
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column1"));
@@ -450,12 +444,12 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure proc2 as select * from Table1 where Column2=?;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().serialize());
+        //* enable to debug */ System.out.println(c.getCatalog().serialize());
         DefaultProcedureManager defaultProcs = new DefaultProcedureManager(c.getCatalogDatabase());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), defaultProcs, new InMemoryJarfile(testout_jar));
         VoltTable params = dut.getMetaData("ProcedureColumns");
-        System.out.println(params);
+        //* enable to debug */ System.out.println(params);
         assertEquals(20, params.getColumnCount());
         assertEquals(4, params.getRowCount()); // 2 real and 2 crud inserts
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(params, "PROCEDURE_NAME", "proc1"));
@@ -487,7 +481,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable typeInfo = dut.getMetaData("typEINfo");
-        System.out.println(typeInfo);
+        //* enable to debug */ System.out.println(typeInfo);
         // just do some minor sanity checks on size of table and that it contains the types
         // we expect
         HashMap<String, VoltType> expectedTypes = new HashMap<String, VoltType>();
@@ -522,7 +516,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable classes = dut.getMetaData("classes");
-        System.out.println(classes);
+        //* enable to debug */ System.out.println(classes);
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testImportProc"));
         assertEquals(1, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
         assertEquals(1, classes.get("ACTIVE_PROC", VoltType.INTEGER));

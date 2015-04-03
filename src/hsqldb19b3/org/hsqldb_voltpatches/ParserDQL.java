@@ -2807,7 +2807,7 @@ public class ParserDQL extends ParserBase {
 
         e = readColumnOrFunctionExpression();
 
-        if (e.isAggregate()) {
+        if (e != null && e.isAggregate()) { // temp hack for hsql232 may not be worth it
             readFilterClause(e);
         }
 
@@ -5218,7 +5218,14 @@ public class ParserDQL extends ParserBase {
                     ExpressionOrException result = readSQLFunction(function, false);
                     ex = result.exception();
                     if (ex == null) {
-                        return result.knownGood();
+                        Expression sqlFunction = result.knownGood();
+                        if (sqlFunction != null) {
+                            return sqlFunction;
+                        }
+                        // an initial false positive name match for a function
+                        // may still may be a column by that name
+                        //  -- ALL functions are not reserved words, just the
+                        // no-argument parenthesis-optional ones.
                     }
                 } catch (HsqlException caught) {
                     ex = caught;

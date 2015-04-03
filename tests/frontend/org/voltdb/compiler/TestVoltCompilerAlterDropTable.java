@@ -234,10 +234,10 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertFalse(success);
-        //user lacks privilege or object not found: V_MYTABLE
+        //object not found: V_MYTABLE
         int foundDropError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("user lacks privilege or object not found: V_MYTABLE")) {
+            if (f.message.contains("object not found: V_MYTABLE")) {
                 foundDropError++;
             }
         }
@@ -660,7 +660,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         //type not found or user lacks privilege:
         int foundMissingError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("user lacks privilege or object not found:")) {
+            if (f.message.contains("object not found:")) {
                 foundMissingError++;
             }
         }
@@ -680,7 +680,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         //type not found or user lacks privilege:
         int foundMissingError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("user lacks privilege or object not found:")) {
+            if (f.message.contains("object not found:")) {
                 foundMissingError++;
             }
         }
