@@ -306,17 +306,31 @@ void dumpSteps(const std::string& title, const ProjectStepSet& steps) {
 }
 
 static uint32_t getNumBytesForMemcpy(const TupleSchema::ColumnInfo* colInfo) {
+
+    // For varialble length data, we always copy the max number of
+    // bytes, even though the actual value may be shorter.  This
+    // simplifies logic at runtime.
+    //
+    // Inlined variable length data has a 1-byte size prefix.
+
     switch (colInfo->getVoltType()) {
     case VALUE_TYPE_VARCHAR:
+        if (colInfo->inlined && !colInfo->inBytes) {
+            // For VARCHAR we need to consider multi-byte characters.
+            uint32_t maxLength = colInfo->length * MAX_BYTES_PER_UTF8_CHARACTER;
+            assert (maxLength < UNINLINEABLE_OBJECT_LENGTH);
+            return maxLength + 1;
+        }
+
+        // FALL THROUGH
+
     case VALUE_TYPE_VARBINARY:
         if (colInfo->inlined) {
-            // the extra byte is for the size prefix.
             return colInfo->length + 1;
         }
         else {
             return sizeof (StringRef**);
         }
-
     default:
         return colInfo->length;
     }
@@ -336,7 +350,9 @@ static ProjectStepSet convertTVEsToMemcpy(const TupleSchema* dstSchema,
             const TupleSchema::ColumnInfo* srcColInfo = srcSchema->getColumnInfo(step.srcFieldIndex());
 
             // XXX test this!
-            if (dstColInfo->getVoltType() != srcColInfo->getVoltType()) {
+            if (dstColInfo->getVoltType() != srcColInfo->getVoltType()
+                || dstColInfo->length != srcColInfo->length
+                || dstColInfo->inBytes != srcColInfo->inBytes) {
                 // Implicit cast, fall back to normal eval
                 outSteps.insert(step);
                 continue;
