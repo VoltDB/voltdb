@@ -42,7 +42,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId);
 
-    public abstract void assertSequencing(int partitionId, long drId);
+    public abstract byte[] assertSequencing(int partitionId, byte[] binaryLog, long drId);
 
     public abstract Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds();
 
@@ -78,7 +78,7 @@ public interface ConsumerDRGateway extends Promotable {
         };
 
         @Override
-        public void assertSequencing(int partitionId, long drId) {}
+        public byte[] assertSequencing(int partitionId, byte[] binaryLog, long drId) { return binaryLog; }
 
         @Override
         public Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds() { return ids; }
