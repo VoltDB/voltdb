@@ -166,9 +166,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.1";
+    static final String m_defaultVersionString = "5.2";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -641,11 +641,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    File drOverflowDir;
-                    drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
                     ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
-                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
+                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
                                                                                    m_replicationActive,
                                                                                    m_configuredNumberOfPartitions,
                                                                                    m_catalogContext.getDeployment().getCluster().getHostcount());
@@ -716,9 +714,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         true,
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
-
-            // Need to register the OpsAgents right before we turn on the client interface
-            m_opsRegistrar.setDummyMode(false);
 
             // Create the client interface
             try {
@@ -963,6 +958,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_restoreAgent != null) {
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterface));
             }
+
+            // Start the stats agent at the end, after everything has been constructed
+            m_opsRegistrar.setDummyMode(false);
 
             m_configLogger = new Thread(new ConfigLogging());
             m_configLogger.start();

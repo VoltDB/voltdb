@@ -425,6 +425,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      TempTableLimitsTest
      ExportTupleStream_test
      DRTupleStream_test
+     DRBinaryLog_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):

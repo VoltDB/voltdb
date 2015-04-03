@@ -41,6 +41,7 @@ public class AccessPath {
     final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<AbstractExpression>();
 
     @Override
     public String toString() {
@@ -71,6 +72,11 @@ public class AccessPath {
         retval += "JOIN EXPRS:\n";
         i = 0;
         for (AbstractExpression expr : joinExprs)
+            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+
+        retval += "ELIMINATED POST FILTER EXPRS:\n";
+        i = 0;
+        for (AbstractExpression expr : eliminatedPostExprs)
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;

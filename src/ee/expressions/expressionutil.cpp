@@ -669,6 +669,25 @@ ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractEx
     return ret;
 }
 
+void
+ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds)
+{
+    if (expr == NULL)
+    {
+        return;
+    }
+    if(expr->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE)
+    {
+        const TupleValueExpression* tve = dynamic_cast<const TupleValueExpression*>(expr);
+        assert(tve != NULL);
+        columnIds.push_back(tve->getColumnId());
+        return;
+    }
+    // Recurse
+    ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);
+    ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
+}
+
 void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring)
 {
     PlannerDomRoot domRoot(jsonarraystring.c_str());
@@ -678,6 +697,12 @@ void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& 
         AbstractExpression *expr = AbstractExpression::buildExpressionTree(exprValue);
         indexed_exprs.push_back(expr);
     }
+}
+
+AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& jsonstring)
+{
+    PlannerDomRoot domRoot(jsonstring.c_str());
+    return AbstractExpression::buildExpressionTree(domRoot.rootObject());
 }
 
 }

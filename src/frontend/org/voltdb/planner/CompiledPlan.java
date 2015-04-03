@@ -101,6 +101,8 @@ public class CompiledPlan {
 
     private Object m_partitioningValue;
 
+    private StatementPartitioning m_partitioning = null;
+
     public int resetPlanNodeIds(int startId) {
         int nextId = resetPlanNodeIds(rootPlanGraph, startId);
         if (subPlanGraph != null) {
@@ -308,5 +310,13 @@ public class CompiledPlan {
 
     public void setReadOnly(boolean newValue) {
         m_readOnly = newValue;
+    }
+
+    public void setStatementPartitioning(StatementPartitioning partitioning) {
+        m_partitioning = partitioning;
+    }
+
+    public StatementPartitioning getStatementPartitioning() {
+        return m_partitioning;
     }
 }

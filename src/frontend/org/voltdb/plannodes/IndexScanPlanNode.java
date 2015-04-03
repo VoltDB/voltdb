@@ -20,10 +20,13 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -39,6 +42,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -100,13 +104,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();;
+    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();
 
     private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
     private static final int FOR_GROUPING = 2;
     private static final int FOR_DETERMINISM = 3;
 
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
+
+    // Post-filters that got eliminated by exactly matched partial index filters
+    private List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
 
     public IndexScanPlanNode() {
         super();
@@ -156,18 +163,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate(int nextKeyIndex) {
+        m_skip_null_predicate = buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+    }
 
-        String exprsjson = m_catalogIndex.getExpressionsjson();
+    public static AbstractExpression buildSkipNullPredicate(
+            int nextKeyIndex, Index catalogIndex, StmtTableScan tableScan,
+            List<AbstractExpression> searchkeyExpressions) {
+
+        String exprsjson = catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
         if (exprsjson.isEmpty()) {
             indexedExprs = new ArrayList<AbstractExpression>();
 
-            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
             assert(nextKeyIndex < indexedColRefs.size());
             for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
-                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
+                TupleValueExpression tve = new TupleValueExpression(tableScan.getTableName(), tableScan.getTableAlias(),
                         col.getTypeName(), col.getTypeName());
                 tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
 
@@ -175,7 +188,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
                 assert(nextKeyIndex < indexedExprs.size());
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -183,19 +196,42 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-        for (int i = 0; i < nextKeyIndex; i++) {
-            AbstractExpression idxExpr = indexedExprs.get(i);
-            AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
-            exprs.add(expr);
+        // For a partial index extract all TVE expressions from it predicate if it's NULL-rejecting expression
+        // These TVEs do not need to be added to the skipNUll predicate because it's redundant.
+        AbstractExpression indexPredicate = null;
+        Set<TupleValueExpression> notNullTves = null;
+        String indexPredicateJson = catalogIndex.getPredicatejson();
+        if (!StringUtil.isEmpty(indexPredicateJson)) {
+            try {
+                indexPredicate = AbstractExpression.fromJSONString(indexPredicateJson, tableScan);
+                assert(indexPredicate != null);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+            if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
+                notNullTves = new HashSet<TupleValueExpression>();
+                notNullTves.addAll(ExpressionUtil.getTupleValueExpressions(indexPredicate));
+            }
         }
-        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
-        AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
-        exprs.add(expr);
 
-        m_skip_null_predicate = ExpressionUtil.combine(exprs);
-        m_skip_null_predicate.finalizeValueTypes();
+        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        AbstractExpression skipNullPredicate = null;
+        if (notNullTves == null || !notNullTves.contains(nullExpr)) {
+            List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+            for (int i = 0; i < nextKeyIndex; i++) {
+                AbstractExpression idxExpr = indexedExprs.get(i);
+                AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                        idxExpr, (AbstractExpression) searchkeyExpressions.get(i).clone());
+                exprs.add(expr);
+            }
+            AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+            exprs.add(expr);
+
+            skipNullPredicate = ExpressionUtil.combine(exprs);
+            skipNullPredicate.finalizeValueTypes();
+        }
+        return skipNullPredicate;
     }
 
     @Override
@@ -435,6 +471,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // otherwise, pick the index with the most columns covered otherwise
         // count non-equality scans as -0.5 coverage
         // prefer array to hash to tree, all else being equal
+        // prefer partial index, all else being equal
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
@@ -526,6 +563,27 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_estimatedOutputTupleCount = 1;
         }
 
+        // Apply discounts similar to the keyWidth one for the additional post-filters that get
+        // eliminated by exactly matched partial index filters. The existing discounts are not
+        // supposed to give a "full refund" of the optimized-out post filters, because there is
+        // an offsetting order log(n) cost to using the index. That offsetting cost will be lower
+        // (order log(smaller n)) for partial indexes, but it's not clear what the typical
+        // relative costs are of a partial index with x key components and y partial index predicates
+        // vs. a full or partial index with x+n key components and y-m partial index predicates.
+        //
+        // Avoid applying the discount to that initial tie-breaker value of  2 or 3
+        if (!m_eliminatedPostFilterExpressions.isEmpty() && m_estimatedProcessedTupleCount > 3) {
+            double discount = 1.0;
+            // Each eliminated filter gets a scaled down by an additional factor of 0.1 discount.
+            for (int i = 0; i < m_eliminatedPostFilterExpressions.size(); ++i) {
+                discount -= Math.pow(0.1, i + 1);
+            }
+            m_estimatedProcessedTupleCount *= discount;
+            if (m_estimatedProcessedTupleCount < 4) {
+                m_estimatedProcessedTupleCount = 4;
+            }
+        }
+
         LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
         if (limit != null) {
             int limitInt = limit.getLimit();
@@ -541,6 +599,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 m_estimatedProcessedTupleCount = limitInt;
             }
         }
+
     }
 
     @Override
@@ -773,6 +832,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public boolean isForGroupingOnly() {
         return m_purpose == FOR_GROUPING;
+    }
+
+    public void setEliminatedPostFilters(List<AbstractExpression> exprs) {
+        for (AbstractExpression expr : exprs) {
+            m_eliminatedPostFilterExpressions.add((AbstractExpression)expr.clone());
+            // Add eliminated PVEs to the bindings. They will be used by the PlannerTool to compare
+            // bound plans in the cache
+            List<AbstractExpression> pves = expr.findAllSubexpressionsOfClass(ParameterValueExpression.class);
+            m_bindings.addAll(pves);
+        }
     }
 
     // Called by ReplaceWithIndexLimit and ReplaceWithIndexCounter

@@ -19,7 +19,10 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -143,6 +146,24 @@ public abstract class SubPlanAssembler {
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
             if (path != null) {
+                assert (path.index != null);
+                if (!path.index.getPredicatejson().isEmpty()) {
+                    // One more check for partial indexes to make sure the index predicate is
+                    // completely covered by the query expressions.
+                    // Process the index WHERE clause into a list of anded sub-expressions and process each expression
+                    // separately searching the query (or matview) for a covering expression for each of these expressions.
+                    // All index WHERE sub-expressions must be covered to enable the index.
+                    // For optimization purposes, keep track of the covering (query) expressions that exactly match the
+                    // covered index sub-expression. They can be eliminated from the post-filter expressions.
+                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                    if (isPartialIndexPredicateIsCovered(tableScan, allExprs, path.index, exactMatchCoveringExprs)) {
+                        filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
+                    } else {
+                        path = null;
+                    }
+                }
+            }
+            if (path != null) {
                 if (postExprs != null) {
                     path.joinExprs.addAll(postExprs);
                 }
@@ -212,6 +233,69 @@ public abstract class SubPlanAssembler {
             return new IndexableExpression(null, ltFilter, m_bindings);
         }
     };
+
+    /**
+     * Split the index WHERE clause into a list of sub-expressions and process each expression
+     * separately searching the query (or matview) for a covering expression for each of these expressions.
+     * All index WHERE sub-expressions must be covered to enable the index.
+     * Collect the query expressions that exactly match the index expression. They can be eliminated from the
+     * post-filters as an optimization
+     *
+     * @param tableScan The source table.
+     * @param coveringExprs The set of query predicate expressions.
+     * @param index The partial index to cover.
+     * @param exactMatchCoveringExprs The output subset of the query predicates that exactly match the
+     *        index predicate expression(s)
+     * @return TRUE if the index predicate is completely covered by the query expressions.
+     */
+    public static boolean isPartialIndexPredicateIsCovered(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, Index index, List<AbstractExpression> exactMatchCoveringExprs) {
+        assert(index != null);
+        String predicatejson = index.getPredicatejson();
+        if (predicatejson.isEmpty()) {
+            // Not a partial index
+            return true;
+        }
+        AbstractExpression indexPredicate = null;
+        try {
+            indexPredicate = AbstractExpression.fromJSONString(predicatejson, tableScan);
+        } catch (JSONException e) {
+            e.printStackTrace();
+            assert(false);
+            return false;
+        }
+        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
+
+        for (AbstractExpression coveringExpr : coveringExprs) {
+            if (exprsToCover.isEmpty()) {
+                // We are done there. All the index predicate expressions are covered.
+                break;
+            }
+
+            // Each covering expression and its reversed copy need to be tested for the index expression coverage.
+            AbstractExpression reversedCoveringExpr = null;
+            ExpressionType reverseCoveringType = ComparisonExpression.reverses.get(coveringExpr.getExpressionType());
+            if (reverseCoveringType != null) {
+                // reverse the expression
+                reversedCoveringExpr = new ComparisonExpression(
+                        reverseCoveringType, coveringExpr.getRight(), coveringExpr.getLeft());
+            }
+            // Exact match first.
+            if (removeExactMatchCoveredExpressions(coveringExpr, exprsToCover)) {
+                exactMatchCoveringExprs.add(coveringExpr);
+            }
+            // Try the reversed expression for the exact match
+            if (reversedCoveringExpr != null && removeExactMatchCoveredExpressions(reversedCoveringExpr, exprsToCover)) {
+                // It is the original expression that we need to remember
+                exactMatchCoveringExprs.add(coveringExpr);
+            }
+        }
+
+        // Handle the remaining NOT NULL index predicate expressions that can be covered by NULL rejecting expressions
+        exprsToCover = removeNotNullCoveredExpressions(tableScan, coveringExprs, exprsToCover);
+
+        // All index predicate expressions must be covered for index to be selected
+        return exprsToCover.isEmpty();
+    }
 
     /**
      * Given a table, a set of predicate expressions and a specific index, find the best way to
@@ -1112,6 +1196,65 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
+    /**
+     * Loop over the expressions to cover to find ones that exactly match the covering expression
+     * and remove them from the original list. Returns true if there is at least one match. False otherwise.
+     * @param coveringExpr
+     * @param exprsToCover
+     * @return true is the covering expression exactly matches to one or more expressions to cover
+     */
+    private static boolean removeExactMatchCoveredExpressions(
+            AbstractExpression coveringExpr, List<AbstractExpression> exprsToCover) {
+
+        boolean hasMatch = false;
+        Iterator<AbstractExpression> iter = exprsToCover.iterator();
+        while(iter.hasNext()) {
+            AbstractExpression exprToCover = iter.next();
+            if (coveringExpr.bindingToIndexedExpression(exprToCover) != null) {
+                iter.remove();
+                hasMatch = true;
+                // need to keep going to remove all matches
+            }
+        }
+        return hasMatch;
+    }
+
+    /**
+     * Remove NOT NULL expressions that are covered by the NULL-rejecting expressions. For example,
+     * 'COL IS NOT NULL' is covered by the 'COL > 0' NULL-rejecting comparison expression.
+     *
+     * @param tableScan
+     * @param coveringExprs
+     * @param exprsToCover
+     * @return List<AbstractExpression>
+     */
+    private static List<AbstractExpression> removeNotNullCoveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
+        // Collect all TVEs from NULL-rejecting covering expressions
+        Set<TupleValueExpression> coveringTves = new HashSet<TupleValueExpression>();
+        for (AbstractExpression coveringExpr : coveringExprs) {
+            if (ExpressionUtil.isNullRejectingExpression(coveringExpr, tableScan.getTableAlias())) {
+                coveringTves.addAll(ExpressionUtil.getTupleValueExpressions(coveringExpr));
+            }
+        }
+        // For each NOT NULL expression to cover extract the TVE expressions. If all of them are also part
+        // of the covering NULL-rejecting collection then this NOT NULL expression is covered
+        Iterator<AbstractExpression> iter = exprsToCover.iterator();
+        while (iter.hasNext()) {
+            AbstractExpression filter = iter.next();
+            if (ExpressionType.OPERATOR_NOT == filter.getExpressionType()) {
+                assert(filter.getLeft() != null);
+                if (ExpressionType.OPERATOR_IS_NULL == filter.getLeft().getExpressionType()) {
+                    assert(filter.getLeft().getLeft() != null);
+                    List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(filter.getLeft().getLeft());
+                    if (coveringTves.containsAll(tves)) {
+                        iter.remove();
+                    }
+                }
+            }
+        }
+        return exprsToCover;
+    }
+
     private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
             if (tableScan.getTableAlias().equals(tve.getTableAlias())) {
@@ -1280,6 +1423,7 @@ public abstract class SubPlanAssembler {
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         scanNode.setSkipNullPredicate();
+        scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         return resultNode;
     }
 
@@ -1321,5 +1465,18 @@ public abstract class SubPlanAssembler {
                 break;
             }
         }
+    }
+
+    /**
+     * Partial index optimization: Remove query expressions that exactly match the index WHERE expression(s)
+     * from the access path.
+     *
+     * @param path - Partial Index access path
+     * @param exprToRemove - expressions to remove
+     */
+    private void filterPostPredicateForPartialIndex(AccessPath path, List<AbstractExpression> exprToRemove) {
+        path.otherExprs.removeAll(exprToRemove);
+        // Keep the eliminated expressions for cost estimating purpose
+        path.eliminatedPostExprs.addAll(exprToRemove);
     }
 }

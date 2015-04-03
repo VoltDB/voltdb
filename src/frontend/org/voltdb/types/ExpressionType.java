@@ -201,5 +201,4 @@ public enum ExpressionType {
     public String symbol() {
         return m_symbol;
     }
-
 }

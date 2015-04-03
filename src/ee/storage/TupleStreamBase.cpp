@@ -97,7 +97,7 @@ void TupleStreamBase::cleanupManagedBuffers()
  */
 size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
 {
-    size_t beginUso = 0;
+    size_t beginUso = SIZE_MAX;
 
     if (currentSpHandle < m_openSpHandle)
     {
@@ -304,9 +304,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength, bool continueTxn /*= t
         throwFatalException("Failed to claim managed buffer for Export.");
     }
     m_currBlock = new StreamBlock(buffer, blockSize, uso);
-    // Valgrind needs the newly created block to be initialized
-    // Leaving the last 8 bytes for MAGIC_HEADER_SPACE_FOR_JAVA
-    ::memset(m_currBlock->rawPtr(), 0, (m_defaultCapacity - 8));
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
