@@ -681,7 +681,6 @@ class SqlQueriesTest extends TestBase {
 
 
 
-
         } catch (geb.error.RequiredPageContentNotPresent e) {
             println("pop up won't occurr due to already in running state")
             println("it is already in admin port")
@@ -858,25 +857,7 @@ class SqlQueriesTest extends TestBase {
         page.runQuery()
 
     }
-    def cleanupSpec() {
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            when: 'Open VMC page'
-            ensureOnVoltDBManagementCenterPage()
-            then: 'to be on VMC page'
-            at VoltDBManagementCenterPage
-        }
 
-        page.loginIfNeeded()
-
-        when: 'click the Schema link (if needed)'
-        page.openSqlQueryPage()
-        then: 'should be on DB Monitor page'
-        at SqlQueryPage
-        String deleteQuery = page.getQueryToDeleteTable()
-        page.setQueryText(deleteQuery)
-
-        page.runQuery()
-    }
 
 
 
