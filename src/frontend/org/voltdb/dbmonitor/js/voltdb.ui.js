@@ -146,10 +146,30 @@ $(document).ready(function () {
             }
         }
     });
+    
+    //DR Show/hide toggle	
+    // Show Hide Graph Block
+    $('#showHideDrBlock').click(function () {
+        $(".drShowHide").toggle();
+        var $this = $(this);
+        var drState = $(".drShowHide").css('display');
+        if (drState == 'none') {
+            $this.removeClass('expanded');
+            $this.addClass('collapsed');
+
+        } else {
+            $this.removeClass('collapsed');
+            $this.addClass('expanded');
+
+        }
+
+
+    });
 
     // Shows memory alerts
     $('#showMemoryAlerts').popup();
-
+    $('.drWarning').popup();
+    
     //Logout popup
     $('#logOut').popup();
     $('#btnlogOut').popup();
@@ -665,6 +685,20 @@ var loadPage = function (serverName, portid) {
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
+        voltDbRenderer.GetClusterReplicaInformation(function(replicaDetail) {
+            if (getCurrentServer() != undefined) {
+                var currentServer = getCurrentServer();
+                VoltDbAdminConfig.drReplicationRole = replicaDetail[currentServer]['status'];
+            }
+        });
+
+        voltDbRenderer.GetDrStatusInformation(function(drDetails) {
+            if (getCurrentServer() != undefined) {
+                var currentServer = getCurrentServer();
+                VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
+            }
+        });
+        
         var loadProcedureInformations = function (procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
                 voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (traverse, htmlData) {

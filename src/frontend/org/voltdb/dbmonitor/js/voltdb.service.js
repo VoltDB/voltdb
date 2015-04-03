@@ -1019,6 +1019,105 @@
             }
 
         };
+        
+        //Check if DR is enable or not
+        this.GetDrStatusInformation = function (onConnectionAdded) {
+            try {
+                var processName = "DR_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["DR"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+        //
+
+        //Check if cluster is replica or not
+        this.GetClusterReplicaInformation = function (onConnectionAdded) {
+            try {
+                var processName = "CLUSTER_REPLICA_INFORMATION";
+                var procedureNames = ['@SystemInformation'];
+                var parameters = ["Overview"];
+                var values = [undefined];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+        //
+
+        //Get datas for DR Replication Graph
+        this.GetDrReplicationInformation = function (onConnectionAdded) {
+            try {
+                var processName = "DR_REPLICATION_GRAPH";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["DRCONSUMER"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+        //
 
     });
 

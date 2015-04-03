@@ -335,6 +335,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         TIME_OUT_MILLIS = newLatency;
     }
 
+    public int getTimeoutLatency() {
+        return TIME_OUT_MILLIS;
+    }
+
     public long fragmentProgressUpdate(int indexFromFragmentTask,
             String planNodeName,
             String lastAccessedTable,
@@ -1029,5 +1033,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     @Deprecated
     public void setInitialLogDurationForTest(long newDuration) {
         INITIAL_LOG_DURATION = newDuration;
+    }
+
+    /**
+     * Useful in unit tests.  Gets the initial frequency with which
+     * the long-running query info message will be logged.
+     */
+    @Deprecated
+    public long getInitialLogDurationForTest() {
+        return INITIAL_LOG_DURATION;
     }
 }
