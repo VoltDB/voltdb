@@ -375,21 +375,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return m_licenseApi;
     }
 
-    @PostConstruct
+
     protected void initialize() {
         logStartupCommand();
         checkStartupCondition();
         setConsoleUtf8Encoding();
         VoltDB.replaceVoltDBInstanceForTest(this);
-        new Thread(new Runnable() {
-
-            @Override
-            public void run() {
-                initialize(m_config);//TODO: parameter is not needed
-                RealVoltDB.this.run();
-            }
-
-        }).start();
+        initialize(m_config);//TODO: parameter is not needed
     }
 
     private void logStartupCommand() {

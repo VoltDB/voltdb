@@ -370,18 +370,25 @@ public class VoltDB {
             if (!config.validate()) {
                 System.exit(-1);
             } else {
-                m_injector = Guice.createInjector(new VoltDBConfigurer(), new AbstractModule() {
-                    @Override
-                    protected void configure() {
-                        bind(Configuration.class).toInstance(config);
-                    }
-                });
+                startServer(config);
             }
         }
         catch (OutOfMemoryError e) {
             String errmsg = "VoltDB Main thread: ran out of Java memory. This node will shut down.";
             VoltDB.crashLocalVoltDB(errmsg, false, e);
         }
+    }
+
+    public static void startServer(final Configuration config) {
+        m_injector = Guice.createInjector(new VoltDBConfigurer(), new AbstractModule() {
+            @Override
+            protected void configure() {
+                bind(Configuration.class).toInstance(config);
+            }
+        });
+        RealVoltDB voltDB = (RealVoltDB) m_injector.getInstance(VoltDBInterface.class);
+        voltDB.initialize();
+        voltDB.run();
     }
 
     /**

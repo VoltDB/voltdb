@@ -126,8 +126,8 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        VoltDB.initialize(m_config);
-        VoltDB.instance().run();
+        VoltDB.startServer(m_config);
+        //VoltDB.instance().run();
     }
 
     public void waitForInitialization() {
