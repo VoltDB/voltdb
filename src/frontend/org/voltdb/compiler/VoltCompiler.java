@@ -87,6 +87,7 @@ import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.config.Configuration;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.StatementPartitioning;
@@ -2283,7 +2284,7 @@ public class VoltCompiler {
 
         // Check if it's compatible (or the upgrade is being forced).
         // getConfig() may return null if it's being mocked for a test.
-        if (   VoltDB.Configuration.m_forceCatalogUpgrade
+        if (   Configuration.m_forceCatalogUpgrade
             || !versionFromCatalog.equals(VoltDB.instance().getVersionString())) {
 
             // Check if there's a project.
@@ -2325,11 +2326,11 @@ public class VoltCompiler {
             CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
             final String outputJarPath = (catalogContext != null
                     ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
-                    : VoltDB.Configuration.getPathToCatalogForTest(jarName));
+                    : Configuration.getPathToCatalogForTest(jarName));
             // Place the compiler output in a text file in the same folder.
             final String outputTextPath = (catalogContext != null
                     ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
-                    : VoltDB.Configuration.getPathToCatalogForTest(textName));
+                    : Configuration.getPathToCatalogForTest(textName));
             try {
                 m_classLoader = outputJar.getLoader();
 
