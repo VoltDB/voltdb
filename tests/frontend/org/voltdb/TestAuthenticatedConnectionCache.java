@@ -26,7 +26,7 @@ package org.voltdb;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -50,7 +50,7 @@ public class TestAuthenticatedConnectionCache extends TestCase {
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
             VoltProjectBuilder.UserInfo users[] = new VoltProjectBuilder.UserInfo[] {

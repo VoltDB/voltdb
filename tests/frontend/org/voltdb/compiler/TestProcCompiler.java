@@ -28,7 +28,7 @@ import java.io.PrintStream;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 
 public class TestProcCompiler extends TestCase {
 

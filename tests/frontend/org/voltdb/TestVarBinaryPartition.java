@@ -27,7 +27,7 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -40,7 +40,7 @@ public class TestVarBinaryPartition extends TestCase {
     private String pathToCatalog;
     private String pathToDeployment;
     private ServerThread localServer;
-    private VoltDB.Configuration config;
+    private Configuration config;
     private VoltProjectBuilder builder;
     private Client client;
 
@@ -68,7 +68,7 @@ public class TestVarBinaryPartition extends TestCase {
             boolean success = builder.compile(pathToCatalog, 2, 1, 0);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-            config = new VoltDB.Configuration();
+            config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             localServer = new ServerThread(config);

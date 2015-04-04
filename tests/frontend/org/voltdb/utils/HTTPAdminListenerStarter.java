@@ -25,7 +25,7 @@ package org.voltdb.utils;
 
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class HTTPAdminListenerStarter {
@@ -49,7 +49,7 @@ public class HTTPAdminListenerStarter {
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         ServerThread localServer = new ServerThread(config);

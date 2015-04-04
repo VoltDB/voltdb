@@ -29,7 +29,7 @@ import java.net.URLDecoder;
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
@@ -56,7 +56,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
 

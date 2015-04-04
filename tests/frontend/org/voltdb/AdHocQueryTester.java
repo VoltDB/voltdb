@@ -28,7 +28,7 @@ import java.io.IOException;
 import junit.framework.TestCase;
 
 import org.voltcore.utils.PortGenerator;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -99,7 +99,7 @@ public abstract class AdHocQueryTester extends TestCase {
                         org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class,} );
     }
 
-    public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {
+    public static Configuration setUpSPDB() throws IOException, Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
 
@@ -110,7 +110,7 @@ public abstract class AdHocQueryTester extends TestCase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration(new PortGenerator());
+        Configuration config = new Configuration(new PortGenerator());
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
         return config;

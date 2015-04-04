@@ -34,7 +34,7 @@ import junit.framework.TestCase;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -73,7 +73,7 @@ public class TestVoltBulkLoader extends TestCase {
     protected String pathToCatalog;
     protected String pathToDeployment;
     protected ServerThread localServer;
-    protected VoltDB.Configuration config;
+    protected Configuration config;
     protected VoltProjectBuilder builder;
     protected Client client1;
     protected Client client2;
@@ -1011,7 +1011,7 @@ public class TestVoltBulkLoader extends TestCase {
             boolean success = builder.compile(pathToCatalog, 2, 1, 0);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-            config = new VoltDB.Configuration();
+            config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             localServer = new ServerThread(config);
@@ -1119,7 +1119,7 @@ public class TestVoltBulkLoader extends TestCase {
             boolean success = builder.compile(pathToCatalog, 2, 1, 0);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-            config = new VoltDB.Configuration();
+            config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             localServer = new ServerThread(config);

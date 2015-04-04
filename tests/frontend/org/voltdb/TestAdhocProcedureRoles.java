@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
@@ -121,7 +121,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
         void start() throws Exception
         {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = CATALOG_PATH;
             config.m_pathToDeployment = DEPLOYMENT_PATH;
             startServer(config);

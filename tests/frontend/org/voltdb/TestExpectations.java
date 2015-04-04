@@ -25,7 +25,7 @@ package org.voltdb;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -51,7 +51,7 @@ public class TestExpectations extends TestCase {
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("expectations.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("expectations.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("expectations.xml");
         ServerThread localServer = new ServerThread(config);

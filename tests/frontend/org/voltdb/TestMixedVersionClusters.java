@@ -31,7 +31,7 @@ import java.io.IOException;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;

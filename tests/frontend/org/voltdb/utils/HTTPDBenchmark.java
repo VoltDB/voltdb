@@ -45,7 +45,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ServerThread;
 import org.voltdb.TestJSONInterface;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -251,7 +251,7 @@ public class HTTPDBenchmark extends TestCase {
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("jsonperf.jar"), 1, 1, 0);
         assert(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("jsonperf.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);

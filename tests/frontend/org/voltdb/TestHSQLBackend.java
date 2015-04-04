@@ -25,7 +25,7 @@ package org.voltdb;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -148,7 +148,7 @@ public class TestHSQLBackend extends TestCase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("hsqldbbin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("hsqldbbin.xml");
         config.m_backend = BackendTarget.HSQLDB_BACKEND;
@@ -188,7 +188,7 @@ public class TestHSQLBackend extends TestCase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("hsqldbbin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("hsqldbbin.xml");
         config.m_backend = BackendTarget.HSQLDB_BACKEND;

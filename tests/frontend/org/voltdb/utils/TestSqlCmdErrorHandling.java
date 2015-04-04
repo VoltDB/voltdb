@@ -40,7 +40,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -84,7 +84,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         String catalogPath = Configuration.getPathToCatalogForTest("sqlcmderror.jar");
         assertTrue(builder.compile(catalogPath, 1, 1, 0));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = catalogPath;
         config.m_pathToDeployment = builder.getPathToDeployment();
         m_server = new ServerThread(config);

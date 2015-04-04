@@ -194,7 +194,7 @@ public class VoltDB {
 
     /**
      * Exit the process with an error message, optionally with a stack trace.
-     * @return 
+     * @return
      */
     public static RuntimeException crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
         try {
@@ -370,12 +370,12 @@ public class VoltDB {
             if (!config.validate()) {
                 System.exit(-1);
             } else {
-            	m_injector = Guice.createInjector(new VoltDBConfigurer(), new AbstractModule() {
-            		@Override
-					protected void configure() {
-						bind(Configuration.class).toInstance(config);
-					}
-				});
+                m_injector = Guice.createInjector(new VoltDBConfigurer(), new AbstractModule() {
+                    @Override
+                    protected void configure() {
+                        bind(Configuration.class).toInstance(config);
+                    }
+                });
             }
         }
         catch (OutOfMemoryError e) {

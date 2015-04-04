@@ -1,5 +1,18 @@
-/**
- * 
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2015 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.config;
 
@@ -86,36 +99,36 @@ public class VoltDBConfigurer extends AbstractModule {
     @Provides @Singleton
     @Named("computation")
     public ListeningExecutorService computationExecutionService(org.voltdb.config.Configuration m_config) {
-    	final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
-    	return CoreUtils.getListeningExecutorService(
+        final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
+        return CoreUtils.getListeningExecutorService(
                 "Computation service thread",
                 computationThreads, m_config.m_computationCoreBindings);
     }
-    
+
 
     @Provides @Singleton
     @Named("periodicVoltThread")
     public ScheduledThreadPoolExecutor periodicVoltThread(org.voltdb.config.Configuration m_config) {
-    	return CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
+        return CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
    }
     @Provides @Singleton
     @Named("periodicPriorityVoltThread")
     public ScheduledThreadPoolExecutor periodicPriorityVoltThread(org.voltdb.config.Configuration m_config) {
-    	return CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
+        return CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
    }
     @Provides @Singleton
     @Named("startActionWatcherES")
     public ListeningExecutorService startActionWatcherExecutionService(org.voltdb.config.Configuration m_config) {
-    	return CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
+        return CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
     }
-    
-    
+
+
     @Provides @Singleton
     public SnapshotIOAgent snapshotIOAgent (HostMessenger m_messenger) {
         Class<?> snapshotIOAgentClass = MiscUtils.loadProClass("org.voltdb.SnapshotIOAgentImpl", "Snapshot", true);
         if (snapshotIOAgentClass != null) {
             try {
-            	SnapshotIOAgent m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
+                SnapshotIOAgent m_snapshotIOAgent = (SnapshotIOAgent) snapshotIOAgentClass.getConstructor(HostMessenger.class, long.class)
                         .newInstance(m_messenger, m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
                 m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
                 return m_snapshotIOAgent;
@@ -123,82 +136,82 @@ public class VoltDBConfigurer extends AbstractModule {
                 throw VoltDB.crashLocalVoltDB("Failed to instantiate snapshot IO agent", true, e);
             }
         } else {
-        	return new SnapshotIOAgent(null, 0) {
-				@Override
-				public void deliver(VoltMessage message) {
-				}
-				
-				@Override
-				public <T> ListenableFuture<T> submit(Callable<T> work) {
-					throw new UnsupportedOperationException("Snapshots are not supported");
-				}
-				
-				@Override
-				public void shutdown() throws InterruptedException {
-				}
-			};
+            return new SnapshotIOAgent(null, 0) {
+                @Override
+                public void deliver(VoltMessage message) {
+                }
+
+                @Override
+                public <T> ListenableFuture<T> submit(Callable<T> work) {
+                    throw new UnsupportedOperationException("Snapshots are not supported");
+                }
+
+                @Override
+                public void shutdown() throws InterruptedException {
+                }
+            };
         }
 
     }
-    
+
 
     @Provides
     public List<TopologyProvider> topologyProvidersChain(
-    		DummyEJoinTopologyProvider joinProvider,
-    		RejoinTopologyProvider rejoinProvider,
-    		StartupTopologyProvider defaultProvider) {
-    	List<TopologyProvider> providers = new ArrayList<TopologyProvider>();
-    	providers.add(joinProvider);
-    	providers.add(rejoinProvider);
-    	providers.add(defaultProvider);
-    	return providers;
+            DummyEJoinTopologyProvider joinProvider,
+            RejoinTopologyProvider rejoinProvider,
+            StartupTopologyProvider defaultProvider) {
+        List<TopologyProvider> providers = new ArrayList<TopologyProvider>();
+        providers.add(joinProvider);
+        providers.add(rejoinProvider);
+        providers.add(defaultProvider);
+        return providers;
     }
 
-	@Override
-	protected void configure() {
-		
-		bind(DummyEJoinTopologyProvider.class).asEagerSingleton();
-		bind(RejoinTopologyProvider.class).asEagerSingleton();
-		bind(StartupTopologyProvider.class).asEagerSingleton();
-		bind(TopologyProviderFactory.class).asEagerSingleton();
+    @Override
+    protected void configure() {
 
-		bind(VoltStateManager.class).asEagerSingleton();
-		bind(PartitionsInformer.class).asEagerSingleton();
-		bind(CartographerProvider.class).asEagerSingleton();
-		bind(CatalogContextProvider.class).asEagerSingleton();
-		bind(ClientInterfaceProvider.class).asEagerSingleton();
-		bind(DeploymentTypeProvider.class).asEagerSingleton();
-		bind(OpsRegistrar.class).asEagerSingleton();
-		bind(SnapshotCompletionMonitor.class).asEagerSingleton();
-		bind(VoltDBInterface.class).to(RealVoltDB.class).asEagerSingleton();
-		
-		
-		binder().bindListener(Matchers.any(), new TypeListener() {
-		    @Override
-		    public <I> void hear(final TypeLiteral<I> typeLiteral, TypeEncounter<I> typeEncounter) {
-		    	final Class<?> target = (Class<?>) typeLiteral.getType();
-		    	if(HostMessenger.class.isAssignableFrom(target)) {
-		    		System.out.print("");
-		    	}
-		    	for(final Method m: target.getDeclaredMethods()) {
-		    		for(Annotation a:m.getAnnotations()) {
-		    			if(a instanceof PostConstruct) {
-		    		        typeEncounter.register(new InjectionListener<I>() {
-		    		            @Override
-		    		            public void afterInjection(Object i) {
-		    		            	try {
-		    		            		m.setAccessible(true);
-										m.invoke(i);
-									} catch (Exception e) {
-										throw new RuntimeException("Error calling post-construct method " + target.getSimpleName() + "." + m.getName(), e);//TODO: specialized exception
-									}
-		    		            }
-		    		        });
-		    			}
-		    		}
-		    	}
-		    }
-		});
-	}
-    
+        bind(DummyEJoinTopologyProvider.class).asEagerSingleton();
+        bind(RejoinTopologyProvider.class).asEagerSingleton();
+        bind(StartupTopologyProvider.class).asEagerSingleton();
+        bind(TopologyProviderFactory.class).asEagerSingleton();
+
+        bind(VoltStateManager.class).asEagerSingleton();
+        bind(PartitionsInformer.class).asEagerSingleton();
+        bind(CartographerProvider.class).asEagerSingleton();
+        bind(CatalogContextProvider.class).asEagerSingleton();
+        bind(ClientInterfaceProvider.class).asEagerSingleton();
+        bind(DeploymentTypeProvider.class).asEagerSingleton();
+        bind(OpsRegistrar.class).asEagerSingleton();
+        bind(SnapshotCompletionMonitor.class).asEagerSingleton();
+        bind(VoltDBInterface.class).to(RealVoltDB.class).asEagerSingleton();
+
+
+        binder().bindListener(Matchers.any(), new TypeListener() {
+            @Override
+            public <I> void hear(final TypeLiteral<I> typeLiteral, TypeEncounter<I> typeEncounter) {
+                final Class<?> target = (Class<?>) typeLiteral.getType();
+                if(HostMessenger.class.isAssignableFrom(target)) {
+                    System.out.print("");
+                }
+                for(final Method m: target.getDeclaredMethods()) {
+                    for(Annotation a:m.getAnnotations()) {
+                        if(a instanceof PostConstruct) {
+                            typeEncounter.register(new InjectionListener<I>() {
+                                @Override
+                                public void afterInjection(Object i) {
+                                    try {
+                                        m.setAccessible(true);
+                                        m.invoke(i);
+                                    } catch (Exception e) {
+                                        throw new RuntimeException("Error calling post-construct method " + target.getSimpleName() + "." + m.getName(), e);//TODO: specialized exception
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        });
+    }
+
 }

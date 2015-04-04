@@ -31,7 +31,7 @@ import junit.framework.TestCase;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -71,7 +71,7 @@ public class TestBlobType extends TestCase {
         Client client = null;
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest.xml");
             config.m_backend = BackendTarget.NATIVE_EE_JNI;
@@ -225,7 +225,7 @@ public class TestBlobType extends TestCase {
         Client client = null;
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("binarytest2.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("binarytest2.xml");
             config.m_backend = BackendTarget.NATIVE_EE_JNI;
@@ -316,7 +316,7 @@ public class TestBlobType extends TestCase {
         assertTrue("Failed to compile catalog", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("bigfatblobs.xml"));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("bigfatblobs.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("bigfatblobs.xml");
         config.m_backend = BackendTarget.NATIVE_EE_JNI;

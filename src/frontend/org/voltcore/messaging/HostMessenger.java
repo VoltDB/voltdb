@@ -182,10 +182,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     int m_localHostId;
 
     private final Config m_config;
-    
+
     @Inject
     private Configuration vConfig;
-    
+
     private final SocketJoiner m_joiner;
     private final VoltNetworkPool m_network;
     private volatile boolean m_localhostReady = false;

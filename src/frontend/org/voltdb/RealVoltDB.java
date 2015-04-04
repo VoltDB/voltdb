@@ -170,25 +170,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     @Inject
     private Configuration m_config;
-    
+
     @Inject
     private DeploymentTypeProvider deploymentProvider;
-    
+
     @Inject
     private PartitionsInformer partitionsInformer;
-    
+
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
-    
+
     @Inject
     private CatalogContextProvider catalogContextProvider;
-    
+
     @Inject
     private VoltStateManager voltStateManager;
-    
+
     volatile CatalogContext m_catalogContext;
-    
+
     private String m_buildString;
     static final String m_defaultVersionString = "5.2";
     // by default set the version to only be compatible with itself
@@ -196,16 +196,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
-    
+
     @Inject
     HostMessenger m_messenger;
-    
+
     @Inject
     private ClientInterfaceProvider clientInterfaceProvider;
     private ClientInterface m_clientInterface = null;
-    
+
     HTTPAdminListener m_adminListener;
-    
+
     @Inject
     private OpsRegistrar m_opsRegistrar;
 
@@ -216,7 +216,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
     private StatsManager m_statsManager = null;
-    
+
     @Inject
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     // These are unused locally, but they need to be registered with the StatsAgent so they're
@@ -232,12 +232,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
     @Inject
     private CartographerProvider cartographerProvider;
-    
+
     Cartographer m_cartographer;
-    
+
     @Inject
     private TopologyProviderFactory topologyProvider;
-    
+
     LeaderAppointer m_leaderAppointer = null;
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
@@ -377,21 +377,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     @PostConstruct
     protected void initialize() {
-    	logStartupCommand();
-    	checkStartupCondition();
-    	setConsoleUtf8Encoding();
-    	VoltDB.replaceVoltDBInstanceForTest(this);
+        logStartupCommand();
+        checkStartupCondition();
+        setConsoleUtf8Encoding();
+        VoltDB.replaceVoltDBInstanceForTest(this);
         new Thread(new Runnable() {
 
             @Override
             public void run() {
-                initialize(m_config);//TODO: parameter is not needed 
+                initialize(m_config);//TODO: parameter is not needed
                 RealVoltDB.this.run();
             }
-            
+
         }).start();
     }
-    
+
     private void logStartupCommand() {
         // Replay command line args that we can see
         StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
@@ -408,9 +408,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         sb.delete(0, sb.length()).append("Command line JVM classpath: ");
         sb.append(System.getProperty("java.class.path", "[not available]"));
         hostLog.info(sb.toString());
-	}
+    }
 
-	private void setConsoleUtf8Encoding() {
+    private void setConsoleUtf8Encoding() {
         // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
         try {
             System.setOut(new PrintStream(System.out, true, "UTF-8"));
@@ -419,9 +419,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             hostLog.fatal("Support for the UTF-8 encoding is required for VoltDB. This means you are likely running an unsupported JVM. Exiting.");
             System.exit(-1);
         }
-	}
+    }
 
-	/**
+    /**
      * Initialize all the global components, then initialize all the m_sites.
      */
     @Override
@@ -430,7 +430,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         synchronized(m_startAndStopLock) {
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
-        	initFields();
+            initFields();
 
             ActivePlanRepository.clear();
 
@@ -558,15 +558,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
                 m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
-                
-                
+
+
                 /*
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
                         */
                 m_cartographer = cartographerProvider.getCartographer();
                 m_configuredNumberOfPartitions = partitionsInformer.getNumberOfPartitions();
-                List<Integer> partitions = partitionsInformer.getPartitions();	
+                List<Integer> partitions = partitionsInformer.getPartitions();
                 /*if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
@@ -995,14 +995,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         if (!rejoining() && !m_joining) {
             m_messenger.waitForGroupJoin(numberOfNodes);
         }
-	}
+    }
 
-	private void initFields() {
+    private void initFields() {
         // If there's no deployment provide a default and put it under voltdbroot.
         if (m_config.m_pathToDeployment == null) {
             try {
-            	m_config.m_pathToDeployment = setupDefaultDeployment(hostLog);
-            	m_config.m_deploymentDefault = true;
+                m_config.m_pathToDeployment = setupDefaultDeployment(hostLog);
+                m_config.m_deploymentDefault = true;
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
             }
@@ -1037,7 +1037,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         m_pathToStartupCatalog = m_config.m_pathToCatalog;
         m_replicationActive = false;
         m_configLogger = null;
-        
+
         // use CLI overrides for testing hotfix version compatibility
         if (m_config.m_versionStringOverrideForTest != null) {
             m_versionString = m_config.m_versionStringOverrideForTest;
@@ -1045,17 +1045,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
             m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
         }
-	}
+    }
 
-	private void checkStartupCondition() {
+    private void checkStartupCondition() {
         // check that this is a 64 bit VM
         if (System.getProperty("java.vm.name").contains("64") == false) {
             hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
             System.exit(-1);
         }
-	}
+    }
 
-	class DailyLogTask implements Runnable {
+    class DailyLogTask implements Runnable {
         @Override
         public void run() {
             m_myHostId = m_messenger.getHostId();
@@ -1313,7 +1313,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return initiators;
     }
 
-    
+
     private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
     /**
      * Schedule all the periodic works
@@ -1362,7 +1362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
          * Debate with the cluster what the deployment file should be
          */
         try {
-            
+
             /*
             ZooKeeper zk = m_messenger.getZK();
             byte deploymentBytes[] = null;
@@ -1421,7 +1421,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             DeploymentType deployment =
                 CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
             */
-            
+
             DeploymentType deployment = deploymentProvider.getDeploymentType(deploymentProvider.getDeploymentBytes());
             // wasn't a valid xml deployment file
             if (deployment == null) {

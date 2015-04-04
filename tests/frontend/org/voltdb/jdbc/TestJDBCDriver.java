@@ -52,7 +52,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.TestClientFeatures;

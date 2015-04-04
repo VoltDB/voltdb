@@ -31,7 +31,7 @@ import java.util.List;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**

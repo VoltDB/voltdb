@@ -28,7 +28,7 @@ import java.io.PrintStream;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.compiler.procedures.FloatParamToGetNiceComplaint;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRONonSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicROSeqProc;
