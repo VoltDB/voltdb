@@ -107,8 +107,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         }
 
         m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, WRITE_TOKEN);
+        //* enable to debug */ System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
         Statement selectStmt = m_testProc.getStatements().getIgnoreCase("warehouse_select");
         PlanFragment selectBottomFrag = null;
@@ -158,8 +158,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         }
 
         m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+        //* enable to debug */ System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
         Statement selectStmt = m_testProc.getStatements().getIgnoreCase("warehouse_select");
         PlanFragment selectBottomFrag = null;
@@ -264,8 +264,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         }
 
         m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, WRITE_TOKEN);
+        //* enable to debug */ System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
         Statement selectStmt = m_testProc.getStatements().getIgnoreCase("warehouse_join");
         PlanFragment selectBottomFrag = null;
@@ -423,8 +423,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         }
 
         m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, 0, false, false, WRITE_TOKEN);
+        //* enable to debug */ System.out.println("Rows loaded to table " + m_ee.serializeTable(ITEM_TABLEID).getRowCount());
         assertEquals(numRowsToInsert, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table " + m_ee.serializeTable(ITEM_TABLEID).getRowCount());
 
         long[] fragIds = new long[numFragsToExecute];
         ParameterSet[] paramSets = new ParameterSet[numFragsToExecute];

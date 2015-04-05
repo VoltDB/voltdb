@@ -17,7 +17,6 @@
 
 package org.voltdb.messaging;
 
-import java.io.DataOutput;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -36,11 +35,11 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.SerializationHelper;
 
 /**
- * <code>DataInputStream</code> subclass to write objects that implement
+ * class to write objects that implement
  * the FastSerializable interface.
  *
  */
-public class FastSerializer implements DataOutput {
+public class FastSerializer {//implements DataOutput {
     /** callbacked when the internal buffer was grown. */
     public interface BufferGrowCallback {
         void onBufferGrow(FastSerializer obj);
@@ -465,12 +464,12 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    @Override
+
     public void write(int b) throws IOException {
         writeByte((byte) b);
     }
 
-    @Override
+
     public void write(byte[] b) throws IOException {
         growIfNeeded(b.length);
         buffer.b().put(b);
@@ -481,70 +480,70 @@ public class FastSerializer implements DataOutput {
         buffer.b().put(b);
     }
 
-    @Override
+
     public void write(byte[] b, int off, int len) throws IOException {
         growIfNeeded(len);
         buffer.b().put(b, off, len);
     }
 
-    @Override
+
     public void writeBoolean(boolean v) throws IOException {
         writeByte((byte) (v ? 1 : 0));
     }
 
-    @Override
+
     public void writeByte(int v) throws IOException {
         growIfNeeded(Byte.SIZE/8);
         buffer.b().put((byte) v);
     }
 
-    @Override
+
     public void writeBytes(String s) throws IOException {
         throw new UnsupportedOperationException("FastSerializer.writeBytes() not supported.");
     }
 
-    @Override
+
     public void writeChar(int v) throws IOException {
         growIfNeeded(Character.SIZE/8);
         buffer.b().putChar((char) v);
     }
 
-    @Override
+
     public void writeChars(String s) throws IOException {
         throw new UnsupportedOperationException("FastSerializer.writeChars() not supported.");
     }
 
-    @Override
+
     public void writeDouble(double v) throws IOException {
         growIfNeeded(Double.SIZE/8);
         buffer.b().putDouble(v);
     }
 
-    @Override
+
     public void writeFloat(float v) throws IOException {
         growIfNeeded(Float.SIZE/8);
         buffer.b().putFloat(v);
     }
 
-    @Override
+
     public void writeInt(int v) throws IOException {
         growIfNeeded(Integer.SIZE/8);
         buffer.b().putInt(v);
     }
 
-    @Override
+
     public void writeLong(long v) throws IOException {
         growIfNeeded(Long.SIZE/8);
         buffer.b().putLong(v);
     }
 
-    @Override
+
     public void writeShort(int v) throws IOException {
         growIfNeeded(Short.SIZE/8);
         buffer.b().putShort((short) v);
     }
 
-    @Override
+
     public void writeUTF(String str) throws IOException {
         throw new UnsupportedOperationException("FastSerializer.writeChars() not supported.");
     }

@@ -70,7 +70,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     static {
         EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
         if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
-            VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD + " is not valid, must be between 0 and 99", false, null);
+            VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD +
+                    " is not valid, must be between 0 and 99", false, null);
         }
         HOST_TRACE_ENABLED = LOG.isTraceEnabled();
     }
@@ -81,7 +82,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** Create a ByteBuffer (in a container) for serializing arguments to C++. Use a direct
     ByteBuffer as it will be passed directly to the C++ code. */
-    private BBContainer psetBufferC = null;
+    private BBContainer psetBufferGuard = null;
     private ByteBuffer psetBuffer = null;
 
     /**
@@ -94,9 +95,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * that rely on being able to serialize large results sets will get the same amount of storage
      * when using the IPC backend.
      **/
-    private final BBContainer deserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+    private final int MAX_MSG_SZ = (1024*1024*10);
+    private final BBContainer deserializerBufferGuard = DBBPool.allocateDirect(MAX_MSG_SZ);
     private FastDeserializer deserializer =
-        new FastDeserializer(deserializerBufferOrigin.b());
+        new FastDeserializer(deserializerBufferGuard.b());
 
     /*
      * For large result sets the EE will allocate new memory for the results
@@ -104,8 +106,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     private ByteBuffer fallbackBuffer = null;
 
-    private final BBContainer exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 5);
-    private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b();
+    // voltdbipc uses MAX_MSG_SZ for this buffer, too. Do we care?
+    private final BBContainer exceptionBufferGuard = DBBPool.allocateDirect(1024 * 1024 * 5);
+    private ByteBuffer exceptionBuffer = exceptionBufferGuard.b();
 
     /**
      * initialize the native Engine object.
@@ -145,7 +148,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     tempTableMemory * 1024 * 1024,
                     createDrReplicatedStream,
                     EE_COMPACTION_THRESHOLD);
-        checkErrorCode(errorCode);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
 
         setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
 
@@ -153,25 +158,30 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //LOG.info("Initialized Execution Engine");
     }
 
-    final void setupPsetBuffer(int size) {
+    private void setupPsetBuffer(int size) {
         if (psetBuffer != null) {
-            psetBufferC.discard();
+            psetBufferGuard.discard();
             psetBuffer = null;
         }
 
-        psetBufferC = DBBPool.allocateDirect(size);
-        psetBuffer = psetBufferC.b();
+        psetBufferGuard = DBBPool.allocateDirect(size);
+        psetBuffer = psetBufferGuard.b();
 
         int errorCode = nativeSetBuffers(pointer, psetBuffer,
                 psetBuffer.capacity(),
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
-        checkErrorCode(errorCode);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
     }
 
-    final void clearPsetAndEnsureCapacity(int size) {
+    private void clearPsetAndEnsureCapacity(int size) {
         assert(psetBuffer != null);
         if (size > psetBuffer.capacity()) {
+            //TODO: It MAY be worth logging this source of memory growth,
+            // even if it does eventually level off to a worst-case value.
+            // The memory is never reclaimed, even on a quiescent system.
             setupPsetBuffer(size);
         }
         else {
@@ -179,10 +189,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
-    @Override
-    final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
-        exceptionBuffer.clear();
+    /**
+     * Utility method to throw a Runtime exception based on the error code and
+     * serialized exception details
+     **/
+    private void throwSerializedException(final int errorCode) throws RuntimeException {
+        exceptionBuffer.clear(); // resets position, not content.
         final int exceptionLength = exceptionBuffer.getInt();
 
         if (exceptionLength == 0) {
@@ -206,14 +218,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (pointer != 0L) {
             final int errorCode = nativeDestroy(pointer);
             pointer = 0L;
-            checkErrorCode(errorCode);
+            if (errorCode != ERRORCODE_SUCCESS) {
+                throwSerializedException(errorCode);
+            }
         }
         deserializer = null;
-        deserializerBufferOrigin.discard();
+        deserializerBufferGuard.discard();
         exceptionBuffer = null;
-        exceptionBufferOrigin.discard();
-        psetBufferC.discard();
-        psetBuffer = null;
+        exceptionBufferGuard.discard();
+        if (psetBuffer != null) {
+            psetBuffer = null;
+            psetBufferGuard.discard();
+        }
         LOG.trace("Released Execution Engine.");
     }
 
@@ -226,7 +242,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
-        checkErrorCode(errorCode);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
         //LOG.info("Loaded Catalog.");
     }
 
@@ -239,7 +257,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
-        checkErrorCode(errorCode);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
     }
 
     /**
@@ -316,40 +336,38 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     undoToken);
 
         try {
-            checkErrorCode(errorCode);
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
-            // get a copy of the result buffers and make the tables
-            // use the copy
-            try {
-                // read the complete size of the buffer used
-                final int totalSize = fds.readInt();
-                // check if anything was changed
-                final boolean dirty = fds.readBoolean();
-                if (dirty)
-                    m_dirty = true;
-                // get a copy of the buffer
-                final ByteBuffer fullBacking = fds.readBuffer(totalSize);
-                final VoltTable[] results = new VoltTable[batchSize];
-                for (int i = 0; i < batchSize; ++i) {
-                    final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
-                    assert(numdeps == 1);
-                    @SuppressWarnings("unused")
-                    final
-                    int depid = fullBacking.getInt(); // ignore the dependency id
-                    final int tableSize = fullBacking.getInt();
-                    // reasonableness check
-                    assert(tableSize < 50000000);
-                    final ByteBuffer tableBacking = fullBacking.slice();
-                    fullBacking.position(fullBacking.position() + tableSize);
-                    tableBacking.limit(tableSize);
-
-                    results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
-                }
-                return results;
-            } catch (final IOException ex) {
-                LOG.error("Failed to deserialze result table" + ex);
-                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+            if (errorCode != ERRORCODE_SUCCESS) {
+                throwSerializedException(errorCode);
             }
+            FastDeserializer fds = (fallbackBuffer == null) ?
+                    deserializer :
+                    new FastDeserializer(fallbackBuffer);
+            // read the complete size of the buffer used
+            final int totalSize = fds.readInt();
+            // check if anything was changed
+            final boolean dirty = fds.readBoolean();
+            if (dirty) {
+                m_dirty = true;
+            }
+            // get a copy of the buffer
+            final ByteBuffer fullBacking = fds.readBuffer(totalSize);
+            final VoltTable[] results = new VoltTable[batchSize];
+            for (int i = 0; i < batchSize; ++i) {
+                final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
+                assert(numdeps == 1);
+                @SuppressWarnings("unused")
+                final
+                int depid = fullBacking.getInt(); // ignore the dependency id
+                final int tableSize = fullBacking.getInt();
+                // reasonableness check
+                assert(tableSize < 50000000);
+                final ByteBuffer tableBacking = fullBacking.slice();
+                fullBacking.position(fullBacking.position() + tableSize);
+                tableBacking.limit(tableSize);
+
+                results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
+            }
+            return results;
         } finally {
             fallbackBuffer = null;
         }
@@ -364,8 +382,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializer.clear();
         final int errorCode = nativeSerializeTable(pointer, tableId, deserializer.buffer(),
                 deserializer.buffer().capacity());
-        checkErrorCode(errorCode);
-
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
         return PrivateVoltTableFactory.createVoltTableFromSharedBuffer(deserializer.buffer());
     }
 
@@ -391,21 +410,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId,
                                               spHandle, uniqueId, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
                                               undoToken);
-        checkErrorCode(errorCode);
-
-        try {
-            int length = deserializer.readInt();
-            if (length == 0) return null;
-            if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
-
-            byte uniqueViolations[] = new byte[length];
-            deserializer.readFully(uniqueViolations);
-
-            return uniqueViolations;
-        } catch (final IOException ex) {
-            LOG.error("Failed to retrieve unique violations: " + tableId, ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
         }
+
+        int length = deserializer.readInt();
+        if (length == 0) return null;
+        if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+
+        byte uniqueViolations[] = new byte[length];
+        deserializer.readFully(uniqueViolations);
+
+        return uniqueViolations;
     }
 
     /**
@@ -443,25 +459,20 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializer.clear();
         final int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
         if (numResults == -1) {
-            throwExceptionForError(ERRORCODE_ERROR);
+            throwSerializedException(ERRORCODE_ERROR);
         }
 
-        try {
-            deserializer.readInt();//Ignore the length of the result tables
+        deserializer.readInt();//Ignore the length of the result tables
 
-            ByteBuffer buf = fallbackBuffer == null ? deserializer.buffer() : fallbackBuffer;
-            final VoltTable results[] = new VoltTable[numResults];
-            for (int ii = 0; ii < numResults; ii++) {
-                int len = buf.getInt();
-                byte[] bufCopy = new byte[len];
-                buf.get(bufCopy);
-                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
-            }
-            return results;
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialze result table for getStats" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        ByteBuffer buf = (fallbackBuffer == null) ? deserializer.buffer() : fallbackBuffer;
+        final VoltTable results[] = new VoltTable[numResults];
+        for (int ii = 0; ii < numResults; ii++) {
+            int len = buf.getInt();
+            byte[] bufCopy = new byte[len];
+            buf.get(bufCopy);
+            results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
         }
+        return results;
     }
 
     @Override
@@ -471,13 +482,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
-        return nativeReleaseUndoToken(pointer, undoToken);
+    public void releaseUndoToken(final long undoToken) {
+        nativeReleaseUndoToken(pointer, undoToken);
     }
 
     @Override
-    public boolean undoUndoToken(final long undoToken) {
-        return nativeUndoUndoToken(pointer, undoToken);
+    public void undoUndoToken(final long undoToken) {
+        nativeUndoUndoToken(pointer, undoToken);
     }
 
     /**
@@ -487,8 +498,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @returns true on success false on failure
      */
     @Override
-    public boolean setLogLevels(final long logLevels) throws EEException {
-        return nativeSetLogLevels(pointer, logLevels);
+    public void setLogLevels(final long logLevels) throws EEException {
+        nativeSetLogLevels(pointer, logLevels);
     }
 
     @Override
@@ -515,18 +526,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         int[] positions = null;
         assert(deserializer != null);
         int count;
-        try {
-            count = deserializer.readInt();
-            if (count > 0) {
-                positions = new int[count];
-                for (int i = 0; i < count; i++) {
-                    positions[i] = deserializer.readInt();
-                }
-                return Pair.of(remaining, positions);
+        count = deserializer.readInt();
+        if (count > 0) {
+            positions = new int[count];
+            for (int i = 0; i < count; i++) {
+                positions[i] = deserializer.readInt();
             }
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialize position array" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+            return Pair.of(remaining, positions);
         }
 
         return Pair.of(remaining, new int[] {0});
@@ -608,7 +614,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     throws EEException
     {
         final int errorCode = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
-        checkErrorCode(errorCode);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
     }
 
     @Override
@@ -634,8 +642,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             //Clear is destructive, do it before the native call
             deserializer.clear();
             final int errorCode = nativeExecuteTask(pointer);
-            checkErrorCode(errorCode);
-            return (byte[])deserializer.readArray(byte.class);
+            if (errorCode != ERRORCODE_SUCCESS) {
+                throwSerializedException(errorCode);
+            }
+            return deserializer.readByteArray();
         } catch (IOException e) {
             Throwables.propagate(e);
         }

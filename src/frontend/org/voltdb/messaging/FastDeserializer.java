@@ -17,9 +17,7 @@
 
 package org.voltdb.messaging;
 
-import java.io.DataInput;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -31,11 +29,18 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 /**
- * <code>DataInputStream</code> subclass to read objects that implement
- * the FastSerializable interface.
+ * Yet another ByteBuffer wrapper class,
+ * this one to read objects that implement the FastSerializable interface.
+ * TODO: They'll come. You'll see.
  *
+ * TODO: None of the use cases to date conform the the DataInput interface.
+ * If that changes, maybe this class could be subtyped for the new use case.
+ * Implementing the interface tends to add complexity not needed in the
+ * current use cases, like implementing/stubbing unused calls and forcing
+ * callers to pretend to be catching IOExceptions that are never actually
+ * thrown.
  */
-public class FastDeserializer implements DataInput {
+public class FastDeserializer {
     /**
      * Interface to monitor metrics and other information about the deserialization process
      *
@@ -44,7 +49,7 @@ public class FastDeserializer implements DataInput {
         public void deserializedBytes(int numBytes);
     }
 
-    private final ByteBuffer buffer;
+    private final ByteBuffer m_buffer;
 
     /**
      * Create a <code>FastDeserializer</code> from an array of bytes.
@@ -52,20 +57,19 @@ public class FastDeserializer implements DataInput {
      * @param in A byte array to wrap.
      */
     public FastDeserializer(final byte[] in) {
-        buffer = ByteBuffer.wrap(in);
-        assert(buffer.order() == ByteOrder.BIG_ENDIAN);
+        this(ByteBuffer.wrap(in));
     }
 
     public FastDeserializer(final byte[] in, ByteOrder order) {
-        buffer = ByteBuffer.wrap(in);
-        buffer.order(order);
+        m_buffer = ByteBuffer.wrap(in);
+        m_buffer.order(order);
     }
 
     /** Create a <code>FastDeserializer</code> from a ByteBuffer.
      * @param in The ByteBuffer that will be part of this FastDeserializer. */
     public FastDeserializer(final ByteBuffer in) {
-        buffer = in;
-        assert(buffer.order() == ByteOrder.BIG_ENDIAN);
+        m_buffer = in;
+        assert(m_buffer.order() == ByteOrder.BIG_ENDIAN);
     }
 
     /**
@@ -75,21 +79,22 @@ public class FastDeserializer implements DataInput {
      **/
     public void clear() {
         //Don't rely on the EE to set the value to 0 when there are no results
-        buffer.clear();
-        buffer.putInt(0, 0);
+        m_buffer.clear();
+        m_buffer.putInt(0, 0);
     }
 
     /** @return The byte buffer contained in this object. */
-    public ByteBuffer buffer() { return buffer; }
+    public ByteBuffer buffer() { return m_buffer; }
 
     /** @return the unread bytes from the contained byte buffer. */
-    public ByteBuffer remainder() { return buffer.slice(); }
+    public ByteBuffer remainder() { return m_buffer.slice(); }
 
     /**
      * Read an object from its byte array representation. This is a shortcut
      * utility method useful when only a single object needs to be deserialized.
      *
      * @return The byte array representation for <code>object</code>.
+     * @throws IOException
      */
     public final static <T extends FastSerializable> T deserialize(
             final byte[] data, final Class<T> expectedType) throws IOException {
@@ -101,7 +106,7 @@ public class FastDeserializer implements DataInput {
      * Read an object from a a byte array stream assuming you know the expected type.
      *
      * @param expectedType The class of the type to be deserialized.
-     * @return A derserialized object.
+     * @return A deserialized object.
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public <T extends FastSerializable> T readObject(final Class<T> expectedType) throws IOException {
@@ -119,7 +124,7 @@ public class FastDeserializer implements DataInput {
     }
 
     /**
-     * Read an object from a a byte array stream into th provied instance. Takes in a
+     * Read an object from a a byte array stream into the provided instance. Takes in a
      * deserialization monitor which is notified of how many bytes were deserialized.
      *
      * @param obj Instance of the class of the type to be deserialized.
@@ -128,9 +133,9 @@ public class FastDeserializer implements DataInput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public FastSerializable readObject(final FastSerializable obj, final DeserializationMonitor monitor) throws IOException {
-        final int startPosition = buffer.position();
+        final int startPosition = m_buffer.position();
         obj.readExternal(this);
-        final int endPosition = buffer.position();
+        final int endPosition = m_buffer.position();
         if (monitor != null) {
             monitor.deserializedBytes(endPosition - startPosition);
         }
@@ -139,7 +144,10 @@ public class FastDeserializer implements DataInput {
 
     /**
      * Read a string in the standard VoltDB way without
-     * wrapping the byte buffer[
+     * wrapping the byte buffer.
+     * That is, a four byte length, or -1 for null,
+     * followed by the bytes of UTF-8 encoded characters.
+     * @throws IOException
      */
     public static String readString(ByteBuffer buffer) throws IOException {
         final int NULL_STRING_INDICATOR = -1;
@@ -147,9 +155,9 @@ public class FastDeserializer implements DataInput {
         final int len = buffer.getInt();
 
         // check for null string
-        if (len == NULL_STRING_INDICATOR)
+        if (len == NULL_STRING_INDICATOR) {
             return null;
-        assert len >= 0;
+        }
 
         if (len > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Serializable strings cannot be longer then "
@@ -162,70 +170,46 @@ public class FastDeserializer implements DataInput {
         // now assume not null
         final byte[] strbytes = new byte[len];
         buffer.get(strbytes);
-        String retval = null;
-        try {
-            retval = new String(strbytes, "UTF-8");
-        } catch (final UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return retval;
+        return new String(strbytes, Constants.UTF8ENCODING);
     }
 
     /**
-     * Read a string in the standard VoltDB way. That is, four
-     * bytes of length info followed by the bytes of characters
-     * encoded in UTF-8.
-     *
-     * @return The String value read from the stream.
+     * Read a string in the standard VoltDB way.
+     * @return The String value read from the internal buffer.
      * @throws IOException Rethrows any IOExceptions.
      */
     public String readString() throws IOException {
-        final int len = readInt();
-
-        // check for null string
-        if (len == VoltType.NULL_STRING_LENGTH) {
-            return null;
-        }
-
-        if (len < VoltType.NULL_STRING_LENGTH) {
-            throw new IOException("String length is negative " + len);
-        }
-        if (len > buffer.remaining()) {
-            throw new IOException("String length is bigger than total buffer " + len);
-        }
-
-        // now assume not null
-        final byte[] strbytes = new byte[len];
-        readFully(strbytes);
-        return new String(strbytes, Constants.UTF8ENCODING);
+        return readString(m_buffer);
     }
 
     /**
      * Read a varbinary, serialized the same way VoltDB serializes
      * strings, but returned as byte[].
      *
-     * @return The byte[] value read from the stream.
+     * @return The byte[] value read from the internal buffer.
      * @throws IOException Rethrows any IOExceptions.
      */
     public byte[] readVarbinary() throws IOException {
-        final int len = readInt();
+        int len = readInt();
 
         // check for null string
         if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
         }
-        assert len >= 0;
 
         if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("Varbinary length is negative " + len);
         }
-        if (len > buffer.remaining()) {
+        if (len > (VoltType.MAX_VALUE_LENGTH)) {
+            throw new IOException("Varbinary length is greater then the max of 1 megabyte " + len);
+        }
+        if (len > m_buffer.remaining()) {
             throw new IOException("Varbinary length is bigger than total buffer " + len);
         }
 
         // now assume not null
-        final byte[] retval = new byte[len];
-        readFully(retval);
+        byte[] retval = new byte[len];
+        m_buffer.get(retval);
         return retval;
     }
 
@@ -234,8 +218,8 @@ public class FastDeserializer implements DataInput {
      * @return BigDecimal
      * @throws IOException
      */
-    public BigDecimal readBigDecimal() throws IOException {
-        return VoltDecimalHelper.deserializeBigDecimal(buffer);
+    public BigDecimal readBigDecimal() {
+        return VoltDecimalHelper.deserializeBigDecimal(m_buffer);
     }
 
     /**
@@ -244,24 +228,29 @@ public class FastDeserializer implements DataInput {
      * @throws IOException
      */
     public BigDecimal readBigDecimalFromString() throws IOException {
-        return VoltDecimalHelper.deserializeBigDecimalFromString(this.readString());
+        return VoltDecimalHelper.deserializeBigDecimalFromString(readString(m_buffer));
+    }
+
+    public byte[] readByteArray() throws IOException {
+        final int count = readInt();
+        if (count < 0) {
+            throw new IOException("Serialized byte array length is negative " + count);
+        }
+        if (count > m_buffer.remaining()) {
+            throw new IOException("Serialized byte array length " + count +
+                    " is greater than total buffer length " + m_buffer.remaining());
+        }
+
+        final byte[] retval = new byte[count];
+        readFully(retval);
+        return retval;
     }
 
     public Object readArray(final Class<?> type) throws IOException {
-        final int count = type == byte.class ? readInt() : readShort();
-        if (count < 0) {
-            throw new IOException("Array length is negative " + count);
-        }
         if (type == byte.class) {
-            if (count > (VoltType.MAX_VALUE_LENGTH)) {
-                throw new IOException("Array length is greater then the max of 1 megabyte " + count);
-            }
+            return readByteArray();
         }
-        if (type == byte.class) {
-            final byte[] retval = new byte[count];
-            readFully(retval);
-            return retval;
-        }
+        final int count = readShort();
         if (type == byte[].class) {
             final byte[][] retval = new byte[count][];
             for (int i = 0; i < count; i++) {
@@ -351,99 +340,40 @@ public class FastDeserializer implements DataInput {
      */
     public ByteBuffer readBuffer(final int byteLen) {
         final byte[] data = new byte[byteLen];
-        buffer.get(data);
+        m_buffer.get(data);
         return ByteBuffer.wrap(data);
     }
 
-    @Override
-    public boolean readBoolean() throws IOException {
-        return buffer.get() > 0;
-    }
+    public boolean readBoolean() { return m_buffer.get() > 0; }
 
-    @Override
-    public byte readByte() throws IOException {
-        return buffer.get();
-    }
+    public byte readByte() { return m_buffer.get(); }
 
-    @Override
-    public char readChar() throws IOException {
-        return buffer.getChar();
-    }
+    public double readDouble() { return m_buffer.getDouble(); }
 
-    @Override
-    public double readDouble() throws IOException {
-        return buffer.getDouble();
-    }
+    public float readFloat() { return m_buffer.getFloat(); }
 
-    @Override
-    public float readFloat() throws IOException {
-        return buffer.getFloat();
-    }
+    public void readFully(final byte[] b) { m_buffer.get(b); }
 
-    @Override
-    public void readFully(final byte[] b) throws IOException {
-        buffer.get(b);
-    }
+    public int readInt() { return m_buffer.getInt(); }
 
-    @Override
-    public void readFully(final byte[] b, final int off, final int len) throws IOException {
-        buffer.get(b, off, len);
-    }
+    public long readLong() { return m_buffer.getLong(); }
 
-    @Override
-    public int readInt() throws IOException {
-        return buffer.getInt();
-    }
+    public short readShort() { return m_buffer.getShort(); }
 
-    @Override
-    public String readLine() throws IOException {
-        throw new RuntimeException("FastDeserializer.readLine() not supported.");
-    }
-
-    @Override
-    public long readLong() throws IOException {
-        return buffer.getLong();
-    }
-
-    @Override
-    public short readShort() throws IOException {
-        return buffer.getShort();
-    }
-
-    @Override
-    public String readUTF() throws IOException {
-        throw new RuntimeException("FastDeserializer.readUTF() not supported.");
-    }
-
-    @Override
-    public int readUnsignedByte() throws IOException {
-        throw new RuntimeException("FastDeserializer.readUnsignedByte() not supported.");
-    }
-
-    @Override
-    public int readUnsignedShort() throws IOException {
-        throw new RuntimeException("FastDeserializer.readUnsignedShort() not supported.");
-    }
-
-    @Override
-    public int skipBytes(final int n) throws IOException {
+    public int skipBytes(final int n) {
         for (int i=0; i < n; i++)
-            readByte();
+            m_buffer.get();
         return n;
     }
 
     /**
      * return Current position within the underlying buffer, for self-comparison only.
      */
-    public int getPosition() {
-        return buffer.position();
-    }
+    public int getPosition() { return m_buffer.position(); }
 
     /**
      * Set current position of underlying buffer. Useful only in concert with getPosition()
      * @param pos The position to set to.
      */
-    public void setPosition(int pos) {
-        buffer.position(pos);
-    }
+    public void setPosition(int pos) { m_buffer.position(pos); }
 }

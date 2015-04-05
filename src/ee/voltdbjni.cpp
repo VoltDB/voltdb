@@ -778,7 +778,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuies
  * @param engine_ptr Pointer to a VoltDBEngine instance
  * @param selector Ordinal value from StatisticsSelectorType enum indicating the type of stats to retrieve
  * @param locatorsArray Java array of CatalogIds indicating what set of sources should the statistics be retrieved from.
- * @return Number of result tables, 0 on no results, -1 on failure.
+ * @return Number of result tables, 0 on no results, -1 on failure. NOT the usual int "ERRORCODES"
  */
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(JNIEnv *env, jobject obj,
@@ -788,39 +788,43 @@ Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(JNIEnv *env, jobject obj,
                                                    jlong now) {
     VoltDBEngine *engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    /*
-     * Can't use the standard JNI EE error code here because this method
-     * actually uses that integer to indicate the number of result tables.
-     */
-    int result = -1;
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
     engine->resetReusedResultOutputBuffer();
 
-    /*
-     * Retrieve locators if any
-     */
+    // This method does NOT return the usual EE error codes.
+    // The return value indicates the number of result tables
+    // which can (so far) range as high as 1.
+    // A return value of -1 is intended to be the equivalent of the
+    // normal ERRORCODE_ERROR return value.
+    // It indicates that an exception has been serialized.
+    // A return value of 0 means that the locatorsArray is NULL or empty or invalid.
+    // If it's just empty, the VoltDBEngine spins its wheels a bit validating
+    // the selector to decide whether to flag this as an error, instead of
+    // requesting 0 stats tables.
+
+    // Retrieve locators if any
     int *locators = NULL;
     int numLocators = 0;
     if (locatorsArray != NULL) {
         locators = env->GetIntArrayElements(locatorsArray, NULL);
         if (locators == NULL) {
             env->ExceptionDescribe();
-            return JNI_FALSE;
+            return static_cast<jint>(0);
         }
         numLocators = env->GetArrayLength(locatorsArray);
         if (env->ExceptionCheck()) {
             env->ExceptionDescribe();
             env->ReleaseIntArrayElements(locatorsArray, locators, JNI_ABORT);
-            return JNI_FALSE;
+            return static_cast<jint>(0);
         }
     }
-    const bool interval = jinterval == JNI_TRUE ? true : false;
 
+    int result = 0; // this initial value is never actually used.
     try {
         result = engine->getStats(static_cast<int>(selector), locators,
-                                  numLocators, interval, now);
+                                  numLocators, (jinterval == JNI_TRUE), now);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
@@ -1154,7 +1158,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProce
         }
         ReferenceSerializeInputBE input(data, remaining);
         RecoveryProtoMsg message(&input);
-        return engine->processRecoveryMessage(&message);
+        engine->processRecoveryMessage(&message);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }

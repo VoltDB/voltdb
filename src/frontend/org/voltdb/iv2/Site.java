@@ -239,9 +239,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /**
      * SystemProcedures are "friends" with ExecutionSites and granted
-     * access to internal state via m_systemProcedureContext.
+     * access to internal state via m_sysprocContext.
      */
-    SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
+    PerSiteSystemProcedureExecutionContext m_sysprocContext =
+            new PerSiteSystemProcedureExecutionContext();
+    class PerSiteSystemProcedureExecutionContext implements SystemProcedureExecutionContext
+    {
         @Override
         public Database getDatabase() {
             return m_context.database;
@@ -388,7 +391,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
             return runner.getCatalogProcedure();
         }
-    };
+    }
 
     /** Create a new execution site and the corresponding EE */
     public Site(

@@ -69,13 +69,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     // is the execution site dirty
     protected boolean m_dirty;
 
-    /** Error codes exported for JNI methods. */
-    public static final int ERRORCODE_SUCCESS = 0;
-    public static final int ERRORCODE_ERROR = 1; // just error or not so far.
-    public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
-    public static final int ERRORCODE_NEED_PLAN = 110;
-    public static final int ERRORCODE_PROGRESS_UPDATE = 111;
-    public static final int ERRORCODE_DECODE_BASE64_AND_DECOMPRESS = 112;
+    // Error codes exported for JNI methods.
+    // These two definitions must match the definitions in voltdbipc.cpp
+    protected static final int ERRORCODE_SUCCESS = 0;
+    protected static final int ERRORCODE_ERROR = 1; // just error or not so far.
+
+    protected static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
@@ -120,20 +119,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public boolean getDirtyStatus() {
         return m_dirty;
     }
-
-    /** Utility method to verify return code and throw as required */
-    final protected void checkErrorCode(final int errorCode) {
-        if ((errorCode != ERRORCODE_SUCCESS) && (errorCode != ERRORCODE_NEED_PLAN)) {
-            throwExceptionForError(errorCode);
-        }
-    }
-
-    /**
-     * Utility method to generate an EEXception that can be overridden by
-     * derived classes. This needs to be implemented by each interface
-     * as data is required from the execution engine.
-     */
-    abstract protected void throwExceptionForError(final int errorCode);
 
     @Override
     public void deserializedBytes(final int numBytes) {
@@ -581,7 +566,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param logLevels Levels to set
      * @throws EEException
      */
-    abstract public boolean setLogLevels(long logLevels) throws EEException;
+    abstract public void setLogLevels(long logLevels) throws EEException;
 
     /**
      * This method should be called roughly every second. It allows the EE
@@ -620,13 +605,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Release all undo actions up to and including the specified undo token
      * @param undoToken The undo token.
      */
-    public abstract boolean releaseUndoToken(long undoToken);
+    public abstract void releaseUndoToken(long undoToken);
 
     /**
      * Undo all undo actions back to and including the specified undo token
      * @param undoToken The undo token.
      */
-    public abstract boolean undoUndoToken(long undoToken);
+    public abstract void undoUndoToken(long undoToken);
 
     /**
      * Execute an Export action against the execution engine.
