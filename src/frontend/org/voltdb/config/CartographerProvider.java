@@ -19,12 +19,14 @@ package org.voltdb.config;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+
 import javax.inject.Inject;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.config.topo.TopologyProviderFactory;
+import org.voltdb.config.topo.TopologyProviderFactoryImpl;
 import org.voltdb.iv2.Cartographer;
 
 /**

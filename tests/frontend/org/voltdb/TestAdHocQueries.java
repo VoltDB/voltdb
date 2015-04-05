@@ -62,6 +62,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testProcedureAdhoc() throws Exception {
+        System.out.println("Starting testProcedureAdhoc");
+
         Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
@@ -995,6 +997,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
 
         void setUp() {
+            System.out.println("setUp...");
             m_cluster.startUp();
 
             try {

@@ -13,14 +13,36 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
- */package org.voltdb.config.topo;
+ */
+package org.voltdb.config.topo;
+
+import java.util.List;
 
 import org.json_voltpatches.JSONObject;
+import javax.inject.Inject;
 
 /**
  * @author black
  *
  */
-public interface TopologyProviderFactory {
-    JSONObject getTopo();
+
+public class TopologyProviderFactoryImpl implements TopologyProviderFactory {
+
+    @Inject
+    private List<TopologyProvider> topologyProvidersChain;
+
+    /**
+     * Gets topology information. If rejoining, get it directly from ZK.
+     * Otherwise, try to do the write/read race to ZK on startup. NOTE: override
+     */
+    public JSONObject getTopo() {
+        for (TopologyProvider provider : topologyProvidersChain) {
+            JSONObject topo = provider.getTopo();
+            if (topo != null) {
+                return topo;
+            }
+        }
+        throw new UnsupportedOperationException("Cannot find relevant topology provider");
+    }
+
 }

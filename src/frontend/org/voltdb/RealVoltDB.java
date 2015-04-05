@@ -76,7 +76,6 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -106,6 +105,7 @@ import org.voltdb.config.state.VoltStateManager;
 import org.voltdb.config.state.VoltState;
 import org.voltdb.config.topo.PartitionsInformer;
 import org.voltdb.config.topo.TopologyProviderFactory;
+import org.voltdb.config.topo.TopologyProviderFactoryImpl;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -376,11 +376,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
 
+    @PostConstruct
+    void init() {
+        VoltDB.replaceVoltDBInstanceForTest(this);
+    }
     protected void initialize() {
         logStartupCommand();
         checkStartupCondition();
         setConsoleUtf8Encoding();
-        VoltDB.replaceVoltDBInstanceForTest(this);
         initialize(m_config);//TODO: parameter is not needed
     }
 

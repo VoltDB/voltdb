@@ -48,8 +48,11 @@ import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+
+import com.google.inject.Guice;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -560,6 +563,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         final long NODE_ID = 1;
 
         super.setUp();
+        Guice.createInjector(new MockedVoltDBModule());
+
         VoltDB.instance().readBuildInfo("Test");
         m_warehousedata = new VoltTable(
                 new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),

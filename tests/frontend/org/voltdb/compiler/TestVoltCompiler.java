@@ -40,6 +40,7 @@ import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.ProcInfoData;
+import org.voltdb.VoltDB;
 import org.voltdb.config.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -59,10 +60,13 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.inject.Guice;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -380,6 +384,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testSnapshotSettings() throws IOException {
+        Guice.createInjector(new MockedVoltDBModule());
         String schemaPath = "";
         try {
             final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");

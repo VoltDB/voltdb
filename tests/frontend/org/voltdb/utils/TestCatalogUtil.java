@@ -54,7 +54,10 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.types.ConstraintType;
+
+import com.google.inject.Guice;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -63,6 +66,8 @@ public class TestCatalogUtil extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
+        Guice.createInjector(new MockedVoltDBModule());
+
         catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
         assertNotNull(catalog);
         catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");

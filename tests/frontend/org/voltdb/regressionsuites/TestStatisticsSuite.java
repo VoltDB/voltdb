@@ -45,10 +45,15 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.config.Configuration;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.join.BalancePartitionsStatistics;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
     private final static int SITES = 2;
@@ -808,6 +813,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     }
 
     public void testDRNodeStatistics() throws Exception {
+        Guice.createInjector(new MockedVoltDBModule());
+
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DRNODE STATS TESTS FOR COMMUNITY VERSION");
             return;
@@ -840,6 +847,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     }
 
     public void testDRPartitionStatistics() throws Exception {
+        Guice.createInjector(new MockedVoltDBModule());
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DRPARTITION STATS TESTS FOR COMMUNITY VERSION");
             return;
@@ -883,6 +891,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     }
 
     public void testDRStatistics() throws Exception {
+        Guice.createInjector(new MockedVoltDBModule());
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DR STATS TESTS FOR COMMUNITY VERSION");
             return;

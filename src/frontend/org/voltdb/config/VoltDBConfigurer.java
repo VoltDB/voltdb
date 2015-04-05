@@ -45,6 +45,7 @@ import org.voltdb.config.topo.RejoinTopologyProvider;
 import org.voltdb.config.topo.StartupTopologyProvider;
 import org.voltdb.config.topo.TopologyProvider;
 import org.voltdb.config.topo.TopologyProviderFactory;
+import org.voltdb.config.topo.TopologyProviderFactoryImpl;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.utils.MiscUtils;
 
@@ -67,9 +68,6 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 public class VoltDBConfigurer extends AbstractModule {
     private final VoltLogger log = new VoltLogger("CONFIG");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-
-    @Inject
-    private Injector injector;
 
     @Provides @Inject @Singleton
     public HostMessenger hostMessenger(org.voltdb.config.Configuration m_config, Injector injector) {
@@ -173,7 +171,7 @@ public class VoltDBConfigurer extends AbstractModule {
         bind(DummyEJoinTopologyProvider.class).asEagerSingleton();
         bind(RejoinTopologyProvider.class).asEagerSingleton();
         bind(StartupTopologyProvider.class).asEagerSingleton();
-        bind(TopologyProviderFactory.class).asEagerSingleton();
+        bind(TopologyProviderFactory.class).to(TopologyProviderFactoryImpl.class).asEagerSingleton();
 
         bind(VoltStateManager.class).asEagerSingleton();
         bind(PartitionsInformer.class).asEagerSingleton();
@@ -186,32 +184,7 @@ public class VoltDBConfigurer extends AbstractModule {
         bind(VoltDBInterface.class).to(RealVoltDB.class).asEagerSingleton();
 
 
-        binder().bindListener(Matchers.any(), new TypeListener() {
-            @Override
-            public <I> void hear(final TypeLiteral<I> typeLiteral, TypeEncounter<I> typeEncounter) {
-                final Class<?> target = (Class<?>) typeLiteral.getType();
-                if(HostMessenger.class.isAssignableFrom(target)) {
-                    System.out.print("");
-                }
-                for(final Method m: target.getDeclaredMethods()) {
-                    for(Annotation a:m.getAnnotations()) {
-                        if(a instanceof PostConstruct) {
-                            typeEncounter.register(new InjectionListener<I>() {
-                                @Override
-                                public void afterInjection(Object i) {
-                                    try {
-                                        m.setAccessible(true);
-                                        m.invoke(i);
-                                    } catch (Exception e) {
-                                        throw new RuntimeException("Error calling post-construct method " + target.getSimpleName() + "." + m.getName(), e);//TODO: specialized exception
-                                    }
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-        });
+        binder().bindListener(Matchers.any(), new PostConstructTypeListener());
     }
 
 }

@@ -26,27 +26,49 @@ package org.voltdb.jni;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
+import org.mockito.Mockito;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.LegacyHashinator;
+import org.voltdb.OpsRegistrar;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.RealVoltDB;
+import org.voltdb.SnapshotIOAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.config.Configuration;
+import org.voltdb.config.PostConstructTypeListener;
+import org.voltdb.config.VoltDBConfigurer;
+import org.voltdb.config.topo.TopologyProvider;
+import org.voltdb.config.topo.TopologyProviderFactory;
+import org.voltdb.config.topo.TopologyProviderFactoryImpl;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.test.MockedVoltDBModule;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Provides;
+import com.google.inject.matcher.Matchers;
+import com.google.inject.name.Names;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /**
  * Tests native execution engine JNI interface.
@@ -328,6 +350,7 @@ public class TestExecutionEngine extends TestCase {
     @Override
     protected void setUp() throws Exception {
         super.setUp();
+        Guice.createInjector(new MockedVoltDBModule());
         VoltDB.instance().readBuildInfo("Test");
         sourceEngine =
                 new ExecutionEngineJNI(

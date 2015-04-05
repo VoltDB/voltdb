@@ -89,9 +89,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.inject.Guice;
 
 public class TestClientInterface {
     // mocked objects that CI requires
@@ -129,6 +132,7 @@ public class TestClientInterface {
 
     @BeforeClass
     public static void setUpOnce() throws Exception {
+        Guice.createInjector(new MockedVoltDBModule());
         buildCatalog();
 
     }

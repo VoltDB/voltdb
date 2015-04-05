@@ -33,9 +33,12 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.config.Configuration;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.inject.Guice;
 
 public class TestVoltDB extends TestCase {
 
@@ -193,6 +196,8 @@ public class TestVoltDB extends TestCase {
      * don't yet exist don't render the deployment file invalid.
      */
     public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
+        Guice.createInjector(new MockedVoltDBModule());
+
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
