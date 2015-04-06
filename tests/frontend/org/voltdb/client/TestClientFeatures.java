@@ -103,7 +103,7 @@ public class TestClientFeatures extends TestCase {
     public void testPerCallTimeout() throws Exception {
         CSL csl = new CSL();
 
-        ClientConfig config = new ClientConfig(null, null, csl);
+        ClientConfig config = new ClientConfig(null, null, csl, ClientAuthHashScheme.HASH_SHA1);
         config.setProcedureCallTimeout(500);
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");

@@ -97,13 +97,13 @@ class CompactingTreeUniqueIndex : public TableIndex
         }
     }
 
-    bool addEntry(const TableTuple *tuple)
+    bool addEntryDo(const TableTuple *tuple)
     {
         ++m_inserts;
         return m_entries.insert_unique(std::pair<KeyType, ValueType>(setKeyFromTuple(tuple), tuple->address())).second;
     }
 
-    bool deleteEntry(const TableTuple *tuple)
+    bool deleteEntryDo(const TableTuple *tuple)
     {
         ++m_deletes;
         return m_entries.erase_unique(setKeyFromTuple(tuple)) == 1;
@@ -112,7 +112,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
         assert(originalTuple.address() != destinationTuple.address());
 
@@ -136,12 +136,12 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
 
-    bool checkForIndexChange(const TableTuple* lhs, const TableTuple* rhs) const
+    bool checkForIndexChangeDo(const TableTuple* lhs, const TableTuple* rhs) const
     {
         return  0 != m_cmp(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
-    bool exists(const TableTuple *persistentTuple) const
+    bool existsDo(const TableTuple *persistentTuple) const
     {
         return findTuple(*persistentTuple) != m_entries.end();
     }

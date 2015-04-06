@@ -72,12 +72,12 @@ class CompactingHashUniqueIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
-    bool addEntry(const TableTuple *tuple) {
+    bool addEntryDo(const TableTuple *tuple) {
         ++m_inserts;
         return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
-    bool deleteEntry(const TableTuple *tuple) {
+    bool deleteEntryDo(const TableTuple *tuple) {
         ++m_deletes;
         return m_entries.erase(setKeyFromTuple(tuple));
     }
@@ -85,7 +85,7 @@ class CompactingHashUniqueIndex : public TableIndex
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
         assert(originalTuple.address() != destinationTuple.address());
 
@@ -108,11 +108,11 @@ class CompactingHashUniqueIndex : public TableIndex
 
     bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
 
-    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const {
+    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const {
         return !(m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs)));
     }
 
-    bool exists(const TableTuple *persistentTuple) const
+    bool existsDo(const TableTuple *persistentTuple) const
     {
         return ! findTuple(*persistentTuple).isEnd();
     }
