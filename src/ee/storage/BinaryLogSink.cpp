@@ -37,7 +37,6 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
-    bool hasData = false;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
@@ -54,7 +53,6 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         switch (type) {
         case DR_RECORD_DELETE:
         case DR_RECORD_INSERT: {
-            hasData = true;
             tableHandle = taskInfo.readLong();
             int32_t rowLength = taskInfo.readInt();
             rowData = reinterpret_cast<const char *>(taskInfo.getRawPointer(rowLength));
@@ -97,15 +95,14 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
                 if (tempSequenceNumber < sequenceNumber) {
                     throwFatalException("Found out of order sequencing inside a binary log segment. Expected %jd but found %jd",
                                         (intmax_t)(sequenceNumber + 1), (intmax_t)tempSequenceNumber);
-                } else if (tempSequenceNumber == sequenceNumber && hasData) {
-                    throwFatalException("Found duplicate transactions inside a binary log segment. Expected %jd but found %jd",
-                                        (intmax_t)(sequenceNumber + 1), (intmax_t)tempSequenceNumber);
+                } else if (tempSequenceNumber == sequenceNumber) {
+                    throwFatalException("Found duplicate transaction %jd in a binary log segment",
+                                        (intmax_t)tempSequenceNumber);
                 } else if (tempSequenceNumber > sequenceNumber + 1) {
                     throwFatalException("Found sequencing gap inside a binary log segment. Expected %jd but found %jd",
                                         (intmax_t)(sequenceNumber + 1), (intmax_t)tempSequenceNumber);
                 }
             }
-            hasData = false;
             sequenceNumber = tempSequenceNumber;
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
@@ -118,13 +115,11 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
                                     (intmax_t)sequenceNumber, (intmax_t)tempSequenceNumber);
             }
 
-            // Not setting hasData to false here so that we can detect duplicate transactions.
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;
         }
         case DR_RECORD_TRUNCATE_TABLE: {
-            hasData = true;
             tableHandle = taskInfo.readLong();
             std::string tableName = taskInfo.readTextString();
 
