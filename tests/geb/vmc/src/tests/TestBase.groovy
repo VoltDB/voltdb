@@ -47,6 +47,10 @@ class TestBase extends GebReportingSpec {
     static final int DEFAULT_WINDOW_HEIGHT = 1000
     static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
+    static int waitTime = 30
+    static int numberOfTrials = 10
+    boolean testStatus = false
+
     @Shared boolean firstDebugMessage = true
 
     def setupSpec() { // called once (per test class), before any tests
