@@ -70,17 +70,14 @@ public:
     void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);
 
-    virtual void extendBufferChain(size_t minLength, bool continueTxn = true);
+    virtual void extendBufferChain(size_t minLength);
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
-    virtual size_t beginTransaction(int64_t sequenceNumber, int64_t uniqueId) { return m_uso; }
-    virtual size_t endTransaction(int64_t sequenceNumber, int64_t uniqueId) { return m_uso; }
-
-    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn) { return false; }
+    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
 
     /** Send committed data to the top end. Returns the USO before the BEGIN TXN entry is written, or SIZE_MAX if not written. */
-    size_t commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
