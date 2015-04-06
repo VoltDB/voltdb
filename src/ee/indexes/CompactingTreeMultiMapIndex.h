@@ -158,7 +158,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
             mapIter = m_entries.end();
             mapEndIter = mapIter;
             cursor.m_match.move(NULL);
-            std::cout << "[MultipleTree::moveToKey()] key not find\n";
             return false;
         }
 
@@ -166,7 +165,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
         mapIter = rv;
         mapEndIter = m_entries.upper_bound(tempKey);
         cursor.m_match.move(const_cast<void*>(mapIter->second));
-        std::cout << "[MultipleTree::moveToKey()] key find, Yes!\n";
 
         return true;
     }
