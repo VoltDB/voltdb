@@ -147,19 +147,26 @@ class CompactingTreeMultiMapIndex : public TableIndex
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const
     {
         cursor.m_forward = true;
-        MapConstRange iter_pair = m_entries.equal_range(KeyType(searchKey));
-
         MapConstIterator &mapIter = castToIter(cursor);
         MapConstIterator &mapEndIter = castToEndIter(cursor);
 
-        mapIter = iter_pair.first;
-        mapEndIter = iter_pair.second;
-
-        if (mapIter == mapEndIter) {
+        KeyType tempKey(searchKey);
+        MapConstIterator rv = m_entries.lower_bound(tempKey);
+        KeyType rvKey = rv.key();
+        setPointerValue(tempKey, MAXPOINTER);
+        if (m_cmp(rvKey, tempKey) > 0) {
+            mapIter = m_entries.end();
+            mapEndIter = mapIter;
             cursor.m_match.move(NULL);
+            std::cout << "[MultipleTree::moveToKey()] key not find\n";
             return false;
         }
+
+        // Has the search key
+        mapIter = rv;
+        mapEndIter = m_entries.upper_bound(tempKey);
         cursor.m_match.move(const_cast<void*>(mapIter->second));
+        std::cout << "[MultipleTree::moveToKey()] key find, Yes!\n";
 
         return true;
     }
@@ -175,7 +182,10 @@ class CompactingTreeMultiMapIndex : public TableIndex
     {
         cursor.m_forward = true;
         MapConstIterator &mapIter = castToIter(cursor);
-        mapIter = m_entries.upper_bound(KeyType(searchKey));
+
+        KeyType tempKey(searchKey);
+        setPointerValue(tempKey, MAXPOINTER);
+        mapIter = m_entries.upper_bound(tempKey);
 
         return isEnd(mapIter);
     }
@@ -254,6 +264,11 @@ class CompactingTreeMultiMapIndex : public TableIndex
         TableTuple retval = cursor.m_match;
         MapConstIterator &mapIter = castToIter(cursor);
         MapConstIterator &mapEndIter = castToEndIter(cursor);
+
+        if (mapIter == mapEndIter) {
+            cursor.m_match.move(NULL);
+            return retval;
+        }
 
         mapIter++;
         if (mapIter == mapEndIter) {
