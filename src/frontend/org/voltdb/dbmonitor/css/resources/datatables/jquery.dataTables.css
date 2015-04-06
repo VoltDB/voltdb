@@ -7,6 +7,7 @@ table.dataTable {
   clear: both;
   border-collapse: separate;
   border-spacing: 0;
+  border-left:1px solid #CCCCCC;
   /*
    * Header and footer styles
    */
@@ -16,12 +17,13 @@ table.dataTable {
 }
 table.dataTable thead th,
 table.dataTable tfoot th {
-  font-weight: bold;
+color:#FFFFFF;
+border-right:1px solid #CCCCCC;
 }
 table.dataTable thead th,
 table.dataTable thead td {
   padding: 10px 18px;
-  border-bottom: 1px solid #111111;
+
 }
 table.dataTable thead th:active,
 table.dataTable thead td:active {
@@ -39,23 +41,23 @@ table.dataTable thead .sorting {
   *cursor: hand;
 }
 table.dataTable thead .sorting {
-  background: url("../images/sort_both.png") no-repeat center right;
+  background: url("../images/bg.gif") no-repeat center right;
   background-color:#3f5364;
 }
 table.dataTable thead .sorting_asc {
-  background: url("../images/sort_asc.png") no-repeat center right;
+  background: url("../images/asc.gif") no-repeat center right;
   background-color:#3f5364;
 }
 table.dataTable thead .sorting_desc {
-  background: url("../images/sort_desc.png") no-repeat center right;
+  background: url("../images/desc.gif") no-repeat center right;
   background-color:#3f5364;
 }
 table.dataTable thead .sorting_asc_disabled {
-  background: url("../images/sort_asc_disabled.png") no-repeat center right;
+  background: url("../images/asc.gif") no-repeat center right;
   background-color:#3f5364;
 }
 table.dataTable thead .sorting_desc_disabled {
-  background: url("../images/sort_desc_disabled.png") no-repeat center right;
+  background: url("../images/desc.gif") no-repeat center right;
   background-color:#3f5364;
 }
 table.dataTable tbody tr {
@@ -328,17 +330,15 @@ table.dataTable td {
   padding-top: 0.25em;
 }
 .dataTables_wrapper .dataTables_paginate .paginate_button {
-  box-sizing: border-box;
+	cursor: pointer;
+  *cursor: hand;
   display: inline-block;
+  /*box-sizing: border-box;
   min-width: 1.5em;
   padding: 0.5em 1em;
   margin-left: 2px;
   text-align: center;
-  text-decoration: none !important;
-  cursor: pointer;
-  *cursor: hand;
-  color: #333333 !important;
-  border: 1px solid transparent;
+  text-decoration: none !important;*/
 }
 .dataTables_wrapper .dataTables_paginate .paginate_button.current, .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
   color: #333333 !important;
@@ -366,7 +366,6 @@ table.dataTable td {
 }
 .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
   color: white !important;
-  border: 1px solid #111111;
   background-color: #585858;
   background: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #585858), color-stop(100%, #111111));
   /* Chrome,Safari4+ */
