@@ -550,6 +550,78 @@ public class TestCatalogUtil extends TestCase {
 
     }
 
+    public void testCompileDeploymentAgainstHTTPKerberos() throws Exception {
+        final String noSec =
+            "<?xml version=\"1.0\"?>\n" +
+            "<deployment>\n" +
+            "    <users>\n" +
+            "        <user name='hdfs@CLOUDERA' password='' roles='administrator'/>\n" +
+            "    </users>\n" +
+            "    <cluster hostcount='1' sitesperhost='1' kfactor='0' />\n" +
+            "    <httpd enabled='true'>\n" +
+            "        <jsonapi enabled='true' />\n" +
+            "    </httpd>\n" +
+            "    <export>\n" +
+            "        <configuration enabled='true' stream='test' type='http'>\n" +
+            "            <property name='kerberos.enable'>true</property>\n" +
+            "        </configuration>\n" +
+            "    </export>\n" +
+            "</deployment>\n";
+
+        final String secDisabled =
+                "<?xml version=\"1.0\"?>\n" +
+                "<deployment>\n" +
+                "    <security enabled='false' provider='kerberos'/>\n" +
+                "    <users>\n" +
+                "        <user name='hdfs@CLOUDERA' password='' roles='administrator'/>\n" +
+                "    </users>\n" +
+                "    <cluster hostcount='1' sitesperhost='1' kfactor='0' />\n" +
+                "    <httpd enabled='true'>\n" +
+                "        <jsonapi enabled='true' />\n" +
+                "    </httpd>\n" +
+                "    <export>\n" +
+                "        <configuration enabled='true' stream='test' type='http'>\n" +
+                "            <property name='kerberos.enable'>true</property>\n" +
+                "        </configuration>\n" +
+                "    </export>\n" +
+                "</deployment>\n";
+
+        final String goodDep =
+                "<?xml version=\"1.0\"?>\n" +
+                "<deployment>\n" +
+                "    <security enabled='true' provider='kerberos'/>\n" +
+                "    <users>\n" +
+                "        <user name='hdfs@CLOUDERA' password='' roles='administrator'/>\n" +
+                "    </users>\n" +
+                "    <cluster hostcount='1' sitesperhost='1' kfactor='0' />\n" +
+                "    <httpd enabled='true'>\n" +
+                "        <jsonapi enabled='true' />\n" +
+                "    </httpd>\n" +
+                "    <export>\n" +
+                "        <configuration enabled='true' stream='test' type='http'>\n" +
+                "            <property name='kerberos.enable'>true</property>\n" +
+                "        </configuration>\n" +
+                "    </export>\n" +
+                "</deployment>\n";
+
+        File tmpNoSec = VoltProjectBuilder.writeStringToTempFile(noSec);
+        String depPath = tmpNoSec.getPath();
+        String err = CatalogUtil.compileDeployment(catalog, depPath, false);
+        assertNotNull(err);
+
+        setUp();
+        File tmpSecDisabled = VoltProjectBuilder.writeStringToTempFile(secDisabled);
+        depPath = tmpSecDisabled.getPath();
+        err = CatalogUtil.compileDeployment(catalog, depPath, false);
+        assertNotNull(err);
+
+        setUp();
+        File tmpGoodDep = VoltProjectBuilder.writeStringToTempFile(goodDep);
+        depPath = tmpGoodDep.getPath();
+        err = CatalogUtil.compileDeployment(catalog, depPath, false);
+        assertNull(err);
+    }
+
     public void testCatalogVersionCheck() {
         // non-sensical version shouldn't work
         assertFalse(CatalogUtil.isCatalogVersionValid("nonsense"));
