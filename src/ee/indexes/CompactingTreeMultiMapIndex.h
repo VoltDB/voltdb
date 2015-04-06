@@ -152,11 +152,13 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
         KeyType tempKey(searchKey);
         MapConstIterator rv = m_entries.lower_bound(tempKey);
+        if (isEnd(rv)) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
         KeyType rvKey = rv.key();
         setPointerValue(tempKey, MAXPOINTER);
         if (m_cmp(rvKey, tempKey) > 0) {
-            mapIter = m_entries.end();
-            mapEndIter = mapIter;
             cursor.m_match.move(NULL);
             return false;
         }
