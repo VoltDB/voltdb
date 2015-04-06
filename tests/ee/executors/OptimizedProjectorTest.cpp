@@ -242,7 +242,7 @@ public:
                 return false;
             }
 
-            std::vector<AbstractExpression*> exprs = baselineProjector.exprs();
+            std::vector<AbstractExpression*> exprs = baselineProjector.exprsForTest();
             int dstIdx = 0;
             BOOST_FOREACH(AbstractExpression* expr, exprs) {
                 NValue expectedVal = expr->eval(&srcTuple, NULL);
@@ -301,13 +301,12 @@ public:
         return static_cast<T>(log(static_cast<double>(n)) / log(2.0));
     }
 
-    void runProjectionTest(const std::vector<TypeAndSize>& srcTableTypes,
-                           const std::vector<TypeAndSize>& dstTableTypes,
+    void runProjectionTest(const std::vector<TypeAndSize>& tableTypes,
                            const OptimizedProjector& baselineProjector) {
 
-        TupleSchema* dstSchema = createSchemaEz(dstTableTypes);
+        TupleSchema* dstSchema = createSchemaEz(tableTypes);
 
-        boost::scoped_ptr<voltdb::Table> srcTable(createTableEz(PERSISTENT, srcTableTypes));
+        boost::scoped_ptr<voltdb::Table> srcTable(createTableEz(PERSISTENT, tableTypes));
         fillTable(srcTable.get(), NUM_ROWS);
 
         cout << "\n";
@@ -323,7 +322,7 @@ public:
             }
 
             OptimizedProjector permutedProjector = OptimizedProjector(baselineProjector);
-            permutedProjector.permuteOnIndexBit(numBits, i);
+            permutedProjector.permuteOnIndexBitForTest(numBits, i);
 
             OptimizedProjector optimizedProjector = OptimizedProjector(permutedProjector);
             optimizedProjector.optimize(dstSchema, srcTable->schema());
@@ -343,16 +342,16 @@ public:
 
             std::pair<bool, double> successAndRate;
             successAndRate = runSteps(prefix + "baseline",
-                                                  dstTableTypes, *srcTable,
-                                                  permutedProjector,
-                                                  permutedProjector, 0.0);
-            ASSERT_TRUE_MSG(successAndRate.first, "Baseline src and dst failed to verify");
+                                      tableTypes, *srcTable,
+                                      permutedProjector,
+                                      permutedProjector, 0.0);
+            ASSERT_TRUE_WITH_MESSAGE(successAndRate.first, "Baseline src and dst failed to verify");
 
             successAndRate = runSteps(prefix + "optimized",
-                                      dstTableTypes, *srcTable,
+                                      tableTypes, *srcTable,
                                       optimizedProjector,
                                       permutedProjector, successAndRate.second);
-            ASSERT_TRUE_MSG(successAndRate.first, "Memcpy src and dst failed to verify");
+            ASSERT_TRUE_WITH_MESSAGE(successAndRate.first, "Memcpy src and dst failed to verify");
         }
 
         TupleSchema::freeTupleSchema(dstSchema);
@@ -383,7 +382,7 @@ TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
     }
 
     cout << "\n\n          " << "BIGINT columns:\n";
-    runProjectionTest(bigIntColumns, bigIntColumns, projector);
+    runProjectionTest(bigIntColumns, projector);
 
     std::vector<TypeAndSize> varcharColumns;
     for (int i = 0; i < NUM_COLS; ++i) {
@@ -391,7 +390,7 @@ TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
     }
 
     cout << "\n          " << "VARCHAR columns (inlined):\n";
-    runProjectionTest(varcharColumns, varcharColumns, projector);
+    runProjectionTest(varcharColumns, projector);
 
     std::vector<TypeAndSize> outlinedVarcharColumns;
     for (int i = 0; i < NUM_COLS; ++i) {
@@ -399,7 +398,7 @@ TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
     }
 
     cout << "\n          " << "VARCHAR columns (outlined):\n";
-    runProjectionTest(outlinedVarcharColumns, outlinedVarcharColumns, projector);
+    runProjectionTest(outlinedVarcharColumns, projector);
     BOOST_FOREACH(AbstractExpression* e, exprs) {
         delete e;
     }
@@ -448,6 +447,15 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
     }
 }
 
+void printUsageAndExit(const std::string& progName) {
+
+    cerr << "Usage: " << progName << " [-r <num_rows>] [-c <num_cols>]\n";
+    cerr << "  Note that <num_cols> must be equal to a power of two "
+         << "(for easy permuations).\n";
+    exit(1);
+
+}
+
 int main(int argc, char* argv[]) {
     int opt;
     while ((opt = getopt(argc, argv, "r:c:")) != -1) {
@@ -457,14 +465,17 @@ int main(int argc, char* argv[]) {
             break;
         case 'c': {
             unsigned long val = boost::lexical_cast<unsigned long>(optarg);
+
             // number of column must be a power of two.
-            assert (std::bitset<64>(val).count() == 1);
+            if (std::bitset<64>(val).count() != 1) {
+                printUsageAndExit(argv[0]);
+            }
+
             NUM_COLS = static_cast<int64_t>(val);
             break;
         }
         default:
-            cerr << "Usage: " << argv[0] << " [-r <num_rows>] [-c <num_cols>]\n";
-            exit(1);
+            printUsageAndExit(argv[0]);
         }
     }
 

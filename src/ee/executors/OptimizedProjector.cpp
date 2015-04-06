@@ -65,29 +65,49 @@ class ProjectStep {
 public:
 
     // expression evaluation constructor
-    ProjectStep(AbstractExpression* expr, int dstFieldIndex);
+    ProjectStep(AbstractExpression* expr, int dstFieldIndex)
+        : m_dstFieldIndex(dstFieldIndex)
+        , m_action(EVAL_EXPR)
+        , m_params(expr, dstFieldIndex) {
+        assert (dstFieldIndex >= 0);
+    }
 
     // The memcpy constructor
     ProjectStep(int dstFieldIndex, int srcFieldIndex,
-                size_t dstOffset, size_t srcOffset, size_t numBytes);
+                size_t dstOffset, size_t srcOffset, size_t numBytes)
+        : m_dstFieldIndex(dstFieldIndex)
+        , m_action(MEMCPY)
+        , m_params(dstFieldIndex, srcFieldIndex,
+                   dstOffset, srcOffset, numBytes) {
+        assert (dstFieldIndex >= 0);
+    }
 
     // Perform this step on the destination tuple
     void exec(TableTuple& dstTuple, const TableTuple& srcTuple) const;
 
     // Returns true if this is a memcpy step
-    bool isMemcpy() const;
+    bool isMemcpy() const {
+        return m_action == MEMCPY;
+    }
 
     // Returns true if this is an expression evaluation step
-    bool isEvalExpr() const;
+    bool isEvalExpr() const {
+        return m_action == EVAL_EXPR;
+    }
 
     // Return the expression for an expression eval step.
     // Asserts if this is not an expr eval step.
-    AbstractExpression* expr() const;
+    AbstractExpression* expr() const {
+        assert (m_action == EVAL_EXPR);
+        return m_params.m_evalParams.m_expr;
+    }
 
     // Returns the field index in the destination tuple for this step.
     // For memcpy steps that span multiple contiguous fields, returns the
     // lowest field index.
-    int dstFieldIndex() const;
+    int dstFieldIndex() const {
+        return m_dstFieldIndex;
+    }
 
     // Returns the source index for TVE expr steps, and memcpy steps
     // that have not been coalesced, and -1 otherwise.
@@ -96,17 +116,26 @@ public:
     // For memcpy steps, returns the offset in the dst tuple
     // (first argument to memcpy)
     // asserts if this is not a memcpy step
-    size_t dstOffset() const;
+    size_t dstOffset() const {
+        assert (m_action == MEMCPY);
+        return m_params.m_memcpyParams.m_dstOffset;
+    }
 
     // For memcpy steps, returns the offset in the src tuple
     // (second argument to memcpy)
     // asserts if this is not a memcpy step
-    size_t srcOffset() const;
+    size_t srcOffset() const {
+        assert (m_action == MEMCPY);
+        return m_params.m_memcpyParams.m_srcOffset;
+    }
 
     // For memcpy steps, returns the number of bytes to copy
     // (third argument to memcpy)
     // asserts if this is not a memcpy step
-    size_t numBytes() const;
+    size_t numBytes() const {
+        assert (m_action == MEMCPY);
+        return m_params.m_memcpyParams.m_numBytes;
+    }
 
     // Returns a handy string for this step
     std::string debug() const;
@@ -116,30 +145,41 @@ private:
     enum Action {
         MEMCPY,
         EVAL_EXPR
-    } m_action;
+    };
+
+    struct Memcpy {
+        int m_srcFieldIndex;
+
+        size_t m_dstOffset;
+        size_t m_srcOffset;
+        size_t m_numBytes;
+    };
+
+    struct Eval {
+        AbstractExpression* m_expr;
+    };
 
     union Params {
 
-        Params(AbstractExpression* expr, int dstFieldIndex);
+        Params(AbstractExpression* expr, int dstFieldIndex) {
+            m_evalParams.m_expr = expr;
+        }
 
-        Params(int dstFieldIndex, int srcFieldIndex, size_t dstOffset, size_t srcOffset, size_t numBytes);
+        Params(int dstFieldIndex, int srcFieldIndex,
+               size_t dstOffset, size_t srcOffset, size_t numBytes) {
+            m_memcpyParams.m_srcFieldIndex = srcFieldIndex;
 
-        struct Memcpy {
-            int dstFieldIndex;
-            int srcFieldIndex;
+            m_memcpyParams.m_dstOffset = dstOffset;
+            m_memcpyParams.m_srcOffset = srcOffset;
+            m_memcpyParams.m_numBytes = numBytes;
+        }
 
-            size_t dstOffset;
-            size_t srcOffset;
-            size_t numBytes;
-        } memcpyParams;
-
-        struct Eval {
-            AbstractExpression* expr;
-            int dstFieldIndex;
-        } evalParams;
-
+        Memcpy m_memcpyParams;
+        Eval m_evalParams;
     };
 
+    int m_dstFieldIndex;
+    Action m_action;
     Params m_params;
 };
 
@@ -148,72 +188,31 @@ private:
 // for ordering: fields in source tuple may be referenced more
 // than once, or projection expression may not be a TVE.
 struct StepComparator {
-    bool operator() (const ProjectStep& lhs, const ProjectStep& rhs);
+    bool operator() (const ProjectStep& lhs, const ProjectStep& rhs) {
+        return lhs.dstFieldIndex() < rhs.dstFieldIndex();
+    }
 };
 
-// expression evaluation constructor
-ProjectStep::ProjectStep(AbstractExpression* expr, int dstFieldIndex)
-    : m_action(EVAL_EXPR)
-    , m_params(expr, dstFieldIndex)
-{
-    assert (dstFieldIndex >= 0);
-}
-
-// The memcpy constructor
-ProjectStep::ProjectStep(int dstFieldIndex, int srcFieldIndex,
-                         size_t dstOffset, size_t srcOffset, size_t numBytes)
-    : m_action(MEMCPY)
-    , m_params(dstFieldIndex, srcFieldIndex,
-               dstOffset, srcOffset, numBytes)
-{
-    assert (dstFieldIndex >= 0);
-}
 
 
 void ProjectStep::exec(TableTuple& dstTuple, const TableTuple& srcTuple) const {
     switch (m_action) {
     case MEMCPY: {
-        Params::Memcpy memcpyParams = m_params.memcpyParams;
-        ::memcpy(dstTuple.address() + TUPLE_HEADER_SIZE + memcpyParams.dstOffset,
-                 srcTuple.address() + TUPLE_HEADER_SIZE + memcpyParams.srcOffset,
-                 memcpyParams.numBytes);
+        Memcpy memcpyParams = m_params.m_memcpyParams;
+        ::memcpy(dstTuple.address() + TUPLE_HEADER_SIZE + memcpyParams.m_dstOffset,
+                 srcTuple.address() + TUPLE_HEADER_SIZE + memcpyParams.m_srcOffset,
+                 memcpyParams.m_numBytes);
         break;
     }
     case EVAL_EXPR: {
-        Params::Eval evalParams = m_params.evalParams;
-        dstTuple.setNValue(evalParams.dstFieldIndex,
-                           evalParams.expr->eval(&srcTuple, NULL));
+        Eval evalParams = m_params.m_evalParams;
+        dstTuple.setNValue(m_dstFieldIndex,
+                           evalParams.m_expr->eval(&srcTuple, NULL));
         break;
     }
     default:
         assert(false);
     }
-}
-
-bool ProjectStep::isMemcpy() const {
-    return m_action == MEMCPY;
-}
-
-bool ProjectStep::isEvalExpr() const {
-    return m_action == EVAL_EXPR;
-}
-
-AbstractExpression* ProjectStep::expr() const {
-    assert (m_action == EVAL_EXPR);
-    return m_params.evalParams.expr;
-}
-
-int ProjectStep::dstFieldIndex() const {
-    switch (m_action) {
-    case EVAL_EXPR:
-        return m_params.evalParams.dstFieldIndex;
-    case MEMCPY:
-        return m_params.memcpyParams.dstFieldIndex;
-    default:
-        assert(false);
-    }
-
-    return -1;
 }
 
 int ProjectStep::srcFieldIndex() const {
@@ -229,27 +228,12 @@ int ProjectStep::srcFieldIndex() const {
             return -1;
         }
     case MEMCPY:
-        return m_params.memcpyParams.srcFieldIndex;
+        return m_params.m_memcpyParams.m_srcFieldIndex;
     default:
         assert(false);
     }
 
     return -1;
-}
-
-size_t ProjectStep::dstOffset() const {
-    assert (m_action == MEMCPY);
-    return m_params.memcpyParams.dstOffset;
-}
-
-size_t ProjectStep::srcOffset() const {
-    assert (m_action == MEMCPY);
-    return m_params.memcpyParams.srcOffset;
-}
-
-size_t ProjectStep::numBytes() const {
-    assert (m_action == MEMCPY);
-    return m_params.memcpyParams.numBytes;
 }
 
 std::string ProjectStep::debug() const {
@@ -272,29 +256,6 @@ std::string ProjectStep::debug() const {
     }
 
     return oss.str();
-}
-
-ProjectStep::Params::Params(AbstractExpression* expr, int dstFieldIndex) {
-    evalParams.expr = expr;
-    evalParams.dstFieldIndex = dstFieldIndex;
-}
-
-ProjectStep::Params::Params(int dstFieldIndex, int srcFieldIndex,
-                            size_t dstOffset, size_t srcOffset, size_t numBytes) {
-    memcpyParams.dstFieldIndex = dstFieldIndex;
-    memcpyParams.srcFieldIndex = srcFieldIndex;
-
-    memcpyParams.dstOffset = dstOffset;
-    memcpyParams.srcOffset = srcOffset;
-    memcpyParams.numBytes = numBytes;
-}
-
-// Implement less than.  We want to order by field index in the
-// destination tuple.  Source tuple field index is not appropriate
-// for ordering: fields in source tuple may be referenced more
-// than once, or projection expression may not be a TVE.
-bool StepComparator::operator() (const ProjectStep& lhs, const ProjectStep& rhs) {
-    return lhs.dstFieldIndex() < rhs.dstFieldIndex();
 }
 
 void dumpSteps(const std::string& title, const ProjectStepSet& steps) {
@@ -492,7 +453,7 @@ void OptimizedProjector::exec(TableTuple& dstTuple, const TableTuple& srcTuple) 
     }
 }
 
-void OptimizedProjector::permuteOnIndexBit(int numBits, int bitToFlip) {
+void OptimizedProjector::permuteOnIndexBitForTest(int numBits, int bitToFlip) {
 
     assert (bitToFlip >= 0);
 
@@ -516,7 +477,7 @@ size_t OptimizedProjector::numSteps() const {
     return m_steps->size();
 }
 
-std::vector<AbstractExpression*> OptimizedProjector::exprs() const {
+std::vector<AbstractExpression*> OptimizedProjector::exprsForTest() const {
     std::vector<AbstractExpression*> theExprs;
     BOOST_FOREACH(const ProjectStep& step, *m_steps) {
         theExprs.push_back(step.expr());

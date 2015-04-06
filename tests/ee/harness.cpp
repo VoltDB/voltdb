@@ -172,6 +172,8 @@ int TestSuite::runAll() {
         }
         catch (voltdb::SerializableEEException& eeExc) {
             printf("Uncaught SerializableEEException: %s\n", eeExc.message().c_str());
+            test->printErrors();
+            printf("\n");
             failed_tests++;
         }
 

@@ -102,15 +102,18 @@ public:
     /** Perform the projection on a destination tuple. */
     void exec(TableTuple& dstTuple, const TableTuple& srcTuple) const;
 
-    /** For testing, re-order the target fields so mem copies must be broken up. */
-    void permuteOnIndexBit(int numBits, int bitToFlip);
-
     /** The number of steps needed to perform this projection */
     size_t numSteps() const;
 
-    /** For testing, return an exppression for each step.  (This must be done before optimizing,
-     * before expressions are replaced with mem copies.)*/
-    std::vector<AbstractExpression*> exprs() const;
+    /** For testing, return an expression for each step.  (This must
+     * be done before optimizing, before expressions are replaced with
+     * mem copies.)*/
+    std::vector<AbstractExpression*> exprsForTest() const;
+
+    /** For testing, re-order the target fields so mem copies must be
+     *  broken up. */
+    void permuteOnIndexBitForTest(int numBits, int bitToFlip);
+
 
 private:
 
