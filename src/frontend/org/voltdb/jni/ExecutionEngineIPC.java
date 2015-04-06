@@ -35,14 +35,13 @@ import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
-
-import com.google_voltpatches.common.base.Charsets;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -442,7 +441,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 final int reasonLength = messageBuffer.getInt();
                 final byte reasonBytes[] = new byte[reasonLength];
                 messageBuffer.get(reasonBytes);
-                message = new String(reasonBytes, Charsets.UTF_8);
+                message = new String(reasonBytes, Constants.UTF8ENCODING);
 
                 final int filenameLength = messageBuffer.getInt();
                 final byte filenameBytes[] = new byte[filenameLength];
@@ -544,19 +543,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          * Read a short-length-prefixed string from the wire.
          */
         String readShortString() throws IOException
-        { return new String(readByteArray(readShort()), Charsets.UTF_8); }
+        { return new String(readByteArray(readShort()), Constants.UTF8ENCODING); }
 
         /**
          * Read an int-length-prefixed string from the wire.
          */
         String readIntSizedString() throws IOException
-        { return new String(readIntSizedByteArray(), Charsets.UTF_8); }
-
-        /**
-         * Read a string from the wire.
-         */
-        String readString(int size) throws IOException
-        { return new String(readByteArray(size), Charsets.UTF_8); }
+        { return new String(readIntSizedByteArray(), Constants.UTF8ENCODING); }
 
         /**
          * Read an int-length-prefixed ByteBuffer from the wire.
@@ -690,6 +683,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
     }
 
+    private static void putString(ByteBuffer data, String string) {
+        assert(string != null);
+        byte[] bytes = string.getBytes(Constants.UTF8ENCODING);
+        data.putInt(bytes.length);
+        data.put(bytes);
+    }
+
     /**
      * the abstract api assumes construction initializes but here initialization
      * is just another command.
@@ -716,8 +716,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
         m_data.putInt(createDrReplicatedStream ? 1 : 0);
-        m_data.putInt((short)hostname.length());
-        m_data.put(hostname.getBytes(Charsets.UTF_8));
+        putString(m_data, hostname);
         sendCommandForResponse();
         updateHashinator(hashinatorConfig);
     }
@@ -741,7 +740,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public void updateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
         m_data.clear();
-        byte[] catalogBytes = catalogDiffs.getBytes(Charsets.UTF_8);
+        byte[] catalogBytes = catalogDiffs.getBytes(Constants.UTF8ENCODING);
         if (m_data.capacity() < catalogBytes.length + 100) {
             m_data = ByteBuffer.allocate(catalogBytes.length + 100);
         }
@@ -960,7 +959,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
         m_data.putLong(undoQuantumToken);
-        m_data.put(predicates); // predicates
+        m_data.put(predicates);
         sendCommandForResponse();
         try {
             return m_connection.readBoolean();
@@ -1014,12 +1013,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(syncAction ? 1 : 0);
         m_data.putLong(ackOffset);
         m_data.putLong(seqNo);
-        if (tableSignature == null) {
-            m_data.putInt(-1);
-        } else {
-            m_data.putInt(tableSignature.getBytes(Charsets.UTF_8).length);
-            m_data.put(tableSignature.getBytes(Charsets.UTF_8));
-        }
+        putString(m_data, tableSignature);
         sendCommandForResponse();
         try {
             long result_offset = m_connection.readLong();
@@ -1039,12 +1033,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         try {
             m_data.clear();
             m_data.putInt(Commands.GetUSOs.m_id);
-            if (tableSignature == null) {
-                m_data.putInt(-1);
-            } else {
-                m_data.putInt(tableSignature.getBytes(Charsets.UTF_8).length);
-                m_data.put(tableSignature.getBytes(Charsets.UTF_8));
-            }
+            putString(m_data, tableSignature);
             sendCommandForResponse();
             long[] retval = new long[2];
             retval[0] = m_connection.readLong();
