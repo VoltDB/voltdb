@@ -856,11 +856,18 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
         client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
 
+        // The subquery select WAGE from R1 limit 4 offset 1)) returns the empty set
+        // The expression WAGE in ( select WAGE from R1 limit 4 offset 1))
+        // Evaluates to FALSE
+        //        vt = client.callProcedure("@AdHoc",
+        //                "select ID from R2 where (WAGE in " +
+        //                "( select WAGE from R1 limit 4 offset 1)) is null").getResults()[0];
+        //        System.out.println(vt.toString());
+        //        validateTableOfLongs(vt, new long[][] {{200}, {203}});
         vt = client.callProcedure("@AdHoc",
-                "select ID from R2 where (WAGE in " +
-                "( select WAGE from R1 limit 4 offset 1)) is null;").getResults()[0];
-        System.out.println(vt.toString());
-        validateTableOfLongs(vt, new long[][] {{200}, {203}});
+                "select ID from R2 where not (WAGE in " +
+                "( select WAGE from R1 limit 4 offset 1)) order by ID").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}, {101}, {102}, {103}, {104}, {105}});
 
         // The inner_expr is empty => TRUE
         vt = client.callProcedure("@AdHoc",

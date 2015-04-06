@@ -660,7 +660,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.columnName = child.attributes.get("alias");
             assert(colExpr instanceof SelectSubqueryExpression);
             SelectSubqueryExpression scalarSubqueryExpr = (SelectSubqueryExpression) colExpr;
-            if (scalarSubqueryExpr.getSubqueryNode().getOutputSchema().size() != 1) {
+            if (scalarSubqueryExpr.getSubqueryScan().getOutputSchema().size() != 1) {
                 throw new PlanningErrorException("Scalar subquery can have only one output column");
             }
             col.tableName = scalarSubqueryExpr.getSubqueryScan().getTableName();
