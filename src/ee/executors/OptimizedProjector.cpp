@@ -183,7 +183,7 @@ private:
     Params m_params;
 };
 
-// Implement less than.  We want to order by field index in the
+// Implement less-than.  We want to order by field index in the
 // destination tuple.  Source tuple field index is not appropriate
 // for ordering: fields in source tuple may be referenced more
 // than once, or projection expression may not be a TVE.
@@ -345,13 +345,16 @@ static ProjectStep squishSteps(const ProjectStepSet& steps) {
         return *(steps.begin());
     }
 
-    size_t dstOffset = steps.begin()->dstOffset();
-    size_t srcOffset = steps.begin()->srcOffset();
-    size_t numBytes = (steps.rbegin()->dstOffset() - steps.begin()->dstOffset()) + steps.rbegin()->numBytes();
+    const ProjectStep &lastStep = *(steps.rbegin());
+    const ProjectStep &firstStep = *(steps.begin());
 
+    size_t dstOffsetDiff = (lastStep.dstOffset() - firstStep.dstOffset());
+    assert (dstOffsetDiff == (lastStep.srcOffset() - firstStep.srcOffset()));
 
+    size_t numBytes = dstOffsetDiff + lastStep.numBytes();
 
-    return ProjectStep(steps.begin()->dstFieldIndex(), -1, dstOffset, srcOffset, numBytes);
+    return ProjectStep(firstStep.dstFieldIndex(), -1,
+                       firstStep.dstOffset(), firstStep.srcOffset(), numBytes);
 }
 
 // Given a set of steps where all the TVEs have been converted to mem copies,

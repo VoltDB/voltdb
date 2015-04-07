@@ -29,9 +29,11 @@
 #include <iomanip>
 #include <set>
 
-#include "boost/timer.hpp"
 #include "boost/format.hpp"
 #include "boost/lexical_cast.hpp"
+#include "boost/make_shared.hpp"
+#include "boost/shared_ptr.hpp"
+#include "boost/timer.hpp"
 
 #include "harness.h"
 
@@ -58,163 +60,171 @@ static int64_t NUM_ROWS = 10000;
 static int64_t NUM_COLS = 32;
 
 
+static const CatalogId DATABASE_ID = 100;
+
+// Declarations in this namespace should someday become
+// more widely visible for use in other tests.
+namespace eetest {
+
+enum TypeAndSize {
+    TINYINT,
+    SMALLINT,
+    INTEGER,
+    BIGINT,
+    DOUBLE,
+    VARCHAR_INLINE,
+    VARCHAR_OUTLINE,
+    TIMESTAMP,
+    DECIMAL,
+    VARBINARY_INLINE,
+    VARBINARY_OUTLINE
+};
+
+
+static ValueType toValueType(TypeAndSize tas) {
+    switch (tas) {
+    case TINYINT: return VALUE_TYPE_TINYINT;
+    case SMALLINT: return VALUE_TYPE_SMALLINT;
+    case INTEGER: return VALUE_TYPE_INTEGER;
+    case BIGINT: return VALUE_TYPE_BIGINT;
+    case VARCHAR_INLINE: return VALUE_TYPE_VARCHAR;
+    case VARCHAR_OUTLINE: return VALUE_TYPE_VARCHAR;
+    case VARBINARY_INLINE: return VALUE_TYPE_VARBINARY;
+    case VARBINARY_OUTLINE: return VALUE_TYPE_VARBINARY;
+    case TIMESTAMP: return VALUE_TYPE_TIMESTAMP;
+    case DECIMAL: return VALUE_TYPE_DECIMAL;
+    default:
+        break;
+    }
+
+    return VALUE_TYPE_INVALID;
+}
+
+static vector<ValueType> toValueType(const vector<TypeAndSize> &tasVec) {
+    vector<ValueType> valTypes;
+    BOOST_FOREACH(TypeAndSize tas, tasVec) {
+        valTypes.push_back(toValueType(tas));
+    }
+
+    return valTypes;
+}
+
+
+static TupleSchema* createSchemaEz(const std::vector<TypeAndSize> &types) {
+    std::vector<int32_t> sizes;
+    BOOST_FOREACH(TypeAndSize tas, types) {
+        switch (tas) {
+        case VARCHAR_INLINE:
+        case VARBINARY_INLINE:
+            // arbitrarily choose the size here.
+            sizes.push_back(8);
+            break;
+        case VARCHAR_OUTLINE:
+        case VARBINARY_OUTLINE:
+            // arbitrarily choose the size here.
+            sizes.push_back(256);
+            break;
+        default:
+            sizes.push_back(NValue::getTupleStorageSize(toValueType(tas)));
+        }
+    }
+
+    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(toValueType(types), sizes, std::vector<bool>(sizes.size()));
+    return schema;
+}
+
+enum TableType { TEMP, PERSISTENT };
+
+static voltdb::Table* createTableEz(TableType tableType, const std::vector<TypeAndSize> &types) {
+
+    const std::string tableName = "a_table";
+
+    TupleSchema *schema = createSchemaEz(types);
+    std::vector<std::string> names;
+    int i = 0;
+    BOOST_FOREACH(TypeAndSize tas, types) {
+        (void)tas;
+        std::string name = "C";
+        name += static_cast<char>(i);
+        names.push_back(name);
+        ++i;
+    }
+
+    voltdb::Table* tbl = NULL;
+    if (tableType == PERSISTENT) {
+        char signature[20];
+        tbl = voltdb::TableFactory::getPersistentTable(DATABASE_ID,
+                                                       tableName,
+                                                       schema,
+                                                       names,
+                                                       signature);
+    }
+    else {
+        tbl = voltdb::TableFactory::getTempTable(DATABASE_ID,
+                                                 tableName,
+                                                 schema,
+                                                 names,
+                                                 NULL);
+    }
+
+    return tbl;
+}
+
+static std::string randomString(int maxLen) {
+    static const std::string chars =
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789~`!@#$%^&*()-=_+,./<>?;':\"[]\{}|";
+
+    std::ostringstream oss;
+    int len = rand() % maxLen;
+    for (int i = 0; i < len; ++i) {
+        oss << chars[rand() % chars.length()];
+    }
+
+    return oss.str();
+}
+
+static void fillTable(Table* tbl, int64_t numRows) {
+    const TupleSchema* schema = tbl->schema();
+    StandAloneTupleStorage storage(schema);
+    TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
+
+    for (int64_t i = 0; i < numRows; ++i) {
+        int numCols = schema->columnCount();
+        for (int j = 0; j < numCols; ++j) {
+            uint32_t length = schema->getColumnInfo(j)->length;
+            ValueType vt = schema->columnType(j);
+            NValue nval;
+            switch (vt) {
+            case VALUE_TYPE_BIGINT: {
+                nval = ValueFactory::getBigIntValue(i * 10000 + j);
+                break;
+            }
+            case VALUE_TYPE_VARCHAR:
+                nval = ValueFactory::getTempStringValue(randomString(length));
+                break;
+            case VALUE_TYPE_VARBINARY:
+                nval = ValueFactory::getTempBinaryValue(randomString(length));
+                break;
+            default:
+                assert(false);
+            }
+
+            srcTuple.setNValue(j, nval);
+        }
+
+        tbl->insertTuple(srcTuple);
+    }
+}
+
+} // end namespace eetest
+
+using namespace eetest;
+
 class OptimizedProjectorTest : public Test
 {
 public:
-
-    static CatalogId databaseId() {
-        return DATABASE_ID;
-    }
-
-    enum TypeAndSize {
-        TINYINT,
-        SMALLINT,
-        INTEGER,
-        BIGINT,
-        DOUBLE,
-        VARCHAR_INLINE,
-        VARCHAR_OUTLINE,
-        TIMESTAMP,
-        DECIMAL,
-        VARBINARY_INLINE,
-        VARBINARY_OUTLINE
-    };
-
-    static ValueType toValueType(TypeAndSize tas) {
-        switch (tas) {
-        case TINYINT: return VALUE_TYPE_TINYINT;
-        case SMALLINT: return VALUE_TYPE_SMALLINT;
-        case INTEGER: return VALUE_TYPE_INTEGER;
-        case BIGINT: return VALUE_TYPE_BIGINT;
-        case VARCHAR_INLINE: return VALUE_TYPE_VARCHAR;
-        case VARCHAR_OUTLINE: return VALUE_TYPE_VARCHAR;
-        case VARBINARY_INLINE: return VALUE_TYPE_VARBINARY;
-        case VARBINARY_OUTLINE: return VALUE_TYPE_VARBINARY;
-        case TIMESTAMP: return VALUE_TYPE_TIMESTAMP;
-        case DECIMAL: return VALUE_TYPE_DECIMAL;
-        default:
-            break;
-        }
-
-        return VALUE_TYPE_INVALID;
-    }
-
-    static vector<ValueType> toValueType(const vector<TypeAndSize>  tasVec) {
-        vector<ValueType> valTypes;
-        BOOST_FOREACH(TypeAndSize tas, tasVec) {
-            valTypes.push_back(toValueType(tas));
-        }
-
-        return valTypes;
-    }
-
-    static TupleSchema* createSchemaEz(const std::vector<TypeAndSize> &types) {
-        std::vector<int32_t> sizes;
-        BOOST_FOREACH(TypeAndSize tas, types) {
-            switch (tas) {
-            case VARCHAR_INLINE:
-            case VARBINARY_INLINE:
-                // arbitrarily choose the size here.
-                sizes.push_back(8);
-                break;
-            case VARCHAR_OUTLINE:
-            case VARBINARY_OUTLINE:
-                // arbitrarily choose the size here.
-                sizes.push_back(256);
-                break;
-            default:
-                sizes.push_back(NValue::getTupleStorageSize(toValueType(tas)));
-            }
-        }
-
-        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(toValueType(types), sizes, std::vector<bool>(sizes.size()));
-        return schema;
-    }
-
-    enum TableType { TEMP, PERSISTENT };
-
-    static voltdb::Table* createTableEz(TableType tableType, const std::vector<TypeAndSize> &types) {
-
-        const std::string tableName = "a_table";
-
-        TupleSchema *schema = createSchemaEz(types);
-        std::vector<std::string> names;
-        int i = 0;
-        BOOST_FOREACH(TypeAndSize tas, types) {
-            (void)tas;
-            std::string name = "C";
-            name += static_cast<char>(i);
-            names.push_back(name);
-            ++i;
-        }
-
-        voltdb::Table* tbl = NULL;
-        if (tableType == PERSISTENT) {
-            char signature[20];
-            tbl = voltdb::TableFactory::getPersistentTable(databaseId(),
-                                                           tableName,
-                                                           schema,
-                                                           names,
-                                                           signature);
-        }
-        else {
-            tbl = voltdb::TableFactory::getTempTable(databaseId(),
-                                                     tableName,
-                                                     schema,
-                                                     names,
-                                                     NULL);
-        }
-
-        return tbl;
-    }
-
-    std::string randomString(int maxLen) {
-        static const std::string chars =
-            "abcdefghijklmnopqrstuvwxyz"
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "0123456789~`!@#$%^&*()-=_+,./<>?;':\"[]\{}|";
-
-        std::ostringstream oss;
-        int len = rand() % maxLen;
-        for (int i = 0; i < len; ++i) {
-            oss << chars[rand() % chars.length()];
-        }
-
-        return oss.str();
-    }
-
-    void fillTable(Table* tbl, int64_t numRows) {
-        const TupleSchema* schema = tbl->schema();
-        StandAloneTupleStorage storage(schema);
-        TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
-
-        for (int64_t i = 0; i < numRows; ++i) {
-            int numCols = schema->columnCount();
-            for (int j = 0; j < numCols; ++j) {
-                uint32_t length = schema->getColumnInfo(j)->length;
-                ValueType vt = schema->columnType(j);
-                NValue nval;
-                switch (vt) {
-                case VALUE_TYPE_BIGINT: {
-                    nval = ValueFactory::getBigIntValue(i * 10000 + j);
-                    break;
-                }
-                case VALUE_TYPE_VARCHAR:
-                    nval = ValueFactory::getTempStringValue(randomString(length));
-                    break;
-                case VALUE_TYPE_VARBINARY:
-                    nval = ValueFactory::getTempBinaryValue(randomString(length));
-                    break;
-                default:
-                    assert(false);
-                }
-
-                srcTuple.setNValue(j, nval);
-            }
-
-            tbl->insertTuple(srcTuple);
-        }
-    }
 
     void projectFields(Table* srcTable, Table* dstTable,
                        const OptimizedProjector& projector) {
@@ -357,28 +367,36 @@ public:
         TupleSchema::freeTupleSchema(dstSchema);
         cout << "            ";
     }
-
-private:
-    static const CatalogId DATABASE_ID = 100;
 };
+
+template<class T>
+std::vector<T*> toRawPtrVector(const std::vector<boost::shared_ptr<T> > &vec) {
+    std::vector<T*> retVec;
+    BOOST_FOREACH(const boost::shared_ptr<T> &elem, vec) {
+        retVec.push_back(elem.get());
+    }
+
+    return retVec;
+}
 
 TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
 {
-    std::vector<TypeAndSize> bigIntColumns;
+    using namespace boost;
 
+    std::vector<TypeAndSize> bigIntColumns;
     for (int i = 0; i < NUM_COLS; ++i) {
         bigIntColumns.push_back(BIGINT);
     }
 
     // Describe a way to move fields from one tuple to another
-    vector<TupleValueExpression*> exprs;
+    std::vector<shared_ptr<TupleValueExpression> > exprs(NUM_COLS);
     for (int i = 0; i < NUM_COLS; ++i) {
-        exprs.push_back(new TupleValueExpression(0, i));
+        exprs[i] = make_shared<TupleValueExpression>(0, i);
     }
 
     OptimizedProjector projector;
-    BOOST_FOREACH(TupleValueExpression* e, exprs) {
-        projector.insertStep(e, e->getColumnId());
+    BOOST_FOREACH(const shared_ptr<TupleValueExpression> &e, exprs) {
+        projector.insertStep(e.get(), e->getColumnId());
     }
 
     cout << "\n\n          " << "BIGINT columns:\n";
@@ -399,14 +417,12 @@ TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
 
     cout << "\n          " << "VARCHAR columns (outlined):\n";
     runProjectionTest(outlinedVarcharColumns, projector);
-    BOOST_FOREACH(AbstractExpression* e, exprs) {
-        delete e;
-    }
 }
 
 TEST_F(OptimizedProjectorTest, ProjectNonTVE)
 {
-    std::vector<AbstractExpression*> exprs;
+    using namespace boost;
+    std::vector<shared_ptr<AbstractExpression> > exprs(NUM_COLS);
 
     // Create a expr vector for a projection like
     // (for NUM_COLS == 4)
@@ -417,19 +433,19 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
         if (i == NUM_COLS / 2) {
             TupleValueExpression* lhs = new TupleValueExpression(0, i - 1);
             TupleValueExpression* rhs = new TupleValueExpression(0, i);
-            OperatorExpression<OpPlus>* plus =
-                new OperatorExpression<OpPlus>(EXPRESSION_TYPE_OPERATOR_PLUS, lhs, rhs);
-            exprs.push_back(plus);
+            shared_ptr<AbstractExpression> plus(new OperatorExpression<OpPlus>(EXPRESSION_TYPE_OPERATOR_PLUS, lhs, rhs));
+            exprs[i] = plus;
         }
         else {
-            exprs.push_back(new TupleValueExpression(0, i));
+            shared_ptr<AbstractExpression> tve(new TupleValueExpression(0, i));
+            exprs[i] = tve;
         }
     }
 
     std::vector<TypeAndSize> types(NUM_COLS, BIGINT);
     TupleSchema* schema = createSchemaEz(types);
 
-    OptimizedProjector projector(exprs);
+    OptimizedProjector projector(toRawPtrVector(exprs));
     projector.optimize(schema, schema);
 
     // There should be at most 3 steps. The plus operator in the
@@ -438,13 +454,10 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
     //
     //   [memcpy 2 fields]    ADD   [memcpy 1 field]
 
-    size_t expectedNumSteps = std::min(int64_t(3), NUM_COLS);
+    size_t expectedNumSteps = std::min(::int64_t(3), NUM_COLS);
     ASSERT_EQ(expectedNumSteps, projector.numSteps());
 
     TupleSchema::freeTupleSchema(schema);
-    BOOST_FOREACH(AbstractExpression* e, exprs) {
-        delete e;
-    }
 }
 
 void printUsageAndExit(const std::string& progName) {
