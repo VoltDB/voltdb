@@ -83,6 +83,9 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         htmlOptions				{ $("option", text:"HTML") }
         csvOptions				{ $("option", text:"CSV") }
         monospaceOptions		{ $("option", text:"Monospace") }
+
+        // for view
+        checkview		{ $("#tabMain > ul > li.active > a")}
         
         //result
         resultHtml		{ $("#resultHtml") }

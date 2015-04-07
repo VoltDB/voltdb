@@ -35,6 +35,7 @@ class SchemaPageDdlSourceTab extends SchemaPage {
         sourceText  { mainContent.find('.dataBlockContent') }
         documentationLink 	{ $("#iconDoc") }
         generatedbytxt		{$("#catalogContainer > div.documentation > span")}
+        refreshddl		{ $("#MenuCatalog > div > button", text:"Refresh")}
     }
     static at = {
         ddlTab.displayed

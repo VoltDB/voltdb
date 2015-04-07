@@ -63,6 +63,7 @@ class SchemaPageSchemaTab extends SchemaPage {
         expandedlistbox { $(class:"invert")}
         expandedlist1   { $(class:"togglex",1)}
         expandedlist2   { $(class:"togglex",2)}
+        refreshtableschema      { $("#MenuCatalog > div > button", text:"Refresh")}
 
 
         header          	{ module Header }

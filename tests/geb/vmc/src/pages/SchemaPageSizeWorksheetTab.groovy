@@ -62,6 +62,7 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         searchName			{ $("#sizetable > thead > tr.tablesorter-filter-row > td:nth-child(1) > input") }
         documentationLink 	{ $("#iconDoc") }
         generatedbytxt		{$("#catalogContainer > div.documentation > span")}
+        refreshtableworksheet   { $("#MenuCatalog > div > button", text:"Refresh")}
 
     }
     static at = {
