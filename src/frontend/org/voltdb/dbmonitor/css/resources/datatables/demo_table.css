@@ -32,12 +32,13 @@
 
 .dataTables_wrapper {
 	position: relative;
-    top: -40px;
-	min-height: 100px;
+	min-height: 120px;
 	clear: both;
 	_height: 302px;
 	zoom: 1; /* Feeling sorry for IE */
 }
+
+.drWrap { top: -40px;min-height: 100px!important;}
 
 .dataTables_processing {
 	position: absolute;
