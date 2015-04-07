@@ -1074,6 +1074,9 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 .paging_extStyleLF { width: 162px!important; margin-bottom:10px;}
 .navigationLabel {display: inline!important; margin: 5px!important;}
 .paginate_enabled_next.paginate_button, .paginate_disabled_next.paginate_button {float: right!important;}
+#txtDrReplica { cursor: default;}
+.warningDr a{color:#ea151d;}
+.warningDr a:hover{color:#111;}
 
 /****DR Ends*******/
 
