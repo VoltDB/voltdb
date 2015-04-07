@@ -45,8 +45,6 @@ class AdminSecurityUser extends TestBase {
 	def "Admin Page: Add users in security"() {
 		testStatus 				= false
 		int count 				= 0
-		int countForFiveTrials	= 0
-		int five 				= 5
 		loopStatus 				= false
 		boolean created 		= false
 		boolean login 			= false 
@@ -107,13 +105,13 @@ class AdminSecurityUser extends TestBase {
 				
 				if(login == false) {
 					when: 'logout button is clicked and popup is displayed'
-					waitFor(30) {
+					waitFor(waitTime) {
 						page.header.logout.click()
 						page.header.logoutPopupOkButton.isDisplayed()
 					}
 				
 					then: 'logout is confirmed and popup is removed'
-					waitFor(30) {
+					waitFor(waitTime) {
 						page.header.logoutPopupOkButton.click()
 						!page.header.logoutPopupOkButton.isDisplayed()
 					}
@@ -140,13 +138,13 @@ class AdminSecurityUser extends TestBase {
 			
 					// LOGOUT AND LOGIN AS admin
 					when: 'logout button is clicked and popup is displayed'
-					waitFor(30) {
+					waitFor(waitTime) {
 						page.header.logout.click()
 						page.header.logoutPopupOkButton.isDisplayed()
 					}
 				
 					then: 'logout is confirmed and popup is removed'
-					waitFor(30) {
+					waitFor(waitTime) {
 						page.header.logoutPopupOkButton.click()
 						!page.header.logoutPopupOkButton.isDisplayed()
 					}
