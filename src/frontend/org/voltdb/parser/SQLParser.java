@@ -1245,6 +1245,10 @@ public class SQLParser extends SQLPatternFactory
             throw new SQLParser.Exception(msg);
         }
 
+		if (filename.startsWith("~")) {
+			filename = filename.replace("~", System.getProperty("user.home"));
+		}
+        
         return new FileInfo(parentContext, option, filename);
     }
     /**
