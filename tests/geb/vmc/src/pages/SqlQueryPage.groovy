@@ -113,6 +113,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Views (by clicking the "Views" tab).
      */
+
     def showViews() {
         clickToDisplay(viewsTab, viewsNames)
     }

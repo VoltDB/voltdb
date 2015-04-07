@@ -94,6 +94,7 @@ class SchemaPageSchemaTab extends SchemaPage {
      * headers returned: converted to lower case, to upper case, or as-is.
      * @return the contents of the "Schema" table, listed by row.
      */
+
     List<List<String>> getSchemaTableByRow(ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
         return getTableByRow(schemaTable, colHeaderFormat)
     }

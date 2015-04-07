@@ -243,6 +243,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * click SQL query to go to SQL query
      */
+
     def boolean gotoSqlQuery() {
         header.tabSQLQuery.click()
     }

@@ -191,7 +191,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         // showHideData.displayed
     }
 
-
     /**
      * Returns the count, as displayed (possibly in parentheses) in the
      * specified Navigator element; e.g., if "(3)" is displayed, then 3 is

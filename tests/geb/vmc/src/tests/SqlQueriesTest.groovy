@@ -1128,5 +1128,4 @@ class SqlQueriesTest extends TestBase {
     }
 
 
-
 }

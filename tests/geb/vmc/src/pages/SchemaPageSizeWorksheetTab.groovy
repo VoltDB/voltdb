@@ -65,6 +65,7 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         refreshtableworksheet   { $("#MenuCatalog > div > button", text:"Refresh")}
 
     }
+
     static at = {
         sizeTab.displayed
         sizeTab.attr('class') == 'active'
