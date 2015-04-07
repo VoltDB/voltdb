@@ -196,7 +196,6 @@ class AdminPage extends VoltDBManagementCenterPage {
      * currently exists (displayed).
      * @return true if the "Directories" area currently exists.
      */
-    
     def boolean doesDirectoriesExist() {
         return directories.displayed
     }

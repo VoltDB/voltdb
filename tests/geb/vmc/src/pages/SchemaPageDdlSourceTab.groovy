@@ -49,6 +49,7 @@ class SchemaPageDdlSourceTab extends SchemaPage {
      * "Schema" page (or tab).
      * @return the displayed DDL Source (as a String).
      */
+
     def String getDdlSource() {
         return sourceText.first().text()
     }

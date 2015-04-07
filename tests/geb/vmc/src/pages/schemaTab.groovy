@@ -128,7 +128,6 @@ class schemaTab extends Module{
         //for writing query
         clicksqlquery{$("#navSqlQuery > a")}
 
-
         //Procedure & SQL
         clickproceduresqlbtn    {$("#p-nav > a")}
         proceduresqlTitle       {$("#p > div > div.dataBlockHeading > h1")}

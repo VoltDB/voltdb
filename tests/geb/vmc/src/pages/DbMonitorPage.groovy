@@ -184,6 +184,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         header          		        { module Header }
         footer          		        { module Footer }
     }
+
     static at = {
         dbMonitorTab.displayed
         dbMonitorTab.attr('class') == 'active'

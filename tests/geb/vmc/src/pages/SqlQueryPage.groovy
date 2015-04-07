@@ -106,6 +106,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Tables (by clicking the "Tables" tab).
      */
+
     def showTables() {
         clickToDisplay(tablesTab, tablesNames)
     }

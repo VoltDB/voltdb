@@ -251,6 +251,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * click schema tab to go to Schema tab
      */
+
     def boolean gotoSchemaSubTab() {
         schemaSubLink.click()
     }
