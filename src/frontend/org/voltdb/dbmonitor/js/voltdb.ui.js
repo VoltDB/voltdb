@@ -1087,6 +1087,8 @@ var loadPage = function (serverName, portid) {
 
             $("#tblDrMAster").find(".sorting_asc").removeClass("sorting_asc");
 
+            $("#drMasterSection").find(".pagination").hide();
+
 
         });
         $('#filterStoredProc1').on('keyup', function () {

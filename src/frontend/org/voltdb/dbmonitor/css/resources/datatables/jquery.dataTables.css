@@ -276,7 +276,7 @@ table.dataTable td.dt-left {
 table.dataTable th.dt-center,
 table.dataTable td.dt-center,
 table.dataTable td.dataTables_empty {
-    text-align: center;
+    text-align: left;
 }
 
 table.dataTable th.dt-right,
