@@ -107,6 +107,7 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
+import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -567,6 +568,20 @@ public abstract class CatalogUtil {
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
+                // Only allow kerberos.enable on HTTP export when VoltDB is in Kerberos mode
+                if (deployment.getExport() != null) {
+                    for (ExportConfigurationType type : deployment.getExport().getConfiguration()) {
+                        if (type.getType() == ServerExportEnum.HTTP && type.isEnabled()) {
+                            for (PropertyType prop : type.getProperty()) {
+                                if (prop.getName().toLowerCase().equals("kerberos.enable") && prop.getValue().toLowerCase().equals("true") &&
+                                        !(deployment.getSecurity().getProvider() == SecurityProviderString.KERBEROS && deployment.getSecurity().isEnabled())) {
+                                    hostLog.error("Cannot enable Kerberos with HTTP export when VoltDB is not using Kerberos");
+                                    throw new DeploymentCheckException("Cannot enable Kerberos with HTTP export when VoltDB is not using Kerberos");
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
