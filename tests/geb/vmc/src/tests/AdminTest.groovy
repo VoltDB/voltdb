@@ -1819,7 +1819,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterClientPortValue.isDisplayed()
-            page.networkInterfaces.clusterClientPortValue.text().equals("")
+            !page.networkInterfaces.clusterClientPortValue.text().equals("")
         }
     }
 
@@ -1829,7 +1829,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterAdminPortValue.isDisplayed()
-            page.networkInterfaces.clusterAdminPortValue.text().equals("")
+            !page.networkInterfaces.clusterAdminPortValue.text().equals("")
         }
     }
 
@@ -1839,7 +1839,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterHttpPortValue.isDisplayed()
-            page.networkInterfaces.clusterHttpPortValue.text().equals("")
+            !page.networkInterfaces.clusterHttpPortValue.text().equals("")
         }
     }
 
@@ -1849,7 +1849,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30) {
             page.networkInterfaces.clusterInternalPortValue.isDisplayed()
-            page.networkInterfaces.clusterInternalPortValue.text().equals("")
+            !page.networkInterfaces.clusterInternalPortValue.text().equals("")
         }
     }
 
@@ -1859,7 +1859,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterZookeeperPortValue.isDisplayed()
-            page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
+            !page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
         }
     }
 
@@ -1869,7 +1869,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterReplicationPortValue.isDisplayed()
-            page.networkInterfaces.clusterReplicationPortValue.text().equals("")
+            !page.networkInterfaces.clusterReplicationPortValue.text().equals("")
         }
     }
 
