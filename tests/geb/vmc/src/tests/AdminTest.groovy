@@ -53,7 +53,6 @@ class AdminTest extends TestBase {
 		}
     }
 
-
     // DIRECTORIES
 
     def "check Directories title"() {
@@ -1558,7 +1557,7 @@ class AdminTest extends TestBase {
 		    	when:
 				waitFor(waitTime) {
 				   	page.networkInterfaces.clusterSettingTitle.isDisplayed()
-            page.networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
+            		page.networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
 				}
 				then:
 				testStatus = true
@@ -1819,7 +1818,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterClientPortValue.isDisplayed()
-            page.networkInterfaces.clusterClientPortValue.text().equals("")
+            !page.networkInterfaces.clusterClientPortValue.text().equals("")
         }
     }
 
@@ -1829,7 +1828,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterAdminPortValue.isDisplayed()
-            page.networkInterfaces.clusterAdminPortValue.text().equals("")
+            !page.networkInterfaces.clusterAdminPortValue.text().equals("")
         }
     }
 
@@ -1839,7 +1838,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterHttpPortValue.isDisplayed()
-            page.networkInterfaces.clusterHttpPortValue.text().equals("")
+            !page.networkInterfaces.clusterHttpPortValue.text().equals("")
         }
     }
 
@@ -1849,7 +1848,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30) {
             page.networkInterfaces.clusterInternalPortValue.isDisplayed()
-            page.networkInterfaces.clusterInternalPortValue.text().equals("")
+            !page.networkInterfaces.clusterInternalPortValue.text().equals("")
         }
     }
 
@@ -1859,7 +1858,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterZookeeperPortValue.isDisplayed()
-            page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
+            !page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
         }
     }
 
@@ -1869,7 +1868,7 @@ class AdminTest extends TestBase {
         then:
         waitFor(30){
             page.networkInterfaces.clusterReplicationPortValue.isDisplayed()
-            page.networkInterfaces.clusterReplicationPortValue.text().equals("")
+            !page.networkInterfaces.clusterReplicationPortValue.text().equals("")
         }
     }
 
@@ -1948,22 +1947,23 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.tabSQLQuery.isDisplayed()
+        waitFor(30) { 
+        	header.tabSQLQuery.isDisplayed()
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
         }
     }
 
     def "header username check" () {
+        String user = page.getUsername()
         when:
         at AdminPage
-        String username = page.getUsername()
+        println(user)
         then:
         waitFor(30) {
-            header.username.isDisplayed()
-            header.username.text().equals(username)
+            page.header.username.isDisplayed()
         }
+        page.header.username.text().equals(user)
     }
-
 
     def "header username click and close" () {
         when:
@@ -2613,5 +2613,4 @@ class AdminTest extends TestBase {
             }
         }
     }
-
 }
