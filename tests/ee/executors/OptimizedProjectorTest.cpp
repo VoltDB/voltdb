@@ -460,6 +460,36 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
     TupleSchema::freeTupleSchema(schema);
 }
 
+TEST_F(OptimizedProjectorTest, ProjectTypeMismatch)
+{
+    using namespace boost;
+    // If destination table has different types than source, a TVE may
+    // be an implicit cast.  We shouldn't create a memcpy step for
+    // this case---it should be treated like a non-TVE.
+
+    std::vector<TypeAndSize> colTypes(NUM_COLS, INTEGER);
+    TupleSchema* srcSchema = createSchemaEz(colTypes);
+    colTypes[NUM_COLS / 2] = BIGINT;
+    TupleSchema* dstSchema = createSchemaEz(colTypes);
+
+    std::vector<shared_ptr<AbstractExpression> > exprs(NUM_COLS);
+    for (int i = 0; i < NUM_COLS; ++i) {
+        shared_ptr<AbstractExpression> tve(new TupleValueExpression(0, i));
+        exprs[i] = tve;
+    }
+
+    OptimizedProjector projector(toRawPtrVector(exprs));
+    projector.optimize(dstSchema, srcSchema);
+
+    // Should be at most 3 steps, because implicit cast is a
+    // combo-breaker.
+    size_t expectedNumSteps = std::min(::int64_t(3), NUM_COLS);
+    ASSERT_EQ(expectedNumSteps, projector.numSteps());
+
+    TupleSchema::freeTupleSchema(dstSchema);
+    TupleSchema::freeTupleSchema(srcSchema);
+}
+
 void printUsageAndExit(const std::string& progName) {
 
     cerr << "Usage: " << progName << " [-r <num_rows>] [-c <num_cols>]\n";

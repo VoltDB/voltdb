@@ -310,7 +310,6 @@ static ProjectStepSet convertTVEsToMemcpy(const TupleSchema* dstSchema,
             const TupleSchema::ColumnInfo* dstColInfo = dstSchema->getColumnInfo(step.dstFieldIndex());
             const TupleSchema::ColumnInfo* srcColInfo = srcSchema->getColumnInfo(step.srcFieldIndex());
 
-            // XXX test this!
             if (dstColInfo->getVoltType() != srcColInfo->getVoltType()
                 || dstColInfo->length != srcColInfo->length
                 || dstColInfo->inBytes != srcColInfo->inBytes) {
