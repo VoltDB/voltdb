@@ -1436,9 +1436,6 @@ TEST CASES
         <tests>
             <fileset dir='${build.test.dir}'>
                 <patternset refid="junit.all.path" />
-            	<!-- patternset id='junit.regression.h1.path'>
-            	    <include name='org/voltdb/jdbc/TestJDBCDriver.class' />
-				</patternset -->
             </fileset>
         </tests>
     </run_junit>
