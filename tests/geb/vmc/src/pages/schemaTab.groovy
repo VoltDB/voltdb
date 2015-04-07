@@ -175,6 +175,5 @@ class schemaTab extends Module{
         tablemaxsortinsizeworksheet{$("#sizetable > thead > tr.tablesorter-headerRow > th:nth-child(9) > div > div")}
 
 
-
     }
 }

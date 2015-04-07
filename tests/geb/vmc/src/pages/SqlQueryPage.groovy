@@ -122,6 +122,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Stored Procedures (by clicking the "Stored Procedures" tab).
      */
+
     def showStoredProcedures() {
         clickToDisplay(storedProcsTab, allStoredProcs)
     }

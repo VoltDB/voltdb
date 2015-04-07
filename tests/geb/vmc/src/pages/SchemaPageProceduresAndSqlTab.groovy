@@ -49,7 +49,6 @@ class SchemaPageProceduresAndSqlTab extends SchemaPage {
         expandedlisttbox { $(class:"invert")}
         expandedlistt1   { $(class:"togglex",1)}
     }
-
     static at = {
         proceduresTab.displayed
         proceduresTab.attr('class') == 'active'

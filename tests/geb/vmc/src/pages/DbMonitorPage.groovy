@@ -204,6 +204,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      * @return the displayed (parenthetical) count (or -1 if not shown, or
      * -2 if not parseable).
      */
+    
     private int getCount(Navigator nav) {
         if (!nav.displayed) {
             return -1

@@ -225,6 +225,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * get tablename that is created and deleted
      */
+
     def String getTablename() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
         String line;

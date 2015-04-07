@@ -76,6 +76,7 @@ class SchemaPageSchemaTab extends SchemaPage {
     }
 
 	String checkId = "#s-"+ getTablename()
+
     /**
      * Returns the contents of the "Schema" table, on the Schema tab of the
      * Schema page of the VMC, by column, as a Map<String,List<String>>.

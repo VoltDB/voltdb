@@ -67,6 +67,7 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
 
     }
 
+
     static at = {
         sizeTab.displayed
         sizeTab.attr('class') == 'active'
