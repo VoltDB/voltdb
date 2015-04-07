@@ -76,7 +76,7 @@ public:
 
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
 
-    /** Send committed data to the top end. Returns the USO before the BEGIN TXN entry is written, or SIZE_MAX if not written. */
+    /** Send committed data to the top end. */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
 
     /** timestamp of most recent flush() */
