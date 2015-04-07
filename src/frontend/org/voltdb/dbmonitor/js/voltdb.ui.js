@@ -701,6 +701,7 @@ var loadPage = function (serverName, portid) {
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
                 VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
+                //console.log(JSON.stringify(drDetails));
             }
         });
 
@@ -1021,11 +1022,14 @@ var loadPage = function (serverName, portid) {
     };
 
     var refreshDrSection = function () {
+        VoltDbAdminConfig.drEnabled = true; // setting enabled to true for testing purpose
 
+        // if (VoltDbAdminConfig.drEnabled == true) {
+        $("#Div5").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
 
             var response = drDetails;
-            
+
             var htmlcontent = "";
 
             for (var key in response) {
@@ -1047,7 +1051,10 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster").find("tbody").append(htmlcontent);
 
             table = $("#tblDrMAster").DataTable({
-                destroy: true, stateSave: true, pageLength: 5, "sPaginationType": "extStyleLF",
+                destroy: true,
+                stateSave: true,
+                pageLength: 5,
+                "sPaginationType": "extStyleLF",
                 "bAutoWidth": false,
                 "fnDrawCallback": function () {
                     var length = this.fnGetData().length;
@@ -1059,15 +1066,15 @@ var loadPage = function (serverName, portid) {
                 },
                 "sDom": '<"clear">ilprtp',
                 "aoColumns": [
-null,
-{ "bSearchable": false },
-{ "bSearchable": false },
-{ "bSearchable": false },
-{ "bSearchable": false },
-{ "bSearchable": false }
+                    null,
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false }
                 ]
             });
-            
+
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
             $(".paginate_enabled_next").html("Next");
@@ -1078,13 +1085,20 @@ null,
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
 
+            $("#tblDrMAster").find(".sorting_asc").removeClass("sorting_asc");
+
+
         });
-
-
-
         $('#filterStoredProc1').on('keyup', function () {
             table.search(this.value).draw();
         });
+
+
+        //} else {
+
+        //    $("#Div5").hide();
+        //}
+
     };
 
     var setPaginationIndicesOfProcedures = function (isProcedureSearch) {

@@ -1057,6 +1057,7 @@ ul.drList li.drArrow {
 }
 .drTbl tr td { text-align:center}
 .drTbl tr td:first-child { text-align:left;}
+.drTbl tr th { background: #3f5364;}
 .overviewTbl {background:#FFFFFF;}
 .drWrapperAdmin { margin:20px 0 0 0;}
 .drContent {background:#FFFFFF;}

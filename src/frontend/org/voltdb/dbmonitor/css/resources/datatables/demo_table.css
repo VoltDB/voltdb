@@ -32,7 +32,8 @@
 
 .dataTables_wrapper {
 	position: relative;
-	min-height: 302px;
+    top: -40px;
+	min-height: 100px;
 	clear: both;
 	_height: 302px;
 	zoom: 1; /* Feeling sorry for IE */

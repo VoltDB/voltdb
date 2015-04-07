@@ -1938,7 +1938,7 @@ function alertNodeClicked(obj) {
                 return;
             }
             connection.Metadata['@Statistics_DR_completeData'][1].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "ENABLED" || columnInfo["name"] == "TIMESTAMP")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "ENABLED" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "SYNCSNAPSHOTSTATE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1951,8 +1951,8 @@ function alertNodeClicked(obj) {
                 }
 
                 drDetails[hostName]["ENABLED"] = info[colIndex["ENABLED"]];
+                //drDetails[hostName]["SYNCSNAPSHOTSTATE"] = info[colIndex["SYNCSNAPSHOTSTATE"]];
             });
-            // console.log(JSON.stringify(drDetails));
         };
         //
 
