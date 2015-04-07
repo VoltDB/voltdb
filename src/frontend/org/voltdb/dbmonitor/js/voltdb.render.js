@@ -299,7 +299,7 @@ function alertNodeClicked(obj) {
                 $(".userN").attr("title", userName).html(userName);
                 $("#userLine").show();
             } else {
-                $(".userN").attr("title","").html("");
+                $(".userN").attr("title", "").html("");
                 $("#userLine").hide();
             }
         };
@@ -309,6 +309,7 @@ function alertNodeClicked(obj) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
+
 
                 if (VoltDbAdminConfig.isAdmin) {
                     onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails(), serverSettings);
@@ -433,10 +434,20 @@ function alertNodeClicked(obj) {
         //Check if DR is enable or not
         this.GetDrStatusInformation = function (onInformationLoaded) {
             var drStatus = {};
-
             VoltDBService.GetDrStatusInformation(function (connection) {
-                getDrDetails(connection, drStatus);
+                getDrStatus(connection, drStatus);
                 onInformationLoaded(drStatus);
+            });
+        };
+        //
+
+        //GET DR Details
+        this.GetDrDetails = function (onInformationLoaded) {
+            var drDetails = {};
+            VoltDBService.GetDrStatusInformation(function (connection) {
+
+                getDrDetails(connection, drDetails);
+                onInformationLoaded(drDetails);
             });
         };
         //
@@ -703,11 +714,11 @@ function alertNodeClicked(obj) {
             var serverOverview = {};
             var iterator = 0;
             var ipAddress = "";
-            
+
             //Error: "Authentication rejected(-3)"
             if (connection.Metadata['@SystemInformation_OVERVIEW_status'] == -3) {
                 VoltDbUI.hasPermissionToView = false;
-                
+
                 if (!$("#loginWarningPopup").is(":visible")) {
                     $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view this page.");
                     $("#loginWarnPopup").click();
@@ -716,7 +727,7 @@ function alertNodeClicked(obj) {
             } else if (connection.Metadata['@SystemInformation_OVERVIEW'] == null) {
                 return;
             }
-            
+
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
@@ -1918,17 +1929,16 @@ function alertNodeClicked(obj) {
             });
         };
 
-        //Get DR Information
-        var getDrDetails = function (connection, drDetails) {
+        //Get DR Status Information
+        var getDrStatus = function (connection, drDetails) {
             var colIndex = {};
             var counter = 0;
 
             if (connection.Metadata['@Statistics_DR'] == null) {
                 return;
             }
-
             connection.Metadata['@Statistics_DR_completeData'][1].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "ENABLED" || columnInfo["name"] == "TIMESTAMP")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "ENABLED" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "SYNCSNAPSHOTSTATE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1939,10 +1949,44 @@ function alertNodeClicked(obj) {
                 if (!drDetails.hasOwnProperty(hostName)) {
                     drDetails[hostName] = {};
                 }
+
                 drDetails[hostName]["ENABLED"] = info[colIndex["ENABLED"]];
+                //drDetails[hostName]["SYNCSNAPSHOTSTATE"] = info[colIndex["SYNCSNAPSHOTSTATE"]];
             });
         };
         //
+
+        //Get DR Details Information
+        var getDrDetails = function (connection, drDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_DR'] == null) {
+                return;
+            }
+            connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            counter = 0;
+
+            connection.Metadata['@Statistics_DR_completeData'][0].data.forEach(function (info) {
+                var partitionId = info[colIndex["PARTITION_ID"]];
+                if (!drDetails.hasOwnProperty(partitionId)) {
+                    drDetails[partitionId] = [];
+                }
+
+                var partitionDetails = {};
+                partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
+                partitionDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                drDetails[partitionId].push(partitionDetails);
+            });
+
+          
+        };
+        
 
         //Get Replication Information
         var getReplicationDetails = function (connection, replicationDetails, processName) {
@@ -1973,7 +2017,7 @@ function alertNodeClicked(obj) {
                     }
                     replicationDetails[hostName]["status"] = replicaStatus;
                 }
-                
+
             });
         };
         //
@@ -2237,7 +2281,7 @@ function alertNodeClicked(obj) {
             var currentServerColumnClass;
             var count = 0;
 
-            this.setServerDetails = function (hostId, serverInfo,iteratorCount) {
+            this.setServerDetails = function (hostId, serverInfo, iteratorCount) {
                 var count = 0;
                 var stopperServerCount = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
@@ -2248,8 +2292,8 @@ function alertNodeClicked(obj) {
                             if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
                                 serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
                                 VoltDbAdminConfig.servers[iteratorCount] = serverDetails;
-                               
-                                $.each(VoltDbAdminConfig.stoppedServers, function(key,val) {
+
+                                $.each(VoltDbAdminConfig.stoppedServers, function (key, val) {
                                     if (val.HOSTNAME == value.serverName) {
                                         //remove server from the stopped server list if server stopped while ago is already in running state
                                         VoltDbAdminConfig.stoppedServers.splice(stopperServerCount, 1);
@@ -2321,7 +2365,7 @@ function alertNodeClicked(obj) {
                         count++;
                     });
 
-                    $.each(VoltDbAdminConfig.stoppedServers, function(id, val) {
+                    $.each(VoltDbAdminConfig.stoppedServers, function (id, val) {
                         setServerDetails(val.HOSTID, val, count);
                     });
                 }
@@ -2330,7 +2374,7 @@ function alertNodeClicked(obj) {
 
             if (VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined) {
                 $.each(VoltDbAdminConfig.servers, function (id, val) {
-                    if ((val.serverName != null || val.serverName != "" || val.serverName!=undefined) && val.serverState == 'RUNNING') {
+                    if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == 'RUNNING') {
                         className = voltDbRenderer.currentHost == val.serverName ? "disableServer" : "shutdown";
                         currentServerRowClass = voltDbRenderer.currentHost == val.serverName ? "activeHostMonitoring" : "activeHost";
                         currentServerColumnClass = voltDbRenderer.currentHost == val.serverName ? "shutdownServer stopDisable" : "shutdownServer";
@@ -2369,7 +2413,7 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.stopServer = function (nodeId,hostNameValue, onServerStopped) {
+        this.stopServer = function (nodeId, hostNameValue, onServerStopped) {
             VoltDBService.stopServerNode(nodeId, function (connection, status, statusString) {
                 if (status == 1) {
                     VoltDbAdminConfig.stoppedServers[VoltDbAdminConfig.stoppedServers.length] = new VoltDbAdminConfig.stoppedServer(nodeId, hostNameValue);
@@ -2562,7 +2606,7 @@ function alertNodeClicked(obj) {
             }, userId, requestType);
         };
 
-        
+
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
             if (processName == "TABLE_INFORMATION") {
@@ -2581,7 +2625,7 @@ function alertNodeClicked(obj) {
 
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
-                if (rawTables[k][6] == 'StreamedTable') 
+                if (rawTables[k][6] == 'StreamedTable')
                     exports[tableName] = { name: tableName };
                 else {
                     var isView = false;

@@ -362,7 +362,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover  {
 }
 
 .storeTbl, .dbTbl { margin:5px 0 0 0; padding:0; border:1px solid #CCCCCC;}
-.storeTbl th, .dbTbl th { margin:0; padding:0; background:#3f5364; color:#FFFFFF;}
+.storeTbl th, .dbTbl th { margin:0; padding:0; background:#3f5364; color:#FFFFFF; font-weight:normal!important;}
 .storeTbl th, td, .dbTbl th,td { padding:10px 25px 10px 10px; border-right:1px solid #CCCCCC;border-bottom:1px solid #CCCCCC;}
 td.txt-center{text-align:center;}
 .storeTbl tr th:hover, .dbTbl tr th:hover {cursor: pointer;}
@@ -1057,6 +1057,7 @@ ul.drList li.drArrow {
 }
 .drTbl tr td { text-align:center}
 .drTbl tr td:first-child { text-align:left;}
+.drTbl tr th { background: #3f5364;}
 .overviewTbl {background:#FFFFFF;}
 .drWrapperAdmin { margin:20px 0 0 0;}
 .drContent {background:#FFFFFF;}
@@ -1070,6 +1071,12 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 .warningDr {display: block; width: 73px;}
 .warninghead { margin:0; padding:0;}
 .warninghead img { margin:5px 5px 0 0; position:relative;top:2px;}
+.paging_extStyleLF { width: 162px!important; margin-bottom:10px;}
+.navigationLabel {display: inline!important; margin: 5px!important;}
+.paginate_enabled_next.paginate_button, .paginate_disabled_next.paginate_button {float: right!important;}
+#txtDrReplica { cursor: default;}
+.warningDr a{color:#ea151d;}
+.warningDr a:hover{color:#111;}
 
 /****DR Ends*******/
 
