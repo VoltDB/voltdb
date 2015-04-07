@@ -299,8 +299,8 @@
                                 </ul>
 
                                 <ul class="drList">
-                                    <li>State</li>
-                                    <li class="drArrow">On</li>
+                                   <!-- <li>State</li>
+                                    <li class="drArrow">On</li>-->
                                     <li class="alertIcon warningDr">
                                         <a id="drWarning" href="#myWarning" class="drWarning">
                                             <span style="margin:0 0 0 24px">Warning</span>
@@ -714,17 +714,16 @@
                             </div>
                             <div class="drContent">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
-                                    <tr>
+                                    <!--<tr>
                                         <td width="62%" class="configLabel">State</td>
                                         <td width="20%" align="right">
                                             <div id="drStateIcon" class="onIcon"></div>
                                             <input style="display: none;" type="checkbox" id="chkDrState" checked="checked" class="drstate" />
                                             <div id="loadingDrState" class="loading-small" style="display: none"></div>
                                         </td>
-                                        <!--</td>-->
-                                        <td width="2%"><div id="txtDrState" class="drStateOn">On</div></td>
-                                        <td width="16%">&nbsp;<!--<a id="btnEditDrStateOk" href="#drStatePop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrStateCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="drStateEdit" class="edit" title="Edit">&nbsp;</a>--></td>
-                                    </tr>
+                                         <td width="2%"><div id="txtDrState" class="drStateOn">On</div></td>
+                                        <td width="16%"><a id="btnEditDrStateOk" href="#drStatePop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrStateCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="drStateEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                    </tr>-->
                                     <tr>
                                         <td width="62%" class="configLabel">ID</td>
                                         <td width="20%" align="right">4</td>
@@ -747,18 +746,18 @@
                                         </td>
                                     </tr>
 
-                                    <tr class="hasSubLabel parent" id="row-8">
-                                        <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Replica</a></td>
+                                    <tr>
+                                        <td class="configLabel">Replica <span style="font-weight:normal">(Source:serverBz)</span></td>
                                         <td align="right">
                                             <div id="drReplicaIcon" class="onIcon"></div>
                                             <input style="display: none;" type="checkbox" id="chkDrReplica" checked="checked" />
                                             <div id="loadingDrReplica" class="loading-small" style="display: none"></div>
                                         </td>
-                                        <td><div id="txtDrReplica" class="drReplicaOn">On</div></td>
-                                        <td><a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                        <td><div id="txtDrReplica" class="drReplicaOn" title="Use the Promote button to exit replica mode">On</div></td>
+                                        <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
 
-                                    <tr class="child-row-8 subLabelRow" id="Tr1">
+                                    <!--<tr class="child-row-8 subLabelRow" id="Tr1">
                                         <td class="configLabel">Source </td>
                                         <td align="right" class="">
                                             <div id="loadingDrSource" class="loading-small" style="display: none;"></div>
@@ -767,7 +766,7 @@
                                         </td>
                                         <td>&nbsp;</td>
                                         <td>&nbsp;</td>
-                                    </tr>
+                                    </tr>-->
 
                                 </table>
 
