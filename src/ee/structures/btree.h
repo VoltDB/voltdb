@@ -970,10 +970,12 @@ class btree : public Params::key_compare {
         return const_iterator(leftmost(), 0);
     }
     iterator end() {
-        return iterator(rightmost(), rightmost() ? rightmost()->count() : 0);
+        node_type* maxNode =  rightmost();
+        return iterator(maxNode, maxNode ? maxNode->count() : 0);
     }
     const_iterator end() const {
-        return const_iterator(rightmost(), rightmost() ? rightmost()->count() : 0);
+        const node_type* maxNode =  rightmost();
+        return const_iterator(maxNode, maxNode ? maxNode->count() : 0);
     }
     reverse_iterator rbegin() {
         return reverse_iterator(end());

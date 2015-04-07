@@ -254,6 +254,35 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     result.clear();
 
 
+    // SCAN without END() factor
+    iter_volt_map = voltMap.begin();
+    benVoltMap.start();
+    for (int i = 0; i < NUM_OF_VALUES; i++) {
+        iter_volt_map.moveNext();
+    }
+    benVoltMap.stop();
+    result.push_back(benVoltMap);
+
+    iter_stl = stlMap.begin();
+    benStl.start();
+    for (int i = 0; i < NUM_OF_VALUES; i++) {
+        iter_stl++;
+    }
+    benStl.stop();
+    result.push_back(benStl);
+
+    iter_btree = btreeMap.begin();
+    benBtree.start();
+    for (int i = 0; i < NUM_OF_VALUES; i++) {
+        iter_btree++;
+    }
+    benBtree.stop();
+    result.push_back(benBtree);
+
+    resultPrinter("SCAN without END() factor", NUM_OF_VALUES, result);
+    result.clear();
+
+
     // LOOK UP
     std::vector<int> keys = getRandomValues(ITERATIONS, BIGGEST_VAL);
 
