@@ -537,15 +537,6 @@ public class VoltDB {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
                 }
-
-                if (m_replicationRole == ReplicationRole.REPLICA) {
-                    if (m_startAction.doesRecover()) {
-                        isValid = false;
-                        hostLog.fatal("Replica cluster only supports create database");
-                    } else {
-                        m_startAction = StartAction.CREATE;
-                    }
-                }
             }
 
             return isValid;
