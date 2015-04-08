@@ -138,6 +138,18 @@ public interface VoltDBInterface
     public long getClusterUptime();
 
     /**
+     * @return The time the cluster's Create start action
+     */
+    public long getClusterCreateTime();
+
+    /**
+     * Set the time at which the cluster was created. This method is used when
+     * in the Recover action and @SnapshotRestore paths to assign the cluster
+     * create time that was preserved in the snapshot.
+     */
+    public void setClusterCreateTime(long clusterCreateTime);
+
+    /**
      * Notify RealVoltDB that recovery is complete
      */
     void onExecutionSiteRejoinCompletion(long transferred);

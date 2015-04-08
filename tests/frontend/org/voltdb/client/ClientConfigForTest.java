@@ -84,7 +84,12 @@ public class ClientConfigForTest extends ClientConfig {
         super("", "", new LoggingCSL());
     }
 
+    //By default this will use SHA256
     public ClientConfigForTest(String user, String password) {
         super(user, password, new LoggingCSL());
+    }
+
+    public ClientConfigForTest(String user, String password, ClientAuthHashScheme scheme) {
+        super(user, password, new LoggingCSL(), scheme);
     }
 }

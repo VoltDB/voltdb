@@ -351,9 +351,21 @@ public abstract class CatalogSchemaTools {
                     add = ", ";
                 }
             }
-            sb.append(");\n");
-        }
+            sb.append(")");
 
+            String jsonPredicate = catalog_idx.getPredicatejson();
+            if (!jsonPredicate.isEmpty()) {
+                try {
+                    AbstractExpression predicate = AbstractExpression.fromJSONString(jsonPredicate,
+                        new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName()));
+                    sb.append(" WHERE " + predicate.explain(catalog_tbl.getTypeName()));
+                } catch (JSONException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+            sb.append(";\n");
+        }
         if (isExportTableWithTarget != null) {
             sb.append("EXPORT TABLE " + catalog_tbl.getTypeName());
             if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
