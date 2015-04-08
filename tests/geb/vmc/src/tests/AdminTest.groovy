@@ -2613,4 +2613,43 @@ class AdminTest extends TestBase {
         }
     }
 
+    //server setting
+
+    def "Check server setting and display its respective value"(){
+
+        when:
+        while(true){
+            if(waitFor(10){page.networkInterfaces.serverSettingTitle.isDisplayed()} && page.networkInterfaces.serverSettingTitle.text() !=""){
+                println("Title displayed as:"+page.networkInterfaces.serverSettingTitle.text())
+            }else println("Server setting title not displayed so not processing further")
+            break;
+        }
+
+        then:
+        if(page.networkInterfaces.serversettingclientvalue.text()==""){
+            println("Client port value in server setting is empty")}
+        else{println("Client port value in server setting is not empty, value:" +page.networkInterfaces.serversettingclientvalue.text())}
+
+        if(page.networkInterfaces.serversettingadminvalue.text()==""){
+            println("Admin port value in server setting is empty")}
+        else{println("Admin port value in server setting is not empty, value:" +page.networkInterfaces.serversettingadminvalue.text())}
+
+        if(page.networkInterfaces.serversettinghttpvalue.text()==""){
+            println("HTTP port value in server setting is empty")}
+        else{println("HTTP port value in server setting is not empty, value:" +page.networkInterfaces.serversettinghttpvalue.text())}
+
+        if(page.networkInterfaces.serversettinginternalvalue.text()==""){
+            println("Internal port value in server setting is empty")}
+        else{println("Internal port value in server setting is not empty, value:" +page.networkInterfaces.serversettinginternalvalue.text())}
+
+        if(page.networkInterfaces.serversettingzookeepervalue.text()==""){
+            println("Zookeeper port value in server setting is empty")}
+        else{println("Zookeeper port value in server setting is not empty, value:" +page.networkInterfaces.serversettingzookeepervalue.text())}
+
+        if(page.networkInterfaces.serversettingreplicationvalue.text()==""){
+            println("Replication port value in server setting is empty")}
+        else{println("Replication port value in server setting is not empty, value:" +page.networkInterfaces.serversettingreplicationvalue.text())}
+
+    }
+
 }
