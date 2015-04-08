@@ -27,7 +27,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;

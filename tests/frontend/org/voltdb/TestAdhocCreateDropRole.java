@@ -26,7 +26,7 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -74,7 +74,7 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
         dbuilder.writeXML(pathToDeployment);
         //MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
 

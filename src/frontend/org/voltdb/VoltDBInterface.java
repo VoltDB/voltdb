@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltdb.config.Configuration;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
@@ -48,7 +49,7 @@ public interface VoltDBInterface
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
-    public void initialize(VoltDB.Configuration config);
+    public void initialize(Configuration config);
 
     /**
      * Start all the site's event loops. That's it.
@@ -68,7 +69,7 @@ public interface VoltDBInterface
 
     public void startSampler();
 
-    public VoltDB.Configuration getConfig();
+    public Configuration getConfig();
     public CatalogContext getCatalogContext();
     public String getBuildString();
     public String getVersionString();

@@ -23,7 +23,7 @@
 
 package org.voltdb;
 
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -57,7 +57,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
 
@@ -180,7 +180,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
 

@@ -34,14 +34,19 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.inject.Guice;
 
 public class TestPlannerTool extends TestCase {
 
     PlannerTool m_pt = null;
 
     public void testSimple() throws IOException {
+        Guice.createInjector(new MockedVoltDBModule());
+
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addAllDefaults();
         final File jar = new File("tpcc-oop.jar");
@@ -134,6 +139,8 @@ public class TestPlannerTool extends TestCase {
 
     public void testBadDDL() throws IOException
     {
+        Guice.createInjector(new MockedVoltDBModule());
+
         // semicolons in in-lined comments are bad
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1)); -- this; is bad");

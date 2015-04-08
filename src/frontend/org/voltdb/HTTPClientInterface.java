@@ -31,13 +31,13 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.config.Configuration;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 

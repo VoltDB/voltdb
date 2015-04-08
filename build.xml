@@ -1371,6 +1371,7 @@ TEST CASES
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <jvmarg value="-XX:-UseSplitVerifier"/>
+        	<!--jvmarg value="-Xrunjdwp:transport=dt_socket,address=8787,server=y,suspend=y" /-->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />

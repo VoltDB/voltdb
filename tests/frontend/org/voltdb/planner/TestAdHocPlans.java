@@ -34,8 +34,12 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.config.Configuration;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.inject.Guice;
 
 public class TestAdHocPlans extends AdHocQueryTester {
 
@@ -45,7 +49,9 @@ public class TestAdHocPlans extends AdHocQueryTester {
     @Override
     protected void setUp() throws Exception {
         // For planner-only testing, we shouldn't care about IV2
-        VoltDB.Configuration config = setUpSPDB();
+        Guice.createInjector(new MockedVoltDBModule());
+
+        Configuration config = setUpSPDB();
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();

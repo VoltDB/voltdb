@@ -51,10 +51,11 @@
 package org.voltdb;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.config.Configuration;
 
 public class TPCCServer {
     public static void main(String[] args) throws InterruptedException {
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.setPathToCatalogForTest("tpcc.jar");
 
         int partitions = 1;
@@ -84,7 +85,7 @@ public class TPCCServer {
             }
         }
 
-        VoltDB.initialize(config);
-        VoltDB.instance().run();
+        VoltDB.startServer(config);
+        //VoltDB.instance().run();
     }
 }

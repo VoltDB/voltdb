@@ -21,6 +21,9 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+
 import org.voltcore.messaging.HostMessenger;
 
 /**
@@ -28,6 +31,9 @@ import org.voltcore.messaging.HostMessenger;
  */
 public class OpsRegistrar {
     private Map<OpsSelector, OpsAgent> m_agents;
+
+    @Inject
+    private HostMessenger m_messenger;
 
     /**
      * Construct an OpsRegistrar.  Will iterate through the OpsSelectors and instantiate one
@@ -48,6 +54,11 @@ public class OpsRegistrar {
                                 + selector.name(), true, e);
             }
         }
+    }
+
+    @PostConstruct
+    void init() {
+        registerMailboxes(m_messenger);
     }
 
     /**

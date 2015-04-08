@@ -32,7 +32,7 @@ import java.net.URLEncoder;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.TestJSONInterface.Response;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -97,7 +97,7 @@ public class TestSimpleCJK {
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0);
         assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        Configuration config = new Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("cjk.jar");
         config.m_pathToDeployment = builder.getPathToDeployment();
         ServerThread server = new ServerThread(config);

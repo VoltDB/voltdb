@@ -43,7 +43,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;

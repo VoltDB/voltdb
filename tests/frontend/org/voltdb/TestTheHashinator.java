@@ -50,7 +50,9 @@ import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
+import org.voltdb.test.MockedVoltDBModule;
 
+import com.google.inject.Guice;
 import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -70,6 +72,8 @@ public class TestTheHashinator {
     public void setUp() {
         ElasticHashinator.DEFAULT_TOTAL_TOKENS = 1024;
         EELibraryLoader.loadExecutionEngineLibrary(true);
+        Guice.createInjector(new MockedVoltDBModule());
+
         VoltDB.instance().readBuildInfo("Test");
     }
 

@@ -46,6 +46,8 @@ import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.config.CatalogContextProvider;
+import org.voltdb.config.Configuration;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
@@ -68,7 +70,7 @@ public class Inits {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final RealVoltDB m_rvdb;
-    final VoltDB.Configuration m_config;
+    final Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
 
@@ -390,6 +392,7 @@ public class Inits {
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
                         catalogStuff.version);
+                CatalogContextProvider.setCachedCatalog(m_rvdb.m_catalogContext);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }

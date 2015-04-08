@@ -34,7 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.voltdb.TheHashinator.HashinatorType;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
@@ -62,7 +62,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testProcedureAdhoc() throws Exception {
-        VoltDB.Configuration config = setUpSPDB();
+        System.out.println("Starting testProcedureAdhoc");
+
+        Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -214,7 +216,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     @Test
     public void testSP() throws Exception {
         System.out.println("Starting testSP");
-        VoltDB.Configuration config = setUpSPDB();
+        Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -995,6 +997,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
 
         void setUp() {
+            System.out.println("setUp...");
             m_cluster.startUp();
 
             try {

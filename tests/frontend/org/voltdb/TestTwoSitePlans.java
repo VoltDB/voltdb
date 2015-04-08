@@ -43,11 +43,14 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.test.MockedVoltDBModule;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
+
+import com.google.inject.Guice;
 
 public class TestTwoSitePlans extends TestCase {
 
@@ -67,6 +70,8 @@ public class TestTwoSitePlans extends TestCase {
     @SuppressWarnings("deprecation")
     @Override
     public void setUp() throws IOException, InterruptedException {
+        Guice.createInjector(new MockedVoltDBModule());
+
         VoltDB.instance().readBuildInfo("Test");
 
         // compile a catalog

@@ -37,7 +37,7 @@ import junit.framework.TestCase;
 import org.voltdb.ServerThread;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
@@ -62,7 +62,7 @@ public class TestClientFeatures extends TestCase {
             depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.writeXML(Configuration.getPathToCatalogForTest("timeouts.xml"));
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("timeouts.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("timeouts.xml");
             localServer = new ServerThread(config);

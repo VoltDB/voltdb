@@ -42,6 +42,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import javax.inject.Inject;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.common.Constants;
@@ -57,7 +58,11 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
+import org.voltdb.config.Configuration;
 import org.voltdb.utils.MiscUtils;
+
+import javax.annotation.PostConstruct;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -177,6 +182,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     int m_localHostId;
 
     private final Config m_config;
+
+    @Inject
+    private Configuration vConfig;
+
     private final SocketJoiner m_joiner;
     private final VoltNetworkPool m_network;
     private volatile boolean m_localhostReady = false;
@@ -208,6 +217,19 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private ZooKeeper m_zk;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
 
+    @PostConstruct
+    public void init() {
+        hostLog.info(String.format("Beginning inter-node communication on port %d.", vConfig.m_internalPort));
+
+        try {
+            start();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+
+        VoltZK.createPersistentZKNodes(getZK());
+
+    }
     public Mailbox getMailbox(long hsId) {
         return m_siteMailboxes.get(hsId);
     }

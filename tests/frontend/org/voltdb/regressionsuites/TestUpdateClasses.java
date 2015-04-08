@@ -29,7 +29,7 @@ import java.io.IOException;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.config.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableTestHelpers;
 import org.voltdb.client.Client;
@@ -87,7 +87,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         jarfile.put("deployment.xml", new File(pathToDeployment));
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
@@ -205,7 +205,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
         Client auth_client = null;
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             // Default client auth is going to fail, catch and keep chugging
@@ -298,7 +298,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
@@ -378,7 +378,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
@@ -416,7 +416,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
@@ -468,7 +468,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
@@ -542,7 +542,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
 
         try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            Configuration config = new Configuration();
             config.m_pathToCatalog = pathToCatalog;
             config.m_pathToDeployment = pathToDeployment;
             startSystem(config);
