@@ -19,4 +19,52 @@
 
 namespace voltdb {
 
+template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    const NValue& rval = arguments[1];
+    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITAND function");
+    }
+
+    int64_t lv = lval.getBigInt();
+    int64_t rv = rval.getBigInt();
+
+    int64_t res = lv & rv;
+    return getBigIntValue(res);
+}
+
+
+template<> inline NValue NValue::call<FUNC_BITOR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    const NValue& rval = arguments[1];
+    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITAND function");
+    }
+
+    int64_t lv = lval.getBigInt();
+    int64_t rv = rval.getBigInt();
+
+    int64_t res = lv | rv;
+    return getBigIntValue(res);
+}
+
+
+template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    const NValue& rval = arguments[1];
+    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITAND function");
+    }
+
+    int64_t lv = lval.getBigInt();
+    int64_t rv = rval.getBigInt();
+
+    int64_t res = lv ^ rv;
+    return getBigIntValue(res);
+}
+
+
 }

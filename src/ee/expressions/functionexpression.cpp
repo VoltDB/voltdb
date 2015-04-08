@@ -338,6 +338,15 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     } else {
         // GeneralFunctions defer deleting the arguments container until through with it.
         switch(functionId) {
+        case FUNC_BITAND:
+            ret = new GeneralFunctionExpression<FUNC_BITAND>(*arguments);
+            break;
+        case FUNC_BITOR:
+            ret = new GeneralFunctionExpression<FUNC_BITOR>(*arguments);
+            break;
+        case FUNC_BITXOR:
+            ret = new GeneralFunctionExpression<FUNC_BITXOR>(*arguments);
+            break;
         case FUNC_CONCAT:
             ret = new GeneralFunctionExpression<FUNC_CONCAT>(*arguments);
             break;

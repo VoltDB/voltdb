@@ -2,3 +2,12 @@ CREATE TABLE ENG913 (
 	name varchar(32),
     city varchar(32)
 );
+
+
+CREATE TABLE bit (
+	TINYINT_type  TINYINT,
+    INTEGER_TYPE INTEGER,
+	BIGINT_TYPE BIGINT,
+    FLOAT_TYPE FLOAT,
+    VARCHAR_TYPE VARCHAR(60)
+);

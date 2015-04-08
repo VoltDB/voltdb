@@ -3297,6 +3297,63 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableColumnOfScalarVarchar(result, new String[]{"ABCabc123ABC"});
     }
 
+    private void bitwiseFunctionChecker(long pk, long bignum, long in) throws IOException, ProcCallException {
+        VoltTable vt;
+        Client client = getClient();
+
+        client.callProcedure("NUMBER_TYPES.insert", pk, 1, 1, bignum, 1.0, 1.0);
+        vt = client.callProcedure("BITWISE_AND_OR_XOR", in, in, in, pk).getResults()[0];
+        System.out.println(vt);
+        validateRowOfLongs(vt, new long[]{bignum & in, bignum | in, bignum ^ in});
+    }
+
+    public void testBitwiseFunction_AND_OR_XOR() throws IOException, ProcCallException {
+        // bigint 1: 01,  input 3: 11
+        bitwiseFunctionChecker(1, 1, 3);
+        bitwiseFunctionChecker(2, 3, 1);
+
+        bitwiseFunctionChecker(3, -3, 1);
+        bitwiseFunctionChecker(4, 1, -3);
+
+        bitwiseFunctionChecker(5, Long.MAX_VALUE, Long.MIN_VALUE + 10);
+        bitwiseFunctionChecker(6, Long.MIN_VALUE + 10, Long.MAX_VALUE);
+
+        bitwiseFunctionChecker(7, -100, Long.MIN_VALUE + 10);
+        bitwiseFunctionChecker(8, Long.MIN_VALUE + 10, -100);
+
+        VoltTable vt;
+        Client client = getClient();
+        long in, pk, bignum;
+        String sql;
+
+        // out of range tests
+        try {
+            sql = "select bitand(bignum, 9223372036854775809) from NUMBER_TYPES;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("numeric value out of range"));
+        }
+
+        if( isHSQL() ) {
+            // Hsqldb has different behavior on the NULL and Long.MIN_VALUE handling
+            return;
+        }
+        bitwiseFunctionChecker(21, Long.MAX_VALUE, Long.MIN_VALUE);
+        bitwiseFunctionChecker(22, Long.MIN_VALUE, Long.MAX_VALUE);
+
+        // special case for null, treated as Long.MIN_VALUE
+        pk = 100; bignum = Long.MIN_VALUE; in = Long.MAX_VALUE;
+        client.callProcedure("NUMBER_TYPES.insert", pk, 1, 1, null, 1.0, 1.0);
+        vt = client.callProcedure("BITWISE_AND_OR_XOR", in, in, in, pk).getResults()[0];
+        validateRowOfLongs(vt, new long[]{bignum & in, bignum | in, bignum ^ in});
+
+        pk = 101; bignum = Long.MAX_VALUE; in = Long.MIN_VALUE;
+        client.callProcedure("NUMBER_TYPES.insert", pk, 1, 1, bignum, 1.0, 1.0);
+        vt = client.callProcedure("BITWISE_AND_OR_XOR", null, null, null, pk).getResults()[0];
+        validateRowOfLongs(vt, new long[]{bignum & in, bignum | in, bignum ^ in});
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -3430,6 +3487,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         // project.addStmtProcedure("ABS_OF_AGG", "select ABS(MIN(ID+9)) from P1");
 
         project.addStmtProcedure("DISPLAY_CEILING", "select CEILING(INTEGERNUM), CEILING(TINYNUM), CEILING(SMALLNUM), CEILING(BIGNUM), CEILING(FLOATNUM), CEILING(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("BITWISE_AND_OR_XOR",  "select bitand(bignum, ?), bitor(bignum, ?), bitxor(bignum, ?) from NUMBER_TYPES WHERE INTEGERNUM = ?");
 
         project.addStmtProcedure("ORDER_CEILING_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(INTEGERNUM), INTEGERNUM");
         project.addStmtProcedure("ORDER_CEILING_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(TINYNUM), TINYNUM");
