@@ -23,9 +23,41 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import decimal
-import re
 import math
+import re
+import types
+
 from SQLCoverageReport import generate_html_reports
+
+# A compare function which can handle datetime to None comparisons
+# -- where the standard cmp gets a TypeError.
+def safecmp(x, y):
+    # It's easiest to bypass the datetime to None comparison by
+    # explicitly filtering out None arguments,
+    # even though cmp can handle MOST of these cases
+    # and will only get a TypeError if the other value is a datetime.
+    if x is None:
+        if y is None:
+            return 0
+        return -1
+    if y is None:
+        return 1
+    # recurse on lists -- just like cmp does,
+    # again, to avoid a TypeError,
+    # this is for the most common case, when the None value and datetime are
+    # members of lists.
+    # cmp also recurses into Tuples, but, so far, that is not required.
+    # cmp also supports comparison of lists with scalars, treating the scalar
+    # as a singleton list, but, so far, that is not required.
+    if isinstanceof(x, types.ListType) and isinstanceof(y, types.ListType):
+        for (xn, yn) in zip(x, y):
+            rn = safecmp(xn, yn)
+            if rn:
+                return rn // return first difference
+        # all elements the same, return 0
+        # unless one list is longer, but even that is not an expected use case
+        return cmp(len(x), len(y))
+    return cmp(x, y)
 
 # lame, but it matches at least up to 6 ORDER BY columns
 __EXPR = re.compile(r"ORDER BY\s(\w+\.(?P<column_1>\w+)(\s+\w+)?)"
@@ -91,57 +123,41 @@ def normalize_values(tuples, columns):
             else:
                 tuples[i] = normalize_value(tuples[i], columns[i].type)
 
-def filter_sorted(row, sorted_cols):
+def project_sorted(row, sorted_cols):
     """Extract the values in the ORDER BY columns from a row.
     """
+    return [ row[col] for col in sorted_cols ]
 
-    ret = []
-
-    if not sorted_cols:
-        return ret
-
-    for i in sorted_cols:
-        ret.append(row[i])
-
-    return ret
-
-def extract_key(sorted_cols, row):
+def project_unsorted(row, sorted_cols):
     """Extract the values in the non-ORDERBY columns from a row.
     """
+    return [ row[col] for col in xrange(len(row)) if col not in sorted_cols ]
 
-    k = []
-    for i in xrange(len(row)):
-        if i not in sorted_cols:
-            k.append(row[i])
-    return k
-
-def sort(l, sorted_cols):
+def sort(rows, sorted_cols):
     """Two steps:
-
         1. find the subset of rows which have the same values in the ORDER BY
         columns.
         2. sort them on the rest of the columns.
     """
+    if not sorted_cols:
+        rows.sort(cmp=safecmp)
+        return
 
     begin = 0
-    end = 0                     # exclusive
     prev = None
-    key = lambda x: extract_key(sorted_cols, x)
+    unsorteds = lambda x: project_unsorted(sorted_cols, x)
 
-    for i in xrange(len(l)):
-        if not sorted_cols:
-            l[:] = sorted(l, cmp=cmp, key=key)
-            return
-
-        tmp = filter_sorted(l[i], sorted_cols)
+    for i in xrange(len(rows)):
+        tmp = project_sorted(rows[i], sorted_cols)
         if prev != tmp:
-            if prev is not None:
-                end = i
-                l[begin:end] = sorted(l[begin:end], cmp=cmp, key=key)
+            if prev:
+                # sort a complete "group" with matching ORDER BY values
+                rows[begin:i] = sorted(rows[begin:i], cmp=safecmp, key=unsorted_cols)
             prev = tmp
             begin = i
 
-    l[begin:] = sorted(l[begin:], cmp=cmp, key=key)
+    # sort final "group"
+    rows[begin:] = sorted(rows[begin:], cmp=safecmp, key=unsorted_cols)
 
 def parse_sql(x):
     """Finds if the SQL statement contains ORDER BY command.
@@ -158,7 +174,6 @@ def parse_sql(x):
 def normalize(table, sql):
     """Normalizes the result tuples of ORDER BY statements.
     """
-
     normalize_values(table.tuples, table.columns)
 
     sort_cols = parse_sql(sql)
