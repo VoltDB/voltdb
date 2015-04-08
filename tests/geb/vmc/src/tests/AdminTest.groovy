@@ -53,7 +53,7 @@ class AdminTest extends TestBase {
 		}
     }
 
-/*
+
     // DIRECTORIES
 
     def "check Directories title"() {
@@ -1952,7 +1952,7 @@ class AdminTest extends TestBase {
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
         }
     }
-*/
+
     def "header username check" () {
         when:
         at AdminPage
@@ -1992,7 +1992,7 @@ class AdminTest extends TestBase {
         header.logoutPopupCancelButton.click()
     }
 
-/*
+
     // LOGOUT TEST
 
     def "logout button test close" ()  {
@@ -2612,5 +2612,5 @@ class AdminTest extends TestBase {
             }
         }
     }
-*/
+
 }
