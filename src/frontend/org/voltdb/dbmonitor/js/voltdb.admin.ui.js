@@ -2523,6 +2523,7 @@ function loadAdminPage() {
         this.toggleStates = {};
         this.orgUserList = [];
         this.drEnabled = false;
+        this.drReplicaEnabled = true;
         this.drReplicationRole = "NONE";
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {

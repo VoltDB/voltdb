@@ -168,7 +168,7 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
@@ -228,15 +228,13 @@ class DbMonitorTest extends TestBase {
     }
 
     def "header username check" () {
-
-
         when:
         at DbMonitorPage
         String username = page.getUsername()
         then:
         waitFor(30) {
-            header.username.isDisplayed()
-            header.username.text().equals(username)
+            header.usernameInHeader.isDisplayed()
+            header.usernameInHeader.text().equals(username)
         }
     }
 
@@ -245,8 +243,8 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
@@ -259,8 +257,8 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
@@ -1330,7 +1328,6 @@ class DbMonitorTest extends TestBase {
     }
 
 
-
     def "check min value in server cpu minutes"(){
         when:
         page.selecttypeindrop.click()
@@ -1345,7 +1342,6 @@ class DbMonitorTest extends TestBase {
             println("doesn't match")
         }
     }
-
 
     def "check max value in server cpu minutes"(){
         when:
@@ -1395,7 +1391,6 @@ class DbMonitorTest extends TestBase {
     }
 
 
-
     def "check min value in server ram days"(){
         when:
         page.selecttypeindrop.click()
@@ -1441,7 +1436,6 @@ class DbMonitorTest extends TestBase {
     }
 
 
-
     def "check max value in server ram minutes"(){
         when:
         page.selecttypeindrop.click()
@@ -1455,7 +1449,6 @@ class DbMonitorTest extends TestBase {
             println("doesn't match")
         }
     }
-
 
 
 
@@ -1487,7 +1480,6 @@ class DbMonitorTest extends TestBase {
             println("doesn't match")
         }
     }
-
 
 
     def "check min value in cluster latency days"(){
@@ -1565,7 +1557,6 @@ class DbMonitorTest extends TestBase {
     }
 
 
-
     def "check max value in cluster latency seconds"(){
         when:
         page.selecttypeindrop.click()
@@ -1579,7 +1570,6 @@ class DbMonitorTest extends TestBase {
             println("doesn't match")
         }
     }
-
 
 
 
@@ -1643,7 +1633,6 @@ class DbMonitorTest extends TestBase {
     }
 
 
-
     def "check min value in cluster transaction seconds"(){
         when:
         page.selecttypeindrop.click()
@@ -1670,6 +1659,192 @@ class DbMonitorTest extends TestBase {
         else {
             println("doesn't match")
         }
+    }
+
+// for partition idle graph
+
+    def "check min value in cluster Partition Idle graph with respect to seconds"(){
+
+        when:'select the type as second in dropdown list'
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
+
+        then:'check minimum value in partition idle time graph'
+        waitFor(10){	page.partitiongraphmin.isDisplayed()
+                         page.partitiongraphmax.isDisplayed()
+        }
+
+        if(page.partitiongraphmax.text() - page.partitiongraphmin.text()<= "15:06") {
+                        println("Min Time for cluster transaction seconds for partition Idle graph is:"+page.partitiongraphmin.text());
+        }
+        else {
+                        println("doesn't match")
+        }
+    }
+
+    def "check max value in cluster Partition Idle graph with respect to seconds"(){
+
+        when:'select the type as second in dropdown list'
+        page.selecttypeindrop.click()
+        page.selecttypesec.click()
+
+        then: 'check maximum value in partition idle time graph'
+        waitFor(10){	page.partitiongraphmin.isDisplayed()
+                        page.partitiongraphmax.isDisplayed()}
+        if(page.partitiongraphmax.text() - page.partitiongraphmin.text()<= "15:06") {
+                        println("Max Time for cluster transaction seconds for Partition Idle graph is:"+page.partitiongraphmax.text());
+        }
+        else {
+                        println("doesn't match")
+        }
+    }
+
+
+    def "check min value in cluster Partition Idle graph with respect to days"(){
+
+        when:'select the type as days in dropdown list'
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
+
+        then:'check minimum value in partition idle time graph'
+        waitFor(10){	page.partitiongraphdaysmin.isDisplayed()
+                        page.partitiongraphdaysmax.isDisplayed()}
+
+        if(page.partitiongraphdaysmax.text() - page.partitiongraphdaysmin.text()<= "08:00:00") {
+                        println("Min Time for cluster transaction days for partition Idle graph is:"+page.partitiongraphdaysmin.text());
+        }
+        else {
+                        println("doesn't match")
+        }
+    }
+
+    def "check max value in cluster Partition Idle graph with respect to days"(){
+
+        when:'select the type as days in dropdown list'
+        page.selecttypeindrop.click()
+        page.selecttypedays.click()
+
+        then:'check maximum value in partition idle time graph'
+        waitFor(10){	page.partitiongraphdaysmin.isDisplayed()
+                        page.partitiongraphdaysmax.isDisplayed()}
+        if(page.partitiongraphdaysmax.text() - page.partitiongraphdaysmin.text()<= "08:00:00") {
+                        println("Max Time for cluster transaction days for Partition Idle graph is:"+page.partitiongraphdaysmax.text());
+        }
+        else {
+                        println("doesn't match")
+        }
+    }
+
+    def "check min value in cluster Partition Idle graph with respect to minutes"(){
+
+        when:'select the type as minutes in dropdown list'
+
+        waitFor(5){page.selecttypeindrop.click()}
+        page.selecttypemin.click()
+        page.selecttypemin.click()
+
+        then:'check minimum value in partition idle time graph'
+        waitFor(10){	page.partitiongraphminutmin.isDisplayed()
+                        page.partitiongraphminutmax.isDisplayed()}
+        if(page.partitiongraphminutmax.text() - page.partitiongraphminutmin.text() <= "20:00") {
+                        println("Min Time for cluster transaction minutes for partition Idle graph is:"+page.partitiongraphminutmin.text());
+        }
+        else {
+            println("doesn't match");
+        }
+    }
+
+    def "check max value in cluster Partition Idle graph with respect to minutes"(){
+
+        when:'select the type as minutes in dropdown list'
+
+        waitFor(5){page.selecttypeindrop.click()}
+        page.selecttypemin.click()
+        page.selecttypemin.click()
+
+        then:'check maximum value in partition idle time graph'
+        waitFor(10){	page.partitiongraphminutmin.isDisplayed()
+                        page.partitiongraphminutmax.isDisplayed()}
+        if(page.partitiongraphminutmax.text() - page.partitiongraphminutmin.text() <= "20:00") {
+                        println("Max Time for cluster transaction minutes for Partition Idle graph is:"+page.partitiongraphminutmax.text());
+        }
+        else {
+                        println("doesn't match");
+        }
+    }
+
+
+    def "Click display preferences remove Partition Idle Time and again Add Partition Idle Time"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time checkbox is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Remove Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Partition Idle Time displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        !page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Add Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Partition Idle Time displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "Click server legends in Graph Partition Idle Time"(){
+
+        when: 'server partition legends is visible'
+        waitFor(10){page.partitionserverlegends.isDisplayed()
+                    page.serverlegendfisrt.isDisplayed()
+                    page.serverlegendsecond.isDisplayed()
+                    page.serverlegendthird.isDisplayed()
+                    page.serverlegendlast.isDisplayed()
+        }
+
+
+        then: 'click those server partition legends'
+            page.serverlegendfisrt.click()
+            println("1st server legend clicked one time")
+            page.serverlegendsecond.click()
+            page.serverlegendsecond.click()
+            println("2nd server legend clicked two times")
+            page.serverlegendthird.click()
+            println("3rd server legend clicked one time")
+            page.serverlegendlast.click()
+            page.serverlegendlast.click()
+            println("last server legend with the red spot clicked two times")
+
+
     }
 
     def cleanupSpec() {

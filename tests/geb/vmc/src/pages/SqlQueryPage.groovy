@@ -83,6 +83,9 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         htmlOptions				{ $("option", text:"HTML") }
         csvOptions				{ $("option", text:"CSV") }
         monospaceOptions		{ $("option", text:"Monospace") }
+
+        // for view
+        checkview		{ $("#tabMain > ul > li.active > a")}
         
         //result
         resultHtml		{ $("#resultHtml") }
@@ -103,6 +106,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Tables (by clicking the "Tables" tab).
      */
+
     def showTables() {
         clickToDisplay(tablesTab, tablesNames)
     }
@@ -110,6 +114,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Views (by clicking the "Views" tab).
      */
+
     def showViews() {
         clickToDisplay(viewsTab, viewsNames)
     }
@@ -117,6 +122,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Stored Procedures (by clicking the "Stored Procedures" tab).
      */
+
     def showStoredProcedures() {
         clickToDisplay(storedProcsTab, allStoredProcs)
     }

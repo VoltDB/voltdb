@@ -53,6 +53,7 @@ class AdminTest extends TestBase {
 		}
     }
 
+
     // DIRECTORIES
 
     def "check Directories title"() {
@@ -1557,7 +1558,7 @@ class AdminTest extends TestBase {
 		    	when:
 				waitFor(waitTime) {
 				   	page.networkInterfaces.clusterSettingTitle.isDisplayed()
-            		page.networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
+            page.networkInterfaces.clusterSettingTitle.text().toLowerCase().equals("Cluster Settings".toLowerCase())
 				}
 				then:
 				testStatus = true
@@ -1893,7 +1894,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
@@ -1947,30 +1948,28 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { 
-        	header.tabSQLQuery.isDisplayed()
+        waitFor(30) { header.tabSQLQuery.isDisplayed()
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
         }
     }
 
     def "header username check" () {
-        String user = page.getUsername()
         when:
         at AdminPage
-        println(user)
+        String username = page.getUsername()
         then:
         waitFor(30) {
-            page.header.username.isDisplayed()
+            header.usernameInHeader.isDisplayed()
+            header.usernameInHeader.text().equals(username)
         }
-        page.header.username.text().equals(user)
     }
 
     def "header username click and close" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
@@ -1983,8 +1982,8 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
@@ -2613,4 +2612,5 @@ class AdminTest extends TestBase {
             }
         }
     }
+
 }
