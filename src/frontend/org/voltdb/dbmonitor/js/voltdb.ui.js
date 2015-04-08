@@ -1084,7 +1084,7 @@ var loadPage = function (serverName, portid) {
                     { "bSearchable": false }
                 ]
             });
-            $("#tblDrMAster_wrapper").find(".dataTables_paginate").first().remove();
+            $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
             $(".paginate_enabled_next").html("Next");
@@ -1099,6 +1099,7 @@ var loadPage = function (serverName, portid) {
 
             $("#drMasterSection").find(".pagination").hide();
         });
+        
         $('#filterStoredProc1').on('keyup', function () {
             table.search(this.value).draw();
         });
