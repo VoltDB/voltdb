@@ -1222,26 +1222,15 @@ class DbMonitorTest extends TestBase {
 	}
 
 
+
     // server search
     def "check server search on dbmonitor matched"(){
 
-        def $line
-        def $line1
-        def $line2
-        def $line3
-        def $lineunused, $lineunused1
-        new File("src/resources/serversearch.txt").withReader {
-            $lineunused = it.readLine()
-            $lineunused1 = it.readLine()
-            $line = it.readLine()
-            $line1 = it.readLine()
-            $line2 = it.readLine()
-            $line3 = it.readLine()
-        }
         when:'clicked server button'
         at DbMonitorPage
+        String serverNamevalid = page.getValidPath()  // taking local server valid name from serversearch.txt file ("/src/resources/serversearch.txt")
         page.clusterserverbutton.click()
-        waitFor(5){page.serversearch.value($line)
+        waitFor(5){page.serversearch.value(serverNamevalid)
         }
 
         then:
@@ -1254,26 +1243,12 @@ class DbMonitorTest extends TestBase {
 
     def "check server search on dbmonitor not matched"(){
 
-
-
-        def $line
-        def $line1
-        def $line2
-        def $line3
-        def $lineunused, $lineunused1
-        new File("src/resources/serversearch.txt").withReader {
-            $lineunused = it.readLine()
-            $lineunused1 = it.readLine()
-            $line = it.readLine()
-            $line1 = it.readLine()
-            $line2 = it.readLine()
-            $line3 = it.readLine()
-        }
         when:'clicked server button'
         at DbMonitorPage
+        String serverNameinvalid = page.getInvalidPath() // taking local server invalid name from serversearch.txt file ("/src/resources/serversearch.txt")
         page.clusterserverbutton.click()
-        waitFor(5){page.serversearch.value($line3)}
-        //page.serversearch.value($line3)
+        waitFor(5){page.serversearch.value(serverNameinvalid)}
+
 
         then:
         at DbMonitorPage

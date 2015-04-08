@@ -204,7 +204,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      * @return the displayed (parenthetical) count (or -1 if not shown, or
      * -2 if not parseable).
      */
-    
+
     private int getCount(Navigator nav) {
         if (!nav.displayed) {
             return -1
@@ -718,6 +718,38 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         }
 
         return query
+    }
+
+
+    //server search
+
+
+    def String getValidPath() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/serversearch.txt"))
+        String validPath
+
+        while((validPath = br.readLine()) != "#servername") {
+        }
+
+        validPath = br.readLine()
+
+        return validPath
+    }
+
+    def String getInvalidPath() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/serversearch.txt"))
+        String invalidPath
+
+        while((invalidPath = br.readLine()) != "#invalidservername") {
+        }
+
+        invalidPath = br.readLine()
+
+        return invalidPath
+    }
+
+    def String getEmptyPath() {
+        return ""
     }
 
     /*
