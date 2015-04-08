@@ -284,6 +284,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
+        long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                 txnId,
                 context.getCatalogCRC(),
@@ -297,6 +298,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 remoteDCLastIds,
                 instId,
                 timestamp,
+                clusterCreateTime,
                 newPartitionCount);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
