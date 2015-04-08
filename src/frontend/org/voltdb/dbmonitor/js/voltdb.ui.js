@@ -1037,9 +1037,9 @@ var loadPage = function (serverName, portid) {
                 for (var i = 0; i <= response[key].length - 1; i++) {
                     htmlcontent = htmlcontent + "<tr>";
                     htmlcontent = htmlcontent + "<td>" + key + "</td>" +
-                        "<td>" + response[key][i].TOTALBUFFERS + "</td>" +
-                        "<td>" + response[key][i].TIMESTAMP + "</td >" +
+                        "<td>on</td>" +
                         "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
+                        "<td>" + response[key][i].TOTALBYTES + "</td >" +
                         "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
                         "<td>" + response[key][i].TOTALBUFFERS + "</td >";
                     htmlcontent = htmlcontent + "</tr>";
@@ -1074,7 +1074,7 @@ var loadPage = function (serverName, portid) {
                     { "bSearchable": false }
                 ]
             });
-
+            $("#tblDrMAster_wrapper").find(".dataTables_paginate").first().remove();
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
             $(".paginate_enabled_next").html("Next");
@@ -1088,8 +1088,6 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster").find(".sorting_asc").removeClass("sorting_asc");
 
             $("#drMasterSection").find(".pagination").hide();
-
-
         });
         $('#filterStoredProc1').on('keyup', function () {
             table.search(this.value).draw();
@@ -1523,10 +1521,10 @@ var loadPage = function (serverName, portid) {
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
-    setInterval(function () {
-        refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-        refreshDrSection();
-    }, 5000);
+    //setInterval(function () {
+    refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
+    refreshDrSection();
+    //  }, 5000);
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();

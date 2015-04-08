@@ -289,7 +289,8 @@
                             <div class="leftShowhide">
                                 <div class="dr">
                                     <h1 class="headText1">
-                                        <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a></h1>
+                                        <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>
+                                    </h1>
                                     </h1>
                                 </div>
                             </div>
@@ -300,8 +301,8 @@
                                 </ul>
 
                                 <ul class="drList">
-                                   <!-- <li>State</li>
-                                    <li class="drArrow">On</li>-->
+                                    <!-- <li>State</li>
+                                     <li class="drArrow">On</li>-->
                                     <li class="alertIcon warningDr">
                                         <a id="drWarning" href="#myWarning" class="drWarning">
                                             <span style="margin:0 0 0 24px">Warning</span>
@@ -317,37 +318,31 @@
                         </div>
                         <div id="drMasterSection" class="drShowHide" style="display:none;">
                             <div id="Div5" class="masterWrapper" style="display:block">
-                                <div class="tabs-filter-wrapper">
-                                    <div class="tableTitle icon-master">Master</div>
-                                    <div class="filter">
-                                        <input name="filter" id="filterStoredProc1" type="text" class="search-box" onblur="" placeholder="Search Partition ID" />
-                                        <a id="searchDrMasterData" href="javascript:void(0)" class="icon-search" title="Search">search</a>
-                                    </div>
-                                    <div class="clear"></div>
-                                    <div class="pagination">
-                                        <a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
-                                        <label id="lblPreviousTable">0</label>
-                                        of
-                                        <label id="lblTotalPagesofTables">0</label>
-                                        <a id="nextTables" href="javascript:void(0)" class="next" title="Next Page">Next</a>
-                                    </div>
-                                </div>
-                              
+
                                 <div class="tblScroll">
-                                   
-                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="drTbl no-footer dataTable">
-                                        <thead>
-                                            <tr>
-                                                <th id="Th1" width="25%" data-name="none">Partition ID</th>
-                                                <th id="Th2" width="20%" data-name="none">Status</th>
-                                                <th id="Th3" width="10%" data-name="none">Total Buffer</th>
-                                                <th id="Th4" width="10%" data-name="none">Buffer on disk</th>
-                                                <th id="Th5" width="15%" data-name="none">Replica Latency (ms)</th>
-                                                <th id="Th6" width="20%" data-name="none">Replica latency (in transactions)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
+                                    <div id="tblDrMAster_wrapper" class="dataTables_wrapper no-footer">
+                                        <div class="tabs-filter-wrapperDR">
+                                            <div class="tableTitle icon-master">Master</div>
+                                            <div class="filter"><input name="filter" id="filterStoredProc1" type="text" class="search-box" onblur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search" title="Search">search</a></div>
+                                            <div class="clear"></div>
+                                        </div>
+                                        <div class="clear"></div>
+
+
+                                        <div class="dataTables_paginate paging_extStyleLF" id="tblDrMAster_paginate">
+                                            <span class="paginate_disabled_previous paginate_button">Prev</span>
+                                            <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                            <span class="paginate_enabled_next paginate_button">Next</span>
+                                        </div>
+
+
+                                        <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">
+                                            <thead>
+                                                <tr role="row"><th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th><th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th><th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th><th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th><th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th><th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th></tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                             <div id="drReplicaSection" class="replicaWrapper">
@@ -388,6 +383,10 @@
                                 </div>
                             </div>
                         </div>
+
+
+
+
                     </div>
 
                 </div>

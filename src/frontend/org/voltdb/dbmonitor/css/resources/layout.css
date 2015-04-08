@@ -1071,12 +1071,16 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 .warningDr {display: block; width: 73px;}
 .warninghead { margin:0; padding:0;}
 .warninghead img { margin:5px 5px 0 0; position:relative;top:2px;}
-.paging_extStyleLF { width: 162px!important; margin-bottom:10px;}
+.paging_extStyleLF { width: 185px!important; margin-bottom:10px;}
 .navigationLabel {display: inline!important; margin: 5px!important;}
 .paginate_enabled_next.paginate_button, .paginate_disabled_next.paginate_button {float: right!important;}
 #txtDrReplica { cursor: default;}
 .warningDr a{color:#ea151d;}
 .warningDr a:hover{color:#111;}
+
+
+.tabs-filter-wrapperDR{   margin-bottom: 10px;float: left; width: 650px;}
+.tabs-filter-wrapperDR .filter{ float:left; width:40%;}
 
 /****DR Ends*******/
 
