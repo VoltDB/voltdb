@@ -41,6 +41,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.ByteBufferUtil;
 import org.voltdb.utils.Encoder;
 
 /* Serializes data over a connection that presumably is being read
@@ -443,10 +444,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 messageBuffer.get(reasonBytes);
                 message = new String(reasonBytes, Constants.UTF8ENCODING);
 
-                final int filenameLength = messageBuffer.getInt();
-                final byte filenameBytes[] = new byte[filenameLength];
-                messageBuffer.get(filenameBytes);
-                filename = new String(filenameBytes, Charsets.UTF_8);
+                filename = ByteBufferUtil.readNonNullSymbolString(messageBuffer);
 
                 lineno = messageBuffer.getInt();
 
@@ -454,12 +452,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 traces = new String[numTraces];
 
                 for (int ii = 0; ii < numTraces; ii++) {
-                    int traceLength = messageBuffer.getInt();
-                    byte traceBytes[] = new byte[traceLength];
-                    messageBuffer.get(traceBytes);
-                    traces[ii] = new String(traceBytes, Charsets.UTF_8);
+                    traces[ii] = ByteBufferUtil.readNonNullSymbolString(messageBuffer);
                 }
-            } catch (IOException x) { }
+            } catch (IOException notImportant) { }
             crashVoltDB(message, traces, filename, lineno);
         }
 

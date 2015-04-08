@@ -266,7 +266,7 @@ public class StoredProcedureInvocation implements JSONString {
             originalUniqueId = in.readLong();
         }
 
-        procName = in.readString().intern();
+        procName = in.readNonNullSymbolString().intern();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         serializedParams = in.remainder();

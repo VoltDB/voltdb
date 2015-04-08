@@ -24,8 +24,8 @@ import java.util.logging.Logger;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.utils.ByteBufferUtil;
 
 /**
  * Exception generated when a constraint is violated. Contains more information then a SQLException.
@@ -43,7 +43,7 @@ public class ConstraintFailureException extends SQLException {
         super(exceptionBuffer);
         type = ConstraintType.get(exceptionBuffer.getInt());
         try {
-            tableName = FastDeserializer.readString(exceptionBuffer);
+            tableName = ByteBufferUtil.readNonNullSymbolString(exceptionBuffer);
         }
         catch (IOException e) {
             // implies that the EE created an invalid constraint

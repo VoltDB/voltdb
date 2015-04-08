@@ -97,7 +97,7 @@ public class EchoServer {
                     fs.writeDouble(f);
                     break;
                 case STRING:
-                    String str = fds.readString();
+                    String str = fds.readVarchar();
                     fs.writeString(str);
                     break;
                 case VARBINARY:

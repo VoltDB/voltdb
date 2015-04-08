@@ -24,9 +24,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import org.voltdb.VoltType;
-import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.ByteBufferUtil;
 
 /**
  * Yet another ByteBuffer wrapper class,
@@ -143,45 +143,33 @@ public class FastDeserializer {
     }
 
     /**
-     * Read a string in the standard VoltDB way without
-     * wrapping the byte buffer.
-     * That is, a four byte length, or -1 for null,
-     * followed by the bytes of UTF-8 encoded characters.
+     * Read a string in the standard VoltDB way.
+     * @return The String value read from the internal buffer.
      * @throws IOException
      */
-    public static String readString(ByteBuffer buffer) throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
-
-        final int len = buffer.getInt();
-
-        // check for null string
-        if (len == NULL_STRING_INDICATOR) {
-            return null;
-        }
-
-        if (len > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Serializable strings cannot be longer then "
-                    + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
-        if (len < NULL_STRING_INDICATOR) {
-            throw new IOException("String length is negative " + len);
-        }
-
-        // now assume not null
-        final byte[] strbytes = new byte[len];
-        buffer.get(strbytes);
-        return new String(strbytes, Constants.UTF8ENCODING);
+    public String readString() throws IOException {
+        return ByteBufferUtil.readArbitraryString(m_buffer);
     }
 
     /**
-     * Read a string in the standard VoltDB way.
+     * Read a string in the standard VoltDB way AND
+     * check that it is a reasonable non-null symbol value.
      * @return The String value read from the internal buffer.
-     * @throws IOException Rethrows any IOExceptions.
+     * @throws IOException
      */
-    public String readString() throws IOException {
-        return readString(m_buffer);
+    public String readNonNullSymbolString() throws IOException {
+        return ByteBufferUtil.readNonNullSymbolString(m_buffer);
     }
 
+    /**
+     * Read a string in the standard VoltDB way AND
+     * check that it is a reasonable String column value.
+     * @return The String value read from the internal buffer.
+     * @throws IOException
+     */
+    public String readVarchar() throws IOException {
+        return ByteBufferUtil.readVarchar(m_buffer);
+    }
     /**
      * Read a varbinary, serialized the same way VoltDB serializes
      * strings, but returned as byte[].
@@ -228,7 +216,8 @@ public class FastDeserializer {
      * @throws IOException
      */
     public BigDecimal readBigDecimalFromString() throws IOException {
-        return VoltDecimalHelper.deserializeBigDecimalFromString(readString(m_buffer));
+        String digits = ByteBufferUtil.readDecimalString(m_buffer);
+        return VoltDecimalHelper.deserializeBigDecimalFromString(digits);
     }
 
     public byte[] readByteArray() throws IOException {
@@ -376,4 +365,5 @@ public class FastDeserializer {
      * @param pos The position to set to.
      */
     public void setPosition(int pos) { m_buffer.position(pos); }
+
 }
