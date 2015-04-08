@@ -937,6 +937,15 @@ public class VoltDB {
         }
     }
 
+    public static int getReplicationPort(int deploymentFilePort) {
+        if (m_config.m_drAgentPortStart != -1) {
+            return m_config.m_drAgentPortStart;
+        }
+        else {
+            return deploymentFilePort;
+        }
+    }
+
     @Override
     public Object clone() throws CloneNotSupportedException {
         throw new CloneNotSupportedException();
