@@ -723,7 +723,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
     //server search
 
-
     def String getValidPath() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/serversearch.txt"))
         String validPath

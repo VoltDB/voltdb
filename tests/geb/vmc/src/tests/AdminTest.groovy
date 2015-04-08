@@ -2625,7 +2625,6 @@ class AdminTest extends TestBase {
             break;
         }
 
-
         then:
         if(page.networkInterfaces.serversettingclientvalue.text()==""){
             println("Client port value in server setting is empty")}

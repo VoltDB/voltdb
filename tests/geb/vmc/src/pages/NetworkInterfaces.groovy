@@ -15,6 +15,7 @@ import org.openqa.selenium.JavascriptExecutor
  */
 
 class NetworkInterfaces extends Module {
+
     static content = {
         title			                { $("h1", text:"Network Interfaces") }
 

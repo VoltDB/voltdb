@@ -1222,7 +1222,6 @@ class DbMonitorTest extends TestBase {
 	}
 
 
-
     // server search
     def "check server search on dbmonitor matched"(){
 
