@@ -134,7 +134,7 @@ $(document).ready(function () {
     $('#showHideGraphBlock').click(function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
-            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false) {
+            if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false) {
                 var graphState = $("#mainGraphBlock").css('display');
                 if (graphState == 'none') {
                     $(".showhideIcon").removeClass('collapsed');
@@ -694,14 +694,24 @@ var loadPage = function (serverName, portid) {
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
                 VoltDbAdminConfig.drReplicationRole = replicaDetail[currentServer]['status'];
-            }
-        });
 
-        voltDbRenderer.GetDrStatusInformation(function (drDetails) {
-            if (getCurrentServer() != undefined) {
-                var currentServer = getCurrentServer();
-                VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
-                //console.log(JSON.stringify(drDetails));
+                voltDbRenderer.GetDrStatusInformation(function (drDetails) {
+                    if (getCurrentServer() != undefined) {
+                        VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
+                        if (VoltDbAdminConfig.drReplicationRole.toLowerCase() != 'none' && VoltDbAdminConfig.drReplicaEnabled == true) {
+                            $('#liDrReplication').css('display', 'block');
+                        } else {
+                            $('#liDrReplication').css('display', 'none');
+                            var userPreferences = getUserPreferences();
+                            $.each(userPreferences, function (key, value) {
+                                if (key == "DrReplicationRate")
+                                    userPreferences[key] = false;
+                            });
+                            saveUserPreferences(userPreferences);
+                        }
+
+                    }
+                });
             }
         });
 
@@ -1278,7 +1288,7 @@ var loadPage = function (serverName, portid) {
         saveCookie("graph-view", $("#graphView").val());
 
     $("#graphView").val($.cookie("graph-view"));
-    MonitorGraphUI.AddGraph($.cookie("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'));
+    MonitorGraphUI.AddGraph($.cookie("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'));
 
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').unbind('click');
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').on('click', function () {
@@ -1667,7 +1677,7 @@ var getUserPreferences = function () {
     } catch (e) {
 
         voltDbRenderer.userPreferences = {};
-        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime"];
+        var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime", "DrReplicationRate"];
         for (var i = 0; i < preferencesList.length; i++) {
             voltDbRenderer.userPreferences[preferencesList[i]] = true;
         }
@@ -1710,6 +1720,8 @@ var showHideGraph = function (userpreferences) {
     else
         $("#chartPartitionIdleTime").show();
 
+    if (userpreferences["DrReplicationRate"] == false)        $("#ChartDrReplicationRate").hide();    else        $("#ChartDrReplicationRate").show();
+
     if (userpreferences["StoredProcedures"] == false)
         $("#tblStoredProcedures").hide();
     else
@@ -1733,7 +1745,7 @@ var showHideGraph = function (userpreferences) {
 function ChangeGraphLabelColor() {
     if ($.cookie("user-preferences") != undefined) {
         var userPreferences = $.parseJSON($.cookie("user-preferences"));
-        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false) {
+        if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false) {
             $('#showHideGraphBlock').css('color', '#000000');
             $("#GraphBlock").removeClass("graphOpacity");
         } else {
