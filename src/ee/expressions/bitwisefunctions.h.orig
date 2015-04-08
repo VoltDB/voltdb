@@ -16,24 +16,12 @@
  */
 
 #include "common/NValue.hpp"
+#include "common/ValueFactory.hpp"
+#include "expressions/functionexpression.h"
 
 namespace voltdb {
 
-template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
-
-    if (getValueType() != VALUE_TYPE_BIGINT) {
-        // The parser should enforce this for us,
-        // but just in case...
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITNOT function");
-    }
-
-    // We're treating LONG_MIN as a normal bit pattern, so *don't*
-    // check for null here.
-
-    int64_t operand = getBigInt();
-    return getBigIntValue(~operand);
-}
-
+<<<<<<< HEAD
 template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& lval = arguments[0];
@@ -82,4 +70,20 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
 }
 
 
+=======
+template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
+
+    // This exception seems inappropriate, what should
+    // we throw here?
+    if (getValueType() != VALUE_TYPE_BIGINT)
+        throwCastSQLException (getValueType(), VALUE_TYPE_BIGINT);
+
+    if (isNull())
+        return getNullValue(VALUE_TYPE_BIGINT);
+
+    int64_t operand = getBigInt();
+    return ValueFactory::getBigIntValue(~operand);
+}
+
+>>>>>>> Support scalar function bitnot
 }

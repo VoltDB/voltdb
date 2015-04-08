@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -1475,39 +1474,15 @@ public class FunctionCustom extends FunctionSQL {
 
                 break;
             }
-            /************************* Volt DB Extensions *************************/
-            // Hsqldb use Integer type by default, VoltDB wants to support BigInt instead
+            // A VoltDB extension: Hsqldb uses Integer type by default,
+            // VoltDB wants to support BigInt instead
             case FUNC_BITAND :
             case FUNC_BITOR :
             case FUNC_BITXOR : {
-                for (int i = 0; i < nodes.length; i++) {
-                    if (nodes[i].dataType == null) {
-                        nodes[i].dataType = Type.SQL_BIGINT;
-                    }
-                    else if (nodes[i].dataType.typeCode
-                               != Types.SQL_BIGINT) {
-                        if (nodes[i].valueData != null && nodes[i].dataType.isIntegralType()) {
-                            if (nodes[i].valueData instanceof BigDecimal) {
-                                // Only Decimal integral type could exceed the range of Long, check the range here
-                                BigDecimal bd = (BigDecimal) nodes[i].valueData;
-                                if (bd.compareTo(NumberType.MAX_LONG) > 0 || bd.compareTo(NumberType.MIN_LONG) < 0) {
-                                    throw Error.error(ErrorCode.X_22003);
-                                }
-                            }
-
-                            nodes[i].dataType = Type.SQL_BIGINT;
-                            break;
-                        }
-
-                        throw Error.error(ErrorCode.X_42561);
-                    }
-                }
-
-                dataType = Type.SQL_BIGINT;
-
+                voltResolveToBigintTypesForBitwise();
                 break;
             }
-            /**********************************************************************/
+            // End of VoltDB extension
             case FUNC_ASCII : {
                 if (nodes[0].dataType == null) {
                     nodes[0].dataType = Type.SQL_VARCHAR;

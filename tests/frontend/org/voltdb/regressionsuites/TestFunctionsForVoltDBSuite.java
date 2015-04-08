@@ -1578,6 +1578,81 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testBitnot() throws Exception {
+        System.out.println("STARTING test Bitnot");
+        Client client = getClient();
+        VoltTable result = null;
+
+        long[] interestingValues = new long[] {
+                // skipping Long.MIN_VALUE because it's our null value
+                // (tested below)
+                Long.MIN_VALUE + 1,
+                Long.MIN_VALUE + 1000,
+                -1,
+                0,
+                1,
+                1000,
+                Long.MAX_VALUE - 1
+                // Long.MAX_VALUE produces Long.MIN_VALUE,
+                // which can represent the null value
+                // (these special cases are tested below)
+        };
+
+        int i = 0;
+        for (long val : interestingValues) {
+            client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)",
+                    i, val);
+            ++i;
+        }
+
+        for (long val : interestingValues) {
+            result = client.callProcedure("@AdHoc",
+                    "select big, bitnot(big) from R3 where big = " + val).getResults()[0];
+            validateRowOfLongs(result, new long[] {val, ~val});
+        }
+
+        // 2^63 is out of range
+        verifyStmtFails(client, "select bitnot(9223372036854775808) from R3", "numeric value out of range");
+
+        // as is -(2^63) - 1
+        verifyStmtFails(client, "select bitnot(-9223372036854775809) from R3", "numeric value out of range");
+    }
+
+    public void testBitnotNull() throws Exception {
+        System.out.println("STARTING test Bitnot with null value");
+        Client client = getClient();
+        VoltTable result = null;
+
+        client.callProcedure("@AdHoc", "insert into R3(id, big) values (0, ?)",
+                Long.MIN_VALUE);
+        client.callProcedure("@AdHoc", "insert into R3(id, big) values (1, ?)",
+                Long.MAX_VALUE);
+
+
+        result = client.callProcedure("@AdHoc",
+                "select bitnot(big) from r3 where id = 0")
+                .getResults()[0];
+
+        result.advanceRow();
+
+        // Treat MIN_VALUE like any other value (as opposed to a null value)
+        // In this case, MIN_VALUE becomes MAX_VALUE
+        long val = result.getLong(0);
+        assertEquals(false, result.wasNull());
+        assertEquals(Long.MAX_VALUE, val);
+
+        result = client.callProcedure("@AdHoc",
+                "select bitnot(big) from r3 where id = 1")
+                .getResults()[0];
+
+        // bitnot(MAX_VALUE) produces MIN_VALUE, which will be
+        // seen as a null by clients.
+        result.advanceRow();
+        val = result.getLong(0);
+        assertEquals(true, result.wasNull());
+        assertEquals(Long.MIN_VALUE, val);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

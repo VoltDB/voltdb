@@ -2339,5 +2339,33 @@ public class FunctionSQL extends Expression {
     public static int voltGetCurrentTimestampId() {
         return FUNC_CURRENT_TIMESTAMP;
     }
+
+    protected void voltResolveToBigintTypesForBitwise() {
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i].dataType == null) {
+                nodes[i].dataType = Type.SQL_BIGINT;
+            }
+            else if (nodes[i].dataType.typeCode
+                       != Types.SQL_BIGINT) {
+                if (nodes[i].valueData != null && nodes[i].dataType.isIntegralType()) {
+                    if (nodes[i].valueData instanceof java.math.BigDecimal) {
+                        // Only Decimal integral type could exceed the range of Long, check the range here
+                        java.math.BigDecimal bd = (java.math.BigDecimal) nodes[i].valueData;
+                        if (bd.compareTo(NumberType.MAX_LONG) > 0 || bd.compareTo(NumberType.MIN_LONG) < 0) {
+                            throw Error.error(ErrorCode.X_22003);
+                        }
+                    }
+
+                    nodes[i].dataType = Type.SQL_BIGINT;
+                    break;
+                }
+
+                throw Error.error(ErrorCode.X_42561);
+            }
+        }
+
+        dataType = Type.SQL_BIGINT;
+    }
+
     /**********************************************************************/
 }
