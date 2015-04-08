@@ -1972,7 +1972,7 @@ function alertNodeClicked(obj) {
                 return;
             }
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP")
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1987,13 +1987,14 @@ function alertNodeClicked(obj) {
 
                 var partitionDetails = {};
                 partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
+                partitionDetails["TOTALBYTES"] = info[colIndex["TOTALBYTES"]];
                 partitionDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 drDetails[partitionId].push(partitionDetails);
             });
 
-          
+
         };
-        
+
 
         //Get Replication Information
         var getReplicationDetails = function (connection, replicationDetails, processName) {
