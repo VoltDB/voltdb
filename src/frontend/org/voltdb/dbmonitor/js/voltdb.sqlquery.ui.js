@@ -1,4 +1,4 @@
-﻿var sqlPortForPausedDB = {
+var sqlPortForPausedDB = {
     UseAdminPort: 'UseAdminPort',
     UseNormalPort: 'UseNormalPort'
 };

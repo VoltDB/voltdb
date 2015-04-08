@@ -196,4 +196,52 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testCreateDRTable() throws Exception {
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // Check basic create of partitioned table that should work.
+            ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            assertFalse(findTableInSystemCatalogResults("FOO"));
+            System.out.println(resp.getResults()[0]);
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table FOO (\n" +
+                        "ID int default 0 not null,\n" +
+                        "VAL varchar(32 bytes),\n" +
+                        "VAL2 bigint not null assumeunique\n" +
+                        ");\n" +
+                        "DR table FOO;\n"
+                        );
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("create table should have succeeded");
+            }
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            System.out.println(resp.getResults()[0]);
+            assertTrue(findTableInSystemCatalogResults("FOO"));
+            assertTrue(isDRedTable("FOO"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
 }

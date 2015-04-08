@@ -25,6 +25,7 @@ package vmcTest.pages
 
 import java.util.List;
 import java.util.Map;
+import vmcTest.pages.VoltDBManagementCenterPage.ColumnHeaderCase;
 
 /**
  * This class represents the 'Schema' tab of the 'Schema' page (or tab) of
