@@ -38,6 +38,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1711,6 +1712,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         String[] lines = pp.toLogLines().split("\n");
         for (String line : lines) {
             hostLog.info(line.trim());
+        }
+        if (m_messenger.getInstanceId().getTimestamp() != m_clusterCreateTime) {
+            hostLog.info("Cluster RECOVERed from CREATE performed on " +
+                    new Date(m_clusterCreateTime).toString() + ".");
         }
 
         final ZooKeeper zk = m_messenger.getZK();
