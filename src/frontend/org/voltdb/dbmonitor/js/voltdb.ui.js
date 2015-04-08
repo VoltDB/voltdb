@@ -1531,10 +1531,10 @@ var loadPage = function (serverName, portid) {
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
-    //setInterval(function () {
+    setInterval(function () {
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     refreshDrSection();
-    //  }, 5000);
+      }, 5000);
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
