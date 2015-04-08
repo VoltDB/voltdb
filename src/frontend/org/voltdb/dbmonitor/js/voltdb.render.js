@@ -620,7 +620,6 @@ function alertNodeClicked(obj) {
         };
 
         var loadAdminDeploymentInformation = function (connection) {
-
             var adminConfigValues = {};
             if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT'] != null) {
                 var data = connection.Metadata['SHORTAPI_DEPLOYMENT'];
@@ -701,6 +700,14 @@ function alertNodeClicked(obj) {
 
                     if (data.paths.commandlogsnapshot != null)
                         adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
+                }
+                
+                //dr
+                if (data.dr != null) {
+                    adminConfigValues['drConnectionSource'] = data.dr.connection != null ? data.dr.connection.source : "";
+                    adminConfigValues['drId'] = data.dr.id;
+                    adminConfigValues['drListen'] = data.dr.listen;
+                    adminConfigValues['drPort'] = data.dr.port;
                 }
             }
 
