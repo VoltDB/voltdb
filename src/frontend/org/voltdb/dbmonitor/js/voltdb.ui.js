@@ -1034,7 +1034,7 @@ var loadPage = function (serverName, portid) {
     var refreshDrSection = function () {
         VoltDbAdminConfig.drEnabled = true; // setting enabled to true for testing purpose
 
-        // if (VoltDbAdminConfig.drEnabled == true) {
+        // if (VoltDbAdminConfig.listen == true) {
         $("#Div5").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
 
@@ -1084,7 +1084,11 @@ var loadPage = function (serverName, portid) {
                     { "bSearchable": false }
                 ]
             });
-            $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
+
+            if (!$.isEmptyObject(response)) {
+                $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
+            }
+            
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
             $(".paginate_enabled_next").html("Next");
