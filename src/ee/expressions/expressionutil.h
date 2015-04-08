@@ -69,6 +69,8 @@ public:
     static void loadIndexedExprsFromJson(std::vector<voltdb::AbstractExpression*>& indexed_exprs,
                                          const std::string& jsonarraystring);
 
+    static AbstractExpression* loadExpressionFromJson(const std::string& jsonstring);
+
     /** If the passed vector contains only TupleValueExpression, it
      * returns ColumnIds of them, otherwise NULL.*/
     static boost::shared_array<int>
@@ -78,6 +80,10 @@ public:
      * returns ParamIds of them, otherwise NULL.*/
     static boost::shared_array<int>
     convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
+
+    /** Returns ColumnIds of TupleValueExpression expressions from passed axpression.*/
+    static void
+    extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds);
 
     // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
     static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);

@@ -77,13 +77,13 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyEndIter);
     }
 
-    bool addEntry(const TableTuple *tuple)
+    bool addEntryDo(const TableTuple *tuple)
     {
         ++m_inserts;
         return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
-    bool deleteEntry(const TableTuple *tuple)
+    bool deleteEntryDo(const TableTuple *tuple)
     {
         ++m_deletes;
         MapIterator iter = findTuple(*tuple);
@@ -96,7 +96,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {
         assert(originalTuple.address() != destinationTuple.address());
         // The KeyType will always depend on tuple address, excpet for CompactingTreeMultiIndexTest.
@@ -108,12 +108,12 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
 
-    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const
+    bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const
     {
         return 0 != m_cmp(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
-    bool exists(const TableTuple *persistentTuple) const
+    bool existsDo(const TableTuple *persistentTuple) const
     {
         return ! findTuple(*persistentTuple).isEnd();
     }

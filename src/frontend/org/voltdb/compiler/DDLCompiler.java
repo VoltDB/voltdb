@@ -66,6 +66,8 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
@@ -75,6 +77,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
@@ -1585,9 +1588,18 @@ public class DDLCompiler {
         }
 
         // Duplicate indexes have identical columns in identical order.
-        return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
-    }
+        if ( ! Arrays.equals(idx1baseTableOrder, idx2baseTableOrder) ) {
+            return false;
+        }
 
+        // Check the predicates
+        if (idx1.getPredicatejson().length() > 0) {
+            return idx1.getPredicatejson().equals(idx2.getPredicatejson());
+        } else if (idx2.getPredicatejson().length() > 0) {
+            return idx2.getPredicatejson().equals(idx1.getPredicatejson());
+        }
+        return true;
+    }
 
     /**
      * This function will recursively find any function expression with ID functionId.
@@ -1626,6 +1638,8 @@ public class DDLCompiler {
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
+        // "parse" the WHERE expression for partial index if any
+        AbstractExpression predicate = null;
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<AbstractExpression>();
@@ -1641,6 +1655,9 @@ public class DDLCompiler {
                     expr.finalizeValueTypes();
                     exprs.add(expr);
                 }
+            } else if (subNode.name.equals("predicate")) {
+                assert(subNode.children.size() == 1);
+                predicate = buildPartialIndexPredicate(dummy, name, subNode.children.get(0), table);
             }
         }
 
@@ -1743,6 +1760,15 @@ public class DDLCompiler {
         }
         index.setAssumeunique(assumeUnique);
 
+        if (predicate != null) {
+            try {
+                index.setPredicatejson(convertToJSONObject(predicate));
+            } catch (JSONException e) {
+                throw m_compiler.new VoltCompilerException("Unexpected error serializing predicate for partial index '" +
+                        name + "' on type '" + table.getTypeName() + "': " + e.toString());
+            }
+        }
+
         // check if an existing index duplicates another index (if so, drop it)
         // note that this is an exact dup... uniqueness, counting-ness and type
         // will make two indexes different
@@ -1789,6 +1815,14 @@ public class DDLCompiler {
             stringer.endObject();
         }
         stringer.endArray();
+        return stringer.toString();
+    }
+
+    private static String convertToJSONObject(AbstractExpression expr) throws JSONException {
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        expr.toJSONString(stringer);
+        stringer.endObject();
         return stringer.toString();
     }
 
@@ -2143,9 +2177,12 @@ public class DDLCompiler {
             Table srcTable, List<AbstractExpression> groupbyExprs)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
-        // Match based on one of two algorithms depending on whether expressions are all simple columns.
-        if (groupbyExprs == null) {
-            for (Index index : allIndexes) {
+        StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
+
+        for (Index index : allIndexes) {
+            boolean matchedAll = true;
+            // Match based on one of two algorithms depending on whether expressions are all simple columns.
+            if (groupbyExprs == null) {
                 String expressionjson = index.getExpressionsjson();
                 if ( ! expressionjson.isEmpty()) {
                     continue;
@@ -2158,7 +2195,6 @@ public class DDLCompiler {
                     continue;
                 }
 
-                boolean matchedAll = true;
                 for (int i = 0; i < indexedColRefs.size(); ++i) {
                     int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
                     int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
@@ -2167,18 +2203,12 @@ public class DDLCompiler {
                         break;
                     }
                 }
-                if (matchedAll) {
-                    return index;
-                }
-            }
-        } else {
-            for (Index index : allIndexes) {
+            } else {
                 String expressionjson = index.getExpressionsjson();
                 if (expressionjson.isEmpty()) {
                     continue;
                 }
                 List<AbstractExpression> indexedExprs = null;
-                StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
@@ -2190,19 +2220,85 @@ public class DDLCompiler {
                     continue;
                 }
 
-                boolean matchedAll = true;
                 for (int i = 0; i < indexedExprs.size(); ++i) {
                     if ( ! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
                         matchedAll = false;
                         break;
                     }
                 }
-                if (matchedAll) {
-                    return index;
+            }
+            if (matchedAll && !index.getPredicatejson().isEmpty()) {
+                // Additional check for partial indexes to make sure matview WHERE clause
+                // covers the partial index predicate
+                List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
+                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                try {
+                    String encodedPredicate = matviewinfo.getPredicate();
+                    if (!encodedPredicate.isEmpty()) {
+                        String predicate = Encoder.hexDecodeToString(encodedPredicate);
+                        AbstractExpression matViewPredicate = AbstractExpression.fromJSONString(predicate, tableScan);
+                        coveringExprs.addAll(ExpressionUtil.uncombineAny(matViewPredicate));
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    assert(false);
+                    return null;
                 }
+                matchedAll = SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs);
+            }
+            if (matchedAll) {
+                return index;
             }
         }
         return null;
+    }
+
+    /**
+     * Build the abstract expression representing the partial index predicate.
+     * Verify it satisfies the rules. Throw error messages otherwise.
+     *
+     * @param dummy AbstractParsedStmt
+     * @param indexName The name of the index being checked.
+     * @param predicateXML The XML representing the predicate.
+     * @param table Table
+     * @throws VoltCompilerException
+     * @return AbstractExpression
+     */
+    private AbstractExpression buildPartialIndexPredicate(
+            AbstractParsedStmt dummy, String indexName, VoltXMLElement predicateXML, Table table) throws VoltCompilerException {
+
+        if (predicateXML == null) {
+            return null;
+        }
+
+        // Make sure all column expressions refer to the same index table before we can parse the XML
+        // to avoid the AbstractParsedStmt exception/assertion
+        String tableName = table.getTypeName();
+        assert(tableName != null);
+        String msg = "Partial index \"" + indexName + "\" ";
+
+        // Make sure all column expressions refer the index table
+        List<VoltXMLElement> columnRefs= predicateXML.findChildren("columnref");
+        for (VoltXMLElement columnRef : columnRefs) {
+            String columnRefTableName = columnRef.attributes.get("table");
+            if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {
+                msg += "with expression(s) involving other tables is not supported.";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+        // Now it safe to parse the expression tree
+        AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
+
+        if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+            msg += "with aggregate expression(s) is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+        // @TODO: un-comment once subqueries are supported
+//        if (!predicate.findAllSubexpressionsOfClass(SubqueryExpression.class).isEmpty()) {
+//            msg += "with subquery expression(s) is not supported.";
+//            throw m_compiler.new VoltCompilerException(msg);
+//        }
+        return predicate;
     }
 
     /**
