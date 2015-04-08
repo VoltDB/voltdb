@@ -715,7 +715,7 @@
                                     <div class="drAdminHeaderRight">
                                         <ul class="drList">
                                             <li>Mode</li>
-                                            <li class="drArrow">Master</li>
+                                            <li id="drMode" class="drArrow"></li>
                                         </ul>
                                         <div class="clear"></div>
                                     </div>
@@ -736,7 +736,7 @@
                                     </tr>-->
                                     <tr>
                                         <td width="62%" class="configLabel">ID</td>
-                                        <td width="20%" align="right">4</td>
+                                        <td id="drId" width="20%" align="right"></td>
                                         <td width="2%">&nbsp;</td>
                                         <td width="16%">&nbsp;</td>
                                     </tr>
@@ -744,11 +744,11 @@
 
                                         <td class="configLabel">Master</td>
                                         <td align="right">
-                                            <div id="drMasterIcon" class="onIcon"></div>
+                                            <div id="drMasterIcon" class="offIcon"></div>
                                             <input style="display: none;" type="checkbox" checked="checked" id="chkDrMaster" />
                                             <div id="loadingDrMaster" class="loading-small" style="display: none"></div>
                                         </td>
-                                        <td><div id="txtDrMaster" class="drMasterOn">On</div></td>
+                                        <td><div id="txtDrMaster" class="drMasterOn"></div></td>
                                         <td>
                                             <a id="btnEditDrMasterOk" href="#drMasterPop" class="editOk" title="Save" style="">Ok</a>
                                             <a id="btnEditDrMasterCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
@@ -757,13 +757,13 @@
                                     </tr>
 
                                     <tr>
-                                        <td class="configLabel">Replica <span style="font-weight:normal">(source: serverBz)</span></td>
+                                        <td class="configLabel">Replica <span id="replicaSource" style="font-weight:normal"></span></td>
                                         <td align="right">
-                                            <div id="drReplicaIcon" class="onIcon" title="Use the Promote button to exit replica mode"></div>
+                                            <div id="drReplicaIcon" class="offIcon" title=""></div>
                                             <input style="display: none;" type="checkbox" id="chkDrReplica" checked="checked" />
                                             <div id="loadingDrReplica" class="loading-small" style="display: none"></div>
                                         </td>
-                                        <td><div id="txtDrReplica" class="drReplicaOn" title="Use the Promote button to exit replica mode">On</div></td>
+                                        <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
                                         <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
 

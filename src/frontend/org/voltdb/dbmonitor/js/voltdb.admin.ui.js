@@ -174,6 +174,10 @@ function loadAdminPage() {
         exportConfiguration: $("#exportConfiguration"),
         exportConfigurationLoading: $('#exportConfigurationLoading'),
 
+        //Dr Mode object
+        labelDrmode:$("#drMode"),
+        labelDrId:$("#drId"),
+
         //Edit Dr State objects
         btnEditDrStateOk: $("#btnEditDrStateOk"),
         btnEditDrStateCancel: $("#btnEditDrStateCancel"),
@@ -206,7 +210,7 @@ function loadAdminPage() {
         txtDrReplica: $("#txtDrReplica"),
         spanDrReplicaEdited: "",
         loadingDrReplica: $("#loadingDrReplica"),
-        
+        labelReplicaSource: $("#replicaSource"),
         txtDrSource: $("#txtDrSource"),
         spanDrSource: $("#drSourceSpan"),
         loadingDrSource: $("#loadingDrSource"),
@@ -2631,6 +2635,50 @@ function loadAdminPage() {
             getUserList(adminConfigValues.users);
             //getEditUserList(adminConfigValues.users);
             getExportProperties(adminConfigValues.configuration);
+            //dr setting
+            getDrMode(adminConfigValues.drListen);
+            //adminConfigValues.drListen = false;
+            adminEditObjects.labelDrId.text(adminConfigValues.drId);
+            adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
+            adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
+            adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
+            adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
+            if (VoltDbAdminConfig.drReplicationRole.toLowerCase() == "replica") {
+                getDrReplicaStatus(true);
+            } else {
+                getDrReplicaStatus(false);
+            }
+        };
+
+        var getDrReplicaStatus = function(result) {
+            debugger;
+            adminEditObjects.chkDrReplicaValue = result;
+            adminEditObjects.iconDrReplicaOption.removeClass().addClass(getOnOffClass(result));
+            adminEditObjects.txtDrReplica.text(getOnOffText(result));
+            if (result) {
+                adminEditObjects.txtDrReplica.attr("title", "Use the Promote button to exit replica mode.");
+                adminEditObjects.iconDrReplicaOption.attr("title", "Use the Promote button to exit replica mode.");
+            } else {
+                adminEditObjects.txtDrReplica.removeAttr("title");
+                adminEditObjects.iconDrReplicaOption.removeAttr("title");
+            }
+        };
+
+        var getDrMode = function (drListen) {
+            var replicationRole = VoltDbAdminConfig.drReplicationRole;
+            if (replicationRole.toLowerCase() == "replica") {
+                if (drListen) {
+                    adminEditObjects.labelDrmode.text("Both");
+                } else {
+                    adminEditObjects.labelDrmode.text("Replica");
+                }
+            } else {
+                if (drListen) {
+                    adminEditObjects.labelDrmode.text("Master");
+                } else {
+                    adminEditObjects.labelDrmode.text("None");
+                }
+            }
         };
 
         var getExportProperties = function (data) {
