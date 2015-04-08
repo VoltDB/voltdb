@@ -98,7 +98,7 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
@@ -163,8 +163,8 @@ class SchemaPageTest extends TestBase {
         String username = page.getUsername()
         then:
         waitFor(30) {
-            header.username.isDisplayed()
-            header.username.text().equals(username)
+            header.usernameInHeader.isDisplayed()
+            header.usernameInHeader.text().equals(username)
         }
     }
 
@@ -173,8 +173,8 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
@@ -187,8 +187,8 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.username.isDisplayed() }
-        header.username.click()
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
         waitFor(30) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
