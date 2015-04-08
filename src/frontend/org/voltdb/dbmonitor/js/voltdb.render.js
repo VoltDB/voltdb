@@ -701,7 +701,7 @@ function alertNodeClicked(obj) {
                     if (data.paths.commandlogsnapshot != null)
                         adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
                 }
-                
+
                 //dr
                 if (data.dr != null) {
                     adminConfigValues['drConnectionSource'] = data.dr.connection != null ? data.dr.connection.source : "";
@@ -1972,7 +1972,7 @@ function alertNodeClicked(obj) {
                 return;
             }
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES")
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1980,19 +1980,20 @@ function alertNodeClicked(obj) {
             counter = 0;
 
             connection.Metadata['@Statistics_DR_completeData'][0].data.forEach(function (info) {
-                var partitionId = info[colIndex["PARTITION_ID"]];
-                if (!drDetails.hasOwnProperty(partitionId)) {
-                    drDetails[partitionId] = [];
+                //Filter Master from Replica
+                if (info[colIndex["MODE"]] == "NORMAL") {
+                    var partitionId = info[colIndex["PARTITION_ID"]];
+                    if (!drDetails.hasOwnProperty(partitionId)) {
+                        drDetails[partitionId] = [];
+                    }
+
+                    var partitionDetails = {};
+                    partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
+                    partitionDetails["TOTALBYTES"] = info[colIndex["TOTALBYTES"]];
+                    partitionDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    drDetails[partitionId].push(partitionDetails);
                 }
-
-                var partitionDetails = {};
-                partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
-                partitionDetails["TOTALBYTES"] = info[colIndex["TOTALBYTES"]];
-                partitionDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                drDetails[partitionId].push(partitionDetails);
             });
-
-
         };
 
 

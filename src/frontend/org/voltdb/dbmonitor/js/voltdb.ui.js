@@ -1032,9 +1032,9 @@ var loadPage = function (serverName, portid) {
     };
 
     var refreshDrSection = function () {
-        VoltDbAdminConfig.drEnabled = true; // setting enabled to true for testing purpose
+        //console.log("test" + VoltDbAdminConfig.drListen);
 
-        // if (VoltDbAdminConfig.listen == true) {
+        //if (VoltDbAdminConfig.drListen == true) {
         $("#Div5").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
 
@@ -1088,7 +1088,7 @@ var loadPage = function (serverName, portid) {
             if (!$.isEmptyObject(response)) {
                 $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
             }
-            
+
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
             $(".paginate_enabled_next").html("Next");
@@ -1103,12 +1103,10 @@ var loadPage = function (serverName, portid) {
 
             $("#drMasterSection").find(".pagination").hide();
         });
-        
+
         $('#filterStoredProc1').on('keyup', function () {
             table.search(this.value).draw();
         });
-
-
         //} else {
 
         //    $("#Div5").hide();
@@ -1537,9 +1535,9 @@ var loadPage = function (serverName, portid) {
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
-    refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    refreshDrSection();
-      }, 5000);
+        refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
+        refreshDrSection();
+    }, 5000);
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
