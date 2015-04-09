@@ -1638,10 +1638,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         VoltTable result = null;
 
         client.callProcedure("@AdHoc", "insert into R3(id, big) values (0, ?)",
-                Long.MIN_VALUE);
+                Long.MIN_VALUE); // this is really a NULL value
         client.callProcedure("@AdHoc", "insert into R3(id, big) values (1, ?)",
                 Long.MAX_VALUE);
-
 
         result = client.callProcedure("@AdHoc",
                 "select bitnot(big) from r3 where id = 0")
@@ -1649,22 +1648,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         result.advanceRow();
 
-        // Treat MIN_VALUE like any other value (as opposed to a null value)
-        // In this case, MIN_VALUE becomes MAX_VALUE
+        // bitnot(null) produces null
         long val = result.getLong(0);
-        assertEquals(false, result.wasNull());
-        assertEquals(Long.MAX_VALUE, val);
-
-        result = client.callProcedure("@AdHoc",
-                "select bitnot(big) from r3 where id = 1")
-                .getResults()[0];
-
-        // bitnot(MAX_VALUE) produces MIN_VALUE, which will be
-        // seen as a null by clients.
-        result.advanceRow();
-        val = result.getLong(0);
         assertEquals(true, result.wasNull());
         assertEquals(Long.MIN_VALUE, val);
+
+        // bitnot(MAX_VALUE) produces MIN_VALUE, which would be
+        // a null value, so an exception is thrown.
+        verifyStmtFails(client, "select bitnot(big) from r3 where id = 1",
+                "Application of bitwise function BITNOT would produce INT64_MIN, "
+                + "which is reserved for SQL NULL values.");
     }
 
     //
