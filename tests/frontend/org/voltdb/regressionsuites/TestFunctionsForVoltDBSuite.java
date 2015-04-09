@@ -140,7 +140,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "������Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -176,7 +176,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "������Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -219,7 +219,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "������Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -336,12 +336,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("You got it!",result.getString(1));
 
         // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
-        cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", "������?������!", 1);
+        cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", "贾鑫?贾鑫!", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("������?������!",result.getString(1));
+        assertEquals("贾鑫?贾鑫!",result.getString(1));
 
         // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
         try {
@@ -1096,7 +1096,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         cr = client.callProcedure(
                 "JSBAD.insert", 2, // OOPS. semi-colon in place of colon before "bool"
-                "{\"id\":2, \"bool\"; false, \"������Vo\":\"������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������\"}"
+                "{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません\"}"
                 );
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -1578,7 +1578,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-
     public void testBitnot() throws Exception {
         System.out.println("STARTING test Bitnot");
         Client client = getClient();
@@ -1890,7 +1889,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
         project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
         project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'������') from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'贾鑫') from P1 where id = ?");
         // Test OCTET_LENGTH
         project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
         // Test POSITION and CHAR_LENGTH
