@@ -1971,8 +1971,11 @@ function alertNodeClicked(obj) {
             if (connection.Metadata['@Statistics_DR'] == null) {
                 return;
             }
+
+            
+
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE")
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1991,6 +1994,10 @@ function alertNodeClicked(obj) {
                     partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
                     partitionDetails["TOTALBYTES"] = info[colIndex["TOTALBYTES"]];
                     partitionDetails["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    partitionDetails["LASTQUEUEDDRID"] = info[colIndex["LASTQUEUEDDRID"]];
+                    partitionDetails["LASTACKDRID"] = info[colIndex["LASTACKDRID"]];
+                    partitionDetails["LASTQUEUEDTIMESTAMP"] = info[colIndex["LASTQUEUEDTIMESTAMP"]];
+                    partitionDetails["LASTACKTIMESTAMP"] = info[colIndex["LASTACKTIMESTAMP"]];
                     drDetails[partitionId].push(partitionDetails);
                 }
             });

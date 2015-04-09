@@ -1041,17 +1041,22 @@ var loadPage = function (serverName, portid) {
             var response = drDetails;
 
             var htmlcontent = "";
-
+            var replicaLatencyMs = 0;
+            var replicaLatencyTrans = 0;
             for (var key in response) {
 
                 for (var i = 0; i <= response[key].length - 1; i++) {
+
+                    replicaLatencyTrans = response[key][i].LASTQUEUEDDRID - response[key][i].LASTACKDRID;
+                    replicaLatencyMs = (response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000;
+
                     htmlcontent = htmlcontent + "<tr>";
                     htmlcontent = htmlcontent + "<td>" + key + "</td>" +
                         "<td>on</td>" +
                         "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
                         "<td>" + response[key][i].TOTALBYTES + "</td >" +
-                        "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
-                        "<td>" + response[key][i].TOTALBUFFERS + "</td >";
+                        "<td>" + replicaLatencyMs + "</td >" +
+                        "<td>" + replicaLatencyTrans + "</td >";
                     htmlcontent = htmlcontent + "</tr>";
                 }
 
