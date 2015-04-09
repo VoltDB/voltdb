@@ -82,4 +82,39 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
 }
 
 
+template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    int64_t lv = lval.castAsBigIntAndGetValue();
+
+    const NValue& rval = arguments[1];
+    int64_t shifts = rval.castAsBigIntAndGetValue();
+    if (shifts < 0) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported negative value for bit shifting");
+    }
+    if (shifts > 64) {
+        return getBigIntValue(0);
+    }
+
+    return getBigIntValue(lv << shifts);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    int64_t lv = lval.castAsBigIntAndGetValue();
+
+    const NValue& rval = arguments[1];
+    int64_t shifts = rval.castAsBigIntAndGetValue();
+    if (shifts < 0) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported negative value for bit shifting");
+    }
+    if (shifts > 64) {
+        return getBigIntValue(0);
+    }
+
+    return getBigIntValue(lv >> shifts);
+}
+
+
 }

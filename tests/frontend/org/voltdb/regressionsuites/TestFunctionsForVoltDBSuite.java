@@ -140,7 +140,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 1, "������Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -176,7 +176,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 1, "������Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -219,7 +219,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 1, "������Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -336,12 +336,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("You got it!",result.getString(1));
 
         // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
-        cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", "贾鑫?贾鑫!", 1);
+        cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", "������?������!", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("贾鑫?贾鑫!",result.getString(1));
+        assertEquals("������?������!",result.getString(1));
 
         // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
         try {
@@ -1096,7 +1096,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         cr = client.callProcedure(
                 "JSBAD.insert", 2, // OOPS. semi-colon in place of colon before "bool"
-                "{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません\"}"
+                "{\"id\":2, \"bool\"; false, \"������Vo\":\"������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������\"}"
                 );
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -1578,6 +1578,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+
     public void testBitnot() throws Exception {
         System.out.println("STARTING test Bitnot");
         Client client = getClient();
@@ -1651,6 +1652,94 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         val = result.getLong(0);
         assertEquals(true, result.wasNull());
         assertEquals(Long.MIN_VALUE, val);
+    }
+
+    private void bitwiseShiftChecker(long pk, long big, long param) throws IOException, ProcCallException {
+        VoltTable vt;
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", String.format("insert into R3(id, big) values (%d, %d)", pk, big));
+
+        if (big >= 0) {
+            vt = client.callProcedure("BITWISE_SHIFT_PARAM_1", param, param, pk).getResults()[0];
+            System.out.println(vt);
+            if (big > 64) {
+                validateRowOfLongs(vt, new long[]{0, 0});
+            } else {
+                validateRowOfLongs(vt, new long[]{param << big, param >> big });
+            }
+        }
+
+        if (param >= 0) {
+            vt = client.callProcedure("BITWISE_SHIFT_PARAM_2", param, param, pk).getResults()[0];
+            System.out.println(vt);
+            if (param > 64) {
+                validateRowOfLongs(vt, new long[]{0, 0});
+            } else {
+                validateRowOfLongs(vt, new long[]{big << param, big >> param });
+            }
+        }
+    }
+
+    public void testBitwiseShift() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test bitwise shifting tests");
+
+        bitwiseShiftChecker(1, 1, 1); bitwiseShiftChecker(2, -1, 1);
+
+        bitwiseShiftChecker(3, 3, 63); bitwiseShiftChecker(4, -3, 63);
+
+        bitwiseShiftChecker(5, 3, 64); bitwiseShiftChecker(6, -3, 64);
+
+        bitwiseShiftChecker(7, 3, 65); bitwiseShiftChecker(8, -3, 65);
+
+        bitwiseShiftChecker(9, 3, 127); bitwiseShiftChecker(10, -3, 127);
+
+        bitwiseShiftChecker(11, 3, 128); bitwiseShiftChecker(12, -3, 128);
+
+        bitwiseShiftChecker(13, 3, 129); bitwiseShiftChecker(14, -3, 129);
+
+        bitwiseShiftChecker(15, 8, 63); bitwiseShiftChecker(16, -8, 63);
+
+        // Min/MAX
+        bitwiseShiftChecker(50, Long.MAX_VALUE, 3);  bitwiseShiftChecker(51, 3, Long.MAX_VALUE);
+        bitwiseShiftChecker(52, Long.MAX_VALUE, -3);  bitwiseShiftChecker(53, -3, Long.MAX_VALUE);
+        bitwiseShiftChecker(54, Long.MIN_VALUE+1, 6);  bitwiseShiftChecker(55, 6, Long.MIN_VALUE+1);
+        bitwiseShiftChecker(56, Long.MIN_VALUE+1, -6);  bitwiseShiftChecker(57, -6, Long.MIN_VALUE+1);
+
+        Client client = getClient();
+        String sql;
+        // out of range tests
+        try {
+            sql = "select BIT_SHIFT_LEFT(big, 9223372036854775809) from R3;";
+            client.callProcedure("@AdHoc", sql);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("numeric value out of range"));
+        }
+
+        // negative shifting tests
+        try {
+            sql = "select BIT_SHIFT_LEFT(big, -1) from R3;";
+            client.callProcedure("@AdHoc", sql);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("unsupported negative value for bit shifting"));
+        }
+
+        VoltTable vt;
+        // NULL tests
+        client.callProcedure("@AdHoc", "insert into R3(id, big) values (100, null)");
+        try {
+            vt = client.callProcedure("BITWISE_SHIFT_PARAM_1", 2, 2, 100).getResults()[0];
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("unsupported negative value for bit shifting"));
+        }
+
+        // NULL works like a MIN
+        vt = client.callProcedure("BITWISE_SHIFT_PARAM_2", 2, 2, 100).getResults()[0];
+        long big = Long.MIN_VALUE, param = 2;
+        validateRowOfLongs(vt, new long[]{big << param, big >> param });
     }
 
     //
@@ -1801,7 +1890,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
         project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
         project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'贾鑫') from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'������') from P1 where id = ?");
         // Test OCTET_LENGTH
         project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
         // Test POSITION and CHAR_LENGTH
@@ -1844,6 +1933,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
+
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
 
         project.addProcedures(GotBadParamCountsInJava.class);
         // CONFIG #1: Local Site/Partition running on JNI backend
