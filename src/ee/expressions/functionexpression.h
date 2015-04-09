@@ -243,6 +243,7 @@ static const int FUNC_VOLT_FORMAT_CURRENCY             = 20025;
 
 // All of these "...functions.h" files need to be included AFTER the above definitions
 // (FUNC_... constants and ...FunctionExpressionTemplates).
+#include "bitwisefunctions.h"
 #include "datefunctions.h"
 #include "numericfunctions.h"
 #include "stringfunctions.h"

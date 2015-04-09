@@ -1109,7 +1109,7 @@ public abstract class CatalogUtil {
             // Get the stream name from the xml attribute "stream"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
             String streamName = exportConfiguration.getStream();
-            if (noEmptyTarget && (streamName == null || streamName.trim().isEmpty()) ) {
+            if (streamName == null || streamName.trim().isEmpty()) {
                     throw new RuntimeException("stream must be specified along with type in export configuration.");
             }
 

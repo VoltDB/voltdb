@@ -115,8 +115,11 @@ public:
     void endTxn(bool success) {
         if (!success) {
             m_undoLog.undo(m_undoToken);
+        } else {
+            m_undoLog.release(m_undoToken++);
+            m_drStream.endTransaction();
+            m_drReplicatedStream.endTransaction();
         }
-        m_undoLog.release(m_undoToken++);
     }
 
     TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple) {
@@ -235,8 +238,10 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     TableTuple tuple_to_delete = m_table->lookupTupleByValues(second_tuple);
     ASSERT_FALSE(tuple_to_delete.isNullTuple());
     m_table->deleteTuple(tuple_to_delete, true);
-    endTxn(true);
     // Tick before the delete
+    ASSERT_TRUE(flush(101));
+    endTxn(true);
+    // Apply the binary log after endTxn() to get a valid undoToken.
     flushAndApply(101);
 
     EXPECT_EQ(4, m_tableReplica->activeTupleCount());
