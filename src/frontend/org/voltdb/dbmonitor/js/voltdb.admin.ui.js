@@ -2637,15 +2637,17 @@ function loadAdminPage() {
             //dr setting
             getDrMode(adminConfigValues.drListen);
             //adminConfigValues.drListen = false;
-            adminEditObjects.labelDrId.text(adminConfigValues.drId);
-            adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
-            adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
-            adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
-            adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
-            if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
-                getDrReplicaStatus(true);
-            } else {
-                getDrReplicaStatus(false);
+            if (VoltDbUI.isDRInfoRequired) {
+                adminEditObjects.labelDrId.text(adminConfigValues.drId);
+                adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
+                adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
+                adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
+                adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
+                if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
+                    getDrReplicaStatus(true);
+                } else {
+                    getDrReplicaStatus(false);
+                }
             }
         };
 
