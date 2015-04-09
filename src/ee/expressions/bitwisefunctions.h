@@ -99,12 +99,12 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITXOR function");
     }
 
-    int64_t lv = lval.getBigInt();
-    int64_t rv = rval.getBigInt();
-
     if (lval.isNull() || rval.isNull()) {
         return getNullValue(VALUE_TYPE_BIGINT);
     }
+
+    int64_t lv = lval.getBigInt();
+    int64_t rv = rval.getBigInt();
 
     int64_t result = lv ^ rv;
     if (result == INT64_NULL) {
