@@ -694,13 +694,13 @@ var loadPage = function (serverName, portid) {
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
-                VoltDbAdminConfig.drReplicationRole = replicaDetail[currentServer]['status'];
+                VoltDbUI.drReplicationRole = replicaDetail[currentServer]['status'];
 
                 voltDbRenderer.GetDrStatusInformation(function (drDetails) {
                     if (getCurrentServer() != undefined) {
-                        VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
+                        VoltDbUI.drEnabled = drDetails[currentServer]['ENABLED'];
                         VoltDbUI.isFirstHit = false;
-                        if (VoltDbAdminConfig.drReplicationRole.toLowerCase() == 'replica') {
+                        if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                             $('#liDrReplication').css('display', 'block');
                             var userPreference = getUserPreferences();
                             if (userPreference["DrReplicationRate"]) {
@@ -1725,7 +1725,7 @@ var showHideGraph = function (userpreferences) {
     else
         $("#chartPartitionIdleTime").show();
 
-    if (userpreferences["DrReplicationRate"] == false || VoltDbUI.isFirstHit == true || VoltDbAdminConfig.drReplicationRole.toLowerCase() != "replica")        $("#ChartDrReplicationRate").hide();    else        $("#ChartDrReplicationRate").show();
+    if (userpreferences["DrReplicationRate"] == false || VoltDbUI.isFirstHit == true || VoltDbUI.drReplicationRole.toLowerCase() != "replica")        $("#ChartDrReplicationRate").hide();    else        $("#ChartDrReplicationRate").show();
 
     if (userpreferences["StoredProcedures"] == false)
         $("#tblStoredProcedures").hide();
@@ -1794,6 +1794,8 @@ var adjustGraphSpacing = function () {
     var iVoltDbUi = (function () {
         this.isSchemaTabLoading = false;
         this.isFirstHit = true;
+        this.drEnabled = false;
+        this.drReplicationRole = "NONE";
         this.ACTION_STATES = {
             NONE: -1,
             NEXT: 0,

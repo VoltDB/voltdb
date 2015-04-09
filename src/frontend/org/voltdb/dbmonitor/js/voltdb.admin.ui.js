@@ -1,4 +1,4 @@
-var adminDOMObjects = {};
+﻿var adminDOMObjects = {};
 var adminEditObjects = {};
 var adminClusterObjects = {};
 var editStates = {
@@ -2526,9 +2526,7 @@ function loadAdminPage() {
         this.isDbPaused = false;
         this.toggleStates = {};
         this.orgUserList = [];
-        this.drEnabled = false;
         this.drReplicaEnabled = true;
-        this.drReplicationRole = "NONE";
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -2643,7 +2641,7 @@ function loadAdminPage() {
             adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
             adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
             adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
-            if (VoltDbAdminConfig.drReplicationRole.toLowerCase() == "replica") {
+            if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
                 getDrReplicaStatus(true);
             } else {
                 getDrReplicaStatus(false);
@@ -2664,7 +2662,7 @@ function loadAdminPage() {
         };
 
         var getDrMode = function (drListen) {
-            var replicationRole = VoltDbAdminConfig.drReplicationRole;
+            var replicationRole = VoltDbUI.drReplicationRole;
             if (replicationRole.toLowerCase() == "replica") {
                 if (drListen) {
                     adminEditObjects.labelDrmode.text("Both");
