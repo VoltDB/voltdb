@@ -138,13 +138,12 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("bit_shift_left", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_LEFT, -1,
                     new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
-                                  Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("bit_shift_right", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_RIGHT, -1,
                     new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
-                                  Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
-
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("decode", null, FUNC_VOLT_DECODE, 2,
                     new Type[] { null, null },

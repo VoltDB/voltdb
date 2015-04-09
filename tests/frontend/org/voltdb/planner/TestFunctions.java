@@ -101,6 +101,11 @@ public class TestFunctions extends PlannerTestCase {
 
         failToCompile("select BIT_SHIFT_RIGHT(9223372036854775809, tinyint_type)from bit", errorMsg);
         failToCompile("select BIT_SHIFT_RIGHT(-9223372036854775809, tinyint_type)from bit", errorMsg);
+
+        // invalid syntax
+        errorMsg = "user lacks privilege or object not found";
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE)from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(BIGINT_TYPE)from bit", errorMsg);
     }
 
 }

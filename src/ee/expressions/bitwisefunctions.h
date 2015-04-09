@@ -170,7 +170,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
         return getBigIntValue(0);
     }
 
-    int64_t result = lv >> shifts;
+    // right logical shift, padding 0s without taking care of sign bits
+    int64_t result = (int64_t)(((uint64_t) lv) >> shifts);
     if (result == INT64_NULL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
                 "Application of bitwise function BIT_SHIFT_RIGHT would produce INT64_MIN, "

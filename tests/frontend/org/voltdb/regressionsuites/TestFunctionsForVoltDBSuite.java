@@ -1672,7 +1672,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             if (big > 64) {
                 validateRowOfLongs(vt, new long[]{0, 0});
             } else {
-                validateRowOfLongs(vt, new long[]{param << big, param >> big });
+                validateRowOfLongs(vt, new long[]{param << big, param >>> big });
             }
         }
 
@@ -1682,7 +1682,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             if (param > 64) {
                 validateRowOfLongs(vt, new long[]{0, 0});
             } else {
-                validateRowOfLongs(vt, new long[]{big << param, big >> param });
+                validateRowOfLongs(vt, new long[]{big << param, big >>> param });
             }
         }
     }
@@ -1706,6 +1706,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         bitwiseShiftChecker(15, 8, 63); bitwiseShiftChecker(16, -8, 63);
 
+        bitwiseShiftChecker(17, 8, 0); bitwiseShiftChecker(18, -8, 0);
+
         // Min/MAX
         bitwiseShiftChecker(50, Long.MAX_VALUE, 3);  bitwiseShiftChecker(51, 3, Long.MAX_VALUE);
         bitwiseShiftChecker(52, Long.MAX_VALUE, -3);  bitwiseShiftChecker(53, -3, Long.MAX_VALUE);
@@ -1727,24 +1729,19 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         Client client = getClient();
-        String sql;
         // out of range tests
-        try {
-            sql = "select BIT_SHIFT_LEFT(big, 9223372036854775809) from R3;";
-            client.callProcedure("@AdHoc", sql);
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("numeric value out of range"));
-        }
+        verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, 9223372036854775809) from R3;",
+                "numeric value out of range");
+
+        verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, 0.5) from R3;",
+                "Type FLOAT can't be cast as BIGINT");
+
+        verifyStmtFails(client, "select BIT_SHIFT_RIGHT(3.6, 2) from R3;",
+                "incompatible data type in conversion");
 
         // negative shifting tests
-        try {
-            sql = "select BIT_SHIFT_LEFT(big, -1) from R3;";
-            client.callProcedure("@AdHoc", sql);
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("unsupported negative value for bit shifting"));
-        }
+        verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, -1) from R3;",
+                "unsupported negative value for bit shifting");
 
         VoltTable vt;
         // NULL tests: null in null out
