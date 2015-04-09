@@ -1578,34 +1578,34 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    static private long[] bitnotInterestingValues = new long[] {
+            // skipping Long.MIN_VALUE because it's our null value
+            // (tested in testBitnotNull)
+            Long.MIN_VALUE + 1,
+            Long.MIN_VALUE + 1000,
+            -1,
+            0,
+            1,
+            1000,
+            Long.MAX_VALUE - 1
+            // Long.MAX_VALUE produces Long.MIN_VALUE when bitnot'd,
+            // which can represent the null value
+            // (tested in testBitnotNull)
+    };
+
     public void testBitnot() throws Exception {
         System.out.println("STARTING test Bitnot");
         Client client = getClient();
         VoltTable result = null;
 
-        long[] interestingValues = new long[] {
-                // skipping Long.MIN_VALUE because it's our null value
-                // (tested below)
-                Long.MIN_VALUE + 1,
-                Long.MIN_VALUE + 1000,
-                -1,
-                0,
-                1,
-                1000,
-                Long.MAX_VALUE - 1
-                // Long.MAX_VALUE produces Long.MIN_VALUE,
-                // which can represent the null value
-                // (these special cases are tested below)
-        };
-
         int i = 0;
-        for (long val : interestingValues) {
+        for (long val : bitnotInterestingValues) {
             client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)",
                     i, val);
             ++i;
         }
 
-        for (long val : interestingValues) {
+        for (long val : bitnotInterestingValues) {
             result = client.callProcedure("@AdHoc",
                     "select big, bitnot(big) from R3 where big = " + val).getResults()[0];
             validateRowOfLongs(result, new long[] {val, ~val});
@@ -1616,6 +1616,20 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // as is -(2^63) - 1
         verifyStmtFails(client, "select bitnot(-9223372036854775809) from R3", "numeric value out of range");
+    }
+
+    public void testBitnotWithParam() throws Exception {
+        System.out.println("STARTING test Bitnot with a parameter");
+        Client client = getClient();
+        VoltTable result = null;
+
+        client.callProcedure("@AdHoc", "insert into R3(id) values (0)");
+
+        for (long val : bitnotInterestingValues) {
+            result = client.callProcedure("@AdHoc",
+                    "select bitnot(?) from R3", val).getResults()[0];
+            validateRowOfLongs(result, new long[] {~val});
+        }
     }
 
     public void testBitnotNull() throws Exception {
