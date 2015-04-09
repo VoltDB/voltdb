@@ -53,7 +53,10 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     
     def setupSpec() { // called once, before any tests
         // Make sure we're on the SQL Query page
+        when: 'click the SQL Query link (if needed)'
         ensureOnSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
 
         // Check which tables, views & (user) Stored Procs exist, before this
         // test (so we can delete the new ones, at the end)
@@ -67,7 +70,10 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
 
     def cleanupSpec() { // called once, after all the tests
         // Make sure we're on the SQL Query page
+        when: 'click the SQL Query link (if needed)'
         ensureOnSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
 
         // Next, get the lists of new tables, views & (user) Stored Procs,
         // created by this test
