@@ -524,8 +524,11 @@ public class FunctionCustom extends FunctionSQL {
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 // $FALL-THROUGH$
             case FUNC_BITAND :
+                name = Tokens.T_BITAND;
             case FUNC_BITOR :
+                name = Tokens.T_BITOR;
             case FUNC_BITXOR :
+                name = Tokens.T_BITXOR;
             case FUNC_REPEAT :
             /* disable 2 lines ...
             case FUNC_REPEAT :
@@ -1718,6 +1721,15 @@ public class FunctionCustom extends FunctionSQL {
                     .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
                     .append(nodes[1].getSQL()).append(')').toString();
             }
+            // A VoltDB extension: Hsqldb uses Integer type by default,
+            case FUNC_BITAND :
+            case FUNC_BITOR :
+            case FUNC_BITXOR: {
+                return new StringBuffer(name).append('(')         //
+                        .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
+                        .append(nodes[1].getSQL()).append(')').toString();
+            }
+            // End of VoltDB extension
             default :
                 return super.getSQL();
         }
