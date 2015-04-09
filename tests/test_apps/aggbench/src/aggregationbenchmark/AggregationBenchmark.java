@@ -111,6 +111,8 @@ public class AggregationBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        //snapshot restore needs > default 2 minute timeout
+        clientConfig.setProcedureCallTimeout(0);
 
         client = ClientFactory.createClient(clientConfig);
 
