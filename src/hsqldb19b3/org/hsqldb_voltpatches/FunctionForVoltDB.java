@@ -410,11 +410,17 @@ public class FunctionForVoltDB extends FunctionSQL {
                     nodes[i].dataType = Type.SQL_BIGINT;
                 }
                 else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
-                    if (nodes[i].valueData != null && nodes[i].dataType.isIntegralType()) {
+                    if (! nodes[i].dataType.isIntegralType()) {
+                        throw Error.error(ErrorCode.X_42561);
+                    }
+                    if (nodes[i].valueData != null) {                       // is constants
                         // check constants in range
                         NumberType.checkValueIsInLongLimits(nodes[i].valueData);
                         nodes[i].dataType = Type.SQL_BIGINT;
-                    } else if (i == 0) {
+                        continue;
+                    }
+
+                    if (i == 0) {
                         // the first parameter has to be BigInteger
                         throw Error.error(ErrorCode.X_42561);
                     }

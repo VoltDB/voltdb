@@ -76,7 +76,6 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select BIT_SHIFT_LEFT(FLOAT_TYPE, 3), BIT_SHIFT_RIGHT(FLOAT_TYPE, 3) from bit", errorMsg);
         failToCompile("select BIT_SHIFT_LEFT(VARCHAR_TYPE, 3), BIT_SHIFT_RIGHT(VARCHAR_TYPE, 3) from bit", errorMsg);
 
-        // works for integral types
         failToCompile("select BIT_SHIFT_LEFT(tinyint_type, 3)  from bit", errorMsg);
         failToCompile("select BIT_SHIFT_RIGHT(tinyint_type, 3) from bit", errorMsg);
         failToCompile("select BIT_SHIFT_LEFT(3.356, tinyint_type)from bit", errorMsg);
@@ -84,8 +83,13 @@ public class TestFunctions extends PlannerTestCase {
 
         failToCompile("select BIT_SHIFT_LEFT(INTEGER_TYPE, 3)  from bit", errorMsg);
         failToCompile("select BIT_SHIFT_RIGHT(INTEGER_TYPE, 3) from bit", errorMsg);
-        failToCompile("select BIT_SHIFT_LEFT(3.356, INTEGER_TYPE)from bit", errorMsg);
-        failToCompile("select BIT_SHIFT_RIGHT(3.356, INTEGER_TYPE)from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(3.356, INTEGER_TYPE) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(3.356, INTEGER_TYPE) from bit", errorMsg);
+
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE, 0.5) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(BIGINT_TYPE, 0.5) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE, FLOAT_TYPE) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE, FLOAT_TYPE) from bit", errorMsg);
 
         // compile on constants
         compile("select BIT_SHIFT_LEFT(3, tinyint_type), BIT_SHIFT_RIGHT(3, tinyint_type) from bit");

@@ -1734,7 +1734,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "numeric value out of range");
 
         verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, 0.5) from R3;",
-                "Type FLOAT can't be cast as BIGINT");
+                "incompatible data type in conversion");
 
         verifyStmtFails(client, "select BIT_SHIFT_RIGHT(3.6, 2) from R3;",
                 "incompatible data type in conversion");
