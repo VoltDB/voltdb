@@ -116,6 +116,26 @@ public class TestVoltDB extends TestCase {
 
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
+
+        String args23[] = { "create", "replica" };
+        VoltDB.Configuration cfg23 = new VoltDB.Configuration(args23);
+        assertEquals(StartAction.CREATE, cfg23.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg23.m_replicationRole);
+
+        String args24[] = { "recover", "replica" };
+        VoltDB.Configuration cfg24 = new VoltDB.Configuration(args24);
+        assertEquals(StartAction.RECOVER, cfg24.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg24.m_replicationRole);
+
+        String args25[] = { "rejoin", "replica" };
+        VoltDB.Configuration cfg25 = new VoltDB.Configuration(args25);
+        assertEquals(StartAction.REJOIN, cfg25.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg25.m_replicationRole);
+
+        String args26[] = { "live rejoin", "replica" };
+        VoltDB.Configuration cfg26 = new VoltDB.Configuration(args26);
+        assertEquals(StartAction.LIVE_REJOIN, cfg26.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg26.m_replicationRole);
     }
 
     public void testConfigurationValidate() {
@@ -145,10 +165,12 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(args6);
         assertFalse(config.validate());
 
-        // replica with non-create
-        String[] args7 = {"create", "host", "hola", "deployment", "teststring4", "replica", "recover"};
-        config = new VoltDB.Configuration(args7);
-        assertFalse(config.validate());
+        if (config.m_isEnterprise) {
+            // replica with explicit recover
+            String[] args7 = {"host", "hola", "replica", "recover"};
+            config = new VoltDB.Configuration(args7);
+            assertTrue(config.validate());
+        }
 
         // replica with explicit create
         String[] args8 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica", "create"};

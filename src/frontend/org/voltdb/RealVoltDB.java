@@ -229,6 +229,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // Are we adding the node to the cluster instead of rejoining?
     volatile boolean m_joining = false;
 
+    long m_clusterCreateTime;
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
     private ConsumerDRGateway m_consumerDRGateway = null;
@@ -1650,6 +1651,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             VoltDB.crashLocalVoltDB("Unable to rejoin a node to itself.  " +
                     "Please check your command line and start action and try again.", false, null);
         }
+        m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -2819,5 +2821,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     public long getClusterUptime()
     {
         return System.currentTimeMillis() - getHostMessenger().getInstanceId().getTimestamp();
+    }
+
+    @Override
+    public long getClusterCreateTime()
+    {
+        return m_clusterCreateTime;
+    }
+
+    @Override
+    public void setClusterCreateTime(long clusterCreateTime) {
+        m_clusterCreateTime = clusterCreateTime;
     }
 }
