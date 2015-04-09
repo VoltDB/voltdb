@@ -37,8 +37,8 @@
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
-    <link href="css/resources/datatables/demo_page.css" rel="stylesheet" />
-    <link href="css/resources/datatables/demo_table.css" rel="stylesheet" />
+    <link href="css/resources/datatables/dataTables_page.css" rel="stylesheet" />
+    <link href="css/resources/datatables/dataTables_table.css" rel="stylesheet" />
     <link href="css/resources/datatables/jquery.dataTables.css" rel="stylesheet" />
     <!--<link href="css/resources/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
     <link href="css/resources/datatables/theme.default.min.css" rel="stylesheet" />
@@ -318,7 +318,6 @@
                         </div>
                         <div id="drMasterSection" class="drShowHide" style="display:none;">
                             <div id="Div5" class="masterWrapper" style="display:block">
-
                                 <div class="tblScroll">
                                     <div id="tblDrMAster_wrapper" class="dataTables_wrapper no-footer">
                                         <div class="tabs-filter-wrapperDR">
@@ -338,7 +337,14 @@
 
                                         <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">
                                             <thead>
-                                                <tr role="row"><th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th><th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th><th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th><th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th><th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th><th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th></tr>
+                                                <tr role="row">
+                                                    <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>
+                                                    <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>
+                                                    <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>
+                                                    <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>
+                                                    <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>
+                                                    <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>
+                                                </tr>
                                             </thead>
                                             <tbody></tbody>
                                         </table>

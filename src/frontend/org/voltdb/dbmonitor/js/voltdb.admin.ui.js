@@ -23,8 +23,8 @@ function loadAdminPage() {
         errorPromoteMessage: $('#promoteErrorMessage'),
         updateMessageBar: $('#snapshotBar'),
         errorRestoreMsgContainer: $('#errorRestoreMsgContainer'),
-        userListObj:[]
-};
+        userListObj: []
+    };
 
     adminDOMObjects = {
         addConfigLink: $("#addConfigPopupLink"),
@@ -175,8 +175,8 @@ function loadAdminPage() {
         exportConfigurationLoading: $('#exportConfigurationLoading'),
 
         //Dr Mode object
-        labelDrmode:$("#drMode"),
-        labelDrId:$("#drId"),
+        labelDrmode: $("#drMode"),
+        labelDrId: $("#drId"),
 
         //Edit Dr State objects
         btnEditDrStateOk: $("#btnEditDrStateOk"),
@@ -188,7 +188,7 @@ function loadAdminPage() {
         txtDrState: $("#txtDrState"),
         spanDrStateEdited: "",
         loadingDrState: $("#loadingDrState"),
-        
+
         //Edit Dr Master objects
         btnEditDrMasterOk: $("#btnEditDrMasterOk"),
         btnEditDrMasterCancel: $("#btnEditDrMasterCancel"),
@@ -199,7 +199,7 @@ function loadAdminPage() {
         txtDrMaster: $("#txtDrMaster"),
         spanDrMasterEdited: "",
         loadingDrMaster: $("#loadingDrMaster"),
-        
+
         //Edit Dr Replica objects
         btnEditDrReplicaOk: $("#btnEditDrReplicaOk"),
         btnEditDrReplicaCancel: $("#btnEditDrReplicaCancel"),
@@ -256,7 +256,7 @@ function loadAdminPage() {
         restoreSnapshotMessages: {
             required: "Please select a snapshot to restore."
         },
-        
+
         streamNameRules: {
             required: true,
             regex: /^[a-zA-Z0-9_.]+$/
@@ -265,7 +265,7 @@ function loadAdminPage() {
             required: "This field is required",
             regex: 'Only alphabets, numbers, _ and . are allowed.'
         },
-        
+
         userNameRule: {
             required: true,
             regex: /^[a-zA-Z0-9_.]+$/,
@@ -274,11 +274,11 @@ function loadAdminPage() {
         userNameMessage: {
             required: "This field is required",
             regex: 'Only alphabets, numbers, _ and . are allowed.',
-            checkDuplicate:'This username already exists.'
+            checkDuplicate: 'This username already exists.'
         },
         passwordRule: {
             required: true
-            
+
         },
         passwordMessage: {
             required: "This field is required",
@@ -551,7 +551,7 @@ function loadAdminPage() {
         toggleSecurityEdit(editStates.ShowEdit);
     });
 
-    adminEditObjects.btnEditSecurityOk.on("click", function(e) {
+    adminEditObjects.btnEditSecurityOk.on("click", function (e) {
         var passwordValidation = $('.passwordtxt');
         for (var i = 0; i < passwordValidation.length; i++) {
             $(passwordValidation[i]).rules("add", {
@@ -560,8 +560,8 @@ function loadAdminPage() {
                     required: "This field is required",
                 }
             });
-        } 
-        
+        }
+
         var usernameValidation = $('.usernametxt');
         for (var j = 0; j < usernameValidation.length; j++) {
             $(usernameValidation[j]).rules("add", {
@@ -582,12 +582,12 @@ function loadAdminPage() {
 
     adminEditObjects.btnEditSecurityOk.popup({
         open: function (event, ui, ele) {
-            
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
             $("#btnSecurityOk").unbind("click");
-            $("#btnSecurityOk").on("click", function() {
+            $("#btnSecurityOk").on("click", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
 
                 if (!adminConfigurations.hasOwnProperty("security")) {
@@ -628,7 +628,7 @@ function loadAdminPage() {
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
-                
+
                 if (adminEditObjects.chkSecurity.is(':checked')) {
                     adminEditObjects.iconSecurityOption.removeClass().addClass("onIcon");
                     adminEditObjects.chkSecurityValue = true;
@@ -1204,7 +1204,7 @@ function loadAdminPage() {
 
     });
 
-    
+
     $("#frmSnapshotFrequency").validate({
         rules: {
             txtFrequency: adminValidationRules.numericRules
@@ -1231,7 +1231,7 @@ function loadAdminPage() {
             txtRetained: adminValidationRules.numericMessages
         }
     });
-    
+
     $("#formQueryTimeout").validate({
         rules: {
             txtQueryTimeout: adminValidationRules.queryTimeoutRules
@@ -1610,7 +1610,7 @@ function loadAdminPage() {
                 $("#deleteAddConfig").show();
             }
             $("#expotSaveConfigText").text("save").data("status", "save");
-            
+
             var contents = '' +
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
@@ -1632,7 +1632,7 @@ function loadAdminPage() {
                 '    <td>&nbsp;</td>' +
                 '</tr>' +
                 '</table>' +
-                
+
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr>' +
                 '    <td class="configLabe1">' +
@@ -1673,10 +1673,10 @@ function loadAdminPage() {
                 '</table>';
 
             $("#addConfigWrapper").html(contents);
-            
+
             $("#addConfigControls").show();
             $("#saveConfigConfirmation").hide();
-            
+
             $('#chkStream').iCheck({
                 checkboxClass: 'icheckbox_square-aero customCheckbox',
                 increaseArea: '20%'
@@ -1692,7 +1692,7 @@ function loadAdminPage() {
                 count++;
                 var nameId = 'txtName' + count;
                 var valueId = 'txtValue' + count;
-                
+
                 var newRow = '<tr>' +
                     '   <td>' +
                     '       <input size="15" id="' + nameId + '" name="' + nameId + '" class="newStreamProperty" type="text">' +
@@ -1719,7 +1719,7 @@ function loadAdminPage() {
             });
         },
         afterOpen: function () {
-            
+
             //For editing an existing configuration
             if (editId != "-1") {
                 var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
@@ -1730,7 +1730,7 @@ function loadAdminPage() {
                 $("#chkStream").iCheck(config.enabled ? 'check' : 'uncheck');
 
                 var properties = config.property;
-                
+
                 if (properties.length == 0) {
                     $("#deleteFirstProperty").trigger("click");
                 }
@@ -1777,10 +1777,10 @@ function loadAdminPage() {
                 //Close the popup
                 popup.close();
             });
-            
+
             //Center align the popup
             popup.center();
-            
+
             $("#deleteAddConfig").on("click", function () {
                 $("#addConfigControls").hide();
                 $("#deleteAddConfig").hide();
@@ -1790,14 +1790,14 @@ function loadAdminPage() {
 
             $("#btnSaveConfigOk").unbind("click");
             $("#btnSaveConfigOk").on("click", function () {
-                
+
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
 
                 if ($("#expotSaveConfigText").data("status") == "delete") {
                     adminConfigurations.export.configuration.splice(editId * 1, 1);
                 }
                 else {
-                    var newConfig = { };
+                    var newConfig = {};
                     newConfig["property"] = [];
 
                     var newStreamProperties = $(".newStreamProperty");
@@ -1814,7 +1814,7 @@ function loadAdminPage() {
                     newConfig["exportconnectorclass"] = "";
 
                     if (!adminConfigurations.export) {
-                        adminConfigurations.export = { };
+                        adminConfigurations.export = {};
                         adminConfigurations.export["configuration"] = [];
                     }
 
@@ -1841,25 +1841,25 @@ function loadAdminPage() {
                 adminEditObjects.exportConfiguration.html(loadingConfig);
                 adminEditObjects.loadingConfiguration.show();
                 adminEditObjects.exportConfiguration.data("status", "loading");
-                
+
                 //Close the popup
                 popup.close();
 
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
-                    
+
                     if (result.status == "1") {
 
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
                             adminEditObjects.loadingConfiguration.hide();
                             adminEditObjects.addNewConfigLink.show();
-                            adminEditObjects.exportConfiguration.data("status","value");
+                            adminEditObjects.exportConfiguration.data("status", "value");
 
                             VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
                         });
 
                     } else {
-                        setTimeout(function() {
+                        setTimeout(function () {
                             adminEditObjects.loadingConfiguration.hide();
                             adminEditObjects.addNewConfigLink.show();
                             adminEditObjects.exportConfiguration.data("status", "value");
@@ -1881,7 +1881,7 @@ function loadAdminPage() {
                     }
                 });
             });
-            
+
             $("#btnSaveConfigCancel").unbind("click");
             $("#btnSaveConfigCancel").on("click", function () {
 
@@ -1910,37 +1910,37 @@ function loadAdminPage() {
                 $("#deleteUser").css('display', 'none');
             }
             var content = '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
-                            '<tbody>'+
+                            '<tbody>' +
                                 '<tr>' +
-                                    '<td width="30%">Username</td>' +    
-                                    '<td width="10%">' +  
-                                        '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +         
+                                    '<td width="30%">Username</td>' +
+                                    '<td width="10%">' +
+                                        '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +
                                         '<label id="errorUser" for="txtUser" class="error" style="display:none">This field is required</label>' +
                                         '<input id="txtOrgUser" name="txtOrgUser" type="text" size="30" aria-required="true" style="display:none"/>' +
-                                    '</td> ' +     
-                                    '<td>&nbsp;</td> ' +     
-                                    '<td>&nbsp;</td>' +  
-                                '</tr>' +  
-                                '<tr>' +  
-                                    '<td><span id="labelPassword"></span> </td> ' +     
-                                    '<td>' +  
-                                        '<input id="txtPassword" name="txtPassword" type="password" size="30" aria-required="true" class="error"/> ' +        
-                                        '<label id="errorPassword" for="txtPassword" class="error" style="display:none">This field is required</label> ' +     
-                                    '</td>' +      
-                                    '<td>&nbsp;</td> ' +     
-                                    '<td>&nbsp;</td>' +  
-                                '</tr>' +  
-                                '<tr>' +  
-                                    '<td>Roles </td> ' +     
-                                    '<td>' +  
-                                        '<select id="selectRole">' +  
-                                            '<option value="administrator" selected="selected">Administrator</option>' +  
-                                            '<option value="user">User</option>' +  
-                                        '</select>  ' +  
-                                    '</td> ' +     
-                                    '<td>&nbsp;</td>' +      
-                                    '<td>&nbsp;</td>' +  
-                                '</tr>' +  
+                                    '</td> ' +
+                                    '<td>&nbsp;</td> ' +
+                                    '<td>&nbsp;</td>' +
+                                '</tr>' +
+                                '<tr>' +
+                                    '<td><span id="labelPassword"></span> </td> ' +
+                                    '<td>' +
+                                        '<input id="txtPassword" name="txtPassword" type="password" size="30" aria-required="true" class="error"/> ' +
+                                        '<label id="errorPassword" for="txtPassword" class="error" style="display:none">This field is required</label> ' +
+                                    '</td>' +
+                                    '<td>&nbsp;</td> ' +
+                                    '<td>&nbsp;</td>' +
+                                '</tr>' +
+                                '<tr>' +
+                                    '<td>Roles </td> ' +
+                                    '<td>' +
+                                        '<select id="selectRole">' +
+                                            '<option value="administrator" selected="selected">Administrator</option>' +
+                                            '<option value="user">User</option>' +
+                                        '</select>  ' +
+                                    '</td> ' +
+                                    '<td>&nbsp;</td>' +
+                                    '<td>&nbsp;</td>' +
+                                '</tr>' +
                             '</tbody>' +
                         '</table>';
             $('#addUserWrapper').html(content);
@@ -1966,14 +1966,14 @@ function loadAdminPage() {
             } else {
                 $('#labelPassword').html('New Password');
                 $('#addUserHeader').html('Edit User');
-                $('#txtUser').val($('#addUserInnerPopup').data('username')); 
+                $('#txtUser').val($('#addUserInnerPopup').data('username'));
                 $('#txtOrgUser').val($('#addUserInnerPopup').data('username'));
                 orguser = $('#addUserInnerPopup').data('username');
                 $('#selectRole').val($('#addUserInnerPopup').data('role').toLowerCase());
             }
 
             $("#btnSaveUser").unbind("click");
-            $("#btnSaveUser").on("click", function(e) {
+            $("#btnSaveUser").on("click", function (e) {
                 if (!$("#frmAddUser").valid()) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1984,7 +1984,7 @@ function loadAdminPage() {
                     $("#deleteSecUser").hide();
                     $("#saveUserControl").show();
                 }
-            }); 
+            });
 
             $("#btnCancelUser").unbind("click");
             $("#btnCancelUser").on("click", function (e) {
@@ -2014,15 +2014,15 @@ function loadAdminPage() {
                         requestType = "PUT";
                     }
                     toggleSecurityEdit(editStates.ShowLoading);
-                    voltDbRenderer.UpdateUserConfiguration(userObject, function(result) {
+                    voltDbRenderer.UpdateUserConfiguration(userObject, function (result) {
                         if (result.status == "1") {
                             toggleSecurityEdit(editStates.ShowEdit);
                             //Reload Admin configurations for displaying the updated value
-                            voltDbRenderer.GetAdminDeploymentInformation(false, function(adminConfigValues, rawConfigValues) {
+                            voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
                                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
                             });
                         } else {
-                            setTimeout(function() {
+                            setTimeout(function () {
                                 toggleSecurityEdit(editStates.ShowEdit);
                                 var errorStatus = '';
                                 if (editUserState == 1) {
@@ -2040,7 +2040,7 @@ function loadAdminPage() {
                                 else {
                                     msg += "Please try again later.";
                                 }
-                                
+
                                 $('#securityUserErrorFieldMsg').html(msg);
                                 $("#sercurityUserPopupLink").trigger("click");
                             }, 3000);
@@ -2050,7 +2050,7 @@ function loadAdminPage() {
                 } else if ($("#userSaveDelete").data('status') == 'delete') {
                     toggleSecurityEdit(editStates.ShowLoading);
                     voltDbRenderer.UpdateUserConfiguration(null, function (result) {
-                        
+
                         if (!result.status) { //Handle the condition when the user deletes himself.
                             return;
                         }
@@ -2063,10 +2063,10 @@ function loadAdminPage() {
                             });
                         } else {
                             setTimeout(function () {
-                                
+
                                 toggleSecurityEdit(editStates.ShowEdit);
                                 var errorStatus = 'Could not delete the user.';
-                                
+
                                 var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
                                     msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
@@ -2082,16 +2082,16 @@ function loadAdminPage() {
                         }
                     }, username, "DELETE");
                 }
-                
+
             });
-            
+
             $("#btnCancelSaveSecUser").unbind("click");
             $("#btnCancelSaveSecUser").on("click", function () {
                 $("#addUserControl").show();
                 $("#deleteSecUser").show();
                 $("#saveUserControl").hide();
-            }); 
-            
+            });
+
             $("#deleteSecUser").unbind("click");
             $("#deleteSecUser").on("click", function () {
                 $("#userSaveDelete").data('status', 'delete');
@@ -2159,7 +2159,7 @@ function loadAdminPage() {
             });
         }
     });
-    
+
     //Start DR State
     var toggleDrStateEdit = function (state) {
 
@@ -2487,7 +2487,7 @@ function loadAdminPage() {
 
     $.validator.addMethod(
         "checkDuplicate",
-        function(value) {
+        function (value) {
             var arr = VoltDbAdminConfig.orgUserList;
             if (editUserState == 1) {
                 if ($.inArray(value, arr) != -1) {
@@ -2526,6 +2526,7 @@ function loadAdminPage() {
         this.isDbPaused = false;
         this.toggleStates = {};
         this.orgUserList = [];
+        this.drStatus = '';
         this.drReplicaEnabled = true;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
@@ -2648,7 +2649,7 @@ function loadAdminPage() {
             }
         };
 
-        var getDrReplicaStatus = function(result) {
+        var getDrReplicaStatus = function (result) {
             adminEditObjects.chkDrReplicaValue = result;
             adminEditObjects.iconDrReplicaOption.removeClass().addClass(getOnOffClass(result));
             adminEditObjects.txtDrReplica.text(getOnOffText(result));
@@ -2684,10 +2685,10 @@ function loadAdminPage() {
             if (data != undefined) {
 
                 //Do not update the data in loading condition
-                if (adminEditObjects.exportConfiguration.data("status") == "loading"){
+                if (adminEditObjects.exportConfiguration.data("status") == "loading") {
                     return;
                 }
-                
+
                 for (var i = 0; i < data.length; i++) {
                     var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
                     var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
@@ -2773,14 +2774,14 @@ function loadAdminPage() {
                         '<td>' + userName + '</td>' +
                         '<td>' + formatDisplayName(role) + '</td>' +
                         '<td>&nbsp</td>' +
-                        '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\''+userName+'\',\''+role+'\');">&nbsp;</a></td>' +
+                        '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\'' + userName + '\',\'' + role + '\');">&nbsp;</a></td>' +
                         '</tr>';
                 }
             }
             $('#UsersList').html(tableHeader + result + tableFooter);
-            
+
         };
-        
+
         this.getEditUserList = function (userData) {
             var result = "";
             var tableHeader = '<table id="secTbl" width="100%" cellpadding="0" cellspacing="0" class="secTbl">' +
@@ -2801,16 +2802,16 @@ function loadAdminPage() {
                         '<td id="latbox" class="username">' +
                         '<input class="usernametxt" size="15" type="text" value=' + userName + ' id="inputUserName' + i + '" name="inputUserName' + i + '">' +
                         '<label id="errorUserName' + i + '" for="inputUserName' + i + '" class="error errorSecurity" style="display:none"></label>' +
-                        '<input class="orgUserName" type="text" value=' + userName + ' style="display:none">'+
+                        '<input class="orgUserName" type="text" value=' + userName + ' style="display:none">' +
                         '</td>' +
                         '<td id="latbox' + i + '" class="password">' +
-                        '<a class="changePsd" href ="javascript:void(0)" onclick="changePassword(this);" id="anchor'+i+'" >Change Password</a>' +
+                        '<a class="changePsd" href ="javascript:void(0)" onclick="changePassword(this);" id="anchor' + i + '" >Change Password</a>' +
                         '<input class="passwordtxt" size="15" type="text" style="display:none" id="input' + i + '" name="input' + i + '">' +
                         '<label id="errorUser' + i + '" for="input' + i + '" class="error errorSecurity" style="display:none"></label>' +
                         '</td>' +
                         '<td id="lngbox" class="roleoption">' +
                         '<select class="roleoptiontxt">';
-                        
+
                     if (role.toLowerCase() == 'administrator') {
                         result += '<option selected="selected">Admin</option>' +
                             '<option>User</option>';
@@ -2914,7 +2915,7 @@ function loadAdminPage() {
                 adminDOMObjects.zookeeperPort.text(configValues.zookeeperInterface);
                 adminDOMObjects.replicationPort.text(configValues.replicationInterface);
                 adminDOMObjects.serverSettingHeader.text("Server Settings");
-                
+
             } else {
                 adminDOMObjects.adminPort.text('');
                 adminDOMObjects.httpPort.text('');
@@ -2923,11 +2924,11 @@ function loadAdminPage() {
                 adminDOMObjects.zookeeperPort.text('');
                 adminDOMObjects.replicationPort.text('');
                 adminDOMObjects.serverSettingHeader.text('');
-                
+
             }
-            
+
         };
-       
+
         var refreshClusterValues = function (clusterValues) {
             if (clusterValues != undefined && clusterValues.hasOwnProperty('clusterState')) {
                 if (clusterValues.clusterState.toLowerCase() == "running") {
@@ -3000,7 +3001,7 @@ function insRow() {
     inp1.name = 'input' + (len - 1);
     inp1.value = '';
     $(inp1).css("display", "inline-block");
-    
+
     var lbl1 = new_row.cells[1].getElementsByTagName('label')[0];
     lbl1.id = 'errorUser' + (len - 1);
     lbl1.htmlFor = 'input' + (len - 1);
@@ -3009,10 +3010,10 @@ function insRow() {
 
     var anch = new_row.cells[1].getElementsByTagName('a')[0];
     $(anch).css("display", "none");
-        
-	var inp0 = new_row.cells[0].getElementsByTagName('input')[0];
-	inp0.id = 'inputUserName' + (len - 1);
-	inp0.name = 'inputUserName' + (len - 1);
+
+    var inp0 = new_row.cells[0].getElementsByTagName('input')[0];
+    inp0.id = 'inputUserName' + (len - 1);
+    inp0.name = 'inputUserName' + (len - 1);
     inp0.value = '';
     $(inp0).css("display", "inline-block");
 
@@ -3021,8 +3022,8 @@ function insRow() {
     lbl0.htmlFor = 'inputUserName' + (len - 1);
     lbl0.value = '';
     $(lbl0).css("display", "none");
-	
-	var sel = new_row.cells[2].getElementsByTagName('select')[0];
+
+    var sel = new_row.cells[2].getElementsByTagName('select')[0];
     sel.id += len;
     sel.value = '';
     x.appendChild(new_row);
@@ -3047,7 +3048,7 @@ var editStream = function (editId) {
     adminDOMObjects.addConfigLink.trigger("click");
 };
 
-var addUser = function(editId, username, role) {
+var addUser = function (editId, username, role) {
     $('#addUserInnerPopup').data('isupdate', editId);
     if (editId == 1) {
         $('#addUserInnerPopup').data('username', username);
@@ -3056,7 +3057,7 @@ var addUser = function(editId, username, role) {
     $("#addNewUserLink").trigger("click");
 };
 
-var formatDisplayName = function(displayName) {
+var formatDisplayName = function (displayName) {
     displayName = displayName.toLowerCase();
     return displayName.charAt(0).toUpperCase() + displayName.slice(1);
 };
