@@ -1,4 +1,4 @@
-﻿var adminDOMObjects = {};
+var adminDOMObjects = {};
 var adminEditObjects = {};
 var adminClusterObjects = {};
 var editStates = {

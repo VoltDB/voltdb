@@ -1,4 +1,4 @@
-﻿function QueryUI(queryString, userName) {
+function QueryUI(queryString, userName) {
     "use strict";
     var CommandParser,
         queryToRun = queryString;
