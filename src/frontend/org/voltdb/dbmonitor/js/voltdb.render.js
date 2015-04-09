@@ -474,6 +474,8 @@ function alertNodeClicked(obj) {
         };
         //
 
+
+
         //Render Cluster Transaction Graph
         this.GetTransactionInformation = function (onInformationLoaded) {
             var transactionDetails = {};
@@ -1958,7 +1960,7 @@ function alertNodeClicked(obj) {
                 }
 
                 drDetails[hostName]["ENABLED"] = info[colIndex["ENABLED"]];
-                //drDetails[hostName]["SYNCSNAPSHOTSTATE"] = info[colIndex["SYNCSNAPSHOTSTATE"]];
+                drDetails[hostName]["SYNCSNAPSHOTSTATE"] = info[colIndex["SYNCSNAPSHOTSTATE"]];
             });
         };
         //
@@ -1972,7 +1974,7 @@ function alertNodeClicked(obj) {
                 return;
             }
 
-            
+
 
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP")
@@ -2048,7 +2050,7 @@ function alertNodeClicked(obj) {
             }
 
             connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "REPLICATION_RATE_1M")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2063,7 +2065,7 @@ function alertNodeClicked(obj) {
             replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M;
 
         };
-        
+
         var getPartitionIdleTimeDetails = function (connection, partitionDetail) {
             var colIndex = {};
             var counter = 0;

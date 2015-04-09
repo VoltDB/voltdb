@@ -699,13 +699,14 @@ var loadPage = function (serverName, portid) {
                 voltDbRenderer.GetDrStatusInformation(function (drDetails) {
                     if (getCurrentServer() != undefined) {
                         VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
+                        VoltDbAdminConfig.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
                         VoltDbUI.isFirstHit = false;
                         if (VoltDbAdminConfig.drReplicationRole.toLowerCase() == 'replica') {
                             $('#liDrReplication').css('display', 'block');
                             var userPreference = getUserPreferences();
                             if (userPreference["DrReplicationRate"]) {
                                 $("#ChartDrReplicationRate").show();
-                            } 
+                            }
                             voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
                                 MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
                             });
@@ -1041,7 +1042,6 @@ var loadPage = function (serverName, portid) {
         //if (VoltDbAdminConfig.drListen == true) {
         $("#Div5").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
-
             var response = drDetails;
 
             var htmlcontent = "";
@@ -1056,7 +1056,7 @@ var loadPage = function (serverName, portid) {
 
                     htmlcontent = htmlcontent + "<tr>";
                     htmlcontent = htmlcontent + "<td>" + key + "</td>" +
-                        "<td>on</td>" +
+                        "<td>" + VoltDbAdminConfig.drStatus + "</td>" +
                         "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
                         "<td>" + response[key][i].TOTALBYTES + "</td >" +
                         "<td>" + replicaLatencyMs + "</td >" +
@@ -1544,8 +1544,8 @@ var loadPage = function (serverName, portid) {
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
-    refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    refreshDrSection();
+        refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
+        refreshDrSection();
     }, 5000);
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
