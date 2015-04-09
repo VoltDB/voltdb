@@ -27,11 +27,18 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITNOT function");
     }
 
-    // We're treating LONG_MIN as a normal bit pattern, so *don't*
-    // check for null here.
+    if (isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
 
-    int64_t operand = getBigInt();
-    return getBigIntValue(~operand);
+    int64_t result = ~(getBigInt());
+    if (result == INT64_NULL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                           "Application of bitwise function BITNOT would produce INT64_MIN, "
+                           "which is reserved for SQL NULL values.");
+    }
+
+    return getBigIntValue(result);
 }
 
 template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& arguments) {

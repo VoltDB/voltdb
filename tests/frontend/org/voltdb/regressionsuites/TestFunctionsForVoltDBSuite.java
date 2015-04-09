@@ -1578,34 +1578,34 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    static private long[] bitnotInterestingValues = new long[] {
+            // skipping Long.MIN_VALUE because it's our null value
+            // (tested in testBitnotNull)
+            Long.MIN_VALUE + 1,
+            Long.MIN_VALUE + 1000,
+            -1,
+            0,
+            1,
+            1000,
+            Long.MAX_VALUE - 1
+            // Long.MAX_VALUE produces Long.MIN_VALUE when bitnot'd,
+            // which can represent the null value
+            // (tested in testBitnotNull)
+    };
+
     public void testBitnot() throws Exception {
         System.out.println("STARTING test Bitnot");
         Client client = getClient();
         VoltTable result = null;
 
-        long[] interestingValues = new long[] {
-                // skipping Long.MIN_VALUE because it's our null value
-                // (tested below)
-                Long.MIN_VALUE + 1,
-                Long.MIN_VALUE + 1000,
-                -1,
-                0,
-                1,
-                1000,
-                Long.MAX_VALUE - 1
-                // Long.MAX_VALUE produces Long.MIN_VALUE,
-                // which can represent the null value
-                // (these special cases are tested below)
-        };
-
         int i = 0;
-        for (long val : interestingValues) {
+        for (long val : bitnotInterestingValues) {
             client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)",
                     i, val);
             ++i;
         }
 
-        for (long val : interestingValues) {
+        for (long val : bitnotInterestingValues) {
             result = client.callProcedure("@AdHoc",
                     "select big, bitnot(big) from R3 where big = " + val).getResults()[0];
             validateRowOfLongs(result, new long[] {val, ~val});
@@ -1618,16 +1618,29 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         verifyStmtFails(client, "select bitnot(-9223372036854775809) from R3", "numeric value out of range");
     }
 
+    public void testBitnotWithParam() throws Exception {
+        System.out.println("STARTING test Bitnot with a parameter");
+        Client client = getClient();
+        VoltTable result = null;
+
+        client.callProcedure("@AdHoc", "insert into R3(id) values (0)");
+
+        for (long val : bitnotInterestingValues) {
+            result = client.callProcedure("@AdHoc",
+                    "select bitnot(?) from R3", val).getResults()[0];
+            validateRowOfLongs(result, new long[] {~val});
+        }
+    }
+
     public void testBitnotNull() throws Exception {
         System.out.println("STARTING test Bitnot with null value");
         Client client = getClient();
         VoltTable result = null;
 
         client.callProcedure("@AdHoc", "insert into R3(id, big) values (0, ?)",
-                Long.MIN_VALUE);
+                Long.MIN_VALUE); // this is really a NULL value
         client.callProcedure("@AdHoc", "insert into R3(id, big) values (1, ?)",
                 Long.MAX_VALUE);
-
 
         result = client.callProcedure("@AdHoc",
                 "select bitnot(big) from r3 where id = 0")
@@ -1635,22 +1648,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         result.advanceRow();
 
-        // Treat MIN_VALUE like any other value (as opposed to a null value)
-        // In this case, MIN_VALUE becomes MAX_VALUE
+        // bitnot(null) produces null
         long val = result.getLong(0);
-        assertEquals(false, result.wasNull());
-        assertEquals(Long.MAX_VALUE, val);
-
-        result = client.callProcedure("@AdHoc",
-                "select bitnot(big) from r3 where id = 1")
-                .getResults()[0];
-
-        // bitnot(MAX_VALUE) produces MIN_VALUE, which will be
-        // seen as a null by clients.
-        result.advanceRow();
-        val = result.getLong(0);
         assertEquals(true, result.wasNull());
         assertEquals(Long.MIN_VALUE, val);
+
+        // bitnot(MAX_VALUE) produces MIN_VALUE, which would be
+        // a null value, so an exception is thrown.
+        verifyStmtFails(client, "select bitnot(big) from r3 where id = 1",
+                "Application of bitwise function BITNOT would produce INT64_MIN, "
+                + "which is reserved for SQL NULL values.");
     }
 
     private void bitwiseShiftChecker(long pk, long big, long param) throws IOException, ProcCallException {
