@@ -75,6 +75,17 @@ public class TestFunctions extends PlannerTestCase {
         errorMsg = "numeric value out of range";
         failToCompile("select bitand(bigint_type, 9223372036854775809) from bit;", errorMsg);
         failToCompile("select bitand(bigint_type, -9223372036854775809) from bit;", errorMsg);
+
+        // bit shift
+        failToCompile("select BIT_SHIFT_LEFT(FLOAT_TYPE, 3), BIT_SHIFT_RIGHT(FLOAT_TYPE, 3) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(VARCHAR_TYPE, 3), BIT_SHIFT_RIGHT(VARCHAR_TYPE, 3) from bit", errorMsg);
+
+        // works for integral types
+        compile("select BIT_SHIFT_LEFT(tinyint_type, 3), BIT_SHIFT_RIGHT(tinyint_type, 3) from bit");
+        compile("select BIT_SHIFT_LEFT(3, tinyint_type), BIT_SHIFT_RIGHT(3, tinyint_type) from bit");
+
+        compile("select BIT_SHIFT_LEFT(INTEGER_TYPE, 3), BIT_SHIFT_RIGHT(INTEGER_TYPE, 3) from bit");
+        compile("select BIT_SHIFT_LEFT(3, INTEGER_TYPE), BIT_SHIFT_RIGHT(3, INTEGER_TYPE) from bit");
     }
 
 }
