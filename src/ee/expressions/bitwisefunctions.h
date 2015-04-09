@@ -119,9 +119,17 @@ template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& ar
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& lval = arguments[0];
-    int64_t lv = lval.castAsBigIntAndGetValue();
+    if (lval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_LEFT function");
+    }
 
     const NValue& rval = arguments[1];
+
+    if (lval.isNull() || rval.isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
+
+    int64_t lv = lval.getBigInt();
     int64_t shifts = rval.castAsBigIntAndGetValue();
     if (shifts < 0) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported negative value for bit shifting");
@@ -130,15 +138,30 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vecto
         return getBigIntValue(0);
     }
 
-    return getBigIntValue(lv << shifts);
+    int64_t result = lv << shifts;
+    if (result == INT64_NULL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Application of bitwise function BIT_SHIFT_LEFT would produce INT64_MIN, "
+                "which is reserved for SQL NULL values.");
+    }
+
+    return getBigIntValue(result);
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& lval = arguments[0];
-    int64_t lv = lval.castAsBigIntAndGetValue();
+    if (lval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIT_SHIFT_RIGHT function");
+    }
 
     const NValue& rval = arguments[1];
+
+    if (lval.isNull() || rval.isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
+
+    int64_t lv = lval.getBigInt();
     int64_t shifts = rval.castAsBigIntAndGetValue();
     if (shifts < 0) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported negative value for bit shifting");
@@ -147,7 +170,14 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
         return getBigIntValue(0);
     }
 
-    return getBigIntValue(lv >> shifts);
+    int64_t result = lv >> shifts;
+    if (result == INT64_NULL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Application of bitwise function BIT_SHIFT_RIGHT would produce INT64_MIN, "
+                "which is reserved for SQL NULL values.");
+    }
+
+    return getBigIntValue(result);
 }
 
 

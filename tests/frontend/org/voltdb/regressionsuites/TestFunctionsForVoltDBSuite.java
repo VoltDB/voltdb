@@ -1692,7 +1692,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         bitwiseShiftChecker(1, 1, 1); bitwiseShiftChecker(2, -1, 1);
 
-        bitwiseShiftChecker(3, 3, 63); bitwiseShiftChecker(4, -3, 63);
+        bitwiseShiftChecker(3, 3, 60); bitwiseShiftChecker(4, -3, 60);
 
         bitwiseShiftChecker(5, 3, 64); bitwiseShiftChecker(6, -3, 64);
 
@@ -1711,6 +1711,20 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         bitwiseShiftChecker(52, Long.MAX_VALUE, -3);  bitwiseShiftChecker(53, -3, Long.MAX_VALUE);
         bitwiseShiftChecker(54, Long.MIN_VALUE+1, 6);  bitwiseShiftChecker(55, 6, Long.MIN_VALUE+1);
         bitwiseShiftChecker(56, Long.MIN_VALUE+1, -6);  bitwiseShiftChecker(57, -6, Long.MIN_VALUE+1);
+
+        try {
+            bitwiseShiftChecker(19, 3, 63);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("would produce INT64_MIN, which is reserved for SQL NULL values"));
+        }
+
+        try {
+            bitwiseShiftChecker(20, -3, 63);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("would produce INT64_MIN, which is reserved for SQL NULL values"));
+        }
 
         Client client = getClient();
         String sql;
@@ -1733,19 +1747,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         VoltTable vt;
-        // NULL tests
+        // NULL tests: null in null out
         client.callProcedure("@AdHoc", "insert into R3(id, big) values (100, null)");
-        try {
-            vt = client.callProcedure("BITWISE_SHIFT_PARAM_1", 2, 2, 100).getResults()[0];
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("unsupported negative value for bit shifting"));
-        }
+        vt = client.callProcedure("BITWISE_SHIFT_PARAM_1", 2, 2, 100).getResults()[0];
+        validateRowOfLongs(vt, new long[]{Long.MIN_VALUE, Long.MIN_VALUE });
 
-        // NULL works like a MIN
         vt = client.callProcedure("BITWISE_SHIFT_PARAM_2", 2, 2, 100).getResults()[0];
-        long big = Long.MIN_VALUE, param = 2;
-        validateRowOfLongs(vt, new long[]{big << param, big >> param });
+        validateRowOfLongs(vt, new long[]{Long.MIN_VALUE, Long.MIN_VALUE });
     }
 
     //
