@@ -1246,7 +1246,7 @@ public class SQLParser extends SQLPatternFactory
         }
 
         if (filename.startsWith("~")) {
-            filename = filename.replace("~", System.getProperty("user.home"));
+            filename = filename.replaceFirst("~", System.getProperty("user.home"));
         }
 
         return new FileInfo(parentContext, option, filename);
