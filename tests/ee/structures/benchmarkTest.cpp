@@ -254,6 +254,35 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     result.clear();
 
 
+    // SCAN without END() factor
+    iter_volt_map = voltMap.begin();
+    benVoltMap.start();
+    for (int i = 0; i < NUM_OF_VALUES; i++) {
+        iter_volt_map.moveNext();
+    }
+    benVoltMap.stop();
+    result.push_back(benVoltMap);
+
+    iter_stl = stlMap.begin();
+    benStl.start();
+    for (int i = 0; i < NUM_OF_VALUES; i++) {
+        iter_stl++;
+    }
+    benStl.stop();
+    result.push_back(benStl);
+
+    iter_btree = btreeMap.begin();
+    benBtree.start();
+    for (int i = 0; i < NUM_OF_VALUES; i++) {
+        iter_btree++;
+    }
+    benBtree.stop();
+    result.push_back(benBtree);
+
+    resultPrinter("SCAN without END() factor", NUM_OF_VALUES, result);
+    result.clear();
+
+
     // LOOK UP
     std::vector<int> keys = getRandomValues(ITERATIONS, BIGGEST_VAL);
 
@@ -306,10 +335,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benVoltMap.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = deletes[i];
-        iter_volt_map = voltMap.find(val);
-        if (!iter_volt_map.isEnd()) {
-            voltMap.erase(iter_volt_map);
-        }
+        voltMap.erase(val);
     }
     benVoltMap.stop();
     result.push_back(benVoltMap);
@@ -317,10 +343,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benStl.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = deletes[i];
-        iter_stl = stlMap.find(val);
-        if (iter_stl != stlMap.end()) {
-            stlMap.erase(iter_stl);
-        }
+        stlMap.erase(val);
     }
     benStl.stop();
     result.push_back(benStl);
@@ -328,10 +351,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benBtree.start();
     for (int i = 0; i< ITERATIONS; i++) {
         int val = deletes[i];
-        iter_btree = btreeMap.find_multi(val);
-        if (iter_btree != btreeMap.end()) {
-            btreeMap.erase(iter_btree);
-        }
+        btreeMap.erase_multi(val);
     }
     benBtree.stop();
     result.push_back(benBtree);
@@ -339,10 +359,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benBoost.start();
     for (int i = 0; i < NUM_OF_VALUES; i++) {
         int val = input[i];
-        iter_boost_map = boostMap.find(val);
-        if (iter_boost_map != boostMap.end()) {
-            boostMap.erase(iter_boost_map);
-        }
+        boostMap.erase(val);
     }
     benBoost.stop();
     result.push_back(benBoost);
@@ -350,10 +367,7 @@ void BenchmarkRun(int NUM_OF_VALUES) {
     benVoltHash.start();
     for (int i = 0; i < NUM_OF_VALUES; i++) {
         int val = input[i];
-        iter_volt_hash = voltHash.find(val);
-        if (!iter_volt_hash.isEnd()) {
-            voltHash.erase(iter_volt_hash);
-        }
+        voltHash.erase(val);
     }
     benVoltHash.stop();
     result.push_back(benVoltHash);
