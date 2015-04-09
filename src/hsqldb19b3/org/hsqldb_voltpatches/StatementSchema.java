@@ -966,17 +966,19 @@ public class StatementSchema extends Statement {
 
                     TableWorks tableWorks = new TableWorks(session, table);
 
-                    // A VoltDB extension to support indexed expressions
+                    // A VoltDB extension to support indexed expressions and partial indexes
+                    Expression predicate = (Expression) arguments[6];
                     @SuppressWarnings("unchecked")
                     java.util.List<Expression> indexExprs = (java.util.List<Expression>)arguments[4];
                     boolean assumeUnique = ((Boolean) arguments[5]).booleanValue();
                     if (indexExprs != null) {
-                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique).setAssumeUnique(assumeUnique);
+                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, predicate).setAssumeUnique(assumeUnique);
                         break;
                     }
                     org.hsqldb_voltpatches.index.Index addedIndex = 
+                    tableWorks.addIndex(indexColumns, name, unique, predicate);
                     // End of VoltDB extension
-                    tableWorks.addIndex(indexColumns, name, unique);
+                    // tableWorks.addIndex(indexColumns, name, unique);
                     // A VoltDB extension to support assume unique attribute
                     addedIndex.setAssumeUnique(assumeUnique);
                     // End of VoltDB extension
