@@ -551,7 +551,6 @@ public class Inits {
      * Command line is highest precedence, followed by deployment xml,
      * finally followed by the default value of 5555.
      *
-     */
     class PickReplicationPort extends InitWork {
         PickReplicationPort() {
         }
@@ -572,6 +571,7 @@ public class Inits {
             m_config.m_drAgentPortStart = replicationPort;
         }
     }
+    */
 
     class SetupReplicationRole extends InitWork {
         SetupReplicationRole() {
