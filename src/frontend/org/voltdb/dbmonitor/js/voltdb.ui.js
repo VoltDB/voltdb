@@ -1,5 +1,6 @@
 ﻿var ispopupRevoked = false;
 var table = '';
+
 $(document).ready(function () {
 
     localStorage.clear(); //clear the localStorage for DataTables in DR Section
@@ -335,7 +336,7 @@ function changePassword(obj) {
 }
 
 var loadPage = function (serverName, portid) {
-
+    //$("#ChartDrReplicationRate").hide();
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
 
@@ -698,16 +699,19 @@ var loadPage = function (serverName, portid) {
                 voltDbRenderer.GetDrStatusInformation(function (drDetails) {
                     if (getCurrentServer() != undefined) {
                         VoltDbAdminConfig.drEnabled = drDetails[currentServer]['ENABLED'];
-                        if (VoltDbAdminConfig.drReplicationRole.toLowerCase() != 'none' && VoltDbAdminConfig.drReplicaEnabled == true) {
+                        VoltDbUI.isFirstHit = false;
+                        if (VoltDbAdminConfig.drReplicationRole.toLowerCase() == 'replica') {
                             $('#liDrReplication').css('display', 'block');
+                            var userPreference = getUserPreferences();
+                            if (userPreference["DrReplicationRate"]) {
+                                $("#ChartDrReplicationRate").show();
+                            } 
+                            voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+                                MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
+                            });
                         } else {
                             $('#liDrReplication').css('display', 'none');
-                            var userPreferences = getUserPreferences();
-                            $.each(userPreferences, function (key, value) {
-                                if (key == "DrReplicationRate")
-                                    userPreferences[key] = false;
-                            });
-                            saveUserPreferences(userPreferences);
+                            $("#ChartDrReplicationRate").hide();
                         }
 
                     }
@@ -1531,10 +1535,10 @@ var loadPage = function (serverName, portid) {
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
-    //setInterval(function () {
+    setInterval(function () {
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     refreshDrSection();
-    //  }, 5000);
+    }, 5000);
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
@@ -1718,7 +1722,7 @@ var showHideGraph = function (userpreferences) {
     else
         $("#chartPartitionIdleTime").show();
 
-    if (userpreferences["DrReplicationRate"] == false)        $("#ChartDrReplicationRate").hide();    else        $("#ChartDrReplicationRate").show();
+    if (userpreferences["DrReplicationRate"] == false || VoltDbUI.isFirstHit == true || VoltDbAdminConfig.drReplicationRole.toLowerCase() != "replica")        $("#ChartDrReplicationRate").hide();    else        $("#ChartDrReplicationRate").show();
 
     if (userpreferences["StoredProcedures"] == false)
         $("#tblStoredProcedures").hide();
@@ -1786,6 +1790,7 @@ var adjustGraphSpacing = function () {
 (function (window) {
     var iVoltDbUi = (function () {
         this.isSchemaTabLoading = false;
+        this.isFirstHit = true;
         this.ACTION_STATES = {
             NONE: -1,
             NEXT: 0,

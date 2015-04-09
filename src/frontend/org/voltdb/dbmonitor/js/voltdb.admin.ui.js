@@ -2651,7 +2651,6 @@ function loadAdminPage() {
         };
 
         var getDrReplicaStatus = function(result) {
-            debugger;
             adminEditObjects.chkDrReplicaValue = result;
             adminEditObjects.iconDrReplicaOption.removeClass().addClass(getOnOffClass(result));
             adminEditObjects.txtDrReplica.text(getOnOffText(result));
