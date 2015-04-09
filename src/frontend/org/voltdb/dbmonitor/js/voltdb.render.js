@@ -465,11 +465,11 @@ function alertNodeClicked(obj) {
 
         //Render DR Replication Graph
         this.GetDrReplicationInformation = function (onInformationLoaded) {
-            var replicationStatus = {};
+            var replicationData = {};
 
             VoltDBService.GetDrReplicationInformation(function (connection) {
-                //getReplicationDetails(connection, replicationStatus, "CLUSTER_REPLICA_INFORMATION");
-                onInformationLoaded(replicationStatus);
+                getDrReplicationData(connection, replicationData);
+                onInformationLoaded(replicationData);
             });
         };
         //
@@ -2038,6 +2038,32 @@ function alertNodeClicked(obj) {
         };
         //
 
+        //Get DR Replication Data
+        var getDrReplicationData = function (connection, replicationDetails) {
+            var colIndex = {};
+            var counter = 0;
+            var replicationRate1M = 0;
+            if (connection.Metadata['@Statistics_DRCONSUMER'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+                if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
+                    replicationDetails["DR_GRAPH"] = {};
+                }
+                replicationRate1M += (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]];
+                replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+            });
+            replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M;
+
+        };
+        
         var getPartitionIdleTimeDetails = function (connection, partitionDetail) {
             var colIndex = {};
             var counter = 0;

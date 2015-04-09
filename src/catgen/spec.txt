@@ -8,6 +8,7 @@ begin Cluster                      "A set of connected hosts running one or more
   bool networkpartition            "Is network partition detection enabled?"
   string voltRoot                  "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"
   string exportOverflow            "Directory where export data should overflow to"
+  string drOverflow                "Directory where DR data should overflow to"
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
   int adminport                    "The port number of the admin port"
   bool adminstartup                "Does the server start in admin mode?"
@@ -95,6 +96,7 @@ end
 begin User javaonly
   GroupRef* groups
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
+  string sha256ShadowPassword "SHA-256 double hashed hex encoded version of the password"
 end
 
 begin Program javaonly "The name of a program with access (effectively a username for an app server)"
@@ -195,6 +197,7 @@ begin Index              "A index structure on a database table's columns"
   int type               "What data structure is the index using and what kinds of keys does it support?"
   ColumnRef* columns     "Columns referenced by the index"
   string expressionsjson "A serialized representation of the optional expression trees"
+  string predicatejson   "A serialized representation of the optional predicate for partial indexes"
 end
 
 begin ColumnRef    "A reference to a table column"

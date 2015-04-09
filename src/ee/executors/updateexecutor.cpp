@@ -147,7 +147,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
     BOOST_FOREACH(TableIndex *index, allIndexes) {
         bool indexKeyUpdated = false;
-        BOOST_FOREACH(int colIndex, index->getColumnIndices()) {
+        BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
             std::pair<int, int> updateColInfo; // needs to be here because of macro failure
             BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
                 if (updateColInfo.second == colIndex) {

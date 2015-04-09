@@ -154,24 +154,6 @@
             return dataPartition;
         };
         
-        function getDataTransactions() {
-            var arr = [];
-            var theDate = new Date(2012, 01, 01, 10, 5, 6, 0);
-            var startVal = 1;
-            var endVal = 200;
-            for (var x = 0; x < 100; x++) {
-
-                if (x > 30) {
-                    startVal = 20;
-                    endVal = 90;
-                }
-
-                arr.push({ x: new Date(theDate.getTime()), y: Math.floor((Math.random() * endVal) + startVal) });
-                theDate.setSeconds(theDate.getSeconds() + 1);
-            }
-            return arr;
-        }
-
         var emptyData = getEmptyData();
         var emptyDataForMinutes = getEmptyDataForMinutes();
         var emptyDataForDays = getEmptyDataForDays();
@@ -226,7 +208,7 @@
         
         var dataDrReplicationRate = [{
             "key": "Replication Rate",
-            "values": getDataTransactions(),
+            "values": getEmptyDataOptimized(),
             "color": "rgb(27, 135, 200)"
         }];
 
@@ -416,7 +398,7 @@
                 .tickFormat(d3.format(',.2f'));
 
             MonitorGraphUI.ChartDrReplicationRate.yAxis
-                .axisLabel('(%)')
+                .axisLabel('(KBps)')
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
@@ -1016,50 +998,50 @@
             partitionMinCount++;
         };
         
-        //this.RefreshDrReplicationGraph = function (drDetails, currentServer, graphView, currentTab) {
-        //    var monitor = MonitorGraphUI.Monitors;
-        //    var drData = monitor.drReplicationData;
-        //    var drDataMin = monitor.drReplicationDataMin;
-        //    var drDataDay = monitor.drReplicationDataDay;
-        //    var drDetail = drDetails;
-        //    var percentageUsage = 11;//parseFloat(drDetail[currentServer].REPLICATION_RATE_1M).toFixed(1) * 1;
-        //    var timeStamp = drDetail[currentServer].TIMESTAMP;
+        this.RefreshDrReplicationGraph = function (drDetails, currentServer, graphView, currentTab) {
+            var monitor = MonitorGraphUI.Monitors;
+            var drData = monitor.drReplicationData;
+            var drDataMin = monitor.drReplicationDataMin;
+            var drDataDay = monitor.drReplicationDataDay;
+            var drDetail = drDetails;
+            var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
+            var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
 
-        //    if (drSecCount >= 6 || monitor.cpuFirstData) {
-        //        drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
-        //        drDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
-        //        MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
-        //        drSecCount = 0;
-        //    }
-        //    if (drMinCount >= 60 || monitor.cpuFirstData) {
-        //        drDataDay = sliceFirstData(drDataDay, dataView.Days);
-        //        drDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
-        //        MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
-        //        drMinCount = 0;
-        //    }
-        //    drData = sliceFirstData(drData, dataView.Seconds);
-        //    drData.push({ "x": new Date(timeStamp), "y": percentageUsage });
-        //    MonitorGraphUI.Monitors.drReplicationData = drData;
-        //    monitor.drFirstData = false;
+            if (drSecCount >= 6 || monitor.cpuFirstData) {
+                drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
+                drSecCount = 0;
+            }
+            if (drMinCount >= 60 || monitor.cpuFirstData) {
+                drDataDay = sliceFirstData(drDataDay, dataView.Days);
+                drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
+                drMinCount = 0;
+            }
+            drData = sliceFirstData(drData, dataView.Seconds);
+            drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
+            MonitorGraphUI.Monitors.drReplicationData = drData;
+            monitor.drFirstData = false;
 
-        //    if (graphView == 'Minutes')
-        //        dataDrReplicationRate[0]["values"] = drDataMin;
-        //    else if (graphView == 'Days')
-        //        dataDrReplicationRate[0]["values"] = drDataDay;
-        //    else {
-        //        dataDrReplicationRate[0]["values"] = drData;
+            if (graphView == 'Minutes')
+                dataDrReplicationRate[0]["values"] = drDataMin;
+            else if (graphView == 'Days')
+                dataDrReplicationRate[0]["values"] = drDataDay;
+            else {
+                dataDrReplicationRate[0]["values"] = drData;
 
-        //    }
+            }
 
-        //    if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
-        //        d3.select('#visualizationDrReplicationRate')
-        //            .datum(dataDrReplicationRate)
-        //            .transition().duration(500)
-        //            .call(MonitorGraphUI.ChartDrReplicationRate);
-        //    }
-        //    drSecCount++;
-        //    drMinCount++;
-        //};
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
+                d3.select('#visualizationDrReplicationRate')
+                    .datum(dataDrReplicationRate)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartDrReplicationRate);
+            }
+            drSecCount++;
+            drMinCount++;
+        };
 
     });
     
