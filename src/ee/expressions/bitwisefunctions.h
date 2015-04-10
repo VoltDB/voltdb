@@ -132,9 +132,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_LEFT>(const std::vecto
     int64_t lv = lval.getBigInt();
     int64_t shifts = rval.castAsBigIntAndGetValue();
     if (shifts < 0) {
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported negative value for bit shifting");
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "unsupported negative value for bit shifting");
     }
-    if (shifts > 64) {
+    // shifting by more than 63 bits is undefined behavior
+    if (shifts > 63) {
         return getBigIntValue(0);
     }
 
@@ -164,9 +166,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
     int64_t lv = lval.getBigInt();
     int64_t shifts = rval.castAsBigIntAndGetValue();
     if (shifts < 0) {
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported negative value for bit shifting");
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "unsupported negative value for bit shifting");
     }
-    if (shifts > 64) {
+    // shifting by more than 63 bits is undefined behavior
+    if (shifts > 63) {
         return getBigIntValue(0);
     }
 

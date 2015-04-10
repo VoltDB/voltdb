@@ -147,6 +147,7 @@ public class SnapshotUtil {
         Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
         InstanceId instanceId,
         long timestamp,
+        long clusterCreateTime,
         int newPartitionCount)
     throws IOException
     {
@@ -201,6 +202,7 @@ public class SnapshotUtil {
 
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("clusterCreateTime").value(clusterCreateTime);
 
                 stringer.key("remoteDCLastIds");
                 stringer.object();

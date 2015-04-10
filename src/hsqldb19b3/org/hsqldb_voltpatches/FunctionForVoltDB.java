@@ -209,6 +209,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+            new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
             new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,

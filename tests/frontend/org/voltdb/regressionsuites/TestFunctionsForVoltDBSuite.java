@@ -1669,7 +1669,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         if (big >= 0) {
             vt = client.callProcedure("BITWISE_SHIFT_PARAM_1", param, param, pk).getResults()[0];
             System.out.println(vt);
-            if (big > 64) {
+            if (big >= 64) {
                 validateRowOfLongs(vt, new long[]{0, 0});
             } else {
                 validateRowOfLongs(vt, new long[]{param << big, param >>> big });
@@ -1679,7 +1679,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         if (param >= 0) {
             vt = client.callProcedure("BITWISE_SHIFT_PARAM_2", param, param, pk).getResults()[0];
             System.out.println(vt);
-            if (param > 64) {
+            if (param >= 64) {
                 validateRowOfLongs(vt, new long[]{0, 0});
             } else {
                 validateRowOfLongs(vt, new long[]{big << param, big >>> param });

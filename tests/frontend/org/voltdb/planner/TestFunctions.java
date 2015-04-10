@@ -71,7 +71,6 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select bitnot(FLOAT_TYPE) from bit;", errorMsg);
         failToCompile("select bitnot(VARCHAR_TYPE) from bit;", errorMsg);
 
-
         // bit shift
         failToCompile("select BIT_SHIFT_LEFT(FLOAT_TYPE, 3), BIT_SHIFT_RIGHT(FLOAT_TYPE, 3) from bit", errorMsg);
         failToCompile("select BIT_SHIFT_LEFT(VARCHAR_TYPE, 3), BIT_SHIFT_RIGHT(VARCHAR_TYPE, 3) from bit", errorMsg);
