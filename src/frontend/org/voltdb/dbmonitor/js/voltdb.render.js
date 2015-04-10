@@ -1943,15 +1943,20 @@ function alertNodeClicked(obj) {
             var colIndex = {};
             var counter = 0;
 
-            if (connection.Metadata['@Statistics_DR'] == null) {
+            if (!drDetails.hasOwnProperty("Details")) {
+                drDetails["Details"] = {};
+            }
+            drDetails["Details"]["STATUS"] = connection.Metadata["@Statistics_DR_status"];
+
+            if (connection.Metadata['@Statistics_DR_completeData'] == null || $.isEmptyObject(connection.Metadata['@Statistics_DR_completeData'])) {
                 return;
             }
+
             connection.Metadata['@Statistics_DR_completeData'][1].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "ENABLED" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "SYNCSNAPSHOTSTATE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
-
 
             connection.Metadata['@Statistics_DR_completeData'][1].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
