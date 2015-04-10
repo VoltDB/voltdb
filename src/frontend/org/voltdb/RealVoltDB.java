@@ -1588,8 +1588,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             String[] zkInterface = m_config.m_zkInterface.split(":");
             stringer.key("zkPort").value(zkInterface[1]);
             stringer.key("zkInterface").value(zkInterface[0]);
-            stringer.key("drPort").value(m_config.m_drAgentPortStart);
-            stringer.key("drInterface").value(m_config.m_drInterface);
+            stringer.key("drPort").value(VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
+            stringer.key("drInterface").value(VoltDB.getDefaultReplicationInterface());
             stringer.key("publicInterface").value(m_config.m_publicInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
