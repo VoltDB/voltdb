@@ -525,10 +525,16 @@ public class FunctionCustom extends FunctionSQL {
                 // $FALL-THROUGH$
             case FUNC_BITAND :
                 name = Tokens.T_BITAND;
+                parseList = doubleParamList;
+                break;
             case FUNC_BITOR :
                 name = Tokens.T_BITOR;
+                parseList = doubleParamList;
+                break;
             case FUNC_BITXOR :
                 name = Tokens.T_BITXOR;
+                parseList = doubleParamList;
+                break;
             case FUNC_REPEAT :
             /* disable 2 lines ...
             case FUNC_REPEAT :
