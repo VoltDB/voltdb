@@ -2614,8 +2614,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         VoltDB.getDefaultReplicationInterface());
             }
             if (m_consumerDRGateway != null) {
-                // TODO: don't always request a snapshot
-                m_consumerDRGateway.initialize(false);
+                m_consumerDRGateway.initialize(m_config.m_startAction.doesRecover());
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
