@@ -1713,10 +1713,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         for (String line : lines) {
             hostLog.info(line.trim());
         }
-        if (m_messenger.getInstanceId().getTimestamp() != m_clusterCreateTime) {
-            hostLog.info("Cluster RECOVERed from CREATE performed on " +
+        hostLog.info("The internal DR cluster timestamp is " +
                     new Date(m_clusterCreateTime).toString() + ".");
-        }
 
         final ZooKeeper zk = m_messenger.getZK();
         ZKUtil.ByteArrayCallback operationModeFuture = new ZKUtil.ByteArrayCallback();
@@ -2837,5 +2835,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Override
     public void setClusterCreateTime(long clusterCreateTime) {
         m_clusterCreateTime = clusterCreateTime;
+        hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
+                new Date(m_clusterCreateTime).toString() + ".");
     }
 }
