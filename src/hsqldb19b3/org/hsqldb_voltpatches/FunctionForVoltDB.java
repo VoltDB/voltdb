@@ -121,6 +121,8 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
 
+        static final int FUNC_VOLT_BITNOT                 = 20026;
+
         static final int FUNC_CONCAT                      = 124;
 
         private static final FunctionId[] instances = {
@@ -189,6 +191,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
             		Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
@@ -378,6 +384,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                     nodes[ii].dataType = inputTypeInferred;
                 }
             }
+            break;
+
+        case FunctionId.FUNC_VOLT_BITNOT:
+            voltResolveToBigintTypesForBitwise();
             break;
 
         default:
