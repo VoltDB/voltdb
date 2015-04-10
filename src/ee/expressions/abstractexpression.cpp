@@ -105,9 +105,6 @@ AbstractExpression::initParamShortCircuits()
 std::string
 AbstractExpression::debug() const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     std::ostringstream buffer;
     //buffer << "Expression[" << expressionutil::getTypeName(getExpressionType()) << "]";
     buffer << "Expression[" << expressionToString(getExpressionType()) << ", " << getExpressionType() << "]";
@@ -117,18 +114,12 @@ AbstractExpression::debug() const
 std::string
 AbstractExpression::debug(bool traverse) const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     return (traverse ? debug(std::string("")) : debug());
 }
 
 std::string
 AbstractExpression::debug(const std::string &spacer) const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     std::ostringstream buffer;
     buffer << spacer << "+ " << debug() << "\n";
 
