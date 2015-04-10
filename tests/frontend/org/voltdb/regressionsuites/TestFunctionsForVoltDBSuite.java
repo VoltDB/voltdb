@@ -1743,6 +1743,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, -1) from R3;",
                 "unsupported negative value for bit shifting");
 
+        verifyStmtFails(client, "select BIT_SHIFT_RIGHT(big, -1) from R3;",
+                "unsupported negative value for bit shifting");
+
         VoltTable vt;
         // NULL tests: null in null out
         client.callProcedure("@AdHoc", "insert into R3(id, big) values (100, null)");

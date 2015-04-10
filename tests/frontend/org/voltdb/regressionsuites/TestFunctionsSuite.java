@@ -3366,6 +3366,14 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains("Constant value underflows BIGINT type"));
         }
 
+        // try the out of range exception
+        client.callProcedure("@AdHoc", "insert into NUMBER_TYPES(INTEGERNUM, bignum) values(50, ?);", Long.MIN_VALUE + 1);
+        verifyStmtFails(client, "select BITAND(bignum, -2) from NUMBER_TYPES where INTEGERNUM = 50;",
+                "would produce INT64_MIN, which is reserved for SQL NULL values");
+
+        verifyStmtFails(client, "select BITXOR(bignum, 1) from NUMBER_TYPES where INTEGERNUM = 50;",
+                "would produce INT64_MIN, which is reserved for SQL NULL values");
+
         // special case for null, treated as Long.MIN_VALUE
         pk = 100; bignum = Long.MIN_VALUE; in = Long.MAX_VALUE;
         client.callProcedure("NUMBER_TYPES.insert", pk, 1, 1, null, 1.0, 1.0);
