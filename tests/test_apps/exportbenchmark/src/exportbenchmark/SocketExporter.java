@@ -66,10 +66,6 @@ public class SocketExporter extends ExportClientBase {
     InetSocketAddress address;
     DatagramChannel channel;
 
-    // Statistics
-    AtomicLong transactions = new AtomicLong();
-    AtomicLong totalDecodeTime = new AtomicLong();
-
     @Override
     public void configure(Properties config) throws Exception {
         host = config.getProperty("socket.dest", "localhost");
@@ -85,26 +81,12 @@ public class SocketExporter extends ExportClientBase {
     }
 
     class SocketExportDecoder extends ExportDecoderBase {
-        Timer timer;
+        long transactions = 0;
+        long totalDecodeTime = 0;
+        long timerStart = 0;
 
         SocketExportDecoder(AdvertisedDataSource source) {
             super(source);
-
-            schedulePeriodicStats();
-        }
-
-        /**
-         * Periodically print statistics to a UDP socket
-         */
-        public void schedulePeriodicStats() {
-            timer = new Timer();
-            TimerTask statsPrinting = new TimerTask() {
-                @Override
-                public void run() { sendStatistics(); }
-            };
-            timer.scheduleAtFixedRate(statsPrinting,
-                                      statsDuration * 1000,
-                                      statsDuration * 1000);
         }
 
         /**
@@ -114,52 +96,45 @@ public class SocketExporter extends ExportClientBase {
          *   -Partition ID
          */
         public void sendStatistics() {
-            ByteBuffer buffer = ByteBuffer.allocate(1024);
+            if (timerStart > 0) {
+                ByteBuffer buffer = ByteBuffer.allocate(1024);
 
-            // Calculate statistics
-            double tps, averageDecodeTime;
-            try {
-                tps = transactions.get() / statsDuration;
-                averageDecodeTime = totalDecodeTime.get() / transactions.get();
-            } catch (ArithmeticException e) {
-                // Divide by zero error. No transactions, so nothing to report
-                return;
-            }
-
-            transactions.set(0);
-            totalDecodeTime.set(0);
-
-            // Create message
-            JSONObject message = new JSONObject();
-            try {
-                message.put("tps", tps);
-                message.put("decodeTime", averageDecodeTime);
-                message.put("partitionId", m_source.partitionId);
-            } catch (JSONException e) {
-                m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
-            }
-
-            String messageString = message.toString();
-            buffer.clear();
-            buffer.put((byte)messageString.length());
-            buffer.put(messageString.getBytes());
-            buffer.flip();
-
-            // Send message over socket
-            try {
-                int sent = channel.send(buffer, address);
-                if (sent != messageString.getBytes().length+1) {
-                    // Should always send the whole packet.
-                    m_logger.error("Error sending entire stats message");
+                // Create message
+                JSONObject message = new JSONObject();
+                try {
+                    message.put("transactions", transactions);
+                    message.put("decodeTime", totalDecodeTime);
+                    message.put("startTime", timerStart);
+                    message.put("endTime", System.currentTimeMillis());
+                    message.put("partitionId", m_source.partitionId);
+                } catch (JSONException e) {
+                    m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
                 }
-            } catch (IOException e) {
-                m_logger.error("Couldn't send stats to socket");
+
+                String messageString = message.toString();
+                buffer.clear();
+                buffer.put((byte)messageString.length());
+                buffer.put(messageString.getBytes());
+                buffer.flip();
+
+                // Send message over socket
+                try {
+                    int sent = channel.send(buffer, address);
+                    if (sent != messageString.getBytes().length+1) {
+                        // Should always send the whole packet.
+                        m_logger.error("Error sending entire stats message");
+                    }
+                } catch (IOException e) {
+                    m_logger.error("Couldn't send stats to socket");
+                }
+                transactions = 0;
+                totalDecodeTime = 0;
             }
+            timerStart = System.currentTimeMillis();
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            timer.cancel();
             try {
                 channel.close();
             } catch (IOException ignore) {}
@@ -172,7 +147,7 @@ public class SocketExporter extends ExportClientBase {
          */
         public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
             // Transaction count
-            transactions.incrementAndGet();
+            transactions++;
 
             // Time decodeRow
             try {
@@ -180,12 +155,18 @@ public class SocketExporter extends ExportClientBase {
                 decodeRow(rowData);
                 long endTime = System.nanoTime();
 
-                totalDecodeTime.addAndGet(endTime - startTime);
+                totalDecodeTime += endTime - startTime;
             } catch (IOException e) {
                 m_logger.error(e.getLocalizedMessage());
             }
 
             return true;
+        }
+
+        @Override
+        public void onBlockCompletion() {
+            if (transactions > 0)
+                sendStatistics();
         }
     }
 

@@ -36,6 +36,7 @@ package exportbenchmark;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.Math;
 import java.net.InetSocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -98,11 +99,25 @@ public class ExportBenchmark {
     AtomicLong failedInserts = new AtomicLong(0);
     AtomicBoolean testFinished = new AtomicBoolean(false);
     // Server-side stats
-    HashMap<Integer, ArrayList<Double>> tpsStats = new HashMap<Integer, ArrayList<Double>>();
-    HashMap<Integer, ArrayList<Double>> decodeStats = new HashMap<Integer, ArrayList<Double>>();
+    ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
     // Test timestamp markers
     long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
 
+    class StatClass {
+        public Integer m_partition;
+        public Long m_transactions;
+        public Long m_decode;
+        public Long m_startTime;
+        public Long m_endTime;
+
+        StatClass (Integer partition, Long transactions, Long decode, Long startTime, Long endTime) {
+            m_partition = partition;
+            m_transactions = transactions;
+            m_decode = decode;
+            m_startTime = startTime;
+            m_endTime = endTime;
+        }
+    }
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
@@ -427,11 +442,6 @@ public class ExportBenchmark {
             message = new String(localBuf);
         } catch (IOException e) {
             exitWithException("Couldn't read from socket", e);
-        } catch (BufferUnderflowException e) {
-            System.out.println("WARN: Incomplete UDP packet; some data might be lost");
-            byte[] localBuf = new byte[buffer.remaining()];
-            buffer.get(localBuf, 0, buffer.remaining());
-            message = new String(localBuf);
         }
 
         // Parse the stats message
@@ -444,33 +454,22 @@ public class ExportBenchmark {
         }
 
         Integer partitionId = null;
-        Double tps = null;
-        Double decode = null;
+        Long transactions = null;
+        Long decode = null;
+        Long startTime = null;
+        Long endTime = null;
         try {
             partitionId = new Integer(json.getInt("partitionId"));
-            tps = new Double(json.getDouble("tps"));
-            decode = new Double(json.getDouble("decodeTime"));
+            transactions = new Long(json.getLong("transactions"));
+            decode = new Long(json.getLong("decodeTime"));
+            startTime = new Long(json.getLong("startTime"));
+            endTime = new Long(json.getLong("endTime"));
         } catch (JSONException e) {
             System.err.println("Unable to parse JSON " + e.getLocalizedMessage());
             return;
         }
-
-        // Add new stats
-        if (tpsStats.get(partitionId) == null) {
-            ArrayList<Double> newTps = new ArrayList<Double>();
-            newTps.add(tps);
-            tpsStats.put(partitionId, newTps);
-        } else {
-            tpsStats.get(partitionId).add(tps);
-        }
-
-        if (decodeStats.get(partitionId) == null) {
-            ArrayList<Double> newDecode = new ArrayList<Double>();
-            newDecode.add(decode);
-            decodeStats.put(partitionId, newDecode);
-        } else {
-            decodeStats.get(partitionId).add(decode);
-        }
+        if (transactions > 0 && decode > 0 && startTime > 0 && endTime > startTime)
+            serverStats.add(new StatClass(partitionId, transactions, decode, startTime, endTime));
     }
 
     /**
@@ -559,7 +558,7 @@ public class ExportBenchmark {
         client.close();
 
         // Make sure we got serverside stats
-        if (tpsStats.size() == 0 || decodeStats.size() == 0) {
+        if (serverStats.size() == 0) {
             System.err.println("ERROR: Never received stats from export clients");
             success = false;
         }
@@ -596,42 +595,48 @@ public class ExportBenchmark {
     public synchronized void printResults(long duration) {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
-        // Print server-side TPS
-        int highestTps = 0;
-        for (Integer partition : tpsStats.keySet()) {
-            ArrayList<Double> thisTps = tpsStats.get(partition);
-            int averageTps = 0;
-
-            for (int i = 0; i < thisTps.size(); i++) {
-                averageTps += thisTps.get(i).intValue();
-            }
-            averageTps /= thisTps.size();
-
-            System.out.println("Average TPS for partition "
-                                + partition.intValue()
-                                + ": " + averageTps);
-            if (averageTps > highestTps) {
-                highestTps = averageTps;
+        ArrayList<StatClass> indexStats = new ArrayList<StatClass>();
+        for (StatClass index : serverStats) {
+            if (index.m_partition.equals(0)) {
+                Double transactions = new Double(index.m_transactions);
+                Double decode = new Double(index.m_decode);
+                for (StatClass indexPrime : serverStats) {
+                    if (!indexPrime.m_partition.equals(0)) {
+                        if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
+                            Double ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+                            transactions +=  ratio * indexPrime.m_transactions;
+                            decode += ratio * indexPrime.m_transactions;
+                        }
+                        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
+                            Double ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+                            transactions +=  ratio * indexPrime.m_transactions;
+                            decode += ratio * indexPrime.m_transactions;
+                        }
+                        else if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
+                            Double ratio = new Double(index.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+                            transactions +=  ratio * indexPrime.m_transactions;
+                            decode += ratio * indexPrime.m_transactions;
+                        }
+                        else if (indexPrime.m_endTime < index.m_endTime && indexPrime.m_startTime > index.m_startTime) {
+                            transactions +=  indexPrime.m_transactions;
+                            decode += indexPrime.m_transactions;
+                        }
+                    }
+                }
+                indexStats.add(new StatClass(index.m_partition, transactions.longValue(), decode.longValue(), index.m_startTime, index.m_endTime));
             }
         }
 
-        // Print average decode time
-        double averageDecode = 0;
-        for (Integer partition : decodeStats.keySet()) {
-            ArrayList<Double> thisDecode = decodeStats.get(partition);
-            int averagePartitionDecode = 0;
-
-            for (int i = 0; i < thisDecode.size(); i++) {
-                averagePartitionDecode += thisDecode.get(i).intValue();
-            }
-            averagePartitionDecode /= thisDecode.size();
-
-            averageDecode += averagePartitionDecode;
+        Double tpsSum = new Double(0);
+        Double decodeSum = new Double(0);
+        for (StatClass index : indexStats) {
+            //System.out.println("indexStats partition: " + index.m_partition + " | tps: " + ((index.m_transactions * 1000) / (index.m_endTime - index.m_startTime)) +
+            //        " | decode: " + (index.m_decode / index.m_transactions) + " | startTime: " + index.m_startTime + " | endTime: " + index.m_endTime);
+            tpsSum += (new Double(index.m_transactions * 1000) / (index.m_endTime - index.m_startTime));
+            decodeSum += (new Double(index.m_decode) / index.m_transactions);
         }
-        averageDecode /= (tpsStats.keySet().size());
-
-        System.out.println("\nHighest TPS: " + highestTps);
-        System.out.println("Average export decode time: " + averageDecode);
+        tpsSum = (tpsSum / indexStats.size());
+        decodeSum = (decodeSum / indexStats.size());
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -653,6 +658,9 @@ public class ExportBenchmark {
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
+        System.out.printf("Average throughput:            %,9d txns/sec\n", tpsSum.longValue());
+        System.out.printf("Average decode time:           %,9.2f txns/sec\n", decodeSum);
+
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
@@ -670,8 +678,8 @@ public class ExportBenchmark {
                                     stats.getStartTimestamp(),
                                     duration,
                                     successfulInserts.get(),
-                                    averageDecode,
-                                    highestTps));
+                                    decodeSum,
+                                    tpsSum.longValue()));
                 fw.close();
             }
         } catch (IOException e) {
