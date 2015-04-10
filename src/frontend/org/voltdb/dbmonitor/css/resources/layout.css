@@ -1087,6 +1087,16 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 a.changePsd {color: #0079bb;}
 a:hover.changePsd { text-decoration: underline; }
 
+/****Partition Idle Time*******/
+.legend {}
+.legend ul {margin: 10px 0 0 10px;padding: 0}
+.legend ul li { margin: 0 20px;padding: 0;float: left; }
+.dotGray {background-color: #D3D3D3;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotBlue  {background-color: #4C76B0;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotOrange {background-color: #FF8C00;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotMaroon {background-color: #850001;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+
+
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
 .serverStat {float:none; clear:left;}
