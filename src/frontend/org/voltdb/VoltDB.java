@@ -151,7 +151,7 @@ public class VoltDB {
         public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
 
         /** port number to use for DR channel (override in the deployment file) */
-        public int m_drAgentPortStart = DEFAULT_DR_PORT;
+        public int m_drAgentPortStart = -1;
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
@@ -536,15 +536,6 @@ public class VoltDB {
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
-                }
-
-                if (m_replicationRole == ReplicationRole.REPLICA) {
-                    if (m_startAction.doesRecover()) {
-                        isValid = false;
-                        hostLog.fatal("Replica cluster only supports create database");
-                    } else {
-                        m_startAction = StartAction.CREATE;
-                    }
                 }
             }
 
@@ -934,6 +925,15 @@ public class VoltDB {
         }
         else {
             return m_config.m_drInterface;
+        }
+    }
+
+    public static int getReplicationPort(int deploymentFilePort) {
+        if (m_config.m_drAgentPortStart != -1) {
+            return m_config.m_drAgentPortStart;
+        }
+        else {
+            return deploymentFilePort;
         }
     }
 
