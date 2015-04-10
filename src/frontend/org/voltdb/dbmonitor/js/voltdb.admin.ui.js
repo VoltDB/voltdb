@@ -1762,8 +1762,8 @@ function loadAdminPage() {
                     var newStreamProperties = $(".newStreamProperty");
                     for (var i = 0; i < newStreamProperties.length; i += 2) {
                         newConfig["property"].push({
-                            "name": $(newStreamProperties[i]).val(),
-                            "value": $(newStreamProperties[i + 1]).val(),
+                            "name": encodeURIComponent($(newStreamProperties[i]).val()),
+                            "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
                         });
                     }
 
