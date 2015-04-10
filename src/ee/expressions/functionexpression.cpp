@@ -386,6 +386,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
             break;
+        case FUNC_VOLT_BIT_SHIFT_LEFT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_LEFT>(*arguments);
+            break;
+        case FUNC_VOLT_BIT_SHIFT_RIGHT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_RIGHT>(*arguments);
+            break;
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
             break;
