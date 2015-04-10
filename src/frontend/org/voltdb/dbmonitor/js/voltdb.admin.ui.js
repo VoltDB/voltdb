@@ -2526,7 +2526,6 @@ function loadAdminPage() {
         this.isDbPaused = false;
         this.toggleStates = {};
         this.orgUserList = [];
-        this.drStatus = '';
         this.drReplicaEnabled = true;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {

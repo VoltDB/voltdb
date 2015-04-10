@@ -2050,7 +2050,7 @@ function alertNodeClicked(obj) {
             }
 
             connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "REPLICATION_RATE_1M")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2061,6 +2061,9 @@ function alertNodeClicked(obj) {
                 }
                 replicationRate1M += (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]];
                 replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                replicationDetails["DR_GRAPH"]["HOST_ID"] = info[colIndex["HOST_ID"]];
+                replicationDetails["DR_GRAPH"]["STATE"] = info[colIndex["STATE"]];
+                replicationDetails["DR_GRAPH"]["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]];
             });
             replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M;
 

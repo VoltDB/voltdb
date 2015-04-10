@@ -1045,8 +1045,8 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .drWrapper { margin:20px 0 0 0;}
 .drWrapper .content {margin-bottom:2px}
 .drShowHide { background:#FFFFFF; padding:20px;}
-.masterWrapper{ margin-bottom:20px;}
-.replicaWrapper {}
+.masterWrapper{}
+.replicaWrapper { position: relative;top: -27px;}
 ul.drList { margin:0 20px 0 0; padding:0; float:left; height: 28px;line-height: 30px;}
 ul.drList li { margin:0 0 0 10px; padding:0; float:left; font-size:14px;}
 

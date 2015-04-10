@@ -692,16 +692,21 @@ var loadPage = function (serverName, portid) {
         });
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
+
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
                 VoltDbUI.drReplicationRole = replicaDetail[currentServer]['status'];
 
                 voltDbRenderer.GetDrStatusInformation(function (drDetails) {
                     if (getCurrentServer() != undefined) {
-                        
+
                         VoltDbUI.drEnabled = drDetails[currentServer]['ENABLED'];
-                        VoltDbAdminConfig.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
+                        VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
                         VoltDbUI.isFirstHit = false;
+
+                        //Refresh
+                        refreshDrSection();
+
                         if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                             $('#liDrReplication').css('display', 'block');
                             var userPreference = getUserPreferences();
@@ -1038,8 +1043,6 @@ var loadPage = function (serverName, portid) {
     };
 
     var refreshDrSection = function () {
-        //console.log("test" + VoltDbAdminConfig.drListen);
-
         //if (VoltDbAdminConfig.drListen == true) {
         $("#Div5").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
@@ -1057,7 +1060,7 @@ var loadPage = function (serverName, portid) {
 
                     htmlcontent = htmlcontent + "<tr>";
                     htmlcontent = htmlcontent + "<td>" + key + "</td>" +
-                        "<td>" + VoltDbAdminConfig.drStatus + "</td>" +
+                        "<td>" + VoltDbUI.drStatus + "</td>" +
                         "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
                         "<td>" + response[key][i].TOTALBYTES + "</td >" +
                         "<td>" + replicaLatencyMs + "</td >" +
@@ -1092,7 +1095,8 @@ var loadPage = function (serverName, portid) {
                     { "bSearchable": false },
                     { "bSearchable": false },
                     { "bSearchable": false }
-                ]
+                ],
+                responsive: true
             });
 
             if (!$.isEmptyObject(response)) {
@@ -1104,6 +1108,11 @@ var loadPage = function (serverName, portid) {
             $(".paginate_enabled_next").html("Next");
             $(".paginate_disabled_next").html("Next");
             $(".paginate_enabled_previous").html("Prev");
+
+            $(".paginate_disabled_previous").attr("title", "Previous Page");
+            $(".paginate_enabled_next").attr("title", "Next Page");
+            $(".paginate_disabled_next").attr("title", "Next Page");
+            $(".paginate_enabled_previous").attr("title", "Previous Page");
 
             $("#tblDrMAster").next().hide();
             $("#tblDrMAster_info").hide();
@@ -1117,6 +1126,76 @@ var loadPage = function (serverName, portid) {
         $('#filterStoredProc1').on('keyup', function () {
             table.search(this.value).draw();
         });
+        var replicaTable = '';
+        voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+            var response = replicationData;
+
+            var htmlcontent = "";
+
+            //replicationData.forEach(function (column) {
+            //    console.log(column["DR_GRAPH"]["TIMESTAMP"]);
+            //});
+            if (!$.isEmptyObject(response)) {
+                for (var key in response) {
+                    htmlcontent = htmlcontent + "<tr>";
+                    htmlcontent = htmlcontent + "<td>" + response[key].HOST_ID + "</td>" +
+                        "<td>" + response[key].STATE + "</td>" +
+                        "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
+                        "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
+                    htmlcontent = htmlcontent + "</tr>";
+
+                }
+
+                $("#tblDrReplica").find("tbody").html('');
+                $("#tblDrReplica").find("tbody").append(htmlcontent);
+
+                replicaTable = $("#tblDrReplica").DataTable({
+                    destroy: true,
+                    stateSave: true,
+                    pageLength: 5,
+                    "sPaginationType": "extStyleLF",
+                    "bAutoWidth": false,
+                    "fnDrawCallback": function () {
+                        var length = this.fnGetData().length;
+                        //if (length <= this.fnPagingInfo().iLength) {
+                        //    $(this).parent().children(".dataTables_paginate").hide();
+                        //}
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                    },
+                    "sDom": '<"clear">ilprtp',
+                    "aoColumns": [
+                        null,
+                        { "bSearchable": false },
+                        { "bSearchable": false },
+                        { "bSearchable": false }
+                    ]
+                });
+
+                if (!$.isEmptyObject(response)) {
+                    $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
+                }
+
+                //  Customizing DataTables to make it as existing pagination
+                $(".paginate_disabled_previous").html("Prev");
+                $(".paginate_enabled_next").html("Next");
+                $(".paginate_disabled_next").html("Next");
+                $(".paginate_enabled_previous").html("Prev");
+
+                $("#tblDrReplica").next().hide();
+                $("#tblDrReplica_info").hide();
+                $("#tblDrReplica_length").hide();
+
+                $("#tblDrReplica").find(".sorting_asc").removeClass("sorting_asc");
+
+                $("#drReplicaSection").find(".pagination").hide();
+            }
+        });
+
+        $('#filterHostID').on('keyup', function () {
+            replicaTable.search(this.value).draw();
+        });
+
         //} else {
 
         //    $("#Div5").hide();
@@ -1546,8 +1625,9 @@ var loadPage = function (serverName, portid) {
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-        refreshDrSection();
+        //refreshDrSection();
     }, 5000);
+
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
@@ -1801,6 +1881,7 @@ var adjustGraphSpacing = function () {
         this.isSchemaTabLoading = false;
         this.isFirstHit = true;
         this.drEnabled = false;
+        this.drStatus = '';
         this.drReplicationRole = "NONE";
         this.ACTION_STATES = {
             NONE: -1,
