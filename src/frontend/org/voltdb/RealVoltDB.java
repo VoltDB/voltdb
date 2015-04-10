@@ -38,6 +38,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -166,9 +167,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.1RC1";
+    static final String m_defaultVersionString = "5.2";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.1RC1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -229,6 +230,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // Are we adding the node to the cluster instead of rejoining?
     volatile boolean m_joining = false;
 
+    long m_clusterCreateTime;
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
     private ConsumerDRGateway m_consumerDRGateway = null;
@@ -641,11 +643,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
-                    File drOverflowDir;
-                    drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
                     ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
-                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
+                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
                                                                                    m_replicationActive,
                                                                                    m_configuredNumberOfPartitions,
                                                                                    m_catalogContext.getDeployment().getCluster().getHostcount());
@@ -717,9 +717,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
-            // Need to register the OpsAgents right before we turn on the client interface
-            m_opsRegistrar.setDummyMode(false);
-
             // Create the client interface
             try {
                 InetAddress clientIntf = null;
@@ -765,12 +762,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 try {
                     Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                     Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
+                            int.class,
                             String.class,
                             ClientInterface.class,
                             byte.class,
                             boolean.class,
                             String.class);
                     m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
+                            m_messenger.getHostId(),
                             drProducerHost,
                             m_clientInterface,
                             drConsumerClusterId,
@@ -961,6 +960,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_restoreAgent != null) {
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterface));
             }
+
+            // Start the stats agent at the end, after everything has been constructed
+            m_opsRegistrar.setDummyMode(false);
 
             m_configLogger = new Thread(new ConfigLogging());
             m_configLogger.start();
@@ -1587,8 +1589,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             String[] zkInterface = m_config.m_zkInterface.split(":");
             stringer.key("zkPort").value(zkInterface[1]);
             stringer.key("zkInterface").value(zkInterface[0]);
-            stringer.key("drPort").value(m_config.m_drAgentPortStart);
-            stringer.key("drInterface").value(m_config.m_drInterface);
+            stringer.key("drPort").value(VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
+            stringer.key("drInterface").value(VoltDB.getDefaultReplicationInterface());
             stringer.key("publicInterface").value(m_config.m_publicInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
@@ -1650,6 +1652,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             VoltDB.crashLocalVoltDB("Unable to rejoin a node to itself.  " +
                     "Please check your command line and start action and try again.", false, null);
         }
+        m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -1710,6 +1713,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         for (String line : lines) {
             hostLog.info(line.trim());
         }
+        hostLog.info("The internal DR cluster timestamp is " +
+                    new Date(m_clusterCreateTime).toString() + ".");
 
         final ZooKeeper zk = m_messenger.getZK();
         ZKUtil.ByteArrayCallback operationModeFuture = new ZKUtil.ByteArrayCallback();
@@ -1792,42 +1797,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     public static String[] extractBuildInfo(VoltLogger logger) {
         StringBuilder sb = new StringBuilder(64);
-        String buildString = "VoltDB";
-        String versionString = m_defaultVersionString;
-        byte b = -1;
         try {
             InputStream buildstringStream =
                 ClassLoader.getSystemResourceAsStream("buildstring.txt");
-            if (buildstringStream == null) {
-                throw new RuntimeException("Unreadable or missing buildstring.txt file.");
-            }
-            while ((b = (byte) buildstringStream.read()) != -1) {
-                sb.append((char)b);
-            }
-            sb.append("\n");
-            String parts[] = sb.toString().split(" ", 2);
-            if (parts.length != 2) {
-                throw new RuntimeException("Invalid buildstring.txt file.");
-            }
-            versionString = parts[0].trim();
-            buildString = parts[1].trim();
-        } catch (Exception ignored) {
-            try {
-                InputStream buildstringStream = new FileInputStream("version.txt");
-                try {
-                    while ((b = (byte) buildstringStream.read()) != -1) {
-                        sb.append((char)b);
-                    }
-                    versionString = sb.toString().trim();
-                } finally {
-                    buildstringStream.close();
+            if (buildstringStream != null) {
+                byte b;
+                while ((b = (byte) buildstringStream.read()) != -1) {
+                    sb.append((char)b);
+                }
+                String parts[] = sb.toString().split(" ", 2);
+                if (parts.length == 2) {
+                    parts[0] = parts[0].trim();
+                    parts[1] = parts[1].trim();
+                    return parts;
                 }
             }
-            catch (Exception ignored2) {
-                logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+        } catch (Exception ignored) {
+        }
+        try {
+            InputStream versionstringStream = new FileInputStream("version.txt");
+            try {
+                byte b;
+                while ((b = (byte) versionstringStream.read()) != -1) {
+                    sb.append((char)b);
+                }
+                return new String[] { sb.toString().trim(), "VoltDB" };
+            } finally {
+                versionstringStream.close();
             }
         }
-        return new String[] { versionString, buildString };
+        catch (Exception ignored2) {
+            logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+            return new String[] { m_defaultVersionString, "VoltDB" };
+        }
     }
 
     @Override
@@ -2187,7 +2189,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
             // 6.1. If we are a DR master, update the DR table signature hash
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.updateCatalog(m_catalogContext);
+                m_nodeDRGateway.updateCatalog(m_catalogContext,
+                        VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
             }
 
             new ConfigLogging().logCatalogAndDeployment();
@@ -2606,7 +2609,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private void prepareReplication() {
         try {
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled());
+                m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled(),
+                        VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
+                        VoltDB.getDefaultReplicationInterface());
             }
             if (m_consumerDRGateway != null) {
                 // TODO: don't always request a snapshot
@@ -2822,5 +2827,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     public long getClusterUptime()
     {
         return System.currentTimeMillis() - getHostMessenger().getInstanceId().getTimestamp();
+    }
+
+    @Override
+    public long getClusterCreateTime()
+    {
+        return m_clusterCreateTime;
+    }
+
+    @Override
+    public void setClusterCreateTime(long clusterCreateTime) {
+        m_clusterCreateTime = clusterCreateTime;
+        hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
+                new Date(m_clusterCreateTime).toString() + ".");
     }
 }

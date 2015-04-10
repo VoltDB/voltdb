@@ -865,18 +865,18 @@ class Distributer {
         m_subject = subject;
     }
 
-    void createConnection(String host, String program, String password, int port)
+    void createConnection(String host, String program, String password, int port, ClientAuthHashScheme scheme)
     throws UnknownHostException, IOException
     {
-        byte hashedPassword[] = ConnectionUtil.getHashedPassword(password);
-        createConnectionWithHashedCredentials(host, program, hashedPassword, port);
+        byte hashedPassword[] = ConnectionUtil.getHashedPassword(scheme, password);
+        createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme);
     }
 
-    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
+    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthHashScheme scheme)
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
         InetSocketAddress address = new InetSocketAddress(host, port);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];

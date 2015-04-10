@@ -232,7 +232,6 @@ public class VoltDDLElementTracker {
     }
 
     void addDRedTable(String tableName, String action)
-        throws VoltCompilerException
     {
         assert tableName != null && ! tableName.trim().isEmpty();
 

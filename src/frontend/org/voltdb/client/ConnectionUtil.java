@@ -48,6 +48,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Throwables;
+import java.util.BitSet;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well
@@ -95,12 +96,22 @@ public class ConnectionUtil {
      * @return The bytes of the hashed password.
      */
     public static byte[] getHashedPassword(String password) {
+        return getHashedPassword(ClientAuthHashScheme.HASH_SHA256, password);
+    }
+
+    /**
+     * Get a hashed password using SHA-1 in a consistent way.
+     * @param scheme hashing scheme for password.
+     * @param password The password to encode.
+     * @return The bytes of the hashed password.
+     */
+    public static byte[] getHashedPassword(ClientAuthHashScheme scheme, String password) {
         if (password == null)
             return null;
 
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance("SHA-1");
+            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
             System.exit(-1);
@@ -129,22 +140,22 @@ public class ConnectionUtil {
      */
     public static Object[] getAuthenticatedConnection(String host, String username,
                                                       byte[] hashedPassword, int port,
-                                                      final Subject subject) throws IOException {
+                                                      final Subject subject, ClientAuthHashScheme scheme) throws IOException {
         String service = subject == null ? "database" : Constants.KERBEROS;
-        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject);
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host,
-            String username, byte[] hashedPassword, int port, final Subject subject)
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthHashScheme scheme)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword, subject);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
-            byte[] hashedPassword, final Subject subject)
+            byte[] hashedPassword, final Subject subject, ClientAuthHashScheme scheme)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -172,7 +183,8 @@ public class ConnectionUtil {
             byte[] usernameBytes = username == null ? null : username.getBytes(Constants.UTF8ENCODING);
 
             // get the length of the data to serialize
-            int requestSize = 4 + 1;
+            int requestSize = 4;
+            requestSize += 2; //version and scheme
             requestSize += serviceBytes == null ? 4 : 4 + serviceBytes.length;
             requestSize += usernameBytes == null ? 4 : 4 + usernameBytes.length;
             requestSize += hashedPassword.length;
@@ -181,7 +193,8 @@ public class ConnectionUtil {
 
             // serialize it
             b.putInt(requestSize - 4);                            // length prefix
-            b.put((byte) 0);                                      // version
+            b.put((byte) 1);                                      // version
+            b.put((byte )scheme.getValue());
             SerializationHelper.writeVarbinary(serviceBytes, b);  // data service (export|database)
             SerializationHelper.writeVarbinary(usernameBytes, b);
             b.put(hashedPassword);

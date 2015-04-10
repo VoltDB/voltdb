@@ -46,4 +46,35 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("update ENG913 set name = 'tim' where user = ?;", "'user'", "not supported");
     }
 
+    public void testBitwise() {
+        String errorMsg = "incompatible data type in conversion";
+        failToCompile("select bitand(tinyint_type, 3) from bit;", errorMsg);
+        failToCompile("select bitand(INTEGER_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitand(FLOAT_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitand(VARCHAR_TYPE, 3) from bit;", errorMsg);
+
+
+        failToCompile("select bitor(tinyint_type, 3) from bit;", errorMsg);
+        failToCompile("select bitor(INTEGER_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitor(FLOAT_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitor(VARCHAR_TYPE, 3) from bit;", errorMsg);
+
+
+        failToCompile("select bitxor(tinyint_type, 3) from bit;", errorMsg);
+        failToCompile("select bitxor(INTEGER_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitxor(FLOAT_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitxor(VARCHAR_TYPE, 3) from bit;", errorMsg);
+
+
+        failToCompile("select bitnot(tinyint_type) from bit;", errorMsg);
+        failToCompile("select bitnot(INTEGER_TYPE) from bit;", errorMsg);
+        failToCompile("select bitnot(FLOAT_TYPE) from bit;", errorMsg);
+        failToCompile("select bitnot(VARCHAR_TYPE) from bit;", errorMsg);
+
+        // out of range exception
+        errorMsg = "numeric value out of range";
+        failToCompile("select bitand(bigint_type, 9223372036854775809) from bit;", errorMsg);
+        failToCompile("select bitand(bigint_type, -9223372036854775809) from bit;", errorMsg);
+    }
+
 }

@@ -466,6 +466,28 @@ class VerbRunner(object):
             utility.abort('Resource file "%s" is missing.' % name)
         return None
 
+    def voltdb_connect(self, host, port, username=None, password=None):
+        """
+        Create a VoltDB client connection.
+        """
+        self.voltdb_disconnect()
+        try:
+            kwargs = {}
+            if username:
+                kwargs['username'] = username
+                if password:
+                    kwargs['password'] = password
+            self.client = FastSerializer(host, port, **kwargs)
+        except Exception, e:
+            utility.abort(e)
+
+    def voltdb_disconnect(self):
+        """
+        Close a VoltDB client connection.
+        """
+        if self.client:
+            self.client.close()
+
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
         verb = self.verbspace.verbs[verb_name]

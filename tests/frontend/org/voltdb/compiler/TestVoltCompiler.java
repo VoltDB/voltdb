@@ -58,6 +58,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -1942,13 +1943,15 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(false, c.hasErrorsOrWarnings());
     }
 
-    public void testDDLCompilerDropOneOfThreeIndexes()
+    public void testDDLCompilerDropTwoOfFiveIndexes()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
                 "create index idx_t_idnum_b on t(id,num);\n" +
-                "create index idx_t_idnum_c on t(id,num);\n";
+                "create index idx_t_idnum_c on t(id,num);\n" +
+                "create index idx_t_idnum_d on t(id,num) where id > 0;\n" +
+                "create index idx_t_idnum_f on t(id,num) where id > 0;\n";
 
         final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertEquals(true, c.hasErrorsOrWarnings());
@@ -1958,7 +1961,7 @@ public class TestVoltCompiler extends TestCase {
                 foundCount++;
             }
         }
-        assertEquals(1, foundCount);
+        assertEquals(2, foundCount);
     }
 
     public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
@@ -2306,6 +2309,26 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
+
+        String errorMsg = "In database, the materialized view is automatically "
+                + "partitioned based on its source table. Invalid PARTITION statement on view table MY_VIEW.";
+
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "partition table t on column num;\n" +
+                "create view my_view as select num, count(*) from t group by num;\n" +
+                "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "partition table t on column num;" +
+                "create view my_view as select num, count(*) as ct from t group by num;" +
+                "partition table my_view on column ct;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "create view my_view as select num, count(*) from t group by num;" +
+                "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
     }
 
     public void testDDLCompilerTableLimit()
@@ -2467,29 +2490,23 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
             }
 
-            Statement stmt = null;
-            try {
-                stmt = tbl.getTuplelimitdeletestmt().iterator().next();
-            }
-            catch (NoSuchElementException nse) {
-            }
+            String stmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(tbl);
 
             if (expectedStmt == null) {
                 assertTrue("Did not expect to find a LIMIT DELETE statement, but found this one:\n"
-                        + (stmt != null ? stmt.getSqltext() : ""),
+                        + (stmt != null ? stmt : ""),
                         stmt == null);
             } else {
                 // Make sure we have the delete statement that we expected
                 assertTrue("Expected to find LIMIT DELETE statement, found none", stmt != null);
 
-                String sql = stmt.getSqltext();
-                if (sql.endsWith(";")) {
+                if (stmt.endsWith(";")) {
                     // We seem to add a semicolon somewhere.  I guess that's okay.
-                    sql = sql.substring(0, sql.length() - 1);
+                    stmt = stmt.substring(0, stmt.length() - 1);
                 }
 
                 assertEquals("Did not find the LIMIT DELETE statement that we expected",
-                        expectedStmt, sql);
+                        expectedStmt, stmt);
             }
         }
     }
@@ -3630,6 +3647,43 @@ public class TestVoltCompiler extends TestCase {
         badDDLAgainstSimpleSchema(".*may not drop.*",
                 "drop role user;");
     }
+
+    public void testDDLPartialIndex()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index idx_t_idnum on t(id) where id > 4;\n";
+
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+    }
+
+    public void testInvalidPartialIndex()
+    {
+        String ddl = null;
+        ddl =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index IDX_T_IDNUM on t(id) where max(id) > 4;\n";
+
+        checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with aggregate expression(s) is not supported.");
+
+        ddl =
+                "create table t1(id integer not null, num integer not null);\n" +
+                "create table t2(id integer not null, num integer not null);\n" +
+                "create unique index IDX_T1_IDNUM on t1(id) where t2.id > 4;\n";
+
+        checkDDLErrorMessage(ddl, "Partial index \"IDX_T1_IDNUM\" with expression(s) involving other tables is not supported.");
+
+        ddl =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
+        // @TODO: Remove TRY/CATCH once subqueries are supported
+        try {
+            checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
+        } catch (PlanningErrorException e) {
+            assertTrue(e.getMessage().contains("Unsupported subquery syntax within an expression."));
+        }
+}
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
         Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);

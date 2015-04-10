@@ -22,37 +22,22 @@
  and executes commands from Java synchronously.
  */
 
-#include "voltdbipc.h"
-#include "logging/StdoutLogProxy.h"
-
-#include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "common/Pool.hpp"
-#include "common/FatalException.hpp"
-#include "common/SegvException.hpp"
-#include "common/RecoveryProtoMessage.h"
-#include "common/TheHashinator.h"
-#include "common/LegacyHashinator.h"
-#include "common/ElasticHashinator.h"
 #include "common/Topend.h"
-#include "common/ThreadLocalPool.h"
+
 #include "execution/VoltDBEngine.h"
+#include "logging/StdoutLogProxy.h"
 #include "storage/table.h"
 
-#include <cassert>
-#include <cstdlib>
-#include <iostream>
-#include <string>
-#include <dlfcn.h>
+#include "common/ElasticHashinator.h"
+#include "common/LegacyHashinator.h"
+#include "common/RecoveryProtoMessage.h"
+#include "common/serializeio.h"
+#include "common/SegvException.hpp"
+#include "common/types.h"
 
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <sys/types.h>
+#include <signal.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <pthread.h>
-
+#include <netinet/tcp.h> // for TCP_NODELAY
 
 // Please don't make this different from the JNI result buffer size.
 // This determines the size of the EE results buffer and it's nice
@@ -60,6 +45,155 @@
 #define MAX_MSG_SZ (1024*1024*10)
 
 using namespace std;
+
+namespace voltdb {
+class Pool;
+class StreamBlock;
+}
+
+class VoltDBIPC : public voltdb::Topend {
+public:
+
+    // must match ERRORCODE_SUCCESS|ERROR in ExecutionEngine.java
+    enum {
+        kErrorCode_None = -1, // not in the java
+        kErrorCode_Success = 0,
+        kErrorCode_Error = 1,
+        /*
+         * The following are not error codes but requests for information or functionality
+         * from Java. These do not exist in ExecutionEngine.java since they are IPC specific.
+         * These constants are mirrored in ExecutionEngine.java.
+         */
+        kErrorCode_RetrieveDependency = 100,       // Request for dependency
+        kErrorCode_DependencyFound = 101,          // Response to 100
+        kErrorCode_DependencyNotFound = 102,       // Also response to 100
+        kErrorCode_pushExportBuffer = 103,         // Indication that el buffer is next
+        kErrorCode_CrashVoltDB = 104,              // Crash with reason string
+        kErrorCode_getQueuedExportBytes = 105,     // Retrieve value for stats
+        kErrorCode_needPlan = 110,                 // fetch a plan from java for a fragment
+        kErrorCode_progressUpdate = 111,           // Update Java on execution progress
+        kErrorCode_decodeBase64AndDecompress = 112 // Decode base64, compressed data
+    };
+
+    VoltDBIPC(int fd);
+
+    ~VoltDBIPC();
+
+    int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination);
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
+
+    /**
+     * Retrieve a dependency from Java via the IPC connection.
+     * This method returns null if there are no more dependency tables. Otherwise
+     * it returns a pointer to a buffer containing the dependency. The first four bytes
+     * of the buffer is an int32_t length prefix.
+     *
+     * The returned allocated memory must be freed by the caller.
+     * Returns dependency size with out parameter.
+     */
+    char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
+
+    int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+            std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
+            int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
+
+    std::string decodeBase64AndDecompress(const std::string& base64Data);
+
+    /**
+     * Retrieve a plan from Java via the IPC connection for a fragment id.
+     * Plan is JSON. Returns the empty string on failure, but failure is
+     * probably going to be detected somewhere else.
+     */
+    std::string planForFragmentId(int64_t fragmentId);
+
+    bool execute(struct ipc_command *cmd);
+
+    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+
+    /**
+     * Log a statement on behalf of the IPC log proxy at the specified log level
+     * @param LoggerId ID of the logger that received this statement
+     * @param level Log level of the statement
+     * @param statement null terminated UTF-8 string containing the statement to log
+     */
+    void log(voltdb::LoggerId loggerId, voltdb::LogLevel level, const char *statement) const;
+
+    void crashVoltDB(voltdb::FatalException e);
+
+    /*
+     * Cause the engine to terminate gracefully after finishing execution of the current command.
+     * Useful when running Valgrind because you can terminate at the point where you think memory has leaked
+     * and this method will make sure that the VoltDBEngine is deleted and that the program will attempt
+     * to free all memory allocated on the heap.
+     */
+    void terminate();
+
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
+    void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
+private:
+    voltdb::VoltDBEngine *m_engine;
+    long int m_counter;
+
+    int8_t stub(struct ipc_command *cmd);
+
+    int8_t loadCatalog(struct ipc_command *cmd);
+
+    int8_t updateCatalog(struct ipc_command *cmd);
+
+    int8_t initialize(struct ipc_command *cmd);
+
+    int8_t toggleProfiler(struct ipc_command *cmd);
+
+    int8_t releaseUndoToken(struct ipc_command *cmd);
+
+    int8_t undoUndoToken(struct ipc_command *cmd);
+
+    int8_t tick(struct ipc_command *cmd);
+
+    int8_t quiesce(struct ipc_command *cmd);
+
+    int8_t setLogLevels(struct ipc_command *cmd);
+
+    void executePlanFragments(struct ipc_command *cmd);
+
+    void getStats(struct ipc_command *cmd);
+
+    int8_t loadTable(struct ipc_command *cmd);
+
+    int8_t processRecoveryMessage( struct ipc_command *cmd);
+
+    void tableHashCode( struct ipc_command *cmd);
+
+    void hashinate(struct ipc_command* cmd);
+
+    void updateHashinator(struct ipc_command *cmd);
+
+    void threadLocalPoolAllocations();
+
+    void applyBinaryLog(struct ipc_command*);
+
+    void executeTask(struct ipc_command*);
+
+    void sendException( int8_t errorCode);
+
+    int8_t activateTableStream(struct ipc_command *cmd);
+    void tableStreamSerializeMore(struct ipc_command *cmd);
+    void exportAction(struct ipc_command *cmd);
+    void getUSOForExportTable(struct ipc_command *cmd);
+
+    void signalHandler(int signum, siginfo_t *info, void *context);
+    static void signalDispatcher(int signum, siginfo_t *info, void *context);
+    void setupSigHandler(void) const;
+
+    int m_fd;
+    char *m_reusedResultBuffer;
+    char *m_exceptionBuffer;
+    bool m_terminate;
+
+    // The tuple buffer gets expanded (doubled) as needed, but never compacted.
+    char *m_tupleBuffer;
+    size_t m_tupleBufferSize;
+};
 
 /* java sends all data with this header */
 struct ipc_command {
@@ -1369,6 +1503,8 @@ void VoltDBIPC::pushExportBuffer(
     if (block != NULL) {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(block->rawLength());
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
+        // Memset the first 8 bytes to initialize the MAGIC_HEADER_SPACE_FOR_JAVA
+        ::memset(block->rawPtr(), 0, 8);
         writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
         // Need the delete in the if statement for valgrind
         delete [] block->rawPtr();

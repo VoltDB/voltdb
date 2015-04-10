@@ -95,10 +95,8 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
 {
-    size_t beginUso = 0;
-
     if (currentSpHandle < m_openSpHandle)
     {
         throwFatalException(
@@ -125,7 +123,7 @@ size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpH
             extendBufferChain(0);
         }
 
-        return beginUso;
+        return;
     }
 
     // If the current TXN ID has advanced, then we know that:
@@ -136,9 +134,6 @@ size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpH
     // by ending the current open transaction and not starting a new one
     if (m_openSpHandle < currentSpHandle && currentSpHandle != lastCommittedSpHandle)
     {
-        if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
-            endTransaction(m_openSequenceNumber, m_openUniqueId);
-        }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
         //<< currentSpHandle << ")" << std::endl;
         m_committedUso = m_uso;
@@ -151,11 +146,8 @@ size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpH
         m_openUniqueId = uniqueId;
 
         if (flush) {
-            // Don't move the txn we've just finished to the new buffer
-            extendBufferChain(0, false);
+            extendBufferChain(0);
         }
-
-        beginUso = beginTransaction(m_openSequenceNumber, uniqueId);
     }
 
     // now check to see if the lastCommittedSpHandle tells us that our open
@@ -165,17 +157,13 @@ size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpH
     {
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
         //lastCommittedSpHandle << ")" << std::endl;
-        if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
-            endTransaction(m_openSequenceNumber, m_openUniqueId);
-        }
         m_committedSequenceNumber = m_openSequenceNumber;
         m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
         m_committedUniqueId = m_openUniqueId;
 
         if (flush) {
-            // Don't move the txn we've just finished to the new buffer
-            extendBufferChain(0, false);
+            extendBufferChain(0);
         }
     }
 
@@ -187,8 +175,6 @@ size_t TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpH
                 true,
                 false);
     }
-
-    return beginUso;
 }
 
 void TupleStreamBase::pushPendingBlocks() {
@@ -274,7 +260,7 @@ void TupleStreamBase::discardBlock(StreamBlock *sb) {
  * Allocate another buffer, preserving the current buffer's content in
  * the pending queue.
  */
-void TupleStreamBase::extendBufferChain(size_t minLength, bool continueTxn /*= true*/)
+void TupleStreamBase::extendBufferChain(size_t minLength)
 {
     if (m_defaultCapacity < minLength) {
         // exportxxx: rollback instead?
@@ -297,14 +283,12 @@ void TupleStreamBase::extendBufferChain(size_t minLength, bool continueTxn /*= t
         }
     }
     size_t blockSize = m_defaultCapacity;
-    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso, continueTxn);
+    bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
     char *buffer = new char[blockSize];
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
-    // Valgrind needs the newly created block to be initialized
-    ::memset(buffer, 0, blockSize);
     m_currBlock = new StreamBlock(buffer, blockSize, uso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);

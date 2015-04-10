@@ -42,7 +42,6 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -437,6 +436,10 @@ public class PlanAssembler {
         }
 
         failIfNonDeterministicDml(parsedStmt, retval);
+
+        if (retval != null && m_partitioning != null) {
+            retval.setStatementPartitioning(m_partitioning);
+        }
 
         return retval;
     }

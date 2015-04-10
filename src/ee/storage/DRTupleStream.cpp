@@ -41,7 +41,8 @@ using namespace voltdb;
 DRTupleStream::DRTupleStream()
     : TupleStreamBase(),
       m_enabled(true),
-      m_secondaryCapacity(SECONDARY_BUFFER_SIZE)
+      m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
+      m_opened(false)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
@@ -61,6 +62,8 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                     int64_t txnId,
                                     int64_t spHandle,
                                     int64_t uniqueId) {
+    size_t startingUso = m_uso;
+
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
@@ -73,7 +76,11 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                 );
     }
 
-    size_t startingUso = commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    if (!m_opened) {
+        beginTransaction(m_openSequenceNumber, uniqueId);
+    }
+    assert(m_opened);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -102,10 +109,6 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     // update m_offset
     m_currBlock->consumed(io.position());
 
-    // No BEGIN TXN entry was written, use the current USO
-    if (startingUso == 0) {
-        startingUso = m_uso;
-    }
     // update uso.
     m_uso += io.position();
 
@@ -127,6 +130,8 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   TableTuple &tuple,
                                   DRRecordType type)
 {
+    size_t startingUso = m_uso;
+
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
@@ -143,7 +148,11 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    size_t startingUso = commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    if (!m_opened) {
+        beginTransaction(m_openSequenceNumber, uniqueId);
+    }
+    assert(m_opened);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -167,11 +176,13 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // has the effect of setting each column non-null.
     ::memset(m_currBlock->mutableDataPtr() + io.position(), 0, rowHeaderSz);
 
-    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
-
     // the nullarray lives in rowheader after the 4 byte header length prefix
     uint8_t *nullArray =
-      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position());
+        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position() + sizeof(int32_t));
+
+    // Reserve the row header by moving the position beyond the row header.
+    // The row header includes the 4 byte length prefix and the null array.
+    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
 
     // write the tuple's data
     tuple.serializeToExport(io, 0, nullArray);
@@ -192,10 +203,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update m_offset
     m_currBlock->consumed(io.position());
 
-    // No BEGIN TXN entry was written, use the current USO
-    if (startingUso == 0) {
-        startingUso = m_uso;
-    }
     // update uso.
     m_uso += io.position();
 
@@ -220,12 +227,21 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
     return *rowHeaderSz + dataSz;
 }
 
+// Set m_opened = false first otherwise checkOpenTransaction() may
+// consider the transaction being rolled back as open.
+void DRTupleStream::rollbackTo(size_t mark) {
+    m_opened = false;
+    TupleStreamBase::rollbackTo(mark);
+}
+
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
-size_t DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+    assert(!m_opened);
+
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -260,13 +276,16 @@ size_t DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId)
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
 
-     const size_t startingUso = m_uso;
      m_uso += io.position();
 
-     return startingUso;
+     m_opened = true;
 }
 
-size_t DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+void DRTupleStream::endTransaction() {
+    if (!m_opened) {
+        return;
+    }
+
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -279,44 +298,42 @@ size_t DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
          throwFatalException(
              "Appending end transaction message to a DR buffer with no matching begin transaction message."
              " DR sequence number (%jd), unique ID (%jd)",
-             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
+             (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
      }
      if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
-         m_currBlock->lastDRSequenceNumber() > sequenceNumber) {
+         m_currBlock->lastDRSequenceNumber() > m_openSequenceNumber) {
          throwFatalException(
              "Appending end transaction message to a DR buffer with a greater DR sequence number."
              " Buffer end DR sequence number (%jd), buffer end unique ID (%jd)."
              " Current DR sequence number (%jd), current unique ID (%jd)",
              (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastUniqueId(),
-             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
+             (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
      }
 
-     m_currBlock->recordCompletedTxnForDR(sequenceNumber, uniqueId);
+     m_currBlock->recordCompletedTxnForDR(m_openSequenceNumber, m_openUniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
      io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
-     io.writeLong(sequenceNumber);
+     io.writeLong(m_openSequenceNumber);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
      crc = vdbcrc::crc32cFinish(crc);
      io.writeInt(crc);
      m_currBlock->consumed(io.position());
 
-     const size_t startingUso = m_uso;
      m_uso += io.position();
 
-     return startingUso;
+     m_opened = false;
 }
 
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
-bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn) {
-    if (sb && continueTxn           /* this is not a flush, or there's still a transaction ongoing */
-           && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
-           && sb->lastDRBeginTxnOffset() != sb->offset() /* current txn is not a DR begin txn */) {
+bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+    if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
+           && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
         if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {
             switch (sb->type()) {
@@ -337,6 +354,7 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
         }
         return true;
     }
+    assert(!m_opened);
     return false;
 }
 
@@ -374,6 +392,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT );
         }
+        stream.endTransaction();
         ii += 5;
     }
 
@@ -382,6 +401,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
     int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
     stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+    stream.endTransaction();
 
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);

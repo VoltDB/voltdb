@@ -140,8 +140,6 @@ public class VoltCompiler {
     // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
     public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
-    // Turn off warning about DRing replicated tables
-    public static final boolean DISABLE_DR_WARNING = Boolean.getBoolean("DISABLE_DR_WARNING");
 
     String m_projectFileURL = null;
     private String m_currentFilename = NO_FILENAME;
@@ -1127,12 +1125,19 @@ public class VoltCompiler {
         final CatalogMap<Table> tables = db.getTables();
         for (Table table: tables) {
             String tableName = table.getTypeName();
+
             if (voltDdlTracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
                 String colName = voltDdlTracker.m_partitionMap.get(tableName.toLowerCase());
                 // A null column name indicates a replicated table. Ignore it here
                 // because it defaults to replicated in the catalog.
                 if (colName != null) {
                     assert(tables.getIgnoreCase(tableName) != null);
+                    if (table.getMaterializer() != null) {
+                        msg += "the materialized view is automatically partitioned based on its source table. "
+                                + "Invalid PARTITION statement on view table " + tableName + ".";
+                        throw new VoltCompilerException(msg);
+                    }
+
                     final Column partitionCol = table.getColumns().getIgnoreCase(colName);
                     // make sure the column exists
                     if (partitionCol == null) {
@@ -1679,9 +1684,7 @@ public class VoltCompiler {
         String action = drNode.getValue();
 
         org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
-        if (tableref == null) {
-            throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
-        } else if (tableref.getMaterializer() != null) {
+        if (tableref.getMaterializer() != null) {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
                                             " DR does not support materialized view.");
         }
@@ -2151,9 +2154,10 @@ public class VoltCompiler {
      * *NOTE*: Does *NOT* work with project.xml jarfiles.
      *
      * @return the compiled catalog is contained in the provided jarfile.
+     * @throws VoltCompilerException
      *
      */
-    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException
+    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException, VoltCompilerException
     {
         String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
                 Constants.UTF8ENCODING);
@@ -2189,7 +2193,7 @@ public class VoltCompiler {
                 int endtrim = errString.indexOf(" in statement starting");
                 if (endtrim < 0) { endtrim = errString.length(); }
                 String trimmed = errString.substring(0, endtrim);
-                throw new IOException(trimmed);
+                throw new VoltCompilerException(trimmed);
             }
         }
         finally {

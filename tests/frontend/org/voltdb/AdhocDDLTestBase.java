@@ -25,6 +25,7 @@ package org.voltdb;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -217,6 +218,29 @@ public class AdhocDDLTestBase extends TestCase {
             }
         }
         return partitioncol;
+    }
+
+    protected boolean isDRedTable(String table) throws Exception
+    {
+        VoltTable tableinfo = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+        for(int i = 0; i < tableinfo.m_rowCount; i++) {
+            tableinfo.advanceToRow(i);
+            String tablename = (String) tableinfo.get(2, VoltType.STRING);
+            if(tablename.equals(table)) {
+                try {
+                    String remarks = (String)tableinfo.get(4, VoltType.STRING);
+                    if (remarks == null) {
+                        return false;
+                    }
+                    JSONObject jsEntry = new JSONObject(remarks);
+                    return Boolean.valueOf(jsEntry.getString(JdbcDatabaseMetaDataGenerator.JSON_DRED_TABLE));
+                } catch (JSONException e) {
+                    return false;
+                }
+
+            }
+        }
+        return false;
     }
 
     protected int indexedColumnCount(String table) throws Exception

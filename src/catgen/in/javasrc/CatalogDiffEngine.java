@@ -197,6 +197,17 @@ public class CatalogDiffEngine {
             return false;
         }
 
+        // partial indexes must have identical predicates
+        if (existingIndex.getPredicatejson().length() > 0) {
+            if (existingIndex.getPredicatejson().equals(newIndex.getPredicatejson())) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (newIndex.getPredicatejson().length() > 0) {
+            return false;
+        }
+
         // iterate over all of the existing columns
         for (ColumnRef existingColRef : existingIndex.getColumns()) {
             boolean foundMatch = false;
@@ -639,19 +650,10 @@ public class CatalogDiffEngine {
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
 
-        if (suspect instanceof Cluster && field.equals("drClusterId") ||
-                suspect instanceof Cluster && field.equals("drProducerPort")) {
+        if (suspect instanceof Cluster && field.equals("drProducerPort")) {
             // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
             if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
                 restrictionQualifier = " while DR is enabled";
-            }
-            else {
-                return null;
-            }
-        }
-        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
-            if ((Boolean)suspect.getField("drProducerEnabled")) {
-                restrictionQualifier = " active-active and daisy-chained DR unsupported";
             }
             else {
                 return null;
