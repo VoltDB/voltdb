@@ -706,17 +706,29 @@ var loadPage = function (serverName, portid) {
                         var drResult = drDetails["Details"]["STATUS"];
                         if (drResult != -2) {
                             VoltDbUI.drEnabled = (drDetails[currentServer]['ENABLED'] != null && drDetails[currentServer]['ENABLED'] != "false") ? true : false;
+
+                            //if (VoltDbUI.drEnabled)
+                            //show master table
                             if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drEnabled)) {
                                 VoltDbUI.isDRInfoRequired = true;
                                 VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
                                 VoltDbUI.isFirstHit = false;
-                                refreshDrSection();
+                                console.log(VoltDbUI.drReplicationRole.toLowerCase());
+                                if (VoltDbUI.drEnabled) {
+                                    //show master table
+                                    refreshDrMasterSection();
+                                }
+
                                 if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
+                                    //show replicaDetail table
+                                    $("#drReplicaSection").show();
                                     $('#liDrReplication').css('display', 'block');
                                     var userPreference = getUserPreferences();
                                     if (userPreference["DrReplicationRate"]) {
                                         $("#ChartDrReplicationRate").show();
                                     }
+
+                                    refreshDrReplicaSection();
                                     voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
                                         MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
                                     });
@@ -728,6 +740,7 @@ var loadPage = function (serverName, portid) {
                                     }
                                     //
                                 } else {
+                                    $("#drReplicaSection").hide();
                                     $('#liDrReplication').css('display', 'none');
                                     $("#ChartDrReplicationRate").hide();
                                     //to show DR Mode
@@ -742,6 +755,7 @@ var loadPage = function (serverName, portid) {
                                 $("#divDrWrapperAdmin").show();
 
                             } else {
+
                                 VoltDbUI.isDRInfoRequired = false;
                                 $("#divDrReplication").hide();
                                 $('#liDrReplication').css('display', 'none');
@@ -1070,9 +1084,8 @@ var loadPage = function (serverName, portid) {
 
     };
 
-    var refreshDrSection = function () {
-        //if (VoltDbAdminConfig.drListen == true) {
-        $("#Div5").show();
+    var refreshDrMasterSection = function () {
+        $("#drMasterSection").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
             var response = drDetails;
 
@@ -1108,10 +1121,10 @@ var loadPage = function (serverName, portid) {
                 "sPaginationType": "extStyleLF",
                 "bAutoWidth": false,
                 "fnDrawCallback": function () {
-                    var length = this.fnGetData().length;
-                    if (length <= this.fnPagingInfo().iLength) {
-                        $(this).parent().children(".dataTables_paginate").hide();
-                    }
+                    //var length = this.fnGetData().length;
+                    //if (length <= this.fnPagingInfo().iLength) {
+                    //    //  $(this).parent().children(".dataTables_paginate").hide();
+                    //}
                     $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
@@ -1123,10 +1136,10 @@ var loadPage = function (serverName, portid) {
                     { "bSearchable": false },
                     { "bSearchable": false },
                     { "bSearchable": false }
-                ],
-                responsive: true
+                ]
             });
 
+            $("#tblDrMAster").wrapAll("<div class='tblScroll'>");
             if (!$.isEmptyObject(response)) {
                 $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
             }
@@ -1142,7 +1155,7 @@ var loadPage = function (serverName, portid) {
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
 
-            $("#tblDrMAster").next().hide();
+            $(".tblScroll").next().hide();
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
 
@@ -1150,19 +1163,18 @@ var loadPage = function (serverName, portid) {
 
             $("#drMasterSection").find(".pagination").hide();
         });
-
-        $('#filterStoredProc1').on('keyup', function () {
+        $('#filterPartitionId').on('keyup', function () {
             table.search(this.value).draw();
         });
+    };
+
+    var refreshDrReplicaSection = function () {
         var replicaTable = '';
         voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
             var response = replicationData;
 
             var htmlcontent = "";
 
-            //replicationData.forEach(function (column) {
-            //    console.log(column["DR_GRAPH"]["TIMESTAMP"]);
-            //});
             if (!$.isEmptyObject(response)) {
                 for (var key in response) {
                     htmlcontent = htmlcontent + "<tr>";
@@ -1184,7 +1196,7 @@ var loadPage = function (serverName, portid) {
                     "sPaginationType": "extStyleLF",
                     "bAutoWidth": false,
                     "fnDrawCallback": function () {
-                        var length = this.fnGetData().length;
+                        // var length = this.fnGetData().length;
                         //if (length <= this.fnPagingInfo().iLength) {
                         //    $(this).parent().children(".dataTables_paginate").hide();
                         //}
@@ -1200,9 +1212,9 @@ var loadPage = function (serverName, portid) {
                     ]
                 });
 
-                if (!$.isEmptyObject(response)) {
-                    $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
-                }
+                // if (!$.isEmptyObject(response)) {
+                $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
+                //  }
 
                 //  Customizing DataTables to make it as existing pagination
                 $(".paginate_disabled_previous").html("Prev");
@@ -1223,12 +1235,6 @@ var loadPage = function (serverName, portid) {
         $('#filterHostID').on('keyup', function () {
             replicaTable.search(this.value).draw();
         });
-
-        //} else {
-
-        //    $("#Div5").hide();
-        //}
-
     };
 
     var setPaginationIndicesOfProcedures = function (isProcedureSearch) {
@@ -1653,7 +1659,6 @@ var loadPage = function (serverName, portid) {
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-        //refreshDrSection();
     }, 5000);
 
 
