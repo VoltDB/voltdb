@@ -19,4 +19,101 @@
 
 namespace voltdb {
 
+template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
+
+    if (getValueType() != VALUE_TYPE_BIGINT) {
+        // The parser should enforce this for us,
+        // but just in case...
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITNOT function");
+    }
+
+    if (isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
+
+    int64_t result = ~(getBigInt());
+    if (result == INT64_NULL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                           "Application of bitwise function BITNOT would produce INT64_MIN, "
+                           "which is reserved for SQL NULL values.");
+    }
+
+    return getBigIntValue(result);
+}
+
+template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    const NValue& rval = arguments[1];
+    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITAND function");
+    }
+
+    if (lval.isNull() || rval.isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
+
+    int64_t lv = lval.getBigInt();
+    int64_t rv = rval.getBigInt();
+
+    int64_t result = lv & rv;
+    if (result == INT64_NULL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Application of bitwise function BITAND would produce INT64_MIN, "
+                "which is reserved for SQL NULL values.");
+    }
+    return getBigIntValue(result);
+}
+
+
+template<> inline NValue NValue::call<FUNC_BITOR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    const NValue& rval = arguments[1];
+    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITOR function");
+    }
+
+    if (lval.isNull() || rval.isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
+
+    int64_t lv = lval.getBigInt();
+    int64_t rv = rval.getBigInt();
+
+    int64_t result = lv | rv;
+    if (result == INT64_NULL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Application of bitwise function BITOR would produce INT64_MIN, "
+                "which is reserved for SQL NULL values.");
+    }
+    return getBigIntValue(result);
+}
+
+
+template<> inline NValue NValue::call<FUNC_BITXOR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& lval = arguments[0];
+    const NValue& rval = arguments[1];
+    if (lval.getValueType() != VALUE_TYPE_BIGINT || rval.getValueType() != VALUE_TYPE_BIGINT) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITXOR function");
+    }
+
+    if (lval.isNull() || rval.isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
+
+    int64_t lv = lval.getBigInt();
+    int64_t rv = rval.getBigInt();
+
+    int64_t result = lv ^ rv;
+    if (result == INT64_NULL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Application of bitwise function BITXOR would produce INT64_MIN, "
+                "which is reserved for SQL NULL values.");
+    }
+    return getBigIntValue(result);
+}
+
+
 }
