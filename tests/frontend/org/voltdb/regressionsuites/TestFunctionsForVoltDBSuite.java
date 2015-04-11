@@ -1660,6 +1660,102 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 + "which is reserved for SQL NULL values.");
     }
 
+    private void bitwiseShiftChecker(long pk, long big, long param) throws IOException, ProcCallException {
+        VoltTable vt;
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", String.format("insert into R3(id, big) values (%d, %d)", pk, big));
+
+        if (big >= 0) {
+            vt = client.callProcedure("BITWISE_SHIFT_PARAM_1", param, param, pk).getResults()[0];
+            System.out.println(vt);
+            if (big >= 64) {
+                validateRowOfLongs(vt, new long[]{0, 0});
+            } else {
+                validateRowOfLongs(vt, new long[]{param << big, param >>> big });
+            }
+        }
+
+        if (param >= 0) {
+            vt = client.callProcedure("BITWISE_SHIFT_PARAM_2", param, param, pk).getResults()[0];
+            System.out.println(vt);
+            if (param >= 64) {
+                validateRowOfLongs(vt, new long[]{0, 0});
+            } else {
+                validateRowOfLongs(vt, new long[]{big << param, big >>> param });
+            }
+        }
+    }
+
+    public void testBitwiseShift() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test bitwise shifting tests");
+
+        bitwiseShiftChecker(1, 1, 1); bitwiseShiftChecker(2, -1, 1);
+
+        bitwiseShiftChecker(3, 3, 60); bitwiseShiftChecker(4, -3, 60);
+
+        bitwiseShiftChecker(5, 3, 64); bitwiseShiftChecker(6, -3, 64);
+
+        bitwiseShiftChecker(7, 3, 65); bitwiseShiftChecker(8, -3, 65);
+
+        bitwiseShiftChecker(9, 3, 127); bitwiseShiftChecker(10, -3, 127);
+
+        bitwiseShiftChecker(11, 3, 128); bitwiseShiftChecker(12, -3, 128);
+
+        bitwiseShiftChecker(13, 3, 129); bitwiseShiftChecker(14, -3, 129);
+
+        bitwiseShiftChecker(15, 8, 63); bitwiseShiftChecker(16, -8, 63);
+
+        bitwiseShiftChecker(17, 8, 0); bitwiseShiftChecker(18, -8, 0);
+
+        // Min/MAX
+        bitwiseShiftChecker(50, Long.MAX_VALUE, 3);  bitwiseShiftChecker(51, 3, Long.MAX_VALUE);
+        bitwiseShiftChecker(52, Long.MAX_VALUE, -3);  bitwiseShiftChecker(53, -3, Long.MAX_VALUE);
+        bitwiseShiftChecker(54, Long.MIN_VALUE+1, 6);  bitwiseShiftChecker(55, 6, Long.MIN_VALUE+1);
+        bitwiseShiftChecker(56, Long.MIN_VALUE+1, -6);  bitwiseShiftChecker(57, -6, Long.MIN_VALUE+1);
+
+        try {
+            bitwiseShiftChecker(19, 3, 63);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("would produce INT64_MIN, which is reserved for SQL NULL values"));
+        }
+
+        try {
+            bitwiseShiftChecker(20, -3, 63);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("would produce INT64_MIN, which is reserved for SQL NULL values"));
+        }
+
+        Client client = getClient();
+        // out of range tests
+        verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, 9223372036854775809) from R3;",
+                "numeric value out of range");
+
+        verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, 0.5) from R3;",
+                "incompatible data type in conversion");
+
+        verifyStmtFails(client, "select BIT_SHIFT_RIGHT(3.6, 2) from R3;",
+                "incompatible data type in conversion");
+
+        // negative shifting tests
+        verifyStmtFails(client, "select BIT_SHIFT_LEFT(big, -1) from R3;",
+                "unsupported negative value for bit shifting");
+
+        verifyStmtFails(client, "select BIT_SHIFT_RIGHT(big, -1) from R3;",
+                "unsupported negative value for bit shifting");
+
+        VoltTable vt;
+        // NULL tests: null in null out
+        client.callProcedure("@AdHoc", "insert into R3(id, big) values (100, null)");
+        vt = client.callProcedure("BITWISE_SHIFT_PARAM_1", 2, 2, 100).getResults()[0];
+        validateRowOfLongs(vt, new long[]{Long.MIN_VALUE, Long.MIN_VALUE });
+
+        vt = client.callProcedure("BITWISE_SHIFT_PARAM_2", 2, 2, 100).getResults()[0];
+        validateRowOfLongs(vt, new long[]{Long.MIN_VALUE, Long.MIN_VALUE });
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1851,6 +1947,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
+
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
 
         project.addProcedures(GotBadParamCountsInJava.class);
         // CONFIG #1: Local Site/Partition running on JNI backend
