@@ -1379,7 +1379,7 @@ public class SQLParser extends SQLPatternFactory
 
         /**
          * Given a parameter string, if it's of the form x'0123456789ABCDEF',
-         * return a string containing just the digits.
+         * return a string containing just the digits.  Otherwise, return null.
          */
         private static String getDigitsFromHexLiteral(String paramString) {
             Matcher matcher = SingleQuotedHexLiteral.matcher(paramString);
@@ -1393,15 +1393,10 @@ public class SQLParser extends SQLPatternFactory
          * Given a string of hex digits, produce a long value, assuming
          * a 2's complement representation.
          */
-        private long hexDigitsToLong(String hexDigits) throws NumberFormatException {
-            // The method
-            //   Long.parseLong(<digits>, <radix>);
-            // Doesn't quite do what we want---it expects a '-' to
-            // indicate negative values, and doesn't want the sign bit set
-            // in the hex digits.
+        private static long hexDigitsToLong(String hexDigits) throws NumberFormatException {
 
             // BigInteger.longValue() will truncate to the lowest 64 bits,
-            // so we need to exlicitly check if there's too many digits.
+            // so we need to explicitly check if there's too many digits.
             if (hexDigits.length() > 16) {
                 throw new SQLParser.Exception("Too many hexadecimal digits for BIGINT value");
             }
@@ -1410,6 +1405,14 @@ public class SQLParser extends SQLPatternFactory
                 throw new SQLParser.Exception("Zero hexadecimal digits is invalid for BIGINT value");
             }
 
+            // The method
+            //   Long.parseLong(<digits>, <radix>);
+            // Doesn't quite do what we want---it expects a '-' to
+            // indicate negative values, and doesn't want the sign bit set
+            // in the hex digits.
+            //
+            // Once we support Java 1.8, we can use Long.parseUnsignedLong(<digits>, 16)
+            // instead.
 
             long val = new BigInteger(hexDigits, 16).longValue();
             return val;
@@ -1482,16 +1485,9 @@ public class SQLParser extends SQLPatternFactory
                             if (hexDigits == null) {
                                 hexDigits = Unquote.matcher(param).replaceAll("");
                             }
+                            // The following call with throw an exception if we
+                            // have an odd number of hex digits.
                             objParam = Encoder.hexDecode(hexDigits);
-                            // Make sure we have an even number of characters, otherwise it is an invalid byte string
-                            if (hexDigits.length() % 2 == 1) {
-                                // This seems to be dead code:
-                                // Encoder will throw an exception before we get here.
-                                throw new SQLParser.Exception(
-                                        "Invalid varbinary value (%s) (param %d) : "
-                                        + "must have an even number of hex characters to be valid.",
-                                        param, i+1);
-                            }
                         }
                         else {
                             throw new SQLParser.Exception("Unsupported Data Type: %s", paramType);
