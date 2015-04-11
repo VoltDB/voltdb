@@ -243,6 +243,7 @@ static const int FUNC_VOLT_FORMAT_CURRENCY             = 20025;
 static const int FUNC_VOLT_BITNOT                      = 20026;
 static const int FUNC_VOLT_BIT_SHIFT_LEFT              = 20027;
 static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
+static const int FUNC_VOLT_HEX                         = 20029;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

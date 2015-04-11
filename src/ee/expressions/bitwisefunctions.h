@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <sstream>
+#include <string>
 
 #include "common/NValue.hpp"
 
@@ -39,6 +41,19 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
     }
 
     return getBigIntValue(result);
+}
+
+template<> inline NValue NValue::callUnary<FUNC_VOLT_HEX>() const {
+    if (isNull()) {
+        return getNullStringValue();
+    }
+    int64_t inputDecimal = castAsBigIntAndGetValue();
+
+    std::stringstream ss;
+    ss << std::hex << std::uppercase << inputDecimal; // decimal_value
+    std::string res (ss.str());
+
+    return getTempStringValue(res.c_str(),res.length());
 }
 
 template<> inline NValue NValue::call<FUNC_BITAND>(const std::vector<NValue>& arguments) {
