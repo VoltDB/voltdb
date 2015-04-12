@@ -1756,6 +1756,47 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         validateRowOfLongs(vt, new long[]{Long.MIN_VALUE, Long.MIN_VALUE });
     }
 
+
+    public void testHex() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test HEX function tests");
+
+        Client client = getClient();
+        VoltTable result = null;
+
+        // test null: Long.MIN_VALUE is our null value
+        client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)", 500, Long.MIN_VALUE);
+        result = client.callProcedure("@AdHoc", "select hex(big) from R3 where id = 500").getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{null});
+
+        // normal tests
+        long[] hexInterestingValues = new long[] {
+            Long.MIN_VALUE + 1,
+            Long.MIN_VALUE + 1000,
+            -1,
+            0,
+            1,
+            1000,
+            Long.MAX_VALUE - 1,
+            Long.MAX_VALUE
+        };
+
+        int i = 0;
+        for (long val : hexInterestingValues) {
+            client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)", i, val);
+            ++i;
+        }
+
+        for (long val : hexInterestingValues) {
+            result = client.callProcedure("@AdHoc",
+                    "select hex(big) from R3 where big = " + val).getResults()[0];
+            String hexString = Long.toHexString(val).toUpperCase();
+            validateTableColumnOfScalarVarchar(result, new String[]{hexString});
+
+            result = client.callProcedure("@AdHoc", String.format("select hex(%d) from R3 where big = %d", val, val)).getResults()[0];
+            validateTableColumnOfScalarVarchar(result, new String[]{hexString});
+        }
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1806,6 +1847,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "VAR VARCHAR(300), " +
                 "DEC DECIMAL, " +
                 "PRIMARY KEY (ID) ); " +
+
+                "CREATE INDEX R3_IDX_HEX ON R3 (hex(big));" +
+                "CREATE INDEX R3_IDX_bit_shift_left ON R3 (bit_shift_left(big, 3));" +
+                "CREATE INDEX R3_IDX_bit_shift_right ON R3 (bit_shift_right(big, 3));" +
 
                 "CREATE TABLE JS1 (\n" +
                 "  ID INTEGER NOT NULL, \n" +

@@ -2342,20 +2342,39 @@ public class FunctionSQL extends Expression {
 
     protected void voltResolveToBigintTypesForBitwise() {
         for (int i = 0; i < nodes.length; i++) {
-            if (nodes[i].dataType == null) {
-                nodes[i].dataType = Type.SQL_BIGINT;
+            voltResolveToBigintType(i);
+        }
+        dataType = Type.SQL_BIGINT;
+    }
+
+    protected void voltResolveToBigintType(int i) {
+        if (nodes[i].dataType == null) {
+            nodes[i].dataType = Type.SQL_BIGINT;
+        }
+        else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
+            if (! nodes[i].dataType.isIntegralType() || nodes[i].valueData == null) {
+                throw Error.error(ErrorCode.X_42561);
             }
-            else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
-                if (! nodes[i].dataType.isIntegralType() || nodes[i].valueData == null) {
-                    throw Error.error(ErrorCode.X_42561);
-                }
-                // Only constants are checked here for long type range limits
+            // Only constants are checked here for long type range limits
+            NumberType.checkValueIsInLongLimits(nodes[i].valueData);
+            nodes[i].dataType = Type.SQL_BIGINT;
+        }
+    }
+
+    protected void voltResolveToBigintCompatibleType(int i) {
+        if (nodes[i].dataType == null) {
+            nodes[i].dataType = Type.SQL_BIGINT;
+        }
+        else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
+            if (! nodes[i].dataType.isIntegralType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[i].valueData != null) {                       // is constants
+                // check constants in range
                 NumberType.checkValueIsInLongLimits(nodes[i].valueData);
                 nodes[i].dataType = Type.SQL_BIGINT;
             }
         }
-
-        dataType = Type.SQL_BIGINT;
     }
 
     /**********************************************************************/
