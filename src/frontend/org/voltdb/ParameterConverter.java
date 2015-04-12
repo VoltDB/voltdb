@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -121,6 +122,11 @@ public class ParameterConverter {
 
         try {
             if (expectedClz == long.class) {
+                // Could be a long value specified in hexadecimal as x'ffff'
+                String hexDigits = SQLParser.getDigitsFromHexLiteral(value);
+                if (hexDigits != null) {
+                    return SQLParser.hexDigitsToLong(hexDigits);
+                }
                 return Long.parseLong(value);
             }
             if (expectedClz == int.class) {
@@ -138,6 +144,7 @@ public class ParameterConverter {
         }
         // ignore the exception and fail through below
         catch (NumberFormatException nfe) {}
+        catch (SQLParser.Exception spe) {}
 
         throw new VoltTypeException(
                 "tryToMakeCompatible: Unable to convert string "
@@ -224,7 +231,7 @@ public class ParameterConverter {
         System.err.flush();*/
 
         // Get blatant null out of the way fast, as it avoids some inline checks
-        // There are some suble null values that aren't java null coming up, but wait until
+        // There are some subtle null values that aren't java null coming up, but wait until
         // after the basics to check for those.
         if (param == null) {
             return nullValueForType(expectedClz);

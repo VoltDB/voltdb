@@ -1345,6 +1345,47 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Given a parameter string, if it's of the form x'0123456789ABCDEF',
+     * return a string containing just the digits.  Otherwise, return null.
+     */
+    public static String getDigitsFromHexLiteral(String paramString) {
+        Matcher matcher = SingleQuotedHexLiteral.matcher(paramString);
+        if (matcher.matches()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
+    /**
+     * Given a string of hex digits, produce a long value, assuming
+     * a 2's complement representation.
+     */
+    public static long hexDigitsToLong(String hexDigits) throws SQLParser.Exception {
+
+        // BigInteger.longValue() will truncate to the lowest 64 bits,
+        // so we need to explicitly check if there's too many digits.
+        if (hexDigits.length() > 16) {
+            throw new SQLParser.Exception("Too many hexadecimal digits for BIGINT value");
+        }
+
+        if (hexDigits.length() == 0) {
+            throw new SQLParser.Exception("Zero hexadecimal digits is invalid for BIGINT value");
+        }
+
+        // The method
+        //   Long.parseLong(<digits>, <radix>);
+        // Doesn't quite do what we want---it expects a '-' to
+        // indicate negative values, and doesn't want the sign bit set
+        // in the hex digits.
+        //
+        // Once we support Java 1.8, we can use Long.parseUnsignedLong(<digits>, 16)
+        // instead.
+
+        long val = new BigInteger(hexDigits, 16).longValue();
+        return val;
+    }
+
+    /**
      * Results returned by parseExecuteCall()
      */
     public static class ExecuteCallResults
@@ -1375,47 +1416,6 @@ public class SQLParser extends SQLPatternFactory
                 return friendly;
             }
             return paramType;
-        }
-
-        /**
-         * Given a parameter string, if it's of the form x'0123456789ABCDEF',
-         * return a string containing just the digits.  Otherwise, return null.
-         */
-        private static String getDigitsFromHexLiteral(String paramString) {
-            Matcher matcher = SingleQuotedHexLiteral.matcher(paramString);
-            if (matcher.matches()) {
-                return matcher.group(1);
-            }
-            return null;
-        }
-
-        /**
-         * Given a string of hex digits, produce a long value, assuming
-         * a 2's complement representation.
-         */
-        private static long hexDigitsToLong(String hexDigits) throws NumberFormatException {
-
-            // BigInteger.longValue() will truncate to the lowest 64 bits,
-            // so we need to explicitly check if there's too many digits.
-            if (hexDigits.length() > 16) {
-                throw new SQLParser.Exception("Too many hexadecimal digits for BIGINT value");
-            }
-
-            if (hexDigits.length() == 0) {
-                throw new SQLParser.Exception("Zero hexadecimal digits is invalid for BIGINT value");
-            }
-
-            // The method
-            //   Long.parseLong(<digits>, <radix>);
-            // Doesn't quite do what we want---it expects a '-' to
-            // indicate negative values, and doesn't want the sign bit set
-            // in the hex digits.
-            //
-            // Once we support Java 1.8, we can use Long.parseUnsignedLong(<digits>, 16)
-            // instead.
-
-            long val = new BigInteger(hexDigits, 16).longValue();
-            return val;
         }
 
         public Object[] getParameterObjects() throws SQLParser.Exception
@@ -1479,12 +1479,7 @@ public class SQLParser extends SQLPatternFactory
                             objParam = parseDate(param);
                         }
                         else if (paramType.equals("varbinary") || paramType.equals("tinyint_array")) {
-                            // A VARBINARY literal may or may not be
-                            // prefixed with an X.
-                            String hexDigits = getDigitsFromHexLiteral(param);
-                            if (hexDigits == null) {
-                                hexDigits = Unquote.matcher(param).replaceAll("");
-                            }
+                            String hexDigits = Unquote.matcher(param).replaceAll("");
                             // The following call with throw an exception if we
                             // have an odd number of hex digits.
                             objParam = Encoder.hexDecode(hexDigits);
