@@ -98,6 +98,7 @@ public class SocketExporter extends ExportClientBase {
         public void sendStatistics() {
             if (timerStart > 0) {
                 ByteBuffer buffer = ByteBuffer.allocate(1024);
+                Long endTime = System.currentTimeMillis();
 
                 // Create message
                 JSONObject message = new JSONObject();
@@ -105,7 +106,7 @@ public class SocketExporter extends ExportClientBase {
                     message.put("transactions", transactions);
                     message.put("decodeTime", totalDecodeTime);
                     message.put("startTime", timerStart);
-                    message.put("endTime", System.currentTimeMillis());
+                    message.put("endTime", endTime);
                     message.put("partitionId", m_source.partitionId);
                 } catch (JSONException e) {
                     m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());

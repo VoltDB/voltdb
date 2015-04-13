@@ -101,7 +101,7 @@ public class ExportBenchmark {
     // Server-side stats
     ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
     // Test timestamp markers
-    long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
+    long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, decodeTime, partCount;
 
     class StatClass {
         public Integer m_partition;
@@ -196,6 +196,8 @@ public class ExportBenchmark {
 
         fullStatsContext = client.createStatsContext();
         periodicStatsContext = client.createStatsContext();
+
+        serverStartTS = serverEndTS = decodeTime = partCount = 0;
     }
 
     /**
@@ -468,8 +470,19 @@ public class ExportBenchmark {
             System.err.println("Unable to parse JSON " + e.getLocalizedMessage());
             return;
         }
-        if (transactions > 0 && decode > 0 && startTime > 0 && endTime > startTime)
+        if (transactions > 0 && decode > 0 && startTime > 0 && endTime > startTime) {
             serverStats.add(new StatClass(partitionId, transactions, decode, startTime, endTime));
+            if (startTime < serverStartTS || serverStartTS == 0) {
+                serverStartTS = startTime;
+            }
+            if (endTime > serverEndTS) {
+                serverEndTS = endTime;
+            }
+            if (partitionId > partCount) {
+                partCount = partitionId;
+            }
+            decodeTime += decode;
+        }
     }
 
     /**
@@ -601,26 +614,58 @@ public class ExportBenchmark {
                 Double transactions = new Double(index.m_transactions);
                 Double decode = new Double(index.m_decode);
                 for (StatClass indexPrime : serverStats) {
+                    // If indexPrime is not partition 0 check for window overlap
                     if (!indexPrime.m_partition.equals(0)) {
-                        if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
-                            Double ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-                            transactions +=  ratio * indexPrime.m_transactions;
-                            decode += ratio * indexPrime.m_transactions;
-                        }
-                        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
-                            Double ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-                            transactions +=  ratio * indexPrime.m_transactions;
-                            decode += ratio * indexPrime.m_transactions;
-                        }
-                        else if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
+                        // Check for overlap format:
+                        //      |-----index window-----|
+                        //   |-----indexPrime window-----|
+                        if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
                             Double ratio = new Double(index.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+                            if (ratio <= 0 || ratio > 1) {
+                                System.out.println("Bad Ratio 1 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                                System.exit(-1);
+                            }
                             transactions +=  ratio * indexPrime.m_transactions;
                             decode += ratio * indexPrime.m_transactions;
                         }
-                        else if (indexPrime.m_endTime < index.m_endTime && indexPrime.m_startTime > index.m_startTime) {
+                        // Check for overlap format:
+                        //      |-----index window-----|
+                        //        |-indexPrime window-|
+                        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_startTime >= index.m_startTime) {
                             transactions +=  indexPrime.m_transactions;
                             decode += indexPrime.m_transactions;
                         }
+                        // Check for overlap format:
+                        //      |-----index window-----|
+                        //            |--indexPrime window--|
+                        else if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
+                            Double ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+                            if (ratio <= 0 || ratio > 1) {
+                                System.out.println("Bad Ratio 2 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                                System.exit(-1);
+                            }
+                            transactions +=  ratio * indexPrime.m_transactions;
+                            decode += ratio * indexPrime.m_transactions;
+                        }
+                        // Check for overlap format:
+                        //      |-----index window-----|
+                        // |--indexPrime window--|
+                        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
+                            Double ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+                            if (ratio <= 0 || ratio > 1) {
+                                System.out.println("Bad Ratio 3 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                                System.exit(-1);
+                            }
+                            transactions +=  ratio * indexPrime.m_transactions;
+                            decode += ratio * indexPrime.m_transactions;
+                        }
+
                     }
                 }
                 indexStats.add(new StatClass(index.m_partition, transactions.longValue(), decode.longValue(), index.m_startTime, index.m_endTime));
@@ -630,8 +675,6 @@ public class ExportBenchmark {
         Double tpsSum = new Double(0);
         Double decodeSum = new Double(0);
         for (StatClass index : indexStats) {
-            //System.out.println("indexStats partition: " + index.m_partition + " | tps: " + ((index.m_transactions * 1000) / (index.m_endTime - index.m_startTime)) +
-            //        " | decode: " + (index.m_decode / index.m_transactions) + " | startTime: " + index.m_startTime + " | endTime: " + index.m_endTime);
             tpsSum += (new Double(index.m_transactions * 1000) / (index.m_endTime - index.m_startTime));
             decodeSum += (new Double(index.m_decode) / index.m_transactions);
         }
@@ -659,7 +702,9 @@ public class ExportBenchmark {
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
         System.out.printf("Average throughput:            %,9d txns/sec\n", tpsSum.longValue());
-        System.out.printf("Average decode time:           %,9.2f txns/sec\n", decodeSum);
+        System.out.printf("Average decode time:           %,9.2f ns\n", decodeSum);
+        Double decodePerc = (new Double(decodeTime) / (((serverEndTS - serverStartTS) * (partCount + 1)) * 1000000)) * 100;
+        System.out.printf("Percent decode row time:       %,9.2f %%\n", decodePerc);
 
         System.out.println(HORIZONTAL_RULE);
 
@@ -674,11 +719,13 @@ public class ExportBenchmark {
         try {
             if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
                 FileWriter fw = new FileWriter(config.statsfile);
-                fw.append(String.format("%d,%d,%d,0,0,%f,%d,0,0,0,0,0,0\n",
+                fw.append(String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
                                     stats.getStartTimestamp(),
                                     duration,
                                     successfulInserts.get(),
-                                    decodeSum,
+                                    serverStartTS - serverEndTS,
+                                    decodeTime,
+                                    decodeSum.longValue(),
                                     tpsSum.longValue()));
                 fw.close();
             }
