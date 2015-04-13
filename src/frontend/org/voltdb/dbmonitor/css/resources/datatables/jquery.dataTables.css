@@ -416,21 +416,8 @@ table.dataTable td {
         }
 
             .dataTables_wrapper .dataTables_paginate .paginate_button.current, .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
-                color: #333333 !important;
-                border: 1px solid #cacaca;
-                background-color: white;
-                background: -webkit-gradient(linear, left top, left bottom, color-stop(0%, white), color-stop(100%, gainsboro));
-                /* Chrome,Safari4+ */
-                background: -webkit-linear-gradient(top, white 0%, gainsboro 100%);
-                /* Chrome10+,Safari5.1+ */
-                background: -moz-linear-gradient(top, white 0%, gainsboro 100%);
-                /* FF3.6+ */
-                background: -ms-linear-gradient(top, white 0%, gainsboro 100%);
-                /* IE10+ */
-                background: -o-linear-gradient(top, white 0%, gainsboro 100%);
-                /* Opera 11.10+ */
-                background: linear-gradient(to bottom, white 0%, gainsboro 100%);
-                /* W3C */
+                
+              
             }
 
             .dataTables_wrapper .dataTables_paginate .paginate_button.disabled, .dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover, .dataTables_wrapper .dataTables_paginate .paginate_button.disabled:active {
@@ -444,36 +431,12 @@ table.dataTable td {
             .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
                 color: white !important;
                 background-color: #585858;
-                background: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #585858), color-stop(100%, #111111));
-                /* Chrome,Safari4+ */
-                background: -webkit-linear-gradient(top, #585858 0%, #111111 100%);
-                /* Chrome10+,Safari5.1+ */
-                background: -moz-linear-gradient(top, #585858 0%, #111111 100%);
-                /* FF3.6+ */
-                background: -ms-linear-gradient(top, #585858 0%, #111111 100%);
-                /* IE10+ */
-                background: -o-linear-gradient(top, #585858 0%, #111111 100%);
-                /* Opera 11.10+ */
-                background: linear-gradient(to bottom, #585858 0%, #111111 100%);
-                /* W3C */
+                
             }
 
             .dataTables_wrapper .dataTables_paginate .paginate_button:active {
                 outline: none;
-                background-color: #2b2b2b;
-                background: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #2b2b2b), color-stop(100%, #0c0c0c));
-                /* Chrome,Safari4+ */
-                background: -webkit-linear-gradient(top, #2b2b2b 0%, #0c0c0c 100%);
-                /* Chrome10+,Safari5.1+ */
-                background: -moz-linear-gradient(top, #2b2b2b 0%, #0c0c0c 100%);
-                /* FF3.6+ */
-                background: -ms-linear-gradient(top, #2b2b2b 0%, #0c0c0c 100%);
-                /* IE10+ */
-                background: -o-linear-gradient(top, #2b2b2b 0%, #0c0c0c 100%);
-                /* Opera 11.10+ */
-                background: linear-gradient(to bottom, #2b2b2b 0%, #0c0c0c 100%);
-                /* W3C */
-                box-shadow: inset 0 0 3px #111;
+               
             }
 
     .dataTables_wrapper .dataTables_processing {
@@ -488,18 +451,7 @@ table.dataTable td {
         text-align: center;
         font-size: 1.2em;
         background-color: white;
-        background: -webkit-gradient(linear, left top, right top, color-stop(0%, rgba(255, 255, 255, 0)), color-stop(25%, rgba(255, 255, 255, 0.9)), color-stop(75%, rgba(255, 255, 255, 0.9)), color-stop(100%, rgba(255, 255, 255, 0)));
-        /* Chrome,Safari4+ */
-        background: -webkit-linear-gradient(left, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 25%, rgba(255, 255, 255, 0.9) 75%, rgba(255, 255, 255, 0) 100%);
-        /* Chrome10+,Safari5.1+ */
-        background: -moz-linear-gradient(left, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 25%, rgba(255, 255, 255, 0.9) 75%, rgba(255, 255, 255, 0) 100%);
-        /* FF3.6+ */
-        background: -ms-linear-gradient(left, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 25%, rgba(255, 255, 255, 0.9) 75%, rgba(255, 255, 255, 0) 100%);
-        /* IE10+ */
-        background: -o-linear-gradient(left, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 25%, rgba(255, 255, 255, 0.9) 75%, rgba(255, 255, 255, 0) 100%);
-        /* Opera 11.10+ */
-        background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 25%, rgba(255, 255, 255, 0.9) 75%, rgba(255, 255, 255, 0) 100%);
-        /* W3C */
+        
     }
 
     .dataTables_wrapper .dataTables_length,
