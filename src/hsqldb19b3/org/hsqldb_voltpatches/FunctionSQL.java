@@ -924,7 +924,7 @@ public class FunctionSQL extends Expression {
                 ... disabled 9 lines */
 
                 return ((CharacterType) dataType).substring(session, data[0],
-                		offset, length, (nodes.length > 2 && nodes[2] != null), false);
+                        offset, length, (nodes.length > 2 && nodes[2] != null), false);
                 // End of VoltDB extension
             }
             /*
@@ -2124,14 +2124,14 @@ public class FunctionSQL extends Expression {
                 volt_alias = "day_of_year";
                 break;
             case Tokens.WEEKDAY :
-            	volt_alias = "weekday";
-            	break;
+                volt_alias = "weekday";
+                break;
             case Tokens.DAY_OF_WEEK :
             // case DTIType.DAY_OF_WEEK :
                 volt_alias = "day_of_week";
                 break;
             case Tokens.WEEK:
-            	keywordConstant = Tokens.WEEK_OF_YEAR;
+                keywordConstant = Tokens.WEEK_OF_YEAR;
             case Tokens.WEEK_OF_YEAR :
             // case DTIType.WEEK_OF_YEAR :
                 volt_alias = "week_of_year";
@@ -2342,29 +2342,39 @@ public class FunctionSQL extends Expression {
 
     protected void voltResolveToBigintTypesForBitwise() {
         for (int i = 0; i < nodes.length; i++) {
-            if (nodes[i].dataType == null) {
-                nodes[i].dataType = Type.SQL_BIGINT;
-            }
-            else if (nodes[i].dataType.typeCode
-                       != Types.SQL_BIGINT) {
-                if (nodes[i].valueData != null && nodes[i].dataType.isIntegralType()) {
-                    if (nodes[i].valueData instanceof java.math.BigDecimal) {
-                        // Only Decimal integral type could exceed the range of Long, check the range here
-                        java.math.BigDecimal bd = (java.math.BigDecimal) nodes[i].valueData;
-                        if (bd.compareTo(NumberType.MAX_LONG) > 0 || bd.compareTo(NumberType.MIN_LONG) < 0) {
-                            throw Error.error(ErrorCode.X_22003);
-                        }
-                    }
+            voltResolveToBigintType(i);
+        }
+        dataType = Type.SQL_BIGINT;
+    }
 
-                    nodes[i].dataType = Type.SQL_BIGINT;
-                    break;
-                }
-
+    protected void voltResolveToBigintType(int i) {
+        if (nodes[i].dataType == null) {
+            nodes[i].dataType = Type.SQL_BIGINT;
+        }
+        else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
+            if (! nodes[i].dataType.isIntegralType() || nodes[i].valueData == null) {
                 throw Error.error(ErrorCode.X_42561);
             }
+            // Only constants are checked here for long type range limits
+            NumberType.checkValueIsInLongLimits(nodes[i].valueData);
+            nodes[i].dataType = Type.SQL_BIGINT;
         }
+    }
 
-        dataType = Type.SQL_BIGINT;
+    protected void voltResolveToBigintCompatibleType(int i) {
+        if (nodes[i].dataType == null) {
+            nodes[i].dataType = Type.SQL_BIGINT;
+        }
+        else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
+            if (! nodes[i].dataType.isIntegralType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[i].valueData != null) {                       // is constants
+                // check constants in range
+                NumberType.checkValueIsInLongLimits(nodes[i].valueData);
+                nodes[i].dataType = Type.SQL_BIGINT;
+            }
+        }
     }
 
     /**********************************************************************/

@@ -35,6 +35,7 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
 
 
@@ -88,6 +89,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
+        static final int FUNC_CONCAT                     = 124;
+
         private static final int FUNC_VOLT_SQL_ERROR     = 20000;
         private static final int FUNC_VOLT_DECODE        = 20001;
         private static final int FUNC_VOLT_FIELD         = 20002;
@@ -122,8 +125,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
 
         static final int FUNC_VOLT_BITNOT                 = 20026;
-
-        static final int FUNC_CONCAT                      = 124;
+        static final int FUNC_VOLT_BIT_SHIFT_LEFT         = 20027;
+        static final int FUNC_VOLT_BIT_SHIFT_RIGHT        = 20028;
+        static final int FUNC_VOLT_HEX                    = 20029;
 
         private static final FunctionId[] instances = {
 
@@ -131,6 +135,16 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { null, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bit_shift_left", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_LEFT, -1,
+                    new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bit_shift_right", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_RIGHT, -1,
+                    new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("decode", null, FUNC_VOLT_DECODE, 2,
                     new Type[] { null, null },
@@ -190,7 +204,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-            		Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
                     new Type[] { Type.SQL_BIGINT },
@@ -201,6 +215,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
+
+            new FunctionId("hex", Type.SQL_VARCHAR, FUNC_VOLT_HEX, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
         };
 
@@ -388,6 +406,20 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         case FunctionId.FUNC_VOLT_BITNOT:
             voltResolveToBigintTypesForBitwise();
+            break;
+
+        case FunctionId.FUNC_VOLT_BIT_SHIFT_LEFT:
+        case FunctionId.FUNC_VOLT_BIT_SHIFT_RIGHT:
+            // the first parameter has to be BigInteger
+            voltResolveToBigintType(0);
+            voltResolveToBigintCompatibleType(1);
+
+            dataType = Type.SQL_BIGINT;
+            break;
+
+        case FunctionId.FUNC_VOLT_HEX:
+            voltResolveToBigintCompatibleType(0);
+            dataType = Type.SQL_VARCHAR;
             break;
 
         default:

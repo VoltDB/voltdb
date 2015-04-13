@@ -87,7 +87,7 @@
                             if (datatype == "data") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
@@ -113,7 +113,7 @@
                             if (datatype == "data") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
@@ -139,7 +139,7 @@
                             if (datatype == "data") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#DB0303" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
                                 dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
                             }
@@ -350,6 +350,7 @@
                     return d3.time.format('%X')(new Date(d));
                 });
 
+            MonitorGraphUI.ChartPartitionIdleTime.showLegend(false);
             MonitorGraphUI.ChartPartitionIdleTime.xAxis.rotateLabels(-20);
 
             MonitorGraphUI.ChartPartitionIdleTime.yAxis
@@ -373,7 +374,7 @@
                 .call(MonitorGraphUI.ChartPartitionIdleTime);
 
             nv.utils.windowResize(MonitorGraphUI.ChartPartitionIdleTime.update);
-
+            
             return MonitorGraphUI.ChartPartitionIdleTime;
         });
 
@@ -922,6 +923,9 @@
                     MonitorGraphUI.Monitors.partitionData = partitionData;
                 });
             });
+            if (monitor.partitionFirstData) {
+                $(".legend").css("display", "block");
+            }
             monitor.partitionFirstData = false;
             if (partitionSecCount >= 6)
                 partitionSecCount = 0;

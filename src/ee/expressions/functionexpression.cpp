@@ -331,6 +331,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_BITNOT:
             ret = new UnaryFunctionExpression<FUNC_VOLT_BITNOT>((*arguments)[0]);
             break;
+        case FUNC_VOLT_HEX:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_HEX>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
@@ -385,6 +388,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
+            break;
+        case FUNC_VOLT_BIT_SHIFT_LEFT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_LEFT>(*arguments);
+            break;
+        case FUNC_VOLT_BIT_SHIFT_RIGHT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_RIGHT>(*arguments);
             break;
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
