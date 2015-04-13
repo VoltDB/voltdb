@@ -1138,12 +1138,22 @@ var loadPage = function (serverName, portid) {
                 pageLength: 5,
                 "sPaginationType": "extStyleLF",
                 "bAutoWidth": false,
-                "fnDrawCallback": function () {
+                "language": {
+                    "zeroRecords": "No data to be displayed"
+                },
+                "fnRowCallback": function () {
+                    //debugger;
                     //var length = this.fnGetData().length;
                     //if (length <= this.fnPagingInfo().iLength) {
                     //    //  $(this).parent().children(".dataTables_paginate").hide();
                     //}
-                    $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+
+                    if ($(this).find("tbody tr td").first().html() == "No data to be displayed") {
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                    } else {
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                    }
+
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
                 "sDom": '<"clear">ilprtp',
@@ -1213,12 +1223,22 @@ var loadPage = function (serverName, portid) {
                     pageLength: 5,
                     "sPaginationType": "extStyleLF",
                     "bAutoWidth": false,
-                    "fnDrawCallback": function () {
-                        // var length = this.fnGetData().length;
+                    "language": {
+                        "zeroRecords": "No data to be displayed"
+                    },
+                    "fnRowCallback": function () {
+                        //debugger;
+                        //var length = this.fnGetData().length;
                         //if (length <= this.fnPagingInfo().iLength) {
-                        //    $(this).parent().children(".dataTables_paginate").hide();
+                        //    //  $(this).parent().children(".dataTables_paginate").hide();
                         //}
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+
+                        if ($(this).find("tbody tr td").first().html() == "No data to be displayed") {
+                            $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                        } else {
+                            $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        }
+
                         $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                     },
                     "sDom": '<"clear">ilprtp',
