@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>VoltDB Management Center</title>
@@ -184,10 +184,18 @@
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
                             </div>
                               <div id="chartPartitionIdleTime" class="chart left">
-                                <div class="chartHeader">
-                                    <h1>Partition Idle Time</h1>
-                                </div>
-                              <svg id="visualisationPartitionIdleTime" width="100%" height="400"></svg>
+                                  <div class="chartHeader">
+                                      <h1>Partition Idle Time</h1>
+                                  </div>
+                                  <div class="legend" style="display:none;">
+                                   <ul>
+                                       <li><div class="dotGray"></div>Local partitions </li>
+                                       <li><div class="dotBlue"></div>Cluster-wide Maximum /  Minimum</li>
+                                       <!--<li><div class="dotBlue"></div>Cluster-wide Minimum</li>-->
+                                       <li><div class="dotOrange"></div>Multi-partition</li>
+                                   </ul>
+                                  </div>
+                              <svg id="visualisationPartitionIdleTime" class="partitionHeight"></svg>
                             </div>
                             <div id="" class="chart right" style="display: none;">
                                 <div class="chartHeader">
