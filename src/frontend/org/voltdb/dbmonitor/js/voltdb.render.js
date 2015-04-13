@@ -451,6 +451,17 @@ function alertNodeClicked(obj) {
                 onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData);
             });
         };
+        
+        this.GetTableInformationClientPort = function () {
+            VoltDBService.GetTableInformationClientPort(function (connection) {
+                var tablesData = {};
+                var viewsData = {};
+                var proceduresData = {};
+                var procedureColumnsData = {};
+                var sysProceduresData = {};
+                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION_CLIENTPORT');
+            });
+        };
 
         this.GetHostNodesHtml = function (callback) {
             try {
@@ -2472,7 +2483,7 @@ function alertNodeClicked(obj) {
         
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
-            if (processName == "TABLE_INFORMATION") {
+            if (processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT") {
                 suffix = "_" + processName;
             }
 

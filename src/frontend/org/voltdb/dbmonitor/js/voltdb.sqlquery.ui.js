@@ -133,8 +133,8 @@ $(document).ready(function () {
         this.saveConnectionKey = function (useAdminPort) {
             var server = SQLQueryRender.server == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(SQLQueryRender.server);
             var user = SQLQueryRender.userName == '' ? null : SQLQueryRender.userName;
-            var processNameSuffix = useAdminPort ? "_ADMINPORT" : "_CLIENTPORT";
-            var processName = 'SQLQUERY_EXECUTE' + processNameSuffix;
+            var processNameSuffix = useAdminPort ? "" : "_CLIENTPORT";
+            var processName = 'TABLE_INFORMATION' + processNameSuffix;
             var key = (server + '_' + (user == '' ? '' : user) + '_' + processName).replace(/[^_a-zA-Z0-9]/g, "_");
             saveSessionCookie('connectionkey', key);
         };
@@ -154,6 +154,7 @@ $(document).ready(function () {
                 toggleSpinner(false);
 
             });
+            voltDbRenderer.GetTableInformationClientPort();
         };
 
         var populateTableData = function (tables) {
