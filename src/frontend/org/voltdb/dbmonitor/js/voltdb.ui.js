@@ -755,7 +755,6 @@ var loadPage = function (serverName, portid) {
                                 $("#divDrWrapperAdmin").show();
 
                             } else {
-
                                 VoltDbUI.isDRInfoRequired = false;
                                 $("#divDrReplication").hide();
                                 $('#liDrReplication').css('display', 'none');

@@ -2078,6 +2078,7 @@ function alertNodeClicked(obj) {
                 replicationDetails["DR_GRAPH"]["STATE"] = info[colIndex["STATE"]];
                 replicationDetails["DR_GRAPH"]["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]];
             });
+
 	      replicationDetails['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1],colIndex2['IS_COVERED']);
             replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M;
 
