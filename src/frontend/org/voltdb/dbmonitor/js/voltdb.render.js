@@ -2048,6 +2048,7 @@ function alertNodeClicked(obj) {
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
             var colIndex = {};
+            var colIndex2 = {};
             var counter = 0;
             var replicationRate1M = 0;
             if (connection.Metadata['@Statistics_DRCONSUMER'] == null) {
@@ -2060,6 +2061,13 @@ function alertNodeClicked(obj) {
                 counter++;
             });
 
+		counter = 0;
+	      connection.Metadata['@Statistics_DRCONSUMER_completeData'][1].schema.forEach(function (columnInfo) {
+		        if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == 'IS_COVERED')
+			        colIndex2[columnInfo["name"]] = counter;
+		        counter++;
+	      });
+
             connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
                 if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
                     replicationDetails["DR_GRAPH"] = {};
@@ -2070,9 +2078,24 @@ function alertNodeClicked(obj) {
                 replicationDetails["DR_GRAPH"]["STATE"] = info[colIndex["STATE"]];
                 replicationDetails["DR_GRAPH"]["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]];
             });
+	      replicationDetails['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1],colIndex2['IS_COVERED']);
             replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M;
 
         };
+
+	  var getReplicationNotCovered = function (replicationData, index){
+		  var count = 0;
+		  if(index != undefined){
+			  replicationData.data.forEach(function (columnInfo) {
+				  columnInfo.forEach(function (col,i){
+					  if (col == 'false' && i == index){
+						  count++;
+					  }
+				  });
+			  });
+		  }
+		  return count;
+	    }
 
         var getPartitionIdleTimeDetails = function (connection, partitionDetail) {
             var colIndex = {};

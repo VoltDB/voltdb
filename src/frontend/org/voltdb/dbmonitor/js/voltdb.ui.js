@@ -26,8 +26,8 @@ $(document).ready(function () {
             }, 10);
         }
 
-            //IE 11 is just a preview release. 
-            //Hence validation expressions may differs after the full version is released 
+            //IE 11 is just a preview release.
+            //Hence validation expressions may differs after the full version is released
             //In such case, below validation has to be updated
         else if (navigator.appName == 'Netscape') {
             var ua = navigator.userAgent;
@@ -110,7 +110,7 @@ $(document).ready(function () {
         event.stopPropagation();
     });
 
-    // Pop Slide Server Search		
+    // Pop Slide Server Search
     $('#popServerSearch').keyup(function () {
         var searchText = $(this).val().toLowerCase();
         $('ul.servers-list > li').each(function () {
@@ -151,7 +151,7 @@ $(document).ready(function () {
         }
     });
 
-    //DR Show/hide toggle	
+    //DR Show/hide toggle
     // Show Hide Graph Block
     $('#showHideDrBlock').click(function () {
         $(".drShowHide").toggle();
@@ -492,7 +492,7 @@ var loadPage = function (serverName, portid) {
                 $("#serversList").html(htmlData.ServerInformation[0].ServersList);
                 setVersionCheckUrl(htmlData.ServerInformation[1].CurrentServer);
 
-                //Trigger search on the newly loaded list. This is required to 
+                //Trigger search on the newly loaded list. This is required to
                 //search server since we are refreshing the server list.
                 if ($("#popServerSearch").val() != "Search Server")
                     $("#popServerSearch").trigger("keyup");
@@ -622,7 +622,7 @@ var loadPage = function (serverName, portid) {
 
                         }
 
-                        //Close the popup                                            
+                        //Close the popup
                         $($(this).siblings()[0]).trigger("click");
 
                     });
@@ -643,7 +643,7 @@ var loadPage = function (serverName, portid) {
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
 
 
-        //Load Admin configurations                
+        //Load Admin configurations
         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
 
             if (!VoltDbUI.hasPermissionToView)
@@ -767,6 +767,25 @@ var loadPage = function (serverName, portid) {
                 });
             }
         });
+
+	  var replicationWarning = function(count){
+		    if(count == 0 || count == undefined){
+			    $('#drWarning').hide();
+			    $('.alertIcon').hide();
+		    }else{
+			    $('#drWarning').show();
+			    $('.alertIcon').show();
+			    if(count == 1){
+				    $('#myWarning .warning p').text(count +' partition is uncovered');
+			    }else{
+				    $('#myWarning .warning p').text(count +' partitions are uncovered');
+			    }
+		    }
+	  };
+
+	  voltDbRenderer.GetDrReplicationInformation(function (replica) {
+		  replicationWarning(replica['WARNING_COUNT']);
+	  });
 
         var loadProcedureInformations = function (procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
@@ -1624,7 +1643,7 @@ var loadPage = function (serverName, portid) {
         MonitorGraphUI.UpdateCharts();
     });
 
-    //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked 
+    //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked
     $("#firstpane div.menu_head").click(function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
@@ -1844,7 +1863,10 @@ var showHideGraph = function (userpreferences) {
     else
         $("#chartPartitionIdleTime").show();
 
-    if (userpreferences["DrReplicationRate"] == false || VoltDbUI.isFirstHit == true || VoltDbUI.drReplicationRole.toLowerCase() != "replica")        $("#ChartDrReplicationRate").hide();    else        $("#ChartDrReplicationRate").show();
+    if (userpreferences["DrReplicationRate"] == false || VoltDbUI.isFirstHit == true || VoltDbUI.drReplicationRole.toLowerCase() != "replica")
+        $("#ChartDrReplicationRate").hide();
+    else
+        $("#ChartDrReplicationRate").show();
 
     if (userpreferences["StoredProcedures"] == false)
         $("#tblStoredProcedures").hide();
@@ -1964,7 +1986,7 @@ var adjustGraphSpacing = function () {
         this.isConnectionChecked = false;
         this.connectionTimeInterval = null;
         this.partitionGraphInterval = null;
-        //load schema tab and table and views tabs inside sql query 
+        //load schema tab and table and views tabs inside sql query
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();
             SQLQueryRender.populateTablesAndViews();
