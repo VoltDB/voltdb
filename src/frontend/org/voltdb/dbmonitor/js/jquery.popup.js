@@ -347,6 +347,15 @@
 		    });
 		    }
 			
+		    var dRPartitionWarningBtn = $("a[id=btnDrPartitionWarning]");
+		    if (dRPartitionWarningBtn != undefined) {
+		        dRPartitionWarningBtn.unbind('click');
+		        dRPartitionWarningBtn.bind('click', function (e) {
+		            e.preventDefault();
+		            p.close();
+		        });
+		    }
+
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content

@@ -775,9 +775,9 @@ var loadPage = function (serverName, portid) {
 			    $('#drWarning').show();
 			    $('.alertIcon').show();
 			    if(count == 1){
-				    $('#myWarning .warning p').text(count +' partition is uncovered');
+			        $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
 			    }else{
-				    $('#myWarning .warning p').text(count +' partitions are uncovered');
+			        $('#drPartitionWarningMsg').text(count + ' partitions are uncovered.');
 			    }
 		    }
 	  };

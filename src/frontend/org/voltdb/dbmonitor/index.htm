@@ -291,7 +291,6 @@
                                     <h1 class="headText1">
                                         <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>
                                     </h1>
-                                    </h1>
                                 </div>
                             </div>
                             <div class="rightShowhide">
@@ -304,7 +303,7 @@
                                     <!-- <li>State</li>
                                      <li class="drArrow">On</li>-->
                                     <li class="alertIcon warningDr" style="display: none">
-                                        <a id="drWarning" href="#myWarning" class="drWarning">
+                                        <a id="drWarning" href="#drPartitionWarning" class="drWarning">
                                             <span style="margin:0 0 0 24px">Warning</span>
                                         </a>
                                     </li>
@@ -1632,13 +1631,13 @@
     </div>
 
     <!--DR warning POPUP  -->
-    <div id="myWarning" style="display: none">
+    <div id="drPartitionWarning" style="display: none">
         <div class="overlay-title"><div class="warninghead"><img src="css/resources/images/Information.png" />Warning</div></div>
         <div class="clear"></div>
         <div class="overlay-content warning">
-            <p>partition is uncovered</p>
+            <p id="drPartitionWarningMsg" ></p>
             <div class="overlay-btns" style="padding:0;">
-                <button class="btn">Ok</button>
+                <a id="btnDrPartitionWarning"  class="btn">Ok</a>
                 <div class="clear"></div>
             </div>
         </div>
