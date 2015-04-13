@@ -1933,10 +1933,10 @@ function alertNodeClicked(obj) {
             connection.Metadata['@Statistics_STARVATION'].data.forEach(function (info) {
                 if (currentServer == info[colIndex["HOSTNAME"]]) {
                     if (siteId == parseInt(info[colIndex["SITE_ID"]])) {
-                        var keyMpi = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                        var keyMpi = info[colIndex["HOSTNAME"]] + ': ' + info[colIndex["SITE_ID"]];
                         starvMpiData[keyMpi] = info[colIndex["PERCENT"]];
                     } else {
-                        var key = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                        var key = info[colIndex["HOSTNAME"]] + ': ' + info[colIndex["SITE_ID"]];
                         keys.push(key);
                         starvStats[key] = info[colIndex["PERCENT"]];
                     }
@@ -1964,7 +1964,7 @@ function alertNodeClicked(obj) {
                                 maxPer = parseFloat(info[colIndex["PERCENT"]]);
                             }
                             previousHost = info[colIndex["HOSTNAME"]];
-                            previousHostKey = info[colIndex["HOSTNAME"]] + info[colIndex["SITE_ID"]];
+                            previousHostKey = info[colIndex["HOSTNAME"]] + ': ' + info[colIndex["SITE_ID"]];
                             previousSiteId = info[colIndex["SITE_ID"]];
                         }
                     }
