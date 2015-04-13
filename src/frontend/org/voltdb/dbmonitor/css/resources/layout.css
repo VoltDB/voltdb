@@ -1146,7 +1146,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{display:block;}
   .clusterStat { background-image:none!important; float:left; width:100%; line-height:28px; margin-left:15px; background-position:left 87px; padding-left:8px;}	
   .clusterStat li{ color:#3e3a3a;font-family: Arial, Helvetica, sans-serif; font-size:15px;}
   
-  .tabs-filter-wrapper .filter { float:right; width:auto;} 
+  .tabs-filter-wrapper .filter { float:left; width:auto;} 
   .tabs-filter-wrapper .pagination {clear:left; float:left; margin-top:15px;}
   
   
@@ -1186,7 +1186,11 @@ top: 3px;}
 	
 	.documentation span {float:right}
 	.adminLeft { float:none; width:100%;}
-	.adminRight{ padding-top:15px;}	
+	.adminRight{ padding-top:15px;}
+    
+    .tabs-filter-wrapperDR .filter { float: none;}
+    .dataTables_wrapper .dataTables_paginate { top: 0!important;}
+    table.dataTable { top: 0 !important;}	
 }
 
 @media (min-width: 480px) and  (max-width:540px) {
@@ -1200,6 +1204,7 @@ top: 3px;}
 	.adminDirectories {overflow:auto; width:auto;}
 	.errorQueryDbPause { width:320px; }
 	
+
    
 }
 @media (min-width: 320px) and (max-width: 479px) {
@@ -1209,6 +1214,8 @@ top: 3px;}
         right: -1px;
         top: 205px;
     }
+
+
 
     .rightShowhideList li a {
         margin: 0 0 0 46px;
