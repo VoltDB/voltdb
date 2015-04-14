@@ -136,9 +136,9 @@ function async-benchmark() {
         --duration=120 \
         --servers=localhost:21212 \
         --contestants=6 \
-        --maxvotes=2
+        --maxvotes=2 \
+        --ratelimit=2000000
 #        --latencyreport=true \
-#        --ratelimit=100000
 }
 
 function simple-benchmark() {

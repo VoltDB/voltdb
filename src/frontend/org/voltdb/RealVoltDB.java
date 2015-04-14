@@ -133,6 +133,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.importer.ImportManager;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -1957,6 +1958,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     m_configLogger.join();
                 }
 
+                //Shutdown import processors.
+                ImportManager.instance().shutdown();
+
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
 
@@ -2143,6 +2147,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 Integer partition = siteTracker.getPartitionForSite(site);
                 partitions.add(partition);
             }
+            // Update catalog for import processor this should be just/stop start and updat partitions.
+            ImportManager.instance().updateCatalog(m_catalogContext, partitions);
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext, partitions);
@@ -2360,6 +2366,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
 
+        //Tell import processors that they can start ingesting data.
+        ImportManager.instance().readyForData(m_catalogContext, m_partitionsToSitesAtStartupForExportInit);
+
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
@@ -2531,6 +2540,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
+
+        //Tell import processors that they can start ingesting data.
+        ImportManager.instance().readyForData(m_catalogContext, m_partitionsToSitesAtStartupForExportInit);
 
         if (m_startMode != null) {
             m_mode = m_startMode;

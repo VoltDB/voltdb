@@ -124,7 +124,11 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import java.util.HashMap;
 import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.importer.ImportDataProcessor;
 
 /**
  *
@@ -567,6 +571,7 @@ public abstract class CatalogUtil {
 
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
+                setImportInfo(catalog, deployment.getImport());
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
@@ -1092,6 +1097,42 @@ public abstract class CatalogUtil {
         return processorProperties;
     }
 
+    private static Properties checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+        String importBundleUrl = importConfiguration.getBundle();
+        if (!importConfiguration.isEnabled()) {
+            return null;
+        }
+
+        Properties processorProperties = new Properties();
+        try {
+            URL u = new URL(importBundleUrl);
+            //Make sure we can load stream
+            u.openStream();
+        } catch (Exception ex) {
+            throw new DeploymentCheckException("Invalid bundle URL specified.");
+        }
+        if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
+            processorProperties.setProperty(ImportDataProcessor.IMPORT_BUNDLE, importBundleUrl);
+        }
+
+        List<PropertyType> configProperties = importConfiguration.getProperty();
+        if (configProperties != null && ! configProperties.isEmpty()) {
+
+            for( PropertyType configProp: configProperties) {
+                String key = configProp.getName();
+                String value = configProp.getValue();
+                if (!key.toLowerCase().contains("passw")) {
+                    processorProperties.setProperty(key, value.trim());
+                } else {
+                    //Dont trim passwords
+                    processorProperties.setProperty(key, value);
+                }
+            }
+        }
+
+        return processorProperties;
+    }
+
     /**
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
@@ -1187,6 +1228,56 @@ public abstract class CatalogUtil {
                 }
             }
         }
+    }
+
+    /**
+     * Set deployment time settings for export
+     * @param catalog The catalog to be updated.
+     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     */
+    private static void setImportInfo(Catalog catalog, ImportType importType) {
+        if (importType == null) {
+            return;
+        }
+        List<String> streamList = new ArrayList<String>();
+
+        for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
+
+            boolean connectorEnabled = importConfiguration.isEnabled();
+            if (!connectorEnabled) continue;
+            if (streamList.contains(importConfiguration.getBundle())) {
+                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
+                        importConfiguration.getBundle() + ".");
+            } else {
+                streamList.add(importConfiguration.getBundle());
+            }
+
+            checkImportProcessorConfiguration(importConfiguration);
+        }
+    }
+
+    public static Map<String, Properties> getImportProcessorConfig(ImportType importType) {
+        Map<String, Properties> processorConfig = new HashMap<String, Properties>();
+        if (importType == null) {
+            return processorConfig;
+        }
+        List<String> streamList = new ArrayList<String>();
+
+        for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
+
+            boolean connectorEnabled = importConfiguration.isEnabled();
+            if (!connectorEnabled) continue;
+            if (streamList.contains(importConfiguration.getBundle())) {
+                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
+                        importConfiguration.getBundle() + ".");
+            } else {
+                streamList.add(importConfiguration.getBundle());
+            }
+
+            Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            processorConfig.put(importConfiguration.getBundle(), processorProperties);
+        }
+        return processorConfig;
     }
 
     /**
