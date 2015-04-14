@@ -108,8 +108,26 @@ public class ParameterConverter {
     }
 
     private static final Pattern thousandSeparator = Pattern.compile("\\,");
+
+    private static boolean isIntegralClass(Class<?> clz) {
+        if (clz == long.class
+            || clz == int.class
+            || clz == short.class
+            || clz == byte.class) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Given a string, covert it to a primitive type or return null.
+     *
+     * If the string value is a VARBINARY constant of the form X'00ABCD', the
+     * expected class is one of byte, short, int or long, then we interpret the
+     * string as specifying bits of a 64-bit signed integer (padded with zeroes if
+     * there are fewer than 16 digits).
+     * Corresponding code for handling hex literals appears in HSQL's ExpressionValue class
+     * and in voltdb.expressions.ConstantValueExpression.
      */
     private static Object convertStringToPrimitive(String value, final Class<?> expectedClz)
     throws VoltTypeException
@@ -138,7 +156,24 @@ public class ParameterConverter {
             }
         }
         // ignore the exception and fail through below
-        catch (NumberFormatException nfe) {}
+        catch (NumberFormatException nfe) {
+        }
+
+        // If we failed to parse the string in decimal form it could still
+        // be a numeric value specified as X'....'
+        //
+        // Do this only after trying to parse a decimal literal, which is the
+        // most common case.
+        if (isIntegralClass(expectedClz)) {
+            String hexDigits = SQLParser.getDigitsFromHexLiteral(value);
+            if (hexDigits != null) {
+                try {
+                    return SQLParser.hexDigitsToLong(hexDigits);
+                }
+                catch (SQLParser.Exception spe) {
+                }
+            }
+        }
 
         throw new VoltTypeException(
                 "tryToMakeCompatible: Unable to convert string "

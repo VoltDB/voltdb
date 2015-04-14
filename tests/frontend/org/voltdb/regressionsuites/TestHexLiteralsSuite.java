@@ -23,7 +23,7 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -37,9 +37,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestHexLiteralsSuite extends RegressionSuite {
 
     /*
-     * Make sure that x-quoted literals (indicating a sequence of bytes
-     * denoted by hexadecimal digits) are not interpreted as integers,
-     * but that they *do* work as VARBINARY literals.
+     * Test hex literals in VARBINARY contexts.
+     *
+     * Test hex literals as integers:
+     *  - In arithmetic (integer type should be inferred)
+     *  - In relational operators
+     *  - In the bitwise functions
      */
 
     static private long[] interestingValues = new long[] {
@@ -54,8 +57,36 @@ public class TestHexLiteralsSuite extends RegressionSuite {
             Long.MAX_VALUE
         };
 
+    // Some values that we can do arithmetic on,
+    // without overflowing to different types.
+    // 3 billion is roughly the square root of 2^63 - 1.
+    static private long[] boringValues = new long[] {
+        -3037000400L,
+        1500000000,
+        1024,
+        -1,
+        0,
+        1,
+        16,
+        2600000075L,
+        3037000400L
+    };
+
     private static String longToHexLiteral(long val) {
+        return "X'" + makeEvenDigits(val) + "'";
+    }
+
+    private static String longToEightByteHexLiteral(long val) {
         return "X'" + makeSixteenDigits(val) + "'";
+    }
+
+    private static String makeEvenDigits(long val) {
+        String valAsHex = Long.toHexString(val).toUpperCase();
+        if ((valAsHex.length() % 2) == 1) {
+            valAsHex = "0" + valAsHex;
+        }
+
+        return valAsHex;
     }
 
     private static String makeSixteenDigits(long val) {
@@ -74,12 +105,12 @@ public class TestHexLiteralsSuite extends RegressionSuite {
     }
 
     @Test
-    public void testHexLiteralsAsVarbinaryParams() throws Exception {
+    public void testVarbinaryHexLiteralsAsParams() throws Exception {
         Client client = getClient();
 
         for (int i = 0; i < interestingValues.length; ++i) {
             long val = interestingValues[i];
-            client.callProcedure("InsertVarbinary", i, longToHexLiteral(val));
+            client.callProcedure("InsertVarbinary", i, longToEightByteHexLiteral(val));
             // Verify that the right constant was inserted
             VoltTable vt = client.callProcedure("@AdHoc", "select vb from t where pk = ?", i)
                     .getResults()[0];
@@ -108,8 +139,9 @@ public class TestHexLiteralsSuite extends RegressionSuite {
         buffer.putLong(x);
         return buffer.array();
     }
+
     @Test
-    public void testProcsWithEmbeddedVarbinaryLiterals() throws Exception {
+    public void testVarbinaryProcsWithEmbeddedLiterals() throws Exception {
         Client client = getClient();
 
         // Insert all the interesting values in the table,
@@ -119,9 +151,6 @@ public class TestHexLiteralsSuite extends RegressionSuite {
         for (int i = 0; i < interestingValues.length; ++i) {
             client.callProcedure("InsertVarbinary", i, longToBytes(interestingValues[i]));
         }
-
-        VoltTable vvt = client.callProcedure("@AdHoc", "select * from t").getResults()[0];
-        System.out.println(vvt);
 
         for (int i = 0; i < interestingValues.length; ++i) {
             long val = interestingValues[i];
@@ -133,12 +162,233 @@ public class TestHexLiteralsSuite extends RegressionSuite {
     }
 
     @Test
-    public void testIntegerHexLiteralsFail() throws IOException {
+    public void testIntegerHexLiteralsAsParams() throws Exception {
         Client client = getClient();
 
-        verifyProcFails(client, "Unable to convert string X'15' to long value for target parameter",
-                "InsertBigint", 0, "X'15'");
+        for (int i = 0; i < interestingValues.length; ++i) {
+            long val = interestingValues[i];
+            client.callProcedure("InsertBigint", i, longToHexLiteral(val));
+            // Verify that the right constant was inserted
+            VoltTable vt = client.callProcedure("@AdHoc", "select bi from t where pk = ?", i)
+                    .getResults()[0];
+            validateRowOfLongs(vt, new long[] {val});
+        }
+
+        // 0 digits is not a valid value
+        verifyProcFails(client, "Unable to convert string x'' to long value for target parameter",
+                "InsertBigint", 21, "x''");
+
+        // Too many digits (more than 16) won't fit into a BIGINT.
+        verifyProcFails(client, "Unable to convert string x'FFFFffffFFFFffffF' to long value for target parameter",
+                "InsertBigint", 21, "x'FFFFffffFFFFffffF'");
     }
+
+    @Test
+    public void testIntegerProcsWithEmbeddedHexLiteralsSelect() throws Exception {
+        Client client = getClient();
+
+        // Insert one row, so calls below produce just one row.
+        client.callProcedure("InsertBigint", 0, 0);
+
+        // For each interesting value,
+        // invoke a corresponding procedure that does XOR against that value.
+        // Make sure that the literal in the procedure was interpreted correctly.
+
+        for (long val : interestingValues) {
+            VoltTable result = client.callProcedure("INT_HEX_LITERAL_PROC_" + makeEvenDigits(val),
+                    0xF0F0F0F0F0F0F0F0L)
+                    .getResults()[0];
+            assertTrue(result.advanceRow());
+            String actual = result.getString(0);
+            long expectedNum = val ^ 0xF0F0F0F0F0F0F0F0L;
+            if (expectedNum != Long.MIN_VALUE && val != Long.MIN_VALUE) {
+                String expected = Long.toHexString(expectedNum).toUpperCase();
+                assertEquals(expected, actual);
+            }
+            else {
+                // Input or output to bit op was null value
+                // So output of HEX will be null.
+                assertEquals(null, actual);
+            }
+        }
+    }
+
+    @Test
+    public void testIntegerProcsWithEmbeddedLiteralsWhere() throws Exception {
+        Client client = getClient();
+
+        // Insert all the interesting values in the table,
+        // and make sure we can select them back with a constant
+        // embedded in the where clause
+
+        for (int i = 0; i < interestingValues.length; ++i) {
+            client.callProcedure("InsertBigint", i, interestingValues[i]);
+        }
+
+        for (int i = 0; i < interestingValues.length; ++i) {
+            long val = interestingValues[i];
+            String procName = "INT_HEX_LITERAL_PROC_WHERE_" + makeEvenDigits(interestingValues[i]);
+            VoltTable vt = client.callProcedure(procName).getResults()[0];
+            if (val != Long.MIN_VALUE) {
+                assertTrue(vt.advanceRow());
+                assertEquals(i, vt.getLong(0));
+            }
+            else {
+                assertFalse(vt.advanceRow());
+            }
+        }
+    }
+
+    @Test
+    public void testIntegerHexLiteralsInArithmetic() throws Exception {
+        Client client = getClient();
+
+        // Insert one row, so calls below produce just one row.
+        client.callProcedure("InsertBigint", 0, 0);
+
+        for (long procVal : boringValues) {
+            String procName = "HEX_LITERAL_PROC_ARITH_" + makeEvenDigits(procVal);
+            for (long paramVal : boringValues) {
+                VoltTable actual = client.callProcedure(procName,
+                        paramVal,
+                        paramVal,
+                        paramVal,
+                        paramVal == 0 ? 1 : paramVal) // avoid divide by zero
+                        .getResults()[0];
+                long[] expected = {
+                        procVal + paramVal,
+                        procVal - paramVal,
+                        procVal * paramVal,
+                        procVal / (paramVal == 0 ? 1 : paramVal),
+                        -procVal};
+                validateRowOfLongs(actual, expected);
+            }
+        }
+    }
+
+    // Users may want to initialize or update narrower integer fields (TINYINT, SMALLINT, BIGINT)
+    // with hexadecimal literals.  The tests below just use TINYINT as a representative
+    // of the non-BIGINT type class.
+
+   @Test
+   public void testIntegerHexLiteralInsertTinyintParams() throws Exception {
+       Client client = getClient();
+       int pk = 0;
+
+       client.callProcedure("InsertTinyint", pk, "x'00'");
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {0x00});
+       ++pk;
+
+       client.callProcedure("InsertTinyint", pk, "x'7F'");
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {0x7F});
+       ++pk;
+
+       // This is -127, the smallest allowed value.
+       client.callProcedure("InsertTinyint", pk, "x'FfffFfffFfffFf81'");
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {0xFfffFfffFfffFf81L});
+       ++pk;
+
+       verifyProcFails(client, "Type BIGINT with value 255 can't be cast as TINYINT "
+               + "because the value is out of range",
+               "InsertTinyint", pk, "x'FF'");
+
+       verifyProcFails(client, "Type BIGINT with value 128 can't be cast as TINYINT "
+               + "because the value is out of range",
+               "InsertTinyint", pk, "x'80'");
+
+       // -128 fits into a signed byte but is our null value and therefore out of range
+       verifyProcFails(client, "Type BIGINT with value -128 can't be cast as TINYINT "
+               + "because the value is out of range",
+               "InsertTinyint", pk, "x'FfffFfffFfffFf80'");
+   }
+
+   @Test
+   public void testIntegerHexLiteralInsertTinyintConstants() throws Exception {
+       Client client = getClient();
+       int pk = 0;
+
+       client.callProcedure("InsertTinyintConstantMin", pk);
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {-127});
+       ++pk;
+
+       client.callProcedure("InsertTinyintConstantMax", pk);
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {127});
+       ++pk;
+   }
+
+   @Test
+   public void testIntegerHexLiteralUpdateTinyintParams() throws Exception {
+       Client client = getClient();
+       int pk = 37;
+
+       client.callProcedure("InsertTinyint", pk, "x'00'");
+       client.callProcedure("UpdateTinyint", "X'7F'", pk);
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {0x7F});
+
+       client.callProcedure("UpdateTinyint", "X'FfffFfffFfffFf81'", pk);
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {-127});
+
+
+       verifyProcFails(client, "Type BIGINT with value 255 can't be cast as TINYINT "
+               + "because the value is out of range",
+               "UpdateTinyint", "x'FF'", pk);
+
+
+       verifyProcFails(client, "Type BIGINT with value 128 can't be cast as TINYINT "
+               + "because the value is out of range",
+               "UpdateTinyint", "x'80'", pk);
+
+       // -128 fits into a signed byte but is our null value and therefore out of range
+       verifyProcFails(client, "Type BIGINT with value -128 can't be cast as TINYINT "
+               + "because the value is out of range",
+               "UpdateTinyint", "x'FFFFFFFFFFFFFF80'", pk);
+   }
+
+   @Test
+   public void testIntegerHexLiteralUpdateTinyintConstants() throws Exception {
+       Client client = getClient();
+       int pk = 37;
+
+       client.callProcedure("InsertTinyint", pk, "x'3F'");
+       client.callProcedure("UpdateTinyintConstantMin", pk);
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {-127});
+
+       client.callProcedure("UpdateTinyintConstantMax", pk);
+       validateTableOfScalarLongs(client, "select ti from t where pk = " + pk, new long[] {127});
+   }
+
+   @Test
+   public void testIntegerHexLiteralMixedMath() throws Exception {
+       Client client = getClient();
+
+       // Insert one row, so calls below produce just one row.
+       client.callProcedure("InsertBigint", 0, 0);
+
+       for (long val : boringValues) {
+           System.out.println("   ***   " + val);
+           VoltTable vt = client.callProcedure("MixedTypeMath", val, val, val, val)
+                   .getResults()[0];
+           assertTrue(vt.advanceRow());
+           assertEquals(val + 33, vt.getLong(0));
+           assertEquals(val + 33.0, vt.getDouble(1));
+           assertEquals(val + 33, vt.getLong(2));
+           assertEquals(10000000000000000033.0 + val, vt.getDouble(3));
+
+           String hexVal = longToHexLiteral(val);
+
+           vt = client.callProcedure("MixedTypeMath", hexVal, val, hexVal, val)
+                   .getResults()[0];
+           assertTrue(vt.advanceRow());
+           assertEquals(val + 33, vt.getLong(0));
+           assertEquals(val + 33.0, vt.getDouble(1));
+           assertEquals(val + 33, vt.getLong(2));
+           assertEquals(10000000000000000033.0 + val, vt.getDouble(3));
+       }
+
+       // When parameters are typed as double, you can't pass an x-literal to them.
+       verifyProcFails(client, "Unable to convert string X'21' to double value for target parameter",
+               "MixedTypeMath", "X'21'", "X'21'", "X'21'", "X'21'");
+   }
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -159,7 +409,8 @@ public class TestHexLiteralsSuite extends RegressionSuite {
         String literalSchema =
                 "CREATE TABLE T (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
-                + "  BI BIGINT,"
+                + "  BI BIGINT,\n"
+                + "  TI TINYINT,\n"
                 + "  VB VARBINARY(8)\n"
                 + ");\n"
                 ;
@@ -170,11 +421,63 @@ public class TestHexLiteralsSuite extends RegressionSuite {
         literalSchema += "CREATE PROCEDURE InsertBigint AS "
                 + "INSERT INTO T (PK, BI) VALUES (?, ?);";
 
+        literalSchema += "CREATE PROCEDURE InsertTinyint AS "
+                + "INSERT INTO T (PK, TI) VALUES (?, ?);";
+
+        literalSchema += "CREATE PROCEDURE UpdateTinyint AS "
+                + "UPDATE T SET TI = ? WHERE PK = ?;";
+
+        literalSchema += "CREATE PROCEDURE InsertTinyintConstantMax AS "
+                + "INSERT INTO T (PK, TI) VALUES (?, X'7F');";
+
+        literalSchema += "CREATE PROCEDURE InsertTinyintConstantMin aS "
+                + "INSERT INTO T (PK, TI) VALUES (?, X'FfffFfffFfffFf81');";
+
+        literalSchema += "CREATE PROCEDURE UpdateTinyintConstantMax AS "
+                + "UPDATE T SET TI = X'7F' WHERE PK = ?;";
+
+        literalSchema += "CREATE PROCEDURE UpdateTinyintConstantMin AS "
+                + "UPDATE T SET TI = X'FfffFfffFfffFf81' WHERE PK = ?;";
+
+        literalSchema += "CREATE PROCEDURE MixedTypeMath AS \n"
+                + "SELECT\n"
+                + "  33 + ?,\n" //
+                + "  33.0 + ?,\n"
+                + "  X'21' + ?,\n"
+                + "  10000000000000000033 + ?"
+                + "FROM T;"
+                + "";
+
+        for (long val : interestingValues) {
+            literalSchema += "CREATE PROCEDURE XQUOTE_VARBINARY_PROC_" + makeSixteenDigits(val) + " AS\n"
+                    + "  SELECT PK FROM T WHERE VB = " + longToEightByteHexLiteral(val) + ";\n";
+        }
+
+        // Create a bunch of procedures with various embedded literals
+        // in the select list
+        for (long val : interestingValues) {
+            literalSchema += "CREATE PROCEDURE INT_HEX_LITERAL_PROC_" + makeEvenDigits(val) + " AS\n"
+                    + "  SELECT HEX(BITXOR(X'" + makeEvenDigits(val) + "', ?)) FROM T;\n";
+        }
+
         // Create a bunch of procedures with various embedded literals
         // in the where clause
         for (long val : interestingValues) {
-            literalSchema += "CREATE PROCEDURE XQUOTE_VARBINARY_PROC_" + makeSixteenDigits(val) + " AS\n"
-                    + "  SELECT PK FROM T WHERE VB = " + longToHexLiteral(val) + ";\n";
+            literalSchema += "CREATE PROCEDURE INT_HEX_LITERAL_PROC_WHERE_" + makeEvenDigits(val) + " AS\n"
+                    + "  SELECT PK FROM T WHERE BI = X'" + makeEvenDigits(val) + "';\n";
+        }
+
+        // Create a bunch of procedures with various embedded literals
+        // in arithmetic expressions
+        for (long val : boringValues) {
+            literalSchema += "CREATE PROCEDURE HEX_LITERAL_PROC_ARITH_" + makeEvenDigits(val) + " AS\n"
+                    + "  SELECT \n"
+                    + "? + X'" + makeEvenDigits(val) + "',\n"
+                    + "X'" + makeEvenDigits(val) + "' - ?,\n"
+                    + "? * X'" + makeEvenDigits(val) + "',\n"
+                    + "X'" + makeEvenDigits(val) + "' / ?,\n"
+                    + "- X'" + makeEvenDigits(val) + "'\n"
+                    + "FROM T;";
         }
 
         try {
