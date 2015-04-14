@@ -35,7 +35,6 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
 
 
@@ -418,7 +417,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
 
         case FunctionId.FUNC_VOLT_HEX:
-            voltResolveToBigintCompatibleType(0);
+            voltResolveToBigintType(0);
             dataType = Type.SQL_VARCHAR;
             break;
 
