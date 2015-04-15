@@ -405,20 +405,20 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
 
         case FunctionId.FUNC_VOLT_BITNOT:
-            voltResolveToBigintTypesForBitwise();
+            voltResolveToBigintTypesForBitwise(session);
             break;
 
         case FunctionId.FUNC_VOLT_BIT_SHIFT_LEFT:
         case FunctionId.FUNC_VOLT_BIT_SHIFT_RIGHT:
             // the first parameter has to be BigInteger
-            voltResolveToBigintType(0);
-            voltResolveToBigintCompatibleType(1);
+            voltResolveToBigintType(session, 0);
+            voltResolveToBigintCompatibleType(session, 1);
 
             dataType = Type.SQL_BIGINT;
             break;
 
         case FunctionId.FUNC_VOLT_HEX:
-            voltResolveToBigintType(0);
+            voltResolveToBigintType(session, 0);
             dataType = Type.SQL_VARCHAR;
             break;
 

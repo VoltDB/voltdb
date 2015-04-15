@@ -2585,14 +2585,14 @@ public class FunctionSQL extends Expression {
         return FUNC_CURRENT_TIMESTAMP;
     }
 
-    protected void voltResolveToBigintTypesForBitwise() {
+    protected void voltResolveToBigintTypesForBitwise(SessionInterface session) {
         for (int i = 0; i < nodes.length; i++) {
-            voltResolveToBigintType(i);
+            voltResolveToBigintType(session, i);
         }
         dataType = Type.SQL_BIGINT;
     }
 
-    protected void voltResolveToBigintType(int i) {
+    protected void voltResolveToBigintType(SessionInterface session, int i) {
         if (nodes[i].dataType == null) {
             nodes[i].dataType = Type.SQL_BIGINT;
         }
@@ -2601,12 +2601,12 @@ public class FunctionSQL extends Expression {
                 throw Error.error(ErrorCode.X_42561);
             }
             // Only constants are checked here for long type range limits
-            NumberType.checkValueIsInLongLimits(nodes[i].valueData);
+            NumberType.checkValueIsInLongLimits(session, nodes[i].valueData);
             nodes[i].dataType = Type.SQL_BIGINT;
         }
     }
 
-    protected void voltResolveToBigintCompatibleType(int i) {
+    protected void voltResolveToBigintCompatibleType(SessionInterface session, int i) {
         if (nodes[i].dataType == null) {
             nodes[i].dataType = Type.SQL_BIGINT;
         }
@@ -2614,9 +2614,9 @@ public class FunctionSQL extends Expression {
             if (! nodes[i].dataType.isIntegralType()) {
                 throw Error.error(ErrorCode.X_42561);
             }
-            if (nodes[i].valueData != null) {                       // is constants
+            if (nodes[i].valueData != null) {                       // is constant
                 // check constants in range
-                NumberType.checkValueIsInLongLimits(nodes[i].valueData);
+                NumberType.checkValueIsInLongLimits(session, nodes[i].valueData);
                 nodes[i].dataType = Type.SQL_BIGINT;
             }
         }

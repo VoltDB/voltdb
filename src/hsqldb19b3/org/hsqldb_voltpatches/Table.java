@@ -1267,7 +1267,7 @@ public class Table extends TableBase implements SchemaObject {
             }
             newIdx = newIdx.setAssumeUnique(assumeUnique);
             newIdx = newIdx.withPredicate(idx.getPredicate());
-            newidx = newIdx.setAssumeUnique(assumeUnique);
+            newIdx = newIdx.setAssumeUnique(assumeUnique);
             // End of VoltDB extension
             tn.addIndex(session, newIdx);
         }

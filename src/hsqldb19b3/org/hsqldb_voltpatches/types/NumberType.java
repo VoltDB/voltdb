@@ -2116,8 +2116,8 @@ public final class NumberType extends Type {
     }
 
     /************************* Volt DB Extensions *************************/
-    public static void checkValueIsInLongLimits(Object a) {
-        convertToLong(a);
+    public static void checkValueIsInLongLimits(SessionInterface session, Object a) {
+        convertToLong(session, a);
     }
     /**********************************************************************/
 }
