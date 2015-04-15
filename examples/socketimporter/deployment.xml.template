@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster sitesperhost="8" hostcount="1" kfactor="0" schema="ddl"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <import>
+        <configuration bundle="file:__PATH_MARKER__/socketstream.jar" enabled="true">
+            <property name="port">7001</property>
+            <property name="procedure">importTable.insert</property>
+        </configuration>
+    </import>
+</deployment>

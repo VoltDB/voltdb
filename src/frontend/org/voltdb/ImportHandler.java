@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import static org.voltdb.ClientInterface.getPartitionForProcedure;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -133,7 +134,12 @@ public class ImportHandler {
 
     //TODO
     public void hadBackPressure() {
-        //Handle back pressure
+        //Handle back pressure....how to count bytes here?
+    }
+
+    //Do something fancy with this.
+    private ByteBuffer getBuffer(int sz) {
+        return ByteBuffer.allocate(sz);
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
@@ -150,23 +156,24 @@ public class ImportHandler {
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
         //type + procname(len + name) + connectionId (long) + params
         int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
-        ByteBuffer buf = ByteBuffer.allocateDirect(sz);
+        final ByteBuffer taskbuf = getBuffer(sz);
+        final ByteBuffer pbuf = getBuffer(pset.getSerializedSize());
         try {
-            buf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
-            buf.putInt((int )proc.length());
-            buf.put(proc.getBytes());
-            buf.putLong(ImportHandler.m_adapter.connectionId());
-            ByteBuffer pbuf = ByteBuffer.allocateDirect(pset.getSerializedSize());
+            taskbuf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
+            taskbuf.putInt((int )proc.length());
+            taskbuf.put(proc.getBytes());
+            taskbuf.putLong(ImportHandler.m_adapter.connectionId());
             pset.flattenToBuffer(pbuf);
             pbuf.flip();
-            buf.put(pbuf);
-            buf.flip();
-            task.initFromBuffer(buf);
+            taskbuf.put(pbuf);
+            taskbuf.flip();
+            task.initFromBuffer(taskbuf);
             task.setClientHandle(m_adapter.registerCallback(new ImportCallback(ic)));
-
+            pbuf.clear();
         } catch (IOException ex) {
             m_failedCount.incrementAndGet();
             m_logger.error("Failed to serialize parameters for stream: " + proc, ex);
+            taskbuf.clear();
             return false;
         }
 
@@ -178,6 +185,7 @@ public class ImportHandler {
         if (catProc == null) {
             m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
             m_failedCount.incrementAndGet();
+            taskbuf.clear();
             return false;
         }
         final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)catProc.getAttachment();
@@ -190,12 +198,14 @@ public class ImportHandler {
             } catch (Exception e) {
                 m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
                 m_failedCount.incrementAndGet();
+                taskbuf.clear();
                 return false;
             }
             //TODO: this should be property
             if (!m_partitions.contains(partition)) {
                 //Not our partition dont do anything.
                 m_unpartitionedCount.incrementAndGet();
+                taskbuf.clear();
                 return false;
             }
         }
@@ -207,6 +217,7 @@ public class ImportHandler {
         if (success) {
             m_submitSuccessCount.incrementAndGet();
         }
+        taskbuf.clear();
         return success;
     }
 }
