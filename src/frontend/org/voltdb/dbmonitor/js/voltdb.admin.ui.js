@@ -1954,7 +1954,7 @@ function loadAdminPage() {
             $("#btnSaveSecUser").on("click", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
-                var password = $('#txtPassword').val();
+                var password = encodeURIComponent($('#txtPassword').val());
                 var role = $('#selectRole').val();
                 var requestType = "POST";
                 var requestUser = "";
