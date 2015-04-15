@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.util.Map;
 
 public interface NodeDRGateway {
 
@@ -67,4 +68,6 @@ public interface NodeDRGateway {
     public abstract void updateCatalog(final CatalogContext catalog, final int listenPort);
 
     public abstract int getDRClusterId();
+
+    public void truncateDRLogsForRestore(Map<Integer, Long> sequenceNumbers);
 }
