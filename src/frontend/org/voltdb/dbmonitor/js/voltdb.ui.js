@@ -1142,19 +1142,34 @@ var loadPage = function (serverName, portid) {
                 "language": {
                     "zeroRecords": "No data to be displayed"
                 },
-                "fnRowCallback": function () {
-                    //debugger;
-                    //var length = this.fnGetData().length;
-                    //if (length <= this.fnPagingInfo().iLength) {
-                    //    //  $(this).parent().children(".dataTables_paginate").hide();
-                    //}
-                    //  console.log($("#tblDrMAster").find("tbody tr td").first().html());
-                    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
-                        console.log("in");
-                        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
-                    } else {
-                        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                //"fnRowCallback": function () {
+                //    //debugger;
+                //    //var length = this.fnGetData().length;
+                //    //if (length <= this.fnPagingInfo().iLength) {
+                //    //    //  $(this).parent().children(".dataTables_paginate").hide();
+                //    //}
+                //    //  console.log($("#tblDrMAster").find("tbody tr td").first().html());
+                //    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
+                //        console.log("in");
+                //        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                //    } else {
+                //        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                //    }
+
+                //    $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                //},
+                "fnDrawCallback": function () {
+                    var length = this.fnGetData().length;
+                    if (length <= this.fnPagingInfo().iLength) {
+                        $(this).parent().children(".dataTables_paginate").hide();
                     }
+
+                    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                    } else {
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                    }
+
 
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
@@ -1169,7 +1184,6 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
-            $("#tblDrMAster").wrapAll("<div class='tblScroll'>");
             if (!$.isEmptyObject(response)) {
                 $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
             }
@@ -1185,7 +1199,7 @@ var loadPage = function (serverName, portid) {
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
 
-            $(".tblScroll").next().hide();
+            $("#tblDrMAster").next().hide();
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
 
