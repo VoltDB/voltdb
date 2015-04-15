@@ -37,6 +37,8 @@ package exportbenchmark;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.Math;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.InetSocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -59,6 +61,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -69,6 +72,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.types.TimestampType;
 
 /**
  * Asychronously sends data to an export table to test VoltDB export performance.
@@ -153,7 +157,6 @@ public class ExportBenchmark {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (statsPort < 1 || statsPort > 65535) exitWithMessageAndUsage("stats port must be between 1 and 65535");
         }
     }
 
@@ -340,15 +343,21 @@ public class ExportBenchmark {
         // Don't track warmup inserts
         System.out.println("Warming up...");
         long now = System.currentTimeMillis();
+        AtomicLong rowId = new AtomicLong(0);
         while (benchmarkWarmupEndTS > now) {
             try {
-                client.callProcedure(new NullCallback(), "ExportInsert", totalInserts, 1, 53, 64, 2.452, "String", 48932098, "aa");
+                client.callProcedure(
+                        "InsertExport",
+                        rowId.getAndIncrement(),
+                        0);
+                // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
                 }
-            } catch (IOException ignore) {}
+            } catch (Exception ignore) {}
         }
         System.out.println("Warmup complete");
+        rowId.set(0);
 
         // reset the stats after warmup is done
         fullStatsContext.fetchAndResetBaseline();
@@ -361,14 +370,15 @@ public class ExportBenchmark {
         now = System.currentTimeMillis();
         while (benchmarkEndTS > now) {
             try {
-                boolean success = client.callProcedure(new ExportCallback(), "ExportInsert", totalInserts, 1, 53, 64, 2.452, "String", 48932098, "aa");
+                client.callProcedure(
+                        "InsertExport",
+                        rowId.getAndIncrement(),
+                        0);
+                // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
                 }
-                if (!success) {
-                    System.err.println("Stored procedure not queuing");
-                }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 System.err.println("Couldn't insert into VoltDB\n");
                 e.printStackTrace();
                 System.exit(1);
@@ -377,8 +387,8 @@ public class ExportBenchmark {
 
         try {
             client.drain();
-        } catch (IOException ignore) {
-        } catch (InterruptedException ignore) {
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
@@ -455,11 +465,11 @@ public class ExportBenchmark {
             return;
         }
 
-        Integer partitionId = null;
-        Long transactions = null;
-        Long decode = null;
-        Long startTime = null;
-        Long endTime = null;
+        final Integer partitionId;
+        final Long transactions;
+        final Long decode;
+        final Long startTime;
+        final Long endTime;
         try {
             partitionId = new Integer(json.getInt("partitionId"));
             transactions = new Long(json.getLong("transactions"));
@@ -470,6 +480,7 @@ public class ExportBenchmark {
             System.err.println("Unable to parse JSON " + e.getLocalizedMessage());
             return;
         }
+        // This should always be true
         if (transactions > 0 && decode > 0 && startTime > 0 && endTime > startTime) {
             serverStats.add(new StatClass(partitionId, transactions, decode, startTime, endTime));
             if (startTime < serverStartTS || serverStartTS == 0) {
@@ -482,6 +493,11 @@ public class ExportBenchmark {
                 partCount = partitionId;
             }
             decodeTime += decode;
+        }
+        // If the else is called it means we received invalid data from the export client
+        else {
+            System.out.println("WARN: invalid data received - partitionId: " + partitionId + " | transactions: " + transactions + " | decode: " + decode +
+                    " | startTime: " + startTime + " | endTime: " + endTime);
         }
     }
 
@@ -598,6 +614,53 @@ public class ExportBenchmark {
                 stats.kPercentileLatencyAsDouble(0.99999));
     }
 
+    public synchronized Double calcRatio(StatClass index, StatClass indexPrime) {
+        Double ratio = new Double(0);
+        // Check for overlap format:
+        //      |-----index window-----|
+        //   |-----indexPrime window-----|
+        if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
+            ratio = new Double(index.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+            if (ratio <= 0 || ratio > 1) {
+                System.out.println("Bad Ratio 1 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                System.exit(-1);
+            }
+        }
+        // Check for overlap format:
+        //      |-----index window-----|
+        //        |-indexPrime window-|
+        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_startTime >= index.m_startTime) {
+            ratio = new Double(1);
+        }
+        // Check for overlap format:
+        //      |-----index window-----|
+        //            |--indexPrime window--|
+        else if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
+            ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+            if (ratio <= 0 || ratio > 1) {
+                System.out.println("Bad Ratio 2 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                System.exit(-1);
+            }
+        }
+        // Check for overlap format:
+        //      |-----index window-----|
+        // |--indexPrime window--|
+        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
+            ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+            if (ratio <= 0 || ratio > 1) {
+                System.out.println("Bad Ratio 3 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                System.exit(-1);
+            }
+        }
+        return ratio;
+    }
+
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
@@ -616,56 +679,9 @@ public class ExportBenchmark {
                 for (StatClass indexPrime : serverStats) {
                     // If indexPrime is not partition 0 check for window overlap
                     if (!indexPrime.m_partition.equals(0)) {
-                        // Check for overlap format:
-                        //      |-----index window-----|
-                        //   |-----indexPrime window-----|
-                        if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
-                            Double ratio = new Double(index.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-                            if (ratio <= 0 || ratio > 1) {
-                                System.out.println("Bad Ratio 1 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                                System.exit(-1);
-                            }
-                            transactions +=  ratio * indexPrime.m_transactions;
-                            decode += ratio * indexPrime.m_transactions;
-                        }
-                        // Check for overlap format:
-                        //      |-----index window-----|
-                        //        |-indexPrime window-|
-                        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_startTime >= index.m_startTime) {
-                            transactions +=  indexPrime.m_transactions;
-                            decode += indexPrime.m_transactions;
-                        }
-                        // Check for overlap format:
-                        //      |-----index window-----|
-                        //            |--indexPrime window--|
-                        else if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
-                            Double ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-                            if (ratio <= 0 || ratio > 1) {
-                                System.out.println("Bad Ratio 2 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                                System.exit(-1);
-                            }
-                            transactions +=  ratio * indexPrime.m_transactions;
-                            decode += ratio * indexPrime.m_transactions;
-                        }
-                        // Check for overlap format:
-                        //      |-----index window-----|
-                        // |--indexPrime window--|
-                        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
-                            Double ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
-                            if (ratio <= 0 || ratio > 1) {
-                                System.out.println("Bad Ratio 3 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
-                                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
-                                        " || indexPrime.startTime: " + indexPrime.m_startTime);
-                                System.exit(-1);
-                            }
-                            transactions +=  ratio * indexPrime.m_transactions;
-                            decode += ratio * indexPrime.m_transactions;
-                        }
-
+                        Double ratio = calcRatio(index, indexPrime);
+                        transactions +=  ratio * indexPrime.m_transactions;
+                        decode += ratio * indexPrime.m_transactions;
                     }
                 }
                 indexStats.add(new StatClass(index.m_partition, transactions.longValue(), decode.longValue(), index.m_startTime, index.m_endTime));
@@ -748,8 +764,8 @@ public class ExportBenchmark {
         try {
             ExportBenchmark bench = new ExportBenchmark(config);
             bench.runTest();
-        } catch (InterruptedException ignore) {
-            // Shouldn't get this
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 }

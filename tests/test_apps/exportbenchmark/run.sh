@@ -74,7 +74,8 @@ function build_deployment_file() {
 function srccompile() {
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-        src/exportbenchmark/*.java 
+        src/exportbenchmark/*.java \
+        src/exportbenchmark/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
     (cd obj && jar cvf ExportBenchmark.jar exportbenchmark/*)
@@ -101,6 +102,12 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     FR_TEMP=/tmp/${USER}/fr
     mkdir -p ${FR_TEMP}
+    # Set up flight recorder options
+    VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
+    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
+    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
+    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:FlightRecorderOptions=maxage=1d,defaultrecording=true,disk=true,repository=${FR_TEMP},threadbuffersize=128k,globalbuffersize=32m"
+    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
     # truncate the voltdb log
     [[ -d log && -w log ]] && > log/volt.log
     # run the server
