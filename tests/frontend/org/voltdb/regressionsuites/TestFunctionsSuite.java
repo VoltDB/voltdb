@@ -3297,19 +3297,31 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableColumnOfScalarVarchar(result, new String[]{"ABCabc123ABC"});
     }
 
-    private void bitwiseFunctionChecker(long pk, long bignum, long in) throws IOException, ProcCallException {
-        VoltTable vt;
-        Client client = getClient();
-        client.callProcedure("@AdHoc", String.format("insert into NUMBER_TYPES(INTEGERNUM, bignum) values(%d,%d);", pk, bignum));
+    private static String longToHexLiteral(long val) {
+        return "x'" + Long.toHexString(val) + "'";
+    }
 
-        vt = client.callProcedure("BITWISE_AND_OR_XOR", in, in, in, pk).getResults()[0];
-
+    private void validateBitwiseAndOrXor(VoltTable vt, long bignum, long in) {
         if (bignum == Long.MIN_VALUE || in == Long.MIN_VALUE) {
             // Long.MIN_VALUE is NULL for VoltDB, following the rule null in, null out
             validateRowOfLongs(vt, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE});
         } else {
             validateRowOfLongs(vt, new long[]{bignum & in, bignum | in, bignum ^ in});
         }
+    }
+
+    private void bitwiseFunctionChecker(long pk, long bignum, long in) throws IOException, ProcCallException {
+        VoltTable vt;
+        Client client = getClient();
+        client.callProcedure("@AdHoc", String.format("insert into NUMBER_TYPES(INTEGERNUM, bignum) values(%d,%d);", pk, bignum));
+
+        vt = client.callProcedure("BITWISE_AND_OR_XOR", in, in, in, pk).getResults()[0];
+        validateBitwiseAndOrXor(vt, bignum, in);
+
+        // Try again using x'...' syntax
+        String hexIn = longToHexLiteral(in);
+        vt = client.callProcedure("BITWISE_AND_OR_XOR", hexIn, hexIn, hexIn, pk).getResults()[0];
+        validateBitwiseAndOrXor(vt, bignum, in);
     }
 
     public void testBitwiseFunction_AND_OR_XOR() throws IOException, ProcCallException {

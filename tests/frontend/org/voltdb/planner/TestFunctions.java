@@ -91,7 +91,7 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE, FLOAT_TYPE) from bit", errorMsg);
 
         failToCompile("select hex(FLOAT_TYPE) from bit;", errorMsg);
-        compile("select hex(INTEGER_TYPE) from bit;");
+        failToCompile("select hex(INTEGER_TYPE) from bit;", errorMsg);
 
         // compile on constants
         compile("select BIT_SHIFT_LEFT(3, tinyint_type), BIT_SHIFT_RIGHT(3, tinyint_type) from bit");

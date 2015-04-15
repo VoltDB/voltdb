@@ -22,10 +22,8 @@
 namespace voltdb {
 
 template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
-
     if (getValueType() != VALUE_TYPE_BIGINT) {
-        // The parser should enforce this for us,
-        // but just in case...
+        // The parser should enforce this for us, but just in case...
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BITNOT function");
     }
 
@@ -44,10 +42,15 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_BITNOT>() const {
 }
 
 template<> inline NValue NValue::callUnary<FUNC_VOLT_HEX>() const {
+    if (getValueType() != VALUE_TYPE_BIGINT) {
+        // The parser should enforce this for us, but just in case...
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL HEX function");
+    }
+
     if (isNull()) {
         return getNullStringValue();
     }
-    int64_t inputDecimal = castAsBigIntAndGetValue();
+    int64_t inputDecimal = getBigInt();
 
     std::stringstream ss;
     ss << std::hex << std::uppercase << inputDecimal; // decimal_value
