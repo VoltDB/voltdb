@@ -172,6 +172,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         partitiongraphminutmin		    { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         partitiongraphminutmax 	 	    { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
         partitionstatus			        { $("#visualisationPartitionIdleTime > g > g > g.nv-y.nv-axis > g > g:nth-child(1) > g:nth-child(2) > text")}
+
         localpartition			        { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(1)")}
         clusterwide			            { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(2)")}
         multipartition			        { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(3)")}
