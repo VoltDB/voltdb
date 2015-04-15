@@ -1575,7 +1575,7 @@ function loadAdminPage() {
                 '<tr id="Tr1">' +
                 '    <td>Stream</td>' +
                 '    <td width="15%">' +
-                '       <input id="txtStream" name="txtStream" type="text" size="35">' +
+                '       <input id="txtStream" name="txtStream" type="text" size="38">' +
                 '       <label id="errorStream" for="txtStream" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td width="8%" align="right"><input type="checkbox" checked="true" id="chkStream" class="chkStream"/></td>' +
@@ -1584,7 +1584,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td>Type </td>' +
                 '    <td>' +
-                '       <input id="txtType" name="txtType" type="text" size="35">' +
+                '       <input id="txtType" name="txtType" type="text" size="38">' +
                 '       <label id="errorType" for="txtType" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
