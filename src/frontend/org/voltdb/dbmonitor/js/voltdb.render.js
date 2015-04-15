@@ -2045,8 +2045,12 @@ function alertNodeClicked(obj) {
         };
         //
 
+
+
+
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
+           
             var colIndex = {};
             var colIndex2 = {};
             var counter = 0;
