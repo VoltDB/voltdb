@@ -1814,7 +1814,6 @@ class DbMonitorTest extends TestBase {
             println("Orange partition displayed as: " +page.multipartition.text())}
         else {println("No server legends are visible")}
 
-
     }
 
     def cleanupSpec() {
