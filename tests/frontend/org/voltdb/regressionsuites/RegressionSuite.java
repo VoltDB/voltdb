@@ -585,14 +585,14 @@ public class RegressionSuite extends TestCase {
         assertTrue(found);
     }
 
-    static public void checkQueryPlan(Client client, String query, String...params) throws Exception {
+    static public void checkQueryPlan(Client client, String query, String...patterns) throws Exception {
         VoltTable vt;
-        assert(params.length >= 1);
+        assert(patterns.length >= 1);
 
         vt = client.callProcedure("@Explain", query).getResults()[0];
         String vtStr = vt.toString();
-        for (int i = 1; i < params.length; i++) {
-            String pattern = params[i];
+
+        for (String pattern : patterns) {
             assertTrue(vtStr.contains(pattern));
         }
     }
