@@ -146,7 +146,7 @@ def sort(rows, sorted_cols):
 
     begin = 0
     prev = None
-    unsorteds = lambda x: project_unsorted(sorted_cols, x)
+    unsorteds = lambda row: project_unsorted(row, sorted_cols)
 
     for i in xrange(len(rows)):
         tmp = project_sorted(rows[i], sorted_cols)
