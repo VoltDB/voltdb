@@ -442,7 +442,13 @@ public class RegressionSuite extends TestCase {
         int len = expected.length;
         for (int i=0; i < len; i++) {
             assertTrue(vt.advanceRow());
-            assertEquals(expected[i], vt.getString(col));
+            if (expected[i] == null) {
+                String actual = vt.getString(col);
+                assertTrue(vt.wasNull());
+                assertEquals(null, actual);
+            } else {
+                assertEquals(expected[i], vt.getString(col));
+            }
         }
     }
 

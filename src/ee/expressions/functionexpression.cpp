@@ -328,6 +328,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_ARRAY_LENGTH:
             ret = new UnaryFunctionExpression<FUNC_VOLT_ARRAY_LENGTH>((*arguments)[0]);
             break;
+        case FUNC_VOLT_BITNOT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_BITNOT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_HEX:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_HEX>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
@@ -338,6 +344,15 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     } else {
         // GeneralFunctions defer deleting the arguments container until through with it.
         switch(functionId) {
+        case FUNC_BITAND:
+            ret = new GeneralFunctionExpression<FUNC_BITAND>(*arguments);
+            break;
+        case FUNC_BITOR:
+            ret = new GeneralFunctionExpression<FUNC_BITOR>(*arguments);
+            break;
+        case FUNC_BITXOR:
+            ret = new GeneralFunctionExpression<FUNC_BITXOR>(*arguments);
+            break;
         case FUNC_CONCAT:
             ret = new GeneralFunctionExpression<FUNC_CONCAT>(*arguments);
             break;
@@ -374,6 +389,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
             break;
+        case FUNC_VOLT_BIT_SHIFT_LEFT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_LEFT>(*arguments);
+            break;
+        case FUNC_VOLT_BIT_SHIFT_RIGHT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_RIGHT>(*arguments);
+            break;
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
             break;
@@ -398,4 +419,3 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
 }
 
 }
-
