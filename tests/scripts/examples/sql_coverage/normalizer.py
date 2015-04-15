@@ -52,18 +52,19 @@ def safecmp(x, y):
         return 1
     # recurse on lists -- just like cmp does,
     # again, to avoid a TypeError,
-    # this is for the most common case, when the None value and datetime are
-    # members of lists.
-    # cmp also recurses into Tuples, but, so far, that is not required.
+    # this is for the most common local use case,
+    # when the None value and datetime are members of lists.
+    # cmp also recurses into Tuples, but, so far, that is not required, locally.
     # cmp also supports comparison of lists with scalars, treating the scalar
-    # as a singleton list, but, so far, that is not required.
-    if isinstanceof(x, types.ListType) and isinstanceof(y, types.ListType):
+    # as a singleton list, but, so far, that is not required, either.
+    if isinstance(x, types.ListType) and isinstance(y, types.ListType):
         for (xn, yn) in zip(x, y):
             rn = safecmp(xn, yn)
             if rn:
-                return rn // return first difference
-        # all elements the same, return 0
-        # unless one list is longer, but even that is not an expected use case
+                return rn  # return first difference
+        # With all elements the same, return 0
+        # unless one list is longer, but even that is not an expected local
+        # use case
         return cmp(len(x), len(y))
     return cmp(x, y)
 

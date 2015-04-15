@@ -233,6 +233,21 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     if "normalizer" in config:
         normalize = imp.load_source("normalizer", config["normalizer"]).normalize
         # print "DEBUG: using normalizer ", config["normalizer"], " for ", template
+        self_check_safecmp = imp.load_source("normalizer", config["normalizer"]).safecmp
+        theNow = datetime.datetime.now()
+        if self_check_safecmp(theNow, theNow) != 0:
+             print >> sys.stderr, "safe_cmp fails datetime selfcheck"
+             exit(2)
+        if self_check_safecmp([theNow], [theNow]) != 0:
+             print >> sys.stderr, "safe_cmp fails [datetime] selfcheck"
+             exit(2)
+        if self_check_safecmp([None], [None]) != 0:
+             print >> sys.stderr, "safe_cmp fails [None] selfcheck"
+             exit(2)
+        if self_check_safecmp([theNow], [None]) <= 0:
+             print >> sys.stderr, "safe_cmp fails [datetime], [None] selfcheck"
+             exit(2)
+
     else:
         normalize = lambda x, y: x
         # print "DEBUG: using no normalizer for ", template
