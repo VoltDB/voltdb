@@ -114,7 +114,7 @@
 						    $('body').css("height", $(window).height());
 							$('body').css("overflow", "hidden");
 							$('body').css("position", "fixed");
-							$('body').css("overflow-y", "scroll");
+							//$('body').css("overflow-y", "scroll");
 							$('body').css("width", "100%");
 							//$('body').bind('touchmove', function(e){e.preventDefault()});//mobile
 							// Call the open callback
@@ -380,7 +380,7 @@
 				}
 
 			}
-
+		    
 			// If we're not open already
 			if( $back === undefined ) {
 				// Create back and fade in
@@ -657,7 +657,6 @@
 		 * @return {Object}
 		 */
 		p.close = function(){
-
 			p.o.beforeClose.call(p);
 
 			// If we got some inline content, cache it
@@ -722,7 +721,8 @@
 			var $popupPlaceholder = $('.'+p.o.popupPlaceholderClass);
 
 			// If we got inline content
-			// put it back
+		    // put it back
+		    
 			if(
 				type == 'inline' &&
 				$popupPlaceholder.length

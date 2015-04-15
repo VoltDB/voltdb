@@ -3456,11 +3456,13 @@ public class ParserDDL extends ParserRoutine {
 
         // A VoltDB extension to support indexed expressions and the assume unique attribute
         java.util.List<Boolean> ascDesc = new java.util.ArrayList<Boolean>();
-        // A VoltDB extension to "readColumnList(table, true)" to support indexed expressions.
         java.util.List<Expression> indexExprs = XreadExpressions(ascDesc);
+        Expression predicate = null;
+        if (readIfThis(Tokens.WHERE)) {
+            predicate = XreadBooleanValueExpression();
+        }
         OrderedHashSet set = voltGetSimpleColumnNames(indexExprs);
         if (set == null) {
-            // A VoltDB extension to support indexed expressions.
             // Not just indexing columns.
             // The meaning of set and indexColumns shifts here to be
             // the set of unique base columns for the indexed expressions.
@@ -3474,16 +3476,17 @@ public class ParserDDL extends ParserRoutine {
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
             table, indexColumns, indexHsqlName, Boolean.valueOf(unique),
-            indexExprs, Boolean.valueOf(assumeUnique),
-        /* disable 4 lines ...
+            indexExprs, Boolean.valueOf(assumeUnique), predicate, qualifiers
+        };
+        /* disable 6 lines ...
         int[]    indexColumns = readColumnList(table, true);
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
             table, indexColumns, indexHsqlName, Boolean.valueOf(unique),
-        ... disabled 4 lines */
-        // End of VoltDB extension
             qualifiers
         };
+        ... disabled 6 lines */
+        // End of VoltDB extension
 
         return new StatementSchema(sql, StatementTypes.CREATE_INDEX, args,
                                    null, new HsqlName[] {

@@ -23,6 +23,11 @@
 
 package org.voltdb.parser;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +37,7 @@ import org.junit.Test;
 import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -544,4 +550,100 @@ public class TestSQLParser extends TestCase {
                 expected, parsedString);
     }
 
+    // Add an entry to the procedures map for a function with the given
+    // signature
+    private void addToProcsMap(Map<String, Map<Integer, List<String>>> procs, String procName, String... paramTypes) {
+        Map<Integer, List<String>> signatures = new HashMap<>();
+        List<String> paramTypesList = new ArrayList<>();
+
+        for (String paramType : paramTypes) {
+            paramTypesList.add(paramType);
+        }
+
+        signatures.put(paramTypesList.size(), paramTypesList);
+
+        procs.put(procName, signatures);
+    }
+
+    private void assertParamsParseAs(
+            Map<String, Map<Integer, List<String>>> procs,
+            Object[] expectedParams,
+            String execCommand) {
+        ExecuteCallResults results = SQLParser.parseExecuteCall(execCommand, procs);
+        Object[] actualParams = results.getParameterObjects();
+
+        int numActualParams = actualParams.length;
+        assertEquals("SQLParser produced wrong number of parameters",
+                expectedParams.length, numActualParams);
+
+        for (int i = 0; i < numActualParams; ++i) {
+            if (expectedParams[i] instanceof byte[]) {
+                // byte[] doesn't override equals and just compares references.
+                // Need to use Arrays.equals instead here.
+                assertTrue(actualParams[i] instanceof byte[]);
+
+                byte[] expectedByteArray = (byte[])expectedParams[i];
+                byte[] actualByteArray = (byte[])actualParams[i];
+
+                assertTrue(Arrays.equals(expectedByteArray, actualByteArray));
+            }
+            else {
+                assertEquals(expectedParams[i], actualParams[i]);
+            }
+        }
+    }
+
+    private static void assertParamParsingFails(
+            Map<String, Map<Integer, List<String>>> procs,
+            String expectedMessage,
+            String execCommand) {
+
+        try {
+            ExecuteCallResults results = SQLParser.parseExecuteCall(execCommand, procs);
+            results.getParameterObjects();
+        }
+        catch (Exception exc) {
+            assertTrue("Expected parsing to fail with message '"
+                    + expectedMessage + "', but instead it failed with '"
+                    + exc.getMessage() + "'.",
+                    exc.getMessage().contains(expectedMessage));
+            return;
+        }
+
+        fail("Expected parsing to fail with message '"
+                + expectedMessage + "', but it didn't fail.");
+    }
+
+    @Test
+    public void testExecHexLiteralParamsBigint() {
+
+        Map<String, Map<Integer, List<String>>> procs = new HashMap<>();
+        addToProcsMap(procs, "myProc_bi", "bigint");
+
+        assertParamsParseAs(procs,
+                new Object[] {Long.parseLong("deadbeef", 16)},
+                "exec myProc_bi x'deadbeef'");
+
+        assertParamsParseAs(procs,
+                new Long[] {-1L},
+                "exec myProc_bi x'ffffffffffffffff'");
+
+        assertParamsParseAs(procs,
+                new Long[] {-16L},
+                "exec myProc_bi x'fffffffffffffff0'");
+
+        // a minus sign isn't allowed to indicate negative values.
+        assertParamParsingFails(procs,
+                "Expected a long numeric value, got 'x'-10''",
+                "exec myProc_bi x'-10'");
+
+        assertParamParsingFails(procs,
+                "Zero hexadecimal digits is invalid for BIGINT value",
+                "exec myProc_bi x''");
+
+        assertParamParsingFails(procs,
+                "Too many hexadecimal digits for BIGINT value",
+                "exec myProc_bi x'ffffffffffffffff0'");
+
+    }
 }

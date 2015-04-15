@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+﻿<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>VoltDB Management Center</title>
@@ -11,9 +11,9 @@
     <link href="css/resources/aero.css" rel="stylesheet" />
     <link href="css/resources/nv.d3.css" rel="stylesheet" />
     <link href="css/resources/tablesorter.css" rel="stylesheet" />
-    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled="disabled" rel="stylesheet">
-    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled" rel="stylesheet">
+    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
+    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
+    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
@@ -37,6 +37,7 @@
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
+
 </head>
 <body>
     <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
@@ -64,7 +65,7 @@
                 <div class="headRight">
                     <ul class="topRightList" id="userSection">
                         <li><a href="#logoutPopup" id="btnlogOut">
-                            <div class="userN"></div>
+                            <div class="userN" title=""></div>
                         </a></li>
                         <li><a href="#logoutPopup" id="logOut">
                             <div class="user" title="Log Out"></div>
@@ -77,6 +78,11 @@
                 <div class="clear"></div>
             </div>
             <div class="contents">
+                <!-- Loading -->
+                <div id="overlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
                 <div class="container" id="containerMain">
                     <div class="clusterDetailsWrapper" id="clusterDetails">
                         <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
@@ -177,6 +183,26 @@
                                 </div>
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
                             </div>
+                              <div id="chartPartitionIdleTime" class="chart left">
+                                  <div class="chartHeader">
+                                      <h1>Partition Idle Time</h1>
+                                  </div>
+                                  <div class="legend" style="display:none;">
+                                   <ul>
+                                       <li><div class="dotGray"></div>Local partitions </li>
+                                       <li><div class="dotBlue"></div>Cluster-wide Maximum /  Minimum</li>
+                                       <!--<li><div class="dotBlue"></div>Cluster-wide Minimum</li>-->
+                                       <li><div class="dotOrange"></div>Multi-partition</li>
+                                   </ul>
+                                  </div>
+                              <svg id="visualisationPartitionIdleTime" class="partitionHeight"></svg>
+                            </div>
+                            <div id="" class="chart right" style="display: none;">
+                                <div class="chartHeader">
+                                    <h1>Data replicated over time </h1>
+                                </div>
+                                <svg id="" width="100%" height="400"></svg>
+                            </div>
                             <div class="clear"></div>
                         </div>
                     </div>
@@ -262,6 +288,12 @@
             <!--Admin-->
 
             <div id="admin" class="container contents">
+                <!-- Loading -->
+                <div id="adminActionOverlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
+
                 <div class="adminWrapper">
                     <div class="adminLeft">
                         <h1 class="headText clusterIcon">Cluster</h1>
@@ -340,8 +372,10 @@
                                     <td id="partitionDetectionLabel"></td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="security" id="securityRow">
-                                    <td class="configLabel">Security</td>
+                                <!--<tr class="security" id="securityRow">
+                                    <td class="configLabel">Security</td>-->
+                                <tr class="hasSubLabel parent security" id="row-6">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Security</a></td>
                                     <td align="right" class="securitytd">
                                         <div id="securityOptionIcon" class="offIcon"></div>
                                         <input type="checkbox" id="chkSecurity" class="chkSecurity" />
@@ -353,6 +387,39 @@
                                         <a id="btnEditSecurityCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
                                         <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
+
+                                <tr class="child-row-6 subLabelRow">
+                                    <td colspan="4">
+                                        <div id="loadingUserList" class="userSecurity" style="display: none;">
+                                            <div class="loading-small loadingSecurity" ></div>
+                                        </div>
+                                        <div class="securWrapper" id="UsersList">
+                                           <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                                <tr>
+                                                    <th>Username</th>
+                                                    <th>Password</th>
+                                                    <th>Role</th>
+                                                </tr>
+                                                <tr>
+                                                    <td>Test</td>
+                                                    <td>Test</td>
+                                                    <td>User</td>
+                                                </tr>
+                                            </table>-->
+                                        </div>
+                                        <div class="securWrapper" id="UsersListEditable" style="display: none;">
+                                            <div class="userName">Users</div>
+                                            <div class="editBtn"><a href="javascript:void(0)" class="btnEd" id="addmorePOIbutton" onclick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
+                                            <div class="clear secLine"></div>
+                                            <form id="frmUserList" method="get" action="">
+                                                <div id="editUserList">
+                                                    
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+
                                 <tr class="hasSubLabel parent" id="row-1">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">HTTP Access</a></td>
                                     <td align="right">
@@ -459,15 +526,17 @@
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
                                 </tr>
                                 <tr class="hasSubLabel parent" id="row-4">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
                                     <td align="right"></td>
-                                    <td></td>
                                     <td>&nbsp;</td>
+                                    <td><a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>
+                                        <div id="loadingConfiguration" class="loading-small loadExport" style="display: none"></div>
+                                        <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
+                                    </td>
                                 </tr>
-                                <tbody id="exportConfiguration" style="display: none;">
+                                <tbody id="exportConfiguration" data-status="value" style="display: none;">
                                 </tbody>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
@@ -536,33 +605,45 @@
                             <div class="headerAdminContent">
                                 <h1>Network Interfaces</h1>
                             </div>
-
-                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
-                                <tr>
-                                    <td width="76%">Client Port</td>
-                                    <td id="clientport" width="24%"></td>
-                                </tr>
-                                <tr>
-                                    <td>Admin Port</td>
-                                    <td id="adminport"></td>
-                                </tr>
-                                <tr>
-                                    <td>HTTP Port</td>
-                                    <td id="httpport"></td>
-                                </tr>
-                                <tr>
-                                    <td>Internal Port</td>
-                                    <td id="internalPort"></td>
-                                </tr>
-                                <tr>
-                                    <td>Zookeeper Port</td>
-                                    <td id="zookeeperPort"></td>
-                                </tr>
-                                <tr>
-                                    <td>Replication Port</td>
-                                    <td id="replicationPort"></td>
-                                </tr>
-                            </table>
+                            <div style="overflow: auto">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
+                                    <tr>
+                                        <th width="30%">Port Name</th>
+                                        <th width="45%" id="hServerSettings">Server Settings</th>
+                                        <th width="25%">Cluster Settings</th>
+                                    </tr>
+                                    <tr>
+                                        <td>Client Port</td>
+                                        <td id="clientport"></td>
+                                        <td id="clusterClientport"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Admin Port</td>
+                                        <td id="adminport"></td>
+                                        <td id="clusterAdminport"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>HTTP Port</td>
+                                        <td id="httpport"></td>
+                                        <td id="clusterHttpport"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Internal Port</td>
+                                        <td id="internalPort"></td>
+                                        <td id="clusterInternalPort"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Zookeeper Port</td>
+                                        <td id="zookeeperPort"></td>
+                                        <td id="clusterZookeeperPort"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Replication Port</td>
+                                        <td id="replicationPort"></td>
+                                        <td id="clusterReplicationPort"></td>
+                                    </tr>
+                                </table>
+                            </div>
                         </div>
                         <div class="adminDirectories">
                             <div class="headerAdminContent">
@@ -599,15 +680,21 @@
             </div>
 
             <!--Schema Tab-->
-            <div id="schema" class="contents"></div>
-
+            <div id="schema" class="contents">
+            </div>
             <!--Sql Query Tab-->
             <div id="sqlQuery" class="containerStudio contents">
                 <div class="blockWrapper" id="BlockContainer01">
                     <div class="objectExplorer">
+                        <!-- Loading -->
+                        <div id="sqlQueryOverlay" style="display: none;">
+                            <div class="loading-medium"></div>
+                        </div>
+                        <!-- Loading -->
                         <div class="explorer">
                             <!--tab-->
                             <div class="tabContant" id="tabMain">
+                                <button class="refreshBtn">Refresh</button>
                                 <ul class="tabs">
                                     <li><a href="#tab1">Tables</a></li>
                                     <li><a href="#tab2">Views</a></li>
@@ -616,7 +703,8 @@
                                 <div class="tab_container">
                                     <div id="tabScroller">
                                         <div id="tab1" class="tab_content">
-                                            <div id="accordionTable"></div>
+                                            <div id="accordionTable">
+                                            </div>
                                         </div>
                                         <div id="tab2" class="tab_content">
                                             <div id="accordionViews"></div>
@@ -694,7 +782,10 @@
           <input type="checkbox" id="ClusterLatency" name="" value="latency" checked="checked" />
                     </li>
                     <li class="pref-graph">Cluster Transactions
-          <input type="checkbox" id="ClusterTransactions" name="" value="transaction" checked="checked" />
+                        <input type="checkbox" id="ClusterTransactions" name="" value="transaction" checked="checked" />
+                    </li>
+                    <li class="pref-graph">Partition Idle Time
+          <input type="checkbox" id="PartitionIdleTime" name="" value="transaction" checked="checked" />
                     </li>
                     <li class="pref-storedProc">Stored Procedures
           <input type="checkbox" id="StoredProcedures" name="" value="stored_proc" checked="checked" />
@@ -766,7 +857,7 @@
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
-                <p>Lost connection to Database. Please click ok when the database is back online. </p>
+                <p>Lost connection to DB Monitor service. Please click ok when the server is back online. </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnConOk">Ok</a></div>
             </div>
@@ -783,7 +874,7 @@
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
-                <p>Database has been shutdown. Please click ok when the server is back online. </p>
+                <p>DB Monitor service has been shutdown. Please click ok when the server is back online. </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnServerShutdownOk">Ok</a></div>
             </div>
@@ -801,7 +892,7 @@
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
                 <p>
-                    Could not establish connection to Database. The service is either down, very slow to respond or the server refused connection.
+                    Could not establish connection to DB Monitor service. The service is either down, very slow to respond or the server refused connection.
         Please click ok when the server is back online.
                 </p>
                 <br />
@@ -818,7 +909,7 @@
         <div class="overlay-contentHelp">
             <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
             <div class="VDBMonitorHelp" id="VDBMonHelp">
-                <p>The <span class="helpStyleTitle">VoltDB Management Center </span> lets you track the performance and health of your cluster. The monitor is divided into three parts: </p>
+                <p>The <span class="helpStyleTitle">VoltDB Management Center DB Monitor</span> lets you track the performance and health of your cluster. The monitor is divided into three parts: </p>
                 <ul class="helpList">
                     <li>Cluster health at-a-glance</li>
                     <li>Performance Graphs</li>
@@ -842,7 +933,7 @@
                 <h2 class="help">Additional Controls</h2>
                 <p>To quckly hide or show either the graphs or the charts, you can click on the "Show/Hide" triangle above each section. You can also choose to display or hide specific charts and graphs using the <span class="helpStyleButton">Display&nbsp;Preference</span> button above the graphs. Clear the checkbox next to the graphs and/or charts you want to hide and press "Save". This setting is saved as a browser cookie so will be retained across sessions. </p>
             </div>
-            <div class="VDBAdminHelp" id="VDBAdmHelp" style="display: none;">
+            <div class="VDBMonitorHelp" id="VDBAdmHelp" style="display: none;">
                 <p>The <span class="helpStyleTitle">VoltDB Management Center Admin</span> lets authorized users perform 
                 administrative functions on the cluster. Supported tasks include pausing and resuming the database, 
                 saving and restoring snapshots, as well as reviewing and editing the database configuration.
@@ -1009,7 +1100,7 @@
         <div class="overlay-title icon-alert">Auto Snapshots</div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight">
-            <p class="txt-bold">Do you want to save the value(s)?</p>
+            <p class="txt-bold">Do you want to save the value?</p>
         </div>
         <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray">Cancel</a></div>
     </div>
@@ -1034,7 +1125,7 @@
         </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
-            <p>Security settings has been changed. You no longer have permission to view Admin Tab.</p>
+            <p id="loginWarningPopupMsg">Security settings has been changed. You no longer have permission to view this page.</p>
             <br />
             <div class="overlay-btns"><a class="btn" id="btnLoginWarningOk">Ok</a></div>
         </div>
@@ -1248,6 +1339,27 @@
         </div>
     </div>
     <!--Update error Popup-->
+    
+    <!--Update error Security User-->
+    <div style="display: none"><a href="#securityUserErrorPopup" id="sercurityUserPopupLink">Update Error</a></div>
+    <div id="securityUserErrorPopup" style="display: none">
+        <div id="securityUserInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                   <span id="securityUserErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSecurityUserErrorOk">Ok</a></div>
+
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
 
     <!-- POPUP StopServerErrorPopup-->
     <div id="divStopServerError" style="display: none;">
@@ -1260,26 +1372,101 @@
     </div>
 
     <!-- POPUP StopServerErrorPopup-->
+    
+    <!--Add Configuration Popup-->
+    <div id="addConfigPopup" style="display: none">
+        <div id="addConfigInnerPopup">
+            
+            <div class="overlay-title icon-alert">
+                <div id="addConfigHeader" class="addConfigHeader">Add Configuration</div>
+                <div id="deleteAddConfig" class="deleteAddConfig "><a href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
 
+            <div id="addConfigControls">
+                <div class="clear"></div>
+                <form id="formAddConfiguration" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddConfigSave" class="btn">Save</a> <a id="btnAddConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
 
+            <div id="saveConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveConfigText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
 
-    <!-- Loading -->
-    <div id="overlay" style="display: none;">
-        <div class="loading"></div>
+        </div>
     </div>
-    <!-- Loading -->
+    <!--Add Configuration Popup-->
 
-
-    <!-- Loading -->
-    <div id="adminActionOverlay" style="display: none;">
-        <div class="loading"></div>
+    <!-- Query error because of Paused Database Popup-->
+    <div style="display: none"><a href="#queryDatabasePausedErrorPopup" id="queryDatabasePausedErrorPopupLink">Query Error</a></div>
+    <div id="queryDatabasePausedErrorPopup" style="display: none">
+        <div id="queryDatabasePausedInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Query Execution Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorQueryDbPause">
+                <p>
+                    The query could not be executed because the database is Paused. You can run the query by switching to admin port. 
+                </p>
+                <p>&nbsp;</p>
+                <p>
+                    <span style="font-weight: bold">Do you want to switch to admin port?</span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryDatabasePausedErrorOk">Ok</a> <a id="btnQueryDatabasePausedErrorCancel" class="btn btn-gray closeBtn">Cancel</a></div>
+            </div>
+        </div>
     </div>
-    <!-- Loading -->
+    <!-- Query error because of Paused Database Popup-->
+    
+    <a href="#addUserPopup" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
+    <div id="addUserPopup" style="display: none">
+        <div id="addUserInnerPopup" data-isupdate="" data-username="" data-role="">
+            
+            <div class="overlay-title icon-alert">
+                <div id="addUserHeader" class="addConfigHeader">Add User</div>
+                <div id="deleteUser" class="deleteAddConfig"><a id="deleteSecUser" href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this User</a></div>
+                <div class="clear"></div>
+            </div>
+
+            <div id="addUserControl">
+                <div class="clear"></div>
+                <form id="frmAddUser" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addUserWrapper" class="editUserWrapper">
+                        
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnSaveUser" class="btn">Save</a> <a id="btnCancelUser" class="btn btn-gray">Cancel</a></div>
+            </div>
+
+            <div id="saveUserControl" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span id="userSaveDelete" data-status=""></span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveSecUser" class="btn closeBtn">Yes</a> <a id="btnCancelSaveSecUser" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+
+        </div>
+    </div>
+    
 
     <!-- Placed at the end of the document so the pages load faster -->
-    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
+    <script src="js/bootstrap.js"></script>
+    <script src="js/jquery.tablesorter.js"></script>
+    <script src="js/jquery.tablesorter.widgets.js"></script>
     <!-- Placed at the end of the document so the pages load faster -->
+    <!--ToDo-->
+    <!--'tablesorter.widgets.js' has a small but important fix which is not present in the one in assets.voltdb.com in the current version-->
+    <!--Therefore we have used the local copy of .js file that contains the fix for <JIRA Issue> feature implementation. Later the fix needed to ammended in remote copy as well-->
+    <!--Otherwise the fix can also be found in the latest github version of tablesorter plugin online-->
 </body>
 </html>

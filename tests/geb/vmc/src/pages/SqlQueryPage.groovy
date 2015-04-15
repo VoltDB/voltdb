@@ -50,6 +50,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         userStoredProcs { defaultStoredProcsHeader.nextAll('h3') }
         allStoredProcs  { storedProcs.find('h3') }
 
+        queryStatus			{ $("th", text:"STATUS") }
+
         // Query elements
         queryInput  { $('#theQueryText') }
         runButton   { $('#runBTn') }
@@ -61,6 +63,16 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryTables  (required: false) { queryResHtml.find('table') }
         queryErrHtml (required: false) { queryResHtml.find('span') }
         queryDurHtml { $('#queryResults') }
+		
+		//options
+        htmlOptions				{ $("option", text:"HTML") }
+        csvOptions				{ $("option", text:"CSV") }
+        monospaceOptions		{ $("option", text:"Monospace") }
+        
+        //result
+        resultHtml		{ $("#resultHtml") }
+        resultCsv		{ $("#resultCsv") }
+        resultMonospace	{ $("#resultMonospace") }
     }
     static at = {
         sqlQueryTab.displayed
@@ -496,4 +508,74 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def String getQueryDuration() {
         return queryDurHtml.text()
     }
+
+    /*
+	 * click DbMonitor tab to go to Db Monitor
+	 */
+    def boolean gotoDbMonitor() {
+        header.tabDBMonitor.click()
+    }
+	
+	/*
+	 * click DbMonitor tab to go to Db Monitor
+	 */
+    def boolean gotoSchema() {
+        header.tabSchema.click()
+    }
+	
+	/*
+     * get query to create a table
+     */
+    def String getQueryToCreateTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#create") {
+        }
+
+        while ((line = br.readLine()) != "#delete") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+	 *	Get delete query
+	 */
+    def String getQueryToDeleteTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+	
+	/*
+	 * get tablename that is created and deleted
+	 */
+	def String getTablename() {
+		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+		String line;
+		String query = ""
+		
+		while((line = br.readLine()) != "#name") {
+		}
+
+		while ((line = br.readLine()) != null) {
+			query = query + line + "\n"
+		}
+		
+		return query
+	}
 }

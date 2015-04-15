@@ -1261,11 +1261,13 @@ public class Table extends TableBase implements SchemaObject {
                                                    idx.isForward());
 
             newIdx.setClustered(idx.isClustered());
-            // A VoltDB extension to support indexed expressions and assume unique attribute
+            // A VoltDB extension to support indexed expressions and assume unique attribute and partial indexes
             if (exprArr != null) {
                 newIdx = newIdx.withExpressions(adjustExprs(exprArr, colIndex, adjust));
             }
             newIdx = newIdx.setAssumeUnique(assumeUnique);
+            newIdx = newIdx.withPredicate(idx.getPredicate());
+            newidx = newIdx.setAssumeUnique(assumeUnique);
             // End of VoltDB extension
             tn.addIndex(session, newIdx);
         }

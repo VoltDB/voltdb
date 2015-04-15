@@ -58,6 +58,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -1942,13 +1943,15 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(false, c.hasErrorsOrWarnings());
     }
 
-    public void testDDLCompilerDropOneOfThreeIndexes()
+    public void testDDLCompilerDropTwoOfFiveIndexes()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
                 "create index idx_t_idnum_b on t(id,num);\n" +
-                "create index idx_t_idnum_c on t(id,num);\n";
+                "create index idx_t_idnum_c on t(id,num);\n" +
+                "create index idx_t_idnum_d on t(id,num) where id > 0;\n" +
+                "create index idx_t_idnum_f on t(id,num) where id > 0;\n";
 
         final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertEquals(true, c.hasErrorsOrWarnings());
@@ -1958,7 +1961,7 @@ public class TestVoltCompiler extends TestCase {
                 foundCount++;
             }
         }
-        assertEquals(1, foundCount);
+        assertEquals(2, foundCount);
     }
 
     public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
@@ -3651,6 +3654,43 @@ public class TestVoltCompiler extends TestCase {
         badDDLAgainstSimpleSchema(".*may not drop.*",
                 "drop role user;");
     }
+
+    public void testDDLPartialIndex()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index idx_t_idnum on t(id) where id > 4;\n";
+
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+    }
+
+    public void testInvalidPartialIndex()
+    {
+        String ddl = null;
+        ddl =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index IDX_T_IDNUM on t(id) where max(id) > 4;\n";
+
+        checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with aggregate expression(s) is not supported.");
+
+        ddl =
+                "create table t1(id integer not null, num integer not null);\n" +
+                "create table t2(id integer not null, num integer not null);\n" +
+                "create unique index IDX_T1_IDNUM on t1(id) where t2.id > 4;\n";
+
+        checkDDLErrorMessage(ddl, "Partial index \"IDX_T1_IDNUM\" with expression(s) involving other tables is not supported.");
+
+        ddl =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
+        // @TODO: Remove TRY/CATCH once subqueries are supported
+        try {
+            checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
+        } catch (PlanningErrorException e) {
+            assertTrue(e.getMessage().contains("Unsupported subquery syntax within an expression."));
+        }
+}
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
         Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);

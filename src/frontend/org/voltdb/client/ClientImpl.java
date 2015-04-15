@@ -68,6 +68,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     private final String m_username;
     private final byte m_passwordHash[];
+    private final ClientAuthHashScheme m_hashScheme;
 
     /**
      * These threads belong to the network thread pool
@@ -117,8 +118,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             m_reconnectStatusListener = null;
         }
 
+        m_hashScheme = config.m_hashScheme;
         if (config.m_cleartext) {
-            m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
+            m_passwordHash = ConnectionUtil.getHashedPassword(m_hashScheme, config.m_password);
         } else {
             m_passwordHash = Encoder.hexDecode(config.m_password);
         }
@@ -180,13 +182,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new IOException("Client instance is shutdown");
         }
         final String subProgram = (program == null) ? "" : program;
-        final byte[] subPassword = (hashedPassword == null) ? ConnectionUtil.getHashedPassword("") : hashedPassword;
+        final byte[] subPassword = (hashedPassword == null) ? ConnectionUtil.getHashedPassword(m_hashScheme, "") : hashedPassword;
 
         if (!verifyCredentialsAreAlwaysTheSame(subProgram, subPassword)) {
             throw new IOException("New connection authorization credentials do not match previous credentials for client.");
         }
 
-        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port);
+        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port, m_hashScheme);
     }
 
     /**

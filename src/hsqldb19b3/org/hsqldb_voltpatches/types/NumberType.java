@@ -2114,4 +2114,10 @@ public final class NumberType extends Type {
                 throw Error.runtimeError(ErrorCode.U_S0500, "NumberType");
         }
     }
+
+    /************************* Volt DB Extensions *************************/
+    public static void checkValueIsInLongLimits(Object a) {
+        convertToLong(a);
+    }
+    /**********************************************************************/
 }

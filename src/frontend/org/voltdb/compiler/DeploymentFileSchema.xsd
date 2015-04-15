@@ -89,6 +89,11 @@
               <xs:attribute name="path" type="xs:string" default="export_overflow"/>
             </xs:complexType>
         </xs:element>
+        <xs:element name="droverflow" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="dr_overflow"/>
+            </xs:complexType>
+        </xs:element>
         <xs:element name="commandlog" minOccurs="0" maxOccurs="1">
             <xs:complexType>
               <xs:attribute name="path" type="xs:string" default="command_log"/>

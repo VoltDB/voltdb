@@ -621,9 +621,21 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_CONCAT :
             case FUNC_CRYPT_KEY :
             case FUNC_BITAND :
+                // A VoltDB extension to customize the SQL function set support
+                parseList = doubleParamList;
+                break;
+                // End of VoltDB extension
             case FUNC_BITANDNOT :
+                // A VoltDB extension to customize the SQL function set support
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // fall through
+                // End of VoltDB extension
             case FUNC_BITOR :
             case FUNC_BITXOR :
+                // A VoltDB extension to customize the SQL function set support
+                parseList = doubleParamList;
+                break;
+                // End of VoltDB extension
             case FUNC_DIFFERENCE :
             case FUNC_FROM_TZ :
                 // A VoltDB extension to customize the SQL function set support
@@ -1659,7 +1671,15 @@ public class FunctionCustom extends FunctionSQL {
                         return null;
                     }
                 }
+                // A VoltDB extension to support BIGINT bitwise operands
+                if (nodes[0].dataType.isIntegralType()) {
+                    if (data[0] == null || data[1] == null)
+                        return null;
 
+                    long v = 0;
+                    long a = ((Number) data[0]).longValue();
+                    long b = ((Number) data[1]).longValue();
+                /* disable 14 lines.
                 if (dataType.isNumberType()) {
                     long v = 0;
                     long a;
@@ -1674,6 +1694,8 @@ public class FunctionCustom extends FunctionSQL {
                                 data[1], nodes[1].getDataType());
                         b = ((Number) data[1]).longValue();
                     }
+                ... disabled 14 lines. */
+                // End of VoltDB extension
 
                     switch (funcType) {
 
@@ -1698,6 +1720,9 @@ public class FunctionCustom extends FunctionSQL {
                             break;
                     }
 
+                    // A VoltDB extension to support BIGINT bitwise operands
+                    return ValuePool.getLong(v);
+                    /* disable 17 lines.
                     switch (dataType.typeCode) {
 
                         case Types.SQL_NUMERIC :
@@ -1715,6 +1740,8 @@ public class FunctionCustom extends FunctionSQL {
                         default :
                             throw Error.error(ErrorCode.X_42561);
                     }
+                    ... disabled 17 lines. */
+                    // End of VoltDB extension
                 } else {
                     byte[] a = ((BinaryData) data[0]).getBytes();
                     byte[] b = null;
@@ -2911,6 +2938,10 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_BITNOT :
             case FUNC_BITOR :
             case FUNC_BITXOR : {
+                // A VoltDB extension: Hsqldb uses Integer type by default,
+                // VoltDB wants to support BigInt instead
+                voltResolveToBigintTypesForBitwise();
+                /* disable 45 lines ...
                 if (nodes[0].dataType == null) {
                     nodes[0].dataType = nodes[1].dataType;
                 }
@@ -2956,6 +2987,8 @@ public class FunctionCustom extends FunctionSQL {
                     default :
                         throw Error.error(ErrorCode.X_42561);
                 }
+                ... disabled 45 lines. */
+                // End of VoltDB extension
 
                 break;
             }
@@ -3711,8 +3744,22 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_BITAND :
             case FUNC_BITANDNOT :
             case FUNC_BITOR :
+            // A VoltDB extension: Hsqldb uses Integer type by default,
+                return new StringBuffer(name).append('(')         //
+                        .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
+                        .append(nodes[1].getSQL()).append(')').toString();
+            }
+            // End of VoltDB extension
             case FUNC_BITNOT :
+            // A VoltDB extension: Hsqldb uses Integer type by default,
+                return new StringBuffer(name).append('(')         //
+                        .append(nodes[0].getSQL()).append(')').toString();
+            }
+            // End of VoltDB extension
             case FUNC_BITXOR :
+            case FUNC_BITAND :
+            case FUNC_BITOR :
+            case FUNC_BITXOR: {
             case FUNC_DIFFERENCE :
             case FUNC_REPEAT :
             case FUNC_LEFT :

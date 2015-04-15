@@ -1391,9 +1391,10 @@ public class TableWorks {
      * @param indexExprs Expression[]
      * @param name HsqlName
      * @param unique boolean
+     * @param predicate Expression
      * @return new index
      */
-    Index addExprIndex(int[] col, Expression[] indexExprs, HsqlName name, boolean unique) {
+    Index addExprIndex(int[] col, Expression[] indexExprs, HsqlName name, boolean unique, Expression predicate) {
 
         Index newindex;
 
@@ -1418,8 +1419,25 @@ public class TableWorks {
         database.schemaManager.addSchemaObject(newindex);
         database.schemaManager.recompileDependentObjects(table);
 
+        if (predicate != null) {
+            newindex = newindex.withPredicate(predicate);
+        }
+
         return newindex;
     } /* addExprIndex */
+
+    /**
+    * A VoltDB extended variant of addIndex that supports partial index predicate.
+     *
+     * @param col int[]
+     * @param name HsqlName
+     * @param unique boolean
+     * @param predicate Expression
+     * @return new index
+     */
+    Index addIndex(int[] col, HsqlName name, boolean unique, Expression predicate) {
+        return addIndex(col, name, unique).withPredicate(predicate);
+    }
 
     /**
      * A VoltDB extended variant of addUniqueConstraint that supports indexed generalized non-column expressions.

@@ -78,7 +78,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             }
         }
     }
-    
+
     /**
      * Build a simple configuration.
      * @param initialSchema
@@ -288,7 +288,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             // unless you use cascade
             assertTrue(doesColumnExist("FOO", "VIEWCOL"));
             assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
-            tryAsShouldBeAble("alter table FOO drop column VIEWCOL cascade; " + 
+            tryAsShouldBeAble("alter table FOO drop column VIEWCOL cascade; " +
                     "--comment messes up cascade?");
             assertFalse(doesColumnExist("FOO", "VIEWCOL"));
             assertFalse(findTableInSystemCatalogResults("FOOVIEW"));
@@ -427,8 +427,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             /* enable to debug *-/ System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
             // Of course we rename this yet again, because, why not?
             //TODO: fix how a later-added pk constraint/index does not get the
-            // same name as the original inline definition. Accident? 
-            // Or some kind of shortfall in the canonicalizer? 
+            // same name as the original inline definition. Accident?
+            // Or some kind of shortfall in the canonicalizer?
             //assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_FOO_ID"));
             //assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_FOO_ID", true));
             // not yet hsql232 */

@@ -322,6 +322,23 @@ public class MiscUtils {
                                    expiresStr);
         consoleLog.info(msg);
 
+        // If this is a commercial license, and there is less than or equal to 30 days until expiration,
+        // issue a "days remaining" warning message.
+        long diff = licenseApi.expires().getTimeInMillis() - now.getTimeInMillis();
+        // The original license is only a whole data (no minutes/millis).
+        // There should thus be no issue with daylight savings time,
+        // but just in case, if the diff is a negative number, round up to zero.
+        if (diff < 0)
+        {
+            diff = 0;
+        }
+        long diffDays = diff / (24 * 60 * 60 * 1000);
+        if ((diff > 0) && (diff <= 30))
+        {
+            msg = "Warning, VoltDB commercial license expires in " + diffDays + " day(s).";
+            consoleLog.info(msg);
+        }
+
         return true;
     }
 
@@ -347,8 +364,9 @@ public class MiscUtils {
         // Test for git build string - example: 2.0 voltdb-2.0-70-gb39f43e-dirty
         Pattern p = Pattern.compile("-(\\d*-\\w{8}(?:-.*)?)");
         Matcher m = p.matcher(fullBuildString);
-        if (! m.find())
+        if (! m.find()) {
             return null;
+        }
         build = m.group(1).trim();
         if (build.length() == 0) {
             return null;
@@ -622,7 +640,9 @@ public class MiscUtils {
      */
     public static <T> T[] concatAll(final T[] empty, Iterable<T[]> arrayList) {
         assert(empty.length == 0);
-        if (arrayList.iterator().hasNext() == false) return empty;
+        if (arrayList.iterator().hasNext() == false) {
+            return empty;
+        }
 
         int len = 0;
         for (T[] subArray : arrayList) {
@@ -638,7 +658,9 @@ public class MiscUtils {
     }
 
     public static void deleteRecursively( File file) {
-        if (file == null || !file.exists() || !file.canRead() || !file.canWrite()) return;
+        if (file == null || !file.exists() || !file.canRead() || !file.canWrite()) {
+            return;
+        }
         if (file.isDirectory() && file.canExecute()) {
             for (File f: file.listFiles()) {
                 deleteRecursively(f);

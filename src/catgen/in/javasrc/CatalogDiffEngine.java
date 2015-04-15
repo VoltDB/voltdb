@@ -197,6 +197,17 @@ public class CatalogDiffEngine {
             return false;
         }
 
+        // partial indexes must have identical predicates
+        if (existingIndex.getPredicatejson().length() > 0) {
+            if (existingIndex.getPredicatejson().equals(newIndex.getPredicatejson())) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (newIndex.getPredicatejson().length() > 0) {
+            return false;
+        }
+
         // iterate over all of the existing columns
         for (ColumnRef existingColRef : existingIndex.getColumns()) {
             boolean foundMatch = false;
@@ -377,9 +388,6 @@ public class CatalogDiffEngine {
         else if (suspect instanceof Connector) {
             if (ChangeType.ADDITION == changeType) {
                 for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
-                    if (cti.getTable().getIsdred()) {
-                        return "May not export a DR table";
-                    }
                     trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
                 }
             }

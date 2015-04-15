@@ -1684,9 +1684,7 @@ public class VoltCompiler {
         String action = drNode.getValue();
 
         org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
-        if (tableref == null) {
-            throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
-        } else if (tableref.getMaterializer() != null) {
+        if (tableref.getMaterializer() != null) {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
                                             " DR does not support materialized view.");
         }
@@ -2156,9 +2154,10 @@ public class VoltCompiler {
      * *NOTE*: Does *NOT* work with project.xml jarfiles.
      *
      * @return the compiled catalog is contained in the provided jarfile.
+     * @throws VoltCompilerException
      *
      */
-    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException
+    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException, VoltCompilerException
     {
         String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
                 Constants.UTF8ENCODING);
@@ -2194,7 +2193,7 @@ public class VoltCompiler {
                 int endtrim = errString.indexOf(" in statement starting");
                 if (endtrim < 0) { endtrim = errString.length(); }
                 String trimmed = errString.substring(0, endtrim);
-                throw new IOException(trimmed);
+                throw new VoltCompilerException(trimmed);
             }
         }
         finally {
