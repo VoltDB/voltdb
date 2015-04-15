@@ -358,7 +358,7 @@
                 var processName = "GRAPH_PARTITIONIDLETIME";
                 var procedureNames = ['@Statistics'];
                 var parameters = ["STARVATION"];
-                var values = ['1'];
+                var values = ['0'];
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
