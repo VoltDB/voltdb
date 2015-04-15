@@ -1798,6 +1798,7 @@ class DbMonitorTest extends TestBase {
     def "Check server legends visible in Graph Partition Idle Time"(){
 
         // for testing , 4 server legends are visible
+        
         when: 'server partition legends is visible'
         waitFor(10){	page.localpartition.isDisplayed()
             page.clusterwide.isDisplayed()
