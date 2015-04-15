@@ -37,7 +37,7 @@ public interface SnapshotCompletionInterest {
         public final Map<Integer, Long> drSequenceNumbers;
         public final Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds;
 
-        SnapshotCompletionEvent(
+        public SnapshotCompletionEvent(
                 String path,
                 String nonce,
                 final long multipartTxnId,
@@ -63,12 +63,13 @@ public interface SnapshotCompletionInterest {
         // Factory method for simplified instances used in testing,
         // to avoid repeating this long series of dummy-valued initializers.
         public static SnapshotCompletionEvent newInstanceForTest(
+                String path,
                 String nonce,
                 long multipartTxnId,
                 Map<Integer, Long> partitionTxnIds,
                 boolean truncationSnapshot) {
             return new SnapshotCompletionEvent(
-                    "", nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
+                    path, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
                     true, "", null, null, null);
         }
     }
