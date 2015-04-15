@@ -291,7 +291,6 @@
                                     <h1 class="headText1">
                                         <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>
                                     </h1>
-                                    </h1>
                                 </div>
                             </div>
                             <div class="rightShowhide">
@@ -304,7 +303,7 @@
                                     <!-- <li>State</li>
                                      <li class="drArrow">On</li>-->
                                     <li class="alertIcon warningDr" style="display: none">
-                                        <a id="drWarning" href="#myWarning" class="drWarning">
+                                        <a id="drWarning" href="#drPartitionWarning" class="drWarning">
                                             <span style="margin:0 0 0 24px">Warning</span>
                                         </a>
                                     </li>
@@ -333,7 +332,7 @@
                                         <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                     </div>
 
-
+<div class="tblScroll">
                                     <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">
                                         <thead>
                                             <tr role="row">
@@ -348,6 +347,7 @@
                                         </thead>
                                         <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
                                     </table>
+                                    </div>
                                 </div>
 
                             </div>
@@ -369,7 +369,7 @@
                                         <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                     </div>
 
-
+<div class="tblScroll">
                                     <table width="100%" border="0" cellspacing="0" id="tblDrReplica" cellpadding="0" class="drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">
                                         <thead>
                                             <tr>
@@ -382,6 +382,7 @@
                                         </thead>
                                         <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
                                     </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1632,13 +1633,13 @@
     </div>
 
     <!--DR warning POPUP  -->
-    <div id="myWarning" style="display: none">
+    <div id="drPartitionWarning" style="display: none">
         <div class="overlay-title"><div class="warninghead"><img src="css/resources/images/Information.png" />Warning</div></div>
         <div class="clear"></div>
         <div class="overlay-content warning">
-            <p>partition is uncovered</p>
+            <p id="drPartitionWarningMsg" ></p>
             <div class="overlay-btns" style="padding:0;">
-                <button class="btn">Ok</button>
+                <a id="btnDrPartitionWarning"  class="btn">Ok</a>
                 <div class="clear"></div>
             </div>
         </div>

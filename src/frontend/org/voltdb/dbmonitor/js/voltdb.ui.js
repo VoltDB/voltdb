@@ -766,6 +766,7 @@ var loadPage = function (serverName, portid) {
             }
         });
 
+
         var replicationWarning = function (count) {
             if (count == 0 || count == undefined) {
                 $('#drWarning').hide();
@@ -774,16 +775,17 @@ var loadPage = function (serverName, portid) {
                 $('#drWarning').show();
                 $('.alertIcon').show();
                 if (count == 1) {
-                    $('#myWarning .warning p').text(count + ' partition is uncovered');
+                    $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
                 } else {
-                    $('#myWarning .warning p').text(count + ' partitions are uncovered');
+                    $('#drPartitionWarningMsg').text(count + ' partitions are uncovered.');
                 }
             }
         };
 
         voltDbRenderer.GetDrReplicationInformation(function (replica) {
-            replicationWarning(replica["DR_GRAPH"]['WARNING_COUNT']);
+            replicationWarning(replica['WARNING_COUNT']);
         });
+
 
         var loadProcedureInformations = function (procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
@@ -1146,7 +1148,7 @@ var loadPage = function (serverName, portid) {
                     //if (length <= this.fnPagingInfo().iLength) {
                     //    //  $(this).parent().children(".dataTables_paginate").hide();
                     //}
-                  //  console.log($("#tblDrMAster").find("tbody tr td").first().html());
+                    //  console.log($("#tblDrMAster").find("tbody tr td").first().html());
                     if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
                         console.log("in");
                         $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
@@ -1252,7 +1254,7 @@ var loadPage = function (serverName, portid) {
 
                 $("#tblDrReplica").wrapAll("<div class='tblScroll'>");
                 // if (!$.isEmptyObject(response)) {
-               // $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
+                // $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
                 //  }
 
                 //  Customizing DataTables to make it as existing pagination

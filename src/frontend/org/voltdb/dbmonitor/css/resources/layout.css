@@ -1095,6 +1095,9 @@ a:hover.changePsd { text-decoration: underline; }
 ul.rightShowhideList { float:none;}
 ul.rightShowhideList li {padding:10px 0;}/*admin*/
 #popServerList{ position:absolute;right:0;top: 186px;}
+.rightShowhide {float:left; padding-top:15px;}
+	.tabs-filter-wrapperDR .filter { float:none; width:auto;}
+	.tabs-filter-wrapperDR {width:250px}
 
 
 .overlay-content { min-width:250px;}
@@ -1188,9 +1191,12 @@ top: 3px;}
 	.adminLeft { float:none; width:100%;}
 	.adminRight{ padding-top:15px;}
     
-    .tabs-filter-wrapperDR .filter { float: none;}
+    /*.tabs-filter-wrapperDR .filter { float: none;}*/
     .dataTables_wrapper .dataTables_paginate { top: 0!important;}
     table.dataTable { top: 0 !important;}	
+	.replicaWrapper { top:20px}
+
+	
 }
 
 @media (min-width: 480px) and  (max-width:540px) {
@@ -1203,6 +1209,9 @@ top: 3px;}
 	.adminRight{ padding-top:15px;}
 	.adminDirectories {overflow:auto; width:auto;}
 	.errorQueryDbPause { width:320px; }
+	.tabs-filter-wrapperDR .filter { float:none; width:auto;}
+	.tabs-filter-wrapperDR {width:250px}
+	
 	
 
    
@@ -1355,10 +1364,15 @@ top: 3px;}
   .restoreCont {overflow:auto; height:146px}
    .adminServer { }	
   .adminLeft { float:none; width:100%}
-  
-  
- 
+
  }
+ 
+ @media (min-width: 480px) and (max-width: 531px) {
+	 .rightShowhide {
+    float: left;
+    padding-top: 15px;}
+	 
+	 }
 @media screen and (orientation:landscape) {
 	.popup_cont {top:5%;}
 	
