@@ -153,12 +153,12 @@ def sort(rows, sorted_cols):
         if prev != tmp:
             if prev:
                 # sort a complete "group" with matching ORDER BY values
-                rows[begin:i] = sorted(rows[begin:i], cmp=safecmp, key=unsorted_cols)
+                rows[begin:i] = sorted(rows[begin:i], cmp=safecmp, key=unsorteds)
             prev = tmp
             begin = i
 
     # sort final "group"
-    rows[begin:] = sorted(rows[begin:], cmp=safecmp, key=unsorted_cols)
+    rows[begin:] = sorted(rows[begin:], cmp=safecmp, key=unsorteds)
 
 def parse_sql(x):
     """Finds if the SQL statement contains ORDER BY command.
