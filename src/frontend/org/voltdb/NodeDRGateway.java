@@ -29,7 +29,7 @@ public interface NodeDRGateway {
     /**
      * Start listening on the ports
      */
-    public abstract void bindPorts(boolean drProducerEnabled);
+    public abstract void bindPorts(boolean drProducerEnabled, int listenPort, String portInterface);
 
     /**
      * @return true if bindPorts has been called.
@@ -64,7 +64,7 @@ public interface NodeDRGateway {
     public abstract void start();
     public abstract void shutdown() throws InterruptedException;
 
-    public abstract void updateCatalog(CatalogContext catalog);
+    public abstract void updateCatalog(final CatalogContext catalog, final int listenPort);
 
     public abstract int getDRClusterId();
 }

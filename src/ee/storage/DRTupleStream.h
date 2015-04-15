@@ -52,6 +52,8 @@ public:
     // for test purpose
     virtual void setSecondaryCapacity(size_t capacity);
 
+    virtual void rollbackTo(size_t mark);
+
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
     /** write a tuple to the stream */
@@ -72,10 +74,12 @@ public:
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    size_t beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
-    size_t endTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    // If a transaction didn't generate any binary log data, calling this
+    // would be a no-op because it was never begun.
+    void endTransaction();
 
-    bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso, bool continueTxn);
+    bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
     std::pair<int64_t, int64_t> getLastCommittedSequenceNumberAndUniqueId() { return std::pair<int64_t, int64_t>(m_committedSequenceNumber, m_committedUniqueId); }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
@@ -86,6 +90,7 @@ public:
 private:
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
+    bool m_opened;
 };
 
 class MockDRTupleStream : public DRTupleStream {

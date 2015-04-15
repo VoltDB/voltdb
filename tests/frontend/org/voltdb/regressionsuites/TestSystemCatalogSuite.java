@@ -70,7 +70,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         // is backed by java.util.TreeMap
         results.advanceRow();
         assertEquals("AA_T", results.get("TABLE_NAME", VoltType.STRING));
-        assertEquals("{\"partitionColumn\":\"A1\"}", results.get("REMARKS", VoltType.STRING));
+        assertEquals("{\"partitionColumn\":\"A1\",\"drEnabled\":\"true\"}", results.get("REMARKS", VoltType.STRING));
 
         results.advanceRow();
         assertEquals("BB_V", results.get("TABLE_NAME", VoltType.STRING));
@@ -209,7 +209,8 @@ public class TestSystemCatalogSuite extends RegressionSuite {
                                  + "(A1 INTEGER NOT NULL, "
                                  + " A2 INTEGER, "
                                  + "LIMIT PARTITION ROWS 5 "
-                                 + "EXECUTE (DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1 = 0));");
+                                 + "EXECUTE (DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1 = 0));"
+                                 + "DR TABLE AA_T;");
         project.addPartitionInfo("AA_T", "A1");
         project.addPartitionInfo("CC_T_WITH_EXEC_DELETE", "A1");
         project.addStmtProcedure("InsertA", "INSERT INTO AA_T VALUES(?,?);", "AA_T.A1: 0");

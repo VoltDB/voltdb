@@ -64,6 +64,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.common.Permission;
 
 
@@ -189,11 +190,19 @@ public class AuthSystem {
          * SHA-1 double hashed copy of the users clear text password
          */
         private final byte[] m_sha1ShadowPassword;
+        /**
+         * SHA-2 double hashed copy of the users clear text password
+         */
+        private final byte[] m_sha2ShadowPassword;
 
         /**
          * SHA-1 hashed and then bcrypted copy of the users clear text password
          */
         private final String m_bcryptShadowPassword;
+        /**
+         * SHA-2 hashed and then bcrypted copy of the users clear text password
+         */
+        private final String m_bcryptSha2ShadowPassword;
 
         /**
          * Name of the user
@@ -227,9 +236,11 @@ public class AuthSystem {
          * @param shadowPassword SHA-1 double hashed copy of the users clear text password
          * @param name Name of the user
          */
-        private AuthUser(byte[] sha1ShadowPassword, String bcryptShadowPassword, String name) {
+        private AuthUser(byte[] sha1ShadowPassword, byte[] sha2ShadowPassword, String bcryptShadowPassword, String bCryptSha2ShadowPassword, String name) {
             m_sha1ShadowPassword = sha1ShadowPassword;
+            m_sha2ShadowPassword = sha2ShadowPassword;
             m_bcryptShadowPassword = bcryptShadowPassword;
+            m_bcryptSha2ShadowPassword = bCryptSha2ShadowPassword;
             if (name != null) {
                 m_name = name.intern();
             } else {
@@ -399,14 +410,18 @@ public class AuthSystem {
          * First associate all users with groups and vice versa
          */
         for (org.voltdb.catalog.User catalogUser : db.getUsers()) {
+            //shadow are bcrypt of sha-?
             String shadowPassword = catalogUser.getShadowpassword();
+            String sha256shadowPassword = catalogUser.getSha256shadowpassword();
             byte sha1ShadowPassword[] = null;
+            byte sha2ShadowPassword[] = null;
             if (shadowPassword.length() == 40) {
                 /*
                  * This is an old catalog with a SHA-1 password
                  * Need to hex decode it
                  */
                 sha1ShadowPassword = Encoder.hexDecode(shadowPassword);
+                sha2ShadowPassword = Encoder.hexDecode(sha256shadowPassword);
             } else if (shadowPassword.length() != 60) {
                 /*
                  * If not 40 should be 60 since it is bcrypt
@@ -415,7 +430,7 @@ public class AuthSystem {
                         "Found a shadowPassword in the catalog that was in an unrecogized format", true, null);
             }
 
-            final AuthUser user = new AuthUser( sha1ShadowPassword, shadowPassword, catalogUser.getTypeName());
+            final AuthUser user = new AuthUser( sha1ShadowPassword, sha2ShadowPassword, shadowPassword, sha256shadowPassword, catalogUser.getTypeName());
             m_users.put(user.m_name, user);
             for (org.voltdb.catalog.GroupRef catalogGroupRef : catalogUser.getGroups()) {
                 final org.voltdb.catalog.Group  catalogGroup = catalogGroupRef.getGroup();
@@ -503,7 +518,7 @@ public class AuthSystem {
      * @param password SHA-1 single hashed version of the users clear text password
      * @return The permission set for the user if authentication succeeds or null if authentication fails.
      */
-    boolean authenticate(String username, byte[] password) {
+    boolean authenticate(String username, byte[] password, ClientAuthHashScheme scheme) {
         if (!m_enabled) {
             return true;
         }
@@ -514,10 +529,10 @@ public class AuthSystem {
         }
 
         boolean matched = true;
-        if (user.m_sha1ShadowPassword != null) {
+        if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
             MessageDigest md = null;
             try {
-                md = MessageDigest.getInstance("SHA-1");
+                md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
             } catch (NoSuchAlgorithmException e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -532,7 +547,8 @@ public class AuthSystem {
                 }
             }
         } else {
-            matched = BCrypt.checkpw(Encoder.hexEncode(password), user.m_bcryptShadowPassword);
+            String pwToCheck = (scheme == ClientAuthHashScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
+            matched = BCrypt.checkpw(Encoder.hexEncode(password), pwToCheck);
         }
 
         if (matched) {
@@ -546,7 +562,7 @@ public class AuthSystem {
 
     public static class AuthDisabledUser extends AuthUser {
         public AuthDisabledUser() {
-            super(null, null, null);
+            super(null, null, null, null, null);
         }
 
         @Override
@@ -610,14 +626,16 @@ public class AuthSystem {
 
         private final String m_user;
         private final byte [] m_password;
+        private ClientAuthHashScheme m_hashScheme;
 
-        public HashAuthenticationRequest(final String user, final byte [] hash) {
+        public HashAuthenticationRequest(final String user, final byte [] hash, final ClientAuthHashScheme scheme) {
             m_user = user;
             m_password = hash;
+            m_hashScheme = scheme;
         }
 
         @Override
-        protected boolean authenticateImpl() throws Exception {
+        protected boolean authenticateImpl(ClientAuthHashScheme scheme) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = m_user;
                 return true;
@@ -632,10 +650,10 @@ public class AuthSystem {
             }
 
             boolean matched = true;
-            if (user.m_sha1ShadowPassword != null) {
+            if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
                 MessageDigest md = null;
                 try {
-                    md = MessageDigest.getInstance("SHA-1");
+                    md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
                 } catch (NoSuchAlgorithmException e) {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
@@ -644,13 +662,15 @@ public class AuthSystem {
                 /*
                  * A n00bs attempt at constant time comparison
                  */
+                byte shaShadowPassword[] = (scheme == ClientAuthHashScheme.HASH_SHA1 ? user.m_sha1ShadowPassword : user.m_sha2ShadowPassword);
                 for (int ii = 0; ii < passwordHash.length; ii++) {
-                    if (passwordHash[ii] != user.m_sha1ShadowPassword[ii]){
+                    if (passwordHash[ii] != shaShadowPassword[ii]){
                         matched = false;
                     }
                 }
             } else {
-                matched = BCrypt.checkpw(Encoder.hexEncode(m_password), user.m_bcryptShadowPassword);
+                String pwToCheck = (scheme == ClientAuthHashScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
+                matched = BCrypt.checkpw(Encoder.hexEncode(m_password), pwToCheck);
             }
 
             if (matched) {
@@ -678,7 +698,7 @@ public class AuthSystem {
             m_socket = socket;
         }
         @Override
-        protected boolean authenticateImpl() throws Exception {
+        protected boolean authenticateImpl(ClientAuthHashScheme scheme) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = "_^_pinco_pallo_^_";
                 return true;

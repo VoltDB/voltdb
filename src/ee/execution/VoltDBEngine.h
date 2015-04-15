@@ -292,6 +292,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                 m_executorContext->setupForPlanFragments(NULL);
             }
             m_undoLog.release(undoToken);
+
+            if (m_drStream) {
+                m_drStream->endTransaction();
+            }
+            if (m_drReplicatedStream) {
+                m_drReplicatedStream->endTransaction();
+            }
         }
 
         void undoUndoToken(int64_t undoToken)
