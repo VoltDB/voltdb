@@ -454,7 +454,7 @@ class ServerBundle(JavaBundle):
 
     def go(self, verb, runner):
         final_args = None
-        if self.subcommand == 'create':
+        if self.subcommand in ('create', 'recover'):
             if runner.opts.replica:
                 final_args = [self.subcommand, 'replica']
         if self.supports_live:

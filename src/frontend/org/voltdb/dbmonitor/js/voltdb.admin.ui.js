@@ -1574,8 +1574,8 @@ function loadAdminPage() {
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
                 '    <td>Stream</td>' +
-                '    <td width="10%">' +
-                '       <input id="txtStream" name="txtStream" type="text" size="30">' +
+                '    <td width="15%">' +
+                '       <input id="txtStream" name="txtStream" type="text" size="38">' +
                 '       <label id="errorStream" for="txtStream" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td width="8%" align="right"><input type="checkbox" checked="true" id="chkStream" class="chkStream"/></td>' +
@@ -1584,7 +1584,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td>Type </td>' +
                 '    <td>' +
-                '       <input id="txtType" name="txtType" type="text" size="30">' +
+                '       <input id="txtType" name="txtType" type="text" size="38">' +
                 '       <label id="errorType" for="txtType" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
@@ -1616,11 +1616,11 @@ function loadAdminPage() {
                 '                </tr>' +
                 '                <tr>' +
                 '                    <td>' +
-                '                        <input size="15" id="txtName0" name="txtName0" class="newStreamProperty" type="text">' +
+                '                        <input size="15" id="txtName0" name="txtName0" class="newStreamPropertyName newStreamProperty" type="text">' +
                 '                        <label id="errorName0" for="txtName0" class="error" style="display: none;"></label>' +
                 '                    </td>' +
                 '                    <td>' +
-                '                        <input size="15" id="txtValue0" name="txtValue0" class="newStreamProperty" type="text">' +
+                '                        <input size="15" id="txtValue0" name="txtValue0" class="newStreamPropertyValue newStreamProperty" type="text">' +
                 '                        <label id="errorValue0" for="txtValue0" class="error" style="display: none;"></label>' +
                 '                    </td>' +
                 '                    <td><div class="securityDelete" id="delRow0" onclick="deleteRow(this)"></div></td>' +
@@ -1654,11 +1654,11 @@ function loadAdminPage() {
                 
                 var newRow = '<tr>' +
                     '   <td>' +
-                    '       <input size="15" id="' + nameId + '" name="' + nameId + '" class="newStreamProperty" type="text">' +
+                    '       <input size="15" id="' + nameId + '" name="' + nameId + '" class="newStreamPropertyName newStreamProperty" type="text">' +
                     '       <label id="errorName' + count + '" for="' + nameId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
-                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newStreamProperty" type="text">' +
+                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newStreamPropertyValue newStreamProperty" type="text">' +
                     '       <label id="errorValue' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td><div class="securityDelete" id="deleteFirstProperty" onclick="deleteRow(this)"></div></td>' +
@@ -1708,9 +1708,9 @@ function loadAdminPage() {
             $("#btnAddConfigSave").unbind("click");
             $("#btnAddConfigSave").on("click", function (e) {
 
-                var newStreamProperties = $(".newStreamProperty");
-                for (var i = 0; i < newStreamProperties.length; i++) {
-                    $(newStreamProperties[i]).rules("add", {
+                var newStreamPropertyNames = $(".newStreamPropertyName");
+                for (var i = 0; i < newStreamPropertyNames.length; i++) {
+                    $(newStreamPropertyNames[i]).rules("add", {
                         required: true,
                         regex: /^[a-zA-Z0-9_\-.]+$/,
                         messages: {
@@ -1762,8 +1762,8 @@ function loadAdminPage() {
                     var newStreamProperties = $(".newStreamProperty");
                     for (var i = 0; i < newStreamProperties.length; i += 2) {
                         newConfig["property"].push({
-                            "name": $(newStreamProperties[i]).val(),
-                            "value": $(newStreamProperties[i + 1]).val(),
+                            "name": encodeURIComponent($(newStreamProperties[i]).val()),
+                            "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
                         });
                     }
 
@@ -1954,7 +1954,7 @@ function loadAdminPage() {
             $("#btnSaveSecUser").on("click", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
-                var password = $('#txtPassword').val();
+                var password = encodeURIComponent($('#txtPassword').val());
                 var role = $('#selectRole').val();
                 var requestType = "POST";
                 var requestUser = "";

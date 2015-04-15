@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -347,6 +348,8 @@ public class SQLParser extends SQLPatternFactory
             "[^']*" +      // arbitrary string content
             "'",           // end of string OR start of escaped quote
             Pattern.MULTILINE);
+
+    private static final Pattern SingleQuotedHexLiteral = Pattern.compile("[Xx]'([0-9A-Fa-f]*)'", Pattern.MULTILINE);
 
     // Define a common pattern to sweep up a mix of semicolons and space and
     // meaningless garbage at the end of the simpler sqlcmd directives.
@@ -1246,7 +1249,7 @@ public class SQLParser extends SQLPatternFactory
         }
 
         if (filename.startsWith("~")) {
-            filename = filename.replace("~", System.getProperty("user.home"));
+            filename = filename.replaceFirst("~", System.getProperty("user.home"));
         }
 
         return new FileInfo(parentContext, option, filename);
@@ -1342,6 +1345,47 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Given a parameter string, if it's of the form x'0123456789ABCDEF',
+     * return a string containing just the digits.  Otherwise, return null.
+     */
+    public static String getDigitsFromHexLiteral(String paramString) {
+        Matcher matcher = SingleQuotedHexLiteral.matcher(paramString);
+        if (matcher.matches()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
+    /**
+     * Given a string of hex digits, produce a long value, assuming
+     * a 2's complement representation.
+     */
+    public static long hexDigitsToLong(String hexDigits) throws SQLParser.Exception {
+
+        // BigInteger.longValue() will truncate to the lowest 64 bits,
+        // so we need to explicitly check if there's too many digits.
+        if (hexDigits.length() > 16) {
+            throw new SQLParser.Exception("Too many hexadecimal digits for BIGINT value");
+        }
+
+        if (hexDigits.length() == 0) {
+            throw new SQLParser.Exception("Zero hexadecimal digits is invalid for BIGINT value");
+        }
+
+        // The method
+        //   Long.parseLong(<digits>, <radix>);
+        // Doesn't quite do what we want---it expects a '-' to
+        // indicate negative values, and doesn't want the sign bit set
+        // in the hex digits.
+        //
+        // Once we support Java 1.8, we can use Long.parseUnsignedLong(<digits>, 16)
+        // instead.
+
+        long val = new BigInteger(hexDigits, 16).longValue();
+        return val;
+    }
+
+    /**
      * Results returned by parseExecuteCall()
      */
     public static class ExecuteCallResults
@@ -1411,7 +1455,16 @@ public class SQLParser extends SQLPatternFactory
                             objParam = Integer.parseInt(param);
                         }
                         else if (paramType.equals("bigint")) {
-                            objParam = Long.parseLong(param);
+                            // Could be literal of the form x'0007'
+                            // or just a simple decimal literal
+                            String hexDigits = getDigitsFromHexLiteral(param);
+                            if (hexDigits != null) {
+                                objParam = hexDigitsToLong(hexDigits);
+                            }
+                            else {
+                                // It's a decimal literal
+                                objParam = Long.parseLong(param);
+                            }
                         }
                         else if (paramType.equals("float")) {
                             objParam = Double.parseDouble(param);
@@ -1426,15 +1479,10 @@ public class SQLParser extends SQLPatternFactory
                             objParam = parseDate(param);
                         }
                         else if (paramType.equals("varbinary") || paramType.equals("tinyint_array")) {
-                            String val = Unquote.matcher(param).replaceAll("");
-                            objParam = Encoder.hexDecode(val);
-                            // Make sure we have an even number of characters, otherwise it is an invalid byte string
-                            if (param.length() % 2 == 1) {
-                                throw new SQLParser.Exception(
-                                        "Invalid varbinary value (%s) (param %d) : "
-                                        + "must have an even number of hex characters to be valid.",
-                                        param, i+1);
-                            }
+                            String hexDigits = Unquote.matcher(param).replaceAll("");
+                            // The following call with throw an exception if we
+                            // have an odd number of hex digits.
+                            objParam = Encoder.hexDecode(hexDigits);
                         }
                         else {
                             throw new SQLParser.Exception("Unsupported Data Type: %s", paramType);
@@ -1453,6 +1501,14 @@ public class SQLParser extends SQLPatternFactory
         // No public constructor.
         ExecuteCallResults()
         {}
+
+        @Override
+        public String toString() {
+            return "ExecuteCallResults { "
+                            + "procedure: " + procedure + ", "
+                            + "params: " + params + ", "
+                            + "paramTypes: " + paramTypes + " }";
+        }
     }
 
     /**
@@ -1472,6 +1528,7 @@ public class SQLParser extends SQLPatternFactory
 
     /**
      * Parse EXECUTE procedure call for testing without looking up parameter types.
+     * Used for testing.
      * @param statement   statement to parse
      * @param procedures  maps procedures to parameter signature maps
      * @return            results object or NULL if statement wasn't recognized

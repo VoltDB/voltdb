@@ -35,7 +35,6 @@
 package exportbenchmark;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
@@ -47,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -77,7 +77,7 @@ public class SocketExporter extends ExportClientBase {
         statsDuration = Integer.parseInt(config.getProperty("stats.duration", "5"));
 
         if (host == "localhost") {
-            address = new InetSocketAddress(InetAddress.getLocalHost(), port);
+            address = new InetSocketAddress(CoreUtils.getHostnameOrAddress(), port);
         } else {
             address = new InetSocketAddress(host, port);
         }
