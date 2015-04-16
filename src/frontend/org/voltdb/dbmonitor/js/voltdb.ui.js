@@ -731,10 +731,11 @@ var loadPage = function (serverName, portid) {
                                         $("#ChartDrReplicationRate").show();
                                     }
 
-                                    refreshDrReplicaSection();
-                                    voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
-                                        MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
-                                    });
+                                    refreshDrReplicaSection(graphView, currentTab);
+
+                                    //voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+                                    //    MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
+                                    //});
                                     //to show DR Mode
                                     if (VoltDbUI.drEnabled) {
                                         $("#dbDrMode").text("Both");
@@ -771,24 +772,9 @@ var loadPage = function (serverName, portid) {
         });
 
 
-        var replicationWarning = function (count) {
-            if (count == 0 || count == undefined) {
-                $('#drWarning').hide();
-                $('.alertIcon').hide();
-            } else {
-                $('#drWarning').show();
-                $('.alertIcon').show();
-                if (count == 1) {
-                    $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
-                } else {
-                    $('#drPartitionWarningMsg').text(count + ' partitions are uncovered.');
-                }
-            }
-        };
-
-        voltDbRenderer.GetDrReplicationInformation(function (replica) {
-            replicationWarning(replica["DR_GRAPH"]['WARNING_COUNT']);
-        });
+        //voltDbRenderer.GetDrReplicationInformation(function (replica) {
+        //    replicationWarning(replica["DR_GRAPH"]['WARNING_COUNT']);
+        //});
 
 
         var loadProcedureInformations = function (procedureMetadata) {
@@ -1107,6 +1093,21 @@ var loadPage = function (serverName, portid) {
 
     };
 
+    var replicationWarning = function (count) {
+        if (count == 0 || count == undefined) {
+            $('#drWarning').hide();
+            $('.alertIcon').hide();
+        } else {
+            $('#drWarning').show();
+            $('.alertIcon').show();
+            if (count == 1) {
+                $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
+            } else {
+                $('#drPartitionWarningMsg').text(count + ' partitions are uncovered.');
+            }
+        }
+    };
+
     var refreshDrMasterSection = function () {
         $("#drMasterSection").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
@@ -1216,9 +1217,14 @@ var loadPage = function (serverName, portid) {
         });
     };
     var replicaTable = '';
-    var refreshDrReplicaSection = function () {
+    var refreshDrReplicaSection = function (graphView, currentTab) {
 
         voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+
+            MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
+
+            replicationWarning(replicationData["DR_GRAPH"]['WARNING_COUNT']);
+
             var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
 
             var htmlcontent = "";
@@ -1285,7 +1291,7 @@ var loadPage = function (serverName, portid) {
                 $("#tblDrReplica_info").hide();
                 $("#tblDrReplica_length").hide();
 
-                $("#tblDrReplica").find(".sorting_asc").removeClass("sorting_asc");
+                //$("#tblDrReplica").find(".sorting_asc").removeClass("sorting_asc");
 
                 $("#drReplicaSection").find(".pagination").hide();
             }
