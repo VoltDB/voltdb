@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,7 +52,6 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
@@ -1898,14 +1896,36 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerTwoIdenticalIndexes()
     {
-        final String s =
-                "create table t(id integer not null, num integer not null);\n" +
-                "create index idx_t_idnum1 on t(id,num);\n" +
-                "create index idx_t_idnum2 on t(id,num);";
-
-        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        String s;
+        VoltCompiler c;
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id,num);\n" +
+            "create index idx_t_idnum2 on t(id,num);";
+        c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
         assertTrue(c.hasErrorsOrWarnings());
+
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id) where num > 3;\n" +
+             "create index idx_t_idnum2 on t(id) where num > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create unique index idx_t_idnum1 on t(id) where num > 3;\n" +
+            "create unique index idx_t_idnum2 on t(id) where num > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id) where abs(num) > 3;\n" +
+            "create index idx_t_idnum2 on t(id) where abs(num) > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
     }
 
     public void testDDLCompilerSameNameIndexesOnTwoTables()
