@@ -44,7 +44,6 @@
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 <envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
-
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
     <isset property="env.VOLTPRO"/>
@@ -787,10 +786,19 @@ JAR BUILDING
 ***************************************
 -->
 
-<target name="buildinfo">
+<target name="getversion">
   <loadfile property='dist.version' srcFile='version.txt'>
       <filterchain><striplinebreaks/></filterchain>
   </loadfile>
+</target>
+
+<!-- Use buildstring from passed parameterm but set version from version.txt -->
+<target name="override_buildstring" depends="getversion">
+  <echo message = "${buildstring}" file="buildstring.txt"/>
+  <echo message = "Version set from commandline property: ${buildstring}"/>
+</target>
+
+<target name="buildinfo" unless="buildstring" depends="override_buildstring, getversion">
   <exec dir="." executable="tools/getgitinfo.py">
       <arg line='${dist.version}' />
   </exec>

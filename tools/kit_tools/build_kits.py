@@ -60,7 +60,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK %s clean default dist" % build_args)
+        run("ant %s -Djmemcheck=NO_MEMCHECK clean default dist" % build_args)
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
