@@ -986,9 +986,13 @@
                         Stored Procedures
                         <input type="checkbox" id="StoredProcedures" name="" value="stored_proc" checked="checked" />
                     </li>
-                    <li class="last pref-tables">
+                    <li class="last pref-tables" id="liTables">
                         Database Tables
                         <input type="checkbox" id="DatabaseTables" name="" value="table" checked="checked" />
+                    </li>
+                    <li class="pref-tables" id="liDrTables" style="display:none">
+                        Data Replication Tables
+                        <input type="checkbox" id="DRTables" name="" value="table" checked="checked" />
                     </li>
                 </ul>
                 <input type="submit" name="account_details" id="account_details" value="Save" class="input-submit left" hidden="hidden" style="display: none;" />
