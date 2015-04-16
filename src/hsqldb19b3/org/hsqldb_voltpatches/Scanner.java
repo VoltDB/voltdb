@@ -32,9 +32,6 @@
 package org.hsqldb_voltpatches;
 
 import java.math.BigDecimal;
-// A VoltDB Extension to use x'....' literals as BIGINTs
-import java.math.BigInteger;
-// End of VoltDB extension
 import java.util.Locale;
 
 import org.hsqldb_voltpatches.lib.ArrayUtil;
@@ -1563,9 +1560,6 @@ public class Scanner {
                         ((BinaryData) token.tokenValue).length(null));
                     token.tokenType = Tokens.X_VALUE;
 
-                    // A VoltDB extension to make x'abcd' literals look like integers
-                    voltForceHexLiteralToBigint();
-                    // End of VoltDB extension
                     return;
                 }
                 break;
@@ -2458,33 +2452,4 @@ public class Scanner {
                 throw Error.runtimeError(ErrorCode.U_S0500, "Scanner");
         }
     }
-    // A VoltDB extension to make x'abcd' literals look like integers
-    /**
-     * Assuming we just parsed a x'....' literal, update the current token
-     * to be a BIGINT instead of VARBINARY
-     */
-    private void voltForceHexLiteralToBigint() {
-        token.dataType = Type.SQL_BIGINT;
-        byte[] data = ((BinaryData)(token.tokenValue)).getBytes();
-        if (data.length == 0 || data.length > 8) {
-            // Too short or too long.
-            token.tokenType   = Tokens.X_MALFORMED_NUMERIC;
-            token.isMalformed = true;
-        }
-        else {
-            // pad with leading zeros, to avoid sign-extension.
-            byte[] dataWithLeadingZeros = new byte[8];
-            int lenDiff = 8 - data.length;
-            for (int i = 0; i < 8; ++i) {
-                byte b = 0;
-                if (i - lenDiff >= 0) {
-                    b = data[i - lenDiff];
-                }
-                dataWithLeadingZeros[i] = b;
-            }
-            BigInteger bi = new BigInteger(dataWithLeadingZeros);
-            token.tokenValue = ValuePool.getLong(bi.longValue());
-        }
-    }
-    // End of VoltDB extension
 }

@@ -209,16 +209,28 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
 
     public void testHexLiterals() throws Exception {
 
-        // 0 digits is no good.
-        ddlErrorTest("malformed numeric constant",
+        // x-quoted literals with hexadecimal digits currently not
+        // allowed to represent integers.
+
+        ddlErrorTest("invalid format for a constant bigint value",
                 "create procedure insHex as insert into blah (ival) values (x'');");
 
-        // An odd number of digits is not accepted (VARBINARY legacy)
+        // This *would* work if we accepted hex literals as ints,
+        // but we don't.
+        ddlErrorTest("invalid format for a constant bigint value",
+                "create procedure insHex as insert into blah (ival) values (x'FF');");
+
+        // This *would* work if we accepted hex literals as ints,
+        // but we don't.  This would be a decimal 128.
+        ddlErrorTest("invalid format for a constant bigint value",
+                "create procedure insHex as insert into blah (ival) values (x'10');");
+
+        // The HSQL parser complains about an odd number of digits,
+        // so the error message is different here.
         ddlErrorTest("malformed binary string",
                 "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef0');");
 
-        // More than 16 digits is also not accepted (won't fit into BIGINT)
-        ddlErrorTest("malformed numeric constant",
+        ddlErrorTest("invalid format for a constant bigint value",
                 "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef01');");
 
     }
