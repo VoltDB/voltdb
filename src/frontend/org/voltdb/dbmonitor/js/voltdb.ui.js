@@ -706,16 +706,22 @@ var loadPage = function (serverName, portid) {
                         var drResult = drDetails["Details"]["STATUS"];
                         if (drResult != -2) {
                             VoltDbUI.drEnabled = (drDetails[currentServer]['ENABLED'] != null && drDetails[currentServer]['ENABLED'] != "false") ? true : false;
-
+                            console.log(VoltDbUI.drReplicationRole.toLowerCase());
                             //if (VoltDbUI.drEnabled)
                             //show master table
                             if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drEnabled)) {
                                 VoltDbUI.isDRInfoRequired = true;
                                 VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
                                 VoltDbUI.isFirstHit = false;
+                                console.log(VoltDbUI.drEnabled);
                                 if (VoltDbUI.drEnabled) {
+                                    $("#drMasterSection").show();
+                                    $(".replicaWrapper").css('top', '-27px');
                                     //show master table
                                     refreshDrMasterSection();
+                                } else {
+                                    $(".replicaWrapper").css('top', '0');
+                                    $("#drMasterSection").hide();
                                 }
 
                                 if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
@@ -783,7 +789,7 @@ var loadPage = function (serverName, portid) {
         };
 
         voltDbRenderer.GetDrReplicationInformation(function (replica) {
-            replicationWarning(replica['WARNING_COUNT']);
+            replicationWarning(replica["DR_GRAPH"]['WARNING_COUNT']);
         });
 
 
@@ -1134,7 +1140,6 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster").find("tbody").append(htmlcontent);
 
             table = $("#tblDrMAster").DataTable({
-                destroy: true,
                 stateSave: true,
                 pageLength: 5,
                 "sPaginationType": "extStyleLF",
@@ -1715,7 +1720,7 @@ var loadPage = function (serverName, portid) {
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    }, 15000);
+    }, 5000);
 
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));

@@ -2050,7 +2050,6 @@ function alertNodeClicked(obj) {
 
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
-           
             var colIndex = {};
             var colIndex2 = {};
             var counter = 0;
@@ -2089,7 +2088,6 @@ function alertNodeClicked(obj) {
                 replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
 
             });
-
             replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
             replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M;
 

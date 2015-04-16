@@ -1047,6 +1047,7 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .drShowHide { background:#FFFFFF; padding:20px;}
 .masterWrapper{}
 .replicaWrapper { position: relative;top: -27px;}
+
 ul.drList { margin:0 20px 0 0; padding:0; float:left; height: 28px;line-height: 30px;}
 ul.drList li { margin:0 0 0 10px; padding:0; float:left; font-size:14px;}
 
@@ -1086,6 +1087,7 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 
 a.changePsd {color: #0079bb;}
 a:hover.changePsd { text-decoration: underline; }
+
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
