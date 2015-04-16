@@ -740,10 +740,10 @@
                                         <td width="2%">&nbsp;</td>
                                         <td width="16%">&nbsp;</td>
                                     </tr>
-                                    <tr>
+                                    <tr id="row-DrConfig">
 
                                         <td class="configLabel">Master</td>
-                                        <td align="right">
+                                        <td align="right" class="tdDrConfig">
                                             <div id="drMasterIcon" class="offIcon"></div>
                                             <input style="display: none;" type="checkbox" checked="checked" id="chkDrMaster" />
                                             <div id="loadingDrMaster" class="loading-small" style="display: none"></div>
@@ -1498,6 +1498,27 @@
         </div>
     </div>
     <!--Update error Popup-->
+    
+    <!--Update error DR Master Popup-->
+    <div style="display: none"><a href="#updateDrMasterErrorPopup" id="updateErrorDrMasterPopupLink">Update Error</a></div>
+    <div id="updateDrMasterErrorPopup" style="display: none">
+        <div id="updateInnerDrMasterErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateDrMasterErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateDrMasterOk">Ok</a></div>
+
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
     <!--Update Query Timeout error Popup-->
     <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
     <div id="queryTimeoutUpdateErrorPopup" style="display: none">
