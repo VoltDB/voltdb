@@ -925,7 +925,7 @@ td.pauseCursorDefault a{cursor: default;}
 #serverListWrapperAdmin{ padding:15px 16px 0 15px;}
 #serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
 .confirmationInfo{font-weight: bold;}
-td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix,td.tdSnapshotFrequency,td.tdSnapshotRetained, td.snapshottd { position: relative;}
+td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix,td.tdSnapshotFrequency,td.tdSnapshotRetained, td.snapshottd , td.tdDrConfig { position: relative;}
 td.heartbeattd span, td.queryTimeOut span{position:relative; top:auto;}
 div.userSecurity{ position: relative;height: 38px;}
 td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px;left:1px;*/}
@@ -1047,6 +1047,7 @@ a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-al
 .drShowHide { background:#FFFFFF; padding:20px;}
 .masterWrapper{}
 .replicaWrapper { position: relative;top: -27px;}
+
 ul.drList { margin:0 20px 0 0; padding:0; float:left; height: 28px;line-height: 30px;}
 ul.drList li { margin:0 0 0 10px; padding:0; float:left; font-size:14px;}
 
@@ -1086,6 +1087,7 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 
 a.changePsd {color: #0079bb;}
 a:hover.changePsd { text-decoration: underline; }
+
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
