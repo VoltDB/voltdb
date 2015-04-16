@@ -47,6 +47,10 @@ class TestBase extends GebReportingSpec {
     static final int DEFAULT_WINDOW_HEIGHT = 1000
     static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
+	static int numberOfTrials 	= 20
+	static int waitTime 		= 30
+	boolean testStatus 			= false
+	
     static Boolean doesDBMonitorPageOpenFirst = null
     @Shared boolean firstDebugMessage = true
 
