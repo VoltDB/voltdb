@@ -925,7 +925,7 @@ td.pauseCursorDefault a{cursor: default;}
 #serverListWrapperAdmin{ padding:15px 16px 0 15px;}
 #serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
 .confirmationInfo{font-weight: bold;}
-td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix,td.tdSnapshotFrequency,td.tdSnapshotRetained, td.snapshottd { position: relative;}
+td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix,td.tdSnapshotFrequency,td.tdSnapshotRetained, td.snapshottd , td.tdDrConfig { position: relative;}
 td.heartbeattd span, td.queryTimeOut span{position:relative; top:auto;}
 div.userSecurity{ position: relative;height: 38px;}
 td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px;left:1px;*/}
