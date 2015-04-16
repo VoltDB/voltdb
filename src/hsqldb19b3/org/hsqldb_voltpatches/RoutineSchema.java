@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,11 +32,14 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
+import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
 
 /**
  * Implementation of SQL procedure and functions
@@ -48,6 +51,9 @@ import org.hsqldb_voltpatches.lib.HsqlArrayList;
  */
 public class RoutineSchema implements SchemaObject {
 
+    static RoutineSchema[] emptyArray = new RoutineSchema[]{};
+
+    //
     Routine[]        routines = Routine.emptyArray;
     int              routineType;
     private HsqlName name;
@@ -78,7 +84,14 @@ public class RoutineSchema implements SchemaObject {
     }
 
     public OrderedHashSet getReferences() {
-        return new OrderedHashSet();
+
+        OrderedHashSet set = new OrderedHashSet();
+
+        for (int i = 0; i < routines.length; i++) {
+            set.addAll(routines[i].getReferences());
+        }
+
+        return set;
     }
 
     public OrderedHashSet getComponents() {
@@ -90,10 +103,14 @@ public class RoutineSchema implements SchemaObject {
         return set;
     }
 
-    public void compile(Session session) {}
+    public void compile(Session session, SchemaObject parentObject) {}
 
     public String getSQL() {
         return null;
+    }
+
+    public long getChangeTimestamp() {
+        return 0;
     }
 
     public String[] getSQLArray() {
@@ -122,6 +139,10 @@ public class RoutineSchema implements SchemaObject {
                     throw Error.error(ErrorCode.X_42605);
                 }
 
+                if (routines[i].isAggregate() != routine.isAggregate()) {
+                    throw Error.error(ErrorCode.X_42605);
+                }
+
                 boolean match = true;
 
                 for (int j = 0; j < types.length; j++) {
@@ -139,15 +160,33 @@ public class RoutineSchema implements SchemaObject {
         }
 
         if (routine.getSpecificName() == null) {
-            HsqlName specificName = database.nameManager.newAutoName("",
-                name.name, name.schema, name, name.type);
+            HsqlName specificName =
+                database.nameManager.newSpecificRoutineName(name);
 
             routine.setSpecificName(specificName);
+        } else {
+            routine.getSpecificName().parent = name;
+            routine.getSpecificName().schema = name.schema;
         }
 
+        routine.setName(name);
+
+        routine.routineSchema = this;
         routines = (Routine[]) ArrayUtil.resizeArray(routines,
                 routines.length + 1);
         routines[routines.length - 1] = routine;
+    }
+
+    public void removeSpecificRoutine(Routine routine) {
+
+        for (int i = 0; i < this.routines.length; i++) {
+            if (routines[i] == routine) {
+                routines = (Routine[]) ArrayUtil.toAdjustedArray(routines,
+                        null, i, -1);
+
+                break;
+            }
+        }
     }
 
     public Routine[] getSpecificRoutines() {
@@ -156,11 +195,77 @@ public class RoutineSchema implements SchemaObject {
 
     public Routine getSpecificRoutine(Type[] types) {
 
+        Routine routine = findSpecificRoutine(types);
+
+        if (routine == null) {
+            StringBuffer sb = new StringBuffer();
+
+            sb.append(name.getSchemaQualifiedStatementName());
+            sb.append(Tokens.T_OPENBRACKET);
+
+            for (int i = 0; i < types.length; i++) {
+                if (i != 0) {
+                    sb.append(Tokens.T_COMMA);
+                }
+
+                sb.append(types[i].getNameString());
+            }
+
+            sb.append(Tokens.T_CLOSEBRACKET);
+
+            throw Error.error(ErrorCode.X_42609, sb.toString());
+        }
+
+        return routine;
+    }
+
+    public Routine findSpecificRoutine(Type[] types) {
+
         int matchIndex = -1;
 
         outerLoop:
         for (int i = 0; i < this.routines.length; i++) {
             int matchCount = 0;
+
+            if (routines[i].isAggregate()) {
+                if (types.length == 1) {
+                    if (types[0] == null) {
+                        return routines[i];
+                    }
+
+                    int typeDifference = types[0].precedenceDegree(
+                        routines[i].parameterTypes[0]);
+
+                    if (typeDifference < -NumberType.DOUBLE_WIDTH) {
+                        if (matchIndex == -1) {
+                            continue;
+                        }
+
+                        int oldDiff = types[0].precedenceDegree(
+                            routines[matchIndex].parameterTypes[0]);
+                        int newDiff = types[0].precedenceDegree(
+                            routines[i].parameterTypes[0]);
+
+                        if (oldDiff == newDiff) {
+                            continue outerLoop;
+                        }
+
+                        if (newDiff < oldDiff) {
+                            matchIndex = i;
+                        }
+
+                        continue outerLoop;
+                    } else if (typeDifference == 0) {
+                        return routines[i];
+                    } else {
+                        matchIndex = i;
+
+                        continue outerLoop;
+                    }
+                }
+
+                // treat routine as non-aggregate
+            }
 
             if (routines[i].parameterTypes.length != types.length) {
                 continue;
@@ -181,7 +286,9 @@ public class RoutineSchema implements SchemaObject {
                 typeDifference =
                     types[j].precedenceDegree(routines[i].parameterTypes[j]);
 
-                if (typeDifference < 0) {
+                if (typeDifference < -NumberType.DOUBLE_WIDTH) {
+
+                    // accept numeric type narrowing
                     continue outerLoop;
                 } else if (typeDifference == 0) {
                     if (matchCount == j) {
@@ -222,11 +329,8 @@ public class RoutineSchema implements SchemaObject {
             }
         }
 
-        if (matchIndex < 0) {
-            throw Error.error(ErrorCode.X_42501);
-        }
-
-        return routines[matchIndex];
+        return matchIndex < 0 ? null
+                              : routines[matchIndex];
     }
 
     public Routine getSpecificRoutine(int paramCount) {
@@ -238,5 +342,9 @@ public class RoutineSchema implements SchemaObject {
         }
 
         throw Error.error(ErrorCode.X_42501);
+    }
+
+    public boolean isAggregate() {
+        return routines[0].isAggregate;
     }
 }

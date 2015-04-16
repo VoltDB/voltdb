@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@ package org.hsqldb_voltpatches.lib;
  * circular queue implementation with automatic capacity expansion.
  *
  * @author boucherb@users
- * @version 1.7.2
+ * @version 2.0.1
  * @since 1.7.2
  */
 public class HsqlTaskQueue {
@@ -62,6 +62,11 @@ public class HsqlTaskQueue {
     }
 
     protected synchronized void clearThread() {
+
+        try {
+            taskRunnerThread.setContextClassLoader(null);
+        } catch (Throwable t) {}
+
         taskRunnerThread = null;
     }
 
@@ -111,7 +116,7 @@ public class HsqlTaskQueue {
 
     public synchronized void restart() {
 
-        if (taskRunnerThread == null &&!isShutdown) {
+        if (taskRunnerThread == null && !isShutdown) {
             taskRunnerThread = new Thread(taskRunner);
 
             taskRunnerThread.start();

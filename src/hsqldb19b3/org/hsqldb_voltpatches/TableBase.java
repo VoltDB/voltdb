@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,10 +32,12 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.index.Index;
-import org.hsqldb_voltpatches.index.IndexAVL;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.navigator.RowIterator;
+import org.hsqldb_voltpatches.persist.DataSpaceManager;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.types.Type;
 
@@ -43,38 +45,38 @@ import org.hsqldb_voltpatches.types.Type;
  * The  base of all HSQLDB table implementations.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.2
  * @since 1.7.2
  */
 public class TableBase {
 
     // types of table
-    public static final int SYSTEM_TABLE     = 0;
-    public static final int SYSTEM_SUBQUERY  = 1;
-    public static final int TEMP_TABLE       = 2;
-    public static final int MEMORY_TABLE     = 3;
-    public static final int CACHED_TABLE     = 4;
-    public static final int TEMP_TEXT_TABLE  = 5;
-    public static final int TEXT_TABLE       = 6;
-    public static final int VIEW_TABLE       = 7;
-    public static final int RESULT_TABLE     = 8;
-    public static final int TRANSITION_TABLE = 9;
-    public static final int FUNCTION_TABLE   = 10;
+    public static final int INFO_SCHEMA_TABLE = 1;
+    public static final int SYSTEM_SUBQUERY   = 2;
+    public static final int TEMP_TABLE        = 3;
+    public static final int MEMORY_TABLE      = 4;
+    public static final int CACHED_TABLE      = 5;
+    public static final int TEMP_TEXT_TABLE   = 6;
+    public static final int TEXT_TABLE        = 7;
+    public static final int VIEW_TABLE        = 8;
+    public static final int RESULT_TABLE      = 9;
+    public static final int TRANSITION_TABLE  = 10;
+    public static final int FUNCTION_TABLE    = 11;
+    public static final int SYSTEM_TABLE      = 12;
+    public static final int CHANGE_SET_TABLE  = 13;
 
     //
-    public static final int SCOPE_STATEMENT   = 11;
-    public static final int SCOPE_TRANSACTION = 12;
-    public static final int SCOPE_SESSION     = 13;
-    public static final int SCOPE_FULL        = 14;
-
-    //
-    public static final int COLUMNS_UNREFERENCED = 15;
-    public static final int COLUMNS_REFERENCED   = 16;
+    public static final int SCOPE_ROUTINE     = 20;
+    public static final int SCOPE_STATEMENT   = 21;
+    public static final int SCOPE_TRANSACTION = 22;
+    public static final int SCOPE_SESSION     = 23;
+    public static final int SCOPE_FULL        = 24;
 
     //
     public PersistentStore store;
     public int             persistenceScope;
     public long            persistenceId;
+    int                    tableSpace = DataSpaceManager.tableIdDefault;
 
     // columns in table
     int[]  primaryKeyCols;                      // column numbers for primary key
@@ -101,6 +103,7 @@ public class TableBase {
     protected boolean isCached;
     protected boolean isText;
     boolean           isView;
+    protected boolean isWithDataSource;
     public boolean    isSessionBased;
     protected boolean isSchemaBased;
     protected boolean isLogged;
@@ -111,7 +114,8 @@ public class TableBase {
     TableBase() {}
 
     //
-    public TableBase(Database database, int scope, int type, Type[] colTypes) {
+    public TableBase(Session session, Database database, int scope, int type,
+                     Type[] colTypes) {
 
         tableType        = type;
         persistenceScope = scope;
@@ -121,8 +125,8 @@ public class TableBase {
         this.colTypes    = colTypes;
         columnCount      = colTypes.length;
         primaryKeyCols   = new int[]{};
-        primaryKeyTypes  = new Type[]{};
-        indexList        = new Index[0];
+        primaryKeyTypes  = Type.emptyArray;
+        indexList        = Index.emptyArray;
 
         createPrimaryIndex(primaryKeyCols, primaryKeyTypes, null);
     }
@@ -137,7 +141,7 @@ public class TableBase {
         copy.persistenceId    = database.persistentStoreCollection.getNextId();
         copy.database         = database;
         copy.colTypes         = colTypes;
-        copy.columnCount      = colTypes.length;
+        copy.columnCount      = columnCount;
         copy.primaryKeyCols   = primaryKeyCols;
         copy.primaryKeyTypes  = primaryKeyTypes;
         copy.indexList        = indexList;
@@ -153,6 +157,14 @@ public class TableBase {
         return persistenceId;
     }
 
+    public int getSpaceID() {
+        return tableSpace;
+    }
+
+    public void setSpaceID(int id) {
+        tableSpace = id;
+    }
+
     int getId() {
         return 0;
     }
@@ -163,9 +175,9 @@ public class TableBase {
 
     public final RowIterator rowIterator(Session session) {
 
-        PersistentStore store = session.sessionData.getRowStore(this);
+        PersistentStore store = getRowStore(session);
 
-        return getPrimaryIndex().firstRow(store);
+        return getPrimaryIndex().firstRow(session, store, 0);
     }
 
     public final RowIterator rowIterator(PersistentStore store) {
@@ -177,7 +189,8 @@ public class TableBase {
     }
 
     public final Index getPrimaryIndex() {
-        return indexList[0];
+        return indexList.length > 0 ? indexList[0]
+                                    : null;
     }
 
     public final Type[] getPrimaryKeyTypes() {
@@ -197,13 +210,6 @@ public class TableBase {
      */
     public final Type[] getColumnTypes() {
         return colTypes;
-    }
-
-    /**
-     * Returns an index on all the columns
-     */
-    public Index getFullIndex() {
-        return fullIndex;
     }
 
     /**
@@ -293,7 +299,7 @@ public class TableBase {
             }
             // End of VoltDB extension
             int[] cols      = index.getColumns();
-            int   colsCount = index.getVisibleColumns();
+            int   colsCount = index.getColumnCount();
 
             if (colsCount == 0) {
                 continue;
@@ -361,12 +367,13 @@ public class TableBase {
             }
         }
 
-        // remove rowID column from bestRowIdentiferCols
-        bestRowIdentifierCols = briCols == null
-                                || briColsCount == briCols.length ? briCols
-                                                                  : ArrayUtil
-                                                                  .arraySlice(briCols,
-                                                                      0, briColsCount);
+        if (briCols == null || briColsCount == briCols.length) {
+            bestRowIdentifierCols = briCols;
+        } else {
+            bestRowIdentifierCols = ArrayUtil.arraySlice(briCols, 0,
+                    briColsCount);
+        }
+
         bestRowIdentifierStrict = isStrict;
 
         if (indexList[0].getColumnCount() > 0) {
@@ -374,27 +381,33 @@ public class TableBase {
         }
     }
 
+    public boolean[] getColumnNotNull() {
+        return this.colNotNull;
+    }
+
     public final void createPrimaryIndex(int[] pkcols, Type[] pktypes,
                                          HsqlName name) {
 
         long id = database.persistentStoreCollection.getNextId();
-        Index newindex = new IndexAVL(name, id, this, pkcols, null, null,
-                                      pktypes, true, true, true, false);
+        Index newIndex = database.logger.newIndex(name, id, this, pkcols,
+            null, null, pktypes, true, pkcols.length > 0, pkcols.length > 0,
+            false);
 
         try {
-            addIndex(newindex);
+            addIndex(null, newIndex);
         } catch (HsqlException e) {}
     }
 
-    public final Index createAndAddIndexStructure(HsqlName name,
-            int[] columns, boolean[] descending, boolean[] nullsLast,
-            boolean unique, boolean constraint, boolean forward) {
+    public final Index createAndAddIndexStructure(Session session,
+            HsqlName name, int[] columns, boolean[] descending,
+            boolean[] nullsLast, boolean unique, boolean constraint,
+            boolean forward) {
 
         Index newindex = createIndexStructure(name, columns, descending,
                                               nullsLast, unique, constraint,
                                               forward);
 
-        addIndex(newindex);
+        addIndex(session, newindex);
 
         return newindex;
     }
@@ -423,14 +436,33 @@ public class TableBase {
         }
 
         long id = database.persistentStoreCollection.getNextId();
-        Index newIndex = new IndexAVL(name, id, this, cols, descending,
-                                      nullsLast, types, false, unique,
-                                      constraint, forward);
+        Index newIndex = database.logger.newIndex(name, id, this, cols,
+            descending, nullsLast, types, false, unique, constraint, forward);
 
         return newIndex;
     }
 
-    final void addIndex(Index index) {
+    /**
+     *  Performs Table structure modification and changes to the index nodes
+     *  to remove a given index from a MEMORY or TEXT table. Not for PK index.
+     *
+     */
+    public void dropIndex(Session session, int todrop) {
+
+        Index[] oldIndexList = indexList;
+
+        indexList = (Index[]) ArrayUtil.toAdjustedArray(indexList, null,
+                todrop, -1);
+
+        for (int i = 0; i < indexList.length; i++) {
+            indexList[i].setPosition(i);
+        }
+
+        resetAccessorKeys(session, indexList, oldIndexList);
+        setBestRowIdentifiers();
+    }
+
+    final void addIndex(Session session, Index index) {
 
         int i = 0;
 
@@ -444,6 +476,8 @@ public class TableBase {
             }
         }
 
+        Index[] oldIndexList = indexList;
+
         indexList = (Index[]) ArrayUtil.toAdjustedArray(indexList, index, i,
                 1);
 
@@ -451,14 +485,20 @@ public class TableBase {
             indexList[i].setPosition(i);
         }
 
+        resetAccessorKeys(session, indexList, oldIndexList);
+        setBestRowIdentifiers();
+    }
+
+    private void resetAccessorKeys(Session session, Index[] indexList,
+                                   Index[] oldIndexList) {
+
         if (store != null) {
             try {
-                store.resetAccessorKeys(indexList);
+                store.resetAccessorKeys(session, indexList);
             } catch (HsqlException e) {
-                indexList = (Index[]) ArrayUtil.toAdjustedArray(indexList,
-                        null, index.getPosition(), -1);
+                indexList = oldIndexList;
 
-                for (i = 0; i < indexList.length; i++) {
+                for (int i = 0; i < indexList.length; i++) {
                     indexList[i].setPosition(i);
                 }
 
@@ -466,11 +506,42 @@ public class TableBase {
             }
         }
 
-        setBestRowIdentifiers();
+        if (session == null) {
+            return;
+        }
+
+        switch (tableType) {
+
+            case TableBase.INFO_SCHEMA_TABLE :
+            case TableBase.TEMP_TABLE : {
+                try {
+
+                    // session may be an unregisterd sys session
+                    session.sessionData.persistentStoreCollection
+                        .registerIndex(session, this);
+
+                    break;
+                } catch (HsqlException e) {
+                    indexList = oldIndexList;
+
+                    for (int i = 0; i < indexList.length; i++) {
+                        indexList[i].setPosition(i);
+                    }
+
+                    throw e;
+                }
+            }
+            case TableBase.SYSTEM_SUBQUERY :
+            case TableBase.SYSTEM_TABLE :
+        }
     }
 
     final void removeIndex(int position) {
         setBestRowIdentifiers();
+    }
+
+    public final void setIndexes(Index[] indexes) {
+        this.indexList = indexes;
     }
 
     public final Object[] getEmptyRowData() {
@@ -480,20 +551,20 @@ public class TableBase {
     /**
      *  Create new memory-resident index. For MEMORY and TEXT tables.
      */
-    public final Index createIndex(PersistentStore store, HsqlName name,
+    public final Index createIndex(Session session, HsqlName name,
                                    int[] columns, boolean[] descending,
                                    boolean[] nullsLast, boolean unique,
                                    boolean constraint, boolean forward) {
 
-        Index newIndex = createAndAddIndexStructure(name, columns, descending,
-            nullsLast, unique, constraint, forward);
+        Index newIndex = createAndAddIndexStructure(session, name, columns,
+            descending, nullsLast, unique, constraint, forward);
 
         return newIndex;
     }
 
     public void clearAllData(Session session) {
 
-        PersistentStore store = session.sessionData.getRowStore(this);
+        PersistentStore store = getRowStore(session);
 
         store.removeAll();
     }
@@ -503,8 +574,12 @@ public class TableBase {
     }
 
     /**
-     * @todo - this is wrong, as it returns true when table has no rows,
-     * but not where it has rows that are not visible by session
+     * @todo - this is not for general use, as it returns true when table has no
+     * rows, but not where it has rows that are not visible by session.
+     * current usage is fine.
+     */
+
+    /**
      *  Returns true if the table has any rows at all.
      */
     public final boolean isEmpty(Session session) {
@@ -513,12 +588,15 @@ public class TableBase {
             return true;
         }
 
-        PersistentStore store = session.sessionData.getRowStore(this);
+        PersistentStore store = getRowStore(session);
 
         return getIndex(0).isEmpty(store);
     }
 
-    public int getRowCount(PersistentStore store) {
-        return getPrimaryIndex().size(store);
+    public PersistentStore getRowStore(Session session) {
+
+        return store == null
+               ? session.sessionData.persistentStoreCollection.getStore(this)
+               : store;
     }
 }

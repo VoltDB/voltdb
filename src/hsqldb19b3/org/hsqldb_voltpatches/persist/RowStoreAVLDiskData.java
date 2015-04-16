@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,100 +35,253 @@ import java.io.IOException;
 
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.Row;
+import org.hsqldb_voltpatches.RowAVL;
 import org.hsqldb_voltpatches.RowAVLDiskData;
 import org.hsqldb_voltpatches.RowAction;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
+import org.hsqldb_voltpatches.TransactionManager;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Error;
+import org.hsqldb_voltpatches.rowio.RowOutputInterface;
 
 /*
  * Implementation of PersistentStore for TEXT tables.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
-public class RowStoreAVLDiskData extends RowStoreAVLDisk {
+public class RowStoreAVLDiskData extends RowStoreAVL {
+
+    DataFileCache      cache;
+    RowOutputInterface rowOut;
 
     public RowStoreAVLDiskData(PersistentStoreCollection manager,
                                Table table) {
-        super(manager, null, table);
+
+        this.database     = table.database;
+        this.manager      = manager;
+        this.table        = table;
+        this.indexList    = table.getIndexList();
+        this.accessorList = new CachedObject[indexList.length];
+
+        manager.setStore(table, this);
+    }
+
+    public CachedObject get(long key, boolean keep) {
+
+        CachedObject object = cache.get(key, this, keep);
+
+        return object;
+    }
+
+    public CachedObject get(CachedObject object, boolean keep) {
+
+        object = cache.get(object, this, keep);
+
+        return object;
+    }
+
+    public void add(Session session, CachedObject object, boolean tx) {
+
+        cache.writeLock.lock();
+
+        try {
+            int size = object.getRealSize(cache.rowOut);
+
+            object.setStorageSize(size);
+
+            long pos = tableSpace.getFilePosition(size, false);
+
+            object.setPos(pos);
+
+            if (tx) {
+                RowAction.addInsertAction(session, table, (Row) object);
+            }
+
+            cache.add(object);
+        } finally {
+            cache.writeLock.unlock();
+        }
+    }
+
+    public CachedObject get(RowInputInterface in) {
+
+        try {
+            RowAVLDiskData row = new RowAVLDiskData(this, table, in);
+
+            row.setPos(in.getPos());
+            row.setStorageSize(in.getSize());
+            row.setChanged(false);
+            ((TextCache) cache).addInit(row);
+
+            return row;
+        } catch (IOException e) {
+            throw Error.error(ErrorCode.TEXT_FILE_IO, e);
+        }
+    }
+
+    public CachedObject get(CachedObject object, RowInputInterface in) {
+
+        try {
+            ((RowAVLDiskData) object).getRowData(table, in);
+
+            return object;
+        } catch (IOException e) {
+            throw Error.error(ErrorCode.TEXT_FILE_IO, e);
+        }
+    }
+
+    public CachedObject getNewCachedObject(Session session, Object object,
+                                           boolean tx) {
+
+        Row row = new RowAVLDiskData(this, table, (Object[]) object);
+
+        add(session, row, tx);
+
+        return row;
+    }
+
+    public void indexRow(Session session, Row row) {
+        super.indexRow(session, row);
     }
 
     public boolean isMemory() {
         return false;
     }
 
-    public void add(CachedObject object) {
-
-        int size = object.getRealSize(cache.rowOut);
-
-        object.setStorageSize(size);
-        cache.add(object);
+    public int getAccessCount() {
+        return cache.getAccessCount();
     }
 
-    public CachedObject get(RowInputInterface in) {
+    public void set(CachedObject object) {}
 
-        try {
-            return new RowAVLDiskData(table, in);
-        } catch (IOException e) {
-            throw Error.error(ErrorCode.TEXT_FILE_IO, e);
-        }
-    }
+    public CachedObject get(long key) {
 
-    public CachedObject getNewCachedObject(Session session, Object object) {
+        CachedObject object = cache.get(key, this, false);
 
-        Row row = new RowAVLDiskData(table, (Object[]) object);
-
-        add(row);
-        RowAction.addAction(session, RowAction.ACTION_INSERT, table, row);
-
-        return row;
+        return object;
     }
 
     public void removeAll() {
 
-        // does not yet clear the storage
+        destroy();
+        elementCount.set(0);
+        ArrayUtil.fillArray(accessorList, null);
     }
 
-    public void remove(int i) {
-
-        if (cache != null) {
-            cache.remove(i, this);
-        }
+    public void remove(CachedObject object) {
+        cache.remove(object);
     }
 
-    public void removePersistence(int i) {
+    public CachedObject getAccessor(Index key) {
 
-        if (cache != null) {
-            cache.removePersistence(i);
+        int position = key.getPosition();
+
+        if (position >= accessorList.length) {
+            throw Error.runtimeError(ErrorCode.U_S0500, "RowStoreAVL");
         }
-    }
 
-    public void release(int i) {
-
-        if (cache != null) {
-            cache.release(i);
-        }
+        return accessorList[position];
     }
 
     public void commitPersistence(CachedObject row) {
 
         try {
-            if (cache != null) {
-                cache.saveRow(row);
-            }
+            cache.saveRow(row);
         } catch (HsqlException e1) {}
     }
 
+    public void commitRow(Session session, Row row, int changeAction,
+                          int txModel) {
+
+        switch (changeAction) {
+
+            case RowAction.ACTION_DELETE :
+                cache.removePersistence(row);
+                break;
+
+            case RowAction.ACTION_INSERT :
+                commitPersistence(row);
+                break;
+
+            case RowAction.ACTION_INSERT_DELETE :
+
+                // INSERT + DELETE
+                if (txModel == TransactionManager.LOCKS) {
+                    remove(row);
+                } else {
+                    delete(session, row);
+                    remove(row);
+                }
+                break;
+
+            case RowAction.ACTION_DELETE_FINAL :
+                if (txModel != TransactionManager.LOCKS) {
+                    delete(session, row);
+                    remove(row);
+                }
+                break;
+        }
+    }
+
+    public void rollbackRow(Session session, Row row, int changeAction,
+                            int txModel) {
+
+        switch (changeAction) {
+
+            case RowAction.ACTION_DELETE :
+                if (txModel == TransactionManager.LOCKS) {
+                    ((RowAVL) row).setNewNodes(this);
+                    indexRow(session, row);
+                }
+                break;
+
+            case RowAction.ACTION_INSERT :
+                if (txModel == TransactionManager.LOCKS) {
+                    delete(session, row);
+                    remove(row);
+                }
+                break;
+
+            case RowAction.ACTION_INSERT_DELETE :
+
+                // INSERT + DELETE
+                if (txModel == TransactionManager.LOCKS) {
+                    remove(row);
+                } else {
+                    delete(session, row);
+                    remove(row);
+                }
+                break;
+        }
+    }
+
+    public DataFileCache getCache() {
+        return cache;
+    }
+
+    public void setCache(DataFileCache cache) {
+
+        this.cache = cache;
+        this.tableSpace =
+            cache.spaceManager.getTableSpace(DataSpaceManager.tableIdDefault);
+    }
+
+    /**
+     * Does not adjust usage count
+     */
     public void release() {
 
-        ArrayUtil.fillArray(accessorList, null);
+        destroy();
         table.database.logger.closeTextCache((Table) table);
 
         cache = null;
+
+        ArrayUtil.fillArray(accessorList, null);
     }
 }

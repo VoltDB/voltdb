@@ -421,10 +421,6 @@ public enum VoltType {
         return type;
     }
 
-    private boolean matchesString(String str) {
-        return str.toLowerCase().endsWith(name().toLowerCase());
-    }
-
     /**
      * Converts string representations to an enum value.
      * @param str A string in the form "TYPENAME" or "VoltType.TYPENAME",
@@ -440,19 +436,23 @@ public enum VoltType {
             str = str.substring("VoltType.".length());
         }
 
-        if (str.compareToIgnoreCase("null") == 0) {
-            return NULL;
+        String upperStr = str.toUpperCase();
+        if (upperStr.equals("DOUBLE")) {
+            return FLOAT;
         }
-
-        for (VoltType type: values()) {
-            if (type.matchesString(str)) {
-                return type;
-            }
+        if (upperStr.equals("CHARACTER") ||
+                upperStr.equals("CHAR") ||
+                upperStr.equals("VARCHAR")) {
+            return STRING;
         }
-        if (str.equalsIgnoreCase("DOUBLE")) return FLOAT;
-        if (str.equalsIgnoreCase("CHARACTER") || str.equalsIgnoreCase("CHAR") || str.equalsIgnoreCase("VARCHAR")) return STRING;
-
-        throw new RuntimeException("Can't find type: " + str);
+        if (upperStr.equals("BOOLEAN")) {
+            // VoltDB does not support a BOOLEAN type for user data.
+            // BOOLEAN only arises in the context of predicate values
+            // and the VoltDB planner (for some strange reason) has
+            // always treated these as BIGINT.
+            return BIGINT;
+        }
+        return valueOf(upperStr);
     }
 
     /**

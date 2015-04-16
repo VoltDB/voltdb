@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches.util;
 
+import java.sql.Blob;
+import java.sql.Clob;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -83,6 +85,10 @@ class TransferHelper {
             return id;
         }
 
+        if (!id.toUpperCase().equals(id)) {
+            return (quote + id + quote);
+        }
+
         if (!Character.isLetter(id.charAt(0)) || (id.indexOf(' ') != -1)) {
             return (quote + id + quote);
         }
@@ -128,8 +134,9 @@ class TransferHelper {
 
                     if (hTypes.get(intobj) == null) {
                         try {
-                            hTypes.put(intobj,
-                                       JDBCT.toString(result.getShort(2)));
+                            int typeNumber = result.getShort(2);
+
+                            hTypes.put(intobj, JDBCT.toString(typeNumber));
                         } catch (Exception e) {}
                     }
                 }
@@ -162,6 +169,23 @@ class TransferHelper {
     }
 
     Object convertColumnValue(Object value, int column, int type) {
+
+        if (value == null) {
+            return value;
+        }
+
+        try {
+            if (value instanceof Clob) {
+                return ((Clob) value).getSubString(
+                    1, (int) ((Clob) value).length());
+            } else if (value instanceof Blob) {
+                return ((Blob) value).getBytes(
+                    1, (int) ((Blob) value).length());
+            }
+        } catch (SQLException e) {
+            return null;
+        }
+
         return (value);
     }
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,30 +41,30 @@ import java.io.InputStream;
  * (without synchronization) and java.io.DataInputStream
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.7.2
+ * @version 1.9.0
  * @since 1.7.2
  */
 public class HsqlByteArrayInputStream extends InputStream
 implements DataInput {
 
-    protected byte[] buf;
+    protected byte[] buffer;
     protected int    pos;
     protected int    mark = 0;
     protected int    count;
 
     public HsqlByteArrayInputStream(byte[] buf) {
 
-        this.buf   = buf;
-        this.pos   = 0;
-        this.count = buf.length;
+        this.buffer = buf;
+        this.pos    = 0;
+        this.count  = buf.length;
     }
 
     public HsqlByteArrayInputStream(byte[] buf, int offset, int length) {
 
-        this.buf   = buf;
-        this.pos   = offset;
-        this.count = Math.min(offset + length, buf.length);
-        this.mark  = offset;
+        this.buffer = buf;
+        this.pos    = offset;
+        this.count  = Math.min(offset + length, buf.length);
+        this.mark   = offset;
     }
 
     // methods that implement java.io.DataInput
@@ -133,8 +133,8 @@ implements DataInput {
             throw new EOFException();
         }
 
-        int ch1 = buf[pos++] & 0xff;
-        int ch2 = buf[pos++] & 0xff;
+        int ch1 = buffer[pos++] & 0xff;
+        int ch2 = buffer[pos++] & 0xff;
 
         return (short) ((ch1 << 8) + (ch2));
     }
@@ -171,17 +171,16 @@ implements DataInput {
             throw new EOFException();
         }
 
-        int ch1 = buf[pos++] & 0xff;
-        int ch2 = buf[pos++] & 0xff;
-        int ch3 = buf[pos++] & 0xff;
-        int ch4 = buf[pos++] & 0xff;
+        int ch1 = buffer[pos++] & 0xff;
+        int ch2 = buffer[pos++] & 0xff;
+        int ch3 = buffer[pos++] & 0xff;
+        int ch4 = buffer[pos++] & 0xff;
 
         return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4));
     }
 
     public long readLong() throws IOException {
-        return (((long) readInt()) << 32)
-               + (((long) readInt()) & 0xffffffffL);
+        return (((long) readInt()) << 32) + (((long) readInt()) & 0xffffffffL);
     }
 
     public final float readFloat() throws IOException {
@@ -210,7 +209,7 @@ implements DataInput {
             throw new EOFException();
         }
 
-        String result = StringConverter.readUTF(buf, pos, bytecount);
+        String result = StringConverter.readUTF(buffer, pos, bytecount);
 
         pos += bytecount;
 
@@ -219,7 +218,7 @@ implements DataInput {
 
 // methods that extend java.io.InputStream
     public int read() {
-        return (pos < count) ? (buf[pos++] & 0xff)
+        return (pos < count) ? (buffer[pos++] & 0xff)
                              : -1;
     }
 
@@ -237,7 +236,7 @@ implements DataInput {
             return 0;
         }
 
-        System.arraycopy(buf, pos, b, off, len);
+        System.arraycopy(buffer, pos, b, off, len);
 
         pos += len;
 

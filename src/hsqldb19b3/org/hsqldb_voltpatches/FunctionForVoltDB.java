@@ -35,8 +35,9 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.types.Type;
-
 
 
 /**
@@ -310,7 +311,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         switch(m_def.getId()) {
         case FunctionId.FUNC_CONCAT:
             for (int ii = 0; ii < nodes.length; ii++) {
-                if (nodes[ii].dataType == null && nodes[ii].isParam) {
+                if (nodes[ii].dataType == null && nodes[ii].isUnresolvedParam()) {
                     nodes[ii].dataType = Type.SQL_VARCHAR;
                 }
             }
@@ -319,10 +320,10 @@ public class FunctionForVoltDB extends FunctionSQL {
          * The types to the FIELD functions parameters are VARCHAR
          */
         case FunctionId.FUNC_VOLT_FIELD:
-            if (nodes[0].dataType == null && nodes[0].isParam) {
+            if (nodes[0].dataType == null && nodes[0].isUnresolvedParam()) {
                 nodes[0].dataType = Type.SQL_VARCHAR;
             }
-            if (nodes[1].dataType == null && nodes[1].isParam) {
+            if (nodes[1].dataType == null && nodes[1].isUnresolvedParam()) {
                 nodes[1].dataType = Type.SQL_VARCHAR;
             }
             break;
@@ -348,7 +349,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 Type argType = nodes[ii].dataType;
                 if (argType == null) {
                     // A param here means work to do, below.
-                    if (nodes[ii].isParam || nodes[ii].valueData == null) {
+                    if (nodes[ii].isUnresolvedParam() || nodes[ii].valueData == null) {
                         needParamType = true;
                     }
                     continue;
@@ -390,7 +391,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             for (int ii = 0; ii < nodes.length; ii++) {
                 Type argType = nodes[ii].dataType;
-                if ((argType != null) || ! (nodes[ii].isParam || nodes[ii].valueData == null)) {
+                if ((argType != null) || ! (nodes[ii].isUnresolvedParam() || nodes[ii].valueData == null)) {
                     continue;
                 }
                 // This is the same test as above for determining that the argument
@@ -404,20 +405,20 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
 
         case FunctionId.FUNC_VOLT_BITNOT:
-            voltResolveToBigintTypesForBitwise();
+            voltResolveToBigintTypesForBitwise(session);
             break;
 
         case FunctionId.FUNC_VOLT_BIT_SHIFT_LEFT:
         case FunctionId.FUNC_VOLT_BIT_SHIFT_RIGHT:
             // the first parameter has to be BigInteger
-            voltResolveToBigintType(0);
-            voltResolveToBigintCompatibleType(1);
+            voltResolveToBigintType(session, 0);
+            voltResolveToBigintCompatibleType(session, 1);
 
             dataType = Type.SQL_BIGINT;
             break;
 
         case FunctionId.FUNC_VOLT_HEX:
-            voltResolveToBigintType(0);
+            voltResolveToBigintType(session, 0);
             dataType = Type.SQL_VARCHAR;
             break;
 

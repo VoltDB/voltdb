@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,14 +44,14 @@ import org.hsqldb_voltpatches.server.ServerConstants;
  * Parses a connection URL into parts.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.8.0
  */
 
 // patch 1.9.0 by Blaine Simpson - IPv6 support
 public class DatabaseURL {
 
-    static final String        S_DOT               = ".";
+    public static final String S_DOT               = ".";
     public static final String S_MEM               = "mem:";
     public static final String S_FILE              = "file:";
     public static final String S_RES               = "res:";
@@ -60,7 +60,8 @@ public class DatabaseURL {
     public static final String S_HSQLS             = "hsqls://";
     public static final String S_HTTP              = "http://";
     public static final String S_HTTPS             = "https://";
-    public static final String S_URL_PREFIX        = "jdbc:hsqldb:";
+    public static final String S_URL_PREFIX        = "jdbc:hsqldb_voltpatches:";
+    public static final String S_URL_INTERNAL      = "jdbc:default:connection";
     public static final String url_connection_type = "connection_type";
     public static final String url_database        = "database";
 
@@ -68,9 +69,9 @@ public class DatabaseURL {
      * Returns true if type represents an in-process connection to a file backed
      * database.
      */
-    public static boolean isFileBasedDatabaseType(String url) {
+    public static boolean isFileBasedDatabaseType(String type) {
 
-        if (url == S_FILE || url == S_RES) {
+        if (type == S_FILE || type == S_RES) {
             return true;
         }
 
@@ -80,9 +81,9 @@ public class DatabaseURL {
     /**
      * Returns true if type represents an in-process connection to database.
      */
-    public static boolean isInProcessDatabaseType(String url) {
+    public static boolean isInProcessDatabaseType(String type) {
 
-        if (url == S_FILE || url == S_RES || url == S_MEM) {
+        if (type == S_FILE || type == S_RES || type == S_MEM) {
             return true;
         }
 
@@ -109,8 +110,8 @@ public class DatabaseURL {
      * (slash) with path elements appended apart from servlet path which is
      * (slash) plus the name of the servlet
      *
-     * <p> database: database name. For memory, resource and networked modes,
-     * this is returned in lowercase, for file databases the original case of
+     * <p> database: database name. For memory, networked modes,
+     * this is returned in lowercase, for file: and res: databases the original case of
      * characters is preserved. Returns empty string if name is not present in
      * the url.
      *
@@ -136,6 +137,11 @@ public class DatabaseURL {
         HsqlProperties extraProps = null;
         String         arguments  = null;
         int            pos        = 0;
+        String         type       = null;
+        int            port       = 0;
+        String         database;
+        String         path;
+        boolean        isNetwork = false;
 
         if (hasPrefix) {
             if (urlImage.startsWith(S_URL_PREFIX)) {
@@ -145,11 +151,34 @@ public class DatabaseURL {
             }
         }
 
-        String  type = null;
-        int     port = 0;
-        String  database;
-        String  path;
-        boolean isNetwork = false;
+        while (true) {
+            int replacePos = url.indexOf("${");
+
+            if (replacePos == -1) {
+                break;
+            }
+
+            int endPos = url.indexOf("}", replacePos);
+
+            if (endPos == -1) {
+                break;
+            }
+
+            String varName  = url.substring(replacePos + 2, endPos);
+            String varValue = null;
+
+            try {
+                varValue = System.getProperty(varName);
+            } catch (SecurityException e) {}
+
+            if (varValue == null) {
+                break;
+            }
+
+            url = url.substring(0, replacePos) + varValue
+                  + url.substring(endPos + 1);
+            urlImage = url.toLowerCase(Locale.ENGLISH);
+        }
 
         props.setProperty("url", url);
 
@@ -162,12 +191,12 @@ public class DatabaseURL {
         int semiPos = url.indexOf(';', pos);
 
         if (semiPos > -1) {
-            arguments  = urlImage.substring(semiPos + 1, urlImage.length());
+            arguments  = url.substring(semiPos + 1, urlImage.length());
             postUrlPos = semiPos;
             extraProps = HsqlProperties.delimitedArgPairsToProps(arguments,
                     "=", ";", null);
 
-            /** @todo 1.9.0 - check if properties have valid names / values */
+            // validity checks are performed by engine
             props.addProperties(extraProps);
         }
 
@@ -214,21 +243,17 @@ public class DatabaseURL {
         if (isNetwork) {
 
             // First capture 3 segments:  host + port + path
-            String pathSeg  = null;
-            String hostSeg  = null;
-            String portSeg  = null;
-            int    slashPos = url.indexOf('/', pos);
+            String pathSeg = null;
+            String hostSeg = null;
+            String portSeg = null;
+            int    endPos  = url.indexOf('/', pos);
 
-            if (slashPos > 0 && slashPos < postUrlPos) {
-                pathSeg = url.substring(slashPos, postUrlPos);
+            if (endPos > 0 && endPos < postUrlPos) {
+                pathSeg = url.substring(endPos, postUrlPos);
 
                 // N.b. pathSeg necessarily begins with /.
-                postUrlPos = slashPos;
-            }
-
-            // Assertion
-            if (postUrlPos <= pos) {
-                return null;
+            } else {
+                endPos = postUrlPos;
             }
 
             // Processing different for ipv6 host address and all others:
@@ -238,7 +263,7 @@ public class DatabaseURL {
                 int endIpv6 = url.indexOf(']', pos + 2);
 
                 // Notice 2 instead of 1 to require non-empty addr segment
-                if (endIpv6 < 0 || endIpv6 >= postUrlPos) {
+                if (endIpv6 < 0 || endIpv6 >= endPos) {
                     return null;
 
                     // Wish could throw something with a useful message for user
@@ -247,23 +272,24 @@ public class DatabaseURL {
 
                 hostSeg = urlImage.substring(pos + 1, endIpv6);
 
-                if (postUrlPos > endIpv6 + 1) {
-                    portSeg = url.substring(endIpv6 + 1, postUrlPos);
+                if (endPos > endIpv6 + 1) {
+                    portSeg = url.substring(endIpv6 + 1, endPos);
                 }
             } else {
 
                 // non-ipv6
                 int colPos = url.indexOf(':', pos + 1);
 
-                // Notice + 1 to require non-empty addr segment
-                hostSeg = urlImage.substring(pos, (colPos > 0) ? colPos
-                                                               : postUrlPos);
-
-                if (colPos > -1 && postUrlPos > colPos + 1) {
+                if (colPos > -1 && colPos < endPos) {
 
                     // portSeg will be non-empty, but could contain just ":"
-                    portSeg = url.substring(colPos, postUrlPos);
+                    portSeg = url.substring(colPos, endPos);
+                } else {
+                    colPos = -1;
                 }
+
+                hostSeg = urlImage.substring(pos, (colPos > 0) ? colPos
+                                                               : endPos);
             }
 
             // At this point, the entire url has been parsed into
@@ -318,24 +344,59 @@ public class DatabaseURL {
 
                 if (filePath != null && database.length() != 0) {
                     database += ";" + filePath;
+                } else {
+                    if (url.indexOf(S_MEM) == postUrlPos + 1
+                            || url.indexOf(S_FILE) == postUrlPos + 1) {
+                        database += url.substring(postUrlPos);
+                    }
                 }
             }
         } else {
-            if (type == S_MEM || type == S_RES) {
-                database = urlImage.substring(pos, postUrlPos).toLowerCase();
+            if (type == S_MEM) {
+                database = urlImage.substring(pos, postUrlPos);
+            } else if (type == S_RES) {
+                database = url.substring(pos, postUrlPos);
 
-                if (type == S_RES) {
-                    if (database.indexOf('/') != 0) {
-                        database = '/' + database;
-                    }
+                if (database.indexOf('/') != 0) {
+                    database = '/' + database;
                 }
             } else {
                 database = url.substring(pos, postUrlPos);
+
+                if (database.startsWith("~")) {
+                    String userHome = "~";
+
+                    try {
+                        userHome = System.getProperty("user.home");
+                    } catch (SecurityException e) {}
+
+                    database = userHome + database.substring(1);
+                }
             }
 
             if (database.length() == 0) {
                 return null;
             }
+        }
+
+        pos = database.indexOf("&password=");
+
+        if (pos != -1) {
+            String password = database.substring(pos + "&password=".length());
+
+            props.setProperty("password", password);
+
+            database = database.substring(0, pos);
+        }
+
+        pos = database.indexOf("?user=");
+
+        if (pos != -1) {
+            String user = database.substring(pos + "?user=".length());
+
+            props.setProperty("user", user);
+
+            database = database.substring(0, pos);
         }
 
         props.setProperty("database", database);

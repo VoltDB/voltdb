@@ -24,6 +24,7 @@ import java.util.TimeZone;
 import java.util.TreeMap;
 
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
@@ -126,14 +127,13 @@ public class HSQLInterface {
 
         HsqlProperties props = new HsqlProperties();
         try {
-            sessionProxy = DatabaseManager.newSession(DatabaseURL.S_MEM, name, "SA", "", props, 0);
+            // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
+            // This ensures that all VoltDB data paths use the same timezone for representing time.
+            sessionProxy = DatabaseManager.newSession(DatabaseURL.S_MEM, name, "SA", "",
+                    props, "GMT+0", 0);
         } catch (HsqlException e) {
             e.printStackTrace();
         }
-
-        // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
-        // This ensures that all VoltDB data paths use the same timezone for representing time.
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
 
         // make HSQL case insensitive
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
@@ -265,7 +265,10 @@ public class HSQLInterface {
     public void runDDLCommand(String ddl) throws HSQLParseException {
         Result result = sessionProxy.executeDirectStatement(ddl);
         if (result.hasError()) {
-            throw new HSQLParseException(result.getMainString());
+            String errorMessage = result.getMainString()
+                    .replace("user lacks privilege or object not found: PUBLIC.", "object not found: ")
+                    .replace("user lacks privilege or object not found: ", "object not found: ");
+            throw new HSQLParseException(errorMessage);
         }
     }
 
@@ -306,28 +309,39 @@ public class HSQLInterface {
         // clear the expression node id set for determinism
         sessionProxy.resetVoltNodeIds();
 
+        String errorMessage = null;
         try {
             cs = sessionProxy.compileStatement(sql);
-        } catch( HsqlException hex) {
-            // a switch in case we want to give more error details on additional error codes
-            switch( hex.getErrorCode()) {
-            case -ErrorCode.X_42581:
-                throw new HSQLParseException("SQL Syntax error in \"" + sql + "\" " + hex.getMessage());
+        } catch(HsqlException hexc) {
+            errorMessage = hexc.getMessage();
+            // Tweak the details specific to commonly occurring error codes.
+            switch( - hexc.getErrorCode()) {
+            case ErrorCode.X_42581:  // unexpected token
+                // It seems a little surprising that "unexpected token" would be the only
+                // case that warrants this kind of elaboration.
+                errorMessage = "Syntax error in \"" + sql + "\" " + errorMessage;
+                break;
+            case ErrorCode.X_42501:
+                // Avoid any suggestion of support for namespaces or privileges in schema.
+                errorMessage = errorMessage
+                .replace("user lacks privilege or object not found: PUBLIC.", "object not found: ")
+                .replace("user lacks privilege or object not found: ", "object not found: ");
             default:
-                throw new HSQLParseException(hex.getMessage());
             }
         } catch (Throwable t) {
-            throw new HSQLParseException(t.getMessage());
+            errorMessage = t.getMessage();
         }
-
+        if (cs == null) {
+            throw new HSQLParseException(errorMessage);
+        }
+        
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
         }
 
-        VoltXMLElement xml = null;
-        xml = cs.voltGetStatementXML(sessionProxy);
+        VoltXMLElement xml = cs.voltGetStatementXML(sessionProxy);
 
         // this releases some small memory hsql uses that builds up over time if not
         // cleared

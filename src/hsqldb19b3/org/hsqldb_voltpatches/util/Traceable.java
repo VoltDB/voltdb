@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@ package org.hsqldb_voltpatches.util;
  */
 interface Traceable {
 
-    boolean TRACE = Boolean.getBoolean("hsqldb.util.trace");
+    boolean TRACE = Boolean.getBoolean("hsqldb_voltpatches.util.trace");
 
     void trace(String s);
 }

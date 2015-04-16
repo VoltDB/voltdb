@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +33,8 @@ package org.hsqldb_voltpatches.types;
 
 import java.io.Serializable;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.InOutUtil;
 
 /**
@@ -60,7 +60,7 @@ import org.hsqldb_voltpatches.lib.InOutUtil;
  * PreparedStatement variables.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.2
  */
 public class JavaObjectData {
@@ -122,5 +122,13 @@ public class JavaObjectData {
      */
     public String toString() {
         return super.toString();
+    }
+
+    public boolean equals(Object other) {
+        return other instanceof JavaObjectData;
+    }
+
+    public int hashCode() {
+        return 1;
     }
 }

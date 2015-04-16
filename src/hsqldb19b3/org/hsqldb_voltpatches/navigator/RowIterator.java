@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,13 +43,15 @@ public interface RowIterator {
 
     Row getNextRow();
 
+    Object[] getNext();
+
     boolean hasNext();
 
-    void remove();
+    void removeCurrent();
 
     boolean setRowColumns(boolean[] columns);
 
     void release();
 
-    long getPos();
+    long getRowId();
 }

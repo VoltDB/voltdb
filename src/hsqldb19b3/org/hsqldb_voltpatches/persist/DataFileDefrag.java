@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,27 +31,15 @@
 
 package org.hsqldb_voltpatches.persist;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-
 import org.hsqldb_voltpatches.Database;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlException;
-import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.DoubleIntIndex;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.StopWatch;
-import org.hsqldb_voltpatches.lib.Storage;
-import org.hsqldb_voltpatches.navigator.RowIterator;
-import org.hsqldb_voltpatches.rowio.RowInputInterface;
-import org.hsqldb_voltpatches.rowio.RowOutputBinary;
-import org.hsqldb_voltpatches.rowio.RowOutputInterface;
-
-// oj@openoffice.org - changed to file access api
+import org.hsqldb_voltpatches.lib.StringUtil;
 
 /**
  *  Routine to defrag the *.data file.
@@ -64,249 +52,172 @@ import org.hsqldb_voltpatches.rowio.RowOutputInterface;
  *  image after translating the old pointers to the new.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version    1.9.0
+ * @version    2.3.2
  * @since      1.7.2
  */
 final class DataFileDefrag {
 
-    BufferedOutputStream fileStreamOut;
-    long                 fileOffset;
-    StopWatch            stopw = new StopWatch();
-    String               filename;
-    int[][]              rootsList;
-    Database             database;
-    DataFileCache        cache;
-    int                  scale;
-    DoubleIntIndex       transactionRowLookup;
+    DataFileCache  dataFileOut;
+    StopWatch      stopw = new StopWatch();
+    String         dataFileName;
+    long[][]       rootsList;
+    Database       database;
+    DataFileCache  dataCache;
+    int            scale;
+    DoubleIntIndex pointerLookup;
 
-    DataFileDefrag(Database db, DataFileCache cache, String filename) {
+    DataFileDefrag(Database db, DataFileCache cache, String dataFileName) {
 
-        this.database = db;
-        this.cache    = cache;
-        this.scale    = cache.cacheFileScale;
-        this.filename = filename;
+        this.database     = db;
+        this.dataCache    = cache;
+        this.scale        = cache.getDataFileScale();
+        this.dataFileName = dataFileName;
     }
 
-    void process() throws IOException {
+    void process() {
 
-        boolean complete = false;
+        Throwable error = null;
 
-        Error.printSystemOut("Defrag Transfer begins");
+        database.logger.logDetailEvent("Defrag process begins");
 
-        transactionRowLookup = database.txManager.getTransactionIDList();
+        HsqlArrayList allTables = database.schemaManager.getAllTables(true);
 
-        HsqlArrayList allTables = database.schemaManager.getAllTables();
+        rootsList = new long[allTables.size()][];
 
-        rootsList = new int[allTables.size()][];
+        long maxSize = 0;
 
-        Storage dest = null;
+        for (int i = 0, tSize = allTables.size(); i < tSize; i++) {
+            Table table = (Table) allTables.get(i);
+
+            if (table.getTableType() == TableBase.CACHED_TABLE) {
+                PersistentStore store =
+                    database.persistentStoreCollection.getStore(table);
+                long size = store.elementCount();
+
+                if (size > maxSize) {
+                    maxSize = size;
+                }
+            }
+        }
+
+        if (maxSize > Integer.MAX_VALUE) {
+            throw Error.error(ErrorCode.X_2200T);
+        }
 
         try {
-            OutputStream fos =
-                database.getFileAccess().openOutputStreamElement(filename
-                    + ".new");
+            pointerLookup = new DoubleIntIndex((int) maxSize, false);
+            dataFileOut   = new DataFileCache(database, dataFileName, true);
 
-            fileStreamOut = new BufferedOutputStream(fos, 1 << 12);
-
-            for (int i = 0; i < DataFileCache.INITIAL_FREE_POS; i++) {
-                fileStreamOut.write(0);
-            }
-
-            fileOffset = DataFileCache.INITIAL_FREE_POS;
+            pointerLookup.setKeysSearchTarget();
 
             for (int i = 0, tSize = allTables.size(); i < tSize; i++) {
                 Table t = (Table) allTables.get(i);
 
                 if (t.getTableType() == TableBase.CACHED_TABLE) {
-                    int[] rootsArray = writeTableToDataFile(t);
+                    long[] rootsArray = writeTableToDataFile(t);
 
                     rootsList[i] = rootsArray;
                 } else {
                     rootsList[i] = null;
                 }
 
-                Error.printSystemOut(t.getName().name + " complete");
+                database.logger.logDetailEvent("table complete "
+                                               + t.getName().name);
             }
 
-            writeTransactionRows();
-            fileStreamOut.flush();
-            fileStreamOut.close();
+            dataFileOut.fileModified = true;
 
-            fileStreamOut = null;
+            dataFileOut.close();
 
-            // write out the end of file position
-            dest = ScaledRAFile.newScaledRAFile(
-                database, filename + ".new", false,
-                ScaledRAFile.DATA_FILE_RAF,
-                database.getURLProperties().getProperty("storage_class_name"),
-                database.getURLProperties().getProperty("storage_key"));
-
-            dest.seek(DataFileCache.LONG_FREE_POS_POS);
-            dest.writeLong(fileOffset);
-            dest.close();
-
-            dest = null;
+            dataFileOut = null;
 
             for (int i = 0, size = rootsList.length; i < size; i++) {
-                int[] roots = rootsList[i];
+                long[] roots = rootsList[i];
 
                 if (roots != null) {
-                    Error.printSystemOut(
-                        org.hsqldb_voltpatches.lib.StringUtil.getList(roots, ",", ""));
+                    database.logger.logDetailEvent("roots: "
+                                                   + StringUtil.getList(roots,
+                                                       ",", ""));
                 }
             }
-
-            complete = true;
-        } catch (IOException e) {
-            throw Error.error(ErrorCode.FILE_IO_ERROR, filename + ".new");
         } catch (OutOfMemoryError e) {
-            throw Error.error(ErrorCode.OUT_OF_MEMORY);
+            error = e;
+
+            throw Error.error(ErrorCode.OUT_OF_MEMORY, e);
+        } catch (Throwable t) {
+            error = t;
+
+            throw Error.error(ErrorCode.GENERAL_ERROR, t);
         } finally {
-            if (fileStreamOut != null) {
-                fileStreamOut.close();
+            try {
+                if (dataFileOut != null) {
+                    dataFileOut.release();
+                }
+            } catch (Throwable t) {}
+
+            if (error instanceof OutOfMemoryError) {
+                database.logger.logInfoEvent(
+                    "defrag failed - out of memory - required: "
+                    + maxSize * 8);
             }
 
-            if (dest != null) {
-                dest.close();
-            }
-
-            if (!complete) {
-                database.getFileAccess().removeElement(filename + ".new");
-            }
-        }
-
-        //Error.printSystemOut("Transfer complete: ", stopw.elapsedTime());
-    }
-
-    /**
-     * called from outside after the complete end of defrag
-     */
-    void updateTableIndexRoots() {
-
-        HsqlArrayList allTables = database.schemaManager.getAllTables();
-
-        for (int i = 0, size = allTables.size(); i < size; i++) {
-            Table t = (Table) allTables.get(i);
-
-            if (t.getTableType() == TableBase.CACHED_TABLE) {
-                int[] rootsArray = rootsList[i];
-
-                t.setIndexRoots(rootsArray);
+            if (error == null) {
+                database.logger.logDetailEvent("Defrag transfer complete: "
+                                               + stopw.elapsedTime());
+            } else {
+                database.logger.logSevereEvent("defrag failed ", error);
+                database.logger.getFileAccess().removeElement(dataFileName
+                        + Logger.newFileExtension);
             }
         }
     }
 
-    /**
-     * called from outside after the complete end of defrag
-     */
-    void updateTransactionRowIDs() {
-        database.txManager.convertTransactionIDs(transactionRowLookup);
-    }
+    long[] writeTableToDataFile(Table table) {
 
-    int[] writeTableToDataFile(Table table) throws IOException {
+        RowStoreAVLDisk store =
+            (RowStoreAVLDisk) table.database.persistentStoreCollection.getStore(
+                table);
+        long[] rootsArray = table.getIndexRootsArray();
 
-        Session session = database.getSessionManager().getSysSession();
-        PersistentStore    store  = session.sessionData.getRowStore(table);
-        RowOutputInterface rowOut = new RowOutputBinary();
-        DoubleIntIndex pointerLookup =
-            new DoubleIntIndex(table.getPrimaryIndex().sizeEstimate(store),
-                               false);
-        int[] rootsArray = table.getIndexRootsArray();
-        long  pos        = fileOffset;
-        int   count      = 0;
+        pointerLookup.clear();
+        database.logger.logDetailEvent("lookup begins " + table.getName().name
+                                       + " " + stopw.elapsedTime());
+        store.moveDataToSpace(dataFileOut, pointerLookup);
 
-        pointerLookup.setKeysSearchTarget();
-        Error.printSystemOut("lookup begins: " + stopw.elapsedTime());
-
-        RowIterator it = table.rowIterator(session);
-
-        for (; it.hasNext(); count++) {
-            CachedObject row = it.getNextRow();
-
-            pointerLookup.addUnsorted(row.getPos(), (int) (pos / scale));
-
-            if (count % 50000 == 0) {
-                Error.printSystemOut("pointer pair for row " + count + " "
-                                     + row.getPos() + " " + pos);
-            }
-
-            pos += row.getStorageSize();
-        }
-
-        Error.printSystemOut(table.getName().name + " list done ",
-                             stopw.elapsedTime());
-
-        count = 0;
-        it    = table.rowIterator(session);
-
-        for (; it.hasNext(); count++) {
-            CachedObject row = it.getNextRow();
-
-            rowOut.reset();
-            row.write(rowOut, pointerLookup);
-            fileStreamOut.write(rowOut.getOutputStream().getBuffer(), 0,
-                                rowOut.size());
-
-            fileOffset += row.getStorageSize();
-
-            if ((count) % 50000 == 0) {
-                Error.printSystemOut(count + " rows " + stopw.elapsedTime());
-            }
-        }
-
-        for (int i = 0; i < rootsArray.length; i++) {
+        for (int i = 0; i < table.getIndexCount(); i++) {
             if (rootsArray[i] == -1) {
                 continue;
             }
 
-            int lookupIndex =
-                pointerLookup.findFirstEqualKeyIndex(rootsArray[i]);
+            long pos = pointerLookup.lookup(rootsArray[i], -1);
 
-            if (lookupIndex == -1) {
+            if (pos == -1) {
                 throw Error.error(ErrorCode.DATA_FILE_ERROR);
             }
 
-            rootsArray[i] = pointerLookup.getValue(lookupIndex);
+            rootsArray[i] = pos;
         }
 
-        setTransactionRowLookups(pointerLookup);
-        Error.printSystemOut(table.getName().name + " : table converted");
+        // log any discrepency in row count
+        long count = rootsArray[table.getIndexCount() * 2];
+
+        if (count != pointerLookup.size()) {
+            database.logger.logSevereEvent("discrepency in row count "
+                                           + table.getName().name + " "
+                                           + count + " "
+                                           + pointerLookup.size(), null);
+        }
+
+        rootsArray[table.getIndexCount()]     = 0;
+        rootsArray[table.getIndexCount() * 2] = pointerLookup.size();
+
+        database.logger.logDetailEvent("table written "
+                                       + table.getName().name);
 
         return rootsArray;
     }
 
-    void setTransactionRowLookups(DoubleIntIndex pointerLookup) {
-
-        for (int i = 0, size = transactionRowLookup.size(); i < size; i++) {
-            int key         = transactionRowLookup.getKey(i);
-            int lookupIndex = pointerLookup.findFirstEqualKeyIndex(key);
-
-            if (lookupIndex != -1) {
-                transactionRowLookup.setValue(
-                    i, pointerLookup.getValue(lookupIndex));
-            }
-        }
-    }
-
-    void writeTransactionRows() {
-
-        for (int i = 0, size = transactionRowLookup.size(); i < size; i++) {
-            if (transactionRowLookup.getValue(i) != 0) {
-                continue;
-            }
-
-            int key = transactionRowLookup.getKey(i);
-
-            try {
-                transactionRowLookup.setValue(i, (int) (fileOffset / scale));
-
-                RowInputInterface rowIn = cache.readObject(key);
-
-                fileStreamOut.write(rowIn.getBuffer(), 0, rowIn.getSize());
-
-                fileOffset += rowIn.getSize();
-            } catch (HsqlException e) {}
-            catch (IOException e) {}
-        }
+    public long[][] getIndexRoots() {
+        return rootsList;
     }
 }

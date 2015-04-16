@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -179,7 +179,7 @@ public class HashMappedList extends HashMap {
         Object  existing = objectValueTable[index];
 
         if (value == null) {
-            result = value != existing;
+            result = existing != null;
         } else {
             result = !value.equals(existing);
         }

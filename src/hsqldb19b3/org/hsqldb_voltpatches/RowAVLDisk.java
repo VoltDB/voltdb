@@ -1,4 +1,40 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+/*
+ * For work developed by the HSQL Development Group:
+ *
+ * Copyright (c) 2001-2011, The HSQL Development Group
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the HSQL Development Group nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ *
+ * For work originally developed by the Hypersonic SQL Group:
+ *
+ * Copyright (c) 1995-2000, The Hypersonic SQL Group.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,38 +65,6 @@
  *
  * This software consists of voluntary contributions made by many individuals
  * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the HSQL Development Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL HSQL DEVELOPMENT GROUP, HSQLDB.ORG,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 
@@ -68,9 +72,12 @@ package org.hsqldb_voltpatches;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.index.NodeAVLDisk;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.index.NodeAVL;
-import org.hsqldb_voltpatches.lib.IntLookup;
+import org.hsqldb_voltpatches.index.NodeAVLDisk;
+import org.hsqldb_voltpatches.lib.LongLookup;
+import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
 
@@ -84,15 +91,11 @@ import org.hsqldb_voltpatches.rowio.RowOutputInterface;
  *  In-memory representation of a disk-based database row object with  methods
  *  for serialization and de-serialization. <p>
  *
- *  A CachedRow is normally part of a circular double linked list which
- *  contains all of the Rows currently in the Cache for the database. It is
- *  unlinked from this list when it is freed from the Cache to make way for
- *  other rows.
+ *  New class derived from Hypersonic SQL code and enhanced in HSQLDB. <p>
  *
- *  New class from the Hypersonic Original
- *
+ * @author Fred Toussi (fredt@users dot sourceforge dot net)
  * @author Thomas Mueller (Hypersonic SQL Group)
- * @version 1.8.0
+ * @version 2.2.9
  * @since Hypersonic SQL
  */
 public class RowAVLDisk extends RowAVL {
@@ -100,26 +103,21 @@ public class RowAVLDisk extends RowAVL {
     public static final int NO_POS = -1;
 
     //
-    protected TableBase tTable;
-    int                 storageSize;
-    int                 keepCount;
-    boolean             isInMemory;
-    int                 usageCount;
+    int              storageSize;
+    int              keepCount;
+    volatile boolean isInMemory;
+    int              accessCount;
+    boolean          isNew;
 
     /**
      *  Flag indicating unwritten data.
      */
-    protected boolean hasDataChanged;
+    boolean hasDataChanged;
 
     /**
      *  Flag indicating Node data has changed.
      */
-    boolean hasNodesChanged;
-
-    /**
-     *  Default constructor used only in subclasses.
-     */
-    RowAVLDisk() {}
+    private boolean hasNodesChanged;
 
     /**
      *  Constructor for new Rows.  Variable hasDataChanged is set to true in
@@ -128,15 +126,13 @@ public class RowAVLDisk extends RowAVL {
      * @param t table
      * @param o row data
      */
-    public RowAVLDisk(TableBase t, Object[] o) {
+    public RowAVLDisk(TableBase t, Object[] o, PersistentStore store) {
 
-        tTable  = t;
-        tableId = tTable.getId();
+        super(t, o);
 
-        setNewNodes();
+        setNewNodes(store);
 
-        rowData        = o;
-        hasDataChanged = hasNodesChanged = true;
+        hasDataChanged = hasNodesChanged = isNew = true;
     }
 
     /**
@@ -146,10 +142,10 @@ public class RowAVLDisk extends RowAVL {
      * @param in data source
      * @throws IOException
      */
-    public RowAVLDisk(TableBase t,
-                      RowInputInterface in) throws IOException {
+    public RowAVLDisk(TableBase t, RowInputInterface in) throws IOException {
 
-        tTable      = t;
+        super(t, (Object[]) null);
+
         position    = in.getPos();
         storageSize = in.getSize();
 
@@ -164,15 +160,18 @@ public class RowAVLDisk extends RowAVL {
             n       = n.nNext;
         }
 
-        rowData = in.readData(tTable.getColumnTypes());
+        rowData = in.readData(table.getColumnTypes());
+    }
+
+    RowAVLDisk(TableBase t) {
+        super(t, (Object[]) null);
     }
 
     public NodeAVL insertNode(int index) {
         return null;
     }
 
-    private void readRowInfo(RowInputInterface in)
-    throws IOException {
+    private void readRowInfo(RowInputInterface in) {
 
         // for use when additional transaction info is attached to rows
     }
@@ -185,11 +184,11 @@ public class RowAVLDisk extends RowAVL {
     }
 
     public void updateAccessCount(int count) {
-        usageCount = count;
+        accessCount = count;
     }
 
     public int getAccessCount() {
-        return usageCount;
+        return accessCount;
     }
 
     public int getStorageSize() {
@@ -205,23 +204,19 @@ public class RowAVLDisk extends RowAVL {
      *
      * @param pos position in data file
      */
-    public void setPos(int pos) {
-
+    public void setPos(long pos) {
         position = pos;
-
-        NodeAVL n = nPrimaryNode;
-
-        while (n != null) {
-            ((NodeAVLDisk) n).iData = position;
-            n                       = n.nNext;
-        }
     }
 
     /**
      * Sets flag for row data change.
      */
-    public synchronized void setChanged() {
-        hasDataChanged = true;
+    public synchronized void setChanged(boolean changed) {
+        hasDataChanged = changed;
+    }
+
+    public boolean isNew() {
+        return isNew;
     }
 
     /**
@@ -239,7 +234,7 @@ public class RowAVLDisk extends RowAVL {
      * @return Table
      */
     public TableBase getTable() {
-        return tTable;
+        return table;
     }
 
     public void setStorageSize(int size) {
@@ -256,11 +251,33 @@ public class RowAVLDisk extends RowAVL {
         return keepCount > 0;
     }
 
+    /**
+     * Only unlinks nodes. Is not a destroy() method
+     */
+    public void delete(PersistentStore store) {
+
+        RowAVLDisk row = this;
+
+        if (!row.keepInMemory(true)) {
+            row = (RowAVLDisk) store.get(row, true);
+        }
+
+        super.delete(store);
+        row.keepInMemory(false);
+    }
+
     public void destroy() {
 
-        super.destroy();
+        NodeAVL n = nPrimaryNode;
 
-        tTable = null;
+        while (n != null) {
+            NodeAVL last = n;
+
+            n          = n.nNext;
+            last.nNext = null;
+        }
+
+        nPrimaryNode = null;
     }
 
     public synchronized boolean keepInMemory(boolean keep) {
@@ -276,7 +293,7 @@ public class RowAVLDisk extends RowAVL {
 
             if (keepCount < 0) {
                 throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "CachedRow keep count");
+                                         "RowAVLDisk - keep count");
             }
         }
 
@@ -302,20 +319,11 @@ public class RowAVLDisk extends RowAVL {
 
             n = n.nNext;
         }
-
-        RowAction action = rowAction;
-
-        if (action != null) {
-            action.memoryRow = null;
-        }
     }
 
-    /**
-     * used in CachedDataRow
-     */
-    void setNewNodes() {
+    public void setNewNodes(PersistentStore store) {
 
-        int indexcount = tTable.getIndexCount();
+        int indexcount = store.getAccessorKeys().length;
 
         nPrimaryNode = new NodeAVLDisk(this, 0);
 
@@ -328,11 +336,7 @@ public class RowAVLDisk extends RowAVL {
     }
 
     public int getRealSize(RowOutputInterface out) {
-
-        int size = out.getSize((RowAVLDisk) this)
-                   + tTable.getIndexCount() * NodeAVLDisk.SIZE_IN_BYTE;
-
-        return size;
+        return out.getSize(this);
     }
 
     /**
@@ -344,37 +348,33 @@ public class RowAVLDisk extends RowAVL {
      */
     public void write(RowOutputInterface out) {
 
-        try {
-            writeNodes(out);
+        writeNodes(out);
 
-            if (hasDataChanged) {
-                out.writeData(rowData, tTable.colTypes);
-                out.writeEnd();
+        if (hasDataChanged) {
+            out.writeData(this, table.colTypes);
+            out.writeEnd();
 
-                hasDataChanged = false;
-            }
-        } catch (IOException e) {}
+            hasDataChanged = false;
+            isNew          = false;
+        }
     }
 
-    private void writeRowInfo(RowOutputInterface out) {
-
-        // for use when additional transaction info is attached to rows
-    }
-
-    public void write(RowOutputInterface out, IntLookup lookup) {
+    public void write(RowOutputInterface out, LongLookup lookup) {
 
         out.writeSize(storageSize);
 
         NodeAVL rownode = nPrimaryNode;
 
         while (rownode != null) {
-            ((NodeAVLDisk) rownode).writeTranslate(out, lookup);
+            rownode.write(out, lookup);
 
             rownode = rownode.nNext;
         }
 
-        out.writeData(getData(), tTable.colTypes);
+        out.writeData(this, table.colTypes);
         out.writeEnd();
+
+        isNew = false;
     }
 
     /**
@@ -384,7 +384,7 @@ public class RowAVLDisk extends RowAVL {
      *
      * @throws IOException
      */
-    private void writeNodes(RowOutputInterface out) throws IOException {
+    void writeNodes(RowOutputInterface out) {
 
         out.writeSize(storageSize);
 
@@ -397,36 +397,5 @@ public class RowAVLDisk extends RowAVL {
         }
 
         hasNodesChanged = false;
-    }
-
-    /**
-     * Lifetime scope of this method depends on the operations performed on
-     * any cached tables since this row or the parameter were constructed.
-     * If only deletes or only inserts have been performed, this method
-     * remains valid. Otherwise it can return invalid results.
-     *
-     * @param obj row to compare
-     * @return boolean
-     */
-    public boolean equals(Object obj) {
-
-        if (obj == this) {
-            return true;
-        }
-
-        if (obj instanceof RowAVLDisk) {
-            return ((RowAVLDisk) obj).position == position;
-        }
-
-        return false;
-    }
-
-    /**
-     * Hash code is valid only until a modification to the cache
-     *
-     * @return file position of row
-     */
-    public int hashCode() {
-        return position;
     }
 }

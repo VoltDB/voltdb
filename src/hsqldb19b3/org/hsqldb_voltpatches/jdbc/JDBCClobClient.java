@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,38 @@
 
 package org.hsqldb_voltpatches.jdbc;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CoderResult;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.IllegalCharsetNameException;
 import java.sql.Clob;
 import java.sql.SQLException;
 
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.SessionInterface;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.types.ClobDataID;
+import org.hsqldb_voltpatches.types.ClobInputStream;
 
+/**
+ * A wrapper for HSQLDB ClobData objects.
+ *
+ * Instances of this class are returned by calls to ResultSet methods.
+ *
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ * @version 2.2.6
+ * @since  JDK 1.2, HSQLDB 1.9.0
+ */
 public class JDBCClobClient implements Clob {
 
     /**
@@ -54,7 +75,156 @@ public class JDBCClobClient implements Clob {
      *   <code>CLOB</code> value
      */
     public synchronized InputStream getAsciiStream() throws SQLException {
-        throw Util.notSupported();
+
+        checkClosed();
+
+        return new InputStream() {
+
+            private final byte[] oneChar = new byte[1];
+            private boolean      m_closed;
+
+            // better size than 8192 for network connections.
+            private CharBuffer m_charBuffer =
+                (CharBuffer) CharBuffer.allocate(64 * 1024).flip();
+            private ByteBuffer m_byteBuffer = ByteBuffer.allocate(1024);
+            private Charset    m_charset    = charsetForName("US-ASCII");
+            private CharsetEncoder m_encoder =
+                m_charset.newEncoder().onMalformedInput(
+                    CodingErrorAction.REPLACE).onUnmappableCharacter(
+                    CodingErrorAction.REPLACE);
+            private Reader m_reader = clob.getCharacterStream(session);
+            public int read() throws IOException {
+
+                if (isEOF()) {
+                    return -1;
+                }
+
+                synchronized (oneChar) {
+                    int charsRead = read(oneChar, 0, 1);
+
+                    return charsRead == 1 ? oneChar[0]
+                            : -1;
+                }
+            }
+            public int read(byte b[], int off, int len) throws IOException {
+
+                checkClosed();
+
+                if (isEOF()) {
+                    return -1;
+                }
+
+                final CharBuffer cb = m_charBuffer;
+
+                //
+                int charsRead;
+                int bytesRead;
+
+                if (cb.remaining() == 0) {
+                    cb.clear();
+
+                    charsRead = m_reader.read(cb);
+
+                    cb.flip();
+
+                    if (charsRead < 0) {
+                        setEOF();
+
+                        return -1;
+                    } else if (charsRead == 0) {
+                        return 0;
+                    }
+                }
+
+                final ByteBuffer bb = (m_byteBuffer.capacity() < len)
+                                      ? ByteBuffer.allocate(len)
+                                      : m_byteBuffer;
+
+                // Since ASCII is single-byte, retrict encoder character consumption
+                // to at most 'len' characters' to produce at most len ASCII
+                // characters
+                int cbLimit     = cb.limit();
+                int cbPosistion = cb.position();
+
+                cb.limit(cbPosistion + len);
+                bb.clear();
+
+                int         bbPosition = bb.position();
+                CoderResult result     = m_encoder.encode(cb, bb, false);
+
+                if (bbPosition == bb.position() && result.isUnderflow()) {
+
+                    // surrogate character time
+                    cb.limit(cb.limit() + 1);
+                    m_encoder.encode(cb, bb, false);
+                }
+
+                // Restore the old limit so the buffer gets topped up
+                // when required.
+                cb.limit(cbLimit);
+                bb.flip();
+
+                bytesRead = bb.limit();
+
+                if (bytesRead == 0) {
+                    setEOF();
+
+                    return -1;
+                }
+                m_byteBuffer = bb;
+
+                bb.get(b, off, bytesRead);
+
+                return bytesRead;
+            }
+            public void close() throws IOException {
+
+                boolean isClosed = m_closed;
+
+                if (!isClosed) {
+                    m_closed     = true;
+                    m_charBuffer = null;
+                    m_charset    = null;
+                    m_encoder    = null;
+
+                    try {
+                        m_reader.close();
+                    } catch (Exception ex) {
+                    }
+                }
+            }
+            private boolean isEOF() {
+
+                final Reader reader = m_reader;
+
+                return (reader == null);
+            }
+            private void setEOF() {
+
+                final Reader reader = m_reader;
+
+                if (reader != null) {
+                    try {
+                        reader.close();
+                    } catch (IOException iOException) {
+                    }
+                }
+                m_reader = null;
+            }
+            private void checkClosed() throws IOException {
+
+                if (JDBCClobClient.this.isClosed()) {
+                    try {
+                        this.close();
+                    } catch (Exception ex) {
+                    }
+                }
+
+                if (m_closed) {
+                    throw new IOException("The stream is closed.");
+                }
+            }
+        };
     }
 
     /**
@@ -68,8 +238,10 @@ public class JDBCClobClient implements Clob {
      *   <code>CLOB</code> value
      */
     public synchronized Reader getCharacterStream() throws SQLException {
-        return new ClobInputStream(this, 0, length(),
-                                   session.getStreamBlockSize());
+
+        checkClosed();
+
+        return new ClobInputStream(session, clob, 0, length());
     }
 
     /**
@@ -87,14 +259,16 @@ public class JDBCClobClient implements Clob {
     public synchronized String getSubString(long pos,
             int length) throws SQLException {
 
+        checkClosed();
+
         if (!isInLimits(Long.MAX_VALUE, pos - 1, length)) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
 
         try {
             return clob.getSubString(session, pos - 1, length);
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
     }
 
@@ -108,10 +282,12 @@ public class JDBCClobClient implements Clob {
      */
     public synchronized long length() throws SQLException {
 
+        checkClosed();
+
         try {
             return clob.length(session);
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
     }
 
@@ -132,13 +308,14 @@ public class JDBCClobClient implements Clob {
                                       long start) throws SQLException {
 
         if (!isInLimits(Long.MAX_VALUE, start - 1, 0)) {
-            throw Util.outOfRangeArgument();
+            throw JDBCUtil.outOfRangeArgument();
         }
+        checkClosed();
 
         try {
             return clob.position(session, searchstr, start - 1);
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
     }
 
@@ -157,7 +334,22 @@ public class JDBCClobClient implements Clob {
      */
     public synchronized long position(Clob searchstr,
                                       long start) throws SQLException {
-        return position(searchstr.getSubString(0, (int) searchstr.length()),
+
+        if (!isInLimits(Long.MAX_VALUE, start - 1, 0)) {
+            throw JDBCUtil.outOfRangeArgument();
+        }
+
+        if (searchstr instanceof JDBCClobClient) {
+            ClobDataID searchClob = ((JDBCClobClient) searchstr).clob;
+
+            try {
+                return clob.position(session, searchClob, start - 1);
+            } catch (HsqlException e) {
+                throw JDBCUtil.sqlException(e);
+            }
+        }
+
+        return position(searchstr.getSubString(1, (int) searchstr.length()),
                         start);
     }
 
@@ -173,8 +365,114 @@ public class JDBCClobClient implements Clob {
      *   <code>CLOB</code> value
      */
     public synchronized OutputStream setAsciiStream(
-            long pos) throws SQLException {
-        throw Util.notSupported();
+            final long pos) throws SQLException {
+
+        checkClosed();
+
+        if (pos < 1) {
+            throw JDBCUtil.outOfRangeArgument("pos: " + pos);
+        }
+
+        if (!isWritable) {
+            throw JDBCUtil.notUpdatableColumn();
+        }
+        startUpdate();
+
+        return new OutputStream() {
+
+            private long    m_position = pos - 1;
+            private Charset m_charset  = charsetForName("US-ASCII");
+            private CharsetDecoder m_decoder =
+                m_charset.newDecoder().onMalformedInput(
+                    CodingErrorAction.REPLACE).onUnmappableCharacter(
+                    CodingErrorAction.REPLACE);
+            private CharBuffer   m_charBuffer = CharBuffer.allocate(64 * 1024);
+            private ByteBuffer   m_byteBuffer = ByteBuffer.allocate(1024);
+            private final byte[] oneByte      = new byte[1];
+            private boolean      m_closed;
+            public void write(int b) throws IOException {
+
+                synchronized (oneByte) {
+                    oneByte[0] = (byte) b;
+
+                    this.write(oneByte, 0, 1);
+                }
+            }
+            public void write(byte b[], int off, int len) throws IOException {
+
+                checkClosed();
+
+                final ByteBuffer bb = (m_byteBuffer.capacity() < len)
+                                      ? ByteBuffer.allocate(len)
+                                      : m_byteBuffer;
+
+                if (m_charBuffer.remaining() < len) {
+                    flush0();
+                }
+
+                final CharBuffer cb = m_charBuffer.capacity() < len
+                                      ? CharBuffer.allocate(len)
+                                      : m_charBuffer;
+
+                bb.clear();
+                bb.put(b, off, len);
+                bb.flip();
+                m_decoder.decode(bb, cb, false);
+
+                if (cb.remaining() == 0) {
+                    flush();
+                }
+            }
+            public void flush() throws IOException {
+                checkClosed();
+                flush0();
+            }
+            public void close() throws IOException {
+
+                if (!m_closed) {
+                    try {
+                        flush0();
+                    } finally {
+                        m_closed     = true;
+                        m_byteBuffer = null;
+                        m_charBuffer = null;
+                        m_charset    = null;
+                        m_decoder    = null;
+                    }
+                }
+            }
+            private void checkClosed() throws IOException {
+
+                if (JDBCClobClient.this.isClosed()) {
+                    try {
+                        close();
+                    } catch (Exception ex) {
+                    }
+                }
+
+                if (m_closed) {
+                    throw new IOException("The stream is closed.");
+                }
+            }
+            private void flush0() throws IOException {
+
+                final CharBuffer cb = m_charBuffer;
+
+                cb.flip();
+
+                final char[] chars = new char[cb.length()];
+
+                cb.get(chars);
+                cb.clear();
+
+                try {
+                    clob.setChars(session, m_position, chars, 0, chars.length);
+                } catch (Exception e) {
+                    throw new IOException(e.toString());
+                }
+                m_position += chars.length;
+            }
+        };
     }
 
     /**
@@ -189,8 +487,46 @@ public class JDBCClobClient implements Clob {
      *   <code>CLOB</code> value
      */
     public synchronized Writer setCharacterStream(
-            long pos) throws SQLException {
-        throw Util.notSupported();
+            final long pos) throws SQLException {
+
+        checkClosed();
+
+        if (pos < 1) {
+            throw JDBCUtil.outOfRangeArgument("pos: " + pos);
+        }
+
+        if (!isWritable) {
+            throw JDBCUtil.notUpdatableColumn();
+        }
+        startUpdate();
+
+        return new Writer() {
+
+            private long    m_clobPosition = pos - 1;
+            private boolean m_closed;
+            public void write(char[] cbuf, int off,
+                              int len) throws IOException {
+
+                checkClosed();
+                clob.setChars(session, m_clobPosition, cbuf, off, len);
+
+                m_clobPosition += len;
+            }
+            public void flush() throws IOException {
+
+                // no-op
+            }
+            @Override
+            public void close() throws IOException {
+                m_closed = true;
+            }
+            private void checkClosed() throws IOException {
+
+                if (m_closed || JDBCClobClient.this.isClosed()) {
+                    throw new IOException("The stream is closed");
+                }
+            }
+        };
     }
 
     /**
@@ -231,14 +567,28 @@ public class JDBCClobClient implements Clob {
     public synchronized int setString(long pos, String str, int offset,
                                       int len) throws SQLException {
 
-        if (!isInLimits(Long.MAX_VALUE, pos - 1, len)) {
-            throw Util.outOfRangeArgument();
+        if (!isInLimits(str.length(), offset, len)) {
+            throw JDBCUtil.outOfRangeArgument();
+        }
+        checkClosed();
+
+        if (pos < 1) {
+            throw JDBCUtil.outOfRangeArgument("pos: " + pos);
         }
 
+        if (!isWritable) {
+            throw JDBCUtil.notUpdatableColumn();
+        }
+        startUpdate();
+
+        str = str.substring(offset, offset + len);
+
         try {
-            return clob.setString(session, pos - 1, str, offset, len);
+            clob.setString(session, pos - 1, str);
+
+            return len;
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
     }
 
@@ -253,10 +603,15 @@ public class JDBCClobClient implements Clob {
      */
     public synchronized void truncate(long len) throws SQLException {
 
+        if (len < 0) {
+            throw JDBCUtil.outOfRangeArgument("len: " + len);
+        }
+        checkClosed();
+
         try {
             clob.truncate(session, len);
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
     }
 
@@ -277,10 +632,13 @@ public class JDBCClobClient implements Clob {
      *
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized void free() throws SQLException {
+
         isClosed = true;
+        clob     = null;
+        session  = null;
     }
 
     /**
@@ -297,12 +655,17 @@ public class JDBCClobClient implements Clob {
      *
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
     public synchronized Reader getCharacterStream(long pos,
             long length) throws SQLException {
-        return new ClobInputStream(this, pos - 1, length,
-                                   session.getStreamBlockSize());
+
+        if (!isInLimits(Long.MAX_VALUE, pos - 1, length)) {
+            throw JDBCUtil.outOfRangeArgument();
+        }
+        checkClosed();
+
+        return new ClobInputStream(session, clob, pos - 1, length);
     }
 
     char[] getChars(long position, int length) throws SQLException {
@@ -310,25 +673,89 @@ public class JDBCClobClient implements Clob {
         try {
             return clob.getChars(session, position - 1, length);
         } catch (HsqlException e) {
-            throw Util.sqlException(e);
+            throw JDBCUtil.sqlException(e);
         }
     }
 
     //
+    ClobDataID       originalClob;
     ClobDataID       clob;
     SessionInterface session;
-    boolean          isClosed;
+    int              colIndex;
+    private boolean  isClosed;
+    private boolean  isWritable;
+    JDBCResultSet    resultSet;
 
-    JDBCClobClient(SessionInterface session, ClobDataID clob) {
+    public JDBCClobClient(SessionInterface session, ClobDataID clob) {
         this.session = session;
         this.clob    = clob;
+    }
+
+    public ClobDataID getClob() {
+        return clob;
     }
 
     public synchronized boolean isClosed() {
         return isClosed;
     }
 
+    public synchronized void setWritable(JDBCResultSet result, int index) {
+
+        isWritable = true;
+        resultSet  = result;
+        colIndex   = index;
+    }
+
+    public synchronized void clearUpdates() {
+
+        if (originalClob != null) {
+            clob         = originalClob;
+            originalClob = null;
+        }
+    }
+
+    private void startUpdate() throws SQLException {
+
+        if (originalClob != null) {
+            return;
+        }
+        originalClob = clob;
+        clob         = (ClobDataID) clob.duplicate(session);
+
+        resultSet.startUpdate(colIndex + 1);
+
+        resultSet.preparedStatement.parameterValues[colIndex] = clob;
+        resultSet.preparedStatement.parameterSet[colIndex]    = Boolean.TRUE;
+    }
+
+    private void checkClosed() throws SQLException {
+
+        if (isClosed) {
+            throw JDBCUtil.sqlException(ErrorCode.X_07501);
+        }
+    }
+
     static boolean isInLimits(long fullLength, long pos, long len) {
-        return pos >= 0 && len >= 0 && pos + len <= fullLength;
+        return fullLength >= 0 && pos >= 0 && len >= 0
+               && pos <= fullLength - len;
+    }
+
+    protected static Charset charsetForName(
+            final String charsetName) throws SQLException {
+
+        String csn = charsetName;
+
+        if (csn == null) {
+            csn = Charset.defaultCharset().name();
+        }
+
+        try {
+            if (Charset.isSupported(csn)) {
+                return Charset.forName(csn);
+            }
+        } catch (IllegalCharsetNameException x) {
+        }
+
+        throw JDBCUtil.sqlException(new UnsupportedEncodingException(csn));
     }
 }

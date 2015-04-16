@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@ public class LongDeque {
 
     // can grow to fill list
     // if elementCount == 0 then firstindex == endindex
-    private static final int DEFAULT_INITIAL_CAPACITY = 10;
+    private static final int DEFAULT_INITIAL_CAPACITY = 8;
 
     public LongDeque() {
         list = new long[DEFAULT_INITIAL_CAPACITY];
@@ -174,6 +174,19 @@ public class LongDeque {
         return true;
     }
 
+    public int addAll(LongDeque deque) {
+
+        int count = 0;
+
+        for (int i = 0; i < deque.size(); i++) {
+            add(deque.get(i));
+
+            count++;
+        }
+
+        return count;
+    }
+
     public void clear() {
 
         if (elementCount == 0) {
@@ -185,6 +198,10 @@ public class LongDeque {
         for (int i = 0; i < list.length; i++) {
             list[i] = 0;
         }
+    }
+
+    public void zeroSize() {
+        firstindex = endindex = elementCount = 0;
     }
 
     public int indexOf(long value) {
@@ -248,6 +265,37 @@ public class LongDeque {
         }
 
         return value;
+    }
+
+    public boolean contains(long value) {
+
+        for (int i = 0; i < elementCount; i++) {
+            int index = firstindex + i;
+
+            if (index >= list.length) {
+                index -= list.length;
+            }
+
+            if (list[index] == value) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void toArray(int[] array) {
+
+        for (int i = 0; i < elementCount; i++) {
+            array[i] = (int) get(i);
+        }
+    }
+
+    public void toArray(long[] array) {
+
+        for (int i = 0; i < elementCount; i++) {
+            array[i] = get(i);
+        }
     }
 
     private int getInternalIndex(int i) throws IndexOutOfBoundsException {

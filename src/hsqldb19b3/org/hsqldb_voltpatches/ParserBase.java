@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,28 +33,32 @@ package org.hsqldb_voltpatches;
 
 import java.math.BigDecimal;
 
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.9.0
  */
 public class ParserBase {
 
-    private Scanner scanner;
-    protected Token token;
+    protected Scanner scanner;
+    protected Token   token;
 
     //
     protected boolean       isRecording;
     protected HsqlArrayList recordedStatement;
+    private final Token     dummyToken = new Token();
 
     //
     protected boolean isCheckOrTriggerCondition;
@@ -148,22 +152,12 @@ public class ParserBase {
 
     String getStatement(int startPosition, short[] startTokens) {
 
-        int semiPosition = 0;
-
         while (true) {
             if (token.tokenType == Tokens.SEMICOLON) {
-                semiPosition = scanner.getPosition();
+                break;
             } else if (token.tokenType == Tokens.X_ENDPARSE) {
-                if (semiPosition == 0) {
-                    break;
-                } else {
-                    rewind(semiPosition);
-
-                    break;
-                }
+                break;
             } else {
-                semiPosition = 0;
-
                 if (ArrayUtil.find(startTokens, token.tokenType) != -1) {
                     break;
                 }
@@ -172,7 +166,41 @@ public class ParserBase {
             read();
         }
 
-        String sql = scanner.getPart(startPosition, scanner.getPosition());
+        String sql = scanner.getPart(startPosition,
+                                     scanner.getTokenPosition());
+
+        return sql;
+    }
+
+    String getStatementForRoutine(int startPosition, short[] startTokens) {
+
+        int tokenIndex   = 0;
+        int semiIndex    = -1;
+        int semiPosition = -1;
+
+        while (true) {
+            if (token.tokenType == Tokens.SEMICOLON) {
+                semiPosition = scanner.getTokenPosition();
+                semiIndex    = tokenIndex;
+            } else if (token.tokenType == Tokens.X_ENDPARSE) {
+                if (semiIndex > 0 && semiIndex == tokenIndex - 1) {
+                    rewind(semiPosition);
+                }
+
+                break;
+            } else {
+                if (ArrayUtil.find(startTokens, token.tokenType) != -1) {
+                    break;
+                }
+            }
+
+            read();
+
+            tokenIndex++;
+        }
+
+        String sql = scanner.getPart(startPosition,
+                                     scanner.getTokenPosition());
 
         return sql;
     }
@@ -187,13 +215,12 @@ public class ParserBase {
         isRecording = true;
     }
 
-    void recordExpressionForToken(ExpressionColumn expression) {
+    Token getRecordedToken() {
 
         if (isRecording) {
-            Token recordToken =
-                (Token) recordedStatement.get(recordedStatement.size() - 1);
-
-            recordToken.columnExpression = expression;
+            return (Token) recordedStatement.get(recordedStatement.size() - 1);
+        } else {
+            return dummyToken;
         }
     }
 
@@ -254,7 +281,7 @@ public class ParserBase {
                     break;
             }
 
-            throw Error.error(errorCode);
+            throw Error.error(errorCode, token.getFullString());
         }
 
         if (isRecording) {
@@ -298,6 +325,13 @@ public class ParserBase {
     void checkIsNonCoreReservedIdentifier() {
 
         if (!isNonCoreReservedIdentifier()) {
+            throw unexpectedToken();
+        }
+    }
+
+    void checkIsIrregularCharInIdentifier() {
+
+        if (scanner.token.hasIrregularChar) {
             throw unexpectedToken();
         }
     }
@@ -350,7 +384,9 @@ public class ParserBase {
     void checkIsThis(int type) {
 
         if (token.tokenType != type) {
-            throw unexpectedToken();
+            String required = Tokens.getKeyword(type);
+
+            throw unexpectedTokenRequire(required);
         }
     }
 
@@ -363,7 +399,7 @@ public class ParserBase {
     }
 
     boolean isSimpleName() {
-        return isNonReservedIdentifier() && token.namePrefix == null;
+        return isNonCoreReservedIdentifier() && token.namePrefix == null;
     }
 
     void checkIsSimpleName() {
@@ -373,11 +409,30 @@ public class ParserBase {
         }
     }
 
-    void readQuotedString() {
+    void readUnquotedIdentifier(String ident) {
+
+        checkIsSimpleName();
+
+        if (!token.tokenString.equals(ident)) {
+            throw unexpectedToken();
+        }
+
+        read();
+    }
+
+    String readQuotedString() {
+
+        checkIsValue();
 
         if (token.dataType.typeCode != Types.SQL_CHAR) {
-            throw Error.error(ErrorCode.X_42565);
+            throw Error.error(ErrorCode.X_42563);
         }
+
+        String value = token.tokenString;
+
+        read();
+
+        return value;
     }
 
     void readThis(int tokenId) {
@@ -402,6 +457,13 @@ public class ParserBase {
         return false;
     }
 
+    Integer readIntegerObject() {
+
+        int value = readInteger();
+
+        return ValuePool.getInt(value);
+    }
+
     int readInteger() {
 
         boolean minus = false;
@@ -423,7 +485,7 @@ public class ParserBase {
         }
 
         if (token.dataType.typeCode != Types.SQL_INTEGER) {
-            throw Error.error(ErrorCode.X_42565);
+            throw Error.error(ErrorCode.X_42563);
         }
 
         int val = ((Number) token.tokenValue).intValue();
@@ -458,7 +520,7 @@ public class ParserBase {
 
         if (token.dataType.typeCode != Types.SQL_INTEGER
                 && token.dataType.typeCode != Types.SQL_BIGINT) {
-            throw Error.error(ErrorCode.X_42565);
+            throw Error.error(ErrorCode.X_42563);
         }
 
         long val = ((Number) token.tokenValue).longValue();
@@ -472,7 +534,7 @@ public class ParserBase {
         return val;
     }
 
-    Expression readDateTimeIntervalLiteral() {
+    Expression readDateTimeIntervalLiteral(Session session) {
 
         int pos = getPosition();
 
@@ -541,16 +603,21 @@ public class ParserBase {
                     read();
                 }
 
-                if (token.tokenType != Tokens.X_VALUE
-                        || token.dataType.typeCode != Types.SQL_CHAR) {
+                if (token.tokenType != Tokens.X_VALUE) {
                     break;
                 }
 
                 String s = token.tokenString;
 
+                /* INT literal accepted in addition to string literal */
+                if (token.dataType.typeCode != Types.SQL_INTEGER
+                        && token.dataType.typeCode != Types.SQL_CHAR) {
+                    break;
+                }
+
                 read();
 
-                IntervalType dataType = readIntervalType();
+                IntervalType dataType = readIntervalType(false);
                 Object       interval = scanner.newInterval(s, dataType);
 
                 dataType = (IntervalType) scanner.dateTimeType;
@@ -562,7 +629,7 @@ public class ParserBase {
                 return new ExpressionValue(interval, dataType);
             }
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "Parser");
+                throw Error.runtimeError(ErrorCode.U_S0500, "ParserBase");
         }
 
         rewind(pos);
@@ -570,7 +637,7 @@ public class ParserBase {
         return null;
     }
 
-    IntervalType readIntervalType() {
+    IntervalType readIntervalType(boolean maxPrecisionDefault) {
 
         int precision = -1;
         int scale     = -1;
@@ -636,6 +703,14 @@ public class ParserBase {
         int endIndex = ArrayUtil.find(Tokens.SQL_INTERVAL_FIELD_CODES,
                                       endToken);
 
+        if (precision == -1 && maxPrecisionDefault) {
+            if (startIndex == IntervalType.INTERVAL_SECOND_INDEX) {
+                precision = IntervalType.maxIntervalSecondPrecision;
+            } else {
+                precision = IntervalType.maxIntervalPrecision;
+            }
+        }
+
         return IntervalType.getIntervalType(startIndex, endIndex, precision,
                                             scale);
     }
@@ -645,7 +720,7 @@ public class ParserBase {
         int type = expressionTypeMap.get(tokenT, -1);
 
         if (type == -1) {
-            throw Error.runtimeError(ErrorCode.U_S0500, "Parser");
+            throw Error.runtimeError(ErrorCode.U_S0500, "ParserBase");
         }
 
         return type;
@@ -677,17 +752,22 @@ public class ParserBase {
         expressionTypeMap.put(Tokens.STDDEV_SAMP, OpTypes.STDDEV_SAMP);
         expressionTypeMap.put(Tokens.VAR_POP, OpTypes.VAR_POP);
         expressionTypeMap.put(Tokens.VAR_SAMP, OpTypes.VAR_SAMP);
+        expressionTypeMap.put(Tokens.ARRAY_AGG, OpTypes.ARRAY_AGG);
+        expressionTypeMap.put(Tokens.GROUP_CONCAT, OpTypes.GROUP_CONCAT);
+        expressionTypeMap.put(Tokens.MEDIAN, OpTypes.MEDIAN);
     }
 
     HsqlException unexpectedToken(String tokenS) {
-        return Error.error(ErrorCode.X_42581, tokenS);
+        return Error.parseError(ErrorCode.X_42581, tokenS,
+                                scanner.getLineNumber());
     }
 
     HsqlException unexpectedTokenRequire(String required) {
 
         if (token.tokenType == Tokens.X_ENDPARSE) {
-            return Error.error(ErrorCode.X_42590, ErrorCode.TOKEN_REQUIRED,
-                               new Object[] {
+            return Error.parseError(ErrorCode.X_42590,
+                                    ErrorCode.TOKEN_REQUIRED,
+                                    scanner.getLineNumber(), new Object[] {
                 "", required
             });
         }
@@ -706,8 +786,8 @@ public class ParserBase {
             tokenS = token.tokenString;
         }
 
-        return Error.error(ErrorCode.X_42581, ErrorCode.TOKEN_REQUIRED,
-                           new Object[] {
+        return Error.parseError(ErrorCode.X_42581, ErrorCode.TOKEN_REQUIRED,
+                                scanner.getLineNumber(), new Object[] {
             tokenS, required
         });
     }
@@ -715,7 +795,8 @@ public class ParserBase {
     HsqlException unexpectedToken() {
 
         if (token.tokenType == Tokens.X_ENDPARSE) {
-            return Error.error(ErrorCode.X_42590);
+            return Error.parseError(ErrorCode.X_42590, null,
+                                    scanner.getLineNumber());
         }
 
         String tokenS;
@@ -732,14 +813,17 @@ public class ParserBase {
             tokenS = token.tokenString;
         }
 
-        return Error.error(ErrorCode.X_42581, tokenS);
+        return Error.parseError(ErrorCode.X_42581, tokenS,
+                                scanner.getLineNumber());
     }
 
     HsqlException tooManyIdentifiers() {
 
         String tokenS;
 
-        if (token.namePrePrefix != null) {
+        if (token.namePrePrePrefix != null) {
+            tokenS = token.namePrePrePrefix;
+        } else if (token.namePrePrefix != null) {
             tokenS = token.namePrePrefix;
         } else if (token.namePrefix != null) {
             tokenS = token.namePrefix;
@@ -747,7 +831,8 @@ public class ParserBase {
             tokenS = token.tokenString;
         }
 
-        return Error.error(ErrorCode.X_42551, tokenS);
+        return Error.parseError(ErrorCode.X_42551, tokenS,
+                                scanner.getLineNumber());
     }
 
     HsqlException unsupportedFeature() {

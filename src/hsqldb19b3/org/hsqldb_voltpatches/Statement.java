@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,30 +32,32 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.result.ResultProperties;
 
 /**
  * Base class for compiled statement objects.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public abstract class Statement {
 
-    final static int META_RESET_VIEWS      = 1;
-    final static int META_RESET_STATEMENTS = 2;
+    static final int META_RESET_VIEWS      = 1;
+    static final int META_RESET_STATEMENTS = 2;
 
     //
-    final static Statement[] emptyArray = new Statement[]{};
+    static final Statement[] emptyArray = new Statement[]{};
 
     //
     final int type;
     int       group;
-    boolean   isLogged = true;
-    boolean   isValid = true;
+    boolean   isLogged            = true;
+    boolean   isValid             = true;
+    int       statementReturnType = StatementTypes.RETURN_COUNT;
 
     /** the default schema name used to resolve names in the sql */
     HsqlName schemaName;
@@ -68,7 +70,6 @@ public abstract class Statement {
     boolean           isError;
     boolean           isTransactionStatement;
     boolean           isExplain;
-    int               metaDataImpact;
 
     /** SQL string for the statement */
     String sql;
@@ -76,11 +77,20 @@ public abstract class Statement {
     /** id in StatementManager */
     long id;
 
+    /** compileTimestamp */
+    long compileTimestamp;
+
     /** table names read - for concurrency control */
     HsqlName[] readTableNames = HsqlName.emptyArray;
 
     /** table names written - for concurrency control */
     HsqlName[] writeTableNames = HsqlName.emptyArray;;
+
+    //
+    OrderedHashSet references;
+
+    //
+    int cursorPropertiesRequest;
 
     public abstract Result execute(Session session);
 
@@ -107,6 +117,14 @@ public abstract class Statement {
         return false;
     }
 
+    public void setCompileTimestamp(long ts) {
+        compileTimestamp = ts;
+    }
+
+    public long getCompileTimestamp() {
+        return compileTimestamp;
+    }
+
     public final void setSQL(String sql) {
         this.sql = sql;
     }
@@ -115,13 +133,17 @@ public abstract class Statement {
         return sql;
     }
 
+    public OrderedHashSet getReferences() {
+        return references;
+    }
+
     public final void setDescribe() {
         isExplain = true;
     }
 
     public abstract String describe(Session session);
 
-    public HsqlName getSchemalName() {
+    public HsqlName getSchemaName() {
         return schemaName;
     }
 
@@ -155,15 +177,7 @@ public abstract class Statement {
 
     public void clearVariables() {}
 
-    public void resolve() {}
-
-    public RangeVariable[] getRangeVariables() {
-        return RangeVariable.emptyArray;
-    }
-
-    void getTableNamesForRead(OrderedHashSet set) {}
-
-    void getTableNamesForWrite(OrderedHashSet set) {}
+    public void resolve(Session session) {}
 
     public final HsqlName[] getTableNamesForRead() {
         return readTableNames;
@@ -171,6 +185,47 @@ public abstract class Statement {
 
     public final HsqlName[] getTableNamesForWrite() {
         return writeTableNames;
+    }
+
+    public boolean isCatalogLock() {
+
+        switch (group) {
+
+            case StatementTypes.X_SQL_SCHEMA_MANIPULATION :
+
+                // in MVCC log replay statement is not followed by COMMIT so no lock
+                if (type == StatementTypes.ALTER_SEQUENCE) {
+                    return false;
+                }
+
+                if (writeTableNames.length == 0) {
+                    return false;
+                }
+
+            case StatementTypes.X_SQL_SCHEMA_DEFINITION :
+            case StatementTypes.X_HSQLDB_SCHEMA_MANIPULATION :
+                return true;
+
+            case StatementTypes.X_HSQLDB_DATABASE_OPERATION :
+                return true;
+
+            default :
+                return false;
+        }
+    }
+
+    public boolean isCatalogChange() {
+
+        switch (group) {
+
+            case StatementTypes.X_SQL_SCHEMA_DEFINITION :
+            case StatementTypes.X_SQL_SCHEMA_MANIPULATION :
+            case StatementTypes.X_HSQLDB_SCHEMA_MANIPULATION :
+                return true;
+
+            default :
+                return false;
+        }
     }
 
     public void setParent(StatementCompound statement) {
@@ -199,6 +254,23 @@ public abstract class Statement {
         return ResultMetaData.emptyParamMetaData;
     }
 
+    public int getResultProperties() {
+        return ResultProperties.defaultPropsValue;
+    }
+
+    public int getStatementReturnType() {
+        return statementReturnType;
+    }
+
+    public int getCursorPropertiesRequest() {
+        return cursorPropertiesRequest;
+    }
+
+    public void setCursorPropertiesRequest(int props) {
+        cursorPropertiesRequest = props;
+    }
+
+    public void clearStructures(Session session) {}
     /************************* Volt DB Extensions *************************/
 
     /**

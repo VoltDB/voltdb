@@ -373,13 +373,13 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
 
     std::string result = "";
     switch (optArg) {
-    case SQL_TRIM_BOTH:
+    case SQL_TRIM:
         result = trim_function(inputStr, trimArg, true, true);
         break;
-    case SQL_TRIM_LEADING:
+    case SQL_LTRIM:
         result = trim_function(inputStr, trimArg, true, false);
         break;
-    case SQL_TRIM_TRAILING:
+    case SQL_RTRIM:
         result = trim_function(inputStr, trimArg, false, true);
         break;
     default:

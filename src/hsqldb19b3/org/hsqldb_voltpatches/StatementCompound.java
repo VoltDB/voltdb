@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,33 +32,41 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for PSM compound statements.
 
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
-public class StatementCompound extends Statement {
+public class StatementCompound extends Statement implements RangeGroup {
 
-    final boolean      isLoop;
-    HsqlName           label;
-    StatementHandler[] handlers = StatementHandler.emptyExceptionHandlerArray;
-    Statement          loopCursor;
-    Statement[]        statements;
-    StatementSimple    condition;
-    boolean            isAtomic;
+    final boolean       isLoop;
+    HsqlName            label;
+    StatementHandler[]  handlers = StatementHandler.emptyExceptionHandlerArray;
+    boolean             hasUndoHandler;
+    StatementQuery      loopCursor;
+    Statement[]         statements;
+    StatementExpression condition;
+    boolean             isAtomic;
 
     //
-    ColumnSchema[]  variables = ColumnSchema.emptyArray;
-    HashMappedList  scopeVariables;
-    RangeVariable[] rangeVariables = RangeVariable.emptyArray;
+    ColumnSchema[]    variables      = ColumnSchema.emptyArray;
+    StatementCursor[] cursors        = StatementCursor.emptyArray;
+    HashMappedList    scopeVariables = new HashMappedList();
+    RangeVariable[]   rangeVariables = RangeVariable.emptyArray;
+    Table[]           tables         = Table.emptyArray;
+    HashMappedList    scopeTables;
 
     //
     public static final StatementCompound[] emptyStatementArray =
@@ -73,6 +81,7 @@ public class StatementCompound extends Statement {
 
         switch (type) {
 
+            case StatementTypes.FOR :
             case StatementTypes.LOOP :
             case StatementTypes.WHILE :
             case StatementTypes.REPEAT :
@@ -85,7 +94,8 @@ public class StatementCompound extends Statement {
                 break;
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "StatementCompound");
         }
     }
 
@@ -99,6 +109,9 @@ public class StatementCompound extends Statement {
         }
 
         switch (type) {
+            case StatementTypes.FOR :
+                // todo
+                break;
 
             case StatementTypes.LOOP :
                 sb.append(Tokens.T_LOOP).append(' ');
@@ -148,7 +161,7 @@ public class StatementCompound extends Statement {
 
                     if (variables[i].hasDefault()) {
                         sb.append(' ').append(Tokens.T_DEFAULT).append(' ');
-                        sb.append(variables[i].getDefaultDDL());
+                        sb.append(variables[i].getDefaultSQL());
                     }
 
                     sb.append(';');
@@ -204,38 +217,89 @@ public class StatementCompound extends Statement {
 
         int varCount     = 0;
         int handlerCount = 0;
+        int cursorCount  = 0;
+        int tableCount   = 0;
 
         for (int i = 0; i < declarations.length; i++) {
             if (declarations[i] instanceof ColumnSchema) {
                 varCount++;
-            } else {
+            } else if (declarations[i] instanceof StatementHandler) {
                 handlerCount++;
+            } else if (declarations[i] instanceof Table) {
+                tableCount++;
+            } else {
+                cursorCount++;
             }
         }
 
-        variables    = new ColumnSchema[varCount];
-        handlers     = new StatementHandler[handlerCount];
+        if (varCount > 0) {
+            variables = new ColumnSchema[varCount];
+        }
+
+        if (handlerCount > 0) {
+            handlers = new StatementHandler[handlerCount];
+        }
+
+        if (tableCount > 0) {
+            tables = new Table[tableCount];
+        }
+
+        if (cursorCount > 0) {
+            cursors = new StatementCursor[cursorCount];
+        }
+
         varCount     = 0;
         handlerCount = 0;
+        tableCount   = 0;
+        cursorCount  = 0;
 
         for (int i = 0; i < declarations.length; i++) {
             if (declarations[i] instanceof ColumnSchema) {
                 variables[varCount++] = (ColumnSchema) declarations[i];
-            } else {
+            } else if (declarations[i] instanceof StatementHandler) {
                 StatementHandler handler = (StatementHandler) declarations[i];
 
                 handler.setParent(this);
 
                 handlers[handlerCount++] = handler;
+
+                if (handler.handlerType == StatementHandler.UNDO) {
+                    hasUndoHandler = true;
+                }
+            } else if (declarations[i] instanceof Table) {
+                Table table = (Table) declarations[i];
+
+                tables[tableCount++] = table;
+            } else {
+                StatementCursor cursor = (StatementCursor) declarations[i];
+
+                cursors[cursorCount++] = cursor;
             }
         }
 
         setVariables();
         setHandlers();
+        setTables();
+        setCursors();
     }
 
-    public void setLoopStatement(Statement cursorStatement) {
+    public void setLoopStatement(StatementQuery cursorStatement) {
+
         loopCursor = cursorStatement;
+
+        HsqlName[] colNames =
+            cursorStatement.queryExpression.getResultColumnNames();
+        Type[] colTypes = cursorStatement.queryExpression.getColumnTypes();
+        ColumnSchema[] columns = new ColumnSchema[colNames.length];
+
+        for (int i = 0; i < colNames.length; i++) {
+            columns[i] = new ColumnSchema(colNames[i], colTypes[i], false,
+                                          false, null);
+
+            columns[i].setParameterMode(SchemaObject.ParameterModes.PARAM_IN);
+        }
+
+        setLocalDeclarations(columns);
     }
 
     void setStatements(Statement[] statements) {
@@ -247,7 +311,7 @@ public class StatementCompound extends Statement {
         this.statements = statements;
     }
 
-    public void setCondition(StatementSimple condition) {
+    public void setCondition(StatementExpression condition) {
         this.condition = condition;
     }
 
@@ -264,6 +328,10 @@ public class StatementCompound extends Statement {
 
                 break;
             }
+            case StatementTypes.FOR :
+                result = executeForLoop(session);
+                break;
+
             case StatementTypes.LOOP :
             case StatementTypes.WHILE :
             case StatementTypes.REPEAT : {
@@ -277,7 +345,8 @@ public class StatementCompound extends Statement {
                 break;
             }
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "StatementCompound");
         }
 
         if (result.isError()) {
@@ -289,13 +358,22 @@ public class StatementCompound extends Statement {
 
     private Result executeBlock(Session session) {
 
-        Result result = Result.updateZeroResult;
-        int    i      = 0;
+        Result  result = Result.updateZeroResult;
+        boolean push   = !root.isTrigger();
 
-        session.sessionContext.push();
+        if (push) {
+            session.sessionContext.push();
 
-        for (; i < statements.length; i++) {
-            result = statements[i].execute(session);
+            if (hasUndoHandler) {
+                String name = HsqlNameManager.getAutoSavepointNameString(
+                    session.actionTimestamp, session.sessionContext.depth);
+
+                session.savepoint(name);
+            }
+        }
+
+        for (int i = 0; i < statements.length; i++) {
+            result = executeProtected(session, statements[i]);
             result = handleCondition(session, result);
 
             if (result.isError()) {
@@ -303,6 +381,10 @@ public class StatementCompound extends Statement {
             }
 
             if (result.getType() == ResultConstants.VALUE) {
+                break;
+            }
+
+            if (result.getType() == ResultConstants.DATA) {
                 break;
             }
         }
@@ -318,7 +400,9 @@ public class StatementCompound extends Statement {
             }
         }
 
-        session.sessionContext.pop();
+        if (push) {
+            session.sessionContext.pop();
+        }
 
         return result;
     }
@@ -329,8 +413,8 @@ public class StatementCompound extends Statement {
 
         if (result.isError()) {
             sqlState = result.getSubString();
-        } else if (session.getLastWarnings() != null) {
-            sqlState = session.getLastWarnings().getSQLState();
+        } else if (session.getLastWarning() != null) {
+            sqlState = session.getLastWarning().getSQLState();
         } else {
             return result;
         }
@@ -347,8 +431,9 @@ public class StatementCompound extends Statement {
                  * if condition is system related promote to top level
                  * schema manipulation conditions are never handled
                  */
-                if (handler.handlesCondition(result.getSubString())) {
-                    session.resetSchema();
+                if (handler.handlesCondition(sqlState)) {
+                    String labelString = label == null ? null
+                                                       : label.name;
 
                     switch (handler.handlerType) {
 
@@ -360,33 +445,106 @@ public class StatementCompound extends Statement {
                             session.rollbackToSavepoint();
 
                             result = Result.newPSMResult(StatementTypes.LEAVE,
-                                                         null, null);
+                                                         labelString, null);
                             break;
 
                         case StatementHandler.EXIT :
                             result = Result.newPSMResult(StatementTypes.LEAVE,
-                                                         null, null);
+                                                         labelString, null);
                             break;
                     }
 
-                    Result actionResult = handler.statement.execute(session);
+                    Result actionResult = executeProtected(session,
+                                                           handler.statement);
 
                     if (actionResult.isError()) {
                         result = actionResult;
 
-                        handleCondition(session, result);
-                    } else {
-                        return result;
+                        // parent should handle this
+                    } else if (actionResult.getType()
+                               == ResultConstants.VALUE) {
+                        result = actionResult;
                     }
                 }
             }
 
-            if (parent != null) {
+            if (result.isError() && parent != null) {
 
                 // unhandled exception condition
                 return parent.handleCondition(session, result);
             }
         }
+
+        return result;
+    }
+
+    private Result executeForLoop(Session session) {
+
+        Result queryResult = loopCursor.execute(session);
+
+        if (queryResult.isError()) {
+            return queryResult;
+        }
+
+        Result result = Result.updateZeroResult;
+
+        while (queryResult.navigator.hasNext()) {
+            queryResult.navigator.next();
+
+            Object[] data = queryResult.navigator.getCurrent();
+
+            initialiseVariables(session, data,
+                                queryResult.metaData.getColumnCount());
+
+            for (int i = 0; i < statements.length; i++) {
+                result = executeProtected(session, statements[i]);
+                result = handleCondition(session, result);
+
+                if (result.isError()) {
+                    break;
+                }
+
+                if (result.getType() == ResultConstants.VALUE) {
+                    break;
+                }
+
+                if (result.getType() == ResultConstants.DATA) {
+                    break;
+                }
+            }
+
+            if (result.isError()) {
+                break;
+            }
+
+            if (result.getType() == ResultConstants.VALUE) {
+                if (result.getErrorCode() == StatementTypes.ITERATE) {
+                    if (result.getMainString() == null) {
+                        continue;
+                    }
+
+                    if (label != null
+                            && label.name.equals(result.getMainString())) {
+                        continue;
+                    }
+
+                    break;
+                }
+
+                if (result.getErrorCode() == StatementTypes.LEAVE) {
+                    break;
+                }
+
+                // return
+                break;
+            }
+
+            if (result.getType() == ResultConstants.DATA) {
+                break;
+            }
+        }
+
+        queryResult.navigator.release();
 
         return result;
     }
@@ -411,13 +569,14 @@ public class StatementCompound extends Statement {
             }
 
             for (int i = 0; i < statements.length; i++) {
-                result = statements[i].execute(session);
+                result = executeProtected(session, statements[i]);
+                result = handleCondition(session, result);
 
-                if (result.isError()) {
+                if (result.getType() == ResultConstants.VALUE) {
                     break;
                 }
 
-                if (result.getType() == ResultConstants.VALUE) {
+                if (result.getType() == ResultConstants.DATA) {
                     break;
                 }
             }
@@ -453,9 +612,12 @@ public class StatementCompound extends Statement {
                     break;
                 }
 
-                if (result.getErrorCode() == StatementTypes.RETURN) {
-                    break;
-                }
+                // return
+                break;
+            }
+
+            if (result.getType() == ResultConstants.DATA) {
+                break;
             }
 
             if (type == StatementTypes.REPEAT) {
@@ -487,7 +649,7 @@ public class StatementCompound extends Statement {
                     break;
                 }
 
-                result = statements[i].execute(session);
+                result = executeProtected(session, statements[i]);
 
                 if (result.isError()) {
                     break;
@@ -506,7 +668,8 @@ public class StatementCompound extends Statement {
                 continue;
             }
 
-            result = statements[i].execute(session);
+            result = executeProtected(session, statements[i]);
+            result = handleCondition(session, result);
 
             if (result.isError()) {
                 break;
@@ -520,7 +683,23 @@ public class StatementCompound extends Statement {
         return result;
     }
 
-    public void resolve() {
+    private Result executeProtected(Session session, Statement statement) {
+
+        int actionIndex = session.rowActionList.size();
+
+        session.actionTimestamp =
+            session.database.txManager.getNextGlobalChangeTimestamp();
+
+        Result result = statement.execute(session);
+
+        if (result.isError()) {
+            session.rollbackAction(actionIndex, session.actionTimestamp);
+        }
+
+        return result;
+    }
+
+    public void resolve(Session session) {
 
         for (int i = 0; i < statements.length; i++) {
             if (statements[i].getType() == StatementTypes.LEAVE
@@ -542,8 +721,53 @@ public class StatementCompound extends Statement {
         }
 
         for (int i = 0; i < statements.length; i++) {
-            statements[i].resolve();
+            statements[i].resolve(session);
         }
+
+        for (int i = 0; i < handlers.length; i++) {
+            handlers[i].resolve(session);
+        }
+
+        OrderedHashSet writeTableNamesSet = new OrderedHashSet();
+        OrderedHashSet readTableNamesSet  = new OrderedHashSet();
+        OrderedHashSet set                = new OrderedHashSet();
+
+        for (int i = 0; i < variables.length; i++) {
+            OrderedHashSet refs = variables[i].getReferences();
+
+            if (refs != null) {
+                set.addAll(refs);
+            }
+        }
+
+        if (condition != null) {
+            set.addAll(condition.getReferences());
+            readTableNamesSet.addAll(condition.getTableNamesForRead());
+        }
+
+        for (int i = 0; i < statements.length; i++) {
+            set.addAll(statements[i].getReferences());
+            readTableNamesSet.addAll(statements[i].getTableNamesForRead());
+            writeTableNamesSet.addAll(statements[i].getTableNamesForWrite());
+        }
+
+        for (int i = 0; i < handlers.length; i++) {
+            set.addAll(handlers[i].getReferences());
+            readTableNamesSet.addAll(handlers[i].getTableNamesForRead());
+            writeTableNamesSet.addAll(handlers[i].getTableNamesForWrite());
+        }
+
+        readTableNamesSet.removeAll(writeTableNamesSet);
+
+        readTableNames = new HsqlName[readTableNamesSet.size()];
+
+        readTableNamesSet.toArray(readTableNames);
+
+        writeTableNames = new HsqlName[writeTableNamesSet.size()];
+
+        writeTableNamesSet.toArray(writeTableNames);
+
+        references = set;
     }
 
     public void setRoot(Routine routine) {
@@ -564,6 +788,10 @@ public class StatementCompound extends Statement {
         return "";
     }
 
+    public OrderedHashSet getReferences() {
+        return references;
+    }
+
     public void setAtomic(boolean atomic) {
         this.isAtomic = atomic;
     }
@@ -571,19 +799,21 @@ public class StatementCompound extends Statement {
     //
     private void setVariables() {
 
+        HashMappedList list = new HashMappedList();
+
         if (variables.length == 0) {
             if (parent == null) {
-                rangeVariables = root.getParameterRangeVariables();
+                rangeVariables = root.getRangeVariables();
             } else {
                 rangeVariables = parent.rangeVariables;
             }
 
+            scopeVariables = list;
+
             return;
         }
 
-        HashMappedList list = new HashMappedList();
-
-        if (parent != null) {
+        if (parent != null && parent.scopeVariables != null) {
             for (int i = 0; i < parent.scopeVariables.size(); i++) {
                 list.add(parent.scopeVariables.getKey(i),
                          parent.scopeVariables.get(i));
@@ -603,12 +833,20 @@ public class StatementCompound extends Statement {
             }
         }
 
-        RangeVariable range = new RangeVariable(list, true);
+        scopeVariables = list;
 
-        rangeVariables     = new RangeVariable[] {
-            root.getParameterRangeVariables()[0], range
-        };
-        root.variableCount = list.size();
+        RangeVariable[] parameterRangeVariables = root.getRangeVariables();
+        RangeVariable range = new RangeVariable(list, null, true,
+            RangeVariable.VARIALBE_RANGE);
+
+        rangeVariables = new RangeVariable[parameterRangeVariables.length + 1];
+
+        for (int i = 0; i < parameterRangeVariables.length; i++) {
+            rangeVariables[i] = parameterRangeVariables[i];
+        }
+
+        rangeVariables[parameterRangeVariables.length] = range;
+        root.variableCount                             = list.size();
     }
 
     private void setHandlers() {
@@ -635,6 +873,52 @@ public class StatementCompound extends Statement {
                 if (!statesSet.add(states[j])) {
                     throw Error.error(ErrorCode.X_42601);
                 }
+            }
+        }
+    }
+
+    private void setTables() {
+
+        if (tables.length == 0) {
+            return;
+        }
+
+        HashMappedList list = new HashMappedList();
+
+        if (parent != null && parent.scopeTables != null) {
+            for (int i = 0; i < parent.scopeTables.size(); i++) {
+                list.add(parent.scopeTables.getKey(i),
+                         parent.scopeTables.get(i));
+            }
+        }
+
+        for (int i = 0; i < tables.length; i++) {
+            String  name  = tables[i].getName().name;
+            boolean added = list.add(name, tables[i]);
+
+            if (!added) {
+                throw Error.error(ErrorCode.X_42606, name);
+            }
+        }
+
+        scopeTables = list;
+    }
+
+    private void setCursors() {
+
+        if (cursors.length == 0) {
+            return;
+        }
+
+        HashSet list = new HashSet();
+
+        for (int i = 0; i < cursors.length; i++) {
+            StatementCursor cursor = cursors[i];
+            boolean         added  = list.add(cursor.getCursorName().name);
+
+            if (!added) {
+                throw Error.error(ErrorCode.X_42606,
+                                  cursor.getCursorName().name);
             }
         }
     }
@@ -669,7 +953,30 @@ public class StatementCompound extends Statement {
         }
     }
 
+    private void initialiseVariables(Session session, Object[] data,
+                                     int count) {
+
+        Object[] vars   = session.sessionContext.routineVariables;
+        int      offset = parent == null ? 0
+                                         : parent.scopeVariables.size();
+
+        for (int i = 0; i < count; i++) {
+            try {
+                vars[offset + i] = data[i];
+            } catch (HsqlException e) {}
+        }
+    }
+
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
+    }
+
+    public void setCorrelated() {
+
+        //
+    }
+
+    public boolean isVariable() {
+        return true;
     }
 }

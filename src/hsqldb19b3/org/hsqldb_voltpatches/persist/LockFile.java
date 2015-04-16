@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,10 +40,10 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 
 import org.hsqldb_voltpatches.DatabaseManager;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
 import org.hsqldb_voltpatches.HsqlException;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.FileUtil;
 import org.hsqldb_voltpatches.lib.HsqlTimer;
 import org.hsqldb_voltpatches.lib.StringConverter;
@@ -216,7 +216,7 @@ import org.hsqldb_voltpatches.lib.StringConverter;
  *
  * In particular, if {@link #USE_NIO_FILELOCK_PROPERTY} is true and the required
  * classes are available at static initialization, then <tt>newLockFile()</tt>
- * produces {@link NIOLockFile NIOLockFile} instances.<p>
+ * produces org.hsqldb_voltpatches.persist.NIOLockFile instances.<p>
  *
  * When <tt>NIOLockFile</tt> instances are produced, then it is possible that
  * true kernel-enforced advisory or manditory file locking is used to protect
@@ -275,7 +275,7 @@ import org.hsqldb_voltpatches.lib.StringConverter;
  * however, this option has been rejected due to the relative complexity of
  * guaranteeing acceptably safe, deterministic behaviour.  On the other hand,
  * if it can be guaranteed that certain site invariants hold (in particular,
- * that only one version of the hsqldb jar will ever be used to open database
+ * that only one version of the hsqldb_voltpatches jar will ever be used to open database
  * instances at the site) and it is desirable or required to experiment with
  * a lower interval, then it is recommended for now simply to recompile the
  * jar using a different value in the static field assignment.  Note that great
@@ -288,7 +288,7 @@ import org.hsqldb_voltpatches.lib.StringConverter;
  * Starting with 1.8.0.3, NIO-enhanced file lock attempts are turned off by
  * default. The general reasons for this are discussed above.  Anyone interested
  * in the reading the detailed research notes should refer to the overview of
- * {@link NIOLockFile}. If, after reviewing the notes and the capabilities of
+ * NIOLockFile. If, after reviewing the notes and the capabilities of
  * the intended target platform, one should still wish to enable NIO-enhanced
  * file lock attempts, it can be done by setting the system property {@link
  * #USE_NIO_FILELOCK_PROPERTY} true at JVM startup (for example, by using a
@@ -349,11 +349,11 @@ import org.hsqldb_voltpatches.lib.StringConverter;
  * performed at the level of the <tt>newLockFile()</tt> factory method.
  * Similarly, the HSQLDB ANT build script now detects the presence or abscence
  * of JDK 1.4+ features such as java.nio and only attempts to build and deploy
- * <tt>NIOLockFile</tt> to the hsqldb.jar if such features are reported
+ * <tt>NIOLockFile</tt> to the hsqldb_voltpatches.jar if such features are reported
  * present. <p>
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
- * @version 1.8.0.3
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
+ * @version 1.8.1.2
  * @since 1.7.2
  */
 public class LockFile {
@@ -415,14 +415,14 @@ public class LockFile {
      * heartbeat poll retries.
      */
     public static final String POLL_RETRIES_PROPERTY =
-        "hsqldb.lockfile.poll.retries";
+        "hsqldb_voltpatches.lockfile.poll.retries";
 
     /**
      * System property that can be used to override the default number of
      * milliseconds between each heartbeat poll retry.
      */
     public static final String POLL_INTERVAL_PROPERTY =
-        "hsqldb.lockfile.poll.interval";
+        "hsqldb_voltpatches.lockfile.poll.interval";
 
     /** Whether <tt>java.nio</tt> file locking is attempted by default. */
     public static final boolean USE_NIO_FILELOCK_DEFAULT = false;
@@ -432,7 +432,7 @@ public class LockFile {
      * attempted.
      */
     public static final String USE_NIO_FILELOCK_PROPERTY =
-        "hsqldb.lockfile.nio.filelock";
+        "hsqldb_voltpatches.lockfile.nio.filelock";
 
     /**
      * Statically computed indication of <tt>java.nio.channels.FileLock</tt>
@@ -794,9 +794,9 @@ public class LockFile {
         try {
             if (withCreateNewFile) {
                 try {
-                    file.createNewFile();
-
-                    return;
+                    if (file.createNewFile()) {
+                        return;
+                    }
                 } catch (IOException ioe) {}
             }
 
@@ -810,6 +810,12 @@ public class LockFile {
         }
 
         if (length != USED_REGION) {
+            if (length == 0) {
+                file.delete();
+
+                return;
+            }
+
             throw new WrongLengthException(this, "checkHeartbeat", length);
         }
 
@@ -1013,17 +1019,17 @@ public class LockFile {
 
         // Should at least be absolutized for reporting purposes, just in case
         // a security or canonicalization exception gets thrown.
-        path = FileUtil.getDefaultInstance().canonicalOrAbsolutePath(path);
+        path      = FileUtil.getFileUtil().canonicalOrAbsolutePath(path);
         this.file = new File(path);
 
         try {
-            FileUtil.getDefaultInstance().makeParentDirectories(this.file);
+            FileUtil.getFileUtil().makeParentDirectories(this.file);
         } catch (SecurityException ex) {
             throw new FileSecurityException(this, "setPath", ex);
         }
 
         try {
-            this.file = FileUtil.getDefaultInstance().canonicalFile(path);
+            this.file = FileUtil.getFileUtil().canonicalFile(path);
         } catch (SecurityException ex) {
             throw new FileSecurityException(this, "setPath", ex);
         } catch (IOException ex) {
@@ -1048,7 +1054,7 @@ public class LockFile {
      */
     private final void openRAF()
     throws LockFile.UnexpectedFileNotFoundException,
-           LockFile.FileSecurityException {
+           LockFile.FileSecurityException, LockFile.UnexpectedFileIOException {
 
         try {
             raf = new RandomAccessFile(file, "rw");
@@ -1381,7 +1387,7 @@ public class LockFile {
      *      acquisition of a cooperative lock condition using the specified
      *      <tt>path</tt>, else <tt>false</tt>
      */
-    public final static boolean isLocked(final String path) {
+    public static final boolean isLocked(final String path) {
 
         boolean locked = true;
 
@@ -1740,7 +1746,7 @@ public class LockFile {
             // store...
             writeMagic();
             writeHeartbeat();
-            FileUtil.getDefaultInstance().deleteOnExit(file);
+            FileUtil.getFileUtil().deleteOnExit(file);
 
             this.locked = true;
 

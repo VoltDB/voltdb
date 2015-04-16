@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches.jdbc;
 
 import java.io.Reader;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.sql.Array;
 import java.sql.Blob;
@@ -40,6 +41,7 @@ import java.sql.CallableStatement;
 import java.sql.Clob;
 import java.sql.Date;
 import java.sql.Ref;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -52,24 +54,24 @@ import java.sql.RowId;
 import java.sql.SQLXML;
 
 //#endif JAVA6
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.HsqlException;
-import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.HsqlDateTime;
 import org.hsqldb_voltpatches.SchemaObject;
-import org.hsqldb_voltpatches.SessionInterface;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobDataID;
 import org.hsqldb_voltpatches.types.ClobDataID;
+import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.JavaObjectData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
-/* $Id: JDBCCallableStatement.java 2993 2009-05-12 16:20:39Z fredt $ */
+/* $Id: JDBCCallableStatement.java 5259 2013-07-05 20:19:09Z fredt $ */
 
 /** @todo fredt 1.9.0 - review wrt multiple result sets, named parameters etc. */
 
@@ -81,7 +83,7 @@ import org.hsqldb_voltpatches.types.Type;
 //       being "@p1" => 1, "@p2" => 2, etc.  Problems: return value is "@p0"
 //       and there is no support for registering the return value as an out
 //       parameter.
-// TODO: 1.9.x
+// TODO: 1.9.x :: DONE
 //       engine and client-side mechanisms for adding, retrieving,
 //       navigating (and perhaps controlling holdability of) multiple
 //       results generated from a single execution.
@@ -132,27 +134,6 @@ import org.hsqldb_voltpatches.types.Type;
  * <div class="ReleaseSpecificDocumentation">
  * <h3>HSQLDB-Specific Information:</h3> <p>
  *
- * Some of the previously unsupported features of this interface
- * are now supported, such as the parameterName-based setter methods. <p>
- *
- * More importantly, JDBCCallableStatement objects are now backed by a true
- * compiled parameteric representation. Hence, there are now significant
- * performance gains to be had by using a CallableStatement object instead of
- * a Statement object, if a short-running CALL statement is to be executed more
- * than a small number of times.  Moreover, the recent work lays the foundation
- * for work in a subsequenct release to support CallableStatement OUT and
- * IN OUT style parameters, as well as the generation and retrieval of multiple
- * results in response to the execution of a CallableStatement object. <p>
- *
- * For a more in-depth discussion of performance issues regarding HSQLDB
- * prepared and callable statement objects, please see overview section of
- * {@link JDBCParameterMetaData JDBCPreparedStatment}.
- *
- * <hr>
- *
- * As with many DBMS, HSQLDB support for stored procedures is not provided in
- * a completely standard fashion. <p>
- *
  * Beyond the XOpen/ODBC extended scalar functions, stored procedures are
  * typically supported in ways that vary greatly from one DBMS implementation
  * to the next.  So, it is almost guaranteed that the code for a stored
@@ -162,17 +143,18 @@ import org.hsqldb_voltpatches.types.Type;
  * from one DBMS product line to another almost invariably involves complex
  * porting issues and often may not be possible at all. <em>Be warned</em>. <p>
  *
- * One kind of HSQLDB stored procedures is Java routines that map directly onto
- * the static methods of compiled Java classes found on the classpath of the
- * engine at runtime. <p>
+ * One kind of HSQLDB stored procedures and functions is SQL/JRT, Java routines
+ * that map directly onto the static methods of compiled Java classes found on
+ * the class path of the engine at runtime. The CREATE PROCEDURE or CREATE FUNCTION
+ * statements are used in SQL to support the Java methods.<p>
+ *
+ * The other kind of HSQLDB stored procedures is SQL/PSM routines that are
+ * written entirely in the SQL procedural language.
  *
  * Overloaded methods are supported and resolved according to the type of
- * para;meters.
+ * parameters.
  *
- * The other kind of HSQLDB stored procedures is SQL routines that are created
- * as part of schemas.
- *
- * With SQL routines, <code>OUT</code> and <code>IN OUT</code> parameters
+ * With procedures, <code>OUT</code> and <code>IN OUT</code> parameters
  * are also supported. <p>
  *
  * In addition, HSQLDB stored procedure call mechanism allows the
@@ -189,47 +171,11 @@ import org.hsqldb_voltpatches.types.Type;
  * SELECT &lt;simple-expression&gt; FROM DUAL;
  * </PRE>
  *
- * As a transitional measure, HSQLDB provides the ability to materialize a
- * general result set in response to stored procedure execution.  In this case,
- * the stored procedure's Java method descriptor must specify a return type of
- * java.lang.Object for external use (although at any point in the devlopment
- * cycle, other, proprietary return types may accepted internally for engine
- * development purposes).
- *
- * When HSQLDB detects that the runtime class of the resulting Object is
- * elligible, an automatic internal unwrapping is performed to correctly
- * expose the underlying result set to the client, whether local or remote. <p>
- *
- * Additionally, HSQLDB automatically detects if java.sql.Connection is
- * the class of the first argument of any underlying Java method(s).  If so,
- * then the engine transparently supplies the internal Connection object
- * corresponding to the Session executing the call, adjusting the positions
- * of other arguments to suite the SQL context. <p>
- *
- * The features above are not intended to be permanent.  Rather, the intention
- * is to offer more general and powerful mechanisms in a future release;
- * it is recommend to use them only as a temporary convenience. <p>
- *
- * For instance, one might be well advised to future-proof by writing
- * HSQLDB-specific adapter methods that in turn call the real logic of an
- * underlying generalized JDBC stored procedure library. <p>
+ * HSQLDB functions can return a single result set. HSQLDB procedures can
+ * return one or more result sets.
  *
  * Here is a very simple example of an HSQLDB stored procedure generating a
  * user-defined result set:
- *
- * <pre class="JavaCodeExample">
- * <span class="JavaKeyWord">package</span> mypackage;
- *
- * <span class="JavaKeyWord">class</span> MyClass {
- *
- *      <span class="JavaKeyWord">public static</span> Object <b>mySp</b>(Connection conn) <span class="JavaKeyWord">throws</span> SQLException {
- *          <span class="JavaKeyWord">return</span> conn.<b>createStatement</b>().<b>executeQuery</b>(<span class="JavaStringLiteral">"select * from my_table"</span>);
- *      }
- * }
- * </pre>
- *
- * Here is a refinement demonstrating no more than the bare essence of the idea
- * behind a more portable style:
  *
  * <pre class="JavaCodeExample">
  * <span class="JavaKeyWord">package</span> mypackage;
@@ -244,46 +190,18 @@ import org.hsqldb_voltpatches.types.Type;
  *      }
  * }
  *
- * //--
- *
- * <span class="JavaKeyWord">package</span> myadaptorpackage;
- *
- * <span class="JavaKeyWord">import</span> java.sql.Connection;
- * <span class="JavaKeyWord">import</span> java.sql.SQLException;
- *
- * <span class="JavaKeyWord">class</span> MyAdaptorClass {
- *
- *      <span class="JavaKeyWord">public static</span> Object <b>mySp</b>(Connection conn) <span class="JavaKeyWord">throws</span> SQLException {
- *          MyLibraryClass.<b>getCtx()</b>.<b>setConnection</b>(conn);
- *          <span class="JavaKeyWord">return</span> MyLibraryClass.<b>mySp</b>();
- *      }
- * }
  * </pre>
- *
- * In a future release, it is intended to provided some new features
- * that will support writing fairly portable JDBC-based stored procedure
- * code: <P>
- *
- * <ul>
- *  <li> Support for the <span class="JavaStringLiteral">"jdbc:default:connection"</span>
- *       standard database connection url. <p>
- *
- *  <li> A well-defined specification of the behaviour of the HSQLDB execution
- *       stack under stored procedure calls. <p>
- *
- *  <li> A well-defined, pure JDBC specification for generating multiple
- *       results from HSQLDB stored procedures for client retrieval.
- * </ul>
  *
  * (boucherb@users)
  * </div>
  * <!-- end Release-specific documentation -->
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
- * @author Fred Toussi (fredt{@users dot sourceforge.net
- * @version 1.9.0
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
+ * @author Fred Toussi (fredt@users dot sourceforge.net)
+ * @version 2.3.0
  * @since 1.7.2
- * @revised JDK 1.6, HSQLDB 1.9.0
+ * @revised JDK 1.6, HSQLDB 2.0
+ * @revised JDK 1.7, HSQLDB 2.0.1
  * @see JDBCConnection#prepareCall
  * @see JDBCResultSet
  */
@@ -314,7 +232,17 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * <div class="ReleaseSpecificDocumentation">
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
-     * HSQLDB supports this feature. <p>
+     * HSQLDB supports this feature. This method can be called after a
+     * PrepareCall method. HSQLDB has already determined which parameters are
+     * OUT or INOUT parameters, therefore this method only checks and
+     * throws an exception if the parameter is not of the correct form.
+     * The data type argument is ignored<p>
+     *
+     * The <code>get</code> method to read the value of the parameter is
+     * determined by the engine based on the data type of the parameter.
+     *
+     * Furthermore, HSQLDB supports multiple OUT and INOUT parameters for
+     * stored procedures.<p>
      * </div>
      * <!-- end release-specific documentation -->
      *
@@ -326,7 +254,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        <code>registerOutParameter</code> that accepts a scale value
      *        should be used.
      *
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1 [if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>sqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -344,8 +273,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 
         if (parameterModes[--parameterIndex]
                 == SchemaObject.ParameterModes.PARAM_IN) {
-            throw Util.invalidArgument();
+            throw JDBCUtil.invalidArgument();
         }
+    }
+
+    public ResultSet getResultSet() throws SQLException {
+        return super.getResultSet();
     }
 
     /**
@@ -380,7 +313,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param sqlType the SQL type code defined by <code>java.sql.Types</code>.
      * @param scale the desired number of digits to the right of the
      * decimal point.  It must be greater than or equal to zero.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>sqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -420,6 +354,11 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * this method is called on a closed <code>CallableStatement</code>
      */
     public synchronized boolean wasNull() throws SQLException {
+
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
+
         return wasNullValue;
     }
 
@@ -452,7 +391,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value. If the value is SQL <code>NULL</code>,
      *         the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setString
      */
@@ -484,7 +424,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>,
      *         the result is <code>false</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setBoolean
      */
@@ -518,7 +459,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setByte
      */
@@ -551,7 +493,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setShort
      */
@@ -585,7 +528,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setInt
      */
@@ -618,7 +562,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setLong
      */
@@ -651,7 +596,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setFloat
      */
@@ -685,7 +631,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setDouble
      */
@@ -721,7 +668,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param scale the number of digits to the right of the decimal point
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -734,13 +682,15 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
     public synchronized BigDecimal getBigDecimal(int parameterIndex,
             int scale) throws SQLException {
 
-        if (scale < 0) {
-            throw Util.outOfRangeArgument();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
         }
 
-        // boucherb@users 20020502 - added conversion
-        BigDecimal bd = (BigDecimal) getColumnInType(parameterIndex,
-            Type.SQL_DECIMAL);
+        if (scale < 0) {
+            throw JDBCUtil.outOfRangeArgument();
+        }
+
+        BigDecimal bd = getBigDecimal(parameterIndex);
 
         if (bd != null) {
             bd = bd.setScale(scale, BigDecimal.ROUND_DOWN);
@@ -772,7 +722,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setBytes
      */
@@ -808,7 +759,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setDate
      */
@@ -845,7 +797,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setTime
      */
@@ -881,7 +834,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *        and so on
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setTimestamp
      */
@@ -928,7 +882,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterIndex the first parameter is 1, the second is 2,
      *        and so on
      * @return A <code>java.lang.Object</code> holding the OUT parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see java.sql.Types
      * @see #setObject
@@ -942,6 +897,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 
         switch (sourceType.typeCode) {
 
+            case Types.SQL_ARRAY :
+                return getArray(parameterIndex);
             case Types.SQL_DATE :
                 return getDate(parameterIndex);
             case Types.SQL_TIME :
@@ -953,6 +910,17 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
                 return getBytes(parameterIndex);
+            case Types.SQL_BIT : {
+                boolean b = getBoolean(parameterIndex);
+
+                return wasNull() ? null
+                                 : b ? Boolean.TRUE
+                                     : Boolean.FALSE;
+            }
+            case Types.SQL_CLOB :
+                return getClob(parameterIndex);
+            case Types.SQL_BLOB :
+                return getBlob(parameterIndex);
             case Types.OTHER :
             case Types.JAVA_OBJECT : {
                 Object o = getColumnInType(parameterIndex, sourceType);
@@ -964,7 +932,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
                 try {
                     return ((JavaObjectData) o).getObject();
                 } catch (HsqlException e) {
-                    throw Util.sqlException(e);
+                    throw JDBCUtil.sqlException(e);
                 }
             }
             default :
@@ -972,7 +940,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
         }
     }
 
-// ----------------------------------- JDBC 2 ----------------------------------
+    //--------------------------JDBC 2.0-----------------------------
 
     /**
      * <!-- start generic documentation -->
@@ -996,7 +964,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * and so on
      * @return the parameter value in full precision.  If the value is
      * SQL <code>NULL</code>, the result is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setBigDecimal
      * @since JDK 1.2 (JDK 1.1.x developers: read the overview for
@@ -1004,7 +973,33 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
     public synchronized BigDecimal getBigDecimal(
             int parameterIndex) throws SQLException {
-        return (BigDecimal) getColumnInType(parameterIndex, Type.SQL_DECIMAL);
+
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
+
+        Type targetType = parameterMetaData.columnTypes[parameterIndex - 1];
+
+        switch (targetType.typeCode) {
+
+            case Types.SQL_NUMERIC :
+            case Types.SQL_DECIMAL :
+                break;
+            case Types.TINYINT :
+            case Types.SQL_SMALLINT :
+            case Types.SQL_INTEGER :
+            case Types.SQL_BIGINT :
+                targetType = Type.SQL_DECIMAL;
+
+                break;
+            case Types.SQL_DOUBLE :
+            default :
+                targetType = Type.SQL_DECIMAL_DEFAULT;
+
+                break;
+        }
+
+        return (BigDecimal) getColumnInType(parameterIndex, targetType);
     }
 
     /**
@@ -1035,7 +1030,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterIndex the first parameter is 1, the second is 2, and so on
      * @param map the mapping from SQL type names to Java classes
      * @return a <code>java.lang.Object</code> holding the OUT parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1047,13 +1043,17 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 //#ifdef JAVA6
     public Object getObject(int parameterIndex,
                             Map<String, Class<?>> map) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
 //#else
 /*
     public Object getObject(int parameterIndex, Map map) throws SQLException {
-        throw Util.notSupported();
+            checkGetParameterIndex(parameterIndex);
+        throw JDBCUtil.notSupported();
     }
 */
 
@@ -1082,7 +1082,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>Ref</code> object in the
      * Java programming language.  If the value was SQL <code>NULL</code>, the value
      * <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1090,7 +1091,10 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * JDBCParameterMetaData)
      */
     public Ref getRef(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
     /**
@@ -1110,12 +1114,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * </div>
      * <!-- end release-specific documentation -->
      *
-     * @param parameterIndex the first parameter is 1, the second is 2,
-     * and so on
+     * @param parameterIndex the first parameter is 1, the second is 2, and so on
      * @return the parameter value as a <code>Blob</code> object in the
      * Java programming language.  If the value was SQL <code>NULL</code>, the value
      * <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1124,7 +1128,10 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
     public synchronized Blob getBlob(int parameterIndex) throws SQLException {
 
-        Object o = getObject(parameterIndex);
+        checkGetParameterIndex(parameterIndex);
+
+        Type   sourceType = parameterMetaData.columnTypes[parameterIndex - 1];
+        Object o          = getColumnInType(parameterIndex, sourceType);
 
         if (o == null) {
             return null;
@@ -1134,7 +1141,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             return new JDBCBlobClient(session, (BlobDataID) o);
         }
 
-        throw Util.sqlException(ErrorCode.X_42561);
+        throw JDBCUtil.sqlException(ErrorCode.X_42561);
     }
 
     /**
@@ -1159,7 +1166,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>Clob</code> object in the
      * Java programming language.  If the value was SQL <code>NULL</code>, the
      * value <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1168,7 +1176,10 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
     public synchronized Clob getClob(int parameterIndex) throws SQLException {
 
-        Object o = getObject(parameterIndex);
+        checkGetParameterIndex(parameterIndex);
+
+        Type   sourceType = parameterMetaData.columnTypes[parameterIndex - 1];
+        Object o          = getColumnInType(parameterIndex, sourceType);
 
         if (o == null) {
             return null;
@@ -1178,7 +1189,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             return new JDBCClobClient(session, (ClobDataID) o);
         }
 
-        throw Util.sqlException(ErrorCode.X_42561);
+        throw JDBCUtil.sqlException(ErrorCode.X_42561);
     }
 
     /**
@@ -1203,7 +1214,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as an <code>Array</code> object in
      * the Java programming language.  If the value was SQL <code>NULL</code>, the
      * value <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1214,7 +1226,20 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 
         checkGetParameterIndex(parameterIndex);
 
-        throw Util.notSupported();
+        Type type = parameterMetaData.columnTypes[parameterIndex - 1];
+
+        if (!type.isArrayType()) {
+            throw JDBCUtil.sqlException(ErrorCode.X_42561);
+        }
+
+        Object[] data = (Object[]) parameterValues[parameterIndex - 1];
+
+        if (data == null) {
+            return null;
+        }
+
+        return new JDBCArray(data, type.collectionBaseType(), type,
+                             connection);
     }
 
     /**
@@ -1246,7 +1271,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *            to construct the date
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setDate
      * @since JDK 1.2 (JDK 1.1.x developers: read the overview for
@@ -1257,10 +1283,18 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 
         TimestampData t = (TimestampData) getColumnInType(parameterIndex,
             Type.SQL_DATE);
-        long millis     = t.getSeconds() * 1000;
-        int  zoneOffset = HsqlDateTime.getZoneMillis(cal, millis);
 
-        return new Date(millis - zoneOffset);
+        if (t == null) {
+            return null;
+        }
+
+        long millis = t.getSeconds() * 1000;
+
+        if (cal != null) {
+            millis = HsqlDateTime.convertMillisToCalendar(cal, millis);
+        }
+
+        return new Date(millis);
     }
 
     /**
@@ -1292,7 +1326,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *            to construct the time
      * @return the parameter value; if the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setTime
      * @since JDK 1.2 (JDK 1.1.x developers: read the overview for
@@ -1307,17 +1342,15 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             return null;
         }
 
-        long millis = t.getSeconds() * 1000;
+        long millis = DateTimeType.normaliseTime(t.getSeconds()) * 1000;
 
-        if (parameterTypes[--parameterIndex].isDateTimeTypeWithZone()) {}
-        else {
+        if (!parameterMetaData.columnTypes[--parameterIndex]
+                .isDateTimeTypeWithZone()) {
+            Calendar calendar = cal == null ? session.getCalendar()
+                    : cal;
 
-            // UTC - calZO == (UTC - sessZO) + (sessionZO - calZO)
-            if (cal != null) {
-                int zoneOffset = HsqlDateTime.getZoneMillis(cal, millis);
-
-                millis += session.getZoneSeconds() * 1000 - zoneOffset;
-            }
+            millis = HsqlDateTime.convertMillisToCalendar(calendar, millis);
+            millis = HsqlDateTime.getNormalisedTime(millis);
         }
 
         return new Time(millis);
@@ -1352,7 +1385,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *            to construct the timestamp
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      *         is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #setTimestamp
      * @since JDK 1.2 (JDK 1.1.x developers: read the overview for
@@ -1370,14 +1404,14 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 
         long millis = t.getSeconds() * 1000;
 
-        if (parameterTypes[--parameterIndex].isDateTimeTypeWithZone()) {}
-        else {
+        if (!parameterMetaData.columnTypes[--parameterIndex]
+                .isDateTimeTypeWithZone()) {
+            Calendar calendar = cal == null ? session.getCalendar()
+                    : cal;
 
-            // UTC - calZO == (UTC - sessZO) + (sessionZO - calZO)
             if (cal != null) {
-                int zoneOffset = HsqlDateTime.getZoneMillis(cal, millis);
-
-                millis += session.getZoneSeconds() * 1000 - zoneOffset;
+                millis = HsqlDateTime.convertMillisToCalendar(calendar,
+                        millis);
             }
         }
 
@@ -1431,7 +1465,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterIndex the first parameter is 1, the second is 2,...
      * @param sqlType a value from {@link java.sql.Types}
      * @param typeName the fully-qualified name of an SQL structured type
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>sqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -1450,7 +1485,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
         registerOutParameter(parameterIndex, sqlType);
     }
 
-// ----------------------------------- JDBC 3 ----------------------------------
+// ----------------------------------- JDBC 3.0----------------------------------
 
     /**
      * <!-- start generic documentation -->
@@ -1486,7 +1521,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * or <code>DECIMAL</code>, the version of
      * <code>registerOutParameter</code> that accepts a scale value
      * should be used.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 41.[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>sqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -1538,7 +1574,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param sqlType SQL type code defined by <code>java.sql.Types</code>.
      * @param scale the desired number of digits to the right of the
      * decimal point.  It must be greater than or equal to zero.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 41.[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>sqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -1603,7 +1640,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @param sqlType a value from {@link java.sql.Types}
      * @param typeName the fully-qualified name of an SQL structured type
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 41.[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>sqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -1646,7 +1684,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return a <code>java.net.URL</code> object that represents the
      *         JDBC <code>DATALINK</code> value used as the designated
      *         parameter
-     * @exception SQLException if a database access error occurs,
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs,
      * this method is called on a closed <code>CallableStatement</code>,
      *            or if the URL being returned is
      *            not a valid URL on the Java platform
@@ -1657,7 +1696,10 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
 //#ifdef JAVA4
     public java.net.URL getURL(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA4
@@ -1683,7 +1725,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param val the parameter value
-     * @exception SQLException if a database access error occurs,
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs,
      * this method is called on a closed <code>CallableStatement</code>,
      *            or if a URL is malformed
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
@@ -1718,7 +1761,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param sqlType the SQL type code defined in <code>java.sql.Types</code>
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1754,7 +1798,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @see #getBoolean
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
@@ -1789,7 +1834,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1823,7 +1869,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1857,7 +1904,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1891,7 +1939,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1925,7 +1974,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1959,7 +2009,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -1994,7 +2045,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2031,7 +2083,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2067,7 +2120,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2104,7 +2158,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2138,7 +2193,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2173,7 +2229,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2216,7 +2273,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @param x the Java input stream that contains the ASCII parameter value
      * @param length the number of bytes in the stream
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2257,7 +2315,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @param x the java input stream which contains the binary parameter value
      * @param length the number of bytes in the stream
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2311,7 +2370,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param scale for java.sql.Types.DECIMAL or java.sql.Types.NUMERIC types,
      *          this is the number of digits after the decimal point.  For all other
      *          types, this value will be ignored.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>targetSqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -2354,7 +2414,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param x the object containing the input parameter value
      * @param targetSqlType the SQL type (as defined in java.sql.Types) to be
      *                      sent to the database
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if <code>targetSqlType</code> is
      * a <code>ARRAY</code>, <code>BLOB</code>, <code>CLOB</code>,
@@ -2414,7 +2475,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the object containing the input parameter value
-     * @exception SQLException if a database access error occurs,
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs,
      * this method is called on a closed <code>CallableStatement</code> or if the given
      *            <code>Object</code> parameter is ambiguous
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
@@ -2459,7 +2521,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param reader the <code>java.io.Reader</code> object that
      *        contains the UNICODE data used as the designated parameter
      * @param length the number of characters in the stream
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2499,7 +2562,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param x the parameter value
      * @param cal the <code>Calendar</code> object the driver will use
      *            to construct the date
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2540,7 +2604,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param x the parameter value
      * @param cal the <code>Calendar</code> object the driver will use
      *            to construct the time
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2581,7 +2646,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param x the parameter value
      * @param cal the <code>Calendar</code> object the driver will use
      *            to construct the timestamp
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2634,7 +2700,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param typeName the fully-qualified name of an SQL user-defined type;
      *        ignored if the parameter is not a user-defined type or
      *        SQL <code>REF</code> value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2676,7 +2743,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value. If the value is SQL <code>NULL</code>, the result
      * is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2713,7 +2781,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>false</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2748,7 +2817,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2783,7 +2853,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2819,7 +2890,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>,
      *         the result is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2853,7 +2925,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>,
      *         the result is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2888,7 +2961,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>,
      *         the result is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2923,7 +2997,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>,
      *         the result is <code>0</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2959,7 +3034,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result is
      *  <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -2994,7 +3070,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3029,7 +3106,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3064,7 +3142,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result
      * is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3105,7 +3184,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @return A <code>java.lang.Object</code> holding the OUT parameter value.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3142,7 +3222,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return the parameter value in full precision.  If the value is
      * SQL <code>NULL</code>, the result is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3184,7 +3265,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @param map the mapping from SQL type names to Java classes
      * @return a <code>java.lang.Object</code> holding the OUT parameter value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3226,7 +3308,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>Ref</code> object in the
      *         Java programming language.  If the value was SQL <code>NULL</code>,
      *         the value <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3260,7 +3343,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>Blob</code> object in the
      *         Java programming language.  If the value was SQL <code>NULL</code>,
      *         the value <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3295,7 +3379,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>Clob</code> object in the
      *         Java programming language.  If the value was SQL <code>NULL</code>,
      *         the value <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3330,7 +3415,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as an <code>Array</code> object in
      *         Java programming language.  If the value was SQL <code>NULL</code>,
      *         the value <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3372,7 +3458,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *            to construct the date
      * @return the parameter value.  If the value is SQL <code>NULL</code>,
      * the result is <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3415,7 +3502,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *            to construct the time
      * @return the parameter value; if the value is SQL <code>NULL</code>, the result is
      * <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3459,7 +3547,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *            to construct the timestamp
      * @return the parameter value.  If the value is SQL <code>NULL</code>, the result is
      * <code>null</code>.
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
@@ -3495,7 +3584,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>java.net.URL</code> object in the
      * Java programming language.  If the value was SQL <code>NULL</code>, the
      * value <code>null</code> is returned.
-     * @exception SQLException if a database access error occurs,
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs,
      * this method is called on a closed <code>CallableStatement</code>,
      *            or if there is a problem with the URL
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
@@ -3532,15 +3622,19 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return a <code>RowId</code> object that represents the JDBC <code>ROWID</code>
      *     value is used as the designated parameter. If the parameter contains
      * a SQL <code>NULL</code>, then a <code>null</code> value is returned.
-     * @throws SQLException if a database access error occurs or
+     * @throws SQLException JDBC 4.1[ if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public RowId getRowId(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA6
@@ -3566,11 +3660,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return a <code>RowId</code> object that represents the JDBC <code>ROWID</code>
      *     value is used as the designated parameter. If the parameter contains
      * a SQL <code>NULL</code>, then a <code>null</code> value is returned.
-     * @throws SQLException if a database access error occurs or
+     * @throws SQLException  JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized RowId getRowId(
@@ -3600,11 +3695,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x the parameter value
-     * @throws SQLException if a database access error occurs or
+     * @throws SQLException  JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setRowId(String parameterName,
@@ -3620,13 +3716,14 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * <code>NVARCHAR</code> or <code>LONGNVARCHAR</code>
      * @param parameterName the name of the parameter to be set
      * @param value the parameter value
-     * @throws SQLException if the driver does not support national
+     * @throws SQLException  JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if the driver does not support national
      *         character sets;  if the driver can detect that a data conversion
      *  error could occur; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setNString(String parameterName,
@@ -3644,13 +3741,14 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter to be set
      * @param value the parameter value
      * @param length the number of characters in the parameter data.
-     * @throws SQLException if the driver does not support national
+     * @throws SQLException  JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if the driver does not support national
      *         character sets;  if the driver can detect that a data conversion
      *  error could occur; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setNCharacterStream(String parameterName,
@@ -3667,13 +3765,14 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * object maps to a SQL <code>NCLOB</code>.
      * @param parameterName the name of the parameter to be set
      * @param value the parameter value
-     * @throws SQLException if the driver does not support national
+     * @throws SQLException  JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if the driver does not support national
      *         character sets;  if the driver can detect that a data conversion
      *  error could occur; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setNClob(String parameterName,
@@ -3695,14 +3794,14 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter to be set
      * @param reader An object that contains the data to set the parameter value to.
      * @param length the number of characters in the parameter data.
-     * @throws SQLException if parameterIndex does not correspond to a parameter
-     * marker in the SQL statement; if the length specified is less than zero;
+     * @throws SQLException if parameterName does not correspond to a named
+     * parameter; if the length specified is less than zero;
      * a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
      *
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setClob(String parameterName, Reader reader,
@@ -3728,15 +3827,15 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param inputStream An object that contains the data to set the parameter
      * value to.
      * @param length the number of bytes in the parameter data.
-     * @throws SQLException  if parameterIndex does not correspond
-     * to a parameter marker in the SQL statement,  or if the length specified
-     * is less than zero; if the number of bytes in the inputstream does not match
-     * the specfied length; if a database access error occurs or
+     * @throws SQLException  if parameterName does not correspond to a named
+     * parameter; if the length specified
+     * is less than zero; if the number of bytes in the input stream does not match
+     * the specified length; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
      *
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setBlob(String parameterName,
@@ -3760,15 +3859,15 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter to be set
      * @param reader An object that contains the data to set the parameter value to.
      * @param length the number of characters in the parameter data.
-     * @throws SQLException if parameterIndex does not correspond to a parameter
-     * marker in the SQL statement; if the length specified is less than zero;
+     * @throws SQLException if parameterName does not correspond to a named
+     * parameter; if the length specified is less than zero;
      * if the driver does not support national
      *         character sets;  if the driver can detect that a data conversion
      *  error could occur; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setNClob(String parameterName, Reader reader,
@@ -3801,17 +3900,21 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>NClob</code> object in the
      * Java programming language.  If the value was SQL <code>NULL</code>, the
      * value <code>null</code> is returned.
-     * @exception SQLException if the driver does not support national
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if the driver does not support national
      *         character sets;  if the driver can detect that a data conversion
      *  error could occur; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public NClob getNClob(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA6
@@ -3838,13 +3941,14 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return the parameter value as a <code>NClob</code> object in the
      *         Java programming language.  If the value was SQL <code>NULL</code>,
      *         the value <code>null</code> is returned.
-     * @exception SQLException if the driver does not support national
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if the driver does not support national
      *         character sets;  if the driver can detect that a data conversion
      *  error could occur; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized NClob getNClob(
@@ -3860,13 +3964,15 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param xmlObject a <code>SQLXML</code> object that maps an <code>SQL XML</code> value
-     * @throws SQLException if a database access error occurs,
+     * @throws SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs;
      * this method is called on a closed <code>CallableStatement</code> or
      * the <code>java.xml.transform.Result</code>,
      *  <code>Writer</code> or <code>OutputStream</code> has not been closed for the <code>SQLXML</code> object
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     *
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setSQLXML(String parameterName,
@@ -3896,15 +4002,19 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterIndex index of the first parameter is 1, the second is 2, ...
      * @return a <code>SQLXML</code> object that maps an <code>SQL XML</code> value
-     * @throws SQLException if a database access error occurs or
+     * @throws SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public SQLXML getSQLXML(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA6
@@ -3929,11 +4039,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @return a <code>SQLXML</code> object that maps an <code>SQL XML</code> value
-     * @throws SQLException if a database access error occurs or
+     * @throws SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized SQLXML getSQLXML(
@@ -3972,16 +4083,20 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterIndex index of the first parameter is 1, the second is 2, ...
      * @return a <code>String</code> object that maps an
      * <code>NCHAR</code>, <code>NVARCHAR</code> or <code>LONGNVARCHAR</code> value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      * @see #setNString
      */
 //#ifdef JAVA6
     public String getNString(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA6
@@ -4015,11 +4130,13 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @return a <code>String</code> object that maps an
      * <code>NCHAR</code>, <code>NVARCHAR</code> or <code>LONGNVARCHAR</code> value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      * @see #setNString
      */
 //#ifdef JAVA6
@@ -4055,15 +4172,19 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * value; if the value is SQL <code>NULL</code>, the value returned is
      * <code>null</code> in the Java programming language.
      * @param parameterIndex the first parameter is 1, the second is 2, ...
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;]
+     * if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public Reader getNCharacterStream(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        throw JDBCUtil.notSupported();
     }
 
 //#endif JAVA6
@@ -4093,11 +4214,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return a <code>java.io.Reader</code> object that contains the parameter
      * value; if the value is SQL <code>NULL</code>, the value returned is
      * <code>null</code> in the Java programming language
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized Reader getNCharacterStream(
@@ -4129,13 +4251,31 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * value; if the value is SQL <code>NULL</code>, the value returned is
      * <code>null</code> in the Java programming language.
      * @param parameterIndex the first parameter is 1, the second is 2, ...
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException  JDBC 4.1[if the parameterIndex is not valid;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public Reader getCharacterStream(int parameterIndex) throws SQLException {
-        throw Util.notSupported();
+
+        checkGetParameterIndex(parameterIndex);
+
+        Type   sourceType = parameterMetaData.columnTypes[parameterIndex - 1];
+        Object o          = getColumnInType(parameterIndex, sourceType);
+
+        if (o == null) {
+            return null;
+        }
+
+        if (o instanceof ClobDataID) {
+            return ((ClobDataID) o).getCharacterStream(session);
+        } else if (o instanceof Clob) {
+            return ((Clob) o).getCharacterStream();
+        } else if (o instanceof String) {
+            return new StringReader((String) o);
+        }
+
+        throw JDBCUtil.sqlException(ErrorCode.X_42561);
     }
 
 //#endif JAVA6
@@ -4161,11 +4301,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @return a <code>java.io.Reader</code> object that contains the parameter
      * value; if the value is SQL <code>NULL</code>, the value returned is
      * <code>null</code> in the Java programming language
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized Reader getCharacterStream(
@@ -4182,11 +4323,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x a <code>Blob</code> object that maps an SQL <code>BLOB</code> value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     *  @since JDK 1.6, HSQLDB 1.9.0
+     *  @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setBlob(String parameterName,
@@ -4203,11 +4345,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param parameterName the name of the parameter
      * @param x a <code>Clob</code> object that maps an SQL <code>CLOB</code> value
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     *  @since JDK 1.6, HSQLDB 1.9.0
+     *  @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setClob(String parameterName,
@@ -4238,7 +4381,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setAsciiStream(String parameterName,
@@ -4248,7 +4391,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             String msg = "Maximum ASCII input octet length exceeded: "
                          + length;    // NOI18N
 
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
         }
         this.setAsciiStream(parameterName, x, (int) length);
     }
@@ -4270,11 +4413,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param parameterName the name of the parameter
      * @param x the java input stream which contains the binary parameter value
      * @param length the number of bytes in the stream
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setBinaryStream(String parameterName,
@@ -4284,7 +4428,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             String msg = "Maximum Binary input octet length exceeded: "
                          + length;    // NOI18N
 
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
         }
         setBinaryStream(parameterName, x, (int) length);
     }
@@ -4308,11 +4452,12 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * @param reader the <code>java.io.Reader</code> object that
      *        contains the UNICODE data used as the designated parameter
      * @param length the number of characters in the stream
-     * @exception SQLException if a database access error occurs or
+     * @exception SQLException JDBC 4.1[if parameterName does not correspond to a named
+     * parameter;] if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @exception SQLFeatureNotSupportedException if the JDBC driver does not support
      * this method
-     * @since JDK 1.6, HSQLDB 1.9.0
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setCharacterStream(String parameterName,
@@ -4321,7 +4466,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
         if (length > Integer.MAX_VALUE) {
             String msg = "Maximum character input length exceeded: " + length;    // NOI18N
 
-            throw Util.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
+            throw JDBCUtil.sqlException(ErrorCode.JDBC_INPUTSTREAM_ERROR, msg);
         }
         setCharacterStream(parameterName, reader, (int) length);
     }
@@ -4349,7 +4494,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * parameter; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     *   @since 1.6
+     *   @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setAsciiStream(String parameterName,
@@ -4379,7 +4524,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * parameter; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     * @since 1.6
+     * @since JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setBinaryStream(String parameterName,
@@ -4412,7 +4557,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * parameter; if a database access error occurs or
      * this method is called on a closed <code>CallableStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     * @since 1.6
+     * JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setCharacterStream(String parameterName,
@@ -4423,27 +4568,27 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
 //#endif JAVA6
 
     /**
-     *   Sets the designated parameter to a <code>Reader</code> object. The
-     *   <code>Reader</code> reads the data till end-of-file is reached. The
-     *   driver does the necessary conversion from Java character format to
-     *   the national character set in the database.
+     * Sets the designated parameter to a <code>Reader</code> object. The
+     * <code>Reader</code> reads the data till end-of-file is reached. The
+     * driver does the necessary conversion from Java character format to
+     * the national character set in the database.
      *
-     *   <P><B>Note:</B> This stream object can either be a standard
-     *   Java stream object or your own subclass that implements the
-     *   standard interface.
-     *   <P><B>Note:</B> Consult your JDBC driver documentation to determine if
-     *   it might be more efficient to use a version of
-     *   <code>setNCharacterStream</code> which takes a length parameter.
+     * <P><B>Note:</B> This stream object can either be a standard
+     * Java stream object or your own subclass that implements the
+     * standard interface.
+     * <P><B>Note:</B> Consult your JDBC driver documentation to determine if
+     * it might be more efficient to use a version of
+     * <code>setNCharacterStream</code> which takes a length parameter.
      *
-     *   @param parameterName the name of the parameter
-     *   @param value the parameter value
-     *   @throws SQLException if parameterName does not correspond to a named
-     *   parameter; if the driver does not support national
-     *           character sets;  if the driver can detect that a data conversion
-     *    error could occur; if a database access error occurs; or
-     *   this method is called on a closed <code>CallableStatement</code>
-     *   @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     *   @since 1.6
+     * @param parameterName the name of the parameter
+     * @param value the parameter value
+     * @throws SQLException if parameterName does not correspond to a named
+     * parameter; if the driver does not support national
+     *         character sets;  if the driver can detect that a data conversion
+     *  error could occur; if a database access error occurs; or
+     * this method is called on a closed <code>CallableStatement</code>
+     * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
+     * JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setNCharacterStream(String parameterName,
@@ -4472,7 +4617,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * a closed <code>CallableStatement</code>
      *
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
-     * @since 1.6
+     * JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setClob(String parameterName,
@@ -4502,7 +4647,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * this method is called on a closed <code>CallableStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
      *
-     * @since 1.6
+     * JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setBlob(
@@ -4533,7 +4678,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * this method is called on a closed <code>CallableStatement</code>
      * @throws SQLFeatureNotSupportedException  if the JDBC driver does not support this method
      *
-     * @since 1.6
+     * JDK 1.6, HSQLDB 2.0
      */
 //#ifdef JAVA6
     public synchronized void setNClob(String parameterName,
@@ -4542,12 +4687,79 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
     }
 
 //#endif JAVA6
+    //------------------------- JDBC 4.1 -----------------------------------
+
+    /**
+     * <p>Returns an object representing the value of OUT parameter
+     * {@code parameterIndex} and will convert from the
+     * SQL type of the parameter to the requested Java data type, if the
+     * conversion is supported. If the conversion is not
+     * supported or null is specified for the type, a
+     * <code>SQLException</code> is thrown.
+     * <p>
+     * At a minimum, an implementation must support the conversions defined in
+     * Appendix B, Table B-3 and conversion of appropriate user defined SQL
+     * types to a Java type which implements {@code SQLData}, or {@code Struct}.
+     * Additional conversions may be supported and are vendor defined.
+     *
+     * @param parameterIndex the first parameter is 1, the second is 2, and so on
+     * @param type Class representing the Java data type to convert the
+     * designated parameter to.
+     * @return an instance of {@code type} holding the OUT parameter value
+     * @throws SQLException if conversion is not supported, type is null or
+     *         another error occurs. The getCause() method of the
+     * exception may provide a more detailed exception, for example, if
+     * a conversion error occurs
+     * @throws SQLFeatureNotSupportedException if the JDBC driver does not support
+     * this method
+     * @since JDK 1.7 M11 2010/09/10 (b123), HSQLDB 2.0.1
+     */
+//#ifdef JAVA5
+    public <T>T getObject(int parameterIndex,
+                          Class<T> type) throws SQLException {
+        return (T) this.getObject(parameterIndex);
+    }
+
+//#endif
+
+    /**
+     * <p>Returns an object representing the value of OUT parameter
+     * {@code parameterName} and will convert from the
+     * SQL type of the parameter to the requested Java data type, if the
+     * conversion is supported. If the conversion is not
+     * supported  or null is specified for the type, a
+     * <code>SQLException</code> is thrown.
+     * <p>
+     * At a minimum, an implementation must support the conversions defined in
+     * Appendix B, Table B-3 and conversion of appropriate user defined SQL
+     * types to a Java type which implements {@code SQLData}, or {@code Struct}.
+     * Additional conversions may be supported and are vendor defined.
+     *
+     * @param parameterName the name of the parameter
+     * @param type Class representing the Java data type to convert
+     * the designated parameter to.
+     * @return an instance of {@code type} holding the OUT parameter
+     * value
+     * @throws SQLException if conversion is not supported, type is null or
+     *         another error occurs. The getCause() method of the
+     * exception may provide a more detailed exception, for example, if
+     * a conversion error occurs
+     * @throws SQLFeatureNotSupportedException if the JDBC driver does not support
+     * this method
+     * @since JDK 1.7 M11 2010/09/10 (b123), HSQLDB 2.0.1
+     */
+//#ifdef JAVA5
+    public <T>T getObject(String parameterName,
+                          Class<T> type) throws SQLException {
+        return getObject(this.findParameterIndex(parameterName), type);
+    }
+
+//#endif
 // --------------------------- Internal Implementation -------------------------
 
     /** parameter name => parameter index */
-    private IntValueHashMap  parameterNameMap;
-    private boolean          wasNullValue;
-    private SessionInterface session;
+    private IntValueHashMap parameterNameMap;
+    private boolean         wasNullValue;
 
     /** parameter index => registered OUT type */
 
@@ -4568,11 +4780,9 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             int resultSetConcurrency,
             int resultSetHoldability) throws HsqlException, SQLException {
 
-        super(c, sql, resultSetType, JDBCResultSet.CONCUR_READ_ONLY,
-              JDBCResultSet.HOLD_CURSORS_OVER_COMMIT,
-              ResultConstants.RETURN_NO_GENERATED_KEYS, null, null);
-
-        session = c.sessionProxy;
+        super(c, sql, resultSetType, resultSetConcurrency,
+              resultSetHoldability, ResultConstants.RETURN_NO_GENERATED_KEYS,
+              null, null);
 
         String[] names;
         String   name;
@@ -4618,7 +4828,9 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
     int findParameterIndex(String parameterName) throws SQLException {
 
-        checkClosed();
+        if (isClosed || connection.isClosed) {
+            checkClosed();
+        }
 
         int index = parameterNameMap.get(parameterName, -1);
 
@@ -4626,7 +4838,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
             return index + 1;
         }
 
-        throw Util.sqlException(ErrorCode.JDBC_COLUMN_NOT_FOUND,
+        throw JDBCUtil.sqlException(ErrorCode.JDBC_COLUMN_NOT_FOUND,
                                 parameterName);
     }
 
@@ -4669,7 +4881,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
         if (type == Integer.MIN_VALUE) {
             msg = "Parameter not registered: " + parameterIndex; //NOI18N
 
-            throw Util.sqlException(ErrorCode.INVALID_JDBC_ARGUMENT, msg);
+            throw JDBCUtil.sqlException(ErrorCode.INVALID_JDBC_ARGUMENT, msg);
         }
     }
 */
@@ -4678,7 +4890,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      * Internal value converter. Similar to its counterpart in JDBCResultSet <p>
      *
      * All trivially successful getXXX methods eventually go through this
-     * method, converting if neccessary from the source type to the
+     * method, converting if necessary from the source type to the
      * requested type.  <p>
      *
      * Conversion to the JDBC representation, if different, is handled by the
@@ -4694,6 +4906,8 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      */
     private Object getColumnInType(int columnIndex,
                                    Type targetType) throws SQLException {
+
+        checkGetParameterIndex(columnIndex);
 
         Type   sourceType;
         Object value;
@@ -4719,7 +4933,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
                              + ", value: " + stringValue;
                 HsqlException err = Error.error(ErrorCode.X_42561, msg);
 
-                throw Util.sqlException(err, e);
+                throw JDBCUtil.sqlException(err, e);
             }
         }
 
@@ -4730,24 +4944,54 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
         return (wasNullValue = (o == null));
     }
 
-    /************************* Volt DB Extensions *************************/
-
     public void closeOnCompletion() throws SQLException {
-        throw new SQLException();
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     public boolean isCloseOnCompletion() throws SQLException {
-        throw new SQLException();
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    public <T> T getObject(int parameterIndex, Class<T> type)
-            throws SQLException {
-        throw new SQLException();
+    /**
+     * <!-- start generic documentation -->
+     * Executes the SQL query in this <code>PreparedStatement</code> object
+     * and returns the <code>ResultSet</code> object generated by the query.
+     * <!-- end generic documentation -->
+     * <!-- start release-specific documentation -->
+     * <div class="ReleaseSpecificDocumentation">
+     * <h3>HSQLDB-Specific Information:</h3> <p>
+     *
+     * HSQLDB supports this method for a call to a FUNCTION that returns a result.
+     * For a PROCEDURE that returns one or more results, the first result is
+     * returned.<p>
+     *
+     * If the FUNCTION or PROCEDURE does not return a ResultSet, an
+     * <code>SQLException</code> if thrown.
+     * </div>
+     * <!-- end release-specific documentation -->
+     *
+     * @return a <code>ResultSet</code> object that contains the data produced by the
+     *         query; never <code>null</code>
+     * @exception SQLException if a database access error occurs,
+     * this method is called on a closed  <code>PreparedStatement</code> or the SQL
+     *            statement does not return a <code>ResultSet</code> object
+     */
+    public synchronized ResultSet executeQuery() throws SQLException {
+
+        fetchResult();
+
+        ResultSet rs = getResultSet();
+
+        if (rs != null) {
+            return rs;
+        }
+
+        if (getMoreResults()) {
+            return getResultSet();
+        }
+
+        throw JDBCUtil.sqlException(ErrorCode.X_07504);
     }
 
-    public <T> T getObject(String parameterName, Class<T> type)
-            throws SQLException {
-        throw new SQLException();
-    }
-    /**********************************************************************/
+
 }

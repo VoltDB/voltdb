@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,18 +33,17 @@ package org.hsqldb_voltpatches.types;
 
 import java.math.BigDecimal;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
 import org.hsqldb_voltpatches.Session;
+import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
 
 /**
  * Common elements for Type instances for DATETIME and INTERVAL.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public abstract class DTIType extends Type {
@@ -63,6 +62,7 @@ public abstract class DTIType extends Type {
         0, 12, 0, 24, 60, 60, 1000000000
     };
     public static final int    INTERVAL_MONTH_INDEX         = 1;
+    public static final int    INTERVAL_SECOND_INDEX        = 5;
     public static final int    INTERVAL_FRACTION_PART_INDEX = 6;
     public static final long[] precisionLimits              = {
         1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
@@ -124,6 +124,7 @@ public abstract class DTIType extends Type {
     public static final int MONTH_NAME      = Types.SQL_TYPE_NUMBER_LIMIT + 9;
     public static final int SECONDS_MIDNIGHT = Types.SQL_TYPE_NUMBER_LIMIT
         + 10;
+    public static final int ISO_YEAR = Types.SQL_TYPE_NUMBER_LIMIT + 11;
 
     //
     public final int startIntervalType;
@@ -168,7 +169,7 @@ public abstract class DTIType extends Type {
                 break;
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");
+                throw Error.runtimeError(ErrorCode.U_S0500, "DTIType");
         }
 
         startPartIndex = intervalIndexMap.get(startIntervalType);
@@ -216,6 +217,10 @@ public abstract class DTIType extends Type {
         if (scale != 0) {
             sb.append((char) DTIType
                 .yearToSecondSeparators[DTIType.INTERVAL_FRACTION_PART_INDEX - 1]);
+        }
+
+        if (nanos < 0) {
+            nanos = -nanos;
         }
 
         for (int i = 0; i < scale; i++) {
@@ -272,7 +277,7 @@ public abstract class DTIType extends Type {
                     }
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_INTERVAL_YEAR :
             case Types.SQL_INTERVAL_MONTH :
             case Types.SQL_INTERVAL_DAY :
@@ -302,7 +307,7 @@ public abstract class DTIType extends Type {
                 return Type.SQL_INTEGER;
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");
+                throw Error.runtimeError(ErrorCode.U_S0500, "DTIType");
         }
     }
 
@@ -388,7 +393,7 @@ public abstract class DTIType extends Type {
             // End of VoltDB extension
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");
+                throw Error.runtimeError(ErrorCode.U_S0500, "DTIType");
         }
     }
 
@@ -445,7 +450,7 @@ public abstract class DTIType extends Type {
                 return Tokens.T_SECONDS_MIDNIGHT;
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");
+                throw Error.runtimeError(ErrorCode.U_S0500, "DTIType");
         }
     }
 
@@ -477,6 +482,7 @@ public abstract class DTIType extends Type {
     public static final int defaultIntervalPrecision          = 2;
     public static final int defaultIntervalFractionPrecision  = 6;
     public static final int maxIntervalPrecision              = 9;
+    public static final int maxIntervalSecondPrecision        = 12;
     public static final int maxFractionPrecision              = 9;
     public static final int limitNanoseconds                  = 1000000000;
 

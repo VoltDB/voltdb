@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,10 +33,10 @@ package org.hsqldb_voltpatches.navigator;
 
 import java.io.IOException;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SessionInterface;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.result.ResultMetaData;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
@@ -47,7 +47,7 @@ import org.hsqldb_voltpatches.rowio.RowOutputInterface;
  * object retreival.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.7
  * @since 1.9.0
  */
 public abstract class RowSetNavigator implements RangeIterator {
@@ -60,6 +60,7 @@ public abstract class RowSetNavigator implements RangeIterator {
     int              mode;
     boolean          isIterator;
     int              currentPos = -1;
+    int              rangePosition;
 
     /**
      * Sets the id;
@@ -80,6 +81,19 @@ public abstract class RowSetNavigator implements RangeIterator {
      */
     public abstract Object[] getCurrent();
 
+    public Object getCurrent(int i) {
+
+        Object[] current = getCurrent();
+
+        if (current == null) {
+            return null;
+        }
+
+        return current[i];
+    }
+
+    public void setCurrent(Object[] data) {}
+
     public long getRowid() {
         return 0;
     }
@@ -91,19 +105,19 @@ public abstract class RowSetNavigator implements RangeIterator {
     public abstract Row getCurrentRow();
 
     /**
+     * Add data to the end
+     */
+    public abstract void add(Object[] data);
+
+    /**
      * Add row to the end
      */
-    public abstract void add(Object data);
+    public abstract boolean addRow(Row row);
 
     /**
      * Remove current row
      */
-    public abstract void remove();
-
-    /**
-     * Clear all rows
-     */
-    public abstract void clear();
+    public abstract void removeCurrent();
 
     /**
      * Reset to initial state
@@ -113,11 +127,14 @@ public abstract class RowSetNavigator implements RangeIterator {
     }
 
     /**
+     * Clear the contents
+     */
+    public abstract void clear();
+
+    /**
      * Remove any resourses and invalidate
      */
-    public void release() {
-        reset();
-    }
+    public abstract void release();
 
     public void setSession(SessionInterface session) {
         this.session = session;
@@ -155,6 +172,18 @@ public abstract class RowSetNavigator implements RangeIterator {
 
     public boolean hasNext() {
         return currentPos < size - 1;
+    }
+
+    public Row getNextRow() {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowSetNavigator");
+    }
+
+    public boolean setRowColumns(boolean[] columns) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowSetNavigator");
+    }
+
+    public long getRowId() {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowSetNavigator");
     }
 
     public boolean beforeFirst() {
@@ -224,7 +253,7 @@ public abstract class RowSetNavigator implements RangeIterator {
             return false;
         }
 
-        if (position > size) {
+        if (position >= size) {
             afterLast();
 
             return false;
@@ -279,8 +308,6 @@ public abstract class RowSetNavigator implements RangeIterator {
         return size > 0 && currentPos == size;
     }
 
-    public void close() {}
-
     public void writeSimple(RowOutputInterface out,
                             ResultMetaData meta) throws IOException {
         throw Error.runtimeError(ErrorCode.U_S0500, "RowSetNavigator");
@@ -302,6 +329,6 @@ public abstract class RowSetNavigator implements RangeIterator {
     }
 
     public int getRangePosition() {
-        return 0;
+        return rangePosition;
     }
 }

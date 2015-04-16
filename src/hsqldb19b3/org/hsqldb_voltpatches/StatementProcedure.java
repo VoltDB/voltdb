@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,22 @@
 
 package org.hsqldb_voltpatches;
 
+import java.sql.Connection;
+
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for callable procedures.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class StatementProcedure extends StatementDMQL {
@@ -53,7 +58,7 @@ public class StatementProcedure extends StatementDMQL {
     Routine procedure;
 
     /** arguments to Routine */
-    Expression[]   arguments;
+    Expression[]   arguments = Expression.emptyArray;
     ResultMetaData resultMetaData;
 
     /**
@@ -63,12 +68,29 @@ public class StatementProcedure extends StatementDMQL {
                        CompileContext compileContext) {
 
         super(StatementTypes.CALL, StatementTypes.X_SQL_DATA,
-              session.currentSchema);
+              session.getCurrentSchemaHsqlName());
 
-        this.expression = expression;
+        statementReturnType = StatementTypes.RETURN_RESULT;
 
-        setDatabseObjects(compileContext);
+        if (expression.opType == OpTypes.FUNCTION) {
+            FunctionSQLInvoked f = (FunctionSQLInvoked) expression;
+
+            if (f.routine.returnsTable) {
+                this.procedure = f.routine;
+                this.arguments = f.nodes;
+            } else {
+                this.expression = expression;
+            }
+        } else {
+            this.expression = expression;
+        }
+
+        setDatabseObjects(session, compileContext);
         checkAccessRights(session);
+
+        if (procedure != null) {
+            session.getGrantee().checkAccess(procedure);
+        }
     }
 
     /**
@@ -78,78 +100,102 @@ public class StatementProcedure extends StatementDMQL {
                        Expression[] arguments, CompileContext compileContext) {
 
         super(StatementTypes.CALL, StatementTypes.X_SQL_DATA,
-              session.currentSchema);
+              session.getCurrentSchemaHsqlName());
+
+        if (procedure.maxDynamicResults > 0) {
+            statementReturnType = StatementTypes.RETURN_ANY;
+        }
 
         this.procedure = procedure;
         this.arguments = arguments;
 
-        setDatabseObjects(compileContext);
+        setDatabseObjects(session, compileContext);
         checkAccessRights(session);
+        session.getGrantee().checkAccess(procedure);
     }
 
     Result getResult(Session session) {
-        return expression == null ? getProcedureResult(session)
-                                  : getExpressionResult(session);
+
+        Result result = expression == null ? getProcedureResult(session)
+                                           : getExpressionResult(session);
+
+        result.setStatementType(statementReturnType);
+
+        return result;
     }
 
     Result getProcedureResult(Session session) {
 
         Object[] data = ValuePool.emptyObjectArray;
+        int      argLength;
 
-        if (arguments.length > 0) {
-            data = new Object[arguments.length];
+        if (procedure.isPSM()) {
+            argLength = arguments.length;
+
+            if (procedure.getMaxDynamicResults() > 0) {
+                argLength++;
+            }
+        } else {
+            argLength = procedure.javaMethod.getParameterTypes().length;
+
+            if (procedure.javaMethodWithConnection) {
+                argLength--;
+            }
+        }
+
+        if (argLength > 0) {
+            data = new Object[argLength];
         }
 
         for (int i = 0; i < arguments.length; i++) {
             Expression e = arguments[i];
 
             if (e != null) {
-                data[i] = e.getValue(session, e.dataType);
+                Type   targetType = procedure.getParameter(i).getDataType();
+                Object value      = e.getValue(session);
+
+                data[i] = targetType.convertToType(session, value,
+                                                   e.getDataType());
             }
         }
-
-        int variableCount = procedure.getVariableCount();
 
         session.sessionContext.push();
 
         session.sessionContext.routineArguments = data;
         session.sessionContext.routineVariables = ValuePool.emptyObjectArray;
 
-        if (variableCount > 0) {
-            session.sessionContext.routineVariables =
-                new Object[variableCount];
-        }
+        Result result = Result.updateZeroResult;
 
-        // fixed? temp until assignment of dynamicArguments in materialiseSubqueries is fixed
-//        Object[] args   = session.sessionContext.dynamicArguments;
-        Result result = procedure.statement.execute(session);
+        if (procedure.isPSM()) {
+            result = executePSMProcedure(session);
+        } else {
+            Connection connection = session.getInternalConnection();
 
-//        session.sessionContext.dynamicArguments = args;
-        if (!result.isError()) {
-            result = Result.updateZeroResult;
+            result = executeJavaProcedure(session, connection);
         }
 
         Object[] callArguments = session.sessionContext.routineArguments;
 
         session.sessionContext.pop();
 
+        if (!procedure.isPSM()) {
+            session.releaseInternalConnection();
+        }
+
         if (result.isError()) {
             return result;
         }
-
-        boolean returnParams = false;
 
         for (int i = 0; i < procedure.getParameterCount(); i++) {
             ColumnSchema param = procedure.getParameter(i);
             int          mode  = param.getParameterMode();
 
             if (mode != SchemaObject.ParameterModes.PARAM_IN) {
-                if (this.arguments[i].isParam) {
+                if (this.arguments[i].isDynamicParam()) {
                     int paramIndex = arguments[i].parameterIndex;
 
                     session.sessionContext.dynamicArguments[paramIndex] =
                         callArguments[i];
-                    returnParams = true;
                 } else {
                     int varIndex = arguments[i].getColumnIndex();
 
@@ -159,47 +205,112 @@ public class StatementProcedure extends StatementDMQL {
             }
         }
 
-        if (returnParams) {
-            result = Result.newCallResponse(
-                this.getParametersMetaData().getParameterTypes(), this.id,
-                session.sessionContext.dynamicArguments);
+        Result r = result;
+
+        result = Result.newCallResponse(
+            this.getParametersMetaData().getParameterTypes(), this.id,
+            session.sessionContext.dynamicArguments);
+
+        if (procedure.returnsTable()) {
+            result.addChainedResult(r);
+        } else if (callArguments.length > arguments.length) {
+            r = (Result) callArguments[arguments.length];
+
+            result.addChainedResult(r);
         }
+
+        return result;
+    }
+
+    Result executePSMProcedure(Session session) {
+
+        int variableCount = procedure.getVariableCount();
+
+        session.sessionContext.routineVariables = new Object[variableCount];
+
+        Result result = procedure.statement.execute(session);
+
+        if (result.isError()) {
+            return result;
+        }
+
+        return result;
+    }
+
+    Result executeJavaProcedure(Session session, Connection connection) {
+
+        Result   result        = Result.updateZeroResult;
+        Object[] callArguments = session.sessionContext.routineArguments;
+        Object[] data = procedure.convertArgsToJava(session, callArguments);
+
+        if (procedure.javaMethodWithConnection) {
+            data[0] = connection;
+        }
+
+        result = procedure.invokeJavaMethod(session, data);
+
+        procedure.convertArgsToSQL(session, callArguments, data);
 
         return result;
     }
 
     Result getExpressionResult(Session session) {
 
-        Expression e = expression;             // representing CALL
-        Object     o = e.getValue(session);    // expression return value
-        Result     r;
+        Object o;    // expression return value
+        Result r;
 
-        if (o instanceof Result) {
-            return (Result) o;
-        }
+        session.sessionData.startRowProcessing();
+
+        o = expression.getValue(session);
 
         if (resultMetaData == null) {
             getResultMetaData();
         }
 
-        /**
-         * @todo 1.9.0 For table functions implment handling of Result objects
-         * returned from Java functions. Review and document instantiation and usage
-         * of relevant implementation of Result and JDBCResultSet for returning
-         * from Java functions?
-         * else if (o instanceof JDBCResultSet) {
-         *   return ((JDBCResultSet) o).getResult();
-         * }
-         */
         r = Result.newSingleColumnResult(resultMetaData);
 
-        Object[] row = new Object[1];
+        Object[] row;
 
-        row[0] = o;
+        if (expression.getDataType().isArrayType()) {
+            row    = new Object[1];
+            row[0] = o;
+        } else if (o instanceof Object[]) {
+            row = (Object[]) o;
+        } else {
+            row    = new Object[1];
+            row[0] = o;
+        }
 
         r.getNavigator().add(row);
 
         return r;
+    }
+
+    TableDerived[] getSubqueries(Session session) {
+
+        OrderedHashSet subQueries = null;
+
+        if (expression != null) {
+            subQueries = expression.collectAllSubqueries(subQueries);
+        }
+
+        for (int i = 0; i < arguments.length; i++) {
+            subQueries = arguments[i].collectAllSubqueries(subQueries);
+        }
+
+        if (subQueries == null || subQueries.size() == 0) {
+            return TableDerived.emptyArray;
+        }
+
+        TableDerived[] subQueryArray = new TableDerived[subQueries.size()];
+
+        subQueries.toArray(subQueryArray);
+
+        for (int i = 0; i < subqueries.length; i++) {
+            subQueryArray[i].prepareTable();
+        }
+
+        return subQueryArray;
     }
 
     public ResultMetaData getResultMetaData() {
@@ -245,9 +356,8 @@ public class StatementProcedure extends StatementDMQL {
                 return md;
             }
             default :
-                throw Error.runtimeError(
-                    ErrorCode.U_S0500,
-                    "CompiledStatement.getResultMetaData()");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "StatementProcedure");
         }
     }
 
@@ -260,7 +370,27 @@ public class StatementProcedure extends StatementDMQL {
         return super.getParametersMetaData();
     }
 
-    void getTableNamesForRead(OrderedHashSet set) {}
+    void collectTableNamesForRead(OrderedHashSet set) {
 
-    void getTableNamesForWrite(OrderedHashSet set) {}
+        if (expression == null) {
+            set.addAll(procedure.getTableNamesForRead());
+        } else {
+            for (int i = 0; i < subqueries.length; i++) {
+                if (subqueries[i].queryExpression != null) {
+                    subqueries[i].queryExpression.getBaseTableNames(set);
+                }
+            }
+
+            for (int i = 0; i < routines.length; i++) {
+                set.addAll(routines[i].getTableNamesForRead());
+            }
+        }
+    }
+
+    void collectTableNamesForWrite(OrderedHashSet set) {
+
+        if (expression == null) {
+            set.addAll(procedure.getTableNamesForWrite());
+        }
+    }
 }

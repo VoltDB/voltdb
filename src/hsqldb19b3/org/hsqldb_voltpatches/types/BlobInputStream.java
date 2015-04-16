@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,42 +34,45 @@ package org.hsqldb_voltpatches.types;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.SessionInterface;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.java.JavaSystem;
 
 /**
  * This class is used as an InputStream to retrieve data from a Blob.
  * mark() and reset() are not supported.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public class BlobInputStream extends InputStream {
 
-    final BlobData   blob;
-    final long       availableLength;
-    long             bufferOffset;
-    long             currentPosition;
-    byte[]           buffer;
-    boolean          isClosed;
-    SessionInterface session;
+    final BlobData                blob;
+    final long                    availableLength;
+    long                          bufferOffset;
+    long                          currentPosition;
+    byte[]                        buffer;
+    boolean                       isClosed;
+    int                           streamBlockSize;
+    public final SessionInterface session;
 
     public BlobInputStream(SessionInterface session, BlobData blob,
                            long offset, long length) {
 
-        if (!isInLimits(blob.length(session), offset, length)) {
-            throw new IndexOutOfBoundsException();
-        }
+        final long blobLength = blob.length(session);
 
+        this.session         = session;
         this.blob            = blob;
-        this.availableLength = offset + length;
+        this.availableLength = offset + Math.min(length, blobLength - offset);
         this.currentPosition = offset;
+        this.streamBlockSize = session.getStreamBlockSize();
     }
 
     public int read() throws IOException {
+
+        checkClosed();
 
         if (currentPosition >= availableLength) {
             return -1;
@@ -80,8 +83,8 @@ public class BlobInputStream extends InputStream {
             try {
                 checkClosed();
                 readIntoBuffer();
-            } catch (HsqlException e) {
-                throw new IOException(e.getMessage());
+            } catch (Exception e) {
+                throw JavaSystem.toIOException(e);
             }
         }
 
@@ -93,6 +96,8 @@ public class BlobInputStream extends InputStream {
     }
 
     public long skip(long n) throws IOException {
+
+        checkClosed();
 
         if (n <= 0) {
             return 0;
@@ -108,17 +113,24 @@ public class BlobInputStream extends InputStream {
     }
 
     public int available() {
-        return (int) (bufferOffset + buffer.length - currentPosition);
+
+        long avail = availableLength - currentPosition;
+
+        if (avail > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+
+        return (int) avail;
     }
 
     public void close() throws IOException {
         isClosed = true;
     }
 
-    private void checkClosed() {
+    private void checkClosed() throws IOException {
 
         if (isClosed || blob.isClosed()) {
-            throw Error.error(ErrorCode.X_0F503);
+            throw new IOException(Error.getMessage(ErrorCode.X_0F503));
         }
     }
 
@@ -126,10 +138,12 @@ public class BlobInputStream extends InputStream {
 
         long readLength = availableLength - currentPosition;
 
-        if (readLength <= 0) {}
+        if (readLength <= 0) {
+            return;
+        }
 
-        if (readLength > session.getStreamBlockSize()) {
-            readLength = session.getStreamBlockSize();
+        if (readLength > streamBlockSize) {
+            readLength = streamBlockSize;
         }
 
         buffer = blob.getBytes(session, currentPosition, (int) readLength);

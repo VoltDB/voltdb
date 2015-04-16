@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.result.Result;
 
 /**
@@ -44,23 +46,27 @@ import org.hsqldb_voltpatches.result.Result;
  */
 public class HsqlException extends RuntimeException {
 
+    //
+    public static final HsqlException[] emptyArray = new HsqlException[]{};
+    public static final HsqlException noDataCondition =
+        Error.error(ErrorCode.N_02000);
+
+    //
     private String message;
     private String state;
     private int    code;
     private int    level;
     private int    statementGroup;
     private int    statementCode;
-
-    //
-    public final static HsqlException noDataCondition =
-        Error.error(ErrorCode.N_02000);
-
+    public  Object info;
     /**
      * @param message String
      * @param state XOPEN / SQL code for exception
      * @param code number code in HSQLDB
      */
-    public HsqlException(String message, String state, int code) {
+    public HsqlException(Throwable t, String message, String state, int code) {
+
+        super(t);
 
         this.message = message;
         this.state   = state;
@@ -130,5 +136,34 @@ public class HsqlException extends RuntimeException {
 
     public static class HsqlRuntimeMemoryError extends OutOfMemoryError {
         HsqlRuntimeMemoryError() {}
+    }
+
+    public int hashCode() {
+        return code;
+    }
+
+    public boolean equals(Object other) {
+
+        if (other instanceof HsqlException) {
+            HsqlException o = (HsqlException) other;
+
+            return code == o.code && equals(state, o.state)
+                   && equals(message, o.message);
+        }
+
+        return false;
+    }
+
+    private static boolean equals(Object a, Object b) {
+
+        if (a == b) {
+            return true;
+        }
+
+        if (a == null || b == null) {
+            return false;
+        }
+
+        return a.equals(b);
     }
 }

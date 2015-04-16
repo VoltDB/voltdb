@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,13 +37,13 @@ import java.lang.reflect.Field;
 
 /**
  * Provides a site for holding the ResultSetMetaData for individual ResultSet
- * columns. In 1.9.0 it is implemented as a simple data structure derived
+ * columns. In 2.0 it is implemented as a simple data structure derived
  * from calls to JDBCResultSetMetaData methods.
  * purposes.<p>
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0
  * @since HSQLDB 1.7.2
  */
 public final class JDBCColumnMetaData {

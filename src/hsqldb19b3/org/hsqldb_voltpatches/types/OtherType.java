@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,18 +33,18 @@ package org.hsqldb_voltpatches.types;
 
 import java.io.Serializable;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.StringConverter;
 
 /**
  * Type implementation for OTHER type.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public final class OtherType extends Type {
@@ -62,6 +62,10 @@ public final class OtherType extends Type {
 
     public int getJDBCTypeCode() {
         return typeCode;
+    }
+
+    public Class getJDBCClass() {
+        return java.lang.Object.class;
     }
 
     public String getJDBCClassName() {
@@ -90,7 +94,7 @@ public final class OtherType extends Type {
 
     public Type getAggregateType(Type other) {
 
-        if (typeCode == other.typeCode) {
+        if (other == null) {
             return this;
         }
 
@@ -98,14 +102,18 @@ public final class OtherType extends Type {
             return this;
         }
 
+        if (typeCode == other.typeCode) {
+            return this;
+        }
+
         throw Error.error(ErrorCode.X_42562);
     }
 
-    public Type getCombinedType(Type other, int operation) {
+    public Type getCombinedType(Session session, Type other, int operation) {
         return this;
     }
 
-    public int compare(Object a, Object b) {
+    public int compare(Session session, Object a, Object b) {
 
         if (a == null) {
             return -1;
@@ -150,7 +158,7 @@ public final class OtherType extends Type {
     public String convertToSQLString(Object a) {
 
         if (a == null) {
-            return "NULL";
+            return Tokens.T_NULL;
         }
 
         return StringConverter.byteArrayToSQLHexString(
@@ -158,6 +166,11 @@ public final class OtherType extends Type {
     }
 
     public Object convertSQLToJava(SessionInterface session, Object a) {
+
+        if (a == null) {
+            return null;
+        }
+
         return ((JavaObjectData) a).getObject();
     }
 
@@ -167,12 +180,7 @@ public final class OtherType extends Type {
             return true;
         }
 
-        if (otherType.typeCode == Types.SQL_CHAR
-                || otherType.typeCode == Types.SQL_VARCHAR) {
-            return true;
-        }
-
-        if (otherType.isNumberType()) {
+        if (otherType.typeCode == Types.SQL_ALL_TYPES) {
             return true;
         }
 

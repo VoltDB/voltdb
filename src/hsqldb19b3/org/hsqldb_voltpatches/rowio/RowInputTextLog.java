@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,19 +33,24 @@ package org.hsqldb_voltpatches.rowio;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlDateTime;
 import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.Scanner;
 import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.scriptio.ScriptReaderBase;
-import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobData;
 import org.hsqldb_voltpatches.types.BlobDataID;
 import org.hsqldb_voltpatches.types.ClobData;
 import org.hsqldb_voltpatches.types.ClobDataID;
+import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.IntervalMonthData;
 import org.hsqldb_voltpatches.types.IntervalSecondData;
 import org.hsqldb_voltpatches.types.IntervalType;
@@ -59,23 +64,34 @@ import org.hsqldb_voltpatches.types.Type;
  * Class for reading the data for a database row from the script file.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.1
  * @since 1.7.3
  */
 public class RowInputTextLog extends RowInputBase
 implements RowInputInterface {
 
-    Scanner scanner;
-    String  tableName  = null;
-    String  schemaName = null;
-    int     statementType;
-    Object  value;
+    Scanner  scanner;
+    String   tableName  = null;
+    String   schemaName = null;
+    int      statementType;
+    Object   value;
+    boolean  version18;
+    boolean  noSeparators;
+    Calendar tempCalDefault = new GregorianCalendar();
 
     public RowInputTextLog() {
 
         super(new byte[0]);
 
         scanner = new Scanner();
+    }
+
+    public RowInputTextLog(boolean version18) {
+
+        super(new byte[0]);
+
+        scanner        = new Scanner();
+        this.version18 = version18;
     }
 
     public void setSource(String text) {
@@ -160,11 +176,13 @@ implements RowInputInterface {
 
     protected void readFieldPrefix() {
 
-        scanner.scanNext();
+        if (!noSeparators) {
+            scanner.scanNext();
 
-        if (statementType == ScriptReaderBase.DELETE_STATEMENT) {
-            scanner.scanNext();
-            scanner.scanNext();
+            if (statementType == ScriptReaderBase.DELETE_STATEMENT) {
+                scanner.scanNext();
+                scanner.scanNext();
+            }
         }
     }
 
@@ -191,7 +209,7 @@ implements RowInputInterface {
         return 0;
     }
 
-    protected boolean checkNull() {
+    protected boolean readNull() {
 
         // Return null on each column read instead.
         return false;
@@ -215,6 +233,10 @@ implements RowInputInterface {
 
         readNumberField(Type.SQL_INTEGER);
 
+        if (value instanceof Long) {
+            value = Type.SQL_INTEGER.convertToDefaultType(null, value);
+        }
+
         return (Integer) value;
     }
 
@@ -224,6 +246,10 @@ implements RowInputInterface {
 
         if (value == null) {
             return null;
+        }
+
+        if (value instanceof BigDecimal) {
+            return (Long) Type.SQL_BIGINT.convertToDefaultType(null, value);
         }
 
         return ValuePool.getLong(((Number) value).longValue());
@@ -237,22 +263,29 @@ implements RowInputInterface {
             return null;
         }
 
-/*
-        if (tokenizer.isGetThis(Token.T_DIVIDE)) {
-            s = tokenizer.getString();
+        if (scanner.scanSpecialIdentifier(Tokens.T_DIVIDE)) {
+            scanner.scanNext();
 
-            // parse simply to ensure it's a number
-            double ii = JavaSystem.parseDouble(s);
+            Object divisor = scanner.getValue();
+            double i       = ((Number) divisor).doubleValue();
 
-            if (i == 0E0) {
-                i = Double.NaN;
-            } else if (i == -1E0) {
-                i = Double.NEGATIVE_INFINITY;
-            } else if (i == 1E0) {
-                i = Double.POSITIVE_INFINITY;
+            if (i == 0) {
+                if (((Number) value).doubleValue() == 1E0) {
+                    i = Double.NEGATIVE_INFINITY;
+                } else if (((Number) value).doubleValue() == -1E0) {
+                    i = Double.POSITIVE_INFINITY;
+                } else if (((Number) value).doubleValue() == 0E0) {
+                    i = Double.NaN;
+                } else {
+                    throw Error.error(ErrorCode.X_42584);
+                }
+            } else {
+                throw Error.error(ErrorCode.X_42584);
             }
+
+            value = Double.valueOf(i);
         }
-*/
+
         return (Double) value;
     }
 
@@ -264,7 +297,9 @@ implements RowInputInterface {
             return null;
         }
 
-        return (BigDecimal) type.convertToDefaultType(null, value);
+        BigDecimal bd = (BigDecimal) type.convertToDefaultType(null, value);
+
+        return bd;
     }
 
     protected TimeData readTime(Type type) throws IOException {
@@ -273,6 +308,17 @@ implements RowInputInterface {
 
         if (value == null) {
             return null;
+        }
+
+        if (version18) {
+            java.sql.Time dateTime = java.sql.Time.valueOf((String) value);
+            long millis =
+                HsqlDateTime.convertMillisFromCalendar(tempCalDefault,
+                    dateTime.getTime());
+
+            millis = HsqlDateTime.getNormalisedTime(millis);
+
+            return new TimeData((int) millis / 1000, 0, 0);
         }
 
         return scanner.newTime((String) value);
@@ -286,6 +332,17 @@ implements RowInputInterface {
             return null;
         }
 
+        if (version18) {
+            java.sql.Date dateTime = java.sql.Date.valueOf((String) value);
+            long millis =
+                HsqlDateTime.convertMillisFromCalendar(tempCalDefault,
+                    dateTime.getTime());
+
+            millis = HsqlDateTime.getNormalisedDate(millis);
+
+            return new TimestampData(millis / 1000);
+        }
+
         return scanner.newDate((String) value);
     }
 
@@ -295,6 +352,19 @@ implements RowInputInterface {
 
         if (value == null) {
             return null;
+        }
+
+        if (version18) {
+            java.sql.Timestamp dateTime =
+                java.sql.Timestamp.valueOf((String) value);
+            long millis =
+                HsqlDateTime.convertMillisFromCalendar(tempCalDefault,
+                    dateTime.getTime());
+            int nanos = dateTime.getNanos();
+
+            nanos = ((DateTimeType) type).normaliseFraction(nanos, type.scale);
+
+            return new TimestampData(millis / 1000, nanos, 0);
         }
 
         return scanner.newTimestamp((String) value);
@@ -328,7 +398,18 @@ implements RowInputInterface {
 
     protected Boolean readBoole() throws IOException {
 
-        readField();
+        readFieldPrefix();
+        scanner.scanNext();
+
+        String token = scanner.getString();
+
+        value = null;
+
+        if (token.equalsIgnoreCase(Tokens.T_TRUE)) {
+            value = Boolean.TRUE;
+        } else if (token.equalsIgnoreCase(Tokens.T_FALSE)) {
+            value = Boolean.FALSE;
+        }
 
         return (Boolean) value;
     }
@@ -414,5 +495,59 @@ implements RowInputInterface {
         long id = ((Number) value).longValue();
 
         return new BlobDataID(id);
+    }
+
+    protected Object[] readArray(Type type) throws IOException {
+
+        type = type.collectionBaseType();
+
+        readFieldPrefix();
+        scanner.scanNext();
+
+        String token = scanner.getString();
+
+        value = null;
+
+        if (token.equalsIgnoreCase(Tokens.T_NULL)) {
+            return null;
+        } else if (!token.equalsIgnoreCase(Tokens.T_ARRAY)) {
+            throw Error.error(ErrorCode.X_42584);
+        }
+
+        scanner.scanNext();
+
+        token = scanner.getString();
+
+        if (!token.equalsIgnoreCase(Tokens.T_LEFTBRACKET)) {
+            throw Error.error(ErrorCode.X_42584);
+        }
+
+        HsqlArrayList list = new HsqlArrayList();
+
+        noSeparators = true;
+
+        for (int i = 0; ; i++) {
+            if (scanner.scanSpecialIdentifier(Tokens.T_RIGHTBRACKET)) {
+                break;
+            }
+
+            if (i > 0) {
+                if (!scanner.scanSpecialIdentifier(Tokens.T_COMMA)) {
+                    throw Error.error(ErrorCode.X_42584);
+                }
+            }
+
+            Object value = readData(type);
+
+            list.add(value);
+        }
+
+        noSeparators = false;
+
+        Object[] data = new Object[list.size()];
+
+        list.toArray(data);
+
+        return data;
     }
 }

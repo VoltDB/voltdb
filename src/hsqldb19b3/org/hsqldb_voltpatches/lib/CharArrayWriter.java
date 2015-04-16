@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,21 +31,25 @@
 
 package org.hsqldb_voltpatches.lib;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.Reader;
-import java.io.EOFException;
 
 /**
  * A writer for char strings.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.9.0
  */
 public class CharArrayWriter {
 
     protected char[] buffer;
     protected int    count;
+
+    public CharArrayWriter(int size) {
+        this.buffer = new char[size];
+    }
 
     public CharArrayWriter(char[] buffer) {
         this.buffer = buffer;
@@ -73,16 +77,53 @@ public class CharArrayWriter {
         }
     }
 
+    public CharArrayWriter(Reader reader) throws IOException {
+
+        buffer = new char[128];
+
+        for (;;) {
+            int read = reader.read(buffer, count, buffer.length - count);
+
+            if (read == -1) {
+                break;
+            }
+
+            count += read;
+
+            if (count == buffer.length) {
+                ensureRoom(count * 2);
+            }
+        }
+    }
+
     public void write(int c) {
 
         if (count == buffer.length) {
-            ensureSize(count + 1);
+            ensureRoom(count + 1);
         }
 
         buffer[count++] = (char) c;
     }
 
-    void ensureSize(int size) {
+    public int write(Reader reader, int length) throws IOException {
+
+        int left = length;
+
+        while (left > 0) {
+            int read = reader.read(buffer, count, left);
+
+            if (read == -1) {
+                break;
+            }
+
+            left  -= read;
+            count += read;
+        }
+
+        return length - left;
+    }
+
+    void ensureRoom(int size) {
 
         if (size <= buffer.length) {
             return;
@@ -103,7 +144,7 @@ public class CharArrayWriter {
 
     public void write(String str, int off, int len) {
 
-        ensureSize(count + len);
+        ensureRoom(count + len);
         str.getChars(off, off + len, buffer, count);
 
         count += len;
@@ -125,6 +166,10 @@ public class CharArrayWriter {
         System.arraycopy(buffer, 0, newBuffer, 0, count);
 
         return (char[]) newBuffer;
+    }
+
+    public char[] getBuffer() {
+        return buffer;
     }
 
     public int size() {

@@ -233,7 +233,7 @@ public abstract class CatalogSchemaTools {
                                 String sep = "";
                                 for (AbstractExpression expr : expressions) {
                                     exprStrings += sep + expr.explain(catalog_tbl.getTypeName());
-                                    sep = ",";
+                                    sep = ", ";
                                 }
                             }
                             catch (JSONException e) {

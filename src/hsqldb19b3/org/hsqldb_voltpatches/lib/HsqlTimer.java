@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches.lib;
 
+import java.util.Comparator;
 import java.util.Date;
 
 /**
@@ -49,14 +50,13 @@ import java.util.Date;
  * not retain a live background thread during periods when the task queue is
  * empty.
  * @author boucherb@users
- * @version 1.8.0.10
+ * @version 1.9.0
  * @since 1.7.2
  */
-public final class HsqlTimer implements ObjectComparator, ThreadFactory {
+public final class HsqlTimer implements Comparator, ThreadFactory {
 
     /** The priority queue for the scheduled tasks. */
-    protected final TaskQueue taskQueue = new TaskQueue(16,
-        (ObjectComparator) this);
+    protected final TaskQueue taskQueue = new TaskQueue(16, (Comparator) this);
 
     /** The inner runnable that executes tasks in the background thread. */
     protected final TaskRunner taskRunner = new TaskRunner();
@@ -484,9 +484,8 @@ public final class HsqlTimer implements ObjectComparator, ThreadFactory {
         try {
             taskRunnerThread.setContextClassLoader(null);
         } catch (Throwable t) {}
-        finally {
-            taskRunnerThread = null;
-        }
+
+        taskRunnerThread = null;
     }
 
     /**
@@ -545,7 +544,9 @@ public final class HsqlTimer implements ObjectComparator, ThreadFactory {
                             // ensure that really late tasks don't
                             // completely saturate the head of the
                             // task queue
-                            period = 0;     /** @todo : is -1, -2 ... fairer? */
+                            period = 0;
+
+                            /** @todo : is -1, -2 ... fairer? */
                         } else if (late > 0) {
 
                             // compensate for scheduling overruns
@@ -823,7 +824,7 @@ public final class HsqlTimer implements ObjectComparator, ThreadFactory {
          * @param oc The ObjectComparator this queue uses to maintain its
          *      Heap invariant.
          */
-        TaskQueue(final int capacity, final ObjectComparator oc) {
+        TaskQueue(final int capacity, final Comparator oc) {
             super(capacity, oc);
         }
 

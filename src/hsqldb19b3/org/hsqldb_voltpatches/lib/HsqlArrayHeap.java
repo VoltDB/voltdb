@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,21 +31,23 @@
 
 package org.hsqldb_voltpatches.lib;
 
+import java.util.Comparator;
+
 /**
  * An HsqlHeap implementation backed by an array of objects and an
  * {@link ObjectComparator ObjectComparator}.  This implementation
  * is non-blocking, dynamically resizing and thread-safe.
  *
  * @author boucherb@users
- * @version 1.7.2
+ * @version 1.9.0
  * @since 1.7.2
  */
 public class HsqlArrayHeap implements HsqlHeap {
 
 // --------------------------------- members -----------------------------------
-    protected ObjectComparator oc;
-    protected int              count;
-    protected Object[]         heap;
+    protected Comparator oc;
+    protected int        count;
+    protected Object[]   heap;
 
 // ------------------------------ constructors ---------------------------------
 
@@ -57,7 +59,7 @@ public class HsqlArrayHeap implements HsqlHeap {
      *      or comparator is null
      */
     public HsqlArrayHeap(int capacity,
-                         ObjectComparator comparator)
+                         Comparator comparator)
                          throws IllegalArgumentException {
 
         if (capacity <= 0) {

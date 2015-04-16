@@ -51,10 +51,10 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
-    private String firstCanonicalDDL = null;
-    private boolean triedSqlcmdDryRun = false;
+    private String m_firstCanonicalDDL = null;
+    private boolean m_triedSqlcmdDryRun = false;
 
-    private String getFirstCanonicalDDL() throws Exception {
+    private void setFirstCanonicalDDL() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("fullDDL.jar");
 
         VoltCompiler compiler = new VoltCompiler();
@@ -62,14 +62,13 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
         boolean success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
         assertTrue(success);
-        return compiler.getCanonicalDDL();
+        m_firstCanonicalDDL = VoltCompiler.getCanonicalDdlForTest();
     }
 
     private void secondCanonicalDDLFromAdhoc() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
-        VoltCompiler compiler = new VoltCompiler();
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         builder.setUseDDLSchema(true);
@@ -83,14 +82,14 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         startSystem(config);
 
-        m_client.callProcedure("@AdHoc", firstCanonicalDDL);
+        m_client.callProcedure("@AdHoc", m_firstCanonicalDDL);
+        String secondDDL = VoltCompiler.getCanonicalDdlForTest();
 
         // First line of canonical DDL differs thanks to creation time.  Avoid
         // it in the comparison
         // Sanity check that we're not trimming the entire fullddl.sql file away
-        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
-        String secondDDL = compiler.getCanonicalDDL();
-        assertEquals(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')),
+        assertTrue(m_firstCanonicalDDL.indexOf('\n') < 100);
+        assertEquals(m_firstCanonicalDDL.substring(m_firstCanonicalDDL.indexOf('\n')),
                 secondDDL.substring(secondDDL.indexOf('\n')));
 
         teardownSystem();
@@ -118,26 +117,26 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         String roundtripDDL;
 
-        assert(firstCanonicalDDL != null);
+        assert(m_firstCanonicalDDL != null);
 
-        if ( ! triedSqlcmdDryRun) {
+        if ( ! m_triedSqlcmdDryRun) {
             assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
                     0, callSQLcmd("\n", fastModeDDL));
-            triedSqlcmdDryRun = true;
+            m_triedSqlcmdDryRun = true;
         }
 
-        assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, callSQLcmd(firstCanonicalDDL, fastModeDDL));
+        assertEquals("sqlcmd failed on input:\n" + m_firstCanonicalDDL, 0, callSQLcmd(m_firstCanonicalDDL, fastModeDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
         // Sanity check that we're not trimming the entire fullddl.sql file away
-        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
-        assertEquals(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')).toLowerCase(),
+        assertTrue(m_firstCanonicalDDL.indexOf('\n') < 100);
+        assertEquals(m_firstCanonicalDDL.substring(m_firstCanonicalDDL.indexOf('\n')).toLowerCase(),
                 roundtripDDL.substring(roundtripDDL.indexOf('\n')).toLowerCase());
 
         assertEquals("sqlcmd failed on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n", fastModeDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
-        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
-        assertFalse(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')).toLowerCase().equals(
+        assertTrue(m_firstCanonicalDDL.indexOf('\n') < 100);
+        assertFalse(m_firstCanonicalDDL.substring(m_firstCanonicalDDL.indexOf('\n')).toLowerCase().equals(
                 roundtripDDL.substring(roundtripDDL.indexOf('\n')).toLowerCase()));
 
         teardownSystem();
@@ -233,7 +232,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
     @Test
     public void testCanonicalDDLRoundtrip() throws Exception {
-        firstCanonicalDDL = getFirstCanonicalDDL();
+        setFirstCanonicalDDL();
         long starttime = System.currentTimeMillis();
         secondCanonicalDDLFromAdhoc();
         long adHocTime = System.currentTimeMillis() - starttime;

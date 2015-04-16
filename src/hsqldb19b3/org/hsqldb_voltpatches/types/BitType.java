@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,16 +31,15 @@
 
 package org.hsqldb_voltpatches.types;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.OpTypes;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.StringConverter;
-import org.hsqldb_voltpatches.store.BitMap;
+import org.hsqldb_voltpatches.map.BitMap;
 
 /**
  *
@@ -55,7 +54,7 @@ import org.hsqldb_voltpatches.store.BitMap;
  * string<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.1
  * @since 1.9.0
  */
 public final class BitType extends BinaryType {
@@ -72,6 +71,10 @@ public final class BitType extends BinaryType {
 
     public int getJDBCTypeCode() {
         return Types.BIT;
+    }
+
+    public Class getJDBCClass() {
+        return byte[].class;
     }
 
     public String getJDBCClassName() {
@@ -107,11 +110,23 @@ public final class BitType extends BinaryType {
         return true;
     }
 
+    public long getMaxPrecision() {
+        return maxBitPrecision;
+    }
+
     public boolean requiresPrecision() {
         return typeCode == Types.SQL_BIT_VARYING;
     }
 
     public Type getAggregateType(Type other) {
+
+        if (other == null) {
+            return this;
+        }
+
+        if (other == SQL_ALL_TYPES) {
+            return this;
+        }
 
         if (typeCode == other.typeCode) {
             return precision >= other.precision ? this
@@ -119,9 +134,6 @@ public final class BitType extends BinaryType {
         }
 
         switch (other.typeCode) {
-
-            case Types.SQL_ALL_TYPES :
-                return this;
 
             case Types.SQL_BIT :
                 return precision >= other.precision ? this
@@ -146,7 +158,7 @@ public final class BitType extends BinaryType {
     /**
      * Returns type for concat
      */
-    public Type getCombinedType(Type other, int operation) {
+    public Type getCombinedType(Session session, Type other, int operation) {
 
         if (operation != OpTypes.CONCAT) {
             return getAggregateType(other);
@@ -171,7 +183,7 @@ public final class BitType extends BinaryType {
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
             case Types.SQL_BLOB :
-                return other.getCombinedType(this, operation);
+                return other.getCombinedType(session, this, operation);
 
             default :
                 throw Error.error(ErrorCode.X_42562);
@@ -190,12 +202,13 @@ public final class BitType extends BinaryType {
         return getBitType(newType.typeCode, newPrecision);
     }
 
-    public int compare(Object a, Object b) {
+    public int compare(Session session, Object a, Object b) {
 
-        int i = super.compare(a, b);
+        int i = super.compare(session, a, b);
 
-        if (i == 0) {
-            if (((BinaryData) a).bitLength(null) == 0) {
+        if (i == 0 && a != null) {
+            if (((BinaryData) a).bitLength(null)
+                    == ((BinaryData) b).bitLength(null)) {
                 return 0;
             }
 
@@ -248,6 +261,36 @@ public final class BitType extends BinaryType {
                 b = (BlobData) a;
                 break;
 
+            case Types.SQL_BOOLEAN : {
+                if (precision != 1) {
+                    throw Error.error(ErrorCode.X_22501);
+                }
+
+                if (((Boolean) a).booleanValue()) {
+                    return BinaryData.singleBitOne;
+                } else {
+                    return BinaryData.singleBitZero;
+                }
+            }
+            case Types.TINYINT :
+            case Types.SQL_SMALLINT :
+            case Types.SQL_INTEGER :
+            case Types.SQL_BIGINT :
+            case Types.SQL_REAL :
+            case Types.SQL_FLOAT :
+            case Types.SQL_DOUBLE :
+            case Types.SQL_NUMERIC :
+            case Types.SQL_DECIMAL : {
+                if (precision != 1) {
+                    throw Error.error(ErrorCode.X_22501);
+                }
+
+                if (((NumberType) otherType).compareToZero(a) == 0) {
+                    return BinaryData.singleBitZero;
+                } else {
+                    return BinaryData.singleBitOne;
+                }
+            }
             default :
                 throw Error.error(ErrorCode.X_22501);
         }
@@ -329,9 +372,19 @@ public final class BitType extends BinaryType {
             return convertToTypeLimits(session, a);
         } else if (a instanceof String) {
             return convertToType(session, a, Type.SQL_VARCHAR);
+        } else if (a instanceof Boolean) {
+            return convertToType(session, a, Type.SQL_BOOLEAN);
+        } else if (a instanceof Integer) {
+            return convertToType(session, a, Type.SQL_INTEGER);
+        } else if (a instanceof Long) {
+            return convertToType(session, a, Type.SQL_BIGINT);
         }
 
         throw Error.error(ErrorCode.X_22501);
+    }
+
+    public Object convertJavaToSQL(SessionInterface session, Object a) {
+        return convertToDefaultType(session, a);
     }
 
     public String convertToString(Object a) {
@@ -348,16 +401,21 @@ public final class BitType extends BinaryType {
     public String convertToSQLString(Object a) {
 
         if (a == null) {
-            return "NULL";
+            return Tokens.T_NULL;
         }
 
-        return StringConverter.byteArrayToSQLHexString(
-            ((BinaryData) a).getBytes());
+        return StringConverter.byteArrayToSQLBitString(
+            ((BinaryData) a).getBytes(),
+            (int) ((BinaryData) a).bitLength(null));
     }
 
     public boolean canConvertFrom(Type otherType) {
+
         return otherType.typeCode == Types.SQL_ALL_TYPES
-               || otherType.isBinaryType();
+               || otherType.isBinaryType()
+               || (precision == 1
+                   && (otherType.isIntegralType() || otherType
+                       .isBooleanType()) || otherType.isCharacterType());
     }
 
     /** @todo - implement */
@@ -473,7 +531,7 @@ public final class BitType extends BinaryType {
                 return binary;
             }
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "BinaryType");
+                throw Error.runtimeError(ErrorCode.U_S0500, "BitType");
         }
     }
 

@@ -1,39 +1,4 @@
-/* Copyright (c) 1995-2000, The Hypersonic SQL Group.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * Neither the name of the Hypersonic SQL Group nor the names of its
- * contributors may be used to endorse or promote products derived from this
- * software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE HYPERSONIC SQL GROUP,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * This software consists of voluntary contributions made by many individuals
- * on behalf of the Hypersonic SQL Group.
- *
- *
- * For work added by the HSQL Development Group:
- *
- * Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,52 +32,63 @@
 package org.hsqldb_voltpatches;
 
 // A VoltDB extension to transfer Expression structures to the VoltDB planner
+// We DO NOT reorganize imports in hsql code. And we try to keep these structured comments in place.
 import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Vector;
-
-/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 import org.hsqldb_voltpatches.types.BinaryData;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.NumberType;
+import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 // End of VoltDB extension
-
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.RangeGroup.RangeGroupSimple;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
+import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
+import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
 import org.hsqldb_voltpatches.persist.PersistentStore;
+import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.types.ArrayType;
+import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
+import org.hsqldb_voltpatches.types.Collation;
 import org.hsqldb_voltpatches.types.NullType;
+import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Expression class.
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
-public class Expression {
+public class Expression implements Cloneable {
 
-    public static final int LEFT   = 0;
-    public static final int RIGHT  = 1;
-    public static final int UNARY  = 1;
-    public static final int BINARY = 2;
+    public static final int LEFT    = 0;
+    public static final int RIGHT   = 1;
+    public static final int UNARY   = 1;
+    public static final int BINARY  = 2;
+    public static final int TERNARY = 3;
 
     //
     //
-    static final Expression[] emptyExpressionArray = new Expression[]{};
+    static final Expression[] emptyArray = new Expression[]{};
 
     //
     static final Expression EXPR_TRUE  = new ExpressionLogical(true);
@@ -134,6 +110,10 @@ public class Expression {
         aggregateFunctionSet.add(OpTypes.STDDEV_SAMP);
         aggregateFunctionSet.add(OpTypes.VAR_POP);
         aggregateFunctionSet.add(OpTypes.VAR_SAMP);
+        aggregateFunctionSet.add(OpTypes.GROUP_CONCAT);
+        aggregateFunctionSet.add(OpTypes.ARRAY_AGG);
+        aggregateFunctionSet.add(OpTypes.MEDIAN);
+        aggregateFunctionSet.add(OpTypes.USER_AGGREGATE);
     }
 
     static final OrderedIntHashSet columnExpressionSet =
@@ -166,10 +146,30 @@ public class Expression {
         subqueryAggregateExpressionSet.add(OpTypes.STDDEV_SAMP);
         subqueryAggregateExpressionSet.add(OpTypes.VAR_POP);
         subqueryAggregateExpressionSet.add(OpTypes.VAR_SAMP);
+        subqueryAggregateExpressionSet.add(OpTypes.GROUP_CONCAT);
+        subqueryAggregateExpressionSet.add(OpTypes.ARRAY_AGG);
+        subqueryAggregateExpressionSet.add(OpTypes.MEDIAN);
+        subqueryAggregateExpressionSet.add(OpTypes.USER_AGGREGATE);
 
         //
         subqueryAggregateExpressionSet.add(OpTypes.TABLE_SUBQUERY);
         subqueryAggregateExpressionSet.add(OpTypes.ROW_SUBQUERY);
+    }
+
+    static final OrderedIntHashSet functionExpressionSet =
+        new OrderedIntHashSet();
+
+    static {
+        functionExpressionSet.add(OpTypes.SQL_FUNCTION);
+        functionExpressionSet.add(OpTypes.FUNCTION);
+    }
+
+    static final OrderedIntHashSet sequenceExpressionSet =
+        new OrderedIntHashSet();
+
+    static {
+        sequenceExpressionSet.add(OpTypes.ROWNUM);
+        sequenceExpressionSet.add(OpTypes.SEQUENCE);
     }
 
     static final OrderedIntHashSet emptyExpressionSet =
@@ -185,15 +185,13 @@ public class Expression {
     SimpleName alias;
 
     // aggregate
-    protected boolean isAggregate;
+    private boolean isAggregate;
 
     // VALUE
     protected Object       valueData;
     protected Expression[] nodes;
     Type[]                 nodeDataTypes;
-
-    // QUERY - in single value selects, IN, EXISTS etc.
-    SubQuery subQuery;
+    TableDerived           table;
 
     // for query and value lists, etc
     boolean isCorrelated;
@@ -205,8 +203,7 @@ public class Expression {
     protected Type dataType;
 
     //
-    int     queryTableColumnIndex = -1;    // >= 0 when it is used for order by
-    boolean isParam;
+    int queryTableColumnIndex = -1;    // >= 0 when it is used for order by
 
     // index of a session-dependent field
     int parameterIndex = -1;
@@ -215,37 +212,64 @@ public class Expression {
     int rangePosition = -1;
 
     //
+    boolean isColumnCondition;
     boolean isColumnEqual;
+    boolean isSingleColumnCondition;
+    boolean isSingleColumnEqual;
+    boolean isSingleColumnNull;
+    boolean isSingleColumnNotNull;
+    byte    nullability = SchemaObject.Nullability.NULLABLE_UNKNOWN;
+
+    //
+    Collation collation;
 
     Expression(int type) {
         opType = type;
-        nodes  = emptyExpressionArray;
+        nodes  = emptyArray;
     }
 
     // IN condition optimisation
 
     /**
-     * Creates a SCALAR SUBQUERY expression. Is called as ROW_SUBQUERY
+     * Creates a SUBQUERY expression.
      */
-    Expression(int exprType, SubQuery sq) {
+    Expression(int type, TableDerived table) {
 
-        this(OpTypes.TABLE_SUBQUERY);
+        switch (type) {
 
-        subQuery = sq;
+            case OpTypes.ARRAY :
+                opType = OpTypes.ARRAY;
+                break;
+
+            case OpTypes.ARRAY_SUBQUERY :
+                opType = OpTypes.ARRAY_SUBQUERY;
+                break;
+
+            case OpTypes.TABLE_SUBQUERY :
+                opType = OpTypes.TABLE_SUBQUERY;
+                break;
+
+            case OpTypes.ROW_SUBQUERY :
+            case OpTypes.SCALAR_SUBQUERY :
+                opType = OpTypes.ROW_SUBQUERY;
+                break;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+        }
+
+        nodes      = emptyArray;
+        this.table = table;
     }
 
     /**
-     * ROW or VALUELIST
+     * ROW, ARRAY etc.
      */
     Expression(int type, Expression[] list) {
 
         this(type);
 
         this.nodes = list;
-    }
-
-    public String describe(Session session) {
-        return describe(session, 0);
     }
 
     static String getContextSQL(Expression expression) {
@@ -310,11 +334,11 @@ public class Expression {
                 sb.append('(');
 
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(nodes[i].getSQL());
-
-                    if (i < nodes.length - 1) {
+                    if (i > 0) {
                         sb.append(',');
                     }
+
+                    sb.append(nodes[i].getSQL());
                 }
 
                 sb.append(')');
@@ -322,13 +346,13 @@ public class Expression {
                 return sb.toString();
 
             //
-            case OpTypes.TABLE :
+            case OpTypes.VALUELIST :
                 for (int i = 0; i < nodes.length; i++) {
-                    sb.append(nodes[i].getSQL());
-
-                    if (i < nodes.length - 1) {
+                    if (i > 0) {
                         sb.append(',');
                     }
+
+                    sb.append(nodes[i].getSQL());
                 }
 
                 return sb.toString();
@@ -336,13 +360,27 @@ public class Expression {
 
         switch (opType) {
 
+            case OpTypes.ARRAY :
+                sb.append(Tokens.T_ARRAY).append('[');
+
+                for (int i = 0; i < nodes.length; i++) {
+                    if (i > 0) {
+                        sb.append(',');
+                    }
+
+                    sb.append(nodes[i].getSQL());
+                }
+
+                sb.append(']');
+                break;
+
+            case OpTypes.ARRAY_SUBQUERY :
+
+            //
             case OpTypes.ROW_SUBQUERY :
             case OpTypes.TABLE_SUBQUERY :
-/*
-                buf.append('(');
-                buf.append(subSelect.getSQL());
-                buf.append(')');
-*/
+                sb.append('(');
+                sb.append(')');
                 break;
 
             default :
@@ -365,15 +403,27 @@ public class Expression {
         switch (opType) {
 
             case OpTypes.VALUE :
-                sb.append("VALUE = ").append(valueData);
+                sb.append("VALUE = ").append(
+                    dataType.convertToSQLString(valueData));
                 sb.append(", TYPE = ").append(dataType.getNameString());
 
                 return sb.toString();
 
+            case OpTypes.ARRAY :
+                sb.append("ARRAY ");
+
+                return sb.toString();
+
+            case OpTypes.ARRAY_SUBQUERY :
+                sb.append("ARRAY SUBQUERY");
+
+                return sb.toString();
+
+            //
             case OpTypes.ROW_SUBQUERY :
             case OpTypes.TABLE_SUBQUERY :
                 sb.append("QUERY ");
-                sb.append(subQuery.queryExpression.describe(session));
+                sb.append(table.queryExpression.describe(session, blanks));
 
                 return sb.toString();
 
@@ -382,12 +432,11 @@ public class Expression {
 
                 for (int i = 0; i < nodes.length; i++) {
                     sb.append(nodes[i].describe(session, blanks + 1));
+                    sb.append(' ');
                 }
-
-                sb.append("), TYPE = ").append(dataType.getNameString());
                 break;
 
-            case OpTypes.TABLE :
+            case OpTypes.VALUELIST :
                 sb.append("VALUELIST ");
 
                 for (int i = 0; i < nodes.length; i++) {
@@ -395,18 +444,6 @@ public class Expression {
                     sb.append(' ');
                 }
                 break;
-        }
-
-        if (nodes[LEFT] != null) {
-            sb.append(" arg1=[");
-            sb.append(nodes[LEFT].describe(session, blanks + 1));
-            sb.append(']');
-        }
-
-        if (nodes[RIGHT] != null) {
-            sb.append(" arg2=[");
-            sb.append(nodes[RIGHT].describe(session, blanks + 1));
-            sb.append(']');
         }
 
         return sb.toString();
@@ -424,6 +461,9 @@ public class Expression {
         dataType = type;
     }
 
+    /**
+     * SIMPLE_COLUMN expressions can be of different Expression subclass types
+     */
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -447,9 +487,17 @@ public class Expression {
             case OpTypes.VALUE :
                 return equals(valueData, other.valueData);
 
+            case OpTypes.ARRAY :
+
+            //
+            case OpTypes.ARRAY_SUBQUERY :
+            case OpTypes.ROW_SUBQUERY :
+            case OpTypes.TABLE_SUBQUERY :
+                return table.queryExpression.isEquivalent(
+                    other.table.queryExpression);
+
             default :
-                return equals(nodes, other.nodes)
-                       && equals(subQuery, other.subQuery);
+                return equals(nodes, other.nodes);
         }
     }
 
@@ -485,7 +533,7 @@ public class Expression {
             return true;
         }
 
-        return (o1 == null) ? o2 == null
+        return (o1 == null) ? false
                             : o1.equals(o2);
     }
 
@@ -515,11 +563,20 @@ public class Expression {
         return true;
     }
 
+    /**
+     * For GROUP only.
+     */
     boolean isComposedOf(Expression exprList[], int start, int end,
                          OrderedIntHashSet excludeSet) {
 
-        if (opType == OpTypes.VALUE) {
-            return true;
+        switch (opType) {
+
+            case OpTypes.VALUE :
+            case OpTypes.DYNAMIC_PARAM :
+            case OpTypes.PARAMETER :
+            case OpTypes.VARIABLE : {
+                return true;
+            }
         }
 
         if (excludeSet.contains(opType)) {
@@ -543,8 +600,9 @@ public class Expression {
             case OpTypes.MATCH_UNIQUE_FULL :
             case OpTypes.UNIQUE :
             case OpTypes.EXISTS :
+            case OpTypes.ARRAY :
+            case OpTypes.ARRAY_SUBQUERY :
             case OpTypes.TABLE_SUBQUERY :
-            case OpTypes.ROW_SUBQUERY :
 
             //
             case OpTypes.COUNT :
@@ -559,6 +617,29 @@ public class Expression {
             case OpTypes.VAR_POP :
             case OpTypes.VAR_SAMP :
                 return false;
+
+            case OpTypes.ROW_SUBQUERY : {
+                if (table == null) {
+                    break;
+                }
+
+                if (!(table.getQueryExpression()
+                        instanceof QuerySpecification)) {
+                    return false;
+                }
+
+                QuerySpecification qs =
+                    (QuerySpecification) table.getQueryExpression();
+                OrderedHashSet set = new OrderedHashSet();
+
+                for (int i = start; i < end; i++) {
+                    if (exprList[i].opType == OpTypes.COLUMN) {
+                        set.add(exprList[i]);
+                    }
+                }
+
+                return qs.collectOuterColumnExpressions(null, set) == null;
+            }
         }
 
         if (nodes.length == 0) {
@@ -576,10 +657,14 @@ public class Expression {
         return result;
     }
 
-    boolean isComposedOf(OrderedHashSet expressions,
+    /**
+     * For HAVING only.
+     */
+    boolean isComposedOf(OrderedHashSet expressions, RangeGroup[] rangeGroups,
                          OrderedIntHashSet excludeSet) {
 
-        if (opType == OpTypes.VALUE) {
+        if (opType == OpTypes.VALUE || opType == OpTypes.DYNAMIC_PARAM
+                || opType == OpTypes.PARAMETER || opType == OpTypes.VARIABLE) {
             return true;
         }
 
@@ -590,6 +675,18 @@ public class Expression {
         for (int i = 0; i < expressions.size(); i++) {
             if (equals(expressions.get(i))) {
                 return true;
+            }
+        }
+
+        if (opType == OpTypes.COLUMN) {
+            for (int i = 0; i < rangeGroups.length; i++) {
+                RangeVariable[] ranges = rangeGroups[i].getRangeVariables();
+
+                for (int j = 0; j < ranges.length; j++) {
+                    if (ranges[j] == getRangeVariable()) {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -633,34 +730,11 @@ public class Expression {
 
         for (int i = 0; i < nodes.length; i++) {
             result &= (nodes[i] == null
-                       || nodes[i].isComposedOf(expressions, excludeSet));
+                       || nodes[i].isComposedOf(expressions, rangeGroups,
+                                                excludeSet));
         }
 
         return result;
-    }
-
-    Expression replace(OrderedHashSet expressions,
-                       OrderedHashSet replacements) {
-
-        if (opType == OpTypes.VALUE) {
-            return this;
-        }
-
-        int index = expressions.getIndex(this);
-
-        if (index != -1) {
-            return (Expression) replacements.get(index);
-        }
-
-        for (int i = 0; i < nodes.length; i++) {
-            if (nodes[i] == null) {
-                continue;
-            }
-
-            nodes[i] = nodes[i].replace(expressions, replacements);
-        }
-
-        return this;
     }
 
     Expression replaceColumnReferences(RangeVariable range,
@@ -674,7 +748,38 @@ public class Expression {
             nodes[i] = nodes[i].replaceColumnReferences(range, list);
         }
 
+        if (table != null && table.queryExpression != null) {
+            table.queryExpression.replaceColumnReferences(range, list);
+        }
+
         return this;
+    }
+
+    void replaceRangeVariables(RangeVariable[] ranges,
+                               RangeVariable[] newRanges) {
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] == null) {
+                continue;
+            }
+
+            nodes[i].replaceRangeVariables(ranges, newRanges);
+        }
+
+        if (table != null && table.queryExpression != null) {
+            table.queryExpression.replaceRangeVariables(ranges, newRanges);
+        }
+    }
+
+    void resetColumnReferences() {
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] == null) {
+                continue;
+            }
+
+            nodes[i].resetColumnReferences();
+        }
     }
 
     void convertToSimpleColumn(OrderedHashSet expressions,
@@ -684,12 +789,16 @@ public class Expression {
             return;
         }
 
+        if (opType == OpTypes.SIMPLE_COLUMN) {
+            return;
+        }
+
         int index = expressions.getIndex(this);
 
         if (index != -1) {
             Expression e = (Expression) replacements.get(index);
 
-            nodes         = emptyExpressionArray;
+            nodes         = emptyArray;
             opType        = OpTypes.SIMPLE_COLUMN;
             columnIndex   = e.columnIndex;
             rangePosition = e.rangePosition;
@@ -704,6 +813,30 @@ public class Expression {
 
             nodes[i].convertToSimpleColumn(expressions, replacements);
         }
+
+        if (table != null) {
+            if (table.queryExpression != null) {
+                OrderedHashSet set = new OrderedHashSet();
+
+                table.queryExpression.collectAllExpressions(set,
+                        Expression.columnExpressionSet,
+                        Expression.emptyExpressionSet);
+
+                for (int i = 0; i < set.size(); i++) {
+                    Expression e = (Expression) set.get(i);
+
+                    e.convertToSimpleColumn(expressions, replacements);
+                }
+            }
+        }
+    }
+
+    boolean isAggregate() {
+        return isAggregate;
+    }
+
+    void setAggregate() {
+        isAggregate = true;
     }
 
     boolean isSelfAggregate() {
@@ -730,12 +863,7 @@ public class Expression {
     }
 
     SimpleName getSimpleName() {
-
-        if (alias != null) {
-            return alias;
-        }
-
-        return null;
+        return alias;
     }
 
     /**
@@ -769,6 +897,10 @@ public class Expression {
         nodes[RIGHT] = e;
     }
 
+    void setSubType(int subType) {
+        exprSubType = subType;
+    }
+
     /**
      * Returns the range variable for a COLUMN expression
      */
@@ -779,53 +911,58 @@ public class Expression {
     /**
      * return the expression for an alias used in an ORDER BY clause
      */
-    Expression replaceAliasInOrderBy(Expression[] columns, int length) {
+    Expression replaceAliasInOrderBy(Session session, Expression[] columns,
+                                     int length) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] == null) {
                 continue;
             }
 
-            nodes[i] = nodes[i].replaceAliasInOrderBy(columns, length);
+            nodes[i] = nodes[i].replaceAliasInOrderBy(session, columns,
+                    length);
         }
 
         return this;
     }
 
     /**
-     * Find a range variable with the given table alias
-     */
-    int findMatchingRangeVariableIndex(RangeVariable[] rangeVarArray) {
-        return -1;
-    }
-
-    /**
      * collects all range variables in expression tree
      */
-    void collectRangeVariables(RangeVariable[] rangeVariables, Set set) {
+    OrderedHashSet collectRangeVariables(OrderedHashSet set) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
-                nodes[i].collectRangeVariables(rangeVariables, set);
+                set = nodes[i].collectRangeVariables(set);
             }
         }
 
-        if (subQuery != null && subQuery.queryExpression != null) {
-            HsqlList unresolvedExpressions =
-                subQuery.queryExpression.getUnresolvedExpressions();
+        if (table != null && table.queryExpression != null) {
+            set = table.queryExpression.collectRangeVariables(set);
+        }
 
-            if (unresolvedExpressions != null) {
-                for (int i = 0; i < unresolvedExpressions.size(); i++) {
-                    Expression e = (Expression) unresolvedExpressions.get(i);
+        return set;
+    }
 
-                    e.collectRangeVariables(rangeVariables, set);
-                }
+    OrderedHashSet collectRangeVariables(RangeVariable[] rangeVariables,
+                                         OrderedHashSet set) {
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null) {
+                set = nodes[i].collectRangeVariables(rangeVariables, set);
             }
         }
+
+        if (table != null && table.queryExpression != null) {
+            set = table.queryExpression.collectRangeVariables(rangeVariables,
+                    set);
+        }
+
+        return set;
     }
 
     /**
-     * collects all range variables in expression tree
+     * collects all schema objects
      */
     void collectObjectNames(Set set) {
 
@@ -835,9 +972,9 @@ public class Expression {
             }
         }
 
-        if (subQuery != null) {
-            if (subQuery.queryExpression != null) {
-                subQuery.queryExpression.collectObjectNames(set);
+        if (table != null) {
+            if (table.queryExpression != null) {
+                table.queryExpression.collectObjectNames(set);
             }
         }
     }
@@ -855,8 +992,28 @@ public class Expression {
             }
         }
 
-        if (subQuery != null && subQuery.queryExpression != null) {
-            if (subQuery.queryExpression.hasReference(range)) {
+        if (table != null && table.queryExpression != null) {
+            if (table.queryExpression.hasReference(range)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * return true if given RangeVariable is used in expression tree
+     */
+    boolean hasReference(RangeVariable[] ranges, int exclude) {
+
+        OrderedHashSet set = collectRangeVariables(ranges, null);
+
+        if (set == null) {
+            return false;
+        }
+
+        for (int j = 0; j < set.size(); j++) {
+            if (set.get(j) != ranges[exclude]) {
                 return true;
             }
         }
@@ -867,14 +1024,18 @@ public class Expression {
     /**
      * resolve tables and collect unresolved column expressions
      */
-    public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
+    public HsqlList resolveColumnReferences(Session session,
+            RangeGroup rangeGroup, RangeGroup[] rangeGroups,
             HsqlList unresolvedSet) {
-        return resolveColumnReferences(rangeVarArray, rangeVarArray.length,
-                                       unresolvedSet, true);
+
+        return resolveColumnReferences(session, rangeGroup,
+                                       rangeGroup.getRangeVariables().length,
+                                       rangeGroups, unresolvedSet, true);
     }
 
-    public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
-            int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
+    public HsqlList resolveColumnReferences(Session session,
+            RangeGroup rangeGroup, int rangeCount, RangeGroup[] rangeGroups,
+            HsqlList unresolvedSet, boolean acceptsSequences) {
 
         if (opType == OpTypes.VALUE) {
             return unresolvedSet;
@@ -882,39 +1043,33 @@ public class Expression {
 
         switch (opType) {
 
-            case OpTypes.CASEWHEN :
-                acceptsSequences = false;
-                break;
+            case OpTypes.TABLE :
+            case OpTypes.VALUELIST : {
+                if (table != null) {
+                    if (rangeGroup.getRangeVariables().length > rangeCount) {
+                        RangeVariable[] rangeVars =
+                            (RangeVariable[]) ArrayUtil.resizeArray(
+                                rangeGroup.getRangeVariables(), rangeCount);
 
-            case OpTypes.TABLE : {
-                HsqlList localSet = null;
+                        rangeGroup = new RangeGroupSimple(rangeVars,
+                                                          rangeGroup);
+                    }
+
+                    rangeGroups =
+                        (RangeGroup[]) ArrayUtil.toAdjustedArray(rangeGroups,
+                            rangeGroup, rangeGroups.length, 1);
+                    rangeGroup = new RangeGroupSimple(table);
+                    rangeCount = 0;
+                }
 
                 for (int i = 0; i < nodes.length; i++) {
                     if (nodes[i] == null) {
                         continue;
                     }
 
-                    localSet = nodes[i].resolveColumnReferences(
-                        RangeVariable.emptyArray, localSet);
-                }
-
-                if (localSet != null) {
-                    isCorrelated = true;
-
-                    if (subQuery != null) {
-                        subQuery.setCorrelated();
-                    }
-
-                    for (int i = 0; i < localSet.size(); i++) {
-                        Expression e = (Expression) localSet.get(i);
-
-                        unresolvedSet =
-                            e.resolveColumnReferences(rangeVarArray,
-                                                      unresolvedSet);
-                    }
-
-                    unresolvedSet = Expression.resolveColumnSet(rangeVarArray,
-                            localSet, unresolvedSet);
+                    unresolvedSet = nodes[i].resolveColumnReferences(session,
+                            rangeGroup, rangeCount, rangeGroups,
+                            unresolvedSet, acceptsSequences);
                 }
 
                 return unresolvedSet;
@@ -926,28 +1081,54 @@ public class Expression {
                 continue;
             }
 
-            unresolvedSet = nodes[i].resolveColumnReferences(rangeVarArray,
-                    rangeCount, unresolvedSet, acceptsSequences);
+            unresolvedSet = nodes[i].resolveColumnReferences(session,
+                    rangeGroup, rangeCount, rangeGroups, unresolvedSet,
+                    acceptsSequences);
         }
 
         switch (opType) {
 
+            case OpTypes.ARRAY :
+                break;
+
+            case OpTypes.ARRAY_SUBQUERY :
             case OpTypes.ROW_SUBQUERY :
             case OpTypes.TABLE_SUBQUERY : {
-                QueryExpression queryExpression = subQuery.queryExpression;
+                RangeVariable[] rangeVars = rangeGroup.getRangeVariables();
 
-                if (!queryExpression.areColumnsResolved()) {
-                    isCorrelated = true;
+                if (rangeVars.length > rangeCount) {
+                    rangeVars =
+                        (RangeVariable[]) ArrayUtil.resizeArray(rangeVars,
+                            rangeCount);
+                    rangeGroup = new RangeGroupSimple(rangeVars, rangeGroup);
+                }
 
-                    subQuery.setCorrelated();
+                rangeGroups =
+                    (RangeGroup[]) ArrayUtil.toAdjustedArray(rangeGroups,
+                        rangeGroup, rangeGroups.length, 1);
 
-                    // take to enclosing context
-                    if (unresolvedSet == null) {
-                        unresolvedSet = new ArrayListIdentity();
+                QueryExpression queryExpression = table.queryExpression;
+
+                if (queryExpression != null) {
+                    queryExpression.resolveReferences(session, rangeGroups);
+
+                    if (!queryExpression.areColumnsResolved()) {
+                        if (unresolvedSet == null) {
+                            unresolvedSet = new ArrayListIdentity();
+                        }
+
+                        unresolvedSet.addAll(
+                            queryExpression.getUnresolvedExpressions());
                     }
+                }
 
-                    unresolvedSet.addAll(
-                        queryExpression.getUnresolvedExpressions());
+                Expression dataExpression = table.dataExpression;
+
+                if (dataExpression != null) {
+                    unresolvedSet =
+                        dataExpression.resolveColumnReferences(session,
+                            rangeGroup, rangeCount, rangeGroups,
+                            unresolvedSet, acceptsSequences);
                 }
 
                 break;
@@ -974,9 +1155,11 @@ public class Expression {
 
         switch (opType) {
 
+            case OpTypes.ARRAY :
+            case OpTypes.ARRAY_SUBQUERY :
             case OpTypes.ROW_SUBQUERY :
             case OpTypes.TABLE_SUBQUERY :
-                if (subQuery != null) {
+                if (table != null) {
                     if (unresolvedSet == null) {
                         unresolvedSet = new OrderedHashSet();
                     }
@@ -1002,7 +1185,7 @@ public class Expression {
             case OpTypes.VALUE :
                 break;
 
-            case OpTypes.TABLE :
+            case OpTypes.VALUELIST :
 
                 /** @todo - should it fall through */
                 break;
@@ -1017,36 +1200,87 @@ public class Expression {
                 }
                 break;
 
-            case OpTypes.ROW_SUBQUERY :
-            case OpTypes.TABLE_SUBQUERY : {
-                QueryExpression queryExpression = subQuery.queryExpression;
+            case OpTypes.ARRAY : {
+                Type nodeDataType = null;
+
+                for (int i = 0; i < nodes.length; i++) {
+                    nodeDataType = Type.getAggregateType(nodeDataType,
+                                                         nodes[i].dataType);
+                }
+
+                for (int i = 0; i < nodes.length; i++) {
+                    nodes[i].dataType = nodeDataType;
+                }
+
+                if (nodeDataType != null) {
+                    for (int i = 0; i < nodes.length; i++) {
+                        if (nodes[i].valueData != null) {
+                            nodes[i].valueData =
+                                nodeDataType.convertToDefaultType(
+                                    session, nodes[i].valueData);
+                        }
+                    }
+                }
+
+                dataType = new ArrayType(nodeDataType, nodes.length);
+
+                return;
+            }
+            case OpTypes.ARRAY_SUBQUERY : {
+                QueryExpression queryExpression = table.queryExpression;
 
                 queryExpression.resolveTypes(session);
-                subQuery.prepareTable(session);
+                table.prepareTable();
 
                 nodeDataTypes = queryExpression.getColumnTypes();
+                dataType      = nodeDataTypes[0];
+
+                if (nodeDataTypes.length > 1) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+
+                dataType = new ArrayType(dataType, Integer.MAX_VALUE);
+
+                break;
+            }
+            case OpTypes.ROW_SUBQUERY :
+            case OpTypes.TABLE_SUBQUERY : {
+                QueryExpression queryExpression = table.queryExpression;
+
+                if (queryExpression != null) {
+                    queryExpression.resolveTypes(session);
+                }
+
+                Expression dataExpression = table.dataExpression;
+
+                if (dataExpression != null) {
+                    dataExpression.resolveTypes(session, null);
+                }
+
+                table.prepareTable();
+
+                nodeDataTypes = table.getColumnTypes();
                 dataType      = nodeDataTypes[0];
 
                 break;
             }
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500,
-                                         "Expression.resolveTypes()");
+                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
     }
 
-    void setAsConstantValue(Session session) {
+    void setAsConstantValue(Session session, Expression parent) {
 
-        valueData = getConstantValue(session);
+        valueData = getValue(session);
         opType    = OpTypes.VALUE;
-        nodes     = emptyExpressionArray;
+        nodes     = emptyArray;
     }
 
-    void setAsConstantValue(Object value) {
+    void setAsConstantValue(Object value, Expression parent) {
 
         valueData = value;
         opType    = OpTypes.VALUE;
-        nodes     = emptyExpressionArray;
+        nodes     = emptyArray;
     }
 
     void prepareTable(Session session, Expression row, int degree) {
@@ -1073,25 +1307,49 @@ public class Expression {
         nodeDataTypes = new Type[degree];
 
         for (int j = 0; j < degree; j++) {
-            Type type = row == null ? null
-                                    : row.nodes[j].dataType;
+            Type    type                  = row == null ? null
+                                                        : row.nodes[j]
+                                                            .dataType;
+            boolean hasUresolvedParameter = row == null ? false
+                                                        : row.nodes[j]
+                                                            .isUnresolvedParam();
 
             for (int i = 0; i < nodes.length; i++) {
                 type = Type.getAggregateType(nodes[i].nodes[j].dataType, type);
+                hasUresolvedParameter |= nodes[i].nodes[j].isUnresolvedParam();
             }
 
             if (type == null) {
-                throw Error.error(ErrorCode.X_42567);
+                type = Type.SQL_VARCHAR_DEFAULT;
+            }
+
+            int typeCode = type.typeCode;
+
+            if (hasUresolvedParameter && type.isCharacterType()) {
+                if (typeCode == Types.SQL_CHAR
+                        || type.precision
+                           < Type.SQL_VARCHAR_DEFAULT.precision) {
+                    if (typeCode == Types.SQL_CHAR) {
+                        typeCode = Types.SQL_VARCHAR;
+                    }
+
+                    long precision =
+                        Math.max(Type.SQL_VARCHAR_DEFAULT.precision,
+                                 type.precision);
+
+                    type = CharacterType.getCharacterType(typeCode, precision,
+                                                          type.getCollation());
+                }
             }
 
             nodeDataTypes[j] = type;
 
-            if (row != null && row.nodes[j].isParam) {
+            if (row != null && row.nodes[j].isUnresolvedParam()) {
                 row.nodes[j].dataType = type;
             }
 
             for (int i = 0; i < nodes.length; i++) {
-                if (nodes[i].nodes[j].isParam) {
+                if (nodes[i].nodes[j].isUnresolvedParam()) {
                     nodes[i].nodes[j].dataType = nodeDataTypes[j];
 
                     continue;
@@ -1102,13 +1360,6 @@ public class Expression {
                         nodes[i].nodes[j].dataType = nodeDataTypes[j];
                     }
                 }
-            }
-
-            if (nodeDataTypes[j].isCharacterType()
-                    && !((CharacterType) nodeDataTypes[j])
-                        .isEqualIdentical()) {
-
-                // collation issues
             }
         }
     }
@@ -1138,17 +1389,16 @@ public class Expression {
     void insertValuesIntoSubqueryTable(Session session,
                                        PersistentStore store) {
 
-        TableDerived table = subQuery.getTable();
-
         for (int i = 0; i < nodes.length; i++) {
-            Object[] data = nodes[i].getRowValue(session);
+            Object[] values = nodes[i].getRowValue(session);
+            Object[] data   = store.getTable().getEmptyRowData();
 
             for (int j = 0; j < nodeDataTypes.length; j++) {
-                data[j] = nodeDataTypes[j].convertToType(session, data[j],
+                data[j] = nodeDataTypes[j].convertToType(session, values[j],
                         nodes[i].nodes[j].dataType);
             }
 
-            Row row = (Row) store.getNewCachedObject(session, data);
+            Row row = (Row) store.getNewCachedObject(session, data, false);
 
             try {
                 store.indexRow(session, row);
@@ -1165,7 +1415,7 @@ public class Expression {
         return getAlias();
     }
 
-    ColumnSchema getColumn() {
+    public ColumnSchema getColumn() {
         return null;
     }
 
@@ -1183,9 +1433,88 @@ public class Expression {
         return dataType;
     }
 
+    byte getNullability() {
+        return nullability;
+    }
+
+    Type getNodeDataType(int i) {
+
+        if (nodeDataTypes == null) {
+            if (i > 0) {
+                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+            }
+
+            return dataType;
+        } else {
+            return nodeDataTypes[i];
+        }
+    }
+
+    Type[] getNodeDataTypes() {
+
+        if (nodeDataTypes == null) {
+            return new Type[]{ dataType };
+        } else {
+            return nodeDataTypes;
+        }
+    }
+
     int getDegree() {
-        return opType == OpTypes.ROW ? nodes.length
-                                     : 1;
+
+        switch (opType) {
+
+            case OpTypes.ROW :
+                return nodes.length;
+
+            case OpTypes.TABLE :
+            case OpTypes.ROW_SUBQUERY :
+            case OpTypes.TABLE_SUBQUERY :
+                if (table == null) {
+                    return nodeDataTypes.length;
+                }
+
+                return table.queryExpression.getColumnCount();
+
+            default :
+                return 1;
+        }
+    }
+
+    public Table getTable() {
+        return table;
+    }
+
+    public void materialise(Session session) {
+
+        if (table == null) {
+            return;
+        }
+
+        if (table.isCorrelated()) {
+            table.materialiseCorrelated(session);
+        } else {
+            table.materialise(session);
+        }
+    }
+
+    Object getValue(Session session, Type type) {
+
+        Object o = getValue(session);
+
+        if (o == null || dataType == type) {
+            return o;
+        }
+
+        return type.convertToType(session, o, dataType);
+    }
+
+    public Object getConstantValueNoCheck(Session session) {
+
+        try {
+            return getValue(session);
+        } catch (HsqlException e) {
+            return null;
+        }
     }
 
     public Object[] getRowValue(Session session) {
@@ -1203,34 +1532,10 @@ public class Expression {
             }
             case OpTypes.ROW_SUBQUERY :
             case OpTypes.TABLE_SUBQUERY : {
-                return subQuery.queryExpression.getValues(session);
+                return table.queryExpression.getValues(session);
             }
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
-        }
-    }
-
-    Object getValue(Session session, Type type) {
-
-        Object o = getValue(session);
-
-        if (o == null || dataType == type) {
-            return o;
-        }
-
-        return type.convertToType(session, o, dataType);
-    }
-
-    public Object getConstantValue(Session session) {
-        return getValue(session);
-    }
-
-    public Object getConstantValueNoCheck(Session session) {
-
-        try {
-            return getValue(session);
-        } catch (HsqlException e) {
-            return null;
         }
     }
 
@@ -1242,11 +1547,11 @@ public class Expression {
                 return valueData;
 
             case OpTypes.SIMPLE_COLUMN : {
-                Object[] data =
+                Object value =
                     session.sessionContext.rangeIterators[rangePosition]
-                        .getCurrent();
+                        .getCurrent(columnIndex);
 
-                return data[columnIndex];
+                return value;
             }
             case OpTypes.ROW : {
                 if (nodes.length == 1) {
@@ -1261,11 +1566,41 @@ public class Expression {
 
                 return row;
             }
-            case OpTypes.ROW_SUBQUERY :
-            case OpTypes.TABLE_SUBQUERY : {
-                subQuery.materialiseCorrelated(session);
+            case OpTypes.ARRAY : {
+                Object[] array = new Object[nodes.length];
 
-                Object value = subQuery.getValue(session);
+                for (int i = 0; i < nodes.length; i++) {
+                    array[i] = nodes[i].getValue(session);
+                }
+
+                return array;
+            }
+            case OpTypes.ARRAY_SUBQUERY : {
+                table.materialiseCorrelated(session);
+
+                RowSetNavigatorData nav   = table.getNavigator(session);
+                int                 size  = nav.getSize();
+                Object[]            array = new Object[size];
+
+                nav.beforeFirst();
+
+                for (int i = 0; nav.hasNext(); i++) {
+                    Object[] data = nav.getNextRowData();
+
+                    array[i] = data[0];
+                }
+
+                return array;
+            }
+            case OpTypes.TABLE_SUBQUERY :
+            case OpTypes.ROW_SUBQUERY : {
+                table.materialiseCorrelated(session);
+
+                Object[] value = table.getValues(session);
+
+                if (value.length == 1) {
+                    return ((Object[]) value)[0];
+                }
 
                 return value;
             }
@@ -1274,7 +1609,43 @@ public class Expression {
         }
     }
 
-    boolean testCondition(Session session) {
+    public Result getResult(Session session) {
+
+        switch (opType) {
+
+            case OpTypes.ARRAY : {
+                RowSetNavigatorData navigator = table.getNavigator(session);
+                Object[]            array = new Object[navigator.getSize()];
+
+                navigator.beforeFirst();
+
+                for (int i = 0; navigator.hasNext(); i++) {
+                    Object[] data = navigator.getNext();
+
+                    array[i] = data[0];
+                }
+
+                return Result.newPSMResult(array);
+            }
+            case OpTypes.TABLE_SUBQUERY : {
+                table.materialiseCorrelated(session);
+
+                RowSetNavigatorData navigator = table.getNavigator(session);
+                Result              result    = Result.newResult(navigator);
+
+                result.metaData = table.queryExpression.getMetaData();
+
+                return result;
+            }
+            default : {
+                Object value = getValue(session);
+
+                return Result.newPSMResult(value);
+            }
+        }
+    }
+
+    public boolean testCondition(Session session) {
         return Boolean.TRUE.equals(getValue(session));
     }
 
@@ -1291,11 +1662,29 @@ public class Expression {
         return nulls;
     }
 
+    public boolean isTrue() {
+        return opType == OpTypes.VALUE && valueData instanceof Boolean
+               && ((Boolean) valueData).booleanValue();
+    }
+
+    public boolean isFalse() {
+        return opType == OpTypes.VALUE && valueData instanceof Boolean
+               && !((Boolean) valueData).booleanValue();
+    }
+
+    public boolean isIndexable(RangeVariable range) {
+        return false;
+    }
+
     static void convertToType(Session session, Object[] data, Type[] dataType,
                               Type[] newType) {
 
         for (int i = 0; i < data.length; i++) {
-            data[i] = newType[i].convertToType(session, data[i], dataType[i]);
+            if (dataType[i].typeComparisonGroup
+                    != newType[i].typeComparisonGroup) {
+                data[i] = newType[i].convertToType(session, data[i],
+                                                   dataType[i]);
+            }
         }
     }
 
@@ -1306,22 +1695,18 @@ public class Expression {
     static QuerySpecification getCheckSelect(Session session, Table t,
             Expression e) {
 
-        CompileContext     compileContext = new CompileContext(session);
-        QuerySpecification s = new QuerySpecification(compileContext);
-
-        s.exprColumns    = new Expression[1];
-        s.exprColumns[0] = EXPR_TRUE;
-
-        RangeVariable range = new RangeVariable(t, null, null, null,
-            compileContext);
-
-        s.rangeVariables = new RangeVariable[]{ range };
-
-        HsqlList unresolved = e.resolveColumnReferences(s.rangeVariables,
+        CompileContext compileContext = new CompileContext(session, null,
             null);
 
-        ExpressionColumn.checkColumnsResolved(unresolved);
-        e.resolveTypes(session, null);
+        compileContext.setNextRangeVarIndex(0);
+
+        QuerySpecification s = new QuerySpecification(compileContext);
+        RangeVariable range = new RangeVariable(t, null, null, null,
+            compileContext);
+        RangeVariable[] ranges     = new RangeVariable[]{ range };
+        RangeGroup      rangeGroup = new RangeGroupSimple(ranges, false);
+
+        e.resolveCheckOrGenExpression(session, rangeGroup, true);
 
         if (Type.SQL_BOOLEAN != e.getDataType()) {
             throw Error.error(ErrorCode.X_42568);
@@ -1329,21 +1714,234 @@ public class Expression {
 
         Expression condition = new ExpressionLogical(OpTypes.NOT, e);
 
-        s.queryCondition = condition;
-
-        s.resolveReferences(session);
-        s.resolveTypes(session);
+        s.addSelectColumnExpression(EXPR_TRUE);
+        s.addRangeVariable(session, range);
+        s.addQueryCondition(condition);
+        s.resolve(session);
 
         return s;
     }
 
-    boolean isParam() {
-        return isParam;
+    public void resolveCheckOrGenExpression(Session session,
+            RangeGroup rangeGroup, boolean isCheck) {
+
+        boolean        nonDeterministic = false;
+        OrderedHashSet set              = new OrderedHashSet();
+        HsqlList unresolved = resolveColumnReferences(session, rangeGroup,
+            RangeGroup.emptyArray, null);
+
+        ExpressionColumn.checkColumnsResolved(unresolved);
+        resolveTypes(session, null);
+        collectAllExpressions(set, Expression.subqueryAggregateExpressionSet,
+                              Expression.emptyExpressionSet);
+
+        if (!set.isEmpty()) {
+            throw Error.error(ErrorCode.X_42512);
+        }
+
+        collectAllExpressions(set, Expression.functionExpressionSet,
+                              Expression.emptyExpressionSet);
+
+        for (int i = 0; i < set.size(); i++) {
+            Expression current = (Expression) set.get(i);
+
+            if (current.opType == OpTypes.FUNCTION) {
+                if (!((FunctionSQLInvoked) current).isDeterministic()) {
+                    throw Error.error(ErrorCode.X_42512);
+                }
+            }
+
+            if (current.opType == OpTypes.SQL_FUNCTION) {
+                if (!((FunctionSQL) current).isDeterministic()) {
+                    if (isCheck) {
+                        nonDeterministic = true;
+
+                        continue;
+                    }
+
+                    throw Error.error(ErrorCode.X_42512);
+                }
+            }
+        }
+
+        if (isCheck && nonDeterministic) {
+            HsqlArrayList list = new HsqlArrayList();
+
+            RangeVariableResolver.decomposeAndConditions(session, this, list);
+
+            for (int i = 0; i < list.size(); i++) {
+                nonDeterministic = true;
+
+                Expression e = (Expression) list.get(i);
+                Expression e1;
+
+                if (e instanceof ExpressionLogical) {
+                    boolean b = ((ExpressionLogical) e).convertToSmaller();
+
+                    if (!b) {
+                        break;
+                    }
+
+                    e1 = e.getRightNode();
+                    e  = e.getLeftNode();
+
+                    if (!e.dataType.isDateTimeType()) {
+                        nonDeterministic = true;
+
+                        break;
+                    }
+
+                    if (e.hasNonDeterministicFunction()) {
+                        nonDeterministic = true;
+
+                        break;
+                    }
+
+                    // both sides are actually consistent regarding timeZone
+                    // e.dataType.isDateTimeTypeWithZone();
+                    if (e1 instanceof ExpressionArithmetic) {
+                        if (opType == OpTypes.ADD) {
+                            if (e1.getRightNode()
+                                    .hasNonDeterministicFunction()) {
+                                e1.swapLeftAndRightNodes();
+                            }
+                        } else if (opType == OpTypes.SUBTRACT) {}
+                        else {
+                            break;
+                        }
+
+                        if (e1.getRightNode().hasNonDeterministicFunction()) {
+                            break;
+                        }
+
+                        e1 = e1.getLeftNode();
+                    }
+
+                    if (e1.opType == OpTypes.SQL_FUNCTION) {
+                        FunctionSQL function = (FunctionSQL) e1;
+
+                        switch (function.funcType) {
+
+                            case FunctionSQL.FUNC_CURRENT_DATE :
+                            case FunctionSQL.FUNC_CURRENT_TIMESTAMP :
+                            case FunctionSQL.FUNC_LOCALTIMESTAMP :
+                                nonDeterministic = false;
+
+                                continue;
+                            default :
+                                break;
+                        }
+
+                        break;
+                    }
+
+                    break;
+                } else {
+                    break;
+                }
+            }
+
+            if (nonDeterministic) {
+                throw Error.error(ErrorCode.X_42512);
+            }
+        }
+
+        set.clear();
+        collectObjectNames(set);
+
+        RangeVariable[] ranges = rangeGroup.getRangeVariables();
+
+        for (int i = 0; i < set.size(); i++) {
+            HsqlName name = (HsqlName) set.get(i);
+
+            switch (name.type) {
+
+                case SchemaObject.COLUMN : {
+                    if (isCheck) {
+                        break;
+                    }
+
+                    int colIndex = ranges[0].rangeTable.findColumn(name.name);
+                    ColumnSchema column =
+                        ranges[0].rangeTable.getColumn(colIndex);
+
+                    if (column.isGenerated()) {
+                        throw Error.error(ErrorCode.X_42512);
+                    }
+
+                    break;
+                }
+                case SchemaObject.SEQUENCE : {
+                    throw Error.error(ErrorCode.X_42512);
+                }
+                case SchemaObject.SPECIFIC_ROUTINE : {
+                    Routine routine =
+                        (Routine) session.database.schemaManager
+                            .getSchemaObject(name);
+
+                    if (!routine.isDeterministic()) {
+                        throw Error.error(ErrorCode.X_42512);
+                    }
+
+                    int impact = routine.getDataImpact();
+
+                    if (impact == Routine.READS_SQL
+                            || impact == Routine.MODIFIES_SQL) {
+                        throw Error.error(ErrorCode.X_42512);
+                    }
+                }
+            }
+        }
+
+        set.clear();
+    }
+
+    boolean isUnresolvedParam() {
+        return false;
+    }
+
+    boolean isDynamicParam() {
+        return false;
+    }
+
+    boolean hasNonDeterministicFunction() {
+
+        OrderedHashSet list = null;
+
+        list = collectAllExpressions(list, Expression.functionExpressionSet,
+                                     Expression.emptyExpressionSet);
+
+        if (list == null) {
+            return false;
+        }
+
+        for (int j = 0; j < list.size(); j++) {
+            Expression current = (Expression) list.get(j);
+
+            if (current.opType == OpTypes.FUNCTION) {
+                if (!((FunctionSQLInvoked) current).isDeterministic()) {
+                    return true;
+                }
+            } else if (current.opType == OpTypes.SQL_FUNCTION) {
+                if (!((FunctionSQL) current).isDeterministic()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    void swapLeftAndRightNodes() {
+
+        Expression temp = nodes[LEFT];
+
+        nodes[LEFT]  = nodes[RIGHT];
+        nodes[RIGHT] = temp;
     }
 
     void setAttributesAsColumn(ColumnSchema column, boolean isWritable) {
-        throw Error.runtimeError(ErrorCode.U_S0500,
-                                 "Expression.setAttributesAsColumn");
+        throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
     }
 
     String getValueClassName() {
@@ -1354,41 +1952,75 @@ public class Expression {
         return type.getJDBCClassName();
     }
 
-    public void collectAllFunctionExpressions(HsqlList set) {
-
-        Expression.collectAllExpressions(set, this,
-                                         Expression.emptyExpressionSet,
-                                         Expression.emptyExpressionSet);
-    }
-
     /**
-     * collect all extrassions of a set of expression types appearing anywhere
+     * collect all expressions of a set of expression types appearing anywhere
      * in a select statement and its subselects, etc.
      */
-    static void collectAllExpressions(HsqlList set, Expression e,
-                                      OrderedIntHashSet typeSet,
-                                      OrderedIntHashSet stopAtTypeSet) {
+    OrderedHashSet collectAllExpressions(OrderedHashSet set,
+                                         OrderedIntHashSet typeSet,
+                                         OrderedIntHashSet stopAtTypeSet) {
 
-        if (e == null) {
-            return;
+        if (stopAtTypeSet.contains(opType)) {
+            return set;
         }
 
-        if (stopAtTypeSet.contains(e.opType)) {
-            return;
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null) {
+                set = nodes[i].collectAllExpressions(set, typeSet,
+                                                     stopAtTypeSet);
+            }
         }
 
-        for (int i = 0; i < e.nodes.length; i++) {
-            collectAllExpressions(set, e.nodes[i], typeSet, stopAtTypeSet);
+        boolean added = false;
+
+        if (typeSet.contains(opType)) {
+            if (set == null) {
+                set = new OrderedHashSet();
+            }
+
+            set.add(this);
+
+            added = true;
         }
 
-        if (typeSet.contains(e.opType)) {
-            set.add(e);
+        if (!added) {
+            if (table != null && table.queryExpression != null) {
+                set = table.queryExpression.collectAllExpressions(set,
+                        typeSet, stopAtTypeSet);
+            }
         }
 
-        if (e.subQuery != null && e.subQuery.queryExpression != null) {
-            e.subQuery.queryExpression.collectAllExpressions(set, typeSet,
-                    stopAtTypeSet);
+        return set;
+    }
+
+    public OrderedHashSet getSubqueries() {
+        return collectAllSubqueries(null);
+    }
+
+    OrderedHashSet collectAllSubqueries(OrderedHashSet set) {
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null) {
+                set = nodes[i].collectAllSubqueries(set);
+            }
         }
+
+        if (table != null) {
+            OrderedHashSet tempSet = null;
+
+            if (table.queryExpression != null) {
+                tempSet = table.queryExpression.getSubqueries();
+                set     = OrderedHashSet.addAll(set, tempSet);
+            }
+
+            if (set == null) {
+                set = new OrderedHashSet();
+            }
+
+            set.add(table);
+        }
+
+        return set;
     }
 
     /**
@@ -1396,12 +2028,11 @@ public class Expression {
      */
     public boolean isCorrelated() {
 
-        if (opType == OpTypes.TABLE_SUBQUERY && subQuery != null
-                && subQuery.isCorrelated()) {
-            return true;
+        if (table == null) {
+            return false;
         }
 
-        return false;
+        return table.isCorrelated();
     }
 
     /**
@@ -1409,48 +2040,150 @@ public class Expression {
      */
     public void checkValidCheckConstraint() {
 
-        HsqlArrayList set = new HsqlArrayList();
+        OrderedHashSet set = null;
 
-        Expression.collectAllExpressions(set, this, subqueryExpressionSet,
-                                         emptyExpressionSet);
+        set = collectAllExpressions(set,
+                                    Expression.subqueryAggregateExpressionSet,
+                                    Expression.emptyExpressionSet);
 
-        if (!set.isEmpty()) {
+        if (set != null && !set.isEmpty()) {
             throw Error.error(ErrorCode.X_0A000,
                               "subquery in check constraint");
         }
     }
 
-    static HsqlList resolveColumnSet(RangeVariable[] rangeVars,
+    static HsqlList resolveColumnSet(Session session,
+                                     RangeVariable[] rangeVars,
+                                     RangeGroup[] rangeGroups,
+                                     HsqlList sourceSet) {
+        return resolveColumnSet(session, rangeVars, rangeVars.length,
+                                rangeGroups, sourceSet, null);
+    }
+
+    static HsqlList resolveColumnSet(Session session,
+                                     RangeVariable[] rangeVars,
+                                     int rangeCount, RangeGroup[] rangeGroups,
                                      HsqlList sourceSet, HsqlList targetSet) {
 
         if (sourceSet == null) {
             return targetSet;
         }
 
+        RangeGroup rangeGroup = new RangeGroupSimple(rangeVars, false);
+
         for (int i = 0; i < sourceSet.size(); i++) {
             Expression e = (Expression) sourceSet.get(i);
 
-            targetSet = e.resolveColumnReferences(rangeVars, targetSet);
+            targetSet = e.resolveColumnReferences(session, rangeGroup,
+                                                  rangeCount, rangeGroups,
+                                                  targetSet, false);
         }
 
         return targetSet;
+    }
+
+    boolean isConditionRangeVariable(RangeVariable range) {
+        return false;
+    }
+
+    RangeVariable[] getJoinRangeVariables(RangeVariable[] ranges) {
+        return RangeVariable.emptyArray;
+    }
+
+    double costFactor(Session session, RangeVariable range, int operation) {
+        return Index.minimumSelectivity;
     }
 
     Expression getIndexableExpression(RangeVariable rangeVar) {
         return null;
     }
 
-    /************************* Volt DB Extensions *************************/
+    public Expression duplicate() {
 
-    // A VoltDB extension to support indexed expressions
-    public void collectAllColumnExpressions(HsqlList set) {
+        Expression e = null;
 
-        Expression.collectAllExpressions(set, this,
-                                         Expression.columnExpressionSet,
-                                         Expression.emptyExpressionSet);
+        try {
+            e       = (Expression) super.clone();
+            e.nodes = (Expression[]) nodes.clone();
+
+            for (int i = 0; i < nodes.length; i++) {
+                if (nodes[i] != null) {
+                    e.nodes[i] = nodes[i].duplicate();
+                }
+            }
+        } catch (CloneNotSupportedException ex) {
+            throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+        }
+
+        return e;
     }
 
-    static Map<Integer, VoltXMLElement> prototypes = new HashMap<Integer, VoltXMLElement>();
+    void replaceNode(Expression existing, Expression replacement) {
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] == existing) {
+                replacement.alias = nodes[i].alias;
+                nodes[i]          = replacement;
+
+                return;
+            }
+        }
+
+        throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+    }
+
+    public Object updateAggregatingValue(Session session, Object currValue) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+    }
+
+    public Object getAggregatedValue(Session session, Object currValue) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+    }
+
+    public Expression getCondition() {
+        return null;
+    }
+
+    public boolean hasCondition() {
+        return false;
+    }
+
+    public void setCondition(Expression e) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+    }
+
+    public void setCollation(Collation collation) {
+        this.collation = collation;
+    }
+    /************************* Volt DB Extensions *************************/
+
+    // VoltDB support for indexed expressions
+    public void voltCollectAllColumnExpressions(ArrayList<ExpressionColumn> list) {
+        if (this instanceof ExpressionColumn) {
+            if (opType == OpTypes.COLUMN) {
+                list.add((ExpressionColumn)this);
+            }
+        }
+        else {
+            for (int i = 0; i < nodes.length; i++) {
+                if (nodes[i] != null) {
+                    nodes[i].voltCollectAllColumnExpressions(list);
+                }
+            }
+        }
+    }
+
+    // VoltDB support for indexed expressions
+    public void voltCollectAllColumnNames(OrderedHashSet col_set) {
+        ArrayList<ExpressionColumn> set = new ArrayList<>();
+        voltCollectAllColumnExpressions(set);
+        for (ExpressionColumn exprColumn : set) {
+            col_set.add(exprColumn.columnName);
+        }
+    }
+
+    static final HashMap<Integer, VoltXMLElement> prototypes =
+            new HashMap<Integer, VoltXMLElement>();
 
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
@@ -1616,7 +2349,7 @@ public class Expression {
         // Duplicate the prototype and add any expression particulars needed for the specific opType value,
         // as well as a unique identifier, a possible alias, and child nodes.
         exp = exp.duplicate();
-        exp.attributes.put("id", this.getUniqueId(session));
+        exp.attributes.put("id", this.voltGetUniqueId(session));
 
         if (realAlias != null) {
             exp.attributes.put("alias", realAlias);
@@ -1626,7 +2359,8 @@ public class Expression {
 
         for (Expression expr : nodes) {
             if (expr != null) {
-                VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
+                VoltXMLElement vxmle = expr.voltGetXML(session,
+                        displayCols, ignoredDisplayColIndexes, startKey, null);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }
@@ -1648,10 +2382,11 @@ public class Expression {
                     exp.attributes.put("valuetype", "NULL");
                     return exp;
                 }
-                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
+                exp.attributes.put("valuetype", dataType.getNameString());
                 return exp;
             }
 
+            /* This test traps false positives and needs to be narrowed if not eliminated for hsql232
             if (dataType.isBooleanType()) {
                 // FIXME: Since BOOLEAN is not a valid user data type a BOOLEAN VALUE is always the result of a constant logical
                 // expression (WHERE clause) like "2 > 1" that HSQL has optimized to a constant value.
@@ -1668,8 +2403,9 @@ public class Expression {
                 throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                         "VoltDB does not support WHERE clauses containing only constants");
             }
+            */
 
-            exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
+            exp.attributes.put("valuetype", dataType.getNameString());
 
             if (valueData instanceof TimestampData) {
                 // When we get the default from the DDL,
@@ -1693,12 +2429,15 @@ public class Expression {
             }
 
             // Otherwise just string format the value.
+            String valueString;
             if (dataType instanceof NumberType && ! dataType.isIntegralType()) {
                 // remove the scentific exponent notation
-                exp.attributes.put("value", new BigDecimal(valueData.toString()).toPlainString());
-                return exp;
+                valueString = new BigDecimal(valueData.toString()).toPlainString();
             }
-            exp.attributes.put("value", valueData.toString());
+            else {
+                valueString = valueData.toString();
+            }
+            exp.attributes.put("value", valueString);
             return exp;
 
         case OpTypes.COLUMN:
@@ -1733,13 +2472,13 @@ public class Expression {
             return exp;
 
         case OpTypes.TABLE_SUBQUERY:
-            if (subQuery == null || subQuery.queryExpression == null) {
+            if (table == null || table.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
             // @TODO: SubQuery doesn't have an information about the query parameters
             // Or maybe there is a way?
             ExpressionColumn parameters[] = new ExpressionColumn[0];
-            exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
+            exp.children.add(StatementQuery.voltGetXMLExpression(table.queryExpression, parameters, session));
             return exp;
 
         case OpTypes.ALTERNATIVE:
@@ -1844,7 +2583,7 @@ public class Expression {
             opAsString = "a MULTICOLUMN operation"; break; // an uninteresting!? ExpressionColumn case
 
         default:
-            opAsString = " the unknown operator with numeric code (" + String.valueOf(exprOp) + ")";
+            opAsString = " the unknown operator from OpTypes.java with numeric code (" + String.valueOf(exprOp) + ")";
         }
         throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                 "VoltDB does not support " + opAsString);
@@ -1859,45 +2598,42 @@ public class Expression {
      * some names.
      * @return simplified expression.
      */
-    public Expression eliminateDuplicates(final Session session) {
+    public Expression voltEliminateDuplicates(final Session session) {
         // First build the map of child expressions joined by the logical AND
         // The key is the expression id and the value is the expression itself
-        Map<String, Expression> subExprMap = new HashMap<String, Expression>();
-        extractAndSubExpressions(session, this, subExprMap);
+        HashMap<String, Expression> subExprMap = new HashMap<String, Expression>();
+        voltExtractAndSubExpressions(session, this, subExprMap);
         // Reconstruct the expression
-        if (!subExprMap.isEmpty()) {
-            Iterator<Map.Entry<String, Expression>> itExpr = subExprMap.entrySet().iterator();
-            Expression finalExpr = itExpr.next().getValue();
-            while (itExpr.hasNext()) {
-                finalExpr = new ExpressionLogical(OpTypes.AND, finalExpr, itExpr.next().getValue());
-            }
-            return finalExpr;
+        assert(!subExprMap.isEmpty());
+        Expression finalExpr = null;
+        for (Expression nextExpr : subExprMap.values()) {
+            finalExpr = voltCombineWithAnd(finalExpr, nextExpr);
         }
-        return this;
+        return finalExpr;
     }
 
-    protected void extractAndSubExpressions(final Session session, Expression expr,
-            Map<String, Expression> subExprMap) {
+    protected void voltExtractAndSubExpressions(final Session session, Expression expr,
+            HashMap<String, Expression> subExprMap) {
         // If it is a logical expression AND then traverse down the tree
         if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
-            extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
-            extractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
+            voltExtractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
+            voltExtractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
         } else {
-            String id = expr.getUniqueId(session);
+            String id = expr.voltGetUniqueId(session);
             subExprMap.put(id, expr);
        }
     }
 
-    protected String cached_id = null;
+    protected String volt_cached_id = null;
 
     /**
      * Get the hex address of this Expression Object in memory,
      * to be used as a unique identifier.
      * @return The hex address of the pointer to this object.
      */
-    protected String getUniqueId(final Session session) {
-        if (cached_id != null) {
-            return cached_id;
+    protected String voltGetUniqueId(final Session session) {
+        if (volt_cached_id != null) {
+            return volt_cached_id;
         }
 
         //
@@ -1906,7 +2642,7 @@ public class Expression {
 
         // this line ripped from the "describe" method
         // seems to help with some types like "equal"
-        cached_id = new String();
+        volt_cached_id = new String();
         int hashCode = 0;
         //
         // If object is a leaf node, then we'll use John's original code...
@@ -1914,18 +2650,18 @@ public class Expression {
         if (getType() == OpTypes.VALUE || getType() == OpTypes.COLUMN) {
             hashCode = super.hashCode();
         //
-        // Otherwise we need to generate and Id based on what our children are
+        // Otherwise we need to generate an Id based on what our children are
         //
         } else {
             //
             // Horribly inefficient, but it works for now...
             //
-            final List<String> id_list = new Vector<String>();
+            final List<String> id_list = new ArrayList<>();
             new Object() {
                 public void traverse(Expression exp) {
                     for (Expression expr : exp.nodes) {
                         if (expr != null)
-                            id_list.add(expr.getUniqueId(session));
+                            id_list.add(expr.voltGetUniqueId(session));
                     }
                 }
             }.traverse(this);
@@ -1933,36 +2669,32 @@ public class Expression {
             if (id_list.size() > 0) {
                 // Flatten the id list, intern it, and then do the same trick from above
                 for (String temp : id_list)
-                    this.cached_id += "+" + temp;
-                hashCode = this.cached_id.intern().hashCode();
+                    this.volt_cached_id += "+" + temp;
+                hashCode = this.volt_cached_id.intern().hashCode();
             }
             else
                 hashCode = super.hashCode();
         }
 
         long id = session.getNodeIdForExpression(hashCode);
-        cached_id = Long.toString(id);
-        return cached_id;
+        volt_cached_id = Long.toString(id);
+        return volt_cached_id;
     }
 
-    // A VoltDB extension to support indexed expressions
     public VoltXMLElement voltGetExpressionXML(Session session, Table table)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
-        resolveTableColumns(table);
+        voltResolveTableColumns(table);
         Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
         resolveTypes(session, parent);
         return voltGetXML(session);
     }
 
-    // A VoltDB extension to support indexed expressions
-    private void resolveTableColumns(Table table) {
-        HsqlList set = new HsqlArrayList();
-        collectAllColumnExpressions(set);
-        for (int i = 0; i < set.size(); i++) {
-            ExpressionColumn array_element = (ExpressionColumn)set.get(i);
-            ColumnSchema column = table.getColumn(table.getColumnIndex(array_element.getAlias()));
-            array_element.setAttributesAsColumn(column, false);
-
+    private void voltResolveTableColumns(Table table) {
+        ArrayList<ExpressionColumn> set = new ArrayList<>();
+        voltCollectAllColumnExpressions(set);
+        for (ExpressionColumn col : set) {
+            ColumnSchema column = table.getColumn(table.getColumnIndex(col.getColumnName()));
+            col.setAttributesAsColumn(column, false);
         }
     }
 
@@ -2006,6 +2738,46 @@ public class Expression {
             str += "\n  " + this.nodes[LEFT].toString();
         }
         return str;
+    }
+
+    static protected Expression voltCombineWithAnd(Expression... conditions)
+    {
+        Expression result = null;
+        if (conditions == null) {
+            return null;
+        }
+        for (Expression child : conditions) {
+            if (child == null) {
+                continue;
+            }
+            if (result == null) {
+                result = child;
+            }
+            else {
+                //TODO: We may want to normalize the case where child is already an AND condition.
+                // If that is not sorted out here, then where?
+                result = new ExpressionLogical(OpTypes.AND, result, child);
+            }
+        }
+        return result;
+    }
+
+    public static Expression voltCombineWithOr(Expression... conditions) {
+        Expression result = null;
+        for (Expression child : conditions) {
+            if (child == null) {
+                continue;
+            }
+            if (result == null) {
+                result = child;
+            }
+            else {
+                //TODO: We may want to normalize the case where child is already an OR condition.
+                // If that is not sorted out here, then where?
+                result = new ExpressionLogical(OpTypes.OR, result, child);
+            }
+        }
+        return result;
     }
     /**********************************************************************/
 }

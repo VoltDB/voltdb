@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,8 +31,6 @@
 
 package org.hsqldb_voltpatches.scriptio;
 
-import java.io.IOException;
-
 import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.NumberSequence;
 import org.hsqldb_voltpatches.Session;
@@ -43,70 +41,47 @@ import org.hsqldb_voltpatches.persist.PersistentStore;
  * Base class for all script readers.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.7.2
+ * @version 2.3.0
  * @since 1.7.2
  */
 public abstract class ScriptReaderBase {
 
-    public static ScriptReaderBase newScriptReader(Database db, String file,
-            int scriptType) throws IOException {
-
-        if (scriptType == ScriptWriterBase.SCRIPT_TEXT_170) {
-            return new ScriptReaderText(db, file);
-        } else if (scriptType == ScriptWriterBase.SCRIPT_BINARY_172) {
-            return new ScriptReaderBinary(db, file);
-        } else {
-            return new ScriptReaderZipped(db, file);
-        }
-    }
-
     public static final int ANY_STATEMENT        = 1;
     public static final int DELETE_STATEMENT     = 2;
     public static final int INSERT_STATEMENT     = 3;
-    public static final int SEQUENCE_STATEMENT   = 4;
-    public static final int COMMIT_STATEMENT     = 5;
-    public static final int SESSION_ID           = 6;
-    public static final int SET_SCHEMA_STATEMENT = 7;
-    Database                db;
+    public static final int COMMIT_STATEMENT     = 4;
+    public static final int SESSION_ID           = 5;
+    public static final int SET_SCHEMA_STATEMENT = 6;
+    Database                database;
     int                     lineCount;
 
-//    int         byteCount;
-    String fileName;
-
-    ScriptReaderBase(Database db,
-                     String file) throws IOException {
-
-        this.db  = db;
-        fileName = file;
-
-        openFile();
+    ScriptReaderBase(Database db) {
+        this.database = db;
     }
 
-    protected abstract void openFile() throws IOException;
-
-    public void readAll(Session session) throws IOException {
+    public void readAll(Session session) {
         readDDL(session);
         readExistingData(session);
     }
 
-    protected abstract void readDDL(Session session)
-    throws IOException;
+    protected abstract void readDDL(Session session);
 
-    protected abstract void readExistingData(Session session)
-    throws IOException;
+    protected abstract void readExistingData(Session session);
 
-    public abstract boolean readLoggedStatement(Session session)
-    throws IOException;
+    public abstract boolean readLoggedStatement(Session session);
 
-    int             statementType;
-    int             sessionNumber;
-    Object[]        rowData;
-    long            sequenceValue;
-    String          statement;
-    Table           currentTable;
-    PersistentStore currentStore;
-    NumberSequence  currentSequence;
-    String          currentSchema;
+    int              statementType;
+    int              sessionNumber;
+    boolean          sessionChanged;
+    Object[]         rowData;
+    long             sequenceValue;
+    String           rawStatement;
+    String           statement;
+    Table            currentTable;
+    PersistentStore  currentStore;
+    NumberSequence   currentSequence;
+    String           currentSchema;
+    ScriptWriterText scrwriter;
 
     public int getStatementType() {
         return statementType;

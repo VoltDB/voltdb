@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,37 +31,34 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
-import org.hsqldb_voltpatches.types.NumberType;
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.map.ValuePool;
+import org.hsqldb_voltpatches.types.ArrayType;
+import org.hsqldb_voltpatches.types.RowType;
 
 /**
  * Implementation of aggregate operations
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class ExpressionAggregate extends Expression {
 
-    boolean isDistinctAggregate;
+    boolean   isDistinctAggregate;
+    ArrayType arrayType;
 
     ExpressionAggregate(int type, boolean distinct, Expression e) {
 
         super(type);
 
-        nodes               = new Expression[UNARY];
+        nodes               = new Expression[BINARY];
         isDistinctAggregate = distinct;
         nodes[LEFT]         = e;
-    }
-
-    ExpressionAggregate(ExpressionAggregate e) {
-
-        super(e.opType);
-
-        isDistinctAggregate = e.isDistinctAggregate;
-        nodes               = e.nodes;
+        nodes[RIGHT]        = Expression.EXPR_TRUE;
     }
 
     boolean isSelfAggregate() {
@@ -131,7 +128,8 @@ public class ExpressionAggregate extends Expression {
                 break;
 
             default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "ExpressionAggregate");
         }
 
         return sb.toString();
@@ -150,23 +148,23 @@ public class ExpressionAggregate extends Expression {
         switch (opType) {
 
             case OpTypes.COUNT :
-                sb.append("COUNT ");
+                sb.append(Tokens.T_COUNT).append(' ');
                 break;
 
             case OpTypes.SUM :
-                sb.append("SUM ");
+                sb.append(Tokens.T_SUM).append(' ');
                 break;
 
             case OpTypes.MIN :
-                sb.append("MIN ");
+                sb.append(Tokens.T_MIN).append(' ');
                 break;
 
             case OpTypes.MAX :
-                sb.append("MAX ");
+                sb.append(Tokens.T_MAX).append(' ');
                 break;
 
             case OpTypes.AVG :
-                sb.append("AVG ");
+                sb.append(Tokens.T_AVG).append(' ');
                 break;
 
             case OpTypes.EVERY :
@@ -194,8 +192,8 @@ public class ExpressionAggregate extends Expression {
                 break;
         }
 
-        if (nodes[LEFT] != null) {
-            sb.append(" arg1=[");
+        if (getLeftNode() != null) {
+            sb.append(" arg=[");
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
         }
@@ -203,8 +201,16 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
-    public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
-            int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
+    public HsqlList resolveColumnReferences(Session session,
+            RangeGroup rangeGroup, int rangeCount, RangeGroup[] rangeGroups,
+            HsqlList unresolvedSet, boolean acceptsSequences) {
+
+        HsqlList conditionSet = nodes[RIGHT].resolveColumnReferences(session,
+            rangeGroup, rangeCount, rangeGroups, null, false);
+
+        if (conditionSet != null) {
+            ExpressionColumn.checkColumnsResolved(conditionSet);
+        }
 
         if (unresolvedSet == null) {
             unresolvedSet = new ArrayListIdentity();
@@ -223,34 +229,53 @@ public class ExpressionAggregate extends Expression {
             }
         }
 
-        if (nodes[LEFT].isParam) {
+        if (nodes[LEFT].getDegree() > 1) {
+            nodes[LEFT].dataType = new RowType(nodes[LEFT].nodeDataTypes);
+        }
+
+        if (nodes[LEFT].isUnresolvedParam()) {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
+        if (isDistinctAggregate) {
+            if (nodes[LEFT].dataType.isLobType()) {
+                throw Error.error(ErrorCode.X_42534);
+            }
+
+            if (nodes[LEFT].dataType.isCharacterType()) {
+                arrayType = new ArrayType(nodes[LEFT].dataType,
+                                          Integer.MAX_VALUE);
+            }
+        }
+
+        dataType = SetFunction.getType(session, opType, nodes[LEFT].dataType);
+
+        nodes[RIGHT].resolveTypes(session, null);
     }
 
     public boolean equals(Expression other) {
 
-        if (other == this) {
-            return true;
+        if (other instanceof ExpressionAggregate) {
+            ExpressionAggregate o = (ExpressionAggregate) other;
+
+            if (isDistinctAggregate == o.isDistinctAggregate) {
+                return super.equals(other);
+            }
         }
 
-        if (other == null) {
-            return false;
-        }
-
-        return opType == other.opType && exprSubType == other.exprSubType
-               && isDistinctAggregate
-                  == ((ExpressionAggregate) other)
-                      .isDistinctAggregate && equals(nodes, other.nodes);
+        return false;
     }
 
     public Object updateAggregatingValue(Session session, Object currValue) {
 
+        if (!nodes[RIGHT].testCondition(session)) {
+            return currValue;
+        }
+
         if (currValue == null) {
-            currValue = new SetFunction(opType, nodes[LEFT].dataType,
-                                        isDistinctAggregate);
+            currValue = new SetFunction(session, opType, nodes[LEFT].dataType,
+                                        dataType, isDistinctAggregate,
+                                        arrayType);
         }
 
         Object newValue = nodes[LEFT].opType == OpTypes.ASTERISK
@@ -272,10 +297,22 @@ public class ExpressionAggregate extends Expression {
     public Object getAggregatedValue(Session session, Object currValue) {
 
         if (currValue == null) {
-            return opType == OpTypes.COUNT ? ValuePool.INTEGER_0
+            return opType == OpTypes.COUNT ? Long.valueOf(0)
                                            : null;
         }
 
-        return ((SetFunction) currValue).getValue();
+        return ((SetFunction) currValue).getValue(session);
+    }
+
+    public Expression getCondition() {
+        return nodes[RIGHT];
+    }
+
+    public boolean hasCondition() {
+        return !nodes[RIGHT].isTrue();
+    }
+
+    public void setCondition(Expression e) {
+        nodes[RIGHT] = e;
     }
 }

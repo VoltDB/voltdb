@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@ package org.hsqldb_voltpatches.lib;
 
 import java.io.LineNumberReader;
 
-import org.hsqldb_voltpatches.store.ValuePool;
+import org.hsqldb_voltpatches.map.ValuePool;
 
 /**
  * Uses a LineNumberReader and returns multiple consecutive lines which conform
@@ -46,10 +46,10 @@ import org.hsqldb_voltpatches.store.ValuePool;
  */
 public class LineGroupReader {
 
-    private final static String[] defaultContinuations = new String[] {
+    private static final String[] defaultContinuations = new String[] {
         " ", "*"
     };
-    private final static String[] defaultIgnoredStarts = new String[]{ "--" };
+    private static final String[] defaultIgnoredStarts = new String[]{ "--" };
     static final String LS = System.getProperty("line.separator", "\n");
 
     //
@@ -98,7 +98,7 @@ public class LineGroupReader {
     public HsqlArrayList getSection() {
 
         String        line;
-        HsqlArrayList list = new HsqlArrayList();
+        HsqlArrayList list = new HsqlArrayList(new String[8], 0);
 
         if (nextStartLine != null) {
             list.add(nextStartLine);
@@ -121,8 +121,7 @@ public class LineGroupReader {
                 return list;
             }
 
-            line = line.substring(
-                0, org.hsqldb_voltpatches.lib.StringUtil.rightTrimSize(line));
+            line = line.substring(0, StringUtil.rightTrimSize(line));
 
             //if the line is blank or a comment, then ignore it
             if (line.length() == 0 || isIgnoredLine(line)) {
@@ -205,6 +204,7 @@ public class LineGroupReader {
     }
 
     public void close() {
+
         try {
             reader.close();
         } catch (Exception e) {}

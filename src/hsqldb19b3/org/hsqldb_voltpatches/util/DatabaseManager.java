@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,6 +41,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Vector;
+
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Color;
@@ -64,8 +65,8 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.MemoryImageSource;
 
-import org.hsqldb_voltpatches.lib.java.JavaSystem;
 import org.hsqldb_voltpatches.lib.RCData;
+import org.hsqldb_voltpatches.lib.java.JavaSystem;
 
 // sqlbob@users 20020401 - patch 1.7.0 by sqlbob (RMP) - enhancements
 // sqlbob@users 20020401 - patch 537501 by ulrivo - command line arguments
@@ -96,19 +97,16 @@ import org.hsqldb_voltpatches.lib.RCData;
  * Originally in HypersonicSQL. Extended in various versions of HSQLDB.
  *
  * @author Thomas Mueller (Hypersonic SQL Group)
- * @version 1.8.0
+ * @version 2.2.1
  * @since Hypersonic SQL
  */
 public class DatabaseManager extends Applet
 implements ActionListener, WindowListener, KeyListener {
 
-    private static final String DEFAULT_RCFILE =
-        System.getProperty("user.home") + "/dbmanager.rc";
     static final String    NL           = System.getProperty("line.separator");
     static final int       iMaxRecent   = 24;
     private static boolean TT_AVAILABLE = false;
 
-//#ifdef JAVA2FULL
     static {
         try {
             Class.forName(DatabaseManager.class.getPackage().getName()
@@ -118,21 +116,20 @@ implements ActionListener, WindowListener, KeyListener {
         } catch (Throwable t) {}
     }
 
-//#endif
     private static final String HELP_TEXT =
         "See the forums, mailing lists, and HSQLDB User Guide\n"
-        + "at http://hsqldb.org.\n\n"
+        + "at http://hsqldb_voltpatches.org.\n\n"
         + "Please paste the following version identifier with any\n"
-        + "problem reports or help requests:  $Revision: 2928 $"
+        + "problem reports or help requests:  $Revision: 5221 $"
         + (TT_AVAILABLE ? ""
                         : ("\n\nTransferTool classes are not in CLASSPATH.\n"
                            + "To enable the Tools menu, add 'transfer.jar' to your class path."));
     ;
     private static final String ABOUT_TEXT =
-        "$Revision: 2928 $ of DatabaseManagerSwing\n\n"
+        "$Revision: 5221 $ of DatabaseManager\n\n"
         + "Copyright (c) 1995-2000, The Hypersonic SQL Group.\n"
-        + "Copyright (c) 2001-2009, The HSQL Development Group.\n"
-        + "http://hsqldb.org  (User Guide available at this site).\n\n\n"
+        + "Copyright (c) 2001-2011, The HSQL Development Group.\n"
+        + "http://hsqldb_voltpatches.org  (User Guide available at this site).\n\n\n"
         + "You may use and redistribute according to the HSQLDB\n"
         + "license documented in the source code and at the web\n"
         + "site above."          //
@@ -161,7 +158,7 @@ implements ActionListener, WindowListener, KeyListener {
 
     // (ulrivo): variables set by arguments from the commandline
     static String defDriver   = "org.hsqldb_voltpatches.jdbcDriver";
-    static String defURL      = "jdbc:hsqldb:mem:.";
+    static String defURL      = "jdbc:hsqldb_voltpatches:mem:.";
     static String defUser     = "SA";
     static String defPassword = "";
     static String defScript;
@@ -207,6 +204,36 @@ implements ActionListener, WindowListener, KeyListener {
         }
     }
 
+    public static void threadedDBM() {
+
+        System.getProperties().put("sun.java2d.noddraw", "true");
+
+        String  urlid        = null;
+        String  rcFile       = null;
+        boolean autoConnect  = false;
+        boolean urlidConnect = false;
+
+        bMustExit = false;
+
+        DatabaseManager m = new DatabaseManager();
+
+        m.main();
+
+        Connection c = null;
+
+        try {
+            c = ConnectionDialog.createConnection(m.fMain, "Connect");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (c == null) {
+            return;
+        }
+
+        m.connect(c);
+    }
+
     /**
      * Run with --help switch for usage instructions.
      *
@@ -217,6 +244,7 @@ implements ActionListener, WindowListener, KeyListener {
         System.getProperties().put("sun.java2d.noddraw", "true");
 
         // (ulrivo): read all arguments from the command line
+        String  currentArg;
         String  lowerArg;
         String  urlid        = null;
         String  rcFile       = null;
@@ -226,19 +254,22 @@ implements ActionListener, WindowListener, KeyListener {
         bMustExit = true;
 
         for (int i = 0; i < arg.length; i++) {
-            lowerArg = arg[i].toLowerCase();
+            currentArg = arg[i];
+            lowerArg   = arg[i].toLowerCase();
 
             if (lowerArg.startsWith("--")) {
                 lowerArg = lowerArg.substring(1);
             }
 
-            i++;
+            if (lowerArg.equals("-noexit") || lowerArg.equals("-help")) {
 
-            if (i == arg.length) {
-                showUsage();
-
-                return;
+                //
+            } else if (i == arg.length - 1) {
+                throw new IllegalArgumentException("No value for argument "
+                                                   + currentArg);
             }
+
+            i++;
 
             if (lowerArg.equals("-driver")) {
                 defDriver   = arg[i];
@@ -277,8 +308,8 @@ implements ActionListener, WindowListener, KeyListener {
                  * determine that there was an invocation problem).
                  */
                 throw new IllegalArgumentException(
-                    "Try:  java... " + DatabaseManagerSwing.class.getName()
-                    + " --help");
+                    "invalid argrument " + currentArg + " try:  java... "
+                    + DatabaseManagerSwing.class.getName() + " --help");
 
                 // No reason to localize, since the main syntax message is
                 // not localized.
@@ -309,11 +340,10 @@ implements ActionListener, WindowListener, KeyListener {
                 autoConnect = true;
 
                 if (rcFile == null) {
-                    rcFile = DEFAULT_RCFILE;
+                    rcFile = System.getProperty("user.home") + "/dbmanager.rc";
                 }
 
                 c = new RCData(new File(rcFile), urlid).getConnection(null,
-                               System.getProperty("sqlfile.charset"),
                                System.getProperty("javax.net.ssl.trustStore"));
             } else {
                 c = ConnectionDialog.createConnection(m.fMain, "Connect");
@@ -824,7 +854,21 @@ implements ActionListener, WindowListener, KeyListener {
             int r = sStatement.getUpdateCount();
 
             if (r == -1) {
-                formatResultSet(sStatement.getResultSet());
+                ResultSet rs = sStatement.getResultSet();
+
+                try {
+                    formatResultSet(rs);
+                } catch (Throwable t) {
+                    g[0] = "Error displaying the ResultSet";
+
+                    gResult.setHead(g);
+
+                    String s = t.getMessage();
+
+                    g[0] = s;
+
+                    gResult.addRow(g);
+                }
             } else {
                 g[0] = "update count";
 
@@ -913,7 +957,9 @@ implements ActionListener, WindowListener, KeyListener {
                         if (r.wasNull()) {
                             h[i - 1] = "(null)";
                         }
-                    } catch (SQLException e) {}
+                    } catch (SQLException e) {
+                        h[i - 1] = "(binary data)";
+                    }
                 }
 
                 gResult.addRow(h);

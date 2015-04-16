@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,47 +32,43 @@
 package org.hsqldb_voltpatches.persist;
 
 import org.hsqldb_voltpatches.Database;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.Row;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.FileUtil;
+import org.hsqldb_voltpatches.lib.Iterator;
 
 /**
  * A file-based row store for temporary CACHED table persistence.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class DataFileCacheSession extends DataFileCache {
 
-    public int storeCount;
-
     public DataFileCacheSession(Database db, String baseFileName) {
+
         super(db, baseFileName);
+
+        logEvents = false;
     }
 
     /**
      * Initial external parameters are set here. The size if fixed.
      */
-    protected void initParams(Database database, String baseFileName) {
+    protected void initParams(Database database, String baseFileName,
+                              boolean defrag) {
 
-        fileName      = baseFileName + ".data.tmp";
-        this.database = database;
-        fa            = FileUtil.getDefaultInstance();
-
-        int cacheSizeScale = 10;
-
-        cacheFileScale = 8;
-
-        Error.printSystemOut("cache_size_scale: " + cacheSizeScale);
-
-        maxCacheSize = 2048;
-
-        int avgRowBytes = 1 << cacheSizeScale;
-
-        maxCacheBytes   = maxCacheSize * avgRowBytes;
-        maxDataFileSize = (long) Integer.MAX_VALUE * 4;
-        dataFile        = null;
+        this.dataFileName = baseFileName + ".data.tmp";
+        this.database     = database;
+        fa                = FileUtil.getFileUtil();
+        dataFileScale     = 64;
+        cachedRowPadding  = dataFileScale;
+        initialFreePos    = dataFileScale;
+        maxCacheRows      = 2048;
+        maxCacheBytes     = maxCacheRows * 1024;
+        maxDataFileSize   = (long) Integer.MAX_VALUE * dataFileScale;
     }
 
     /**
@@ -81,66 +77,86 @@ public class DataFileCacheSession extends DataFileCache {
     public void open(boolean readonly) {
 
         try {
-            dataFile = ScaledRAFile.newScaledRAFile(database, fileName, false,
-                    ScaledRAFile.DATA_FILE_RAF, null, null);
-            fileFreePosition = INITIAL_FREE_POS;
+            dataFile = new RAFile(database, dataFileName, false, false, false);
+            fileFreePosition = initialFreePos;
 
             initBuffers();
 
-            freeBlocks = new DataFileBlockManager(0, cacheFileScale, 0);
-        } catch (Throwable e) {
-            database.logger.appLog.logContext(e, null);
-            close(false);
+            spaceManager = new DataSpaceManagerSimple(this);
+        } catch (Throwable t) {
+            database.logger.logWarningEvent("Failed to open Session RA file",
+                                            t);
+            release();
 
-            throw Error.error(ErrorCode.FILE_IO_ERROR,
+            throw Error.error(t, ErrorCode.FILE_IO_ERROR,
                               ErrorCode.M_DataFileCache_open, new Object[] {
-                e, fileName
+                t.toString(), dataFileName
             });
         }
     }
 
-    public synchronized void add(CachedObject object) {
-        super.add(object);
-    }
+    protected void setFileModified() {}
 
     /**
      *  Parameter write is always false. The backing file is simply closed and
      *  deleted.
      */
-    public synchronized void close(boolean write) {
+    public void close() {
+
+        writeLock.lock();
 
         try {
+            clear();
+
             if (dataFile != null) {
                 dataFile.close();
 
                 dataFile = null;
 
-                fa.removeElement(fileName);
+                fa.removeElement(dataFileName);
             }
-        } catch (Throwable e) {
-            database.logger.appLog.logContext(e, null);
+        } catch (Throwable t) {
+            database.logger.logWarningEvent("Failed to close Session RA file",
+                                            t);
 
-            throw Error.error(ErrorCode.FILE_IO_ERROR,
+            throw Error.error(t, ErrorCode.FILE_IO_ERROR,
                               ErrorCode.M_DataFileCache_close, new Object[] {
-                e, fileName
+                t.toString(), dataFileName
             });
+        } finally {
+            writeLock.unlock();
         }
     }
 
-    void postClose(boolean keep) {}
+    public void adjustStoreCount(int adjust) {
 
-    public void clear() {
+        writeLock.lock();
 
-        cache.clear();
+        try {
+            storeCount += adjust;
 
-        fileFreePosition = INITIAL_FREE_POS;
+            if (storeCount == 0) {
+                clear();
+            }
+        } finally {
+            writeLock.unlock();
+        }
     }
 
-    public void deleteAll() {
+    protected void clear() {
+
+        Iterator it = cache.getIterator();
+
+        while (it.hasNext()) {
+            Row row = (Row) it.next();
+
+            row.setInMemory(false);
+            row.destroy();
+        }
 
         cache.clear();
 
-        fileFreePosition = INITIAL_FREE_POS;
+        fileStartFreePosition = fileFreePosition = initialFreePos;
 
         initBuffers();
     }

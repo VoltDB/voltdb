@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,16 +32,29 @@
 package org.hsqldb_voltpatches.persist;
 
 import java.io.EOFException;
+import java.io.InputStream;
 
+import org.hsqldb_voltpatches.ColumnSchema;
 import org.hsqldb_voltpatches.Database;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
+import org.hsqldb_voltpatches.HsqlException;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.Session;
+import org.hsqldb_voltpatches.Statement;
+import org.hsqldb_voltpatches.StatementDML;
+import org.hsqldb_voltpatches.StatementSchema;
+import org.hsqldb_voltpatches.StatementTypes;
+import org.hsqldb_voltpatches.Table;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.IntKeyHashMap;
-import org.hsqldb_voltpatches.lib.SimpleLog;
 import org.hsqldb_voltpatches.lib.StopWatch;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.scriptio.ScriptReaderBase;
+import org.hsqldb_voltpatches.scriptio.ScriptReaderDecode;
+import org.hsqldb_voltpatches.scriptio.ScriptReaderText;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Restores the state of a Database instance from an SQL log file. <p>
@@ -50,33 +63,85 @@ import org.hsqldb_voltpatches.scriptio.ScriptReaderBase;
  * logged to the application log. If memory runs out, an exception is thrown.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.7
  * @since 1.7.2
  */
 public class ScriptRunner {
+
+    public static void runScript(Database database, InputStream inputStream) {
+
+        Crypto           crypto = database.logger.getCrypto();
+        ScriptReaderBase scr;
+
+        if (crypto == null) {
+            scr = new ScriptReaderText(database, inputStream);
+        } else {
+            try {
+                scr = new ScriptReaderDecode(database, inputStream, crypto,
+                                             true);
+            } catch (Throwable e) {
+                database.logger.logSevereEvent("opening log file", e);
+
+                return;
+            }
+        }
+
+        runScript(database, scr);
+    }
 
     /**
      *  This is used to read the *.log file and manage any necessary
      *  transaction rollback.
      */
-    public static void runScript(Database database, String logFilename,
-                                 int logType) {
+    public static void runScript(Database database, String logFilename) {
+
+        Crypto           crypto = database.logger.getCrypto();
+        ScriptReaderBase scr;
+
+        try {
+            if (crypto == null) {
+                scr = new ScriptReaderText(database, logFilename, false);
+            } else {
+                scr = new ScriptReaderDecode(database, logFilename, crypto,
+                                             true);
+            }
+        } catch (Throwable e) {
+
+            // catch out-of-memory errors and terminate
+            if (e instanceof EOFException) {
+
+                // end of file - normal end
+            } else {
+
+                // stop processing on bad script line
+                database.logger.logSevereEvent("opening log file", e);
+            }
+
+            return;
+        }
+
+        runScript(database, scr);
+    }
+
+    private static void runScript(Database database, ScriptReaderBase scr) {
 
         IntKeyHashMap sessionMap = new IntKeyHashMap();
         Session       current    = null;
         int           currentId  = 0;
+        String        statement;
+        int           statementType;
+        Statement dummy = new StatementDML(StatementTypes.UPDATE_CURSOR,
+                                           StatementTypes.X_SQL_DATA_CHANGE,
+                                           null);
+        String databaseFile = database.getPath();
+        boolean fullReplay = database.getURLProperties().isPropertyTrue(
+            HsqlDatabaseProperties.hsqldb_full_log_replay);
 
+        dummy.setCompileTimestamp(Long.MAX_VALUE);
         database.setReferentialIntegrity(false);
-
-        ScriptReaderBase scr = null;
-        String           statement;
-        int              statementType;
 
         try {
             StopWatch sw = new StopWatch();
-
-            scr = ScriptReaderBase.newScriptReader(database, logFilename,
-                                                   logType);
 
             while (scr.readLoggedStatement(current)) {
                 int sessionId = scr.getSessionNumber();
@@ -87,9 +152,8 @@ public class ScriptRunner {
 
                     if (current == null) {
                         current =
-                            database.getSessionManager().newSession(database,
-                                database.getUserManager().getSysUser(), false,
-                                true, 0);
+                            database.getSessionManager().newSessionForLog(
+                                database);
 
                         sessionMap.put(currentId, current);
                     }
@@ -109,7 +173,38 @@ public class ScriptRunner {
 
                     case ScriptReaderBase.ANY_STATEMENT :
                         statement = scr.getLoggedStatement();
-                        result    = current.executeDirectStatement(statement);
+
+                        Statement cs;
+
+                        try {
+                            cs = current.compileStatement(statement);
+
+                            if (database.getProperties().isVersion18()) {
+
+                                // convert BIT columns in .log to BOOLEAN
+                                if (cs.getType()
+                                        == StatementTypes.CREATE_TABLE) {
+                                    Table table =
+                                        (Table) ((StatementSchema) cs)
+                                            .getArguments()[0];
+
+                                    for (int i = 0; i < table.getColumnCount();
+                                            i++) {
+                                        ColumnSchema column =
+                                            table.getColumn(i);
+
+                                        if (column.getDataType().isBitType()) {
+                                            column.setType(Type.SQL_BOOLEAN);
+                                        }
+                                    }
+                                }
+                            }
+
+                            result = current.executeCompiledStatement(cs,
+                                    ValuePool.emptyObjectArray, 0);
+                        } catch (Throwable e) {
+                            result = Result.newErrorResult(e);
+                        }
 
                         if (result != null && result.isError()) {
                             if (result.getException() != null) {
@@ -120,16 +215,14 @@ public class ScriptRunner {
                         }
                         break;
 
-                    case ScriptReaderBase.SEQUENCE_STATEMENT :
-                        scr.getCurrentSequence().reset(scr.getSequenceValue());
-                        break;
-
                     case ScriptReaderBase.COMMIT_STATEMENT :
                         current.commit(false);
                         break;
 
                     case ScriptReaderBase.INSERT_STATEMENT : {
-                        current.beginAction(null);
+                        current.sessionContext.currentStatement = dummy;
+
+                        current.beginAction(dummy);
 
                         Object[] data = scr.getData();
 
@@ -140,18 +233,34 @@ public class ScriptRunner {
                         break;
                     }
                     case ScriptReaderBase.DELETE_STATEMENT : {
-                        current.beginAction(null);
+                        current.sessionContext.currentStatement = dummy;
 
-                        Object[] data = scr.getData();
+                        current.beginAction(dummy);
 
-                        scr.getCurrentTable().deleteNoCheckFromLog(current,
-                                data);
+                        Table           table = scr.getCurrentTable();
+                        PersistentStore store = table.getRowStore(current);
+                        Object[]        data  = scr.getData();
+                        Row row = table.getDeleteRowFromLog(current, data);
+
+                        if (row != null) {
+                            current.addDeleteAction(table, store, row, null);
+                        }
+
                         current.endAction(Result.updateOneResult);
 
                         break;
                     }
                     case ScriptReaderBase.SET_SCHEMA_STATEMENT : {
-                        current.setSchema(scr.getCurrentSchema());
+                        HsqlName name =
+                            database.schemaManager.findSchemaHsqlName(
+                                scr.getCurrentSchema());
+
+                        current.setCurrentSchemaHsqlName(name);
+
+                        break;
+                    }
+                    case ScriptReaderBase.SESSION_ID : {
+                        break;
                     }
                 }
 
@@ -159,29 +268,35 @@ public class ScriptRunner {
                     sessionMap.remove(currentId);
                 }
             }
-        } catch (Throwable e) {
-            String message;
+        } catch (HsqlException e) {
+
+            // stop processing on bad log line
+            String error = "statement error processing log " + databaseFile
+                           + "line: " + scr.getLineNumber();
+
+            database.logger.logSevereEvent(error, e);
+
+            if (fullReplay) {
+                throw Error.error(e, ErrorCode.ERROR_IN_SCRIPT_FILE, error);
+            }
+        } catch (OutOfMemoryError e) {
+            String error = "out of memory processing log" + databaseFile
+                           + " line: " + scr.getLineNumber();
 
             // catch out-of-memory errors and terminate
-            if (e instanceof EOFException) {
+            database.logger.logSevereEvent(error, e);
 
-                // end of file - normal end
-            } else if (e instanceof OutOfMemoryError) {
-                message = "out of memory processing " + logFilename
-                          + " line: " + scr.getLineNumber();
+            throw Error.error(ErrorCode.OUT_OF_MEMORY);
+        } catch (Throwable e) {
 
-                database.logger.appLog.logContext(SimpleLog.LOG_ERROR,
-                                                  message);
+            // stop processing on bad script line
+            String error = "statement error processing log " + databaseFile
+                           + "line: " + scr.getLineNumber();
 
-                throw Error.error(ErrorCode.OUT_OF_MEMORY);
-            } else {
+            database.logger.logSevereEvent(error, e);
 
-                // stop processing on bad log line
-                message = logFilename + " line: " + scr.getLineNumber() + " "
-                          + e.toString();
-
-                database.logger.appLog.logContext(SimpleLog.LOG_ERROR,
-                                                  message);
+            if (fullReplay) {
+                throw Error.error(e, ErrorCode.ERROR_IN_SCRIPT_FILE, error);
             }
         } finally {
             if (scr != null) {

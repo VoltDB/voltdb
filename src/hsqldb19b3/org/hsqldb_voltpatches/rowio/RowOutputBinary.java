@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,11 +35,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import org.hsqldb_voltpatches.Row;
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.StringConverter;
-import org.hsqldb_voltpatches.lib.java.JavaSystem;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobData;
 import org.hsqldb_voltpatches.types.ClobData;
@@ -49,6 +47,7 @@ import org.hsqldb_voltpatches.types.JavaObjectData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Provides methods for writing the data for a row to a
@@ -57,27 +56,22 @@ import org.hsqldb_voltpatches.types.Type;
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.7
  * @since 1.7.0
  */
 public class RowOutputBinary extends RowOutputBase {
 
-    private static final int INT_STORE_SIZE = 4;
-    int                      storageSize;
-    final int                scale;
-
-    public RowOutputBinary() {
-
-        super();
-
-        scale = 1;
-    }
+    public static final int INT_STORE_SIZE = 4;
+    int                     storageSize;
+    final int               scale;    // 2 to power n where n >= 0
+    final int               mask;
 
     public RowOutputBinary(int initialSize, int scale) {
 
         super(initialSize);
 
         this.scale = scale;
+        this.mask  = ~(scale - 1);
     }
 
     /**
@@ -89,7 +83,8 @@ public class RowOutputBinary extends RowOutputBase {
 
         super(buffer);
 
-        scale = 1;
+        scale     = 1;
+        this.mask = ~(scale - 1);
     }
 
 // fredt@users - comment - methods for writing column type, name and data size
@@ -106,12 +101,16 @@ public class RowOutputBinary extends RowOutputBase {
         }
     }
 
+    public void writeData(Row row, Type[] types) {
+        super.writeData(row, types);
+    }
+
     public void writeEnd() {
 
-        // fredt - this value is used in 1.7.0 when reading back, for a
-        // 'data integrity' check
-        // has been removed in 1.7.2 as compatibility is no longer necessary
-        // writeInt(pos);
+        if (count > storageSize) {
+            Error.runtimeError(ErrorCode.U_S0500, "RowOutputBinary");
+        }
+
         for (; count < storageSize; ) {
             this.write(0);
         }
@@ -136,7 +135,7 @@ public class RowOutputBinary extends RowOutputBase {
 
         if (s != null && s.length() != 0) {
             StringConverter.stringToUTFBytes(s, this);
-            writeIntData(count - temp - 4, temp);
+            writeIntData(count - temp - INT_STORE_SIZE, temp);
         }
     }
 
@@ -157,15 +156,14 @@ public class RowOutputBinary extends RowOutputBase {
     }
 
     public int getStorageSize(int size) {
-        return scale == 1 ? size
-                          : ((size + scale - 1) / scale) * scale;
+        return (size + scale - 1) & mask;
     }
 
-    protected void writeFieldType(Type type) {
+    public void writeFieldType(Type type) {
         write(1);
     }
 
-    protected void writeNull(Type type) {
+    public void writeNull(Type type) {
         write(0);
     }
 
@@ -192,7 +190,7 @@ public class RowOutputBinary extends RowOutputBase {
     protected void writeDecimal(BigDecimal o, Type type) {
 
         int        scale   = o.scale();
-        BigInteger bigint  = JavaSystem.unscaledValue(o);
+        BigInteger bigint  = o.unscaledValue();
         byte[]     bytearr = bigint.toByteArray();
 
         writeByteArray(bytearr);
@@ -233,8 +231,8 @@ public class RowOutputBinary extends RowOutputBase {
     }
 
     protected void writeDaySecondInterval(IntervalSecondData o, Type type) {
-        writeLong(o.units);
-        writeInt(o.nanos);
+        writeLong(o.getSeconds());
+        writeInt(o.getNanos());
     }
 
     protected void writeOther(JavaObjectData o) {
@@ -258,6 +256,27 @@ public class RowOutputBinary extends RowOutputBase {
         writeLong(o.getId());
     }
 
+    protected void writeArray(Object[] o, Type type) {
+
+        type = type.collectionBaseType();
+
+        writeInt(o.length);
+
+        for (int i = 0; i < o.length; i++) {
+            writeData(type, o[i]);
+        }
+    }
+
+    public void writeArray(int[] o) {
+
+        writeInt(o.length);
+
+        for (int i = 0; i < o.length; i++) {
+            write(1);
+            writeInt(o[i]);
+        }
+    }
+
 // fredt@users - comment - helper and conversion methods
     public void writeByteArray(byte[] b) {
         writeInt(b.length);
@@ -270,6 +289,10 @@ public class RowOutputBinary extends RowOutputBase {
         write(c, 0, c.length);
     }
 
+    public int getSize(int[] array) {
+        return 4 + array.length * 5;
+    }
+
     /**
      * Calculate the size of byte array required to store a row.
      *
@@ -278,127 +301,146 @@ public class RowOutputBinary extends RowOutputBase {
      * @param types - array of java.sql.Types values
      * @return size of byte array
      */
-    private static int getSize(Object[] data, int l, Type[] types) {
+    public int getSize(Object[] data, int l, Type[] types) {
 
         int s = 0;
 
         for (int i = 0; i < l; i++) {
             Object o = data[i];
 
-            s += 1;    // type or null
+            s += getSize(o, types[i]);
+        }
 
-            if (o != null) {
-                switch (types[i].typeCode) {
+        return s;
+    }
 
-                    case Types.SQL_ALL_TYPES :
-                        throw Error.runtimeError(ErrorCode.U_S0500,
-                                                 "RowOutputBinary");
-                    case Types.SQL_CHAR :
-                    case Types.SQL_VARCHAR :
-                    case Types.VARCHAR_IGNORECASE :
-                        s += 4;
-                        s += StringConverter.getUTFSize((String) o);
-                        break;
+    private int getSize(Object o, Type type) {
 
-                    case Types.TINYINT :
-                    case Types.SQL_SMALLINT :
-                        s += 2;
-                        break;
+        int s = 1;    // type or null
 
-                    case Types.SQL_INTEGER :
-                        s += 4;
-                        break;
+        if (o == null) {
+            return s;
+        }
 
-                    case Types.SQL_BIGINT :
-                    case Types.SQL_REAL :
-                    case Types.SQL_FLOAT :
-                    case Types.SQL_DOUBLE :
-                        s += 8;
-                        break;
+        switch (type.typeCode) {
 
-                    case Types.SQL_NUMERIC :
-                    case Types.SQL_DECIMAL :
-                        s += 8;
+            case Types.SQL_ALL_TYPES :
+                break;
 
-                        BigDecimal bigdecimal = (BigDecimal) o;
-                        BigInteger bigint =
-                            JavaSystem.unscaledValue(bigdecimal);
+            case Types.SQL_CHAR :
+            case Types.SQL_VARCHAR :
+                s += INT_STORE_SIZE;
+                s += StringConverter.getUTFSize((String) o);
+                break;
 
-                        s += bigint.toByteArray().length;
-                        break;
+            case Types.TINYINT :
+            case Types.SQL_SMALLINT :
+                s += 2;
+                break;
 
-                    case Types.SQL_BOOLEAN :
-                        s += 1;
-                        break;
+            case Types.SQL_INTEGER :
+                s += 4;
+                break;
 
-                    case Types.SQL_DATE :
-                        s += 8;
-                        break;
+            case Types.SQL_BIGINT :
+            case Types.SQL_REAL :
+            case Types.SQL_FLOAT :
+            case Types.SQL_DOUBLE :
+                s += 8;
+                break;
 
-                    case Types.SQL_TIME :
-                        s += 8;
-                        break;
+            case Types.SQL_NUMERIC :
+            case Types.SQL_DECIMAL :
+                s += 8;
 
-                    case Types.SQL_TIME_WITH_TIME_ZONE :
-                        s += 12;
-                        break;
+                BigDecimal bigdecimal = (BigDecimal) o;
+                BigInteger bigint     = bigdecimal.unscaledValue();
 
-                    case Types.SQL_TIMESTAMP :
-                        s += 12;
-                        break;
+                s += bigint.toByteArray().length;
+                break;
 
-                    case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
-                        s += 16;
-                        break;
+            case Types.SQL_BOOLEAN :
+                s += 1;
+                break;
 
-                    case Types.SQL_INTERVAL_YEAR :
-                    case Types.SQL_INTERVAL_YEAR_TO_MONTH :
-                    case Types.SQL_INTERVAL_MONTH :
-                        s += 8;
-                        break;
+            case Types.SQL_DATE :
+                s += 8;
+                break;
 
-                    case Types.SQL_INTERVAL_DAY :
-                    case Types.SQL_INTERVAL_DAY_TO_HOUR :
-                    case Types.SQL_INTERVAL_DAY_TO_MINUTE :
-                    case Types.SQL_INTERVAL_DAY_TO_SECOND :
-                    case Types.SQL_INTERVAL_HOUR :
-                    case Types.SQL_INTERVAL_HOUR_TO_MINUTE :
-                    case Types.SQL_INTERVAL_HOUR_TO_SECOND :
-                    case Types.SQL_INTERVAL_MINUTE :
-                    case Types.SQL_INTERVAL_MINUTE_TO_SECOND :
-                    case Types.SQL_INTERVAL_SECOND :
-                        s += 12;
-                        break;
+            case Types.SQL_TIME :
+                s += 8;
+                break;
 
-                    case Types.SQL_BINARY :
-                    case Types.SQL_VARBINARY :
-                        s += 4;
-                        s += ((BinaryData) o).length(null);
-                        break;
+            case Types.SQL_TIME_WITH_TIME_ZONE :
+                s += 12;
+                break;
 
-                    case Types.SQL_BIT :
-                    case Types.SQL_BIT_VARYING :
-                        s += 4;
-                        s += ((BinaryData) o).length(null);
-                        break;
+            case Types.SQL_TIMESTAMP :
+                s += 12;
+                break;
 
-                    case Types.SQL_CLOB :
-                    case Types.SQL_BLOB :
-                        s += 8;
-                        break;
+            case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
+                s += 16;
+                break;
 
-                    case Types.OTHER :
-                        JavaObjectData jo = (JavaObjectData) o;
+            case Types.SQL_INTERVAL_YEAR :
+            case Types.SQL_INTERVAL_YEAR_TO_MONTH :
+            case Types.SQL_INTERVAL_MONTH :
+                s += 8;
+                break;
 
-                        s += 4;
-                        s += jo.getBytesLength();
-                        break;
+            case Types.SQL_INTERVAL_DAY :
+            case Types.SQL_INTERVAL_DAY_TO_HOUR :
+            case Types.SQL_INTERVAL_DAY_TO_MINUTE :
+            case Types.SQL_INTERVAL_DAY_TO_SECOND :
+            case Types.SQL_INTERVAL_HOUR :
+            case Types.SQL_INTERVAL_HOUR_TO_MINUTE :
+            case Types.SQL_INTERVAL_HOUR_TO_SECOND :
+            case Types.SQL_INTERVAL_MINUTE :
+            case Types.SQL_INTERVAL_MINUTE_TO_SECOND :
+            case Types.SQL_INTERVAL_SECOND :
+                s += 12;
+                break;
 
-                    default :
-                        throw Error.runtimeError(ErrorCode.U_S0500,
-                                                 "RowOutputBinary");
+            case Types.SQL_BINARY :
+            case Types.SQL_VARBINARY :
+                s += INT_STORE_SIZE;
+                s += ((BinaryData) o).length(null);
+                break;
+
+            case Types.SQL_BIT :
+            case Types.SQL_BIT_VARYING :
+                s += INT_STORE_SIZE;
+                s += ((BinaryData) o).length(null);
+                break;
+
+            case Types.SQL_CLOB :
+            case Types.SQL_BLOB :
+                s += 8;
+                break;
+
+            case Types.SQL_ARRAY : {
+                s += 4;
+
+                Object[] array = (Object[]) o;
+
+                type = type.collectionBaseType();
+
+                for (int i = 0; i < array.length; i++) {
+                    s += getSize(array[i], type);
                 }
+
+                break;
             }
+            case Types.OTHER :
+                JavaObjectData jo = (JavaObjectData) o;
+
+                s += INT_STORE_SIZE;
+                s += jo.getBytesLength();
+                break;
+
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "RowOutputBinary");
         }
 
         return s;
@@ -425,10 +467,14 @@ public class RowOutputBinary extends RowOutputBase {
         storageSize = 0;
     }
 
-    public void setBuffer(byte[] buffer) {
+    public void reset(byte[] buffer) {
 
-        this.buffer = buffer;
+        super.reset(buffer);
 
-        reset();
+        storageSize = 0;
+    }
+
+    public RowOutputInterface duplicate() {
+        return new RowOutputBinary(128, this.scale);
     }
 }

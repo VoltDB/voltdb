@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,52 +31,59 @@
 
 package org.hsqldb_voltpatches;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.lib.CharArrayWriter;
 import org.hsqldb_voltpatches.lib.CountdownInputStream;
 import org.hsqldb_voltpatches.lib.HashMap;
+import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 import org.hsqldb_voltpatches.lib.Iterator;
-import org.hsqldb_voltpatches.lib.LongDeque;
 import org.hsqldb_voltpatches.lib.LongKeyHashMap;
-import org.hsqldb_voltpatches.lib.LongKeyIntValueHashMap;
 import org.hsqldb_voltpatches.lib.LongKeyLongValueHashMap;
-import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.ReaderInputStream;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorClient;
-import org.hsqldb_voltpatches.persist.DataFileCacheSession;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.persist.PersistentStoreCollectionSession;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultLob;
+import org.hsqldb_voltpatches.result.ResultProperties;
 import org.hsqldb_voltpatches.types.BlobData;
+import org.hsqldb_voltpatches.types.BlobDataID;
 import org.hsqldb_voltpatches.types.ClobData;
+import org.hsqldb_voltpatches.types.ClobDataID;
+import org.hsqldb_voltpatches.types.LobData;
 
 /*
  * Session semi-persistent data structures
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.3.0
  * @since 1.9.0
  */
 public class SessionData {
 
-    private final Database           database;
-    private final Session            session;
-    PersistentStoreCollectionSession persistentStoreCollection;
+    private final Database                  database;
+    private final Session                   session;
+    public PersistentStoreCollectionSession persistentStoreCollection;
 
     // large results
-    LongKeyHashMap       resultMap;
-    DataFileCacheSession resultCache;
+    LongKeyHashMap resultMap;
 
     // VALUE
     Object currentValue;
 
     // SEQUENCE
-    HashMap        sequenceMap;
-    OrderedHashSet sequenceUpdateSet;
+    HashMap sequenceMap;
+    HashMap sequenceUpdateMap;
 
     public SessionData(Database database, Session session) {
 
@@ -84,20 +91,6 @@ public class SessionData {
         this.session  = session;
         persistentStoreCollection =
             new PersistentStoreCollectionSession(session);
-    }
-
-    // transitional feature
-    public PersistentStore getRowStore(TableBase table) {
-
-        if (table.store != null) {
-            return table.store;
-        }
-
-        if (table.isSessionBased) {
-            return persistentStoreCollection.getStore(table);
-        }
-
-        return database.persistentStoreCollection.getStore(table);
     }
 
     public PersistentStore getSubqueryRowStore(TableBase table) {
@@ -114,7 +107,11 @@ public class SessionData {
 
         try {
             PersistentStore store = session.database.logger.newStore(session,
-                    persistentStoreCollection, table, isCached);
+                persistentStoreCollection, table);
+
+            if (!isCached) {
+                store.setMemory(true);
+            }
 
             return store;
         } catch (HsqlException e) {}
@@ -125,24 +122,33 @@ public class SessionData {
     // result
     void setResultSetProperties(Result command, Result result) {
 
-        /**
-         * @todo - fredt - this does not work with different prepare calls
-         * with the same SQL statement, but different generated column requests
-         * To fix, add comment encapsulating the generated column list to SQL
-         * to differentiate between the two invocations
-         */
-        if (command.rsConcurrency == ResultConstants.CONCUR_READ_ONLY) {
-            result.setDataResultConcurrency(ResultConstants.CONCUR_READ_ONLY);
-            result.setDataResultHoldability(command.rsHoldability);
-        } else {
-            if (result.rsConcurrency == ResultConstants.CONCUR_READ_ONLY) {
-                result.setDataResultHoldability(command.rsHoldability);
+        int required = command.rsProperties;
+        int returned = result.rsProperties;
 
-                // add warning for concurrency conflict
+        if (required != returned) {
+            if (ResultProperties.isReadOnly(required)) {
+                returned = ResultProperties.addHoldable(returned,
+                        ResultProperties.isHoldable(required));
             } else {
-                result.setDataResultHoldability(
-                    ResultConstants.CLOSE_CURSORS_AT_COMMIT);
+                if (ResultProperties.isUpdatable(returned)) {
+                    if (ResultProperties.isHoldable(required)) {
+                        session.addWarning(Error.error(ErrorCode.W_36503));
+                    }
+                } else {
+                    returned = ResultProperties.addHoldable(returned,
+                            ResultProperties.isHoldable(required));
+
+                    session.addWarning(Error.error(ErrorCode.W_36502));
+                }
             }
+
+            if (ResultProperties.isSensitive(required)) {
+                session.addWarning(Error.error(ErrorCode.W_36501));
+            }
+
+            returned = ResultProperties.addScrollable(returned,
+                    ResultProperties.isScrollable(required));
+            result.rsProperties = returned;
         }
     }
 
@@ -153,33 +159,39 @@ public class SessionData {
 
         result.setResultId(session.actionTimestamp);
 
-        if (command.rsConcurrency == ResultConstants.CONCUR_READ_ONLY) {
-            result.setDataResultConcurrency(ResultConstants.CONCUR_READ_ONLY);
-            result.setDataResultHoldability(command.rsHoldability);
-        } else {
-            if (result.rsConcurrency == ResultConstants.CONCUR_READ_ONLY) {
-                result.setDataResultHoldability(command.rsHoldability);
+        int required = command.rsProperties;
+        int returned = result.rsProperties;
 
-                // add warning for concurrency conflict
+        if (required != returned) {
+            if (ResultProperties.isReadOnly(required)) {
+                returned = ResultProperties.addHoldable(returned,
+                        ResultProperties.isHoldable(required));
             } else {
-                if (session.isAutoCommit()) {
-                    result.setDataResultConcurrency(
-                        ResultConstants.CONCUR_READ_ONLY);
-                    result.setDataResultHoldability(
-                        ResultConstants.HOLD_CURSORS_OVER_COMMIT);
+                if (ResultProperties.isReadOnly(returned)) {
+                    returned = ResultProperties.addHoldable(returned,
+                            ResultProperties.isHoldable(required));
+
+                    // add warning for concurrency conflict
                 } else {
-                    result.setDataResultHoldability(
-                        ResultConstants.CLOSE_CURSORS_AT_COMMIT);
+                    if (session.isAutoCommit()) {
+                        returned = ResultProperties.addHoldable(returned,
+                                ResultProperties.isHoldable(required));
+                    } else {
+                        returned = ResultProperties.addHoldable(returned,
+                                false);
+                    }
                 }
             }
-        }
 
-        result.setDataResultScrollability(command.rsScrollability);
+            returned = ResultProperties.addScrollable(returned,
+                    ResultProperties.isScrollable(required));
+            result.rsProperties = returned;
+        }
 
         boolean hold = false;
         boolean copy = false;
 
-        if (result.rsConcurrency == ResultConstants.CONCUR_UPDATABLE) {
+        if (ResultProperties.isUpdatable(result.rsProperties)) {
             hold = true;
         }
 
@@ -201,6 +213,9 @@ public class SessionData {
             }
 
             resultMap.put(result.getResultId(), result);
+
+            result.rsProperties =
+                ResultProperties.addIsHeld(result.rsProperties, true);
         }
 
         if (copy) {
@@ -212,9 +227,14 @@ public class SessionData {
 
     Result getDataResultSlice(long id, int offset, int count) {
 
-        RowSetNavigatorClient navigator = getRowSetSlice(id, offset, count);
+        Result          result = (Result) resultMap.get(id);
+        RowSetNavigator source = result.getNavigator();
 
-        return Result.newDataRowsResult(navigator);
+        if (offset + count > source.getSize()) {
+            count = source.getSize() - offset;
+        }
+
+        return Result.newDataRowsResult(result, offset, count);
     }
 
     Result getDataResult(long id) {
@@ -240,7 +260,9 @@ public class SessionData {
 
         Result result = (Result) resultMap.remove(id);
 
-        result.getNavigator().close();
+        if (result != null) {
+            result.getNavigator().release();
+        }
     }
 
     public void closeAllNavigators() {
@@ -254,7 +276,7 @@ public class SessionData {
         while (it.hasNext()) {
             Result result = (Result) it.next();
 
-            result.getNavigator().close();
+            result.getNavigator().release();
         }
 
         resultMap.clear();
@@ -271,153 +293,86 @@ public class SessionData {
         while (it.hasNext()) {
             Result result = (Result) it.next();
 
-            if (result.rsHoldability
-                    == ResultConstants.CLOSE_CURSORS_AT_COMMIT) {
-                result.getNavigator().close();
+            if (!ResultProperties.isHoldable(result.rsProperties)) {
+                result.getNavigator().release();
                 it.remove();
             }
         }
-
-        resultMap.clear();
     }
 
-    public DataFileCacheSession getResultCache() {
+    // lob creation
+    boolean hasLobOps;
+    long    firstNewLobID;
 
-        if (resultCache == null) {
-            String path = database.getTempDirectoryPath();
+    public void registerNewLob(long lobID) {
 
-            if (path == null) {
-                return null;
-            }
-
-            try {
-                resultCache =
-                    new DataFileCacheSession(database,
-                                             path + "/session_"
-                                             + Long.toString(session.getId()));
-
-                resultCache.open(false);
-            } catch (Throwable t) {
-                return null;
-            }
+        if (firstNewLobID == 0) {
+            firstNewLobID = lobID;
         }
 
-        return resultCache;
+        hasLobOps = true;
     }
 
-    synchronized void closeResultCache() {
+    public void clearLobOps() {
+        firstNewLobID = 0;
+        hasLobOps     = false;
+    }
 
-        if (resultCache != null) {
-            try {
-                resultCache.close(false);
-            } catch (HsqlException e) {}
-
-            resultCache = null;
-        }
+    public long getFirstLobID() {
+        return firstNewLobID;
     }
 
     // lobs in results
     LongKeyLongValueHashMap resultLobs = new LongKeyLongValueHashMap();
 
     // lobs in transaction
-    LongKeyIntValueHashMap lobUsageCount = new LongKeyIntValueHashMap();
-    LongDeque              createdLobs   = new LongDeque();
-    boolean                hasLobOps;
+    public void adjustLobUsageCount(Object value, int adjust) {
 
-    // LOBs
-    // if rolled back, delete created lobs and ignore all changes
-    // if committed,
-    // delete created lobs that have no usage count (due to constraint violation or savepoint rollback)
-    // update LobManager user counts, delete lobs that have no usage
-    public void updateLobUsage(boolean commit) {
-
-        if (!hasLobOps) {
+        if (session.isProcessingLog() || session.isProcessingScript()) {
             return;
         }
 
-        hasLobOps = false;
+        if (value == null) {
+            return;
+        }
 
-        if (commit) {
-            for (int i = 0; i < createdLobs.size(); i++) {
-                long lobID = createdLobs.get(i);
-                int  delta = lobUsageCount.get(lobID, 0);
+        database.lobManager.adjustUsageCount(session,
+                                             ((LobData) value).getId(),
+                                             adjust);
 
-                if (delta == 1) {
-                    lobUsageCount.remove(lobID);
-                    createdLobs.remove(i);
+        hasLobOps = true;
+    }
 
-                    i--;
-                } else if (!session.isBatch) {
-                    database.lobManager.adjustUsageCount(lobID, delta - 1);
-                    lobUsageCount.remove(lobID);
-                    createdLobs.remove(i);
+    public void adjustLobUsageCount(TableBase table, Object[] data,
+                                    int adjust) {
 
-                    i--;
-                }
-            }
+        if (!table.hasLobColumn) {
+            return;
+        }
 
-            if (!lobUsageCount.isEmpty()) {
-                Iterator it = lobUsageCount.keySet().iterator();
+        if (table.isTemp) {
+            return;
+        }
 
-                while (it.hasNext()) {
-                    long lobID = it.nextLong();
-                    int  delta = lobUsageCount.get(lobID);
+        if (session.isProcessingLog() || session.isProcessingScript()) {
+            return;
+        }
 
-                    database.lobManager.adjustUsageCount(lobID, delta - 1);
+        for (int j = 0; j < table.columnCount; j++) {
+            if (table.colTypes[j].isLobType()) {
+                Object value = data[j];
+
+                if (value == null) {
+                    continue;
                 }
 
-                lobUsageCount.clear();
+                database.lobManager.adjustUsageCount(session,
+                                                     ((LobData) value).getId(),
+                                                     adjust);
+
+                hasLobOps = true;
             }
-
-            return;
-        } else {
-            for (int i = 0; i < createdLobs.size(); i++) {
-                long lobID = createdLobs.get(i);
-
-                database.lobManager.deleteLob(lobID);
-            }
-
-            createdLobs.clear();
-            lobUsageCount.clear();
-
-            return;
         }
-    }
-
-    public void updateLobUsageForBatch() {
-
-        for (int i = 0; i < createdLobs.size(); i++) {
-            long lobID = createdLobs.get(i);
-
-            database.lobManager.deleteLob(lobID);
-        }
-
-        createdLobs.clear();
-    }
-
-    public void addToCreatedLobs(long lobID) {
-
-        hasLobOps = true;
-
-        createdLobs.add(lobID);
-    }
-
-    public void addLobUsageCount(long lobID) {
-
-        int count = lobUsageCount.get(lobID, 0);
-
-        hasLobOps = true;
-
-        lobUsageCount.put(lobID, count + 1);
-    }
-
-    public void removeUsageCount(long lobID) {
-
-        int count = lobUsageCount.get(lobID, 0);
-
-        hasLobOps = true;
-
-        lobUsageCount.put(lobID, count - 1);
     }
 
     /**
@@ -426,62 +381,175 @@ public class SessionData {
     public void allocateLobForResult(ResultLob result,
                                      InputStream inputStream) {
 
-        long                 resultLobId = result.getLobID();
-        CountdownInputStream countStream;
+        try {
+            CountdownInputStream countStream;
 
-        switch (result.getSubType()) {
+            switch (result.getSubType()) {
 
-            case ResultLob.LobResultTypes.REQUEST_CREATE_BYTES : {
-                long blobId;
-                long blobLength = result.getBlockLength();
+                case ResultLob.LobResultTypes.REQUEST_CREATE_BYTES : {
+                    long blobId;
+                    long blobLength = result.getBlockLength();
 
-                if (inputStream == null) {
-                    blobId      = resultLobId;
-                    inputStream = result.getInputStream();
-                } else {
-                    BlobData blob = session.createBlob(blobLength);
+                    if (blobLength < 0) {
 
-                    blobId = blob.getId();
+                        // embedded session + unknown lob length
+                        allocateBlobSegments(result, result.getInputStream());
 
-                    resultLobs.put(resultLobId, blobId);
-                }
-
-                countStream = new CountdownInputStream(inputStream);
-
-                countStream.setCount(blobLength);
-                database.lobManager.setBytesForNewBlob(
-                    blobId, countStream, result.getBlockLength());
-
-                break;
-            }
-            case ResultLob.LobResultTypes.REQUEST_CREATE_CHARS : {
-                long clobId;
-                long clobLength = result.getBlockLength();
-
-                if (inputStream == null) {
-                    clobId = resultLobId;
-
-                    if (result.getReader() != null) {
-                        inputStream =
-                            new ReaderInputStream(result.getReader());
-                    } else {
-                        inputStream = result.getInputStream();
+                        break;
                     }
-                } else {
-                    ClobData clob = session.createClob(clobLength);
 
-                    clobId = clob.getId();
+                    if (inputStream == null) {
 
-                    resultLobs.put(resultLobId, clobId);
+                        // embedded session + known lob length
+                        blobId      = result.getLobID();
+                        inputStream = result.getInputStream();
+                    } else {
+
+                        // server session + known or unknown lob length
+                        BlobData blob = session.createBlob(blobLength);
+
+                        blobId = blob.getId();
+
+                        resultLobs.put(result.getLobID(), blobId);
+                    }
+
+                    countStream = new CountdownInputStream(inputStream);
+
+                    countStream.setCount(blobLength);
+                    database.lobManager.setBytesForNewBlob(
+                        blobId, countStream, result.getBlockLength());
+
+                    break;
                 }
+                case ResultLob.LobResultTypes.REQUEST_CREATE_CHARS : {
+                    long clobId;
+                    long clobLength = result.getBlockLength();
 
-                countStream = new CountdownInputStream(inputStream);
+                    if (clobLength < 0) {
 
-                countStream.setCount(clobLength * 2);
-                database.lobManager.setCharsForNewClob(
-                    clobId, countStream, result.getBlockLength());
+                        // embedded session + unknown lob length
+                        allocateClobSegments(result, result.getReader());
 
-                break;
+                        break;
+                    }
+
+                    if (inputStream == null) {
+                        clobId = result.getLobID();
+
+                        // embedded session + known lob length
+                        if (result.getReader() != null) {
+                            inputStream =
+                                new ReaderInputStream(result.getReader());
+                        } else {
+                            inputStream = result.getInputStream();
+                        }
+                    } else {
+
+                        // server session + known or unknown lob length
+                        ClobData clob = session.createClob(clobLength);
+
+                        clobId = clob.getId();
+
+                        resultLobs.put(result.getLobID(), clobId);
+                    }
+
+                    countStream = new CountdownInputStream(inputStream);
+
+                    countStream.setCount(clobLength * 2);
+                    database.lobManager.setCharsForNewClob(
+                        clobId, countStream, result.getBlockLength());
+
+                    break;
+                }
+                case ResultLob.LobResultTypes.REQUEST_SET_BYTES : {
+
+                    // server session + unknown lob length
+                    long   blobId     = resultLobs.get(result.getLobID());
+                    long   dataLength = result.getBlockLength();
+                    byte[] byteArray  = result.getByteArray();
+                    Result actionResult = database.lobManager.setBytes(blobId,
+                        result.getOffset(), byteArray, (int) dataLength);
+
+                    break;
+                }
+                case ResultLob.LobResultTypes.REQUEST_SET_CHARS : {
+
+                    // server session + unknown lob length
+                    long   clobId     = resultLobs.get(result.getLobID());
+                    long   dataLength = result.getBlockLength();
+                    char[] charArray  = result.getCharArray();
+                    Result actionResult = database.lobManager.setChars(clobId,
+                        result.getOffset(), charArray, (int) dataLength);
+
+                    break;
+                }
+            }
+        } catch (Throwable e) {
+            resultLobs.clear();
+
+            throw Error.error(ErrorCode.GENERAL_ERROR, e);
+        }
+    }
+
+    private void allocateBlobSegments(ResultLob result,
+                                      InputStream stream) throws IOException {
+
+        //
+        long currentOffset = result.getOffset();
+        int  bufferLength  = session.getStreamBlockSize();
+        HsqlByteArrayOutputStream byteArrayOS =
+            new HsqlByteArrayOutputStream(bufferLength);
+
+        while (true) {
+            byteArrayOS.reset();
+            byteArrayOS.write(stream, bufferLength);
+
+            if (byteArrayOS.size() == 0) {
+                return;
+            }
+
+            byte[] byteArray = byteArrayOS.getBuffer();
+            Result actionResult =
+                database.lobManager.setBytes(result.getLobID(), currentOffset,
+                                             byteArray, byteArrayOS.size());
+
+            currentOffset += byteArrayOS.size();
+
+            if (byteArrayOS.size() < bufferLength) {
+                return;
+            }
+        }
+    }
+
+    private void allocateClobSegments(ResultLob result,
+                                      Reader reader) throws IOException {
+        allocateClobSegments(result.getLobID(), result.getOffset(), reader);
+    }
+
+    private void allocateClobSegments(long lobID, long offset,
+                                      Reader reader) throws IOException {
+
+        int             bufferLength  = session.getStreamBlockSize();
+        CharArrayWriter charWriter    = new CharArrayWriter(bufferLength);
+        long            currentOffset = offset;
+
+        while (true) {
+            charWriter.reset();
+            charWriter.write(reader, bufferLength);
+
+            char[] charArray = charWriter.getBuffer();
+
+            if (charWriter.size() == 0) {
+                return;
+            }
+
+            Result actionResult = database.lobManager.setChars(lobID,
+                currentOffset, charArray, charWriter.size());
+
+            currentOffset += charWriter.size();
+
+            if (charWriter.size() < bufferLength) {
+                return;
             }
         }
     }
@@ -490,29 +558,120 @@ public class SessionData {
 
         RowSetNavigator navigator = result.getNavigator();
 
-        while (navigator.next()) {
-            Object[] data = navigator.getCurrent();
+        if (navigator == null) {
+            registerLobsForRow((Object[]) result.valueData);
+        } else {
+            while (navigator.next()) {
+                Object[] data = navigator.getCurrent();
 
-            for (int i = 0; i < data.length; i++) {
-                if (data[i] instanceof BlobData) {
-                    BlobData blob = (BlobData) data[i];
-                    long     id   = resultLobs.get(blob.getId());
-
-                    data[i] = database.lobManager.getBlob(session, id);
-                } else if (data[i] instanceof ClobData) {
-                    ClobData clob = (ClobData) data[i];
-                    long     id   = resultLobs.get(clob.getId());
-
-                    data[i] = database.lobManager.getClob(session, id);
-                }
+                registerLobsForRow(data);
             }
+
+            navigator.reset();
         }
 
         resultLobs.clear();
-        navigator.reset();
     }
 
-    //
+    private void registerLobsForRow(Object[] data) {
+
+        for (int i = 0; i < data.length; i++) {
+            if (data[i] instanceof BlobDataID) {
+                BlobData blob = (BlobDataID) data[i];
+                long     id   = blob.getId();
+
+                if (id < 0) {
+                    id = resultLobs.get(id);
+                }
+
+                data[i] = database.lobManager.getBlob(id);
+
+                // handle invalid id;
+            } else if (data[i] instanceof ClobDataID) {
+                ClobData clob = (ClobDataID) data[i];
+                long     id   = clob.getId();
+
+                if (id < 0) {
+                    id = resultLobs.get(id);
+                }
+
+                data[i] = database.lobManager.getClob(id);
+
+                // handle invalid id;
+            }
+        }
+    }
+
+    ClobData createClobFromFile(String filename, String encoding) {
+
+        File        file       = getFile(filename);
+        long        fileLength = file.length();
+        InputStream is         = null;
+
+        try {
+            ClobData clob = session.createClob(fileLength);
+
+            is = new FileInputStream(file);
+
+            Reader reader = new InputStreamReader(is, encoding);
+
+            allocateClobSegments(clob.getId(), 0, reader);
+
+            return clob;
+        } catch (IOException e) {
+            throw Error.error(ErrorCode.FILE_IO_ERROR, e.toString());
+        } finally {
+            try {
+                is.close();
+            } catch (Exception e) {}
+        }
+    }
+
+    BlobData createBlobFromFile(String filename) {
+
+        File        file       = getFile(filename);
+        long        fileLength = file.length();
+        InputStream is         = null;
+
+        try {
+            BlobData blob = session.createBlob(fileLength);
+
+            is = new FileInputStream(file);
+
+            database.lobManager.setBytesForNewBlob(blob.getId(), is,
+                                                   fileLength);
+
+            return blob;
+        } catch (IOException e) {
+            throw Error.error(ErrorCode.FILE_IO_ERROR);
+        } finally {
+            try {
+                is.close();
+            } catch (Exception e) {}
+        }
+    }
+
+    private File getFile(String name) {
+
+        session.checkAdmin();
+
+        String fileName = database.logger.getSecurePath(name, false, false);
+
+        if (fileName == null) {
+            throw (Error.error(ErrorCode.ACCESS_IS_DENIED, name));
+        }
+
+        File    file   = new File(fileName);
+        boolean exists = file.exists();
+
+        if (!exists) {
+            throw Error.error(ErrorCode.FILE_IO_ERROR);
+        }
+
+        return file;
+    }
+
+    // sequences
     public void startRowProcessing() {
 
         if (sequenceMap != null) {
@@ -524,7 +683,7 @@ public class SessionData {
 
         if (sequenceMap == null) {
             sequenceMap       = new HashMap();
-            sequenceUpdateSet = new OrderedHashSet();
+            sequenceUpdateMap = new HashMap();
         }
 
         HsqlName key   = sequence.getName();
@@ -534,9 +693,14 @@ public class SessionData {
             value = sequence.getValueObject();
 
             sequenceMap.put(key, value);
-            sequenceUpdateSet.add(sequence);
+            sequenceUpdateMap.put(sequence, value);
         }
 
         return value;
+    }
+
+    public Object getSequenceCurrent(NumberSequence sequence) {
+        return sequenceUpdateMap == null ? null
+                                         : sequenceUpdateMap.get(sequence);
     }
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,9 +31,10 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
-
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  *
@@ -47,7 +48,7 @@ public class IntKeyHashMapConcurrent extends BaseHashMap {
     Collection values;
 
     //
-    ReentrantReadWriteLock           lock      = new ReentrantReadWriteLock();
+    ReentrantReadWriteLock           lock      = new ReentrantReadWriteLock(true);
     ReentrantReadWriteLock.ReadLock  readLock  = lock.readLock();
     ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
 
@@ -59,6 +60,10 @@ public class IntKeyHashMapConcurrent extends BaseHashMap {
     throws IllegalArgumentException {
         super(initialCapacity, BaseHashMap.intKeyOrValue,
               BaseHashMap.objectKeyOrValue, false);
+    }
+
+    public Lock getWriteLock() {
+        return writeLock;
     }
 
     public Object get(int key) {

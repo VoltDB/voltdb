@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,10 +34,11 @@ package org.hsqldb_voltpatches.rowio;
 import java.io.IOException;
 import java.math.BigDecimal;
 
-import org.hsqldb_voltpatches.Error;
-import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.Scanner;
-import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.Tokens;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.BlobData;
 import org.hsqldb_voltpatches.types.BlobDataID;
@@ -50,12 +51,13 @@ import org.hsqldb_voltpatches.types.JavaObjectData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.Types;
 
 /**
  * Class for reading the data for a database row in text table format.
  *
  * @author Bob Preston (sqlbob@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.0.1
  * @since 1.7.0
  */
 public class RowInputText extends RowInputBase implements RowInputInterface {
@@ -77,6 +79,9 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
     protected int     next = 0;
     protected boolean allQuoted;
     protected Scanner scanner;
+
+    //
+    private int maxPooledStringLength = ValuePool.getMaxStringLength();
 
     /**
      * fredt@users - comment - in future may use a custom subclasse of
@@ -114,7 +119,7 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
         longvarSepLen   = longvarSep.length();
     }
 
-    public void setSource(String text, int pos, int byteSize) {
+    public void setSource(String text, long pos, int byteSize) {
 
         size      = byteSize;
         this.text = text;
@@ -159,17 +164,28 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
 
             s    = text.substring(start, next);
             next += sepLen;
-            s    = s.trim();
 
-            if (s.length() == 0) {
+            int trimLength = s.trim().length();
+
+            if (trimLength == 0) {
                 s = null;
+            } else if (trimLength < s.length()) {
+                trimLength = s.length() - 1;
+
+                while (s.charAt(trimLength) < ' ') {
+                    trimLength--;
+                }
+
+                s = s.substring(0, trimLength + 1);
             }
         } catch (Exception e) {
+            Object[] messages = new Object[] {
+                new Integer(field), e.toString()
+            };
+
             throw new IOException(
                 Error.getMessage(
-                    ErrorCode.M_TEXT_SOURCE_FIELD_ERROR, 0, new Object[] {
-                new Integer(field), e.toString()
-            }));
+                    ErrorCode.M_TEXT_SOURCE_FIELD_ERROR, 0, messages));
         }
 
         return s;
@@ -219,7 +235,7 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
         return 0;
     }
 
-    protected boolean checkNull() {
+    protected boolean readNull() {
 
         // Return null on each column read instead.
         return false;
@@ -227,17 +243,31 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
 
     protected String readChar(Type type) throws IOException {
 
+        String s = null;
+
         switch (type.typeCode) {
 
             case Types.SQL_CHAR :
-                return readString();
+                s = readString();
+                break;
 
             case Types.SQL_VARCHAR :
-            case Types.VARCHAR_IGNORECASE :
-                return readVarString();
+                s = readVarString();
+                break;
 
             default :
-                return readLongVarString();
+                s = readLongVarString();
+                break;
+        }
+
+        if (s == null) {
+            return null;
+        }
+
+        if (s.length() > this.maxPooledStringLength) {
+            return new String(s);
+        } else {
+            return ValuePool.getString(s);
         }
     }
 
@@ -255,7 +285,7 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
             return null;
         }
 
-        return Integer.valueOf(s);
+        return ValuePool.getInt(Integer.parseInt(s));
     }
 
     protected Integer readInteger() throws IOException {
@@ -272,7 +302,7 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
             return null;
         }
 
-        return Integer.valueOf(s);
+        return ValuePool.getInt(Integer.parseInt(s));
     }
 
     protected Long readBigint() throws IOException {
@@ -289,7 +319,7 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
             return null;
         }
 
-        return Long.valueOf(s);
+        return ValuePool.getLong(Long.parseLong(s));
     }
 
     protected Double readReal() throws IOException {
@@ -428,8 +458,8 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
             return null;
         }
 
-        return s.equalsIgnoreCase("TRUE") ? Boolean.TRUE
-                                          : Boolean.FALSE;
+        return s.equalsIgnoreCase(Tokens.T_TRUE) ? Boolean.TRUE
+                                                 : Boolean.FALSE;
     }
 
     protected Object readOther() throws IOException {
@@ -511,6 +541,10 @@ public class RowInputText extends RowInputBase implements RowInputInterface {
         long id = Long.parseLong(s);
 
         return new BlobDataID(id);
+    }
+
+    protected Object[] readArray(Type type) {
+        throw Error.runtimeError(ErrorCode.U_S0500, "RowInputText");
     }
 
     public int getLineNumber() {

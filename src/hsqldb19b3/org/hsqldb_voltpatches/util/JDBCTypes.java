@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -97,6 +97,7 @@ class JDBCTypes {
                              "VARBINARY");
         hStringJDBCtypes.put(new Integer(java.sql.Types.VARCHAR), "VARCHAR");
 
+        hStringJDBCtypes.put(new Integer(java.sql.Types.BOOLEAN), "BOOLEAN");
         //
         hIntJDBCtypes.put("ARRAY", new Integer(ARRAY));
         hIntJDBCtypes.put("BLOB", new Integer(BLOB));
@@ -135,6 +136,7 @@ class JDBCTypes {
         hIntJDBCtypes.put("TINYINT", new Integer(java.sql.Types.TINYINT));
         hIntJDBCtypes.put("VARBINARY", new Integer(java.sql.Types.VARBINARY));
         hIntJDBCtypes.put("VARCHAR", new Integer(java.sql.Types.VARCHAR));
+        hIntJDBCtypes.put("BOOLEAN", new Integer(java.sql.Types.BOOLEAN));
     }
 
     public Hashtable getHashtable() {

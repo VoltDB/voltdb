@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,26 +48,27 @@ import java.util.zip.GZIPOutputStream;
  * It is concerned with reading and writing blocks of data in conformance with
  * Tar formatting, in a way convenient to those who want to write the header
  * and data blocks.
- * <P>
+ * </P> <P>
  * Users write file data by means of populating the provided, public byte array,
  * then calling the single write(int) method to write a portion of that array.
  * This design purposefully goes with efficiency, simplicity, and performance
  * over Java convention, which would not use public fields.
- * <P>
+ * </P> <P>
  * At this time, we do not support appending.  That would greatly decrease the
  * generality and simplicity of the our design, since appending is trivial
  * without compression and very difficult with compression.
- * <P>
+ * </P> <P>
  * Users must finish tar file creation by using the finish() method.
  * Just like a normal OutputStream, if processing is aborted for any reason,
  * the close() method must be used to free up system resources.
- * <P>
+ * </P> <P>
  * <B>SECURITY NOTE</B>
  * Due to pitiful lack of support for file security in Java before version 1.6,
  * this class will only explicitly set permissions if it is compiled for Java
  * 1.6.  If it was not, and if your tar entries contain private data in files
  * with 0400 or similar, be aware that that file can be pretty much be
  * extracted by anybody with access to the tar file.
+ * </P>
  *
  * @see #finish
  * @see #close
@@ -76,18 +77,18 @@ public class TarFileOutputStream {
 
     public interface Compression {
 
-        public static final int NO_COMPRESSION            = 0;
-        public static final int GZIP_COMPRESSION          = 1;
-        public static final int DEFAULT_COMPRESSION       = NO_COMPRESSION;
-        public static final int DEFAULT_BLOCKS_PER_RECORD = 20;
+        int NO_COMPRESSION            = 0;
+        int GZIP_COMPRESSION          = 1;
+        int DEFAULT_COMPRESSION       = NO_COMPRESSION;
+        int DEFAULT_BLOCKS_PER_RECORD = 20;
     }
 
-    public static boolean debug = Boolean.getBoolean("DEBUG");
-    protected int         blocksPerRecord;
-    protected long        bytesWritten = 0;
-    private OutputStream  writeStream;
-    private File          targetFile;
-    private File          writeFile;
+    public static final boolean debug = Boolean.getBoolean("DEBUG");
+    protected int               blocksPerRecord;
+    protected long              bytesWritten = 0;
+    private OutputStream        writeStream;
+    private File                targetFile;
+    private File                writeFile;
 
     /* This is not a "Writer", but the byte "Stream" that we write() to. */
     public byte[] writeBuffer;
@@ -96,7 +97,7 @@ public class TarFileOutputStream {
      * array is a direct, optimally efficient byte array.  No setter because
      * the inside implementation of this class is intimately dependent upon
      * the nature of the write buffer. */
-    public static final byte[] ZERO_BLOCK = new byte[512];
+    static final byte[] ZERO_BLOCK = new byte[512];
 
     /**
      * Convenience wrapper to use default blocksPerRecord and compressionType.
@@ -122,7 +123,7 @@ public class TarFileOutputStream {
      * This class does no validation or enforcement of file naming conventions.
      * If desired, the caller should enforce extensions like "tar" and
      * "tar.gz" (and that they match the specified compression type).
-     * <P/>
+     *
      * It also overwrites files without warning (just like FileOutputStream).
      */
     public TarFileOutputStream(File targetFile, int compressionType,
@@ -134,25 +135,25 @@ public class TarFileOutputStream {
                              targetFile.getName() + "-partial");
 
         if (this.writeFile.exists()) {
-            throw new IOException(RB.singleton.getString(RB.MOVE_WORK_FILE,
-                    writeFile.getAbsolutePath()));
+            throw new IOException(
+                RB.move_work_file.getString(writeFile.getAbsolutePath()));
         }
 
         if (targetFile.exists() && !targetFile.canWrite()) {
-            throw new IOException(RB.singleton.getString(RB.CANT_OVERWRITE,
-                    targetFile.getAbsolutePath()));
+            throw new IOException(
+                RB.cant_overwrite.getString(targetFile.getAbsolutePath()));
         }
 
         File parentDir = targetFile.getAbsoluteFile().getParentFile();
 
         if (parentDir.exists() && parentDir.isDirectory()) {
             if (!parentDir.canWrite()) {
-                throw new IOException(RB.singleton.getString(RB.CANT_WRITE_DIR,
-                        parentDir.getAbsolutePath()));
+                throw new IOException(
+                    RB.cant_write_dir.getString(parentDir.getAbsolutePath()));
             }
         } else {
-            throw new IOException(RB.singleton.getString(RB.NO_PARENT_DIR,
-                    parentDir.getAbsolutePath()));
+            throw new IOException(
+                RB.no_parent_dir.getString(parentDir.getAbsolutePath()));
         }
 
         writeBuffer = new byte[blocksPerRecord * 512];
@@ -171,8 +172,7 @@ public class TarFileOutputStream {
 
             default :
                 throw new IllegalArgumentException(
-                    RB.singleton.getString(
-                        RB.COMPRESSION_UNKNOWN, compressionType));
+                    RB.compression_unknown.getString(compressionType));
         }
 
 //#ifdef JAVA6
@@ -211,7 +211,6 @@ public class TarFileOutputStream {
 
     /**
      * Write a user-specified 512-byte block.
-     *
      * For efficiency, write(int) should be used when writing file body content.
      *
      * @see #write(int)
@@ -220,7 +219,7 @@ public class TarFileOutputStream {
 
         if (block.length != 512) {
             throw new IllegalArgumentException(
-                RB.singleton.getString(RB.BAD_BLOCK_WRITE_LEN, block.length));
+                RB.bad_block_write_len.getString(block.length));
         }
 
         write(block, block.length);
@@ -261,8 +260,8 @@ public class TarFileOutputStream {
 
         if (bytesLeftInBlock() != 0) {
             throw new IllegalArgumentException(
-                RB.singleton.getString(
-                    RB.ILLEGAL_BLOCK_BOUNDARY, Long.toString(bytesWritten)));
+                RB.illegal_block_boundary.getString(
+                    Long.toString(bytesWritten)));
         }
     }
 
@@ -303,12 +302,20 @@ public class TarFileOutputStream {
      */
     public void close() throws IOException {
 
-        writeStream.close();
+        if (writeStream == null) {
+            return;
+        }
 
-        if (!writeFile.delete()) {
-            throw new IOException(
-                RB.singleton.getString(
-                    RB.WORKFILE_DELETE_FAIL, writeFile.getAbsolutePath()));
+        try {
+            writeStream.close();
+
+            if (!writeFile.delete()) {
+                throw new IOException(
+                    RB.workfile_delete_fail.getString(
+                        writeFile.getAbsolutePath()));
+            }
+        } finally {
+            writeStream = null;    // Encourage buffer GC
         }
     }
 
@@ -349,8 +356,8 @@ public class TarFileOutputStream {
             int finalPadBlocks = (int) (finalBlock - bytesWritten / 512L);
 
             if (TarFileOutputStream.debug) {
-                System.out.println(RB.singleton.getString(RB.PAD_BLOCK_WRITE,
-                        finalPadBlocks));
+                System.out.println(
+                    RB.pad_block_write.getString(finalPadBlocks));
             }
 
             writePadBlocks(finalPadBlocks);

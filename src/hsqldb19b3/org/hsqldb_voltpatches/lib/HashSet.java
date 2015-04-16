@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,13 +31,13 @@
 
 package org.hsqldb_voltpatches.lib;
 
-import org.hsqldb_voltpatches.store.BaseHashMap;
+import org.hsqldb_voltpatches.map.BaseHashMap;
 
 /**
  * This class does not store null keys.
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.7.2
  */
 public class HashSet extends BaseHashMap implements Set {
@@ -47,8 +47,12 @@ public class HashSet extends BaseHashMap implements Set {
     }
 
     public HashSet(int initialCapacity) throws IllegalArgumentException {
-        super(initialCapacity, BaseHashMap.objectKeyOrValue, BaseHashMap.noKeyOrValue,
-              false);
+        super(initialCapacity, BaseHashMap.objectKeyOrValue,
+              BaseHashMap.noKeyOrValue, false);
+    }
+
+    public void setComparator(ObjectComparator comparator) {
+        super.setComparator(comparator);
     }
 
     public boolean contains(Object key) {
@@ -81,6 +85,7 @@ public class HashSet extends BaseHashMap implements Set {
         }
     }
 
+    /** returns true if added */
     public boolean add(Object key) {
 
         int oldSize = size();
@@ -90,40 +95,49 @@ public class HashSet extends BaseHashMap implements Set {
         return oldSize != size();
     }
 
+    /** returns true if any added */
     public boolean addAll(Collection c) {
 
-        int      oldSize = size();
+        boolean  changed = false;
         Iterator it      = c.iterator();
 
         while (it.hasNext()) {
-            add(it.next());
-        }
-
-        return oldSize != size();
-    }
-
-    public boolean addAll(Object[] keys) {
-
-        boolean changed = false;
-
-        for (int i = 0; i < keys.length; i++) {
-            if (add(keys[i])) {
-                changed = true;
-            }
+            changed |= add(it.next());
         }
 
         return changed;
     }
 
-    public boolean remove(Object key) {
+    /** returns true if any added */
+    public boolean addAll(Object[] keys) {
 
-        int oldSize = size();
+        boolean changed = false;
 
-        super.removeObject(key, false);
+        for (int i = 0; i < keys.length; i++) {
+            changed |= add(keys[i]);
+        }
 
-        return oldSize != size();
+        return changed;
     }
 
+    /** returns true if any added */
+    public boolean addAll(Object[] keys, int start, int limit) {
+
+        boolean changed = false;
+
+        for (int i = start; i < keys.length && i < limit; i++) {
+            changed |= add(keys[i]);
+        }
+
+        return changed;
+    }
+
+    /** returns true if removed */
+    public boolean remove(Object key) {
+        return super.removeObject(key, false) != null;
+    }
+
+    /** returns true if all were removed */
     public boolean removeAll(Collection c) {
 
         Iterator it     = c.iterator();
@@ -136,19 +150,38 @@ public class HashSet extends BaseHashMap implements Set {
         return result;
     }
 
-    public Object[] toArray(Object[] a) {
+    /** returns true if all were removed */
+    public boolean removeAll(Object[] keys) {
 
-        if (a == null || a.length < size()) {
-            a = new Object[size()];
+        boolean result = true;
+
+        for (int i = 0; i < keys.length; i++) {
+            result &= remove(keys[i]);
         }
+
+        return result;
+    }
+
+    public void toArray(Object[] a) {
 
         Iterator it = iterator();
 
         for (int i = 0; it.hasNext(); i++) {
             a[i] = it.next();
         }
+    }
 
-        return a;
+    public Object[] toArray() {
+
+        if (isEmpty()) {
+            return emptyObjectArray;
+        }
+
+        Object[] array = new Object[size()];
+
+        toArray(array);
+
+        return array;
     }
 
     public Iterator iterator() {

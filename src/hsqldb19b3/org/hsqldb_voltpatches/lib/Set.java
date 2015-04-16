@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,8 @@ public interface Set extends Collection {
 
 /*
     Object[] toArray();
-    Object[] toArray(Object a[]);
+
+    void toArray(Object a[]);
 */
     boolean add(Object o);
 
