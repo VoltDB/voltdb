@@ -2082,6 +2082,7 @@ function alertNodeClicked(obj) {
 
                 var repData = {};
                 repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 repData["HOST_ID"] = info[colIndex["HOST_ID"]];
                 repData["STATE"] = info[colIndex["STATE"]];
                 repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]];
