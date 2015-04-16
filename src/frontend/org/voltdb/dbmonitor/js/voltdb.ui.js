@@ -706,14 +706,12 @@ var loadPage = function (serverName, portid) {
                         var drResult = drDetails["Details"]["STATUS"];
                         if (drResult != -2) {
                             VoltDbUI.drEnabled = (drDetails[currentServer]['ENABLED'] != null && drDetails[currentServer]['ENABLED'] != "false") ? true : false;
-                            console.log(VoltDbUI.drReplicationRole.toLowerCase());
                             //if (VoltDbUI.drEnabled)
                             //show master table
                             if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drEnabled)) {
                                 VoltDbUI.isDRInfoRequired = true;
                                 VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
                                 VoltDbUI.isFirstHit = false;
-                                console.log(VoltDbUI.drEnabled);
                                 if (VoltDbUI.drEnabled) {
                                     $("#drMasterSection").show();
                                     $(".replicaWrapper").css('top', '-27px');
