@@ -731,7 +731,7 @@ var loadPage = function (serverName, portid) {
                                     $('#liDrReplication').css('display', 'block');
                                     $('#liDrTables').css('display', 'block');
                                     showHideLastLineClass(true);
-                                    
+
                                     if (userPreference["DrReplicationRate"]) {
                                         $("#ChartDrReplicationRate").show();
                                     }
@@ -781,7 +781,7 @@ var loadPage = function (serverName, portid) {
             }
         });
 
-        var showHideLastLineClass = function(showDrTable) {
+        var showHideLastLineClass = function (showDrTable) {
             if (showDrTable) {
                 $("#liTables").removeClass("last");
                 $("#liDrTables").addClass("last");
@@ -1154,8 +1154,23 @@ var loadPage = function (serverName, portid) {
 
             }
 
-            $("#tblDrMAster").find("tbody").html('');
-            $("#tblDrMAster").find("tbody").append(htmlcontent);
+            //$("#tblDrMAster").find("tbody").html('');
+            //$("#tblDrMAster").find("tbody").append(htmlcontent);
+
+            if ($.fn.dataTable.isDataTable('#tblDrMAster')) {
+                $("#drMasterSection").find(".tblScroll").DataTable().destroy();
+            }
+
+            var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
+                                            "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
+                                                    "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
+                                                    "<th id='Th3' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Total Buffer</th>" +
+                                                    "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
+                                                    "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
+                                                    "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
+            //$("#tblDrReplica").find("tbody").html('');
+            //$("#tblDrReplica").find("tbody").append("<table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'>" + htmlcontent + "</table>");
+            $("#drMasterSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
 
             table = $("#tblDrMAster").DataTable({
                 stateSave: true,
@@ -1237,7 +1252,7 @@ var loadPage = function (serverName, portid) {
     };
     var replicaTable = '';
     var refreshDrReplicaSection = function (graphView, currentTab) {
-
+        //    debugger;
         voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
 
             MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
@@ -1259,11 +1274,19 @@ var loadPage = function (serverName, portid) {
 
                 }
 
-                $("#tblDrReplica").find("tbody").html('');
-                $("#tblDrReplica").find("tbody").append(htmlcontent);
+
+                if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
+                    $("#drReplicaSection").find(".tblScroll").DataTable().destroy();
+                }
+                var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Host ID</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
+                                                   "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
+                                            "<tbody>";
+                //$("#tblDrReplica").find("tbody").html('');
+                //$("#tblDrReplica").find("tbody").append("<table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'>" + htmlcontent + "</table>");
+                $("#drReplicaSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
 
                 replicaTable = $("#tblDrReplica").DataTable({
-                    destroy: true,
+                    // destroy: true,
                     stateSave: true,
                     pageLength: 5,
                     "sPaginationType": "extStyleLF",
@@ -1272,10 +1295,10 @@ var loadPage = function (serverName, portid) {
                         "zeroRecords": "No data to be displayed"
                     },
                     "fnDrawCallback": function () {
-                        var length = this.fnGetData().length;
-                        if (length <= this.fnPagingInfo().iLength) {
-                            $(this).parent().children(".dataTables_paginate").hide();
-                        }
+                        //var length = this.fnGetData().length;
+                        //if (length <= this.fnPagingInfo().iLength) {
+                        //    $(this).parent().children(".dataTables_paginate").hide();
+                        //}
 
                         if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
@@ -1294,7 +1317,6 @@ var loadPage = function (serverName, portid) {
                         { "bSearchable": false }
                     ]
                 });
-
 
 
                 $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
