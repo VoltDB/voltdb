@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
@@ -56,21 +58,23 @@ public class ImportHandler {
             new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer", true);
     private final static AtomicLong m_idGenerator = new AtomicLong(0);
     private final long m_id;
-
-    static {
-        VoltDB.instance().getClientInterface().bindAdapter(m_adapter, null);
-    }
+    private final long m_callbackHandle;
+    private final AtomicLong m_pendingCount = new AtomicLong(0);
+    private static final long MAX_PENDING_TRANSACTIONS = 10000;
 
     private class ImportCallback implements ImportClientResponseAdapter.Callback {
 
         //TODO: This is when we need to callback into the bundle.
         private final ImportContext m_importerContext;
-        public ImportCallback(ImportContext importContext) {
+        private final ImportHandler m_handler;
+        public ImportCallback(ImportContext importContext, ImportHandler handler) {
             m_importerContext = importContext;
+            m_handler = handler;
         }
 
         @Override
         public void handleResponse(ClientResponse response) {
+            m_pendingCount.decrementAndGet();
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 m_successCount.incrementAndGet();
             } else {
@@ -90,7 +94,9 @@ public class ImportHandler {
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + System.currentTimeMillis(), 2);
         m_importContext = importContext;
+        VoltDB.instance().getClientInterface().bindAdapter(m_adapter, null);
         m_adapter.registerHandler(this);
+        m_callbackHandle = m_adapter.registerCallback(new ImportCallback(importContext, this));
     }
 
     public long getId() {
@@ -139,37 +145,43 @@ public class ImportHandler {
 
     //Do something fancy with this.
     private ByteBuffer getBuffer(int sz) {
-        return ByteBuffer.allocate(sz);
+        return DBBPool.allocateDirectAndPool(sz).b();
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
-        m_callCount.incrementAndGet();
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             m_logger.warn("Can not invoke procedure from streaming interface when server is paused.");
             m_failedCount.incrementAndGet();
             return false;
         }
+        while (m_pendingCount.get() > MAX_PENDING_TRANSACTIONS) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
 
+            }
+        }
+        m_callCount.incrementAndGet();
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
         //type + procname(len + name) + connectionId (long) + params
         int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
         final ByteBuffer taskbuf = getBuffer(sz);
-        final ByteBuffer pbuf = getBuffer(pset.getSerializedSize());
+        //final ByteBuffer pbuf = getBuffer(pset.getSerializedSize());
         try {
             taskbuf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
             taskbuf.putInt((int )proc.length());
             taskbuf.put(proc.getBytes());
             taskbuf.putLong(ImportHandler.m_adapter.connectionId());
-            pset.flattenToBuffer(pbuf);
-            pbuf.flip();
-            taskbuf.put(pbuf);
+            pset.flattenToBuffer(taskbuf);
+            //pbuf.flip();
+            //taskbuf.put(pbuf);
             taskbuf.flip();
             task.initFromBuffer(taskbuf);
-            task.setClientHandle(m_adapter.registerCallback(new ImportCallback(ic)));
-            pbuf.clear();
+            task.setClientHandle(m_callbackHandle);
+            //pbuf.clear();
         } catch (IOException ex) {
             m_failedCount.incrementAndGet();
             m_logger.error("Failed to serialize parameters for stream: " + proc, ex);
@@ -215,6 +227,7 @@ public class ImportHandler {
                 catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                 task.getSerializedSize(), nowNanos);
         if (success) {
+            m_pendingCount.incrementAndGet();
             m_submitSuccessCount.incrementAndGet();
         }
         taskbuf.clear();

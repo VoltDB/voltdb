@@ -156,7 +156,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         for (ImportHandler handler : m_handlers.values()) {
             handler.hadBackPressure();
         }
-        throw new UnsupportedOperationException();
+        return true;
     }
 
     @Override
@@ -172,15 +172,19 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             // in NIOWriteStream.enqueue().
             ByteBuffer buf = null;
             synchronized(this) {
-                buf = ByteBuffer.allocate(ds.getSerializedSize());
-                ds.serialize(buf);
+                int sz = ds.getSerializedSize();
+                if (sz > 0) {
+                    buf = ByteBuffer.allocate(sz);
+                    ds.serialize(buf);
+                }
             }
-            if (buf == null) {
-                throw new UnsupportedOperationException();
+            //If buf is null we will send a UNEXPECTED error.
+            //TODO: Need to track down why handle is ahead looks like some race.
+            if (buf != null) {
+                enqueue(buf);
             }
-            enqueue(buf);
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("enqueue() in SimpleClientResponseAdapter throw an exception", true, e);
+            VoltDB.crashLocalVoltDB("enqueue() in ImportClientResponseAdapter throw an exception", true, e);
         }
     }
 
@@ -210,7 +214,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         }
         catch (IOException e)
         {
-            throw new RuntimeException("Unable to deserialize ClientResponse in SimpleClientResponseAdapter", e);
+            throw new RuntimeException("Unable to deserialize ClientResponse in ImportClientResponseAdapter", e);
         }
     }
 

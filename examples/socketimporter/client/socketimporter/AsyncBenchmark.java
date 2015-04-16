@@ -221,7 +221,8 @@ public class AsyncBenchmark {
         final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
         while (warmupEndTime > System.currentTimeMillis()) {
             PrintWriter writer = writers.get(0);
-            writer.println(String.valueOf(System.currentTimeMillis()));
+            writer.println(String.valueOf(System.nanoTime()));
+            writer.flush();
         }
 
         // print periodic statistics to the console
@@ -235,7 +236,8 @@ public class AsyncBenchmark {
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
             PrintWriter writer = writers.get(0);
-            writer.println(String.valueOf(System.currentTimeMillis()));
+            writer.println(String.valueOf(System.nanoTime()));
+            writer.flush();
         }
 
         // cancel periodic stats printing
@@ -245,6 +247,25 @@ public class AsyncBenchmark {
         printResults();
     }
 
+    public static class BenchmarkRunner extends Thread {
+        private final AsyncBenchmark benchmark;
+        private final CountDownLatch cdl;
+        public BenchmarkRunner(AsyncBenchmark bm, CountDownLatch c) {
+            benchmark = bm;
+            cdl = c;
+        }
+
+        @Override
+        public void run() {
+            try {
+                benchmark.runBenchmark();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                cdl.countDown();
+            }
+        }
+    }
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
      *
@@ -256,8 +277,13 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(AsyncBenchmark.class.getName(), args);
-
-        AsyncBenchmark benchmark = new AsyncBenchmark(config);
-        benchmark.runBenchmark();
+        int count = 10;
+        CountDownLatch cdl = new CountDownLatch(count);
+        for (int i = 0; i < count; i++) {
+            AsyncBenchmark benchmark = new AsyncBenchmark(config);
+            BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl);
+            runner.start();
+        }
+        cdl.await();
     }
 }
