@@ -1795,29 +1795,24 @@ class DbMonitorTest extends TestBase {
         page.partitionIdleTimeDisplayed()
     }
 
-    def "Click server legends in Graph Partition Idle Time"(){
+    def "Check server legends visible in Graph Partition Idle Time"(){
 
+        // for testing , 4 server legends are visible
+        
         when: 'server partition legends is visible'
-        waitFor(10){page.partitionserverlegends.isDisplayed()
-                    page.serverlegendfisrt.isDisplayed()
-                    page.serverlegendsecond.isDisplayed()
-                    page.serverlegendthird.isDisplayed()
-                    page.serverlegendlast.isDisplayed()
+        waitFor(10){	page.localpartition.isDisplayed()
+            page.clusterwide.isDisplayed()
+            page.multipartition.isDisplayed()
         }
 
-
-        then: 'click those server partition legends'
-            page.serverlegendfisrt.click()
-            println("1st server legend clicked one time")
-            page.serverlegendsecond.click()
-            page.serverlegendsecond.click()
-            println("2nd server legend clicked two times")
-            page.serverlegendthird.click()
-            println("3rd server legend clicked one time")
-            page.serverlegendlast.click()
-            page.serverlegendlast.click()
-            println("last server legend with the red spot clicked two times")
-
+        then: 'check those server partition legends and print them'
+        if(page.localpartition.text()=="Local partitions"){
+            println("grey partition displayed as: " +page.localpartition.text())}
+        if(page.clusterwide.text()=="Cluster-wide Maximum / Minimum"){
+            println("Blue partition displayed as: " +page.clusterwide.text())}
+        if(page.multipartition.text()=="Multi-partition"){
+            println("Orange partition displayed as: " +page.multipartition.text())}
+        else {println("No server legends are visible")}
 
     }
 
