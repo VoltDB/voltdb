@@ -60,7 +60,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK clean default dist")
+        run("ant %s -Djmemcheck=NO_MEMCHECK clean default dist" % build_args)
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -71,7 +71,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d %s clean dist.pro" % (defaultlicensedays, build_args))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -233,6 +233,11 @@ if len(sys.argv) == 3:
     rbmqExportTreeish = sys.argv[2]
     if voltdbTreeish != proTreeish:
         oneOff = True     #force oneoff when not same tag/branch
+
+try:
+    build_args = os.environ['VOLTDB_BUILD_ARGS']
+except:
+    build_args=""
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
