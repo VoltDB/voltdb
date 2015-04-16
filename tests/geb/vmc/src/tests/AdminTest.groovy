@@ -757,7 +757,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.sitePerHostValue.isDisplayed()
             !overview.sitePerHostValue.text().equals("")
         }
@@ -767,7 +767,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.ksafetyValue.isDisplayed()
             !overview.ksafetyValue.text().equals("")
         }
@@ -777,7 +777,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.partitionDetectionValue.isDisplayed()
             !overview.partitionDetectionValue.text().equals("")
         }
@@ -787,7 +787,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.securityValue.isDisplayed()
             !overview.securityValue.text().equals("")
         }
@@ -798,7 +798,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.httpAccessValue.isDisplayed()
             !overview.httpAccessValue.text().equals("")
         }
@@ -808,7 +808,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.autoSnapshotsValue.isDisplayed()
             !overview.autoSnapshotsValue.text().equals("")
         }
@@ -818,7 +818,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             overview.commandLoggingValue.isDisplayed()
             !overview.commandLoggingValue.text().equals("")
         }
@@ -832,14 +832,14 @@ class AdminTest extends TestBase {
         then:
 
         try {
-            waitFor(30) { page.overview.exportNoConfigAvailable.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportNoConfigAvailable.isDisplayed() }
             println(page.overview.exportNoConfigAvailable.text())
         } catch(geb.error.RequiredPageContentNotPresent e ) {
-            waitFor(30) { page.overview.exportConfig.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
             println("The export configuration")
             println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
         } catch (geb.waiting.WaitTimeoutException e ) {
-            waitFor(30) { page.overview.exportConfig.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportConfig.isDisplayed() }
             println("The export configuration")
             println(page.overview.exportConfiguration.text().replaceAll("On","").replaceAll("Off",""))
         }
@@ -851,21 +851,21 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
         }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutCancel.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutCancel.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             !page.overview.heartTimeoutField.isDisplayed()
             !page.overview.heartTimeoutOk.isDisplayed()
             !page.overview.heartTimeoutCancel.isDisplayed()
@@ -876,12 +876,12 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -889,19 +889,19 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value("10")
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutPopupOk.isDisplayed()
             page.overview.heartTimeoutPopupCancel.isDisplayed()
         }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutPopupCancel.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutPopupCancel.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutEdit.isDisplayed()
             !page.overview.heartTimeoutPopupOk.isDisplayed()
             !page.overview.heartTimeoutPopupCancel.isDisplayed()
@@ -912,7 +912,7 @@ class AdminTest extends TestBase {
         when:
         String heartTimeout = 20
         page.advanced.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutValue.isDisplayed()
         }
         initialHeartTimeout = page.overview.heartTimeoutValue.text()
@@ -920,12 +920,12 @@ class AdminTest extends TestBase {
         revertHeartTimeout = true
 
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -933,17 +933,17 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value(heartTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutPopupOk.isDisplayed()
             page.overview.heartTimeoutPopupCancel.isDisplayed()
         }
 
 
-        waitFor(30) {
+        waitFor(waitTime) {
             try {
                 page.overview.heartTimeoutPopupOk.click()
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
@@ -962,12 +962,12 @@ class AdminTest extends TestBase {
         String heartTimeout = ""
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -975,11 +975,11 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value(heartTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.errorMsgHeartbeat.isDisplayed()
             page.overview.errorMsgHeartbeat.text().equals("Please enter a valid positive number.")
         }
@@ -991,12 +991,12 @@ class AdminTest extends TestBase {
         String heartTimeout = "0"
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.heartTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutField.isDisplayed()
             page.overview.heartTimeoutOk.isDisplayed()
             page.overview.heartTimeoutCancel.isDisplayed()
@@ -1004,11 +1004,11 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.heartTimeoutField.value(heartTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.heartTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.errorMsgHeartbeat.isDisplayed()
             page.overview.errorMsgHeartbeat.text().equals("Please enter a positive number. Its minimum value should be 1.")
         }
@@ -1021,21 +1021,21 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
         }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutCancel.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutCancel.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             !page.overview.queryTimeoutField.isDisplayed()
             !page.overview.queryTimeoutOk.isDisplayed()
             !page.overview.queryTimeoutCancel.isDisplayed()
@@ -1046,12 +1046,12 @@ class AdminTest extends TestBase {
         when:
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
@@ -1059,19 +1059,19 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.queryTimeoutField.value("10")
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutPopupOk.isDisplayed()
             page.overview.queryTimeoutPopupCancel.isDisplayed()
         }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutPopupCancel.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutPopupCancel.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutEdit.isDisplayed()
             !page.overview.queryTimeoutPopupOk.isDisplayed()
             !page.overview.queryTimeoutPopupCancel.isDisplayed()
@@ -1082,7 +1082,7 @@ class AdminTest extends TestBase {
         when:
         String queryTimeout = 20
         page.advanced.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutValue.isDisplayed()
         }
         initialQueryTimeout = page.overview.queryTimeoutValue.text()
@@ -1090,12 +1090,12 @@ class AdminTest extends TestBase {
         revertQueryTimeout = true
 
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
@@ -1103,17 +1103,17 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.queryTimeoutField.value(queryTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutPopupOk.isDisplayed()
             page.overview.queryTimeoutPopupCancel.isDisplayed()
         }
 
 
-        waitFor(30) {
+        waitFor(waitTime) {
             try {
                 page.overview.queryTimeoutPopupOk.click()
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
@@ -1132,12 +1132,12 @@ class AdminTest extends TestBase {
         String queryTimeout = ""
         page.advanced.click()
         then:
-        waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
         when:
-        waitFor(30) { page.overview.queryTimeoutEdit.click() }
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutField.isDisplayed()
             page.overview.queryTimeoutOk.isDisplayed()
             page.overview.queryTimeoutCancel.isDisplayed()
@@ -1145,11 +1145,11 @@ class AdminTest extends TestBase {
 
         when:
         page.overview.queryTimeoutField.value(queryTimeout)
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.queryTimeoutOk.click()
         }
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.overview.errorQuery.isDisplayed()
             page.overview.errorQuery.text().equals("Please enter a valid positive number.")
         }
@@ -1240,7 +1240,7 @@ class AdminTest extends TestBase {
         page.securityEditOk.click()
         println("security edit ok clicked!")
 
-        waitFor(30) {
+        waitFor(waitTime) {
             page.securityPopupOk.isDisplayed()
             page.securityPopupCancel.isDisplayed()
             page.securityPopupOk.click()
@@ -1267,13 +1267,13 @@ class AdminTest extends TestBase {
         }
         page.autoSnapshotsEdit.click()
 
-        waitFor(30) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
 
         }
-        waitFor(30){
+        waitFor(waitTime){
 
             page.frequencyEdit.isDisplayed()
             //println("first wait")
@@ -1296,7 +1296,7 @@ class AdminTest extends TestBase {
         when:
         page.autoSnapshotsEdit.click()
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
         }
@@ -1304,7 +1304,7 @@ class AdminTest extends TestBase {
         when:
         page.autoSnapshotsEditCancel.click()
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             !(page.autoSnapshotsEditCancel.isDisplayed())
             !(page.autoSnapshotsEditOk.isDisplayed())
         }
@@ -1405,7 +1405,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         page.autoSnapshots.click()
-        waitFor(30) {
+        waitFor(waitTime) {
 		    page.filePrefix.isDisplayed()
 		    page.frequency.isDisplayed()
 		    page.frequencyUnit.isDisplayed()
@@ -1817,7 +1817,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterClientPortValue.isDisplayed()
             !page.networkInterfaces.clusterClientPortValue.text().equals("")
         }
@@ -1827,7 +1827,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterAdminPortValue.isDisplayed()
             !page.networkInterfaces.clusterAdminPortValue.text().equals("")
         }
@@ -1837,7 +1837,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterHttpPortValue.isDisplayed()
             !page.networkInterfaces.clusterHttpPortValue.text().equals("")
         }
@@ -1847,7 +1847,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             page.networkInterfaces.clusterInternalPortValue.isDisplayed()
             !page.networkInterfaces.clusterInternalPortValue.text().equals("")
         }
@@ -1857,7 +1857,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterZookeeperPortValue.isDisplayed()
             !page.networkInterfaces.clusterZookeeperPortValue.text().equals("")
         }
@@ -1867,7 +1867,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30){
+        waitFor(waitTime){
             page.networkInterfaces.clusterReplicationPortValue.isDisplayed()
             !page.networkInterfaces.clusterReplicationPortValue.text().equals("")
         }
@@ -1879,7 +1879,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.banner.isDisplayed() }
+        waitFor(waitTime) { header.banner.isDisplayed() }
     }
 
 
@@ -1887,28 +1887,28 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.image.isDisplayed() }
+        waitFor(waitTime) { header.image.isDisplayed() }
     }
 
     def "header username exists" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
     }
 
     def "header help exists" () {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.help.isDisplayed() }
+        waitFor(waitTime) { header.help.isDisplayed() }
     }
 
     // HEADER TAB TESTS
@@ -1917,7 +1917,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabDBMonitor.isDisplayed()
             header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
         }
@@ -1927,7 +1927,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabAdmin.isDisplayed()
             header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
         }
@@ -1937,7 +1937,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabSchema.isDisplayed()
             header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
 
@@ -1948,7 +1948,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.tabSQLQuery.isDisplayed()
+        waitFor(waitTime) { header.tabSQLQuery.isDisplayed()
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
         }
     }
@@ -1958,7 +1958,7 @@ class AdminTest extends TestBase {
         at AdminPage
         String username = page.getUsername()
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.usernameInHeader.isDisplayed()
             header.usernameInHeader.text().equals(username)
         }
@@ -1968,9 +1968,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
         header.usernameInHeader.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -1982,9 +1982,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
         header.usernameInHeader.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -1999,9 +1999,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
         header.logout.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -2014,9 +2014,9 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
         header.logout.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -2029,10 +2029,10 @@ class AdminTest extends TestBase {
     def "help popup existance" () {
         when:
         at AdminPage
-        waitFor(30) { header.help.isDisplayed() }
+        waitFor(waitTime) { header.help.isDisplayed() }
         header.help.click()
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.popup.isDisplayed()
             header.popupTitle.isDisplayed()
             header.popupClose.isDisplayed()
@@ -2048,14 +2048,14 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { footer.banner.isDisplayed() }
+        waitFor(waitTime) { footer.banner.isDisplayed() }
     }
 
     def "footer text exists and valid"() {
         when:
         at AdminPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
             footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
@@ -2086,7 +2086,7 @@ class AdminTest extends TestBase {
     def "cluster title"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.clusterTitle.isDisplayed() }
+        waitFor(waitTime) { cluster.clusterTitle.isDisplayed() }
         then:
         cluster.clusterTitle.text().equals("Cluster")
     }
@@ -2096,7 +2096,7 @@ class AdminTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(30) { cluster.promotebutton.isDisplayed() }
+        waitFor(waitTime) { cluster.promotebutton.isDisplayed() }
     }
 
     def "check pause cancel"(){
@@ -2350,10 +2350,10 @@ class AdminTest extends TestBase {
     def "when shutdown and cancel popup"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.shutdownbutton.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownbutton.isDisplayed() }
         cluster.shutdownbutton.click()
         then:
-        waitFor(30) { cluster.shutdownconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownconfirmation.isDisplayed() }
         cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
         cluster.shutdowncancelbutton.click()
     }
@@ -2361,10 +2361,10 @@ class AdminTest extends TestBase {
     def "when shutdown and close popup"(){
         when:
         at AdminPage
-        waitFor(30) { cluster.shutdownbutton.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownbutton.isDisplayed() }
         cluster.shutdownbutton.click()
         then:
-        waitFor(30) { cluster.shutdownconfirmation.isDisplayed() }
+        waitFor(waitTime) { cluster.shutdownconfirmation.isDisplayed() }
         cluster.shutdownconfirmation.text().toLowerCase().equals("Shutdown: Confirmation".toLowerCase())
         cluster.shutdownclosebutton.click()
     }
@@ -2406,7 +2406,7 @@ class AdminTest extends TestBase {
     	when:
     	page.overview.httpAccess.click()
     	then:
-    	waitFor(30) {
+    	waitFor(waitTime) {
     		page.overview.jsonApi.text().equals("JSON API")
     		!page.overview.jsonApiStatus.text().equals("")
     	}
@@ -2416,7 +2416,7 @@ class AdminTest extends TestBase {
     	when:
     	page.overview.commandLogging.click()
     	then:
-    	waitFor(30) {
+    	waitFor(waitTime) {
     		page.overview.logFrequencyTime.text().equals("Log Frequency Time")
     		!page.overview.logFrequencyTimeValue.text().equals("")
     		
@@ -2432,7 +2432,7 @@ class AdminTest extends TestBase {
     	when:
     	page.overview.advanced.click()
     	then:
-    	waitFor(30) {
+    	waitFor(waitTime) {
     		page.overview.maxJavaHeap.text().equals("Max Java Heap")
     		!page.overview.maxJavaHeapValue.text().equals("")
     		
@@ -2532,12 +2532,12 @@ class AdminTest extends TestBase {
             when:
             page.advanced.click()
             then:
-            waitFor(30) { page.overview.heartTimeoutEdit.isDisplayed() }
+            waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
 
             when:
-            waitFor(30) { page.overview.heartTimeoutEdit.click() }
+            waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.heartTimeoutField.isDisplayed()
                 page.overview.heartTimeoutOk.isDisplayed()
                 page.overview.heartTimeoutCancel.isDisplayed()
@@ -2545,17 +2545,17 @@ class AdminTest extends TestBase {
 
             when:
             page.overview.heartTimeoutField.value(initialHeartTimeout)
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.heartTimeoutOk.click()
             }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.heartTimeoutPopupOk.isDisplayed()
                 page.overview.heartTimeoutPopupCancel.isDisplayed()
             }
 
 
-            waitFor(30) {
+            waitFor(waitTime) {
                 try {
                     page.overview.heartTimeoutPopupOk.click()
                 } catch (org.openqa.selenium.ElementNotVisibleException e) {
@@ -2575,12 +2575,12 @@ class AdminTest extends TestBase {
             when:
             page.advanced.click()
             then:
-            waitFor(30) { page.overview.queryTimeoutEdit.isDisplayed() }
+            waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
 
             when:
-            waitFor(30) { page.overview.queryTimeoutEdit.click() }
+            waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.queryTimeoutField.isDisplayed()
                 page.overview.queryTimeoutOk.isDisplayed()
                 page.overview.queryTimeoutCancel.isDisplayed()
@@ -2588,17 +2588,17 @@ class AdminTest extends TestBase {
 
             when:
             page.overview.queryTimeoutField.value(initialQueryTimeout)
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.queryTimeoutOk.click()
             }
             then:
-            waitFor(30) {
+            waitFor(waitTime) {
                 page.overview.queryTimeoutPopupOk.isDisplayed()
                 page.overview.queryTimeoutPopupCancel.isDisplayed()
             }
 
 
-            waitFor(30) {
+            waitFor(waitTime) {
                 try {
                     page.overview.queryTimeoutPopupOk.click()
                 } catch (org.openqa.selenium.ElementNotVisibleException e) {

@@ -43,6 +43,8 @@ class SchemaPageTest extends TestBase {
     //@Shared def fileLinesPairs = [ [ddlSourceFile, ddlExpectedSourceLines] ]
     //@Shared def slurper = new JsonSlurper()
 
+    int count = 0
+
     def setupSpec() { // called once, before any tests
         // Move contents of the specified file into memory
         ddlExpectedSourceLines = getFileLines(ddlSourceFile)
@@ -51,10 +53,22 @@ class SchemaPageTest extends TestBase {
 
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
-        when: 'click the Schema (page) link'
-        page.openSchemaPage()
-        then: 'should be on Schema page'
-        at SchemaPage
+        count = 0
+		
+		while(count<numberOfTrials) {
+			count ++
+			try {
+                when: 'click the Schema (page) link'
+                page.openSchemaPage()
+                then: 'should be on Schema page'
+                at SchemaPage
+            
+				break
+			} catch (org.openqa.selenium.ElementNotVisibleException e) {
+				println("ElementNotVisibleException: Unable to Start the test")
+				println("Retrying")
+			}
+		}
     }
 
     /**
