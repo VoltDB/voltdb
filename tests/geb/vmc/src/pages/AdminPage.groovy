@@ -148,6 +148,59 @@ class AdminPage extends VoltDBManagementCenterPage {
         minute                      { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#snapshotFrequencyRow.child-row-2.subLabelRow td.tdSnapshotFrequency form#frmSnapshotFrequency select#ddlfrequencyUnit.valid option") }
         second                      { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#snapshotFrequencyRow.child-row-2.subLabelRow td.tdSnapshotFrequency form#frmSnapshotFrequency select#ddlfrequencyUnit.valid option") }
 
+        // Admin Export
+
+        exportbtn			{ $("#row-4 > td.configLabel > a", text:"Export")}
+        noconfigtxt			{ $("#exportConfiguration > tr > td.configLabel")}
+        addconfig			{ $("#addNewConfigLink")}
+        addconfigpopup			{ $("#addConfigInnerPopup")}
+        addconfigtxt			{ $("#addConfigHeader")}
+        inputstream			{ $("#txtStream")}
+        inputtype			{ $("#txtType")}
+        inputnamefrst			{ $("#txtName0")}
+        inputvaluefrst			{ $("#txtValue0")}
+        inputnamescnd			{ $("#txtName1")}
+        inputvaluescnd			{ $("#txtValue1")}
+        addproperty			{ $("#lnkAddNewProperty")}
+        deleteproperty			{ $("#delRow0")}
+        deletescndproperty		{ $("#deleteFirstProperty")}
+        saveconfig			{ $("#btnAddConfigSave", text:"Save")}
+        cancelconfig			{ $("#btnAddConfigCancel", text:"Cancel")}
+        streamchkbox			{ $("#Tr1 > td:nth-child(3) > div > ins")}
+        reqfielderror			{ $(class:"error", text:"This field is required")}
+        streamtxt			{ $("#Tr1 > td:nth-child(1)", text:"Stream")}
+        typetxt				{ $("#addConfigWrapper > table:nth-child(1) > tbody > tr:nth-child(2) > td:nth-child(1)", text:"Type")}
+        propertiestxt			{ $("#addConfigWrapper > table:nth-child(2) > tbody > tr:nth-child(1) > td > div > div.proLeft", text:"Properties")}
+        nametxt				{ $("#tblAddNewProperty > tbody > tr:nth-child(1) > th:nth-child(1)", text:"Name")}
+        valuetxt			{ $("#tblAddNewProperty > tbody > tr:nth-child(1) > th:nth-child(2)", text:"Value")}
+        deletetxt			{ $("#tblAddNewProperty > tbody > tr:nth-child(1) > th:nth-child(3)", text:"Delete")}
+        confirmpopupask			{ $("#saveConfigConfirmation > div.overlay-content > div")}
+        confirmnobtn			{ $("#btnSaveConfigCancel", text:"No")}
+        confirmyesbtn			{ $("#btnSaveConfigOk", text:"Yes")}
+        belowexportbtn			{ $("#row-40 > td.configLabel.expoStream > a")}
+        belowexportnametxt		{ $("#exportConfiguration > tr:nth-child(2) > td.configLabe2")}
+        belowexportvaluetxt		{ $("#exportConfiguration > tr:nth-child(2) > td:nth-child(2)")}
+        belowexportnamescndtxt		{ $("#exportConfiguration > tr:nth-child(3) > td.configLabe2")}
+        belowexportvaluescndtxt		{ $("#exportConfiguration > tr:nth-child(3) > td:nth-child(2)")}
+        clickdbmonitorerrormsg		{ $("#btnUpdateErrorOk", text:"Ok")}
+        dbmonitorerrormsgpopup		{ $("#updateInnerErrorPopup")}
+        onstatetxt			{ $("#row-40 > td:nth-child(3)", text:"On")}
+        offstatetxt			{ $("#row-40 > td:nth-child(3)", text:"Off")}
+        exportsametxterr		{ $("#btnUpdateErrorOk", text:"Ok")}
+        updateerrormsgexport		{ $("#updateInnerErrorPopup > div.overlay-contentError.errorMsg > p")}
+        exporteditbtn			{ $("#exportEdit0")}
+        addconfigcheckonbox		{ $("input[type='checkbox']",class:"chkStream")}
+        checkboxtest			{ $("div.icheckbox_square-aero:nth-child(1) > ins:nth-child(2)")}
+        //addconfigcheckoffbox		{ $(id:"chkStream", class:"chkStream")}
+        checkboxofftxt			{ $("#chkStreamValue", text:"Off")}
+        checkboxontxt			{ $("#chkStreamValue", text:"On")}
+        deleteconfigurations		{ $("#deleteAddConfig > a", text:"Delete this Configuration")}
+        deleteconfirmation		{ $("#saveConfigConfirmation > div.overlay-content > div")}
+        deleteYes			{ $("#btnSaveConfigOk", text:"Yes")}
+        deleteNo			{ $("#btnSaveConfigCancel", text:"No")}
+        samestreamnameerrorpopup	{ $("#updateInnerErrorPopup")}
+        samestreamnameerrorOk		{ $("#btnUpdateErrorOk", text:"Ok")}
+
         // SECURITY POPUP
         securityPopup				{ $(class:"popup_content14") }
         securityPopupOk             { $("#btnSecurityOk") }
@@ -240,5 +293,95 @@ class AdminPage extends VoltDBManagementCenterPage {
 
         return username
     }
+
+    //for export
+
+    def String getStream() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportpath.txt"))
+        String stream
+
+        while((stream = br.readLine()) != "#stream") {
+        }
+
+        stream = br.readLine()
+
+        return stream
+    }
+
+    def String getType() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportpath.txt"))
+        String type
+
+        while((type = br.readLine()) != "#type") {
+        }
+
+        type = br.readLine()
+
+        return type
+    }
+
+
+    def String getExportName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportpath.txt"))
+        String name
+
+        while((name = br.readLine()) != "#name") {
+        }
+
+        name = br.readLine()
+
+        return name
+    }
+
+    def String getValue() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportpath.txt"))
+        String value
+
+        while((value = br.readLine()) != "#value") {
+        }
+
+        value = br.readLine()
+
+        return value
+    }
+
+
+    def String getExportNamescnd() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportpath.txt"))
+        String name
+
+        while((name = br.readLine()) != "#name_2") {
+        }
+
+        name = br.readLine()
+
+        return name
+    }
+
+    def String getExportValuescnd() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportpath.txt"))
+        String value
+
+        while((value = br.readLine()) != "#value_2") {
+        }
+
+        value = br.readLine()
+
+        return value
+    }
+
+
+    def String getStreamNxt() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/exportpath.txt"))
+        String streamNxt
+
+        while((streamNxt = br.readLine()) != "#streamNext") {
+        }
+
+        streamNxt = br.readLine()
+
+        return streamNxt
+    }
+
 
 }
