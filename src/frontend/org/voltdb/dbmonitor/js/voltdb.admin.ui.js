@@ -199,6 +199,9 @@ function loadAdminPage() {
         txtDrMaster: $("#txtDrMaster"),
         spanDrMasterEdited: "",
         loadingDrMaster: $("#loadingDrMaster"),
+        drMasterEditedValue: "",
+        updateDrMasterErrorFieldMsg: $("#updateDrMasterErrorFieldMsg"),
+        drMasterLabel: $("#row-DrConfig").find("td:first-child").text(),
 
         //Edit Dr Replica objects
         btnEditDrReplicaOk: $("#btnEditDrReplicaOk"),
@@ -213,8 +216,8 @@ function loadAdminPage() {
         labelReplicaSource: $("#replicaSource"),
         txtDrSource: $("#txtDrSource"),
         spanDrSource: $("#drSourceSpan"),
-        loadingDrSource: $("#loadingDrSource"),
-    };
+        loadingDrSource: $("#loadingDrSource")
+      };
 
     var adminValidationRules = {
         numericRules: {
@@ -317,6 +320,11 @@ function loadAdminPage() {
     adminEditObjects.chkAutoSnapsot.on('ifChanged', function () {
         adminEditObjects.spanAutoSpanEdited = getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked"));
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked")));
+    });
+
+    adminEditObjects.chkDrMaster.on('ifChanged', function () {
+        adminEditObjects.drMasterEditedValue = getOnOffText(adminEditObjects.chkDrMaster.is(":checked"));
+        adminEditObjects.txtDrMaster.text(getOnOffText(adminEditObjects.chkDrMaster.is(":checked")));
     });
 
     $(".tblshutdown").find(".edit").on("click", function () {
@@ -2260,44 +2268,37 @@ function loadAdminPage() {
             adminEditObjects.chkDrMaster.iCheck('uncheck');
         }
 
-        //        adminEditObjects.editStateHeartbeatTimeout = state;
-        //        adminEditObjects.tBoxHeartbeatTimeout.val(adminEditObjects.tBoxHeartbeatTimeoutValue);
-
-        /*        if (state == editStates.ShowLoading) {
-                    adminDOMObjects.heartBeatTimeoutLabel.hide();
-                    adminEditObjects.LinkHeartbeatEdit.hide();
-                    adminEditObjects.spanHeartbeatTimeOut.hide();
-                    adminEditObjects.tBoxHeartbeatTimeout.hide();
-                    adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
-                    adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
-                    adminEditObjects.errorHeartbeatTimeout.hide();
-        
-                    adminEditObjects.loadingHeartbeatTimeout.show();
-                }
-                else*/
         if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingDrMaster.hide();
             adminEditObjects.LinkDrMasterEdit.hide();
             adminEditObjects.btnEditDrMasterOk.show();
             adminEditObjects.btnEditDrMasterCancel.show();
             adminEditObjects.chkDrMaster.parent().addClass("customCheckbox");
-
             adminEditObjects.iconDrMasterOption.hide();
-        }
-        else {
+            adminEditObjects.txtDrMaster.show();
+        } else if (state == editStates.ShowLoading) {
+            adminEditObjects.loadingDrMaster.show();
+            adminEditObjects.btnEditDrMasterOk.hide();
+            adminEditObjects.btnEditDrMasterCancel.hide();
+            adminEditObjects.LinkDrMasterEdit.hide();
+            adminEditObjects.chkDrMaster.parent().removeClass("customCheckbox");
+            adminEditObjects.iconDrMasterOption.hide();
+            adminEditObjects.txtDrMaster.hide();
+        } else {
             adminEditObjects.loadingDrMaster.hide();
             adminEditObjects.btnEditDrMasterOk.hide();
             adminEditObjects.btnEditDrMasterCancel.hide();
             adminEditObjects.LinkDrMasterEdit.show();
             adminEditObjects.chkDrMaster.parent().removeClass("customCheckbox");
-
             adminEditObjects.iconDrMasterOption.show();
+            adminEditObjects.txtDrMaster.show();
         }
 
     };
 
     adminEditObjects.LinkDrMasterEdit.on("click", function () {
-        toggleDrMasterEdit(editStates.ShowOkCancel);
+        if (adminEditObjects.LinkDrMasterEdit.hasClass("edit"))
+            toggleDrMasterEdit(editStates.ShowOkCancel);
     });
 
     adminEditObjects.btnEditDrMasterCancel.on("click", function () {
@@ -2308,12 +2309,38 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
-
             var popup = $(this)[0];
             $("#btnSaveDrMaster").unbind("click");
             $("#btnSaveDrMaster").on("click", function () {
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (!adminConfigurations.hasOwnProperty("dr")) {
+                    adminConfigurations.dr = {};
+                }
+                //Set the new value to be saved.
+                adminConfigurations.dr.listen = adminEditObjects.chkDrMaster.is(':checked');
+                //Call the loading image only after setting the new value to be saved.
+                toggleDrMasterEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleDrMasterEdit(editStates.ShowEdit);
+                        });
+                    } else {
+                        toggleDrMasterEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.drMasterLabel + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
 
-                toggleDrMasterEdit(editStates.ShowEdit);
+                        adminEditObjects.updateDrMasterErrorFieldMsg.text(msg);
+                        $("#updateErrorDrMasterPopupLink").trigger("click");
+                    }
+                });
+                //Close the popup
                 popup.close();
             });
 
@@ -2328,6 +2355,18 @@ function loadAdminPage() {
 
             $(".popup_close").on("click", function () {
                 toggleDrMasterEdit(editStates.ShowEdit);
+            });
+        }
+    });
+
+    $("#updateErrorDrMasterPopupLink").popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnUpdateDrMasterOk").unbind("click");
+            $("#btnUpdateDrMasterOk").on("click", function () {
+                popup.close();
             });
         }
     });
@@ -2640,7 +2679,8 @@ function loadAdminPage() {
                 adminEditObjects.labelDrId.text(adminConfigValues.drId);
                 adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
                 adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
-                adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
+                //adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
+                adminEditObjects.txtDrMaster.text(adminEditObjects.drMasterEditedValue == "" ? getOnOffText(adminConfigValues.drListen) : adminEditObjects.drMasterEditedValue);
                 adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
                 if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
                     getDrReplicaStatus(true);
@@ -2671,12 +2711,14 @@ function loadAdminPage() {
                 } else {
                     adminEditObjects.labelDrmode.text("Replica");
                 }
+                adminEditObjects.LinkDrMasterEdit.removeClass().addClass('edit');
             } else {
                 if (drListen) {
                     adminEditObjects.labelDrmode.text("Master");
                 } else {
                     adminEditObjects.labelDrmode.text("None");
                 }
+                adminEditObjects.LinkDrMasterEdit.removeClass().addClass('editDisabled');
             }
         };
 

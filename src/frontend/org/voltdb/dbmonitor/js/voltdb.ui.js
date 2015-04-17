@@ -706,17 +706,20 @@ var loadPage = function (serverName, portid) {
                         var drResult = drDetails["Details"]["STATUS"];
                         if (drResult != -2) {
                             VoltDbUI.drEnabled = (drDetails[currentServer]['ENABLED'] != null && drDetails[currentServer]['ENABLED'] != "false") ? true : false;
-
                             //if (VoltDbUI.drEnabled)
                             //show master table
                             if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drEnabled)) {
                                 VoltDbUI.isDRInfoRequired = true;
                                 VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
                                 VoltDbUI.isFirstHit = false;
-                                console.log(VoltDbUI.drReplicationRole.toLowerCase());
                                 if (VoltDbUI.drEnabled) {
+                                    $("#drMasterSection").show();
+                                    $(".replicaWrapper").css('top', '-27px');
                                     //show master table
                                     refreshDrMasterSection();
+                                } else {
+                                    $(".replicaWrapper").css('top', '0');
+                                    $("#drMasterSection").hide();
                                 }
 
                                 if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
@@ -767,24 +770,26 @@ var loadPage = function (serverName, portid) {
             }
         });
 
-	  var replicationWarning = function(count){
-		    if(count == 0 || count == undefined){
-			    $('#drWarning').hide();
-			    $('.alertIcon').hide();
-		    }else{
-			    $('#drWarning').show();
-			    $('.alertIcon').show();
-			    if(count == 1){
-			        $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
-			    }else{
-			        $('#drPartitionWarningMsg').text(count + ' partitions are uncovered.');
-			    }
-		    }
-	  };
 
-	  voltDbRenderer.GetDrReplicationInformation(function (replica) {
-		  replicationWarning(replica['WARNING_COUNT']);
-	  });
+        var replicationWarning = function (count) {
+            if (count == 0 || count == undefined) {
+                $('#drWarning').hide();
+                $('.alertIcon').hide();
+            } else {
+                $('#drWarning').show();
+                $('.alertIcon').show();
+                if (count == 1) {
+                    $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
+                } else {
+                    $('#drPartitionWarningMsg').text(count + ' partitions are uncovered.');
+                }
+            }
+        };
+
+        voltDbRenderer.GetDrReplicationInformation(function (replica) {
+            replicationWarning(replica["DR_GRAPH"]['WARNING_COUNT']);
+        });
+
 
         var loadProcedureInformations = function (procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
@@ -1133,7 +1138,6 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster").find("tbody").append(htmlcontent);
 
             table = $("#tblDrMAster").DataTable({
-                destroy: true,
                 stateSave: true,
                 pageLength: 5,
                 "sPaginationType": "extStyleLF",
@@ -1141,18 +1145,34 @@ var loadPage = function (serverName, portid) {
                 "language": {
                     "zeroRecords": "No data to be displayed"
                 },
-                "fnRowCallback": function () {
-                    //debugger;
-                    //var length = this.fnGetData().length;
-                    //if (length <= this.fnPagingInfo().iLength) {
-                    //    //  $(this).parent().children(".dataTables_paginate").hide();
-                    //}
+                //"fnRowCallback": function () {
+                //    //debugger;
+                //    //var length = this.fnGetData().length;
+                //    //if (length <= this.fnPagingInfo().iLength) {
+                //    //    //  $(this).parent().children(".dataTables_paginate").hide();
+                //    //}
+                //    //  console.log($("#tblDrMAster").find("tbody tr td").first().html());
+                //    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
+                //        console.log("in");
+                //        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                //    } else {
+                //        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                //    }
 
-                    if ($(this).find("tbody tr td").first().html() == "No data to be displayed") {
+                //    $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                //},
+                "fnDrawCallback": function () {
+                    var length = this.fnGetData().length;
+                    if (length <= this.fnPagingInfo().iLength) {
+                        $(this).parent().children(".dataTables_paginate").hide();
+                    }
+
+                    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                     } else {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
                     }
+
 
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
@@ -1167,7 +1187,6 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
-            $("#tblDrMAster").wrapAll("<div class='tblScroll'>");
             if (!$.isEmptyObject(response)) {
                 $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
             }
@@ -1183,7 +1202,7 @@ var loadPage = function (serverName, portid) {
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
 
-            $(".tblScroll").next().hide();
+            $("#tblDrMAster").next().hide();
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
 
@@ -1193,13 +1212,14 @@ var loadPage = function (serverName, portid) {
         });
         $('#filterPartitionId').on('keyup', function () {
             table.search(this.value).draw();
+            //  debugger;
         });
     };
-
+    var replicaTable = '';
     var refreshDrReplicaSection = function () {
-        var replicaTable = '';
+
         voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
-            var response = replicationData;
+            var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
 
             var htmlcontent = "";
 
@@ -1226,22 +1246,22 @@ var loadPage = function (serverName, portid) {
                     "language": {
                         "zeroRecords": "No data to be displayed"
                     },
-                    "fnRowCallback": function () {
-                        //debugger;
-                        //var length = this.fnGetData().length;
-                        //if (length <= this.fnPagingInfo().iLength) {
-                        //    //  $(this).parent().children(".dataTables_paginate").hide();
-                        //}
+                    "fnDrawCallback": function () {
+                        var length = this.fnGetData().length;
+                        if (length <= this.fnPagingInfo().iLength) {
+                            $(this).parent().children(".dataTables_paginate").hide();
+                        }
 
-                        if ($(this).find("tbody tr td").first().html() == "No data to be displayed") {
+                        if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                         } else {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
                         }
 
+
                         $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                     },
-                    "sDom": '<"clear">ilprtp',
+                    "sDom": '<"pager"p>t<"pager"p><"info"i><"clear">',
                     "aoColumns": [
                         null,
                         { "bSearchable": false },
@@ -1250,9 +1270,10 @@ var loadPage = function (serverName, portid) {
                     ]
                 });
 
-                // if (!$.isEmptyObject(response)) {
+
+
                 $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
-                //  }
+
 
                 //  Customizing DataTables to make it as existing pagination
                 $(".paginate_disabled_previous").html("Prev");

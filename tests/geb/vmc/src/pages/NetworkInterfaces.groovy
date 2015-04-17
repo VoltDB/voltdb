@@ -22,12 +22,12 @@ class NetworkInterfaces extends Module {
         portNameTitle			        { $("th", text:"Port Name") }
         clusterSettingTitle		        { $("th", text:"Cluster Settings") }
         serverSettingTitle		        { $("th", text:"Server Settings") }
-        clientPortTitle			        { $("td", text:"Client Port") }
-        adminPortTitle			        { $("td", text:"Admin Port") }
-        httpPortTitle 			        { $("td", text:"HTTP Port") }
-        internalPortTitle		        { $("td", text:"Internal Port") }
-        zookeeperPortTitle		        { $("td", text:"Zookeeper Port") }
-        replicationPortTitle	        { $("td", text:"Replication Port") }
+        clientPortTitle			        { $("#clientport").previous() }
+        adminPortTitle			        { $("#adminport").previous() }
+        httpPortTitle 			        { $("#httpport").previous() }
+        internalPortTitle		        { $("#internalPort").previous() }
+        zookeeperPortTitle		        { $("#zookeeperPort").previous() }
+        replicationPortTitle	        { $("#replicationPort").previous() }
 
         clusterClientPortValue			{ $("#clusterClientport") }
         clusterAdminPortValue			{ $("#clusterAdminport") }
