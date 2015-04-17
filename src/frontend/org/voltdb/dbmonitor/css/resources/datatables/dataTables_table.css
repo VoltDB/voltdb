@@ -91,6 +91,10 @@
     background: #aa1f2f;
   padding: 6px 10px!important;
   color: #fff;
+      -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
 }
 
 
@@ -100,6 +104,10 @@
      background: #aa1f2f;
   padding: 6px 10px!important;
   color: #fff;
+        -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
 }
 
 
@@ -108,6 +116,10 @@
      background: #aa1f2f;
   padding: 6px 10px!important;
   color: #fff;
+      -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
 }
 
 
@@ -116,6 +128,10 @@
      background: #aa1f2f;
   padding: 6px 10px!important;
   color: #fff;
+        -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
 }
 .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
      background: #76bd1d!important;
