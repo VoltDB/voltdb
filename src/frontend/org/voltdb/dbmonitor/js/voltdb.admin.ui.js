@@ -178,17 +178,6 @@ function loadAdminPage() {
         labelDrmode: $("#drMode"),
         labelDrId: $("#drId"),
 
-        //Edit Dr State objects
-        btnEditDrStateOk: $("#btnEditDrStateOk"),
-        btnEditDrStateCancel: $("#btnEditDrStateCancel"),
-        LinkDrStateEdit: $("#drStateEdit"),
-        chkDrState: $("#chkDrState"),
-        chkDrStateValue: $("#chkDrState").is(":checked"),
-        iconDrStateOption: $("#drStateIcon"),
-        txtDrState: $("#txtDrState"),
-        spanDrStateEdited: "",
-        loadingDrState: $("#loadingDrState"),
-
         //Edit Dr Master objects
         btnEditDrMasterOk: $("#btnEditDrMasterOk"),
         btnEditDrMasterCancel: $("#btnEditDrMasterCancel"),
@@ -204,19 +193,11 @@ function loadAdminPage() {
         drMasterLabel: $("#row-DrConfig").find("td:first-child").text(),
 
         //Edit Dr Replica objects
-        btnEditDrReplicaOk: $("#btnEditDrReplicaOk"),
-        btnEditDrReplicaCancel: $("#btnEditDrReplicaCancel"),
-        LinkDrReplicaEdit: $("#drReplicaEdit"),
         chkDrReplica: $("#chkDrReplica"),
         chkDrReplicaValue: $("#chkDrReplica").is(":checked"),
         iconDrReplicaOption: $("#drReplicaIcon"),
         txtDrReplica: $("#txtDrReplica"),
-        spanDrReplicaEdited: "",
-        loadingDrReplica: $("#loadingDrReplica"),
         labelReplicaSource: $("#replicaSource"),
-        txtDrSource: $("#txtDrSource"),
-        spanDrSource: $("#drSourceSpan"),
-        loadingDrSource: $("#loadingDrSource")
       };
 
     var adminValidationRules = {
@@ -2168,97 +2149,6 @@ function loadAdminPage() {
         }
     });
 
-    //Start DR State
-    var toggleDrStateEdit = function (state) {
-
-        if (adminEditObjects.chkDrStateValue) {
-            adminEditObjects.chkDrState.iCheck('check');
-        } else {
-            adminEditObjects.chkDrState.iCheck('uncheck');
-        }
-
-        //        adminEditObjects.editStateHeartbeatTimeout = state;
-        //        adminEditObjects.tBoxHeartbeatTimeout.val(adminEditObjects.tBoxHeartbeatTimeoutValue);
-
-        /*        if (state == editStates.ShowLoading) {
-                    adminDOMObjects.heartBeatTimeoutLabel.hide();
-                    adminEditObjects.LinkHeartbeatEdit.hide();
-                    adminEditObjects.spanHeartbeatTimeOut.hide();
-                    adminEditObjects.tBoxHeartbeatTimeout.hide();
-                    adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
-                    adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
-                    adminEditObjects.errorHeartbeatTimeout.hide();
-        
-                    adminEditObjects.loadingHeartbeatTimeout.show();
-                }
-                else*/
-        if (state == editStates.ShowOkCancel) {
-            adminEditObjects.loadingDrState.hide();
-            adminEditObjects.LinkDrStateEdit.hide();
-            adminEditObjects.btnEditDrStateOk.show();
-            adminEditObjects.btnEditDrStateCancel.show();
-            adminEditObjects.chkDrState.parent().addClass("customCheckbox");
-
-            adminEditObjects.iconDrStateOption.hide();
-        }
-        else {
-            adminEditObjects.loadingDrState.hide();
-            adminEditObjects.btnEditDrStateOk.hide();
-            adminEditObjects.btnEditDrStateCancel.hide();
-            adminEditObjects.LinkDrStateEdit.show();
-            adminEditObjects.chkDrState.parent().removeClass("customCheckbox");
-
-            adminEditObjects.iconDrStateOption.show();
-        }
-
-    };
-
-    adminEditObjects.LinkDrStateEdit.on("click", function () {
-        toggleDrStateEdit(editStates.ShowOkCancel);
-    });
-
-    adminEditObjects.btnEditDrStateCancel.on("click", function () {
-        toggleDrStateEdit(editStates.ShowEdit);
-    });
-
-    adminEditObjects.btnEditDrStateOk.popup({
-        open: function (event, ui, ele) {
-        },
-        afterOpen: function () {
-
-            var popup = $(this)[0];
-            $("#btnSaveDrState").unbind("click");
-            $("#btnSaveDrState").on("click", function () {
-
-                toggleDrStateEdit(editStates.ShowEdit);
-                popup.close();
-            });
-
-            $("#btnPopupDrStateCancel").on("click", function () {
-                toggleDrStateEdit(editStates.ShowEdit);
-                popup.close();
-            });
-
-            $(".popup_back").on("click", function () {
-                toggleDrStateEdit(editStates.ShowEdit);
-            });
-
-            $(".popup_close").on("click", function () {
-                toggleDrStateEdit(editStates.ShowEdit);
-            });
-        }
-    });
-
-    adminEditObjects.chkDrState.on('ifChanged', function () {
-        adminEditObjects.txtDrState.text(getOnOffText(adminEditObjects.chkDrState.is(":checked")));
-    });
-
-    adminEditObjects.chkDrState.iCheck({
-        checkboxClass: 'icheckbox_square-aero',
-        increaseArea: '20%' // optional
-    });
-    //End DR State
-
     //Start DR Master
     var toggleDrMasterEdit = function (state) {
 
@@ -2380,106 +2270,6 @@ function loadAdminPage() {
         increaseArea: '20%' // optional
     });
     //End DR Master
-
-    //Start DR Replica
-    var toggleDrReplicaEdit = function (state) {
-
-        if (adminEditObjects.chkDrReplicaValue) {
-            adminEditObjects.chkDrReplica.iCheck('check');
-        } else {
-            adminEditObjects.chkDrReplica.iCheck('uncheck');
-        }
-
-        //        adminEditObjects.editStateHeartbeatTimeout = state;
-        //        adminEditObjects.tBoxHeartbeatTimeout.val(adminEditObjects.tBoxHeartbeatTimeoutValue);
-
-        /*        if (state == editStates.ShowLoading) {
-                    adminDOMObjects.heartBeatTimeoutLabel.hide();
-                    adminEditObjects.LinkHeartbeatEdit.hide();
-                    adminEditObjects.spanHeartbeatTimeOut.hide();
-                    adminEditObjects.tBoxHeartbeatTimeout.hide();
-                    adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
-                    adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
-                    adminEditObjects.errorHeartbeatTimeout.hide();
-        
-                    adminEditObjects.loadingHeartbeatTimeout.show();
-                }
-                else*/
-        if (state == editStates.ShowOkCancel) {
-            adminEditObjects.loadingDrReplica.hide();
-            adminEditObjects.loadingDrSource.hide();
-            adminEditObjects.LinkDrReplicaEdit.hide();
-            adminEditObjects.spanDrSource.hide();
-            adminEditObjects.txtDrSource.show();
-            adminEditObjects.btnEditDrReplicaOk.show();
-            adminEditObjects.btnEditDrReplicaCancel.show();
-            adminEditObjects.chkDrReplica.parent().addClass("customCheckbox");
-
-            adminEditObjects.iconDrReplicaOption.hide();
-        }
-        else {
-            adminEditObjects.loadingDrReplica.hide();
-            adminEditObjects.loadingDrSource.hide();
-            adminEditObjects.btnEditDrReplicaOk.hide();
-            adminEditObjects.btnEditDrReplicaCancel.hide();
-            adminEditObjects.txtDrSource.hide();
-            adminEditObjects.spanDrSource.show();
-            adminEditObjects.LinkDrReplicaEdit.show();
-            adminEditObjects.chkDrReplica.parent().removeClass("customCheckbox");
-
-            adminEditObjects.iconDrReplicaOption.show();
-        }
-
-    };
-
-    adminEditObjects.LinkDrReplicaEdit.on("click", function () {
-        var parent = $(this).parent().parent();
-        parent.siblings('.child-' + parent.attr("id")).show();
-        parent.find(".labelCollapsed").addClass("labelExpanded");
-        toggleDrReplicaEdit(editStates.ShowOkCancel);
-    });
-
-    adminEditObjects.btnEditDrReplicaCancel.on("click", function () {
-        toggleDrReplicaEdit(editStates.ShowEdit);
-    });
-
-    adminEditObjects.btnEditDrReplicaOk.popup({
-        open: function (event, ui, ele) {
-        },
-        afterOpen: function () {
-
-            var popup = $(this)[0];
-            $("#btnSaveDrReplica").unbind("click");
-            $("#btnSaveDrReplica").on("click", function () {
-
-                toggleDrReplicaEdit(editStates.ShowEdit);
-                popup.close();
-            });
-
-            $("#btnPopupDrReplicaCancel").on("click", function () {
-                toggleDrReplicaEdit(editStates.ShowEdit);
-                popup.close();
-            });
-
-            $(".popup_back").on("click", function () {
-                toggleDrReplicaEdit(editStates.ShowEdit);
-            });
-
-            $(".popup_close").on("click", function () {
-                toggleDrReplicaEdit(editStates.ShowEdit);
-            });
-        }
-    });
-
-    adminEditObjects.chkDrReplica.on('ifChanged', function () {
-        adminEditObjects.txtDrReplica.text(getOnOffText(adminEditObjects.chkDrReplica.is(":checked")));
-    });
-
-    adminEditObjects.chkDrReplica.iCheck({
-        checkboxClass: 'icheckbox_square-aero',
-        increaseArea: '20%' // optional
-    });
-    //End DR Replica
 
     // Filters servers list
     $('#popServerSearchAdmin').keyup(function () {

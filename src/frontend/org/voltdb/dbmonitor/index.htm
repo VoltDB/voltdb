@@ -316,7 +316,7 @@
                             <div class="clear"></div>
                         </div>
                         <div id="drSection" class="drShowHide" style="display:none;">
-                            <div id="drMasterSection" class="masterWrapper" style="display:block;">
+                            <div id="drMasterSection" class="masterWrapper" style="display:none;">
                                 <div id="tblDrMAster_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
                                         <div class="tableTitle icon-master">Master</div>
@@ -353,7 +353,7 @@
                             </div>
 
 
-                            <div id="drReplicaSection" class="replicaWrapper" style="display:block">
+                            <div id="drReplicaSection" class="replicaWrapper" style="display:none">
                                 <div id="tblDrReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
                                         <div class="tableTitle icon-replica">Replica</div>
@@ -504,18 +504,7 @@
                                             <div class="loading-small loadingSecurity"></div>
                                         </div>
                                         <div class="securWrapper" id="UsersList">
-                                            <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
-                                                    <tr>
-                                                        <th>Username</th>
-                                                        <th>Password</th>
-                                                        <th>Role</th>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>Test</td>
-                                                        <td>Test</td>
-                                                        <td>User</td>
-                                                    </tr>
-                                                </table>-->
+                                            
                                         </div>
                                         <div class="securWrapper" id="UsersListEditable" style="display: none;">
                                             <div class="userName">Users</div>
@@ -726,16 +715,6 @@
                             </div>
                             <div class="drContent">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
-                                    <!--<tr>
-                                        <td width="62%" class="configLabel">State</td>
-                                        <td width="20%" align="right">
-                                            <div id="drStateIcon" class="onIcon"></div>
-                                            <input style="display: none;" type="checkbox" id="chkDrState" checked="checked" class="drstate" />
-                                            <div id="loadingDrState" class="loading-small" style="display: none"></div>
-                                        </td>
-                                         <td width="2%"><div id="txtDrState" class="drStateOn">On</div></td>
-                                        <td width="16%"><a id="btnEditDrStateOk" href="#drStatePop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrStateCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="drStateEdit" class="edit" title="Edit">&nbsp;</a></td>
-                                    </tr>-->
                                     <tr>
                                         <td width="62%" class="configLabel">ID</td>
                                         <td id="drId" width="20%" align="right"></td>
@@ -743,7 +722,6 @@
                                         <td width="16%">&nbsp;</td>
                                     </tr>
                                     <tr id="row-DrConfig">
-
                                         <td class="configLabel">Master</td>
                                         <td align="right" class="tdDrConfig">
                                             <div id="drMasterIcon" class="offIcon"></div>
@@ -757,29 +735,15 @@
                                             <a href="javascript:void(0);" id="drMasterEdit" class="edit" title="Edit">&nbsp;</a>
                                         </td>
                                     </tr>
-
                                     <tr>
                                         <td class="configLabel">Replica <span id="replicaSource" style="font-weight:normal"></span></td>
                                         <td align="right">
                                             <div id="drReplicaIcon" class="offIcon" title=""></div>
                                             <input style="display: none;" type="checkbox" id="chkDrReplica" checked="checked" />
-                                            <div id="loadingDrReplica" class="loading-small" style="display: none"></div>
                                         </td>
                                         <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
-                                        <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
+                                        <td> &nbsp;</td>
                                     </tr>
-
-                                    <!--<tr class="child-row-8 subLabelRow" id="Tr1">
-                                        <td class="configLabel">Source </td>
-                                        <td align="right" class="">
-                                            <div id="loadingDrSource" class="loading-small" style="display: none;"></div>
-                                            <span id="drSourceSpan">serverBz</span>
-                                            <input id="txtDrSource" name="txtDrSource" class="exitableTxtDr" value="serverBz" type="text" style="display: none" />
-                                        </td>
-                                        <td>&nbsp;</td>
-                                        <td>&nbsp;</td>
-                                    </tr>-->
-
                                 </table>
 
                             </div>
