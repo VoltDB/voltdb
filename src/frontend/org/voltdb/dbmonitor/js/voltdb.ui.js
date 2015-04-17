@@ -719,7 +719,7 @@ var loadPage = function (serverName, portid) {
 
                                 $('#liDrTables').css('display', 'block');
                                 showHideLastLineClass(true);
-                                
+
                                 $("#divDrWrapperAdmin").show();
 
                                 if (VoltDbUI.drEnabled) {
@@ -750,7 +750,7 @@ var loadPage = function (serverName, portid) {
                                         $('#drMasterSection').css('display', 'none');
                                     }
                                     $('#drReplicaSection').css('display', 'block');
-                                 } else {
+                                } else {
                                     $('#liDrReplication').css('display', 'none');
                                     $("#ChartDrReplicationRate").hide();
                                     //to show DR Mode
@@ -1160,8 +1160,6 @@ var loadPage = function (serverName, portid) {
                                                     "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
                                                     "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                                                     "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
-            //$("#tblDrReplica").find("tbody").html('');
-            //$("#tblDrReplica").find("tbody").append("<table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'>" + htmlcontent + "</table>");
             $("#drMasterSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
 
             table = $("#tblDrMAster").DataTable({
@@ -1172,28 +1170,7 @@ var loadPage = function (serverName, portid) {
                 "language": {
                     "zeroRecords": "No data to be displayed"
                 },
-                //"fnRowCallback": function () {
-                //    //debugger;
-                //    //var length = this.fnGetData().length;
-                //    //if (length <= this.fnPagingInfo().iLength) {
-                //    //    //  $(this).parent().children(".dataTables_paginate").hide();
-                //    //}
-                //    //  console.log($("#tblDrMAster").find("tbody tr td").first().html());
-                //    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
-                //        console.log("in");
-                //        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
-                //    } else {
-                //        $("#tblDrMAster").parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
-                //    }
-
-                //    $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
-                //},
                 "fnDrawCallback": function () {
-                    var length = this.fnGetData().length;
-                    if (length <= this.fnPagingInfo().iLength) {
-                        $(this).parent().children(".dataTables_paginate").hide();
-                    }
-
                     if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                     } else {
@@ -1271,12 +1248,9 @@ var loadPage = function (serverName, portid) {
                 var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Host ID</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
                                                    "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
                                             "<tbody>";
-                //$("#tblDrReplica").find("tbody").html('');
-                //$("#tblDrReplica").find("tbody").append("<table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'>" + htmlcontent + "</table>");
                 $("#drReplicaSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
 
                 replicaTable = $("#tblDrReplica").DataTable({
-                    // destroy: true,
                     stateSave: true,
                     pageLength: 5,
                     "sPaginationType": "extStyleLF",
