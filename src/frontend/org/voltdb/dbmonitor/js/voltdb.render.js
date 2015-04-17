@@ -562,7 +562,6 @@ function alertNodeClicked(obj) {
             var alertHtml = "";
 
             jQuery.each(systemMemory, function (id, val) {
-
                 var threshold = $.cookie("alert-threshold") != undefined ? $.cookie("alert-threshold") : 70;
                 if (val["MEMORYUSAGE"] * 1 >= threshold) {
                     alertHtml += '<li class="active"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick=\"alertNodeClicked(this);\" href=\"#\">' + val['HOSTNAME'] + '</a> <span class=\"memory-status alert\">' + val['MEMORYUSAGE'] + '%</span></li>';
@@ -740,7 +739,6 @@ function alertNodeClicked(obj) {
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
-
                 if (singleData[1] == 'IPADDRESS') {
                     if (singleData[2] == VoltDBConfig.GetDefaultServerIP()) {
                         voltDbRenderer.isHost = true;
@@ -783,12 +781,17 @@ function alertNodeClicked(obj) {
             });
 
             systemOverview = {};
-            systemOverview[0] = currentServerOverview;
+            if (!$.isEmptyObject(currentServerOverview))
+                systemOverview[0] = currentServerOverview;
+            
 
             //iterate through updatedSystemOverview to add remaining server to the list 'systemOverview'
             for (iterator = 0; iterator < updatedSystemOverview.length; iterator++) {
-                systemOverview[iterator + 1] = updatedSystemOverview[iterator];
-
+                if (!$.isEmptyObject(currentServerOverview))
+                    systemOverview[iterator + 1] = updatedSystemOverview[iterator];
+                else {
+                    systemOverview[iterator] = updatedSystemOverview[iterator];
+                }
             };
 
         };
