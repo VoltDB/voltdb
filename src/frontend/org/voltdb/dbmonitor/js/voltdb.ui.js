@@ -1146,11 +1146,8 @@ var loadPage = function (serverName, portid) {
 
             }
 
-            //$("#tblDrMAster").find("tbody").html('');
-            //$("#tblDrMAster").find("tbody").append(htmlcontent);
-
             if ($.fn.dataTable.isDataTable('#tblDrMAster')) {
-                $("#drMasterSection").find(".tblScroll").DataTable().destroy();
+                $("#tblDrMAster").DataTable().destroy();
             }
 
             var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
@@ -1160,7 +1157,7 @@ var loadPage = function (serverName, portid) {
                                                     "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
                                                     "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                                                     "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
-            $("#drMasterSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
+            $("#tblMAster_wrapper").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
 
             table = $("#tblDrMAster").DataTable({
                 stateSave: true,
@@ -1181,6 +1178,7 @@ var loadPage = function (serverName, portid) {
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
                 "sDom": '<"clear">ilprtp',
+                "order": [],
                 "aoColumns": [
                     null,
                     { "bSearchable": false },
@@ -1192,7 +1190,7 @@ var loadPage = function (serverName, portid) {
             });
 
             if (!$.isEmptyObject(response)) {
-                $("#tblDrMAster_wrapper").find(".paginationDefault").remove();
+                $("#tblMAster_wrapper").find(".paginationDefault").remove();
             }
 
             //Customizing DataTables to make it as existing pagination
@@ -1210,7 +1208,7 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
 
-            $("#tblDrMAster").find(".sorting_asc").removeClass("sorting_asc");
+             //$("#tblDrMAster").find(".sorting_asc").removeClass("sorting_asc");
 
             $("#drMasterSection").find(".pagination").hide();
         });
@@ -1243,7 +1241,7 @@ var loadPage = function (serverName, portid) {
 
 
                 if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
-                    $("#drReplicaSection").find(".tblScroll").DataTable().destroy();
+                    $("#tblDrReplica").DataTable().destroy();
                 }
                 var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Host ID</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
                                                    "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
@@ -1259,10 +1257,6 @@ var loadPage = function (serverName, portid) {
                         "zeroRecords": "No data to be displayed"
                     },
                     "fnDrawCallback": function () {
-                        //var length = this.fnGetData().length;
-                        //if (length <= this.fnPagingInfo().iLength) {
-                        //    $(this).parent().children(".dataTables_paginate").hide();
-                        //}
 
                         if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
@@ -1273,7 +1267,8 @@ var loadPage = function (serverName, portid) {
 
                         $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                     },
-                    "sDom": '<"pager"p>t<"pager"p><"info"i><"clear">',
+                    "order": [],
+                    "sDom": '<"clear">ilprtp',
                     "aoColumns": [
                         null,
                         { "bSearchable": false },
@@ -1283,7 +1278,7 @@ var loadPage = function (serverName, portid) {
                 });
 
 
-                $("#tblDrReplica_wrapper").find(".paginationDefault").remove();
+                $("#tblReplica_wrapper").find(".paginationDefault").remove();
 
 
                 //  Customizing DataTables to make it as existing pagination
