@@ -347,6 +347,7 @@ public class ExportBenchmark {
         while (benchmarkWarmupEndTS > now) {
             try {
                 client.callProcedure(
+                        new NullCallback(),
                         "InsertExport",
                         rowId.getAndIncrement(),
                         0);
@@ -371,6 +372,7 @@ public class ExportBenchmark {
         while (benchmarkEndTS > now) {
             try {
                 client.callProcedure(
+                        new ExportCallback(),
                         "InsertExport",
                         rowId.getAndIncrement(),
                         0);
@@ -739,7 +741,7 @@ public class ExportBenchmark {
                                     stats.getStartTimestamp(),
                                     duration,
                                     successfulInserts.get(),
-                                    serverStartTS - serverEndTS,
+                                    serverEndTS - serverStartTS,
                                     decodeTime,
                                     decodeSum.longValue(),
                                     tpsSum.longValue()));
