@@ -91,6 +91,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         resultHtml		{ $("#resultHtml") }
         resultCsv		{ $("#resultCsv") }
         resultMonospace	{ $("#resultMonospace") }
+        
+        errorObjectNameAlreadyExist     { $("span", class:"errorValue") }
     }
     static at = {
         sqlQueryTab.displayed

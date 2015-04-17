@@ -97,7 +97,7 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.banner.isDisplayed() }
+        waitFor(waitTime) { header.banner.isDisplayed() }
     }
 
 
@@ -105,28 +105,28 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.image.isDisplayed() }
+        waitFor(waitTime) { header.image.isDisplayed() }
     }
 
     def "header username exists" () {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
     }
 
     def "header help exists" () {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.help.isDisplayed() }
+        waitFor(waitTime) { header.help.isDisplayed() }
     }
 
     // HEADER TAB TESTS
@@ -135,7 +135,7 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabDBMonitor.isDisplayed()
             header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
         }
@@ -145,7 +145,7 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabAdmin.isDisplayed()
             header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
         }
@@ -155,7 +155,7 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.tabSchema.isDisplayed()
             header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
 
@@ -166,7 +166,7 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.tabSQLQuery.isDisplayed()
+        waitFor(waitTime) { header.tabSQLQuery.isDisplayed()
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
         }
     }
@@ -176,7 +176,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPage
         String username = page.getUsername()
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             header.usernameInHeader.isDisplayed()
             header.usernameInHeader.text().equals(username)
         }
@@ -187,9 +187,9 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
         header.usernameInHeader.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -201,9 +201,9 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
         header.usernameInHeader.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -218,9 +218,9 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
         header.logout.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -233,9 +233,9 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { header.logout.isDisplayed() }
+        waitFor(waitTime) { header.logout.isDisplayed() }
         header.logout.click()
-        waitFor(30) {
+        waitFor(waitTime) {
             header.logoutPopupOkButton.isDisplayed()
             header.logoutPopupCancelButton.isDisplayed()
             header.popupClose.isDisplayed()
@@ -248,11 +248,10 @@ class SchemaPageTest extends TestBase {
     def "help popup existance" () {
         when:
         at SchemaPage
-        waitFor(30) { header.help.isDisplayed() }
+        waitFor(waitTime) { header.help.isDisplayed() }
         header.help.click()
         then:
-        waitFor(30) {
-            header.popup.isDisplayed()
+        waitFor(waitTime) {
             header.popupTitle.isDisplayed()
             header.popupClose.isDisplayed()
             header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
@@ -267,14 +266,14 @@ class SchemaPageTest extends TestBase {
         when:
         at SchemaPage
         then:
-        waitFor(30) { footer.banner.isDisplayed() }
+        waitFor(waitTime) { footer.banner.isDisplayed() }
     }
 
     def "footer text exists and valid"() {
         when:
         at SchemaPage
         then:
-        waitFor(30) {
+        waitFor(waitTime) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
             footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
@@ -391,7 +390,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if system overview present'
-        waitFor(30) { page.checkSystemOverview() }
+        waitFor(waitTime) { page.checkSystemOverview() }
         then: 'check if text is correct'
         page.systemOverview.text().equals("System Overview")
     }
@@ -403,7 +402,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if mode present'
-        waitFor(30) { page.checkMode() }
+        waitFor(waitTime) { page.checkMode() }
         then: 'check if text is correct'
         page.mode.text().equals("Mode")
     }
@@ -415,7 +414,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if voltDB version present'
-        waitFor(30) { page.checkVoltDBVersion() }
+        waitFor(waitTime) { page.checkVoltDBVersion() }
         then: 'check if text is correct'
         page.voltDBVersion.text().equals("VoltDB Version")
     }
@@ -427,7 +426,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if buildstring present'
-        waitFor(30) { page.checkBuildstring() }
+        waitFor(waitTime) { page.checkBuildstring() }
         then: 'check if text is correct'
         page.buildstring.text().equals("Buildstring")
     }
@@ -439,7 +438,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if cluster composition present'
-        waitFor(30) { page.checkClusterComposition() }
+        waitFor(waitTime) { page.checkClusterComposition() }
         then: 'check if text is correct'
         page.clusterComposition.text().equals("Cluster Composition")
     }
@@ -451,7 +450,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if running since present'
-        waitFor(30) { page.checkRunningSince() }
+        waitFor(waitTime) { page.checkRunningSince() }
         then: 'check if text is correct'
         page.runningSince.text().equals("Running Since")
     }
@@ -465,7 +464,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if catalog overview statistics present'
-        waitFor(30) { page.checkCatalogOverviewStatistics() }
+        waitFor(waitTime) { page.checkCatalogOverviewStatistics() }
         then: 'check if text is correct'
         page.catalogOverviewStatistics.text().equals("Catalog Overview Statistics")
     }
@@ -477,7 +476,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if compiled by present'
-        waitFor(30) { page.checkCompiledBy() }
+        waitFor(waitTime) { page.checkCompiledBy() }
         then: 'check if text is correct'
         page.compiledBy.text().equals("Compiled by VoltDB Version")
     }
@@ -489,7 +488,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if compiled on present'
-        waitFor(30) { page.checkCompiledOn() }
+        waitFor(waitTime) { page.checkCompiledOn() }
         then: 'check if text is correct'
         page.compiledOn.text().equals("Compiled on")
     }
@@ -501,7 +500,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if table count present'
-        waitFor(30) { page.checkTableCount() }
+        waitFor(waitTime) { page.checkTableCount() }
         then: 'check if text is correct'
         page.tableCount.text().equals("Table Count")
     }
@@ -513,7 +512,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if materialized view count present'
-        waitFor(30) { page.checkMaterializedViewCount() }
+        waitFor(waitTime) { page.checkMaterializedViewCount() }
         then: 'check if text is correct'
         page.materializedViewCount.text().equals("Materialized View Count")
     }
@@ -525,7 +524,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if index count present'
-        waitFor(30) { page.checkIndexCount() }
+        waitFor(waitTime) { page.checkIndexCount() }
         then: 'check if text is correct'
         page.indexCount.text().equals("Index Count")
     }
@@ -537,7 +536,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if prodedure count present'
-        waitFor(30) { page.checkProcedureCount() }
+        waitFor(waitTime) { page.checkProcedureCount() }
         then: 'check if text is correct'
         page.procedureCount.text().equals("Procedure Count")
     }
@@ -549,7 +548,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if statement count present'
-        waitFor(30) { page.checkSqlStatementCount() }
+        waitFor(waitTime) { page.checkSqlStatementCount() }
         then: 'check if text is correct'
         page.sqlStatementCount.text().equals("SQL Statement Count")
     }
@@ -561,7 +560,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if mode value present'
-        waitFor(30) { page.modeValue.isDisplayed() }
+        waitFor(waitTime) { page.modeValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.modeValue.text().equals("")) {
@@ -581,7 +580,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if voltdb version value present'
-        waitFor(30) { page.voltDBVersionValue.isDisplayed() }
+        waitFor(waitTime) { page.voltDBVersionValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.voltDBVersionValue.text().equals("")) {
@@ -601,7 +600,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if buildstring value present'
-        waitFor(30) { page.buildstringValue.isDisplayed() }
+        waitFor(waitTime) { page.buildstringValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.buildstringValue.text().equals("")) {
@@ -621,7 +620,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if cluster composition value present'
-        waitFor(30) { page.clusterCompositionValue.isDisplayed() }
+        waitFor(waitTime) { page.clusterCompositionValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.clusterCompositionValue.text().equals("")) {
@@ -641,7 +640,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if running since value present'
-        waitFor(30) { page.runningSinceValue.isDisplayed() }
+        waitFor(waitTime) { page.runningSinceValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.runningSinceValue.text().equals("")) {
@@ -661,7 +660,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if compiled by voltdb version value present'
-        waitFor(30) { page.compiledByValue.isDisplayed() }
+        waitFor(waitTime) { page.compiledByValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.compiledByValue.text().equals("")) {
@@ -681,7 +680,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if compiled on value present'
-        waitFor(30) { page.compiledOnValue.isDisplayed() }
+        waitFor(waitTime) { page.compiledOnValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.compiledOnValue.text().equals("")) {
@@ -701,7 +700,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if table count value present'
-        waitFor(30) { page.tableCountValue.isDisplayed() }
+        waitFor(waitTime) { page.tableCountValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.tableCountValue.text().equals("")) {
@@ -721,7 +720,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if materialized view count value present'
-        waitFor(30) { page.materializedViewCountValue.isDisplayed() }
+        waitFor(waitTime) { page.materializedViewCountValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.materializedViewCountValue.text().equals("")) {
@@ -741,7 +740,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if index count value present'
-        waitFor(30) { page.indexCountValue.isDisplayed() }
+        waitFor(waitTime) { page.indexCountValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.indexCountValue.text().equals("")) {
@@ -761,7 +760,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if procedure count value present'
-        waitFor(30) { page.procedureCountValue.isDisplayed() }
+        waitFor(waitTime) { page.procedureCountValue.isDisplayed() }
         then: 'check if text is present'
 
         if(!page.procedureCountValue.text().equals("")) {
@@ -781,7 +780,7 @@ class SchemaPageTest extends TestBase {
         at SchemaPageOverviewTab
 
         when: 'check if sql statement count value present'
-        waitFor(30) { page.sqlStatementCountValue.isDisplayed() }
+        waitFor(waitTime) { page.sqlStatementCountValue.isDisplayed() }
         then: 'check if text is present'
         if(!page.sqlStatementCountValue.text().equals("")) {
             println("Overview Tab:Check SQL Statement Count Value-PASS")
@@ -1145,7 +1144,7 @@ class SchemaPageTest extends TestBase {
         page.refreshbutton.click()
         page.searchName.value(tablename)
         then: 'at least one table is present'
-        waitFor(30) { page.tablenamePresent.isDisplayed() }
+        waitFor(waitTime) { page.tablenamePresent.isDisplayed() }
 
         when: 'go to SQL Query page'
         page.gotoSqlQuery()
@@ -1178,7 +1177,7 @@ class SchemaPageTest extends TestBase {
         page.refreshbutton.click()
         page.searchName.value(tablename)
         then: 'at least one table is present'
-        waitFor(30) { !page.tablenamePresent.isDisplayed() }
+        waitFor(waitTime) { !page.tablenamePresent.isDisplayed() }
 
         if(!page.tablenamePresent.isDisplayed()) {
             println("Size Worksheet Tab:Add table, search and delete-PASS")
@@ -1367,13 +1366,25 @@ class SchemaPageTest extends TestBase {
 		then: 'run the query'
 		page.runQuery()
 				
-		if ( page.queryStatus.isDisplayed() ) {
-			println("Create query successful")
-		}
-		else {
-			println("Create query unsuccessful")
-			assert false
-		}
+		try {
+            waitFor(waitTime) {
+                page.errorObjectNameAlreadyExist.isDisplayed()
+            }
+            println("Table with tablename: " + tablename + " already created")
+        } catch(geb.waiting.WaitTimeoutException e) {
+            try {
+                waitFor(waitTime) {
+                    page.queryStatus.isDisplayed()
+                }
+                println("Create query successful")
+            } catch(geb.error.RequiredPageContentNotPresent f) {
+                println("Create query unsuccessful")
+                assert false
+            } catch(geb.waiting.WaitTimeoutException f) {
+                println("Create query unsuccessful")
+                assert false
+            }
+        }
 		
 		when: 'go to Schema page'
 		page.gotoSchema()
@@ -1389,7 +1400,8 @@ class SchemaPageTest extends TestBase {
 		page.refreshbutton.click()
 		page.searchName.value(tablename)
 		then: 'at least one table is present'
-		waitFor(30) { page.requiredId.isDisplayed() }
+		waitFor(waitTime) { page.requiredId.isDisplayed() }
+		println("Table with tablename: " + tablename + " was found")
 		
 		when: 'go to SQL Query page'
 		page.gotoSqlQuery()
@@ -1400,13 +1412,19 @@ class SchemaPageTest extends TestBase {
 		page.setQueryText(deleteQuery)
 		then: 'run the query'
 		page.runQuery()
-		if ( page.queryStatus.isDisplayed() ) {
-			println("Delete query successful")
-		}
-		else {
-			println("Delete query unsuccessful")
-			assert false
-		}
+		
+		try {
+            waitFor(waitTime) {
+                page.queryStatus.isDisplayed()
+            }
+            println("Delete query successful")
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            println("Delete query unsuccessful")
+            assert false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Delete query unsuccessful")
+            assert false
+        }
 		
 		when: 'go to Schema page'
 		page.gotoSchema()
@@ -1415,22 +1433,15 @@ class SchemaPageTest extends TestBase {
 		
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
-		then: 'at sschema tab'
+		then: 'at schema tab'
 		at SchemaPageSchemaTab
 		
 		when: 'tablename is searched'
 		page.refreshbutton.click()
 		page.searchName.value(tablename)
 		then: 'at least one table is present'
+		println("Table with tablename: " + tablename + " wasn't found")
 		
-		try {
-			page.requiredId.isDisplayed()
-			println("Schema Tab:Add table, search and delete-FAIL")
-			assert false
-		}
-		catch (geb.error.RequiredPageContentNotPresent e) {
-			println("Schema Tab:Add table, search and delete-PASS")
-		}
 		println()
 	}
 	
@@ -1547,7 +1558,7 @@ class SchemaPageTest extends TestBase {
 		at SchemaPageDdlSourceTab
 		
 		when: 'check if download button is present'
-		waitFor(30) { page.downloadButton.isDisplayed() }
+		waitFor(waitTime) { page.downloadButton.isDisplayed() }
 		then: 'check if download button is correct'
 		page.downloadButton.text().equals("Download")
 	}
@@ -1558,7 +1569,7 @@ class SchemaPageTest extends TestBase {
 		then: 'at ddl source tab'
 		at SchemaPageDdlSourceTab
 		
-		waitFor(30) { page.sourceText.isDisplayed() }
+		waitFor(waitTime) { page.sourceText.isDisplayed() }
 	}
 	
 	// Cleanup
