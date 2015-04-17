@@ -58,7 +58,6 @@ public class ImportHandler {
             new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer", true);
     private final static AtomicLong m_idGenerator = new AtomicLong(0);
     private final long m_id;
-    private final long m_callbackHandle;
     private final AtomicLong m_pendingCount = new AtomicLong(0);
     private static final long MAX_PENDING_TRANSACTIONS = 10000;
 
@@ -96,7 +95,6 @@ public class ImportHandler {
         m_importContext = importContext;
         VoltDB.instance().getClientInterface().bindAdapter(m_adapter, null);
         m_adapter.registerHandler(this);
-        m_callbackHandle = m_adapter.registerCallback(new ImportCallback(importContext, this));
     }
 
     public long getId() {
@@ -169,18 +167,16 @@ public class ImportHandler {
         //type + procname(len + name) + connectionId (long) + params
         int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
         final ByteBuffer taskbuf = getBuffer(sz);
-        //final ByteBuffer pbuf = getBuffer(pset.getSerializedSize());
         try {
             taskbuf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
             taskbuf.putInt((int )proc.length());
             taskbuf.put(proc.getBytes());
             taskbuf.putLong(ImportHandler.m_adapter.connectionId());
             pset.flattenToBuffer(taskbuf);
-            //pbuf.flip();
-            //taskbuf.put(pbuf);
             taskbuf.flip();
             task.initFromBuffer(taskbuf);
-            task.setClientHandle(m_callbackHandle);
+            long cbhandle = m_adapter.registerCallback(new ImportCallback(ic, this));
+            task.setClientHandle(cbhandle);
             //pbuf.clear();
         } catch (IOException ex) {
             m_failedCount.incrementAndGet();
