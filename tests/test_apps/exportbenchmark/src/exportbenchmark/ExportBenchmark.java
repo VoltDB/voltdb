@@ -36,15 +36,32 @@ package exportbenchmark;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.Math;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.net.InetSocketAddress;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.spi.SelectorProvider;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -55,6 +72,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.types.TimestampType;
 
 /**
  * Asychronously sends data to an export table to test VoltDB export performance.
@@ -70,18 +88,40 @@ public class ExportBenchmark {
     final Client client;
     // Validated CLI config
     final ExportBenchConfig config;
+    // Network variables
+    Selector statsSocketSelector;
+    Thread statsThread;
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
     // Timer for periodic stats
-    Timer timer;
+    Timer periodicStatsTimer;
     // Test stats variables
-    long insertNumber = 0;
+    long totalInserts = 0;
     AtomicLong successfulInserts = new AtomicLong(0);
     AtomicLong failedInserts = new AtomicLong(0);
+    AtomicBoolean testFinished = new AtomicBoolean(false);
+    // Server-side stats
+    ArrayList<StatClass> serverStats = new ArrayList<StatClass>();
     // Test timestamp markers
-    long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS;
+    long benchmarkStartTS, benchmarkWarmupEndTS, benchmarkEndTS, serverStartTS, serverEndTS, decodeTime, partCount;
 
+    class StatClass {
+        public Integer m_partition;
+        public Long m_transactions;
+        public Long m_decode;
+        public Long m_startTime;
+        public Long m_endTime;
+
+        StatClass (Integer partition, Long transactions, Long decode, Long startTime, Long endTime) {
+            m_partition = partition;
+            m_transactions = transactions;
+            m_decode = decode;
+            m_startTime = startTime;
+            m_endTime = endTime;
+        }
+    }
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
@@ -95,13 +135,16 @@ public class ExportBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 15;
+        int duration = 25;
 
         @Option(desc = "Warmup duration in seconds.")
-        int warmup = 5;
+        int warmup = 10;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
+
+        @Option (desc = "Port on which to listen for statistics info from export clients")
+        int statsPort = 5001;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -122,13 +165,24 @@ public class ExportBenchmark {
      */
     class ExportCallback implements ProcedureCallback {
         @Override
-        public void clientCallback(ClientResponse response) throws Exception {
+        public void clientCallback(ClientResponse response) {
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 successfulInserts.incrementAndGet();
             } else {
                 failedInserts.incrementAndGet();
             }
         }
+    }
+
+    /**
+     * Clean way of exiting from an exception
+     * @param message   Message to accompany the exception
+     * @param e         The exception thrown
+     */
+    private void exitWithException(String message, Exception e) {
+        System.err.println(message);
+        System.err.println(e.getLocalizedMessage());
+        System.exit(-1);
     }
 
     /**
@@ -145,27 +199,31 @@ public class ExportBenchmark {
 
         fullStatsContext = client.createStatsContext();
         periodicStatsContext = client.createStatsContext();
+
+        serverStartTS = serverEndTS = decodeTime = partCount = 0;
     }
 
     /**
-     * Create a Timer task to display performance data on the Vote procedure
-     * It calls printStatistics() every displayInterval seconds
-     */
+    * Create a Timer task to display performance data.
+    * It calls printStatistics() every displayInterval seconds
+    */
     public void schedulePeriodicStats() {
-        timer = new Timer();
+        periodicStatsTimer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
         };
-        timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
+        periodicStatsTimer.scheduleAtFixedRate(statsPrinting,
+                                    config.displayinterval * 1000,
+                                    config.displayinterval * 1000);
     }
 
     /**
      * Checks the export table to make sure that everything has been successfully
      * processed.
-     * @throws Exception
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws InterruptedException
      */
     public boolean waitForStreamedAllocatedMemoryZero() throws ProcCallException,IOException,InterruptedException {
         boolean passed = false;
@@ -237,9 +295,9 @@ public class ExportBenchmark {
                 client.createConnection(server);
                 break;
             }
-            catch (Exception e) {
+            catch (IOException e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                try { Thread.sleep(sleep); } catch (InterruptedException interruted) {}
                 if (sleep < 8000) sleep += sleep;
             }
         }
@@ -280,20 +338,27 @@ public class ExportBenchmark {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    public void doInserts(Client client) throws NoConnectionsException, InterruptedException {
+    public void doInserts(Client client) {
 
         // Don't track warmup inserts
         System.out.println("Warming up...");
         long now = System.currentTimeMillis();
+        AtomicLong rowId = new AtomicLong(0);
         while (benchmarkWarmupEndTS > now) {
             try {
-                client.callProcedure(new NullCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                if (++insertNumber % 50 == 0) {
+                client.callProcedure(
+                        new NullCallback(),
+                        "InsertExport",
+                        rowId.getAndIncrement(),
+                        0);
+                // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
+                if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
                 }
-            } catch (IOException ignore) {}
+            } catch (Exception ignore) {}
         }
         System.out.println("Warmup complete");
+        rowId.set(0);
 
         // reset the stats after warmup is done
         fullStatsContext.fetchAndResetBaseline();
@@ -306,12 +371,14 @@ public class ExportBenchmark {
         now = System.currentTimeMillis();
         while (benchmarkEndTS > now) {
             try {
-                boolean success = client.callProcedure(new ExportCallback(), "ExportInsert", insertNumber, 1, 53, 64, 2.452, "String", 48932098, "aa");
-                if (++insertNumber % 50 == 0) {
+                client.callProcedure(
+                        new ExportCallback(),
+                        "InsertExport",
+                        rowId.getAndIncrement(),
+                        0);
+                // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
+                if (++totalInserts % 50 == 0) {
                     now = System.currentTimeMillis();
-                }
-                if (!success) {
-                    System.err.println("Stored procedure not queuing");
                 }
             } catch (Exception e) {
                 System.err.println("Couldn't insert into VoltDB\n");
@@ -319,9 +386,149 @@ public class ExportBenchmark {
                 System.exit(1);
             }
         }
-        client.drain();
+
+        try {
+            client.drain();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         System.out.println("Benchmark complete: wrote " + successfulInserts.get() + " objects");
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
+
+        testFinished.set(true);
+        statsSocketSelector.wakeup();
+    }
+
+    /**
+     * Listens on a UDP socket for incoming statistics packets, until the
+     * test is finished.
+     */
+    private void listenForStats() {
+
+        while (true) {
+            // Wait for an event...
+            try {
+                statsSocketSelector.select();
+            } catch (IOException e) {
+                exitWithException("Can't select a new socket", e);
+            }
+
+            // See if we're done
+            if (testFinished.get() == true) {
+                return;
+            }
+
+            // We have events. Process each one.
+            for (SelectionKey key : statsSocketSelector.selectedKeys()) {
+                if (!key.isValid()) {
+                    continue;           // Ignore invalid keys
+                }
+
+                if (key.isReadable()) {
+                    getStatsMessage((DatagramChannel)key.channel());
+                }
+            }
+        }
+    }
+
+    /**
+     * Parses a received statistics message & logs the information
+     * @param channel   The channel with the incoming packet
+     */
+    private void getStatsMessage(DatagramChannel channel) {
+        String message = null;
+
+        // Read the data
+        try {
+            buffer.clear();
+            channel.receive(buffer);
+
+            buffer.flip();
+            int messageLength = buffer.get();
+
+            if (messageLength > buffer.capacity()) {
+                System.out.println("WARN: packet exceeds allocate size; message truncated");
+            }
+
+            byte[] localBuf = new byte[messageLength];
+            buffer.get(localBuf, 0, messageLength);
+            message = new String(localBuf);
+        } catch (IOException e) {
+            exitWithException("Couldn't read from socket", e);
+        }
+
+        // Parse the stats message
+        JSONObject json;
+        try {
+            json = new JSONObject(message);
+        } catch (JSONException e) {
+            System.err.println("Received invalid JSON: " + e.getLocalizedMessage());
+            return;
+        }
+
+        final Integer partitionId;
+        final Long transactions;
+        final Long decode;
+        final Long startTime;
+        final Long endTime;
+        try {
+            partitionId = new Integer(json.getInt("partitionId"));
+            transactions = new Long(json.getLong("transactions"));
+            decode = new Long(json.getLong("decodeTime"));
+            startTime = new Long(json.getLong("startTime"));
+            endTime = new Long(json.getLong("endTime"));
+        } catch (JSONException e) {
+            System.err.println("Unable to parse JSON " + e.getLocalizedMessage());
+            return;
+        }
+        // This should always be true
+        if (transactions > 0 && decode > 0 && startTime > 0 && endTime > startTime) {
+            serverStats.add(new StatClass(partitionId, transactions, decode, startTime, endTime));
+            if (startTime < serverStartTS || serverStartTS == 0) {
+                serverStartTS = startTime;
+            }
+            if (endTime > serverEndTS) {
+                serverEndTS = endTime;
+            }
+            if (partitionId > partCount) {
+                partCount = partitionId;
+            }
+            decodeTime += decode;
+        }
+        // If the else is called it means we received invalid data from the export client
+        else {
+            System.out.println("WARN: invalid data received - partitionId: " + partitionId + " | transactions: " + transactions + " | decode: " + decode +
+                    " | startTime: " + startTime + " | endTime: " + endTime);
+        }
+    }
+
+    /**
+     * Sets up a UDP socket on a certain port to listen for connections.
+     */
+    private void setupSocketListener() {
+        DatagramChannel channel = null;
+
+        // Setup Listener
+        try {
+            statsSocketSelector = SelectorProvider.provider().openSelector();
+            channel = DatagramChannel.open();
+            channel.configureBlocking(false);
+        } catch (IOException e) {
+            exitWithException("Couldn't set up network channels", e);
+        }
+
+        // Bind to port & register with a channel
+        try {
+            InetSocketAddress isa = new InetSocketAddress(
+                                            CoreUtils.getLocalAddress(),
+                                            config.statsPort);
+            channel.socket().setReuseAddress(true);
+            channel.socket().bind(isa);
+            channel.register(statsSocketSelector, SelectionKey.OP_READ);
+        } catch (IOException e) {
+            exitWithException("Couldn't bind to socket", e);
+        }
     }
 
     /**
@@ -329,7 +536,7 @@ public class ExportBenchmark {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    private void runTest() throws NoConnectionsException, InterruptedException {
+    private void runTest() throws InterruptedException {
         // Connect to servers
         try {
             System.out.println("Test initialization");
@@ -345,19 +552,34 @@ public class ExportBenchmark {
         benchmarkWarmupEndTS = benchmarkStartTS + (config.warmup * 1000);
         benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
 
-        // Do the inserts
-        doInserts(client);
+        // Do the inserts in a separate thread
+        Thread writes = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                doInserts(client);
+            }
+        });
+        writes.start();
 
-        timer.cancel();
+        // Listen for stats until we stop
+        Thread.sleep(config.warmup * 1000);
+        setupSocketListener();
+        listenForStats();
+
+        writes.join();
+        periodicStatsTimer.cancel();
         System.out.println("Client flushed; waiting for export to finish");
 
         // Wait until export is done
         boolean success = false;
         try {
             success = waitForStreamedAllocatedMemoryZero();
-        } catch (Exception e) {
+        } catch (IOException e) {
             System.err.println("Error while waiting for export: ");
-            e.printStackTrace();
+            e.getLocalizedMessage();
+        } catch (ProcCallException e) {
+            System.err.println("Error while calling procedures: ");
+            e.getLocalizedMessage();
         }
 
         System.out.println("Finished benchmark");
@@ -366,8 +588,14 @@ public class ExportBenchmark {
         printResults(benchmarkEndTS-benchmarkWarmupEndTS);
         client.close();
 
+        // Make sure we got serverside stats
+        if (serverStats.size() == 0) {
+            System.err.println("ERROR: Never received stats from export clients");
+            success = false;
+        }
+
         if (!success) {
-            System.exit(1);
+            System.exit(-1);
         }
     }
 
@@ -388,6 +616,53 @@ public class ExportBenchmark {
                 stats.kPercentileLatencyAsDouble(0.99999));
     }
 
+    public synchronized Double calcRatio(StatClass index, StatClass indexPrime) {
+        Double ratio = new Double(0);
+        // Check for overlap format:
+        //      |-----index window-----|
+        //   |-----indexPrime window-----|
+        if (indexPrime.m_endTime >= index.m_endTime && indexPrime.m_startTime <= index.m_startTime) {
+            ratio = new Double(index.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+            if (ratio <= 0 || ratio > 1) {
+                System.out.println("Bad Ratio 1 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                System.exit(-1);
+            }
+        }
+        // Check for overlap format:
+        //      |-----index window-----|
+        //        |-indexPrime window-|
+        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_startTime >= index.m_startTime) {
+            ratio = new Double(1);
+        }
+        // Check for overlap format:
+        //      |-----index window-----|
+        //            |--indexPrime window--|
+        else if (indexPrime.m_startTime >= index.m_startTime && indexPrime.m_startTime < index.m_endTime) {
+            ratio = new Double(index.m_endTime - indexPrime.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+            if (ratio <= 0 || ratio > 1) {
+                System.out.println("Bad Ratio 2 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                System.exit(-1);
+            }
+        }
+        // Check for overlap format:
+        //      |-----index window-----|
+        // |--indexPrime window--|
+        else if (indexPrime.m_endTime <= index.m_endTime && indexPrime.m_endTime > index.m_startTime) {
+            ratio = new Double(indexPrime.m_endTime - index.m_startTime) / (indexPrime.m_endTime - indexPrime.m_startTime);
+            if (ratio <= 0 || ratio > 1) {
+                System.out.println("Bad Ratio 3 - ratio: " + ratio + " || index.endTime: " + index.m_endTime +
+                        " || index.startTime: " + index.m_startTime + " || indexPrime.endTime: " + indexPrime.m_endTime +
+                        " || indexPrime.startTime: " + indexPrime.m_startTime);
+                System.exit(-1);
+            }
+        }
+        return ratio;
+    }
+
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
@@ -397,6 +672,32 @@ public class ExportBenchmark {
      */
     public synchronized void printResults(long duration) {
         ClientStats stats = fullStatsContext.fetch().getStats();
+
+        ArrayList<StatClass> indexStats = new ArrayList<StatClass>();
+        for (StatClass index : serverStats) {
+            if (index.m_partition.equals(0)) {
+                Double transactions = new Double(index.m_transactions);
+                Double decode = new Double(index.m_decode);
+                for (StatClass indexPrime : serverStats) {
+                    // If indexPrime is not partition 0 check for window overlap
+                    if (!indexPrime.m_partition.equals(0)) {
+                        Double ratio = calcRatio(index, indexPrime);
+                        transactions +=  ratio * indexPrime.m_transactions;
+                        decode += ratio * indexPrime.m_transactions;
+                    }
+                }
+                indexStats.add(new StatClass(index.m_partition, transactions.longValue(), decode.longValue(), index.m_startTime, index.m_endTime));
+            }
+        }
+
+        Double tpsSum = new Double(0);
+        Double decodeSum = new Double(0);
+        for (StatClass index : indexStats) {
+            tpsSum += (new Double(index.m_transactions * 1000) / (index.m_endTime - index.m_startTime));
+            decodeSum += (new Double(index.m_decode) / index.m_transactions);
+        }
+        tpsSum = (tpsSum / indexStats.size());
+        decodeSum = (decodeSum / indexStats.size());
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -418,6 +719,11 @@ public class ExportBenchmark {
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
+        System.out.printf("Average throughput:            %,9d txns/sec\n", tpsSum.longValue());
+        System.out.printf("Average decode time:           %,9.2f ns\n", decodeSum);
+        Double decodePerc = (new Double(decodeTime) / (((serverEndTS - serverStartTS) * (partCount + 1)) * 1000000)) * 100;
+        System.out.printf("Percent decode row time:       %,9.2f %%\n", decodePerc);
+
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
@@ -431,10 +737,14 @@ public class ExportBenchmark {
         try {
             if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
                 FileWriter fw = new FileWriter(config.statsfile);
-                fw.append(String.format("%d,%d,%d,0,0,0,0,0,0,0,0,0,0\n",
+                fw.append(String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
                                     stats.getStartTimestamp(),
                                     duration,
-                                    successfulInserts.get()));
+                                    successfulInserts.get(),
+                                    serverEndTS - serverStartTS,
+                                    decodeTime,
+                                    decodeSum.longValue(),
+                                    tpsSum.longValue()));
                 fw.close();
             }
         } catch (IOException e) {
@@ -456,10 +766,8 @@ public class ExportBenchmark {
         try {
             ExportBenchmark bench = new ExportBenchmark(config);
             bench.runTest();
-        } catch (NoConnectionsException|InterruptedException e) {
-            System.err.println("VoltDB client error");
+        } catch (InterruptedException e) {
             e.printStackTrace();
-            System.exit(1);
         }
     }
 }
