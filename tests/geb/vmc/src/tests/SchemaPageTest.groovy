@@ -1065,44 +1065,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Size Worksheet Tab:Check Size Analysis Summary values for total"() {
-        when: 'go to size worksheet tab'
-        page.openSchemaPageSizeWorksheetTab()
-        then: 'at size worksheet tab'
-        at SchemaPageSizeWorksheetTab
-
-        when: 'check if text is present'
-        page.textTable.isDisplayed()
-        then: 'check if text is correct'
-        if(page.textTotal.text().equals("Total user data is expected to use between")) {
-            println("Size Worksheet Tab:Check Size Analysis Summary values for total-Text Correct")
-        }
-        else {
-            println("Size Worksheet Tab:Text not available or wrong - FAIL")
-            assert false
-        }
-
-        if (page.sizeTotalMin.isDisplayed()) {
-            println("Size Worksheet Tab:Check Size Analysis Summary values for total-Min present")
-        }
-        else {
-            println("Size Worksheet Tab:Size Table Min not present-FAIL")
-            assert false
-        }
-
-        if (page.sizeTotalMax.isDisplayed()) {
-            println("Size Worksheet Tab:Check Size Analysis Summary values for total-Max present")
-        }
-        else {
-            println("Size Worksheet Tab:Size Table Max not present-FAIL")
-            assert false
-        }
-
-        println("Size Worksheet Tab:Check Size Analysis Summary values for total-PASS")
-        println()
-    }
-
-    def "Size Worksheet Tab:Add table, search and delete"() {
+     def "Size Worksheet Tab:Add table, search and delete"() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -1121,15 +1084,28 @@ class SchemaPageTest extends TestBase {
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-
-        if ( page.queryStatus.isDisplayed() ) {
-            println("Create query successful")
+        
+        try {
+            waitFor(waitTime) {
+                page.errorObjectNameAlreadyExist.isDisplayed()
+            }
+            println("Table with tablename: " + tablename + " already created")
+           
+        } catch(geb.waiting.WaitTimeoutException e) {
+            try {
+                waitFor(waitTime) {
+                    page.queryStatus.isDisplayed()
+                }
+                println("Create query successful")
+            } catch(geb.error.RequiredPageContentNotPresent f) {
+                println("Create query unsuccessful")
+                assert false
+            } catch(geb.waiting.WaitTimeoutException f) {
+                println("Create query unsuccessful")
+                assert false
+            }
         }
-        else {
-            println("Create query unsuccessful")
-            assert false
-        }
-
+        
         when: 'go to Schema page'
         page.gotoSchema()
         then: 'at Schema page'
@@ -1145,7 +1121,8 @@ class SchemaPageTest extends TestBase {
         page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(waitTime) { page.tablenamePresent.isDisplayed() }
-
+        println("Table with tablename: " + tablename + " was found")
+        
         when: 'go to SQL Query page'
         page.gotoSqlQuery()
         then: 'at SQL Query page'
@@ -1155,14 +1132,20 @@ class SchemaPageTest extends TestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-        if ( page.queryStatus.isDisplayed() ) {
+        
+        try {
+            waitFor(waitTime) {
+                page.queryStatus.isDisplayed()
+            }
             println("Delete query successful")
-        }
-        else {
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            println("Delete query unsuccessful")
+            assert false
+        } catch(geb.waiting.WaitTimeoutException e) {
             println("Delete query unsuccessful")
             assert false
         }
-
+        
         when: 'go to Schema page'
         page.gotoSchema()
         then: 'at Schema page'
@@ -1178,16 +1161,9 @@ class SchemaPageTest extends TestBase {
         page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(waitTime) { !page.tablenamePresent.isDisplayed() }
-
-        if(!page.tablenamePresent.isDisplayed()) {
-            println("Size Worksheet Tab:Add table, search and delete-PASS")
-            println()
-        }
-        else {
-            println("Size Worksheet Tab:Add table, search and delete-FAIL")
-            println()
-            assert false
-        }
+        println("Table with tablename: " + tablename + " wasn't found")
+        
+        println()
     }
 	
 	// Schema Tab
