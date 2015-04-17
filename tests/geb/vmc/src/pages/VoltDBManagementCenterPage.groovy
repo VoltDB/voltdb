@@ -41,7 +41,7 @@ import org.openqa.selenium.JavascriptExecutor
 class VoltDBManagementCenterPage extends Page {
     static Boolean securityEnabled = null;
 
-    static url = '/'  // relative to the baseUrl
+    static url = ''  // relative to the baseUrl
     static content = {
         navTabs { $('#nav') }
         dbMonitorTab { navTabs.find('#navDbmonitor') }
