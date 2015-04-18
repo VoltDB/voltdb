@@ -481,11 +481,6 @@ DISTRIBUTION
             <include name="nativelibs/libvoltdb*" />
         </fileset>
     </copy>
-    <copy todir="${dist.dir}/voltdb" flatten="true" >
-        <fileset dir="." defaultexcludes="yes">
-            <include name="third_party/cpp/jnilib/libjzmq*" />
-        </fileset>
-    </copy>
 
     <!-- add the Project and Deployment file schemas to the dist -->
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
@@ -606,7 +601,6 @@ DISTRIBUTION
             <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
-            <exclude name="voltdb/libjzmq*"/>
         </fileset>
     </copy>
 
@@ -1045,13 +1039,6 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <!-- copy zmq to voltdb dir / would be nice to only copy the right one -->
-    <copy todir="voltdb" flatten="true" >
-        <fileset dir="." defaultexcludes="yes">
-            <include name="third_party/cpp/jnilib/libjzmq*" />
-        </fileset>
-    </copy>
-
     <!-- compile the individual source directories -->
     <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
@@ -1365,7 +1352,7 @@ TEST CASES
             showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
-            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
+            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
             <jvmarg value="-server" />
             <jvmarg value="-Xcheck:jni" />
             <jvmarg value="-Xmx256m"/>
