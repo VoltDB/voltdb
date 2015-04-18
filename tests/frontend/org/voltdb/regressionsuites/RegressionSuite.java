@@ -32,6 +32,7 @@ import java.util.Random;
 import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
+import org.junit.Assume;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -126,6 +127,14 @@ public class RegressionSuite extends TestCase {
      * @return Is the underlying instance of VoltDB running Valgrind with the IPC client?
      */
     public boolean isValgrind() {
+        Assume.assumeTrue( ! m_config.isValgrind());
+        return m_config.isValgrind();
+    }
+
+    /**
+     * @return Is the underlying instance of VoltDB running Valgrind with the IPC client?
+     */
+    public boolean isValgrindNoExit() {
         return m_config.isValgrind();
     }
 

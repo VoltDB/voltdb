@@ -102,8 +102,14 @@ public interface VoltServerConfig {
 
     /**
      * @return Is the underlying instance of VoltDB running IPC with Valgrind?
+     * Will fail assumption of so
      */
     public boolean isValgrind();
+
+    /**
+     * @return Is the underlying instance of VoltDB running IPC with Valgrind?
+     */
+    public boolean isValgrindNoExit();
 
     boolean compileWithPartitionDetection(VoltProjectBuilder builder,
             String snapshotPath,

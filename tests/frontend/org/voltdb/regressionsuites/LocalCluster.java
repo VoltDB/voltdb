@@ -40,6 +40,8 @@ import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
+import org.junit.Assume;
+
 /**
  * Implementation of a VoltServerConfig for a multi-process
  * cluster. All cluster processes run locally (keep this in
@@ -285,6 +287,7 @@ public class LocalCluster implements VoltServerConfig {
      * Called after a constructor but before startup.
      */
     public void overrideAnyRequestForValgrind() {
+        Assume.assumeTrue (templateCmdLine.m_backend != BackendTarget.NATIVE_EE_VALGRIND_IPC);
         if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             m_target = BackendTarget.NATIVE_EE_JNI;
             templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
@@ -1291,6 +1294,12 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public boolean isValgrind() {
+        Assume.assumeTrue( templateCmdLine.m_backend != BackendTarget.NATIVE_EE_VALGRIND_IPC);
+        return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+    }
+
+    @Override
+    public boolean isValgrindNoExit() {
         return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
 

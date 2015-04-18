@@ -34,6 +34,8 @@ import org.voltdb.StartAction;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 
+import org.junit.Assume;
+
 /**
  * Implementation of a VoltServerConfig for the simplest case:
  * the single-process VoltServer that's so easy to use.
@@ -212,8 +214,15 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
 
     @Override
     public boolean isValgrind() {
+        Assume.assumeTrue( m_target != BackendTarget.NATIVE_EE_VALGRIND_IPC);
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
+
+    @Override
+    public boolean isValgrindNoExit() {
+        return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+    }
+
     @Override
     public void startUp() {
         startUp(true);
