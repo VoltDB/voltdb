@@ -117,8 +117,36 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT count(*) from T1");
     }
 
-    public void testCountDistinctA1() {
-        pns = compileToFragments("SELECT count(distinct A1) from T1");
+    public void testCountDistinct() {
+        AbstractPlanNode p;
+        // push down distinct because of group by partition column
+        pns = compileToFragments("SELECT A4, count(distinct B4) from T4 group by A4");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        // group by multiple columns
+        pns = compileToFragments("SELECT C4, A4, count(distinct B4) from T4 group by C4, A4");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+
+        // not push down distinct
+        pns = compileToFragments("SELECT ABS(A4), count(distinct B4) from T4 group by ABS(A4)");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof HashAggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
     }
 
     public void testDistinctA1() {
@@ -129,7 +157,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractPlanNode p;
         // Distinct rewrote with group by
         pns = compileToFragments("select * from (SELECT DISTINCT A1 FROM T1) temp");
-        printExplainPlan(pns);
 
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof SeqScanPlanNode);

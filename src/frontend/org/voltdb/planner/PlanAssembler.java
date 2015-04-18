@@ -1829,7 +1829,7 @@ public class PlanAssembler {
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
                             agg_expression_type == ExpressionType.AGGREGATE_SUM) {
-                            if (is_distinct) {
+                            if (is_distinct && !m_parsedSelect.hasPartitionColumnInGroupby()) {
                                 topAggNode = null;
                             }
                             else {

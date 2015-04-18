@@ -93,7 +93,7 @@ SELECT 50,                           @optionalfn(@onefun(A._variable[#GB @column
 SELECT 51,                           A._variable[#GB @columntype] as tag ,                       @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY tag
 SELECT 52,              @optionalfn(@onefun(A._variable[#GB @columntype])) as tag1,  A._variable[@columntype] as tag2,  @agg(           A._variable[@columntype])         FROM @fromtables A GROUP BY        tag2, tag1
 
--- DISTINCT expression (56 - 60)
+-- DISTINCT expression (56 - 65)
 -- basic select template has covered multiple columns distinct
 SELECT DISTINCT @optionalfn(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A 
 SELECT DISTINCT @onefun(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A ORDER BY 1, 2 LIMIT 10 
@@ -106,6 +106,11 @@ SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A
 SELECT DISTINCT   @agg(@optionalfn(A._variable[@columntype]))                                 FROM @fromtables A GROUP BY         A.__[#GB]
 SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
 SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2] ORDER BY 1, 2 LIMIT 5
+
+-- AGG DISTINCT
+SELECT   A._variable[#GB @columntype],  _distinctableagg(DISTINCT  A._variable[@columntype]  ) AS Q58 FROM @fromtables A  GROUP BY         A.__[#GB]
+SELECT   A._variable[#GB1 @columntype],  A._variable[#GB2 @columntype]   , _distinctableagg( A._variable[@columntype])  AS Q59       FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
+SELECT   A._variable[#GB1 @columntype],  @optionalfn(        A._variable[@columntype]     ) as gb2   , _distinctableagg( A._variable[@columntype])  AS Q60         FROM @fromtables A GROUP BY         A.__[#GB1], A.gb2
 
 -- update
 -- compare two cols
