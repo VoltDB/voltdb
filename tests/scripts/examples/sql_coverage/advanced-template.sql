@@ -103,14 +103,14 @@ SELECT DISTINCT COUNT(*) FROM @fromtables A
 SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A 
 
 -- DISTINCT on GROUP BY
-SELECT DISTINCT   @agg(@optionalfn(A._variable[@columntype]))                                 FROM @fromtables A GROUP BY         A.__[#GB]
-SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
-SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2] ORDER BY 1, 2 LIMIT 5
+SELECT DISTINCT   @agg(@optionalfn(A._variable[@columntype]))                                 FROM @fromtables A GROUP BY         A._variable[@columntype]
+SELECT DISTINCT   A._variable[#GB1 @columntype], A._variable[#GB2 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
+SELECT DISTINCT   A._variable[#GB1 @columntype], A._variable[#GB2 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2] ORDER BY 1, 2 LIMIT 5
 
 -- AGG DISTINCT
-SELECT   A._variable[#GB @columntype],  _distinctableagg(DISTINCT  A._variable[@columntype]  ) AS Q58 FROM @fromtables A  GROUP BY         A.__[#GB]
-SELECT   A._variable[#GB1 @columntype],  A._variable[#GB2 @columntype]   , _distinctableagg( A._variable[@columntype])  AS Q59       FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
-SELECT   A._variable[#GB1 @columntype],  @optionalfn(        A._variable[@columntype]     ) as gb2   , _distinctableagg( A._variable[@columntype])  AS Q60         FROM @fromtables A GROUP BY         A.__[#GB1], A.gb2
+SELECT   A._variable[#GB @columntype],  _distinctableagg(DISTINCT  A._variable[@columntype]  ) AS Q60 FROM @fromtables A  GROUP BY         A.__[#GB]
+SELECT   A._variable[#GB1 @columntype],  A._variable[#GB2 @columntype]   , _distinctableagg( A._variable[@columntype])  AS Q61       FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
+SELECT   A._variable[#GB1 @columntype],  @optionalfn(        A._variable[@columntype]     ) as GB2   , _distinctableagg( A._variable[@columntype])  AS Q62         FROM @fromtables A GROUP BY         A.__[#GB1], A.GB2
 
 -- update
 -- compare two cols

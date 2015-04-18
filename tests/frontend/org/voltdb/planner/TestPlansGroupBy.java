@@ -147,6 +147,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
         assertNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        // test not group by partition column with index available
+        pns = compileToFragments("SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof HashAggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertTrue(p.toExplainPlanString().contains("for deterministic order only"));
     }
 
     public void testDistinctA1() {

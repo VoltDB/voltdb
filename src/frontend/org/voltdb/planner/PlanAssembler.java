@@ -1740,10 +1740,13 @@ public class PlanAssembler {
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
-                AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                gbInfo.m_multiPartition = true;
-                switchToIndexScanForGroupBy(candidate, gbInfo);
-
+                // do not apply index scan for serial/partial aggregation
+                // for distinct that does not group by partition column
+                if (!m_parsedSelect.hasAggregateDistinct() || m_parsedSelect.hasPartitionColumnInGroupby()) {
+                    AbstractPlanNode candidate = root.getChild(0).getChild(0);
+                    gbInfo.m_multiPartition = true;
+                    switchToIndexScanForGroupBy(candidate, gbInfo);
+                }
             } else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
