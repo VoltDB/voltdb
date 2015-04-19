@@ -399,9 +399,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
             return;
         }
         m_closed = true;
-        if (m_segments.peekLast().isEmpty()) {
-            m_segments.pollLast().closeAndDelete();
-        }
         for (PBDSegment segment : m_segments) {
             segment.close();
         }

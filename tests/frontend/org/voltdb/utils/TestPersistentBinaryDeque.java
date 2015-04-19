@@ -127,14 +127,14 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
-    public void testEmptyTruncation() throws Exception {
+    public void testCloseEmptyShouldNotDelete() throws Exception {
         System.out.println("Running testEmptyTruncation");
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
         m_pbd.close();
 
         listing = getSortedDirectoryListing();
-        assertEquals(listing.size(), 0);
+        assertEquals(listing.size(), 1);
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
 
