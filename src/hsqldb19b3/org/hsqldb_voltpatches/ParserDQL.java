@@ -1817,11 +1817,13 @@ public class ParserDQL extends ParserBase {
                             return null;
                         }
 
-                        if (!sq.queryExpression.isSingleColumn()) {
-                            throw Error.error(ErrorCode.W_01000);
+                        /************************* Volt DB Extensions *************************/
+                        if (sq.queryExpression.isSingleColumn()) {
+                            return new Expression(OpTypes.SCALAR_SUBQUERY, sq);
+                        } else {
+                            return new Expression(OpTypes.ROW_SUBQUERY, sq);
                         }
-
-                        return new Expression(OpTypes.SCALAR_SUBQUERY, sq);
+                        /**********************************************************************/
 
                     default :
                         rewind(position);

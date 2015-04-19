@@ -138,14 +138,7 @@ bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
     if (numTuples >= tupleLimit) {
         // Next insert will fail: run the purge fragment
         // before trying to insert.
-        int rc = m_engine->executePurgeFragment(table);
-        if (rc != ENGINE_ERRORCODE_SUCCESS) {
-            VOLT_ERROR("Unexpected error while attempting to purge "
-                       "rows from table %s.  Row limit: %d",
-                       table->name().c_str(),
-                       tupleLimit);
-            return false;
-        }
+        m_engine->executePurgeFragment(table);
 
         // If the purge fragment did a truncate table, then the old
         // table is still around for undo purposes, but there is now a

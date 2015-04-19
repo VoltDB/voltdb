@@ -167,7 +167,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // executes the corresponding fragment.
         //
         // Returns ENGINE_ERRORCODE_SUCCESS on success
-        int executePurgeFragment(PersistentTable* table);
+        void executePurgeFragment(PersistentTable* table);
 
         // -------------------------------------------------
         // Dependency Transfer Functions
@@ -429,12 +429,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                 bool last);
 
         /**
-         * Get a vector of executors for a given fragment id.
+         * Set up the vector of executors for a given fragment id.
          * Get the vector from the cache if the fragment id is there.
          * If not, get a plan from the Java topend and load it up,
          * putting it in the cache and possibly bumping something else.
          */
-        ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
+        void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
         void resetExecutionMetadata();

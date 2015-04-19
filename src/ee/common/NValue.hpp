@@ -650,8 +650,20 @@ class NValue {
         return &valueChars[i];
     }
 
+    // Copy a value. If the value is inlined in a source tuple, then allocate
+    // memory from the temp string pool and copy data there
+    NValue copyNValue() const
+    {
+        NValue copy = *this;
+        if (m_sourceInlined) {
+            // The NValue storage is inlined (a pointer to the backing tuple storage) and needs
+            // to be copied to a local storage
+            copy.allocateObjectFromInlinedValue(getTempStringPool());
+        }
+        return copy;
+    }
 
-  private:
+private:
     /*
      * Private methods are private for a reason. Don't expose the raw
      * data so that it can be operated on directly.

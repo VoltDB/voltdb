@@ -706,7 +706,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                         AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
-                        asIndexed[ii++] = ae.explain(m_targetTableName);
+                        asIndexed[ii++] = ae.explain(getTableNameForExplain());
                     }
                 } catch (JSONException e) {
                     // If something unexpected went wrong,
@@ -757,7 +757,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String predicate = explainPredicate(predicatePrefix);
         // Describe the table name and either a user-provided name of the index or
         // its user-specified role ("primary key").
-        String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
+        String tableName = m_targetTableName;
+        if (m_targetTableAlias != null && !m_targetTableAlias.equals(m_targetTableName)) {
+            tableName += " (" + m_targetTableAlias +")";
+        }
+        String retval = "INDEX SCAN of \"" + tableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
         if (m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
@@ -785,13 +789,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
             result += conjunction + asIndexed[ii] + " = " +
-                    m_searchkeyExpressions.get(ii).explain(m_targetTableName);
+                    m_searchkeyExpressions.get(ii).explain(getTableNameForExplain());
             conjunction = ") AND (";
         }
         // last element
         result += conjunction +
                 asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
-                m_searchkeyExpressions.get(prefixSize).explain(m_targetTableName) + ")";
+                m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain()) + ")";
         return result;
     }
 
@@ -803,7 +807,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_endExpression == null) {
             return " to end";
         }
-        return " while " + m_endExpression.explain(m_targetTableName);
+        return " while " + m_endExpression.explain(getTableNameForExplain());
     }
 
     public void setBindings(ArrayList<AbstractExpression> bindings) {
@@ -866,4 +870,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         return true;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_endExpression, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_initialExpression, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
+        for (AbstractExpression ae : m_searchkeyExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
+    }
+
 }

@@ -579,9 +579,12 @@ public class Expression {
     boolean isComposedOf(OrderedHashSet expressions,
                          OrderedIntHashSet excludeSet) {
 
-        if (opType == OpTypes.VALUE) {
+        /************************* Volt DB Extensions *************************/
+        if (opType == OpTypes.VALUE || opType == OpTypes.DYNAMIC_PARAM
+                || opType == OpTypes.PARAMETER || opType == OpTypes.VARIABLE) {
             return true;
         }
+        /**********************************************************************/
 
         if (excludeSet.contains(opType)) {
             return true;
@@ -1507,7 +1510,7 @@ public class Expression {
         // logicals - other predicates
         prototypes.put(OpTypes.LIKE,          (new VoltXMLElement("operation")).withValue("optype", "like"));
         prototypes.put(OpTypes.IN,            null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.EXISTS,        null); // not yet supported ExpressionLogical for subqueries
+        prototypes.put(OpTypes.EXISTS,        (new VoltXMLElement("operation")).withValue("optype", "exists"));
         prototypes.put(OpTypes.OVERLAPS,      null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.UNIQUE,        null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.NOT_DISTINCT,  null); // not yet supported ExpressionLogical
@@ -1624,6 +1627,13 @@ public class Expression {
             exp.attributes.put("alias", getAlias());
         }
 
+        // Add expresion sub type
+        if (exprSubType == OpTypes.ANY_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "any");
+        } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "all");
+        }
+
         for (Expression expr : nodes) {
             if (expr != null) {
                 VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
@@ -1736,8 +1746,6 @@ public class Expression {
             if (subQuery == null || subQuery.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
-            // @TODO: SubQuery doesn't have an information about the query parameters
-            // Or maybe there is a way?
             ExpressionColumn parameters[] = new ExpressionColumn[0];
             exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
             return exp;

@@ -188,6 +188,9 @@ public class TestUnion extends PlannerTestCase {
         // At this point, coordinator designation is only supported for single-fragment plans.
         failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
 
+        // Multiple Set operations in a single statement with multiple partitioned tables
+        failToCompile("select F from T1 UNION select G from T6 INTERSECT select F from T1");
+
         // Column types must match.
         failToCompile("select A, DESC from T1 UNION select B from T2");
         failToCompile("select B from T2 EXCEPT select A, DESC from T1");

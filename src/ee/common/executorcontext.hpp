@@ -20,11 +20,18 @@
 
 #include "Topend.h"
 #include "common/UndoQuantum.h"
+#include "common/valuevector.h"
+#include "common/subquerycontext.h"
+
+#include <vector>
+#include <map>
 
 namespace voltdb {
 
+class AbstractExecutor;
 class DRTupleStream;
 class VoltDBEngine;
+
 
 /*
  * EE site global data required by executors at runtime.
@@ -39,18 +46,19 @@ class VoltDBEngine;
  */
 class ExecutorContext {
   public:
-    ~ExecutorContext();
-
     ExecutorContext(int64_t siteId,
                     CatalogId partitionId,
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
+                    NValueArray* params,
                     VoltDBEngine* engine,
                     std::string hostname,
                     CatalogId hostId,
                     DRTupleStream *drTupleStream,
                     DRTupleStream *drReplicatedStream);
+
+    ~ExecutorContext();
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
@@ -102,8 +110,18 @@ class ExecutorContext {
         m_undoQuantum = undoQuantum;
     }
 
+    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
+        assert(executorsMap != NULL);
+        m_executorsMap = executorsMap;
+        m_subqueryContextMap.clear();
+    }
+
     UndoQuantum *getCurrentUndoQuantum() {
         return m_undoQuantum;
+    }
+
+    NValueArray* getParameterContainer() {
+        return m_staticParams;
     }
 
     static VoltDBEngine* getEngine() {
@@ -143,6 +161,44 @@ class ExecutorContext {
         return m_lastCommittedSpHandle;
     }
 
+    /** Executor List for a given sub statement id */
+    const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
+    {
+        assert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
+        return *m_executorsMap->find(subqueryId)->second;
+    }
+
+    /** Return pointer to a subquery context or NULL */
+    SubqueryContext* getSubqueryContext(int subqueryId)
+    {
+        std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(subqueryId);
+        if (it != m_subqueryContextMap.end()) {
+            return &(it->second);
+        } else {
+            return NULL;
+        }
+    }
+
+    /** Set a new subquery context for the statement id. */
+    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams)
+    {
+        SubqueryContext fromCopy(lastParams);
+#ifdef DEBUG
+        std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
+#endif
+            m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
+        assert(result.second);
+        return &(m_subqueryContextMap.find(subqueryId)->second);
+    }
+
+    Table* executeExecutors(int subqueryId) const;
+    Table* executeExecutors(const std::vector<AbstractExecutor*>& executorList,
+                            int subqueryId) const;
+
+    Table* getSubqueryOutputTable(int subqueryId) const;
+
+    void cleanupExecutors(int subqueryId) const;
+
     DRTupleStream* drStream() {
         return m_drStream;
     }
@@ -168,6 +224,14 @@ class ExecutorContext {
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
+
+    // Pointer to the static parameters
+    NValueArray* m_staticParams;
+    // Executor stack map. The key is the statement id (0 means the main/parent statement)
+    // The value is the pointer to the executor stack for that statement
+    std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
+    std::map<int, SubqueryContext> m_subqueryContextMap;
+
     DRTupleStream *m_drStream;
     DRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
