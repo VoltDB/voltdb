@@ -768,6 +768,8 @@ var loadPage = function (serverName, portid) {
                                 $("#ChartDrReplicationRate").hide();
                                 $("#divDrWrapperAdmin").hide();
                             }
+                        } else {
+                            VoltDbUI.isDRInfoRequired = false;
                         }
                     }
                 });
