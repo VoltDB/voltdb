@@ -694,7 +694,6 @@ var loadPage = function (serverName, portid) {
         });
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
-
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
                 if (replicaDetail.hasOwnProperty(currentServer))
@@ -737,10 +736,7 @@ var loadPage = function (serverName, portid) {
                                     if (userPreference["DrReplicationRate"]) {
                                         $("#ChartDrReplicationRate").show();
                                     }
-                                    refreshDrReplicaSection();
-                                    voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
-                                        MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
-                                    });
+                                    refreshDrReplicaSection(graphView, currentTab);
                                     //to show DR Mode and DR tables
                                     if (VoltDbUI.drEnabled) {
                                         $("#dbDrMode").text("Both");
