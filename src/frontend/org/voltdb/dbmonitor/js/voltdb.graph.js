@@ -370,7 +370,8 @@
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 80 });
-            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 1]);
+            MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
+            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
 
             MonitorGraphUI.ChartPartitionIdleTime.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Partition Idle Time </h3>'
@@ -1011,13 +1012,13 @@
             var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
 
-            if (drSecCount >= 6 || monitor.cpuFirstData) {
+            if (drSecCount >= 6 || monitor.drFirstData) {
                 drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
                 drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
                 MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
                 drSecCount = 0;
             }
-            if (drMinCount >= 60 || monitor.cpuFirstData) {
+            if (drMinCount >= 60 || monitor.drFirstData) {
                 drDataDay = sliceFirstData(drDataDay, dataView.Days);
                 drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
                 MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
