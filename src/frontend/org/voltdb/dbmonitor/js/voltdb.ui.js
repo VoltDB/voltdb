@@ -768,6 +768,14 @@ var loadPage = function (serverName, portid) {
                                 $("#ChartDrReplicationRate").hide();
                                 $("#divDrWrapperAdmin").hide();
                             }
+                        } else {
+                            VoltDbUI.isDRInfoRequired = false;
+                            $("#divDrReplication").hide();
+                            $('#liDrReplication').css('display', 'none');
+                            $('#liDrTables').css('display', 'none');
+                            showHideLastLineClass(false);
+                            $("#ChartDrReplicationRate").hide();
+                            $("#divDrWrapperAdmin").hide();
                         }
                     }
                 });
