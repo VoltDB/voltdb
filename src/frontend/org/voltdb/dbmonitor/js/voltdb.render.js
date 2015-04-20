@@ -1,4 +1,4 @@
-﻿
+
 function alertNodeClicked(obj) {
 
     var clickedServer = $(obj).html();
