@@ -1011,13 +1011,13 @@
             var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
 
-            if (drSecCount >= 6 || monitor.cpuFirstData) {
+            if (drSecCount >= 6 || monitor.drFirstData) {
                 drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
                 drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
                 MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
                 drSecCount = 0;
             }
-            if (drMinCount >= 60 || monitor.cpuFirstData) {
+            if (drMinCount >= 60 || monitor.drFirstData) {
                 drDataDay = sliceFirstData(drDataDay, dataView.Days);
                 drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
                 MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
