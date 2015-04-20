@@ -370,7 +370,8 @@
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 80 });
-            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 1]);
+            MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
+            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
 
             MonitorGraphUI.ChartPartitionIdleTime.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Partition Idle Time </h3>'
