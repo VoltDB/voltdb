@@ -21,6 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.TimestampType;
@@ -321,7 +322,17 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (neededType.isInteger()) {
             long value = 0;
             try {
-                value = Long.parseLong(getValue());
+                String hexDigits = SQLParser.getDigitsFromHexLiteral(getValue());
+                if (hexDigits != null) {
+                    value = SQLParser.hexDigitsToLong(hexDigits);
+                }
+                else {
+                    value = Long.parseLong(getValue());
+                }
+            }
+            catch (SQLParser.Exception spe) {
+                // Caught in the catch block below.
+                throw new NumberFormatException();
             } catch (NumberFormatException nfe) {
                 throw new PlanningErrorException("Value (" + getValue() +
                                                  ") has an invalid format for a constant " +

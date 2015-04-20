@@ -1088,6 +1088,16 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 a.changePsd {color: #0079bb;}
 a:hover.changePsd { text-decoration: underline; }
 
+/****Partition Idle Time*******/
+.legend {margin: 0 0 0 90px;}
+.legend ul {margin: 0 0 0 10px;padding: 0}
+.legend ul li { margin: 0 10px;padding: 0;float: left; }
+.dotGray {background-color: #D3D3D3;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotBlue  {background-color: #4C76B0;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotOrange {background-color: #FF8C00;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotMaroon {background-color: #FFF700;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.partitionHeight { width: 90%;height: 358px;}
+.partitionHeightDisplay {width: 90%;height: 0px;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -1213,10 +1223,7 @@ top: 3px;}
 	.errorQueryDbPause { width:320px; }
 	.tabs-filter-wrapperDR .filter { float:none; width:auto;}
 	.tabs-filter-wrapperDR {width:250px}
-	
-	
-
-   
+    .partitionHeight {height: 350px; margin-top:30px}
 }
 @media (min-width: 320px) and (max-width: 479px) {
     #popServerList {
@@ -1225,6 +1232,7 @@ top: 3px;}
         right: -1px;
         top: 205px;
     }
+    .partitionHeight {height: 350px; margin-top:30px}
 
 
 
@@ -1356,6 +1364,7 @@ top: 3px;}
  
  .objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
  .queryInput { float:none; width:100%;}
+
  }
 
 @media (width: 320px) {
@@ -1375,6 +1384,17 @@ top: 3px;}
     padding-top: 15px;}
 	 
 	 }
+  .partitionHeight {height: 300px; margin-top:75px}
+  
+@media (width: 360px) and (max-width:438px) {
+    .partitionHeight {height: 300px; }
+}
+
+@media (min-width: 768px) and (max-width:1246px) {
+    .partitionHeight {height: 310px;}
+
+}
+
 @media screen and (orientation:landscape) {
 	.popup_cont {top:5%;}
 	
