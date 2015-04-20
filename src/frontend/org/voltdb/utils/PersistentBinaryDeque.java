@@ -644,7 +644,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private void assertions() {
-        if (!assertionsOn) return;
+        if (!assertionsOn || m_closed) return;
         int numObjects = 0;
         for (PBDSegment segment : m_segments) {
             try {
