@@ -1941,6 +1941,10 @@ public class PlanAssembler {
             if ( ! IndexType.isScannable(index.getType())) {
                 continue;
             }
+            if (! index.getPredicatejson().isEmpty()) {
+                // do not try to look at Partial/Sparse index
+                continue;
+            }
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
             List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(
                     index, fromTableAlias, bindings);

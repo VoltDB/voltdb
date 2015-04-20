@@ -109,8 +109,55 @@ public class TestPlansGroupBy extends PlannerTestCase {
       assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
 
-    public void testCountA1() {
-        pns = compileToFragments("SELECT count(A1) from T1");
+    /**
+     * VoltDB has an optimization to switch to IndexScan for aggregate queries from a sequential scan.
+     * However, for simplicity ,we should not match group by columns with an index that has a where clause.
+     * In future, we may need to check more details on the where clause.
+     */
+    public void testAggregateOptimizationWithIndex() {
+        AbstractPlanNode p;
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("primary key index"));
+
+        // matching the partial index where clause
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 3 group by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("primary key index"));
+
+        // using the partial index
+        pns = compileToFragments("SELECT A, count(B) from R2 where A > 5 and B > 3 group by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+
+        // order by will help pick up the partial index
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 3 group by A order by A;");
+        assertEquals(1, pns.size());
+        printExplainPlan(pns);
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+
+        // where clause not matching
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A order by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof OrderByPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof SeqScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
     }
 
     public void testCountStar() {
