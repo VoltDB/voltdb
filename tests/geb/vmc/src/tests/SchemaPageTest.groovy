@@ -1065,7 +1065,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-     def "Size Worksheet Tab:Add table, search and delete"() {
+    def "Size Worksheet Tab:Add table, search and delete"() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -1133,18 +1133,7 @@ class SchemaPageTest extends TestBase {
         then: 'run the query'
         page.runQuery()
         
-        try {
-            waitFor(waitTime) {
-                page.queryStatus.isDisplayed()
-            }
-            println("Delete query successful")
-        } catch(geb.error.RequiredPageContentNotPresent e) {
-            println("Delete query unsuccessful")
-            assert false
-        } catch(geb.waiting.WaitTimeoutException e) {
-            println("Delete query unsuccessful")
-            assert false
-        }
+        
         
         when: 'go to Schema page'
         page.gotoSchema()
@@ -1391,15 +1380,22 @@ class SchemaPageTest extends TestBase {
 		
 		try {
             waitFor(waitTime) {
-                page.queryStatus.isDisplayed()
+                page.errorObjectNameAlreadyExist.isDisplayed()
             }
-            println("Delete query successful")
-        } catch(geb.error.RequiredPageContentNotPresent e) {
-            println("Delete query unsuccessful")
-            assert false
+            println("Table with tablename: " + tablename + " already deleted")
         } catch(geb.waiting.WaitTimeoutException e) {
-            println("Delete query unsuccessful")
-            assert false
+		    try {
+                waitFor(waitTime) {
+                    page.queryStatus.isDisplayed()
+                }
+                println("Delete query successful")
+            } catch(geb.error.RequiredPageContentNotPresent f) {
+                println("Delete query unsuccessful")
+                assert false
+            } catch(geb.waiting.WaitTimeoutException f) {
+                println("Delete query unsuccessful")
+                assert false
+            }
         }
 		
 		when: 'go to Schema page'
