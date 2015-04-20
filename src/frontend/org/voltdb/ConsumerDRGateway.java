@@ -42,6 +42,14 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId);
 
+    /**
+     * Should only be called before initialization. Populate all previously seen
+     * [drId, uniqueId] pairs from remote clusters
+     * @param lastAppliedIds A map of clusterIds to maps of partitionIds to [drId, uniqueId] pairs.
+     * The outer map is assumed to be of size 1
+     */
+    public abstract void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, Pair<Long, Long>>> lastAppliedIds);
+
     public abstract void assertSequencing(int partitionId, long drId);
 
     public abstract Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds();
@@ -82,5 +90,11 @@ public interface ConsumerDRGateway extends Promotable {
 
         @Override
         public Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds() { return ids; }
+
+        @Override
+        public void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, Pair<Long, Long>>> lastAppliedIds) {
+            ids.clear();
+            ids.putAll(lastAppliedIds);
+        }
     }
 }
