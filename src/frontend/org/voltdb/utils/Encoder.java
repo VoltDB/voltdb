@@ -76,10 +76,12 @@ public class Encoder {
      */
     public static byte[] hexDecode(String hexString) {
         byte[] retval = null;
-        try {
-            if ((hexString.length() % 2) != 0)
-                throw new IllegalArgumentException();
+        final String errorText = "String is not properly hex-encoded.";
 
+        if ((hexString.length() % 2) != 0)
+            throw new RuntimeException(errorText);
+
+        try {
             retval = new byte[hexString.length() / 2];
             for (int i = 0; i < retval.length; i++) {
                 int value = Integer.parseInt(hexString.substring(2 * i, 2 * i + 2), 16);
@@ -89,7 +91,7 @@ public class Encoder {
         catch (IllegalArgumentException exc) {
             // parseInt can throw a NumberFormatException, which is a subclass of
             // IllegalArgumentException, so both kinds of failure come here.
-            throw new RuntimeException("String is not properly hex-encoded");
+            throw new RuntimeException(errorText);
         }
         return retval;
     }

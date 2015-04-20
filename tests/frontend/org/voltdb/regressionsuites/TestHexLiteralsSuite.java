@@ -171,7 +171,7 @@ public class TestHexLiteralsSuite extends RegressionSuite {
                 + "INSERT INTO T (PK, BI) VALUES (?, ?);";
 
         // Create a bunch of procedures with various embedded literals
-        // in the select list
+        // in the where clause
         for (long val : interestingValues) {
             literalSchema += "CREATE PROCEDURE XQUOTE_VARBINARY_PROC_" + makeSixteenDigits(val) + " AS\n"
                     + "  SELECT PK FROM T WHERE VB = " + longToHexLiteral(val) + ";\n";

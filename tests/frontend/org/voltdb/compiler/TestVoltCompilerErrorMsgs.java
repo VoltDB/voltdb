@@ -223,7 +223,7 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
         // This *would* work if we accepted hex literals as ints,
         // but we don't.  This would be a decimal 128.
         ddlErrorTest("invalid format for a constant bigint value",
-                "create procedure insHex as insert into blah (ival) values (x'10');");
+                "create procedure insHex as insert into blah (ival) values (x'80');");
 
         // The HSQL parser complains about an odd number of digits,
         // so the error message is different here.
