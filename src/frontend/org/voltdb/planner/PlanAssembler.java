@@ -1827,7 +1827,7 @@ public class PlanAssembler {
                          * aggregate node.
                          *
                          * If DISTINCT is specified, don't do push-down for
-                         * count() and sum()
+                         * count() and sum() when not group by partition column.
                          */
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
@@ -1836,6 +1836,8 @@ public class PlanAssembler {
                                 topAggNode = null;
                             }
                             else {
+                                // for aggregate distinct when group by partition column, the top aggregate node
+                                // will be dropped later, thus there is no effect to assign the top_expression_type.
                                 top_expression_type = ExpressionType.AGGREGATE_SUM;
                             }
                         }
