@@ -308,7 +308,6 @@ class DbMonitorTest extends TestBase {
         header.help.click()
         then:
         waitFor(30) {
-            header.popup.isDisplayed()
             header.popupTitle.isDisplayed()
             header.popupClose.isDisplayed()
             header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
