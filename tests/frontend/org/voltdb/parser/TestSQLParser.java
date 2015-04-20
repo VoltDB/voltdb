@@ -615,6 +615,41 @@ public class TestSQLParser extends TestCase {
     }
 
     @Test
+    public void testExecHexLiteralParamsVarbinary() {
+
+        Map<String, Map<Integer, List<String>>> procs = new HashMap<>();
+        addToProcsMap(procs, "myProc_vb", "varbinary");
+
+        // 0-length hex string is okay.
+        assertParamsParseAs(procs,
+                new Object[] {new byte[] {}},
+                "exec myProc_vb x''");
+        assertParamsParseAs(procs,
+                new Object[] {new byte[] {}},
+                "exec myProc_vb ''");
+
+        assertParamsParseAs(procs,
+                new byte[][] {{(byte) 255}},
+                "exec myProc_vb x'ff'");
+        assertParamsParseAs(procs,
+                new byte[][] {{(byte) 255}},
+                "exec myProc_vb 'ff'");
+
+        assertParamsParseAs(procs,
+                new Object[] {Encoder.hexDecode("deadbeef")},
+                "exec myProc_vb x'deadbeef'");
+        assertParamsParseAs(procs,
+                new Object[] {Encoder.hexDecode("deadbeef")},
+                "exec myProc_vb 'deadbeef'");
+
+        // number of hex digits must be even in varbinary context.
+        assertParamParsingFails(procs, "String is not properly hex-encoded.",
+                "exec myProc_vb x'a'");
+        assertParamParsingFails(procs, "String is not properly hex-encoded.",
+                "exec myProc_vb x'abc'");
+    }
+
+    @Test
     public void testExecHexLiteralParamsBigint() {
 
         Map<String, Map<Integer, List<String>>> procs = new HashMap<>();
