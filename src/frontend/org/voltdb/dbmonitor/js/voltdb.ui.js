@@ -1169,7 +1169,7 @@ var loadPage = function (serverName, portid) {
                     } else {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
 
-                        $("#tblDrMAster th").on('click', function() {
+                        $("#tblDrMAster th").on('click', function () {
                             VoltDbUI.isDRMasterTableClicked = true;
                         });
 
@@ -1195,8 +1195,8 @@ var loadPage = function (serverName, portid) {
             if (!$.isEmptyObject(response)) {
                 $("#tblMAster_wrapper").find(".paginationDefault").remove();
             }
-            
-            
+
+
 
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
@@ -1212,8 +1212,6 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster").next().hide();
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
-
-            $("#drMasterSection").find(".pagination").hide();
         });
         $('#filterPartitionId').on('keyup', function () {
             table.search(this.value).draw();
@@ -1265,7 +1263,7 @@ var loadPage = function (serverName, portid) {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                         } else {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
-                            
+
                             $("#tblDrReplica th").on('click', function () {
                                 VoltDbUI.isDRReplicaTableClicked = true;
                             });
@@ -1290,18 +1288,23 @@ var loadPage = function (serverName, portid) {
 
 
                 $("#tblReplica_wrapper").find(".paginationDefault").remove();
-                
+
                 //  Customizing DataTables to make it as existing pagination
                 $(".paginate_disabled_previous").html("Prev");
                 $(".paginate_enabled_next").html("Next");
                 $(".paginate_disabled_next").html("Next");
                 $(".paginate_enabled_previous").html("Prev");
 
+                $(".paginate_disabled_previous").attr("title", "Previous Page");
+                $(".paginate_enabled_next").attr("title", "Next Page");
+                $(".paginate_disabled_next").attr("title", "Next Page");
+                $(".paginate_enabled_previous").attr("title", "Previous Page");
+                $(".paginate_enabled_previous").attr("title", "Previous Page");
+
                 $("#tblDrReplica").next().hide();
                 $("#tblDrReplica_info").hide();
                 $("#tblDrReplica_length").hide();
 
-                $("#drReplicaSection").find(".pagination").hide();
             }
         });
 
