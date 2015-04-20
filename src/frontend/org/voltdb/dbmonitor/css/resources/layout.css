@@ -1383,8 +1383,8 @@ top: 3px;}
     float: left;
     padding-top: 15px;}
 	 
-	 }
-  .partitionHeight {height: 300px; margin-top:75px}
+     .partitionHeight {height: 300px; margin-top:75px}
+}
   
 @media (width: 360px) and (max-width:438px) {
     .partitionHeight {height: 300px; }
