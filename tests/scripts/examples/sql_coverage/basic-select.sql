@@ -60,6 +60,9 @@ SELECT COUNT(*) FROM @fromtables B10
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
 SELECT * FROM @fromtables A WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
+--- test EXISTS/IN operators ()
+SELECT * FROM @fromtables A WHERE EXISTS(SELECT * FROM @fromtables B WHERE _maybe B.@idcol _cmp A.@idcol )
+
 --- test arithmetic operators (+, -, *, /) with comparison ops
 SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops

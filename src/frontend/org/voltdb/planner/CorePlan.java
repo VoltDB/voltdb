@@ -102,7 +102,7 @@ public class CorePlan {
         isReplicatedTableDML = plan.replicatedTableDML;
         this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
-        readOnly = plan.getReadOnly();
+        readOnly = plan.isReadOnly();
         m_questionMarkParameterCount = plan.getQuestionMarkParameterCount();
     }
 

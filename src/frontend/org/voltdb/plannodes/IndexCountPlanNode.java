@@ -487,4 +487,20 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public ArrayList<AbstractExpression> getBindings() {
         return m_bindings;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
+        for (AbstractExpression ae : m_searchkeyExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        if (m_bindings != null) {
+            for (AbstractExpression ae : m_bindings) {
+                collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+            }
+        }
+        return collected;
+    }
 }

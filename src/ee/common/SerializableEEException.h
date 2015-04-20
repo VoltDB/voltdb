@@ -50,20 +50,28 @@ public:
      * exception buffer.
      */
     SerializableEEException(VoltEEExceptionType exceptionType, std::string message);
+    SerializableEEException(std::string message);
     virtual ~SerializableEEException();
 
     void serialize (ReferenceSerializeOutput *output) const;
     virtual const std::string message() const { return m_message; }
     VoltEEExceptionType getType() const { return m_exceptionType; }
+    void appendContextToMessage(const std::string& more) { m_message += more; }
 protected:
     virtual void p_serialize(ReferenceSerializeOutput *output) const {};
 
 private:
     const VoltEEExceptionType m_exceptionType;
-    const std::string m_message;
+    std::string m_message;
 
 };
 
-}
+class UnexpectedEEException : public SerializableEEException {
+public:
+    UnexpectedEEException(std::string message)
+      : SerializableEEException(message)
+    { }
+};
 
+} // end namespace voltdb
 #endif /* SERIALIZABLEEEEXCEPTION_H_ */

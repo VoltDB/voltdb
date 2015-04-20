@@ -220,7 +220,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 break;
             }
         }
-        VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
     }
 
     if (m_numOfEndkeys != 0) {

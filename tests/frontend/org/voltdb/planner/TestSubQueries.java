@@ -51,8 +51,9 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestSubQueries extends PlannerTestCase {
 
+    // Supported
     public void testUnsupportedSyntax() {
-        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
+        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
@@ -273,6 +274,7 @@ public class TestSubQueries extends PlannerTestCase {
                 "       from (select C, COUNT(*) A from P1 GROUP BY C ORDER BY A LIMIT 6) T1 group by A) T2 " +
                 "group by A_count order by A_count";
         planNodes = compileToFragments(sql);
+        printExplainPlan(planNodes);
         // send node
         pn = planNodes.get(1).getChild(0);
         // P1 has PRIMARY KEY INDEX on column A: GROUP BY C should not use its INDEX to speed up.
@@ -400,7 +402,7 @@ public class TestSubQueries extends PlannerTestCase {
 
         pn = planNodes.get(1);
         assertTrue(pn instanceof SendPlanNode);
-        System.out.println(pn.toExplainPlanString());
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
         nlpn = pn.getChild(0);
         assertTrue(nlpn instanceof NestLoopPlanNode);
         pn = nlpn.getChild(0);
@@ -1250,14 +1252,14 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile("SELECT * FROM (SELECT count(A) as A FROM P1) T1, P2 " +
                 "where P2.A = T1.A", joinErrorMsg);
 
-
+        // Special non-push-down-able join case where the join must follow the
+        // agg which must follow the send/receive.
         planNodes = compileToFragments(
                 "SELECT * FROM (SELECT sum(C) AS SC FROM P1) T1, R1 " +
                 "where R1.A = T1.SC");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
         assertEquals(2, planNodes.size());
+        //* enable to debug */ System.out.println(planNodes.get(0).toExplainPlanString());
+        //* enable to debug */ System.out.println(planNodes.get(1).toExplainPlanString());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         nlpn = pn.getChild(0);
@@ -1287,74 +1289,36 @@ public class TestSubQueries extends PlannerTestCase {
      * be able to drop the receive node if it has partition table in other places.
      */
     public void testFineGrainedCases() {
-        List<AbstractPlanNode> planNodes;
-
         // LIMIT comes from replicated table which has no receive node
-        planNodes = compileToFragments(
+        checkPushedDownJoins(3,
                 "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
                 "                (SELECT A, C FROM R2 LIMIT 5) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
-        assertEquals(2, planNodes.size());
-        checkPushedDownJoins(planNodes, 3);
-
         // Distinct apply on replicated table only
-        // Simplified for now:
-        // TODO: Re-enable the original more realistic version of the test
-        // once multi-column distinct is correctly re-enabled.
-        // This will most likely happen as a side effect of fixing ENG-6436.
-        planNodes = compileToFragments(
-                "SELECT     * " +
-                "  FROM     (SELECT   P1.A, R1.C " +
-                //* original   */ "              FROM   R1, P1, (SELECT     Distinct A, C" +
-                /*  simplified */ "              FROM   R1, P1, (SELECT     Distinct A   " +
-                "                                FROM     R2" +
-                "                                WHERE    A > 3) T0" +
-                "              WHERE  R1.A = T0.A ) T1, P2 " +
-                "  WHERE    T1.A = P2.A");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
-        assertEquals(2, planNodes.size());
-        checkPushedDownJoins(planNodes, 3);
-
-
+        checkPushedDownJoins(3,
+                "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
+                "                (SELECT Distinct A, C FROM R2 where A > 3) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
         // table count
-        planNodes = compileToFragments(
+        checkPushedDownJoins(3,
                 "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
                 "                (SELECT COUNT(*) AS A FROM R2 where C > 3) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
-        assertEquals(2, planNodes.size());
-        checkPushedDownJoins(planNodes, 3);
-
-
         // group by
-        planNodes = compileToFragments(
+        checkPushedDownJoins(3,
                 "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
                 "                (SELECT A, COUNT(*) C FROM R2 where C > 3 GROUP BY A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
-        assertEquals(2, planNodes.size());
-        checkPushedDownJoins(planNodes, 3);
-
         //
-        planNodes = compileToFragments(
+        checkPushedDownJoins(3,
                 "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
                 "                (SELECT A, C FROM R2 where C > 3 ) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
-        for (AbstractPlanNode apn: planNodes) {
-            System.out.println(apn.toExplainPlanString());
-        }
-        assertEquals(2, planNodes.size());
-        checkPushedDownJoins(planNodes, 3);
     }
 
     private void checkJoinNode(AbstractPlanNode root, PlanNodeType type, int num) {
@@ -1364,13 +1328,15 @@ public class TestSubQueries extends PlannerTestCase {
         }
     }
 
-    private void checkPushedDownJoins(List<AbstractPlanNode> planNodes, int nestLoopCount) {
+    private void checkPushedDownJoins(int nestLoopCount, String joinQuery) {
+        List<AbstractPlanNode> planNodes = compileToFragments(joinQuery);
         assertEquals(2, planNodes.size());
-
+        //* enable to debug */ System.out.println(planNodes.get(0).toExplainPlanString());
         checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOP, 0);
         checkJoinNode(planNodes.get(0), PlanNodeType.NESTLOOPINDEX, 0);
         // Join on distributed node
-        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, 3);
+        //* enable to debug */ System.out.println(planNodes.get(1).toExplainPlanString());
+        checkJoinNode(planNodes.get(1), PlanNodeType.NESTLOOP, nestLoopCount);
     }
 
     public void testPartitionedLimitOffset() {
@@ -1601,8 +1567,11 @@ public class TestSubQueries extends PlannerTestCase {
     }
 
     /**
-     * The next DISTINCT are possible to do. The reason that we do not support them is
-     * DISTINCT has to be applied again on coordinator after joins locally.
+     * MANY of these DISTINCT use cases could be supported, some quite easily.
+     * The cases that we can not support are those that require a join on
+     * partition key AFTER a global distinct operation.
+     * Other cases where the DISTINCT can be executed locally -- because it
+     * contains the partition key are the most trivial.
      * TODO: make the planner smarter to plan these kind of sub-queries.
      */
     public void testDistinct() {
@@ -1620,14 +1589,48 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
 
+        // T
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT DISTINCT A FROM P1) T1, P2 where T1.A = P2.A");
+        assertEquals(2, planNodes.size());
+        //* enable to debug */ System.out.println(planNodes.get(1).toExplainPlanString());
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("AGGREGATION"));
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("DISTINCT"));
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("JOIN"));
+
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("AGGREGATION"));
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("INDEX INNER JOIN"));
+
         // Distinct with GROUP BY
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
 
         failToCompile(
-                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "SELECT * FROM (SELECT DISTINCT A FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
+
+        planNodes = compileToFragments(
+                "SELECT * " +
+                "FROM   (   SELECT T0.A, R1.C " +
+                "           FROM   R1, " +
+                "                  (   SELECT DISTINCT P1.A " +
+                "                      FROM P1, R2 " +
+                "                      WHERE P1.A = R2.A) " +
+                "                  T0 " +
+                "           WHERE  R1.A = T0.A ) " +
+                "       T1, " +
+                "       P2 " +
+                "WHERE T1.A = P2.A");
+        assertEquals(2, planNodes.size());
+        //* enable to debug */ System.out.println(planNodes.get(1).toExplainPlanString());
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("AGGREGATION"));
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("DISTINCT"));
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("JOIN"));
+
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("AGGREGATION"));
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("INDEX INNER JOIN"));
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("LOOP INNER JOIN"));
 
         // Distinct without GROUP BY
         String sql1, sql2;
@@ -1644,6 +1647,25 @@ public class TestSubQueries extends PlannerTestCase {
                 "              P2 " +
                 "where T1.A = P2.A";
         checkQueriesPlansAreTheSame(sql1, sql2);
+
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT DISTINCT T0.A FROM R1, " +
+                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
+        assertEquals(2, planNodes.size());
+        //* enable to debug */ System.out.println(planNodes.get(1).toExplainPlanString());
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("AGGREGATION"));
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("DISTINCT"));
+        assertFalse(planNodes.get(0).toExplainPlanString().contains("JOIN"));
+
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("AGGREGATION"));
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("INDEX INNER JOIN"));
+        assertTrue(planNodes.get(1).toExplainPlanString().contains("LOOP INNER JOIN"));
+
+        failToCompile(
+                "SELECT * FROM (SELECT DISTINCT A FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A");
 
         sql1 =  "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
                 "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
@@ -1709,7 +1731,7 @@ public class TestSubQueries extends PlannerTestCase {
 
         pn = compile("SELECT -8, T2.C FROM (select * from R1) T1, R1 T2 WHERE (T2.C + 5 ) > 44");
         pn = pn.getChild(0);
-        System.out.println(pn.toExplainPlanString());
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
         assertTrue(pn instanceof ProjectionPlanNode);
     }
 
@@ -2056,8 +2078,6 @@ public class TestSubQueries extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
 }
