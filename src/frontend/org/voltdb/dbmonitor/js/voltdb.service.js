@@ -358,7 +358,7 @@
                 var processName = "GRAPH_PARTITIONIDLETIME";
                 var procedureNames = ['@Statistics'];
                 var parameters = ["STARVATION"];
-                var values = ['1'];
+                var values = ['0'];
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
@@ -474,10 +474,43 @@
 
         };
         
+        this.GetTableInformationClientPort = function (onConnectionAdded) {
+            try {
+                var processName = "TABLE_INFORMATION_CLIENTPORT";
+                var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
+                var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
+                var values = ['0', '0', undefined];
+                var isAdmin = true;
+                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    _connection.admin = true;
+                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
+                        onConnectionAdded(connection, status);
+                    });
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+        
         this.SetConnectionForSQLExecution = function (useAdminPort) {
             try {
-                var processNameSuffix = useAdminPort ? '_ADMINPORT' : '_CLIENTPORT';
-                var processName = "SQLQUERY_EXECUTE" + processNameSuffix;
+                var processNameSuffix = useAdminPort ? '' : '_CLIENTPORT';
+                var processName = "TABLE_INFORMATION" + processNameSuffix;
                 var procedureNames = ['@Statistics'];
                 var parameters = ["TABLE"];
                 var values = ['0'];

@@ -946,6 +946,22 @@ DROP TABLE T59;
 DR TABLE T60 DISABLE;
 DR TABLE T61 DISABLE;
 
+-- Partial index
+CREATE TABLE T62
+(
+   C1 INTEGER,
+   C2 INTEGER,
+   C3 INTEGER,
+   pk INTEGER NOT NULL,
+   PRIMARY KEY (pk)
+);
+CREATE INDEX partial_idx_1 ON T62 (C2) WHERE C1 > 3;
+CREATE INDEX partial_idx_2 ON T62 (C1) WHERE C1 IS NOT NULL;
+CREATE INDEX partial_idx_3 ON T62 (C2) WHERE C1 IS NOT NULL;
+CREATE INDEX partial_idx_4 ON T62 (C1) WHERE ABS(C1) > 5;
+CREATE INDEX partial_idx_5 ON T62 (C1,C2) WHERE ABS(C3) = 5;
+CREATE INDEX partial_idx_6 ON T62 (C1) WHERE C2 > 5 and C2 < 100;
+
 -- These statements were added when use of some Volt-specific functions or ||
 -- or NULL in indexed expressions was discovered to be mishandled (ENG-7792).
 -- They showed that views and procs did NOT share these problems,

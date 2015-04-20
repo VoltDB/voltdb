@@ -206,4 +206,20 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 + "execute (delete frm partitioned_blah));");
 
     }
+
+    public void testHexLiterals() throws Exception {
+
+        // 0 digits is no good.
+        ddlErrorTest("malformed numeric constant",
+                "create procedure insHex as insert into blah (ival) values (x'');");
+
+        // An odd number of digits is not accepted (VARBINARY legacy)
+        ddlErrorTest("malformed binary string",
+                "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef0');");
+
+        // More than 16 digits is also not accepted (won't fit into BIGINT)
+        ddlErrorTest("malformed numeric constant",
+                "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef01');");
+
+    }
 }
