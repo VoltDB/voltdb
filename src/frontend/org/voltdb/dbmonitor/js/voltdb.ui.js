@@ -768,6 +768,14 @@ var loadPage = function (serverName, portid) {
                                 $("#ChartDrReplicationRate").hide();
                                 $("#divDrWrapperAdmin").hide();
                             }
+                        } else {
+                            VoltDbUI.isDRInfoRequired = false;
+                            $("#divDrReplication").hide();
+                            $('#liDrReplication').css('display', 'none');
+                            $('#liDrTables').css('display', 'none');
+                            showHideLastLineClass(false);
+                            $("#ChartDrReplicationRate").hide();
+                            $("#divDrWrapperAdmin").hide();
                         }
                     }
                 });
@@ -1168,13 +1176,20 @@ var loadPage = function (serverName, portid) {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                     } else {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
-                    }
 
+                        $("#tblDrMAster th").on('click', function() {
+                            VoltDbUI.isDRMasterTableClicked = true;
+                        });
+
+                        if (!VoltDbUI.isDRMasterTableClicked || !VoltDbUI.isDRMasterTableLoaded) {
+                            VoltDbUI.isDRMasterTableLoaded = true;
+                            $("#tblMAster_wrapper").find(".sorting_asc").removeClass('sorting_asc');
+                        }
+                    }
 
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
                 "sDom": '<"clear">ilprtp',
-                "order": [],
                 "aoColumns": [
                     null,
                     { "bSearchable": false },
@@ -1188,6 +1203,8 @@ var loadPage = function (serverName, portid) {
             if (!$.isEmptyObject(response)) {
                 $("#tblMAster_wrapper").find(".paginationDefault").remove();
             }
+            
+            
 
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
@@ -1203,8 +1220,6 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster").next().hide();
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
-
-             //$("#tblDrMAster").find(".sorting_asc").removeClass("sorting_asc");
 
             $("#drMasterSection").find(".pagination").hide();
         });
@@ -1258,12 +1273,20 @@ var loadPage = function (serverName, portid) {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                         } else {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                            
+                            $("#tblDrReplica th").on('click', function () {
+                                VoltDbUI.isDRReplicaTableClicked = true;
+                            });
+
+                            if (!VoltDbUI.isDRReplicaTableClicked || !VoltDbUI.isDRReplicaTableLoaded) {
+                                VoltDbUI.isDRReplicaTableLoaded = true;
+                                $("#tblDrReplica_wrapper").find(".sorting_asc").removeClass('sorting_asc');
+                            }
                         }
 
 
                         $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                     },
-                    "order": [],
                     "sDom": '<"clear">ilprtp',
                     "aoColumns": [
                         null,
@@ -1275,8 +1298,7 @@ var loadPage = function (serverName, portid) {
 
 
                 $("#tblReplica_wrapper").find(".paginationDefault").remove();
-
-
+                
                 //  Customizing DataTables to make it as existing pagination
                 $(".paginate_disabled_previous").html("Prev");
                 $(".paginate_enabled_next").html("Next");
@@ -1286,8 +1308,6 @@ var loadPage = function (serverName, portid) {
                 $("#tblDrReplica").next().hide();
                 $("#tblDrReplica_info").hide();
                 $("#tblDrReplica_length").hide();
-
-                //$("#tblDrReplica").find(".sorting_asc").removeClass("sorting_asc");
 
                 $("#drReplicaSection").find(".pagination").hide();
             }
@@ -1987,6 +2007,10 @@ var adjustGraphSpacing = function () {
         this.drStatus = '';
         this.drReplicationRole = "NONE";
         this.isDRInfoRequired = false;
+        this.isDRReplicaTableLoaded = false;
+        this.isDRReplicaTableClicked = false;
+        this.isDRMasterTableLoaded = false;
+        this.isDRMasterTableClicked = false;
         this.ACTION_STATES = {
             NONE: -1,
             NEXT: 0,
