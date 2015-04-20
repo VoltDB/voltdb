@@ -1479,7 +1479,12 @@ public class SQLParser extends SQLPatternFactory
                             objParam = parseDate(param);
                         }
                         else if (paramType.equals("varbinary") || paramType.equals("tinyint_array")) {
-                            String hexDigits = Unquote.matcher(param).replaceAll("");
+                            // A VARBINARY literal may or may not be
+                            // prefixed with an X.
+                            String hexDigits = getDigitsFromHexLiteral(param);
+                            if (hexDigits == null) {
+                                hexDigits = Unquote.matcher(param).replaceAll("");
+                            }
                             // The following call with throw an exception if we
                             // have an odd number of hex digits.
                             objParam = Encoder.hexDecode(hexDigits);
