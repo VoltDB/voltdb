@@ -918,7 +918,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
             result = "seconds"
         }
         else {
-            if((minuteTwo - minuteOne) < 8 && (minuteTwo - minuteOne) >3 ) {
+            if((minuteOne - minuteTwo) > 20 ) {
                 result = "seconds"
             }
             else {
