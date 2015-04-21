@@ -388,7 +388,7 @@ class DbMonitorTest extends TestBase {
         // This loop is used to gain time. 
         while(count<numberOfTrials) {
             count++
-            page.chooseGraphView("Minute")
+            page.chooseGraphView("Minutes")
             if(graphView.text().equals("")) {
                 break
             }
