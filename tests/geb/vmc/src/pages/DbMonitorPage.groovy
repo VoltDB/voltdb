@@ -636,6 +636,16 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return hourInt
     }
 
+    def int changeToDate(String string) {
+        String date = string.substring(0, 2)
+        int dateInt = Integer.parseInt(date)
+        return dateInt
+    }
+    
+    def String changeToMonth(String string) {
+        String date = string.substring(3, string.length()-9)
+        return date
+    }
     /*
      * click SQL Query to go to SqlQueryPage
      */
