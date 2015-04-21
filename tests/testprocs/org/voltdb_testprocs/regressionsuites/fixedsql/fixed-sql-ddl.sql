@@ -62,6 +62,12 @@ CREATE TABLE R3 (
 create index idx1 on R3 (id);
 create unique index idx2 on R3 (id,num);
 
+-- not suppose to define index on this table
+CREATE TABLE R4 (
+  ID INTEGER DEFAULT 0 NOT NULL,
+  NUM INTEGER
+);
+
 CREATE TABLE P1_DECIMAL (
   ID INTEGER DEFAULT 0 NOT NULL,
   CASH DECIMAL NOT NULL,

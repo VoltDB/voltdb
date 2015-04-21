@@ -2190,7 +2190,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable vt;
         String sql;
 
-        String[] tables = {"R1", "R3"};
+        String[] tables = {"R1", "R3", "R4"};
         for (String tb : tables)
         {
             sql = "insert into " + tb + "  (id, num) Values(?, ?);";
@@ -2220,21 +2220,20 @@ public class TestFixedSQLSuite extends RegressionSuite {
             nullIndexSearchKeyChecker(client, sql);
 
             // activate # of searchkey is 2
-            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num > ?;";
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num > ?;";
             nullIndexSearchKeyChecker(client, sql);
 
-            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num >= ?;";
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num >= ?;";
             nullIndexSearchKeyChecker(client, sql);
 
-            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num = ?;";
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num = ?;";
             nullIndexSearchKeyChecker(client, sql);
 
-            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num < ?;";
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num < ?;";
             nullIndexSearchKeyChecker(client, sql);
 
-            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num <= ?;";
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num <= ?;";
             nullIndexSearchKeyChecker(client, sql);
-
 
             // post predicate
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
@@ -2244,6 +2243,25 @@ public class TestFixedSQLSuite extends RegressionSuite {
             nullIndexSearchKeyChecker(client, sql);
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // nest loop index join
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
+            vt = client.callProcedure("@Explain", sql, null).getResults()[0];
+            assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
+            assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R1\""));
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
             nullIndexSearchKeyChecker(client, sql);
         }
 

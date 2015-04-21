@@ -203,9 +203,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
-        if (ctr == 0 && candidateValue.isNull()) {
-            // when the first search key is NULL, the result is false when it compares to anything
-            // do early return optimization. Our comparator may not handle null comparison correctly.
+        if (candidateValue.isNull()) {
+            // when any part of the search key is NULL, the result is false when it compares to anything.
+            // do early return optimization, our index comparator may not handle null comparison correctly.
             earlyReturnForSearchKeyOutOfRange = true;
             break;
         }
