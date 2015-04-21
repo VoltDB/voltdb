@@ -194,18 +194,18 @@
                                 </div>
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
                             </div>
-                              <div id="chartPartitionIdleTime" class="chart left">
-                                  <div class="chartHeader">
-                                      <h1>Partition Idle Time</h1>
-                                  </div>
-                                  <div class="legend" style="display:none;">
-                                   <ul>
-                                       <li><div class="dotGray"></div>Local partitions </li>
-                                       <li><div class="dotBlue"></div>Cluster-wide Maximum / Minimum</li>
-                                       <li><div class="dotOrange"></div>Multi-partition</li>
-                                   </ul>
-                                  </div>
-                              <svg id="visualisationPartitionIdleTime" class="partitionHeight"></svg>
+                            <div id="chartPartitionIdleTime" class="chart left">
+                                <div class="chartHeader">
+                                    <h1>Partition Idle Time</h1>
+                                </div>
+                                <div class="legend" style="display:none;">
+                                    <ul>
+                                        <li><div class="dotGray"></div>Local partitions </li>
+                                        <li><div class="dotBlue"></div>Cluster-wide Maximum / Minimum</li>
+                                        <li><div class="dotOrange"></div>Multi-partition</li>
+                                    </ul>
+                                </div>
+                                <svg id="visualisationPartitionIdleTime" class="partitionHeight"></svg>
                             </div>
                             <div id="ChartDrReplicationRate" class="chart right" style="display: none">
                                 <div class="chartHeader">
@@ -243,7 +243,7 @@
                                         <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
                                             <thead>
                                                 <tr>
-                                                    <th id="PROCEDURE" width="30%" data-name="none">Stored Procedure</th>
+                                                    <th id="PROCEDURE" width="30%" data-name="ascending" class="sorttable_sorted">Stored Procedure</th>
                                                     <th id="INVOCATIONS" width="10%" data-name="none">Invocations</th>
                                                     <th id="MIN_LATENCY" width="15%" data-name="none">Min Latency (ms)</th>
                                                     <th id="MAX_LATENCY" width="15%" data-name="none">Max Latency (ms)</th>
@@ -275,7 +275,7 @@
                                         <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
                                             <thead>
                                                 <tr>
-                                                    <th id="TABLE_NAME" width="30%" data-name="none">Table</th>
+                                                    <th id="TABLE_NAME" width="30%" data-name="ascending" class="sorttable_sorted">Table</th>
                                                     <th id="TUPLE_COUNT" width="10%" data-name="none">Row Count</th>
                                                     <th id="MAX_ROWS" width="15%" data-name="none">Max Rows (per partition)</th>
                                                     <th id="MIN_ROWS" width="15%" data-name="none">Min Rows (per partition)</th>
@@ -986,7 +986,7 @@
                         <input type="checkbox" id="PartitionIdleTime" name="" value="transaction" checked="checked" />
                     </li>
                     <li class="pref-graph" id="liDrReplication" style="display:none">
-                        Data Replication (DR) 
+                        Data Replication (DR)
                         <input type="checkbox" id="DrReplicationRate" name="" value="drReplication" checked="checked" />
                     </li>
                     <li class="pref-storedProc">
@@ -1706,11 +1706,10 @@
         <div class="overlay-btns"><a id="btnSaveDrReplica" class="btn">Ok</a> <a id="btnPopupDrReplicaCancel" class="btn btn-gray">Cancel</a></div>
     </div>
     <!-- POPUP DRReplicaPop -->
-
-    <!-- Placed at the end of the document so the pages load faster --> 
-    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script> 
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script> 
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script> 
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
+    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
+    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
 
     <!-- Placed at the end of the document so the pages load faster -->
 </body>

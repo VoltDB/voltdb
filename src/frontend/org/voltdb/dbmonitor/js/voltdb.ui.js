@@ -1177,14 +1177,14 @@ var loadPage = function (serverName, portid) {
                     } else {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
 
-                        $("#tblDrMAster th").on('click', function () {
-                            VoltDbUI.isDRMasterTableClicked = true;
-                        });
+                        //$("#tblDrMAster th").on('click', function () {
+                        //    VoltDbUI.isDRMasterTableClicked = true;
+                        //});
 
-                        if (!VoltDbUI.isDRMasterTableClicked || !VoltDbUI.isDRMasterTableLoaded) {
-                            VoltDbUI.isDRMasterTableLoaded = true;
-                            $("#tblMAster_wrapper").find(".sorting_asc").removeClass('sorting_asc');
-                        }
+                        //if (!VoltDbUI.isDRMasterTableClicked || !VoltDbUI.isDRMasterTableLoaded) {
+                        //    VoltDbUI.isDRMasterTableLoaded = true;
+                        //    $("#tblMAster_wrapper").find(".sorting_asc").removeClass('sorting_asc');
+                        //}
                     }
 
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
@@ -1272,14 +1272,14 @@ var loadPage = function (serverName, portid) {
                         } else {
                             $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
 
-                            $("#tblDrReplica th").on('click', function () {
-                                VoltDbUI.isDRReplicaTableClicked = true;
-                            });
+                            //$("#tblDrReplica th").on('click', function () {
+                            //    VoltDbUI.isDRReplicaTableClicked = true;
+                            //});
 
-                            if (!VoltDbUI.isDRReplicaTableClicked || !VoltDbUI.isDRReplicaTableLoaded) {
-                                VoltDbUI.isDRReplicaTableLoaded = true;
-                                $("#tblDrReplica_wrapper").find(".sorting_asc").removeClass('sorting_asc');
-                            }
+                            //if (!VoltDbUI.isDRReplicaTableClicked || !VoltDbUI.isDRReplicaTableLoaded) {
+                            //    VoltDbUI.isDRReplicaTableLoaded = true;
+                            //    $("#tblDrReplica_wrapper").find(".sorting_asc").removeClass('sorting_asc');
+                            //}
                         }
 
 
@@ -1502,6 +1502,12 @@ var loadPage = function (serverName, portid) {
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').on('click', function () {
         voltDbRenderer.isProcedureSortClicked = true;
         currentProcedureAction = VoltDbUI.ACTION_STATES.SORT;
+
+        if (this.id != 'PROCEDURE') {
+            $("#tblStoredProcedures").find('#PROCEDURE').attr('data-name', 'none');
+            $("#tblStoredProcedures").find('#PROCEDURE').removeAttr('class');
+        }
+
         if (VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.NONE || VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.SORTED) {
             if ($(this).data('name') == "none") {
                 $(this).data('name', 'ascending');
@@ -1607,6 +1613,11 @@ var loadPage = function (serverName, portid) {
     $('#TABLE_NAME,#TUPLE_COUNT,#MAX_ROWS,#MIN_ROWS,#AVG_ROWS,#TABLE_TYPE').unbind('click');
     $('#TABLE_NAME,#TUPLE_COUNT,#MAX_ROWS,#MIN_ROWS,#AVG_ROWS,#TABLE_TYPE').on('click', function () {
         voltDbRenderer.isTableSortClicked = true;
+
+        if (this.id != 'TABLE_NAME') {
+            $("#tblDataTables").find('#TABLE_NAME').attr('data-name', 'none');
+            $("#tblDataTables").find('#TABLE_NAME').removeAttr('class');
+        }
         if (VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.NONE || VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.SORTED) {
             if ($(this).data('name') == "none") {
                 $(this).data('name', 'ascending');
@@ -1625,9 +1636,9 @@ var loadPage = function (serverName, portid) {
 
             //apply css to display sort arrow image
             if ($(this).hasClass("sorttable_sorted")) {
-                if (this.id == voltDbRenderer.tableSortColumn)
+                if (this.id == voltDbRenderer.tableSortColumn) {
                     $("#" + voltDbRenderer.tableSortColumn).data('name', 'descending');
-                else
+                } else
                     $("#" + voltDbRenderer.tableSortColumn).data('name', 'none');
 
 
