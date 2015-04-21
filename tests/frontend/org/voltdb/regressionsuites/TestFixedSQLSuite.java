@@ -2174,6 +2174,81 @@ public class TestFixedSQLSuite extends RegressionSuite {
         runQueryGetDouble(client, sql, 1.9);
     }
 
+    private void nullIndexSearchKeyChecker(Client client, String sql) throws Exception {
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+    }
+
+    public void testENG8120() throws Exception {
+        // hsqldb does not handle null
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        String[] tables = {"R1", "R3"};
+        for (String tb : tables)
+        {
+            sql = "insert into " + tb + "  (id, num) Values(?, ?);";
+            client.callProcedure("@AdHoc", sql, 1, null);
+            client.callProcedure("@AdHoc", sql, 2, null);
+            client.callProcedure("@AdHoc", sql, 3, 3);
+            client.callProcedure("@AdHoc", sql, 4, 4);
+
+            sql = "select count(*) from " + tb;
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{4});
+
+            // activate # of searchkey is 1
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // activate # of searchkey is 2
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = -7263 and num <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+
+            // post predicate
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+        }
+
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
