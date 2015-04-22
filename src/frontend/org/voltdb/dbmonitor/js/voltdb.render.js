@@ -1086,7 +1086,7 @@ function alertNodeClicked(obj) {
                             "MIN_ROWS": data["MIN_ROWS"],
                             "AVG_ROWS": data["AVG_ROWS"],
                             "TUPLE_COUNT": data["TUPLE_COUNT"],
-                            "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                            "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS //getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                         };
                         tableCount++;
                     });
@@ -1102,7 +1102,7 @@ function alertNodeClicked(obj) {
                             "MIN_ROWS": data["MIN_ROWS"],
                             "AVG_ROWS": data["AVG_ROWS"],
                             "TUPLE_COUNT": data["TUPLE_COUNT"],
-                            "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                            "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS //getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                         };
                         tableCount++;
                     });
@@ -3256,7 +3256,7 @@ function alertNodeClicked(obj) {
                                 "MIN_ROWS": tupleData["MIN_ROWS"],
                                 "AVG_ROWS": tupleData["AVG_ROWS"],
                                 "TUPLE_COUNT": tupleData["TUPLE_COUNT"],
-                                "TABLE_TYPE": getColumnTypes(nestKey) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[nestKey].TABLE_TYPE
+                                "TABLE_TYPE": schemaCatalogTableTypes[nestKey].REMARKS //getColumnTypes(nestKey) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[nestKey].TABLE_TYPE
                             };
                             searchTableCount++;
 
