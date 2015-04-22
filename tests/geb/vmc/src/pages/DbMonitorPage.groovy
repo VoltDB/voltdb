@@ -766,7 +766,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         if ( descending.displayed )
             return true
         else
-            return false
+            return falsez
     }
 
     /*
