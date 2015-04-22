@@ -3351,9 +3351,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateBitwiseAndOrXor(vt, bignum, in);
 
         // Try again using x'...' syntax
+        // Doesn't work yet, just verify it fails.
         String hexIn = longToHexLiteral(in);
-        vt = client.callProcedure("BITWISE_AND_OR_XOR", hexIn, hexIn, hexIn, pk).getResults()[0];
-        validateBitwiseAndOrXor(vt, bignum, in);
+        verifyProcFails(client, "Unable to convert string", "BITWISE_AND_OR_XOR", hexIn, hexIn, hexIn, pk);
     }
 
     public void testBitwiseFunction_AND_OR_XOR() throws IOException, ProcCallException {

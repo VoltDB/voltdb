@@ -578,7 +578,7 @@ function loadAdminPage() {
                         toggleSecurityEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.securityLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -1246,7 +1246,7 @@ function loadAdminPage() {
                         toggleAutoSnapshotEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.snapshotLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -1389,7 +1389,7 @@ function loadAdminPage() {
                         toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.heartbeatTimeoutLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -1520,7 +1520,7 @@ function loadAdminPage() {
                         toggleQueryTimeoutEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.queryTimeoutFieldLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -1574,8 +1574,8 @@ function loadAdminPage() {
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
                 '    <td>Stream</td>' +
-                '    <td width="10%">' +
-                '       <input id="txtStream" name="txtStream" type="text" size="30">' +
+                '    <td width="15%">' +
+                '       <input id="txtStream" name="txtStream" type="text" size="38">' +
                 '       <label id="errorStream" for="txtStream" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td width="8%" align="right"><input type="checkbox" checked="true" id="chkStream" class="chkStream"/></td>' +
@@ -1584,7 +1584,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td>Type </td>' +
                 '    <td>' +
-                '       <input id="txtType" name="txtType" type="text" size="30">' +
+                '       <input id="txtType" name="txtType" type="text" size="38">' +
                 '       <label id="errorType" for="txtType" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
@@ -1826,7 +1826,7 @@ function loadAdminPage() {
 
                             var msg = '"Export Configuration". ';
                             if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                                msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                             } else if (result.statusstring != "") {
                                 msg += result.statusstring;
                             } else {
@@ -1954,7 +1954,7 @@ function loadAdminPage() {
             $("#btnSaveSecUser").on("click", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
-                var password = $('#txtPassword').val();
+                var password = encodeURIComponent($('#txtPassword').val());
                 var role = $('#selectRole').val();
                 var requestType = "POST";
                 var requestUser = "";
@@ -1991,7 +1991,7 @@ function loadAdminPage() {
                                 }
                                 var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                                    msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                    msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                                 }
                                 else if (result.statusstring != "") {
                                     msg += " " + result.statusstring;
@@ -2028,7 +2028,7 @@ function loadAdminPage() {
                                 
                                 var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                                    msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                    msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                                 } else if (result.statusstring != "") {
                                     msg += " " + result.statusstring;
                                 } else {
