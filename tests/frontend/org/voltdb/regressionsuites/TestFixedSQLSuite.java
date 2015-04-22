@@ -2247,9 +2247,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
             // nest loop index join
             sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
-            vt = client.callProcedure("@Explain", sql, null).getResults()[0];
-            assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
-            assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R1\""));
+
+            if (tb != "R4") {
+                vt = client.callProcedure("@Explain", sql, null).getResults()[0];
+                assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
+                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R1\""));
+            }
             nullIndexSearchKeyChecker(client, sql);
 
             sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
