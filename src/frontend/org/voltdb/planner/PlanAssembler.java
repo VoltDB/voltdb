@@ -1809,10 +1809,13 @@ public class PlanAssembler {
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
-                AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                gbInfo.m_multiPartition = true;
-                switchToIndexScanForGroupBy(candidate, gbInfo);
-
+                // do not apply index scan for serial/partial aggregation
+                // for distinct that does not group by partition column
+                if (!m_parsedSelect.hasAggregateDistinct() || m_parsedSelect.hasPartitionColumnInGroupby()) {
+                    AbstractPlanNode candidate = root.getChild(0).getChild(0);
+                    gbInfo.m_multiPartition = true;
+                    switchToIndexScanForGroupBy(candidate, gbInfo);
+                }
             } else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
@@ -1893,15 +1896,17 @@ public class PlanAssembler {
                          * aggregate node.
                          *
                          * If DISTINCT is specified, don't do push-down for
-                         * count() and sum()
+                         * count() and sum() when not group by partition column.
                          */
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
                             agg_expression_type == ExpressionType.AGGREGATE_SUM) {
-                            if (is_distinct) {
+                            if (is_distinct && !m_parsedSelect.hasPartitionColumnInGroupby()) {
                                 topAggNode = null;
                             }
                             else {
+                                // for aggregate distinct when group by partition column, the top aggregate node
+                                // will be dropped later, thus there is no effect to assign the top_expression_type.
                                 top_expression_type = ExpressionType.AGGREGATE_SUM;
                             }
                         }
@@ -2003,6 +2008,10 @@ public class PlanAssembler {
 
         for (Index index : allIndexes) {
             if ( ! IndexType.isScannable(index.getType())) {
+                continue;
+            }
+            if (! index.getPredicatejson().isEmpty()) {
+                // do not try to look at Partial/Sparse index
                 continue;
             }
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();

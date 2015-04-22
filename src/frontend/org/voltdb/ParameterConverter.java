@@ -122,11 +122,6 @@ public class ParameterConverter {
 
         try {
             if (expectedClz == long.class) {
-                // Could be a long value specified in hexadecimal as x'ffff'
-                String hexDigits = SQLParser.getDigitsFromHexLiteral(value);
-                if (hexDigits != null) {
-                    return SQLParser.hexDigitsToLong(hexDigits);
-                }
                 return Long.parseLong(value);
             }
             if (expectedClz == int.class) {
@@ -144,7 +139,6 @@ public class ParameterConverter {
         }
         // ignore the exception and fail through below
         catch (NumberFormatException nfe) {}
-        catch (SQLParser.Exception spe) {}
 
         throw new VoltTypeException(
                 "tryToMakeCompatible: Unable to convert string "
@@ -278,16 +272,25 @@ public class ParameterConverter {
             if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(expectedClz);
         }
         else if (inputClz == String.class) {
-            if (((String) param).equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
+            String stringParam = (String)param;
+            if (stringParam.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
             else if (expectedClz == String.class) return param;
             // Hack allows hex-encoded strings to be passed into byte[] params
             else if (expectedClz == byte[].class) {
-                return Encoder.hexDecode((String) param);
+                // regular expressions can be expensive, so don't invoke SQLParser
+                // unless the param really looks like an x-quoted literal
+                if (stringParam.startsWith("X") || stringParam.startsWith("x")) {
+                    String hexDigits = SQLParser.getDigitsFromHexLiteral(stringParam);
+                    if (hexDigits != null) {
+                        stringParam = hexDigits;
+                    }
+                }
+                return Encoder.hexDecode(stringParam);
             }
             // We allow all values to be passed as strings for csv loading, json, etc...
             // This code handles primitive types. Complex types come later.
             if (expectedClz.isPrimitive()) {
-                return convertStringToPrimitive((String) param, expectedClz);
+                return convertStringToPrimitive(stringParam, expectedClz);
             }
         }
         else if (inputClz == byte[].class) {

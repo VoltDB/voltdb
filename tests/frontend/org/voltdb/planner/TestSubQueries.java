@@ -1579,15 +1579,36 @@ public class TestSubQueries extends PlannerTestCase {
         List<AbstractPlanNode> planNodes;
 
         planNodes = compileToFragments(
-                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P2 GROUP BY A, C) T1, R1 " +
-                "where T1.A = R1.A ");
+                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P2 GROUP BY A, C) T1, R1 where T1.A = R1.A ");
         assertEquals(2, planNodes.size());
-        assertTrue(planNodes.get(0).toExplainPlanString().contains("DISTINCT"));
-        assertTrue(planNodes.get(0).toExplainPlanString().contains("LOOP INNER JOIN"));
+        pn = planNodes.get(0).getChild(0);
+
+        assertFalse(pn.toExplainPlanString().contains("DISTINCT"));
+        assertTrue(pn.toExplainPlanString().contains("LOOP INNER JOIN")); // this join can be pushed down also in future
 
         pn = planNodes.get(1).getChild(0);
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertTrue(pn.toExplainPlanString().contains("SUM DISTINCT(P2.D"));
+
+        // verify the optimized plan without sub-query like the one above
+        planNodes = compileToFragments(
+                "SELECT P2.A, P2.C, SUM(distinct P2.D) FROM P2, R1 WHERE P2.A = R1.A GROUP BY P2.A, P2.C");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        assertTrue(pn.getChild(0) instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.INDEXSCAN));
+        assertTrue(pn.getInlinePlanNode(PlanNodeType.INDEXSCAN).
+                toExplainPlanString().contains("INDEX SCAN of \"P2\" using its primary key index"));
+
+        assertTrue(pn.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(pn.getChild(0).toExplainPlanString().contains("SEQUENTIAL SCAN of \"R1\""));
 
         // T
         planNodes = compileToFragments(
