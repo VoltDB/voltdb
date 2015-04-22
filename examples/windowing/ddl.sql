@@ -4,16 +4,15 @@ CREATE TABLE timedata
 (
   uuid VARCHAR(36) NOT NULL,
   val BIGINT NOT NULL,
-  update_ts TIMESTAMP NOT NULL
+  update_ts TIMESTAMP NOT NULL,
+  -- Ordered index on timestamp value allows for quickly finding timestamp
+  -- values as well as quickly finding rows by offset.
+  -- Used by all 4 of the deleting stored procedures.
+  CONSTRAINT PK_timedate PRIMARY KEY (update_ts, uuid)
 );
 
 -- Partition this table to get parallelism.
 PARTITION TABLE timedata ON COLUMN uuid;
-
--- Ordered index on timestamp value allows for quickly finding timestamp
--- values as well as quickly finding rows by offset.
--- Used by all 4 of the deleting stored procedures.
-CREATE INDEX uptate_ts_index ON timedata (update_ts);
 
 -- Ordered index on value field allows for fast maximum value retrieval.
 -- Used in procedure windowing.MaxValue below.

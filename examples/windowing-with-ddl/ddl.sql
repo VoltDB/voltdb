@@ -19,7 +19,7 @@ CREATE TABLE timedata
   uuid VARCHAR(36) NOT NULL,
   val BIGINT NOT NULL,
   update_ts TIMESTAMP NOT NULL,
-  CONSTRAINT update_ts_uuid UNIQUE (update_ts, uuid),
+  CONSTRAINT update_ts_uuid PRIMARY KEY (update_ts, uuid),
   CONSTRAINT row_limit LIMIT PARTITION ROWS 82500
     EXECUTE (DELETE FROM timedata
              WHERE update_ts
