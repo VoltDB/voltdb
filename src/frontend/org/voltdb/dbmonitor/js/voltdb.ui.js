@@ -409,12 +409,14 @@ var loadPage = function (serverName, portid) {
 
             $("#btnLoginWarningOk").unbind("click");
             $("#btnLoginWarningOk").on('click', function () {
-                
+
                 if (!VoltDbUI.hasPermissionToView) {
                     location.reload(true);
                 } else {
                     if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-                        $("#navDbmonitor").click();
+                        setTimeout(function() {
+                            $("#navDbmonitor").trigger("click");
+                        }, 500);
                     }
                     
                     $("#navAdmin").hide();
