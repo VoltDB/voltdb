@@ -1133,87 +1133,88 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
             var replicaLatencyMs = 0;
             var replicaLatencyTrans = 0;
-            for (var key in response) {
+            if (!$.isEmptyObject(response)) {
+                for (var key in response) {
 
-                for (var i = 0; i <= response[key].length - 1; i++) {
+                    for (var i = 0; i <= response[key].length - 1; i++) {
 
-                    replicaLatencyTrans = response[key][i].LASTQUEUEDDRID - response[key][i].LASTACKDRID;
-                    replicaLatencyMs = (response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000;
+                        replicaLatencyTrans = response[key][i].LASTQUEUEDDRID - response[key][i].LASTACKDRID;
+                        replicaLatencyMs = (response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000;
 
-                    htmlcontent = htmlcontent + "<tr>";
-                    htmlcontent = htmlcontent + "<td>" + key + "</td>" +
-                        "<td>" + VoltDbUI.drStatus + "</td>" +
-                        "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
-                        "<td>" + response[key][i].TOTALBYTES + "</td >" +
-                        "<td>" + replicaLatencyMs + "</td >" +
-                        "<td>" + replicaLatencyTrans + "</td >";
-                    htmlcontent = htmlcontent + "</tr>";
-                }
-
-            }
-
-            if ($.fn.dataTable.isDataTable('#tblDrMAster')) {
-                $("#tblDrMAster").DataTable().destroy();
-            }
-
-            var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
-                                            "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
-                                                    "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                                                    "<th id='Th3' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Total Buffer</th>" +
-                                                    "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
-                                                    "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
-                                                    "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
-            $("#tblMAster_wrapper").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
-
-            table = $("#tblDrMAster").DataTable({
-                stateSave: true,
-                pageLength: 5,
-                "sPaginationType": "extStyleLF",
-                "bAutoWidth": false,
-                "language": {
-                    "zeroRecords": "No data to be displayed"
-                },
-                "fnDrawCallback": function () {
-                    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
-                    } else {
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        htmlcontent = htmlcontent + "<tr>";
+                        htmlcontent = htmlcontent + "<td>" + key + "</td>" +
+                            "<td>" + VoltDbUI.drStatus + "</td>" +
+                            "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
+                            "<td>" + response[key][i].TOTALBYTES + "</td >" +
+                            "<td>" + replicaLatencyMs + "</td >" +
+                            "<td>" + replicaLatencyTrans + "</td >";
+                        htmlcontent = htmlcontent + "</tr>";
                     }
 
-                    $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
-                },
-                "sDom": '<"clear">ilprtp',
-                "aoColumns": [
-                    null,
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false }
-                ]
-            });
+                }
 
-            if (!$.isEmptyObject(response)) {
+                if ($.fn.dataTable.isDataTable('#tblDrMAster')) {
+                    $("#tblDrMAster").DataTable().destroy();
+                }
+
+                var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
+                    "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
+                    "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
+                    "<th id='Th3' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Total Buffer</th>" +
+                    "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
+                    "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
+                    "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
+                $("#tblMAster_wrapper").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
+
+                table = $("#tblDrMAster").DataTable({
+                    stateSave: true,
+                    pageLength: 5,
+                    "sPaginationType": "extStyleLF",
+                    "bAutoWidth": false,
+                    "language": {
+                        "zeroRecords": "No data to be displayed"
+                    },
+                    "fnDrawCallback": function () {
+                        if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
+                            $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                        } else {
+                            $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        }
+
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                    },
+                    "sDom": '<"clear">ilprtp',
+                    "aoColumns": [
+                        null,
+                        { "bSearchable": false },
+                        { "bSearchable": false },
+                        { "bSearchable": false },
+                        { "bSearchable": false },
+                        { "bSearchable": false }
+                    ]
+                });
+
+
                 $("#tblMAster_wrapper").find(".paginationDefault").remove();
+
+
+                //Customizing DataTables to make it as existing pagination
+                $(".paginate_disabled_previous").html("Prev");
+                $(".paginate_enabled_next").html("Next");
+                $(".paginate_disabled_next").html("Next");
+                $(".paginate_enabled_previous").html("Prev");
+
+                $(".paginate_disabled_previous").attr("title", "Previous Page");
+                $(".paginate_enabled_next").attr("title", "Next Page");
+                $(".paginate_disabled_next").attr("title", "Next Page");
+                $(".paginate_enabled_previous").attr("title", "Previous Page");
+
+                $("#tblDrMAster").next().hide();
+                $("#tblDrMAster_info").hide();
+                $("#tblDrMAster_length").hide();
             }
-
-
-
-            //Customizing DataTables to make it as existing pagination
-            $(".paginate_disabled_previous").html("Prev");
-            $(".paginate_enabled_next").html("Next");
-            $(".paginate_disabled_next").html("Next");
-            $(".paginate_enabled_previous").html("Prev");
-
-            $(".paginate_disabled_previous").attr("title", "Previous Page");
-            $(".paginate_enabled_next").attr("title", "Next Page");
-            $(".paginate_disabled_next").attr("title", "Next Page");
-            $(".paginate_enabled_previous").attr("title", "Previous Page");
-
-            $("#tblDrMAster").next().hide();
-            $("#tblDrMAster_info").hide();
-            $("#tblDrMAster_length").hide();
         });
+
         $('#filterPartitionId').on('keyup', function () {
             table.search(this.value).draw();
         });
