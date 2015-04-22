@@ -1083,6 +1083,18 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 .tabs-filter-wrapperDR{   margin-bottom: 10px;float: left; width: 650px;}
 .tabs-filter-wrapperDR .filter{ float:left; width:40%;}
 
+.drTitle {
+    float: left;
+    padding: 15px 15px 15px 28px;
+    font-size: 13px;
+    font-weight: bold;
+    width: 197px;
+}
+.drIcon {
+    position: relative;
+    left: 3px;
+}
+
 /****DR Ends*******/
 
 a.changePsd {color: #0079bb;}
