@@ -629,7 +629,7 @@ var loadPage = function (serverName, portid) {
                         if (!VoltDbUI.hasPermissionToView)
                             return;
                         else
-                            $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view Admin Tab.");
+                            $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view Admin Tab.");
 
                         if (!$("#loginWarningPopup").is(":visible")) {
                             $("#loginWarnPopup").trigger("click");
