@@ -131,46 +131,27 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clickthreshholdset		        { $("#saveThreshold")}
 
         // dbmonitor graph
-        servercpudaysmin		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        servercpudaysmax		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        servercpuminutesmin		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        servercpuminutemax		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        servercpusecondmin		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        servercpusecondmax		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        servercpumin		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        servercpumax		        { $("#visualisationCpu > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
         selecttypeindrop		        { $("#graphView")}
         selecttypedays			        { $("#graphView > option:nth-child(3)")}
         selecttypemin			        { $("#graphView > option:nth-child(2)")}
         selecttypesec			        { $("#graphView > option:nth-child(1)")}
 
-        serverramdaysmin		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        serverramdaysmax		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        serverramsecondmin		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        serverramsecondmax		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        serverramminutesmin		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        serverramminutesmax		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        serverrammin		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        serverrammax		        { $("#visualisationRam > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
-        clusterlatencydaysmin		    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clusterlatencydaysmax		    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        clusterlatencysecondmin		    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clusterlatencysecondmax		    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        clusterlatencyminutesmin	    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clusterlatencyminutesmax	    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clusterlatencymin		    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clusterlatencymax		    { $("#visualisationLatency > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
-        clustertransactiondaysmin	    { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clustertransactiondaysmax	    { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        clustertransactionsecondmin	    { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clustertransactionsecondmax	    { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        clustertransactionminutesmin	{ $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        clustertransactionminutesmax	{ $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        clustertransactionmin	    { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        clustertransactionmax	    { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
         //partition idle graph
         partitiongraphmin 		        { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         partitiongraphmax		        { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        partitiongraphdaysmin 		    { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        partitiongraphdaysmax		    { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        partitiongraphminutmin		    { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
-        partitiongraphminutmax 	 	    { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
+        
         partitionstatus			        { $("#visualisationPartitionIdleTime > g > g > g.nv-y.nv-axis > g > g:nth-child(1) > g:nth-child(2) > text")}
         localpartition			        { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(1)")}
         clusterwide			            { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(2)")}
@@ -655,6 +636,16 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return hourInt
     }
 
+    def int changeToDate(String string) {
+        String date = string.substring(0, 2)
+        int dateInt = Integer.parseInt(date)
+        return dateInt
+    }
+    
+    def String changeToMonth(String string) {
+        String date = string.substring(3, string.length()-9)
+        return date
+    }
     /*
      * click SQL Query to go to SqlQueryPage
      */
@@ -910,5 +901,31 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         alertThreshold.value(threshold)
         saveThreshold.click()
+    }
+    
+    /*
+     *
+     */
+    def String compareTime(String stringOne, String stringTwo) {
+        int hourOne = changeToHour(stringOne)
+        int hourTwo = changeToHour(stringTwo)
+        int minuteOne = changeToMinute(stringOne)
+        int minuteTwo = changeToMinute(stringTwo)
+        
+        String result = ""
+        
+        if(hourTwo-hourOne == 0) {
+            result = "seconds"
+        }
+        else {
+            if((minuteOne - minuteTwo) > 20 ) {
+                result = "seconds"
+            }
+            else {
+                result = "minutes"
+            }
+        }
+        
+        return result
     }
 }
