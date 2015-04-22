@@ -108,7 +108,6 @@ function loadAdminPage() {
         chkAutoSnapshotValue: $("#chkAutoSnapshot").is(":checked"),
         iconAutoSnapshotOption: $("#autoSnapshotIcon"),
         txtAutoSnapshot: $("#txtAutoSnapshot"),
-        spanAutoSpanEdited: "",
         //File Prefix objects
         tBoxFilePrefix: $("#txtPrefix"),
         tBoxFilePrefixValue: $("#txtPrefix").text(),
@@ -188,7 +187,6 @@ function loadAdminPage() {
         txtDrMaster: $("#txtDrMaster"),
         spanDrMasterEdited: "",
         loadingDrMaster: $("#loadingDrMaster"),
-        drMasterEditedValue: "",
         updateDrMasterErrorFieldMsg: $("#updateDrMasterErrorFieldMsg"),
         drMasterLabel: $("#row-DrConfig").find("td:first-child").text(),
 
@@ -299,12 +297,10 @@ function loadAdminPage() {
     });
 
     adminEditObjects.chkAutoSnapsot.on('ifChanged', function () {
-        adminEditObjects.spanAutoSpanEdited = getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked"));
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked")));
     });
 
     adminEditObjects.chkDrMaster.on('ifChanged', function () {
-        adminEditObjects.drMasterEditedValue = getOnOffText(adminEditObjects.chkDrMaster.is(":checked"));
         adminEditObjects.txtDrMaster.text(getOnOffText(adminEditObjects.chkDrMaster.is(":checked")));
     });
 
@@ -646,29 +642,6 @@ function loadAdminPage() {
                 toggleSecurityEdit(editStates.ShowEdit);
             });
         }
-    });
-
-
-    $("#loginWarnPopup").popup({
-        afterOpen: function (event, ui, ele) {
-            var popup = $(this)[0];
-
-            $("#btnLoginWarningOk").unbind("click");
-            $("#btnLoginWarningOk").on('click', function () {
-                if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
-                    location.reload(true);
-                }
-
-                if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-                    $("#navDbmonitor").click();
-                }
-
-                $("#navAdmin").hide();
-                popup.close();
-            });
-        },
-        closeContent: '',
-        modal: true
     });
 
     var showUpdateMessage = function (msg) {
@@ -1078,7 +1051,7 @@ function loadAdminPage() {
         adminEditObjects.tBoxFilePrefix.val(adminEditObjects.tBoxFilePrefixValue);
         adminEditObjects.ddlAutoSnapshotFreqUnit.val(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapshotValue));
-
+        VoltDbAdminConfig.isSnapshotEditMode = false;
         if (state == editStates.ShowLoading) {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.iconAutoSnapshotOption.hide();
@@ -1128,6 +1101,7 @@ function loadAdminPage() {
             adminEditObjects.loadingSnapshotPrefix.hide();
             adminEditObjects.loadingSnapshotRetained.hide();
             adminEditObjects.loadingSnapshot.hide();
+            VoltDbAdminConfig.isSnapshotEditMode = true;
         } else {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
@@ -2157,6 +2131,7 @@ function loadAdminPage() {
         } else {
             adminEditObjects.chkDrMaster.iCheck('uncheck');
         }
+        VoltDbAdminConfig.isDrMasterEditMode = false;
 
         if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingDrMaster.hide();
@@ -2166,6 +2141,7 @@ function loadAdminPage() {
             adminEditObjects.chkDrMaster.parent().addClass("customCheckbox");
             adminEditObjects.iconDrMasterOption.hide();
             adminEditObjects.txtDrMaster.show();
+            VoltDbAdminConfig.isDrMasterEditMode = true;
         } else if (state == editStates.ShowLoading) {
             adminEditObjects.loadingDrMaster.show();
             adminEditObjects.btnEditDrMasterOk.hide();
@@ -2356,6 +2332,8 @@ function loadAdminPage() {
         this.toggleStates = {};
         this.orgUserList = [];
         this.drReplicaEnabled = true;
+        this.isDrMasterEditMode = false;
+        this.isSnapshotEditMode = false;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -2416,7 +2394,8 @@ function loadAdminPage() {
             adminDOMObjects.jsonAPI.removeClass().addClass(getOnOffClass(adminConfigValues.jsonEnabled));
             adminDOMObjects.jsonAPILabel.text(getOnOffText(adminConfigValues.jsonEnabled));
             adminDOMObjects.autoSnapshot.removeClass().addClass(getOnOffClass(adminConfigValues.snapshotEnabled));
-            adminDOMObjects.autoSnapshotLabel.text(adminEditObjects.spanAutoSpanEdited == "" ? getOnOffText(adminConfigValues.snapshotEnabled) : adminConfigValues.spanAutoSpanEdited);
+            if (!VoltDbAdminConfig.isSnapshotEditMode)
+                adminDOMObjects.autoSnapshotLabel.text(getOnOffText(adminConfigValues.snapshotEnabled));
             adminDOMObjects.filePrefix.text(adminConfigValues.filePrefix != null ? adminConfigValues.filePrefix : "");
             adminDOMObjects.frequency.text(adminConfigValues.frequency != null ? adminConfigValues.frequency : "");
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != null ? "Hrs" : "");
@@ -2470,7 +2449,8 @@ function loadAdminPage() {
                 adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
                 adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
                 //adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
-                adminEditObjects.txtDrMaster.text(adminEditObjects.drMasterEditedValue == "" ? getOnOffText(adminConfigValues.drListen) : adminEditObjects.drMasterEditedValue);
+                if (!VoltDbAdminConfig.isDrMasterEditMode)
+                    adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
                 adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
                 if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
                     getDrReplicaStatus(true);

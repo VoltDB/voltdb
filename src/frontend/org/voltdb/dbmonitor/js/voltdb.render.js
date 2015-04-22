@@ -739,7 +739,7 @@ function alertNodeClicked(obj) {
                 VoltDbUI.hasPermissionToView = false;
 
                 if (!$("#loginWarningPopup").is(":visible")) {
-                    $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view this page.");
+                    $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view this page.");
                     $("#loginWarnPopup").click();
                 }
                 return;
@@ -794,7 +794,6 @@ function alertNodeClicked(obj) {
             systemOverview = {};
             if (!$.isEmptyObject(currentServerOverview))
                 systemOverview[0] = currentServerOverview;
-            
 
             //iterate through updatedSystemOverview to add remaining server to the list 'systemOverview'
             for (iterator = 0; iterator < updatedSystemOverview.length; iterator++) {
@@ -1087,7 +1086,7 @@ function alertNodeClicked(obj) {
                             "MIN_ROWS": data["MIN_ROWS"],
                             "AVG_ROWS": data["AVG_ROWS"],
                             "TUPLE_COUNT": data["TUPLE_COUNT"],
-                            "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                            "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS //getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                         };
                         tableCount++;
                     });
@@ -1103,7 +1102,7 @@ function alertNodeClicked(obj) {
                             "MIN_ROWS": data["MIN_ROWS"],
                             "AVG_ROWS": data["AVG_ROWS"],
                             "TUPLE_COUNT": data["TUPLE_COUNT"],
-                            "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                            "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS //getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                         };
                         tableCount++;
                     });
@@ -3257,7 +3256,7 @@ function alertNodeClicked(obj) {
                                 "MIN_ROWS": tupleData["MIN_ROWS"],
                                 "AVG_ROWS": tupleData["AVG_ROWS"],
                                 "TUPLE_COUNT": tupleData["TUPLE_COUNT"],
-                                "TABLE_TYPE": getColumnTypes(nestKey) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[nestKey].TABLE_TYPE
+                                "TABLE_TYPE": schemaCatalogTableTypes[nestKey].REMARKS //getColumnTypes(nestKey) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[nestKey].TABLE_TYPE
                             };
                             searchTableCount++;
 
