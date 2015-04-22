@@ -1,8 +1,8 @@
 drop table t if exists;
 create table t ( c integer, d varchar(4) );
-create table t2 ( c integer, d varchar(4), e varchar(4) );
 create procedure p as
     select * from t where d between ? and ?;
+create table t2 ( c integer, d varchar(4), e varchar(4) );
 
 exec T.insert 1,'a';
 execute T.insert 2 ab;

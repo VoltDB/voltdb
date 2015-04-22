@@ -5,11 +5,11 @@ Command succeeded.
 create table t ( c integer, d varchar(4) );
 Command succeeded.
 
-create table t2 ( c integer, d varchar(4), e varchar(4) );
-Command succeeded.
-
 create procedure p as
     select * from t where d between ? and ?;
+Command succeeded.
+
+create table t2 ( c integer, d varchar(4), e varchar(4) );
 Command succeeded.
 
 exec T.insert 1,'a';
