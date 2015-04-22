@@ -188,7 +188,6 @@ function loadAdminPage() {
         txtDrMaster: $("#txtDrMaster"),
         spanDrMasterEdited: "",
         loadingDrMaster: $("#loadingDrMaster"),
-        drMasterEditedValue: "",
         updateDrMasterErrorFieldMsg: $("#updateDrMasterErrorFieldMsg"),
         drMasterLabel: $("#row-DrConfig").find("td:first-child").text(),
 
@@ -304,7 +303,6 @@ function loadAdminPage() {
     });
 
     adminEditObjects.chkDrMaster.on('ifChanged', function () {
-        adminEditObjects.drMasterEditedValue = getOnOffText(adminEditObjects.chkDrMaster.is(":checked"));
         adminEditObjects.txtDrMaster.text(getOnOffText(adminEditObjects.chkDrMaster.is(":checked")));
     });
 
@@ -2157,6 +2155,7 @@ function loadAdminPage() {
         } else {
             adminEditObjects.chkDrMaster.iCheck('uncheck');
         }
+        VoltDbAdminConfig.isDrMasterEditMode = false;
 
         if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingDrMaster.hide();
@@ -2166,6 +2165,7 @@ function loadAdminPage() {
             adminEditObjects.chkDrMaster.parent().addClass("customCheckbox");
             adminEditObjects.iconDrMasterOption.hide();
             adminEditObjects.txtDrMaster.show();
+            VoltDbAdminConfig.isDrMasterEditMode = true;
         } else if (state == editStates.ShowLoading) {
             adminEditObjects.loadingDrMaster.show();
             adminEditObjects.btnEditDrMasterOk.hide();
@@ -2356,6 +2356,7 @@ function loadAdminPage() {
         this.toggleStates = {};
         this.orgUserList = [];
         this.drReplicaEnabled = true;
+        this.isDrMasterEditMode = false;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -2470,7 +2471,8 @@ function loadAdminPage() {
                 adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
                 adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
                 //adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
-                adminEditObjects.txtDrMaster.text(adminEditObjects.drMasterEditedValue == "" ? getOnOffText(adminConfigValues.drListen) : adminEditObjects.drMasterEditedValue);
+                if (!VoltDbAdminConfig.isDrMasterEditMode)
+                    adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
                 adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
                 if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
                     getDrReplicaStatus(true);

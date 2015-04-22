@@ -1011,27 +1011,26 @@ class DbMonitorTest extends TestBase {
 		String after  = ""
 
 		when: 'click stored procedure'
-			page.clickStoredProcedure()
-        then: 'check if table is in ascending'
-            if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
+		    try {
+                page.tableInAscendingOrder()
+                before = "ascending"
+            } catch(geb.error.RequiredPageContentNotPresent e) {
 				before = "descending"
+		    }
+			waitFor(30) { page.clickStoredProcedure() }
+        then: 'check if table is in ascending'
+            try {
+                page.tableInAscendingOrder()
+                before = "ascending"
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+				before = "descending"
+		    }
 
-		when: 'click stored procedure'
-			page.clickStoredProcedure()
-		then: 'check if table is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
-
-			if ( before.equals("ascending") && after.equals("descending") )
+			if ( !before.equals(after)  )
 				assert true
 			else
 				assert false
     }
-
 
     def "check if Invocations is clickable"() {
         String before = ""
