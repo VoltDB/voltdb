@@ -5086,7 +5086,9 @@ public class ParserDDL extends ParserRoutine {
             // LIMIT PARTITION ROWS 10 EXECUTE (DELETE FROM tbl WHERE b = 1)
             //
             readThis(Tokens.OPENBRACKET);
-            int position = getPosition();
+
+            startRecording();
+
             int numOpenBrackets = 1;
             while (numOpenBrackets > 0) {
                 switch(token.tokenType) {
@@ -5111,8 +5113,10 @@ public class ParserDDL extends ParserRoutine {
                 }
             }
 
+            Token[] stmtTokens = getRecordedStatement();
+
             // This captures the DELETE statement exactly, including embedded whitespace, etc.
-            c.rowsLimitDeleteStmt = getLastPart(position);
+            c.rowsLimitDeleteStmt = Token.getSQL(stmtTokens);
             readThis(Tokens.CLOSEBRACKET);
         }
     }
