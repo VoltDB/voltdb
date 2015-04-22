@@ -30,6 +30,7 @@ import java.security.SecureRandom;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -74,7 +75,7 @@ public class TestClientPortChannel extends TestCase {
             String catalogJar = "dummy.jar";
 
             m_config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+            m_config.setHasLocalServer(true);
             m_config.portGenerator.enablePortProvider();
             m_config.portGenerator.pprovider.setNextClient(m_clientPort);
             m_config.portGenerator.pprovider.setAdmin(m_adminPort);
@@ -106,12 +107,49 @@ public class TestClientPortChannel extends TestCase {
     public void login(PortConnector conn) throws Exception {
         ByteBuffer buf = ByteBuffer.allocate(41);
         buf.putInt(37);
-        buf.put((byte) '0');
+        buf.put((byte) 0);
         buf.putInt(8);
         buf.put("database".getBytes("UTF-8"));
         buf.putInt(0);
         buf.put("".getBytes("UTF-8"));
-        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.put(ConnectionUtil.getHashedPassword(ClientAuthHashScheme.HASH_SHA1, ""));
+        buf.flip();
+        conn.write(buf);
+
+        ByteBuffer resp = ByteBuffer.allocate(4);
+        conn.read(resp, 4);
+        resp.flip();
+        int length = resp.getInt();
+        resp = ByteBuffer.allocate(length);
+        conn.read(resp, length);
+        resp.flip();
+
+        byte code = resp.get();
+        assertEquals(code, 0);
+        byte rcode = resp.get();
+        assertEquals(rcode, 0);
+        resp.getInt();
+        resp.getLong();
+        resp.getLong();
+        resp.getInt();
+        int buildStringLength = resp.getInt();
+        byte buildStringBytes[] = new byte[buildStringLength];
+        resp.get(buildStringBytes);
+
+        System.out.println("Authenticated to server: " + new String(buildStringBytes, "UTF-8"));
+    }
+
+    // Just do a login
+    public void loginSha2(PortConnector conn) throws Exception {
+        ByteBuffer buf = ByteBuffer.allocate(54);
+        buf.putInt(50);
+        buf.put((byte) 1);
+        buf.put((byte )ClientAuthHashScheme.HASH_SHA256.getValue()); // Add scheme
+        buf.putInt(8);
+        buf.put("database".getBytes("UTF-8"));
+        buf.putInt(0);
+        buf.put("".getBytes("UTF-8"));
+        buf.put(ConnectionUtil.getHashedPassword(ClientAuthHashScheme.HASH_SHA256, ""));
         buf.flip();
         conn.write(buf);
 
@@ -144,6 +182,15 @@ public class TestClientPortChannel extends TestCase {
         PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
         login(channel);
+        channel.close();
+    }
+
+    //Login with new connection and close
+    public void doLoginSha2AndClose(int port) throws Exception {
+        System.out.println("Testing valid login message");
+        PortConnector channel = new PortConnector("localhost", port);
+        channel.connect();
+        loginSha2(channel);
         channel.close();
     }
 
@@ -199,20 +246,21 @@ public class TestClientPortChannel extends TestCase {
         channel.write(buf);
         channel.close();
 
-        //login message with bad service
+        //login message with bad version
         System.out.println("Testing bad service name");
         channel.connect();
-        buf = ByteBuffer.allocate(41);
-        buf.putInt(37);
+        buf = ByteBuffer.allocate(42);
+        buf.putInt(38);
         buf.put((byte) '0');
+        buf.put((byte) ClientAuthHashScheme.HASH_SHA1.getValue());
         buf.putInt(8);
         buf.put("dataCase".getBytes("UTF-8"));
         buf.putInt(0);
         buf.put("".getBytes("UTF-8"));
-        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.put(ConnectionUtil.getHashedPassword(ClientAuthHashScheme.HASH_SHA1, ""));
         buf.flip();
         channel.write(buf);
-
+        //Now this will fail because bad version will be read.
         try {
             ByteBuffer resp = ByteBuffer.allocate(6);
             channel.read(resp, 6);
@@ -226,17 +274,46 @@ public class TestClientPortChannel extends TestCase {
             fail();
         }
 
+        //login message with bad version
+        System.out.println("Testing bad scheme name");
+        channel.connect();
+        buf = ByteBuffer.allocate(42);
+        buf.putInt(38);
+        buf.put((byte) 1);
+        buf.put((byte) 3);
+        buf.putInt(8);
+        buf.put("database".getBytes("UTF-8"));
+        buf.putInt(0);
+        buf.put("".getBytes("UTF-8"));
+        buf.put(ConnectionUtil.getHashedPassword(ClientAuthHashScheme.HASH_SHA1, ""));
+        buf.flip();
+        channel.write(buf);
+        //Now this will fail because bad version will be read.
+        try {
+            ByteBuffer resp = ByteBuffer.allocate(6);
+            channel.read(resp, 6);
+            resp.flip();
+            resp.getInt();
+            resp.get();
+            byte code = resp.get();
+            assertEquals(3, code);
+        } catch (Exception ioex) {
+            //Should not get called; we get a legit response.
+            fail();
+        }
+
         //login message with bad service name length.
         System.out.println("Testing service name with invalid length");
         channel.connect();
-        buf = ByteBuffer.allocate(41);
-        buf.putInt(37);
+        buf = ByteBuffer.allocate(42);
+        buf.putInt(38);
         buf.put((byte) '0');
+        buf.put((byte) ClientAuthHashScheme.HASH_SHA1.getValue());
         buf.putInt(Integer.MAX_VALUE);
         buf.put("database".getBytes("UTF-8"));
         buf.putInt(0);
         buf.put("".getBytes("UTF-8"));
-        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.put(ConnectionUtil.getHashedPassword(ClientAuthHashScheme.HASH_SHA1, ""));
         buf.flip();
         channel.write(buf);
 
@@ -255,17 +332,21 @@ public class TestClientPortChannel extends TestCase {
 
         //Make sure server is up and we can login/connect after all the beating it took.
         doLoginAndClose(port);
+        doLoginSha2AndClose(port);
 
     }
 
     public void testInvocationClientPort() throws Exception {
-        runInvocationMessageTest(m_clientPort);
-    }
-    public void testInvocationAdminPort() throws Exception {
-        runInvocationMessageTest(m_adminPort);
+        runInvocationMessageTest(ClientAuthHashScheme.HASH_SHA1, m_clientPort);
+        runInvocationMessageTest(ClientAuthHashScheme.HASH_SHA256, m_clientPort);
     }
 
-    public void runInvocationMessageTest(int port) throws Exception {
+    public void testInvocationAdminPort() throws Exception {
+        runInvocationMessageTest(ClientAuthHashScheme.HASH_SHA1, m_adminPort);
+        runInvocationMessageTest(ClientAuthHashScheme.HASH_SHA256, m_adminPort);
+    }
+
+    public void runInvocationMessageTest(ClientAuthHashScheme scheme, int port) throws Exception {
         PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
 
@@ -290,7 +371,10 @@ public class TestClientPortChannel extends TestCase {
         //reconnect as we should have bombed.
         channel.connect();
         //Send login message before invocation.
-        login(channel);
+        if (scheme == ClientAuthHashScheme.HASH_SHA1)
+            login(channel);
+        else
+            loginSha2(channel);
 
         //Now start testing combinations of invocation messages.
         //Start with a good Ping procedure invocation.
@@ -372,18 +456,23 @@ public class TestClientPortChannel extends TestCase {
     }
 
     public void testInvocationParamsClientPort() throws Exception {
-        runInvocationParams(m_clientPort);
+        runInvocationParams(ClientAuthHashScheme.HASH_SHA1, m_clientPort);
+        runInvocationParams(ClientAuthHashScheme.HASH_SHA256, m_clientPort);
     }
     public void testInvocationParamsAdminPort() throws Exception {
-        runInvocationParams(m_adminPort);
+        runInvocationParams(ClientAuthHashScheme.HASH_SHA1, m_adminPort);
+        runInvocationParams(ClientAuthHashScheme.HASH_SHA256, m_adminPort);
     }
 
-    public void runInvocationParams(int port) throws Exception {
+    public void runInvocationParams(ClientAuthHashScheme scheme, int port) throws Exception {
         PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
 
         //Send login message before invocation.
-        login(channel);
+        if (scheme == ClientAuthHashScheme.HASH_SHA1)
+            login(channel);
+        else
+            loginSha2(channel);
 
         //Now start testing combinations of invocation messages with invocation params.
         //no param

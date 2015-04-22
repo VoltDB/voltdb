@@ -1,8 +1,7 @@
-﻿function QueryUI(queryString) {
+function QueryUI(queryString, userName) {
     "use strict";
     var CommandParser,
-        queryToRun=queryString,
-        DataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        queryToRun = queryString;
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -218,9 +217,42 @@
         $(targetMonospace).html('');
 
         function callback(response) {
-            processResponse('HTML', targetHtml, Id + '_html', response);
-            processResponse('CSV', targetCsv, Id + '_csv', response);
-            processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+
+            var processResponseForAllViews = function() {
+                processResponse('HTML', targetHtml, Id + '_html', response);
+                processResponse('CSV', targetCsv, Id + '_csv', response);
+                processResponse('MONOSPACE', targetMonospace, Id + '_mono', response);
+            };
+            
+            var handlePortSwitchingOption = function (isPaused) {
+                
+                if (isPaused) {
+                    //Show error message with an option to allow admin port switching
+                    $("#queryDatabasePausedErrorPopupLink").click();
+                } else {
+                    processResponseForAllViews();
+                }
+            };
+            
+            //Handle the case when Database is paused
+            if (response.status == -5 && VoltDbAdminConfig.isAdmin && !SQLQueryRender.useAdminPortCancelled) {
+
+                if (!VoltDbAdminConfig.isDbPaused) {
+
+                    //Refresh cluster state to display latest status.
+                    var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
+                        VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
+                        handlePortSwitchingOption(VoltDbAdminConfig.isDbPaused);
+                    };
+                    voltDbRenderer.GetSystemInformation(function() {}, loadAdminTabPortAndOverviewDetails, function(data) {});
+                } else {
+                    handlePortSwitchingOption(true);
+                }
+                
+            } else {
+                processResponseForAllViews();
+            }
+            SQLQueryRender.useAdminPortCancelled = false;
         }
         this.Callback = callback;
     }
@@ -228,13 +260,14 @@
     function executeMethod() {
         var target = $('.queryResult');
         var format = $('#exportType').val();
-        
-        if (!VoltDBCore.connections.hasOwnProperty(DataSource)) {
+
+        var dataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
             return;
         }
 
-        var connection = VoltDBCore.connections[DataSource];
+        var connection = VoltDBCore.connections[dataSource];
         var source = '';
         source = queryToRun;
         source = source.replace(/^\s+|\s+$/g, '');

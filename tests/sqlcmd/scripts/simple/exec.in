@@ -1,5 +1,6 @@
 drop table t if exists;
 create table t ( c integer, d varchar(4) );
+create table t2 ( c integer, d varchar(4), e varchar(4) );
 create procedure p as
     select * from t where d between ? and ?;
 
@@ -40,13 +41,20 @@ EXECUTE T.insert 71 ,
 
 -- try out some quoted quotes here.
 exec    T.insert 81,  'x''' ;
-exec    T.insert 81,  '''y' ;
-exec    T.insert 81,  '''z''' ;
-exec    T.insert 81,  ''' ''' ;
-exec    T.insert 81,  '" "' ;
-exec    T.insert 81,  ''' "' ;
-exec    T.insert 81,  ''' "' ;
+exec    T.insert 82,  '''y' ;
+exec    T.insert 83,  '''z''' ;
+exec    T.insert 84,  ''' ''' ;
+exec    T.insert 85,  '" "' ;
+exec    T.insert 86,  ''' "' ;
+exec    T.insert 87,  ''' "' ;
+exec    T2.insert 88,  ''' '  ' ''' ;
 
+-- try some quoted parens.
+exec    T.insert 91,  '( )' ;
+exec    T.insert 92,  ')' ;
+exec    T.insert 93,  '"(' ;
+exec    T.insert 94,  '''()' ;
+exec    T2.insert 95,  '('  ')' ;
 -- exec with multiple strings
 -- a recent branch regression on the way to fixing ENG-7927.
 exec p 'abc'    'abd' ;
@@ -55,6 +63,14 @@ exec p 'abc'    'abd' ;
 exec p 'abc'    'abd''' ;
 exec p ''' abc' 'abd ''' ;
 
-select * from t;
+-- more quoted parens
+exec p '((' '))';
+
+-- error out on unquoted parens
+exec p ( );
+
+select * from t order by c;
+select * from t2 order by c;
+drop table t2;
 drop procedure p;
 drop table t;

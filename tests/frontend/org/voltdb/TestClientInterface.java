@@ -73,7 +73,6 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.AuthSystem;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -743,6 +742,9 @@ public class TestClientInterface {
             m_ci.schedulePeriodicWorks();
 
             //Shouldn't get anything
+            assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
+
+            statsAnswers.offer(dsOf(getClientResponse("foo")));
             assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
 
             //Change the bytes of the topology results and expect a topology update

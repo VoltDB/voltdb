@@ -292,6 +292,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 // in a normal index scan, params would be substituted here,
                 // but this scan fills in params outside the loop
                 NValue candidateValue = m_indexNode->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
+                if (candidateValue.isNull()) {
+                    // when any part of the search key is NULL, the result is false when it compares to anything.
+                    // do early return optimization, our index comparator may not handle null comparison correctly.
+                    keyException = true;
+                    break;
+                }
                 try {
                     index_values.setNValue(ctr, candidateValue);
                 }

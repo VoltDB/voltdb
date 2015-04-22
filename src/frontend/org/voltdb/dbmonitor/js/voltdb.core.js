@@ -1,4 +1,4 @@
-﻿
+
 
 (function (window, unused) {
 
@@ -18,7 +18,7 @@
             this.password = (aPassword === '' || aPassword === 'null') ? null : (aIsHashPassword == false ? aPassword : null);
             this.isHashedPassword = (aPassword === '' || aPassword === 'null') ? null : (aIsHashPassword == true ? aPassword : null);
             this.process = aProcess;
-            this.key = (this.server + '_' + this.port + '_' + (this.user == '' ? '' : this.user) + '_' + (this.admin == true ? 'Admin' : '') + "_" + this.process).replace(/[^_a-zA-Z0-9]/g, "_");
+            this.key = (this.server + '_' + (this.user == '' ? '' : this.user) + '_' + this.process).replace(/[^_a-zA-Z0-9]/g, "_");
             this.display = this.server + ':' + this.port + (this.user == '' ? '' : ' (' + this.user + ')') + (this.admin == true ? ' - Admin' : '');
             this.Metadata = {};
             this.ready = false;
@@ -142,7 +142,7 @@
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 }
                 if (typeof (params) == 'string') {
-                    if (VoltDBCore.isServerConnected) {
+                    if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
                         if (this.authorization != null) {
                             ah = this.authorization;
@@ -168,21 +168,29 @@
 
                     uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
 
-                    if (VoltDBCore.isServerConnected) {
+                    if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
                         if (this.authorization != null) {
                             ah = this.authorization;
                         } else {
                             VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                         }
-                        jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        if (!shortApiCallDetails.hasOwnProperty("requestType")) {
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else if (shortApiCallDetails.requestType.toLowerCase() == "put") {
+                            jQuery.putJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else if (shortApiCallDetails.requestType.toLowerCase() == "delete") {
+                            jQuery.deleteJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        } else {
+                            jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
+                        }
                     }
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
 
                     var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                     if (typeof (params) == 'string') {
-                        if (VoltDBCore.isServerConnected) {
+                        if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                             var ah = null;
                             if (this.authorization != null) {
                                 ah = this.authorization;
@@ -461,12 +469,13 @@
 
         };
 
-        this.AddConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, onConnectionAdded, shortApiCallDetails) {
+        this.AddConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, onConnectionAdded, shortApiCallDetails, isExecutionRequired) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
             compileProcedureCommands(conn, procedureNames, parameters, values);
             this.connections[conn.key] = conn;
-            loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName, shortApiCallDetails);
 
+            if (isExecutionRequired !== false)
+                loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName, shortApiCallDetails);
         };
 
         this.updateConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, connection, onConnectionAdded, shortApiCallDetails) {
@@ -478,8 +487,7 @@
             var serverName = server == null ? 'localhost' : $.trim(server);
             var portId = port == null ? '8080' : $.trim(port);
             var userName = user == '' ? null : user;
-            var key = (serverName + '_' + portId + '_' + (userName == '' ? '' : userName) + '_' +
-                (admin == true ? 'Admin' : '') + "_" + processName).replace(/[^_a-zA-Z0-9]/g, "_");
+            var key = (serverName + '_' + (userName == '' ? '' : userName) + '_' + processName).replace(/[^_a-zA-Z0-9]/g, "_");
 
             if (this.connections[key] != undefined) {
                 var conn = this.connections[key];
@@ -503,7 +511,7 @@
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "CLUSTER_INFORMATION" ? "_" + processName : "";
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" ? "_" + processName : "";
                         if (processName == "SYSTEMINFORMATION_STOPSERVER") {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_statusString"] = data.statusstring;
@@ -525,8 +533,10 @@
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
                         }
-                        else
+                        else {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
+                            connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
+                        }
                     });
                 });
             }
@@ -589,9 +599,7 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization) {
-        
         if (VoltDBCore.hostIP == "") {
-
             jQuery.ajax({
                 type: 'POST',
                 url: url,
@@ -633,7 +641,6 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-        
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',
@@ -675,3 +682,41 @@ jQuery.extend({
 
 });
 
+jQuery.extend({
+    putJSON: function (url, formData, callback, authorization) {
+        jQuery.ajax({
+            type: 'PUT',
+            url: url,
+            data: formData,
+            dataType: 'json',
+            beforeSend: function (request) {
+                if (authorization != null) {
+                    request.setRequestHeader("Authorization", authorization);
+                }
+            },
+            success: callback,
+            error: function (e) {
+                console.log(e.message);
+            }
+        });
+    }
+});
+
+jQuery.extend({
+    deleteJSON: function (url, formData, callback, authorization) {
+        jQuery.ajax({
+            type: 'DELETE',
+            url: url,
+            dataType: 'json',
+            beforeSend: function (request) {
+                if (authorization != null) {
+                    request.setRequestHeader("Authorization", authorization);
+                }
+            },
+            success: callback,
+            error: function (e) {
+                console.log(e.message);
+            }
+        });
+    }
+});

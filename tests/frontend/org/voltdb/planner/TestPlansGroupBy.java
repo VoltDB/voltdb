@@ -109,16 +109,101 @@ public class TestPlansGroupBy extends PlannerTestCase {
       assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
 
-    public void testCountA1() {
-        pns = compileToFragments("SELECT count(A1) from T1");
+    /**
+     * VoltDB has an optimization to switch to IndexScan for aggregate queries from a sequential scan.
+     * However, for simplicity ,we should not match group by columns with an index that has a where clause.
+     * In future, we may need to check more details on the where clause.
+     */
+    public void testAggregateOptimizationWithIndex() {
+        AbstractPlanNode p;
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("primary key index"));
+
+        // matching the partial index where clause
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 3 group by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("primary key index"));
+
+        // using the partial index
+        pns = compileToFragments("SELECT A, count(B) from R2 where A > 5 and B > 3 group by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+
+        // order by will help pick up the partial index
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 3 group by A order by A;");
+        assertEquals(1, pns.size());
+        printExplainPlan(pns);
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+
+        // where clause not matching
+        pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A order by A;");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof OrderByPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof SeqScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
     }
 
     public void testCountStar() {
         pns = compileToFragments("SELECT count(*) from T1");
     }
 
-    public void testCountDistinctA1() {
-        pns = compileToFragments("SELECT count(distinct A1) from T1");
+    public void testCountDistinct() {
+        AbstractPlanNode p;
+        // push down distinct because of group by partition column
+        pns = compileToFragments("SELECT A4, count(distinct B4) from T4 group by A4");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        // group by multiple columns
+        pns = compileToFragments("SELECT C4, A4, count(distinct B4) from T4 group by C4, A4");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+
+        // not push down distinct
+        pns = compileToFragments("SELECT ABS(A4), count(distinct B4) from T4 group by ABS(A4)");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof HashAggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        assertNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+
+        // test not group by partition column with index available
+        pns = compileToFragments("SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ");
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof HashAggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertTrue(p.toExplainPlanString().contains("for deterministic order only"));
     }
 
     public void testDistinctA1() {
@@ -129,7 +214,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractPlanNode p;
         // Distinct rewrote with group by
         pns = compileToFragments("select * from (SELECT DISTINCT A1 FROM T1) temp");
-        printExplainPlan(pns);
 
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof SeqScanPlanNode);

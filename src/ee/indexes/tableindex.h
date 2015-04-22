@@ -73,18 +73,11 @@ struct TableIndexScheme {
     TableIndexScheme(std::string a_name, TableIndexType a_type,
                      const std::vector<int32_t>& a_columnIndices,
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
+                     AbstractExpression* a_predicate,
                      bool a_unique, bool a_countable,
                      const std::string& a_expressionsAsText,
-                     const TupleSchema *a_tupleSchema) :
-      name(a_name),
-      type(a_type),
-      columnIndices(a_columnIndices),
-      indexedExpressions(a_indexedExpressions),
-      unique(a_unique),
-      countable(a_countable),
-      expressionsAsText(a_expressionsAsText),
-      tupleSchema(a_tupleSchema)
-    {}
+                     const std::string& a_predicateAsText,
+                     const TupleSchema *a_tupleSchema);
 
     // TODO: Remove this temporary backward-compatible test-only constructor -- this should go away soon, forcing
     // column index construction in the ee tests to provide rather than default the empty expressionsAsText string.
@@ -107,9 +100,12 @@ struct TableIndexScheme {
       type(a_type),
       columnIndices(a_columnIndices),
       indexedExpressions(a_indexedExpressions),
+      predicate(NULL),
+      allColumnIndices(a_columnIndices),
       unique(a_unique),
       countable(a_countable),
-      expressionsAsText(""),
+      expressionsAsText(),
+      predicateAsText(),
       tupleSchema(a_tupleSchema)
     {
     }
@@ -119,9 +115,12 @@ struct TableIndexScheme {
       type(other.type),
       columnIndices(other.columnIndices),
       indexedExpressions(other.indexedExpressions),
+      predicate(other.predicate),
+      allColumnIndices(other.allColumnIndices),
       unique(other.unique),
       countable(other.countable),
       expressionsAsText(other.expressionsAsText),
+      predicateAsText(other.predicateAsText),
       tupleSchema(other.tupleSchema)
     {}
 
@@ -131,9 +130,12 @@ struct TableIndexScheme {
         type = other.type;
         columnIndices = other.columnIndices;
         indexedExpressions = other.indexedExpressions;
+        predicate = other.predicate;
+        allColumnIndices = other.allColumnIndices;
         unique = other.unique;
         countable = other.countable;
         expressionsAsText = other.expressionsAsText;
+        predicateAsText = other.predicateAsText;
         tupleSchema = other.tupleSchema;
         return *this;
     }
@@ -147,9 +149,14 @@ struct TableIndexScheme {
     TableIndexType type;
     std::vector<int32_t> columnIndices;
     std::vector<AbstractExpression*> indexedExpressions;
+    AbstractExpression* predicate;
+    // For partial indexes this vector contains index columns indicies plus
+    // columns that are part of the index predicate
+    std::vector<int32_t> allColumnIndices;
     bool unique;
     bool countable;
     std::string expressionsAsText;
+    std::string predicateAsText;
     const TupleSchema *tupleSchema;
 };
 
@@ -209,19 +216,19 @@ public:
     /**
      * adds passed value as an index entry linked to given tuple
      */
-    virtual bool addEntry(const TableTuple *tuple) = 0;
+    bool addEntry(const TableTuple *tuple);
 
     /**
      * removes the index entry linked to given value (and tuple
      * pointer, if it's non-unique index).
      */
-    virtual bool deleteEntry(const TableTuple *tuple) = 0;
+    bool deleteEntry(const TableTuple *tuple);
 
     /**
      * Update in place an index entry with a new tuple address
      */
-    virtual bool replaceEntryNoKeyChange(const TableTuple &destinationTuple,
-                                         const TableTuple &originalTuple) = 0;
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple,
+                                 const TableTuple &originalTuple);
 
     /**
      * Does the key out-of-line strings or binary data?
@@ -233,7 +240,7 @@ public:
      * just returns whether the value is already stored. no
      * modification occurs.
      */
-    virtual bool exists(const TableTuple* values) const = 0;
+    bool exists(const TableTuple* values) const;
 
     /**
      * This method moves to the first tuple equal to given key.  To
@@ -359,8 +366,7 @@ public:
      * @return true if lhs is different from rhs in this index, which
      * means replaceEntry has to follow.
      */
-    virtual bool checkForIndexChange(const TableTuple *lhs,
-                                     const TableTuple *rhs) const = 0;
+    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const;
 
     /**
      * Currently, UniqueIndex is just a TableIndex with additional checks.
@@ -377,6 +383,14 @@ public:
     inline bool isCountableIndex() const
     {
         return m_scheme.countable;
+    }
+
+    /**
+     * Return TRUE if the index has a predicate.
+     */
+    bool isPartialIndex() const
+    {
+        return getPredicate() != NULL;
     }
 
     virtual bool hasKey(const TableTuple *searchKey) const = 0;
@@ -424,6 +438,12 @@ public:
         return m_scheme.columnIndices;
     }
 
+    // Return all column indicies including the predicate ones
+    const std::vector<int>& getAllColumnIndices() const
+    {
+        return m_scheme.allColumnIndices;
+    }
+
     // Provide an empty expressions vector to indicate a simple columns-only index.
     static const std::vector<AbstractExpression*>& simplyIndexColumns() {
         static std::vector<AbstractExpression*> emptyExpressionVector;
@@ -435,6 +455,10 @@ public:
         return m_scheme.indexedExpressions;
     }
 
+    const AbstractExpression* getPredicate() const
+    {
+        return m_scheme.predicate;
+    }
 
     const std::string& getName() const
     {
@@ -494,6 +518,15 @@ protected:
 
     // stats
     IndexStats m_stats;
+
+protected:
+    // Index specific implementations
+    virtual bool addEntryDo(const TableTuple *tuple) = 0;
+    virtual bool deleteEntryDo(const TableTuple *tuple) = 0;
+    virtual bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
+                                         const TableTuple &originalTuple) = 0;
+    virtual bool existsDo(const TableTuple* values) const = 0;
+    virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
 
 private:
 

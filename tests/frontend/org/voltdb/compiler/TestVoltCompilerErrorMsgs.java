@@ -206,4 +206,32 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 + "execute (delete frm partitioned_blah));");
 
     }
+
+    public void testHexLiterals() throws Exception {
+
+        // x-quoted literals with hexadecimal digits currently not
+        // allowed to represent integers.
+
+        ddlErrorTest("invalid format for a constant bigint value",
+                "create procedure insHex as insert into blah (ival) values (x'');");
+
+        // This *would* work if we accepted hex literals as ints,
+        // but we don't.
+        ddlErrorTest("invalid format for a constant bigint value",
+                "create procedure insHex as insert into blah (ival) values (x'FF');");
+
+        // This *would* work if we accepted hex literals as ints,
+        // but we don't.  This would be a decimal 128.
+        ddlErrorTest("invalid format for a constant bigint value",
+                "create procedure insHex as insert into blah (ival) values (x'80');");
+
+        // The HSQL parser complains about an odd number of digits,
+        // so the error message is different here.
+        ddlErrorTest("malformed binary string",
+                "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef0');");
+
+        ddlErrorTest("invalid format for a constant bigint value",
+                "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef01');");
+
+    }
 }
