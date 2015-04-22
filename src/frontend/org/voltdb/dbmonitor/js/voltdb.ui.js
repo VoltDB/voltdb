@@ -704,9 +704,9 @@ var loadPage = function (serverName, portid) {
                     if (getCurrentServer() != undefined) {
                         var drResult = drDetails["Details"]["STATUS"];
                         if (drResult != -2) {
-                            VoltDbUI.drEnabled = (drDetails[currentServer]['ENABLED'] != null && drDetails[currentServer]['ENABLED'] != "false") ? true : false;
+                            VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
                             //show master/replica table
-                            if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drEnabled)) {
+                            if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
                                 var userPreference = getUserPreferences();
                                 VoltDbUI.isDRInfoRequired = true;
                                 VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
@@ -721,7 +721,7 @@ var loadPage = function (serverName, portid) {
 
                                 $("#divDrWrapperAdmin").show();
 
-                                if (VoltDbUI.drEnabled) {
+                                if (VoltDbUI.drMasterEnabled) {
                                     $("#drMasterSection").show();
                                     $(".replicaWrapper").css('top', '-27px');
                                     //show master table
@@ -738,7 +738,7 @@ var loadPage = function (serverName, portid) {
                                     }
                                     refreshDrReplicaSection(graphView, currentTab);
                                     //to show DR Mode and DR tables
-                                    if (VoltDbUI.drEnabled) {
+                                    if (VoltDbUI.drMasterEnabled) {
                                         $("#dbDrMode").text("Both");
                                         $('#drMasterSection').css('display', 'block');
                                     } else {
@@ -750,7 +750,7 @@ var loadPage = function (serverName, portid) {
                                     $('#liDrReplication').css('display', 'none');
                                     $("#ChartDrReplicationRate").hide();
                                     //to show DR Mode
-                                    if (VoltDbUI.drEnabled) {
+                                    if (VoltDbUI.drMasterEnabled) {
                                         $("#dbDrMode").text("Master");
                                         $('#drMasterSection').css('display', 'block');
                                     } else {
@@ -1983,7 +1983,7 @@ var adjustGraphSpacing = function () {
     var iVoltDbUi = (function () {
         this.isSchemaTabLoading = false;
         this.isFirstHit = true;
-        this.drEnabled = false;
+        this.drMasterEnabled = false;
         this.drStatus = '';
         this.drReplicationRole = "NONE";
         this.isDRInfoRequired = false;

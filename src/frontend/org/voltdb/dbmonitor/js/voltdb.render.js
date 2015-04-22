@@ -1967,7 +1967,7 @@ function alertNodeClicked(obj) {
             }
 
             connection.Metadata['@Statistics_DR_completeData'][1].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "ENABLED" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "SYNCSNAPSHOTSTATE")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "SYNCSNAPSHOTSTATE" || columnInfo["name"] == "STATE")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1977,12 +1977,14 @@ function alertNodeClicked(obj) {
                 if (!drDetails.hasOwnProperty(hostName)) {
                     drDetails[hostName] = {};
                 }
-
-                drDetails[hostName]["ENABLED"] = info[colIndex["ENABLED"]];
+                var isEnable = false;
+                if (info[colIndex["STATE"]] != null && info[colIndex["STATE"]].toLowerCase() != "off")
+                    isEnable = true;
+                drDetails[hostName]["MASTERENABLED"] = isEnable;
+                drDetails[hostName]["STATE"] = info[colIndex["STATE"]];
                 drDetails[hostName]["SYNCSNAPSHOTSTATE"] = info[colIndex["SYNCSNAPSHOTSTATE"]];
             });
         };
-        //
 
         //Get DR Details Information
         var getDrDetails = function (connection, drDetails) {
