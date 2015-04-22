@@ -739,7 +739,7 @@ function alertNodeClicked(obj) {
                 VoltDbUI.hasPermissionToView = false;
 
                 if (!$("#loginWarningPopup").is(":visible")) {
-                    $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view this page.");
+                    $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view this page.");
                     $("#loginWarnPopup").click();
                 }
                 return;
@@ -794,7 +794,6 @@ function alertNodeClicked(obj) {
             systemOverview = {};
             if (!$.isEmptyObject(currentServerOverview))
                 systemOverview[0] = currentServerOverview;
-            
 
             //iterate through updatedSystemOverview to add remaining server to the list 'systemOverview'
             for (iterator = 0; iterator < updatedSystemOverview.length; iterator++) {
