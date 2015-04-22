@@ -687,7 +687,7 @@ function alertNodeClicked(obj) {
                 VoltDbUI.hasPermissionToView = false;
                 
                 if (!$("#loginWarningPopup").is(":visible")) {
-                    $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view this page.");
+                    $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view this page.");
                     $("#loginWarnPopup").click();
                 }
                 return;

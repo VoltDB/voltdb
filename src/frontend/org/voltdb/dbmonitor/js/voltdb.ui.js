@@ -409,12 +409,14 @@ var loadPage = function (serverName, portid) {
 
             $("#btnLoginWarningOk").unbind("click");
             $("#btnLoginWarningOk").on('click', function () {
-                
+
                 if (!VoltDbUI.hasPermissionToView) {
                     location.reload(true);
                 } else {
                     if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-                        $("#navDbmonitor").click();
+                        setTimeout(function() {
+                            $("#navDbmonitor").trigger("click");
+                        }, 500);
                     }
                     
                     $("#navAdmin").hide();
@@ -629,7 +631,7 @@ var loadPage = function (serverName, portid) {
                         if (!VoltDbUI.hasPermissionToView)
                             return;
                         else
-                            $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view Admin Tab.");
+                            $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view Admin Tab.");
 
                         if (!$("#loginWarningPopup").is(":visible")) {
                             $("#loginWarnPopup").trigger("click");
