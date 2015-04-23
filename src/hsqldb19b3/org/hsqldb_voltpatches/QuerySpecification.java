@@ -44,7 +44,9 @@ import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
+// BEGIN Cherry-picked code change from hsqldb-2.3.2
 import org.hsqldb_voltpatches.lib.Iterator;
+// END Cherry-picked code change from hsqldb-2.3.2
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
@@ -693,29 +695,34 @@ public class QuerySpecification extends QueryExpression {
             if (queryCondition.getDataType() != Type.SQL_BOOLEAN) {
                 throw Error.error(ErrorCode.X_42568);
             }
-            /************************* Volt DB Extensions *************************/
+            // A VoltDB extension to guard against abuse of aggregates in subqueries.
             // Make sure no aggregates in WHERE clause
             tempSet.clear();
             Expression.collectAllExpressions(
                     tempSet, queryCondition, Expression.aggregateFunctionSet,
                     Expression.subqueryExpressionSet);
             if (!tempSet.isEmpty()) {
-                if (isTopLevel) {
-                    // Top level WHERE clause can't have aggregate expressions
-                    throw Error.error(ErrorCode.X_47000);
-                } else {
-                    // Subquery WHERE clause may have an aggregate expression only if it
-                    // references columns from top query(s). 
-                    // At the moment, VoltDB doesn't support them.
+
+                // A top level WHERE clause can't have aggregate expressions.
+                // In theory, a subquery WHERE clause may have aggregate
+                // expressions in some edge cases where they reference only
+                // columns from parent query(s).
+                // Even these should be restricted to cases where the subquery
+                // is evaluated after the parent agg, such as from the HAVING
+                // or SELECT clause of the parent query defining the columns.
+                // TO be safe, VoltDB doesn't support ANY cases of aggs of
+                // parent columns. All this code block does is choose between
+                // two error messages for two different unsupported cases.
+                if ( ! isTopLevel) {
                     HsqlList columnSet = new OrderedHashSet();
                     Iterator aggIt = tempSet.iterator();
-                    while(aggIt.hasNext()) {
+                    while (aggIt.hasNext()) {
                         Expression nextAggr = (Expression) aggIt.next();
                         Expression.collectAllExpressions(columnSet, nextAggr,
                                 Expression.columnExpressionSet, Expression.emptyExpressionSet);
                     }
                     Iterator columnIt = columnSet.iterator();
-                    while(columnIt.hasNext()) {
+                    while (columnIt.hasNext()) {
                         Expression nextColumn = (Expression) columnIt.next();
                         assert(nextColumn instanceof ExpressionColumn);
                         ExpressionColumn nextColumnEx = (ExpressionColumn) nextColumn;
@@ -736,13 +743,12 @@ public class QuerySpecification extends QueryExpression {
                             throw Error.error(ErrorCode.X_47001);
                         }
                     }
-                    // If we get there it means that WHERE expression has an aggregate expression
-                    // with local columns
-                    throw Error.error(ErrorCode.X_47000);
                 }
+                // If we get here it means that WHERE expression has an aggregate expression
+                // with local columns
+                throw Error.error(ErrorCode.X_47000);
             }
-            /*********************************************************************/
-
+            // End of VoltDB extension
         }
 
         if (havingCondition != null) {

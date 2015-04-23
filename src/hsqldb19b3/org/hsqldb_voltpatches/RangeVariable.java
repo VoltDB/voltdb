@@ -1153,10 +1153,6 @@ final class RangeVariable {
 
     /************************* Volt DB Extensions *************************/
 
-    private Expression subqueryExpression;
-
-    void setSubqueryExpression(Expression sqe) { subqueryExpression = sqe; }
-
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
