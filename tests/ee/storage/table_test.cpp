@@ -122,7 +122,7 @@ protected:
         }
         TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
         if (xact) {
-            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature, &drStream, false);
+            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature, false);
             m_table = persistent_table;
         } else {
             temp_table = TableFactory::getTempTable(database_id, "test_temp_table", schema, columnNames, &limits);

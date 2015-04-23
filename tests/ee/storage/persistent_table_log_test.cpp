@@ -122,7 +122,7 @@ public:
                                                               m_tableSchemaColumnSizes,
                                                               m_tableSchemaAllowNull);
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, false, 0));
 
         if ( ! withPK ) {
             return;
@@ -144,7 +144,7 @@ public:
                                                               m_narrowTableSchemaColumnSizes,
                                                               m_narrowTableSchemaAllowNull);
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_narrowColumnNames, signature, &drStream, false, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_narrowColumnNames, signature, false, 0));
     }
 
     VoltDBEngine *m_engine;

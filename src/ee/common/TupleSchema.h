@@ -35,7 +35,7 @@
 namespace voltdb {
 
 /**
- * Represents the shcema of a tuple or table row. Used to define table rows, as
+ * Represents the schema of a tuple or table row. Used to define table rows, as
  * well as index keys. Note: due to arbitrary size embedded array data, this class
  * cannot be created on the stack; all constructors are private.
  */

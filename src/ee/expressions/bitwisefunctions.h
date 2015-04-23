@@ -16,7 +16,7 @@
  */
 #include <sstream>
 #include <string>
-
+#include <limits.h>
 #include "common/NValue.hpp"
 
 namespace voltdb {
@@ -56,6 +56,35 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_HEX>() const {
     ss << std::hex << std::uppercase << inputDecimal; // decimal_value
     std::string res (ss.str());
 
+    return getTempStringValue(res.c_str(),res.length());
+}
+
+template<> inline NValue NValue::callUnary<FUNC_VOLT_BIN>() const {
+    if (getValueType() != VALUE_TYPE_BIGINT) {
+        // The parser should enforce this for us, but just in case...
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL BIN function");
+    }
+
+    if (isNull()) {
+        return getNullStringValue();
+    }
+    uint64_t inputDecimal = uint64_t(getBigInt());
+
+    std::stringstream ss;
+    const size_t uint64_size = sizeof(inputDecimal)*CHAR_BIT;
+    uint64_t mask = 0x1ULL << (uint64_size - 1);
+    int idx = int(uint64_size - 1);
+    for (;0 <= idx && (inputDecimal & mask) == 0; idx -= 1) {
+    	mask >>= 1;
+    }
+    for (; 0 <= idx; idx -= 1) {
+    	ss << ((inputDecimal & mask) ? '1' : '0');
+    	mask >>= 1;
+    }
+    std::string res (ss.str());
+    if (res.size() == 0) {
+    	res = std::string("0");
+    }
     return getTempStringValue(res.c_str(),res.length());
 }
 

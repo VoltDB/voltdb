@@ -127,6 +127,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_BIT_SHIFT_LEFT         = 20027;
         static final int FUNC_VOLT_BIT_SHIFT_RIGHT        = 20028;
         static final int FUNC_VOLT_HEX                    = 20029;
+        static final int FUNC_VOLT_BIN                    = 20030;
 
         private static final FunctionId[] instances = {
 
