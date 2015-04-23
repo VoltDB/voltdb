@@ -104,11 +104,18 @@ class SqlQueriesTest extends SqlQueriesTestBase {
                 ensureOnSqlQueryPage()
                 then: 'should be on SQL Query page'
                 at SqlQueryPage
+<<<<<<< HEAD
 >>>>>>> c0da8c0f6d666ad0ace94d05f069f340b161559e
 
                 break
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
 
+=======
+
+                break
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+
+>>>>>>> c0da8c0f6d666ad0ace94d05f069f340b161559e
             }
         }
         // Create tables from the 'genqa' app, needed for testing (e.g.
