@@ -122,7 +122,7 @@ public:
                                                               m_tableSchemaColumnSizes,
                                                               m_tableSchemaAllowNull);
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, false, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature));
 
         if ( ! withPK ) {
             return;
@@ -144,13 +144,12 @@ public:
                                                               m_narrowTableSchemaColumnSizes,
                                                               m_narrowTableSchemaAllowNull);
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_narrowColumnNames, signature, false, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_narrowColumnNames, signature));
     }
 
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
     PersistentTable *m_table;
-    MockDRTupleStream drStream;
     std::vector<std::string> m_columnNames;
     std::vector<ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;

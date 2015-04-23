@@ -326,16 +326,7 @@ public class RejoinProducer extends JoinProducerBase {
                     }
 
                     drSequenceNumbers = event.drSequenceNumbers;
-
-                    if (event.remoteDCLastIds.size() > 1) {
-                        VoltDB.crashLocalVoltDB("Have DR data from more than one upstream cluster, which shouldn't be possible.");
-                    }
-                    for (Map<Integer, Pair<Long, Long>> ids : event.remoteDCLastIds.values()) {
-                        Pair<Long, Long> myDRIds = ids.get(m_partitionId);
-                        if (myDRIds != null) {
-                            VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedSegmentId(m_partitionId, myDRIds.getFirst(), myDRIds.getSecond());
-                        }
-                    }
+                    VoltDB.instance().getConsumerDRGateway().populateLastAppliedSegmentIds(event.remoteDCLastIds);
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");

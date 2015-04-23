@@ -276,7 +276,6 @@ public:
     int64_t m_undoToken;
 
     CatalogId m_tableId;
-    MockDRTupleStream drStream;
     char signature[20];
 };
 

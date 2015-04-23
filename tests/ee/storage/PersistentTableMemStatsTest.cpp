@@ -91,7 +91,7 @@ public:
         vector<TableIndexScheme> indexes;
 
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, false, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -109,7 +109,6 @@ public:
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
     PersistentTable *m_table;
-    MockDRTupleStream drStream;
     vector<string> m_columnNames;
     vector<ValueType> m_tableSchemaTypes;
     vector<int32_t> m_tableSchemaColumnSizes;
