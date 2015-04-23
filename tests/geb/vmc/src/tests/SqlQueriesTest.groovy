@@ -91,7 +91,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     def setup() { // called before each test
-        // SqlQueriesTestBase.setup gets called first (automatically)
+        // TestBase.setup gets called first (automatically)
         int count = 0
 
         while(count<numberOfTrials) {
@@ -101,9 +101,9 @@ class SqlQueriesTest extends SqlQueriesTestBase {
                 ensureOnSqlQueryPage()
                 then: 'should be on SQL Query page'
                 at SqlQueryPage
-
                 break
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
+
 
             }
         }
