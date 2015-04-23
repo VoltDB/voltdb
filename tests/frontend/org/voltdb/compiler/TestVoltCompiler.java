@@ -1905,13 +1905,15 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(c.hasErrors());
         assertTrue(c.hasErrorsOrWarnings());
 
+        // non-unique partial index
         s = "create table t(id integer not null, num integer not null);\n" +
             "create index idx_t_idnum1 on t(id) where num > 3;\n" +
-             "create index idx_t_idnum2 on t(id) where num > 3;";
+            "create index idx_t_idnum2 on t(id) where num > 3;";
         c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
         assertTrue(c.hasErrorsOrWarnings());
 
+        // unique partial index
         s = "create table t(id integer not null, num integer not null);\n" +
             "create unique index idx_t_idnum1 on t(id) where num > 3;\n" +
             "create unique index idx_t_idnum2 on t(id) where num > 3;";
@@ -1919,6 +1921,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(c.hasErrors());
         assertTrue(c.hasErrorsOrWarnings());
 
+        // non-unique expression partial index
         s = "create table t(id integer not null, num integer not null);\n" +
             "create index idx_t_idnum1 on t(id) where abs(num) > 3;\n" +
             "create index idx_t_idnum2 on t(id) where abs(num) > 3;";
@@ -1926,6 +1929,13 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(c.hasErrors());
         assertTrue(c.hasErrorsOrWarnings());
 
+        // unique expression partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create unique index idx_t_idnum1 on t(id) where abs(num) > 3;\n" +
+            "create unique index idx_t_idnum2 on t(id) where abs(num) > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
     }
 
     public void testDDLCompilerSameNameIndexesOnTwoTables()
