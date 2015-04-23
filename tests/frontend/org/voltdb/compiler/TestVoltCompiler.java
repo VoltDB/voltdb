@@ -2505,6 +2505,11 @@ public class TestVoltCompiler extends TestCase {
                     stmt = stmt.substring(0, stmt.length() - 1);
                 }
 
+                // Remove spaces from both strings so we compare whitespace insensitively
+                // Capturing the DELETE statement in HSQL does not preserve whitespace.
+                expectedStmt = stmt.replace(" ", "");
+                stmt = stmt.replace(" ", "");
+
                 assertEquals("Did not find the LIMIT DELETE statement that we expected",
                         expectedStmt, stmt);
             }
