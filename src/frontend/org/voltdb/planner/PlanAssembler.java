@@ -380,7 +380,7 @@ public class PlanAssembler {
      * @return The best cost plan or null.
      */
     public static String IN_EXISTS_SCALAR_ERROR_MESSAGE = "Subquery expressions are only supported for "
-            + "single partition procedures and AdHoc replicated tables";
+            + "single partition procedures and AdHoc queries referencing only replicated tables.";
 
     public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
@@ -480,6 +480,10 @@ public class PlanAssembler {
         }
 
         failIfNonDeterministicDml(parsedStmt, retval);
+
+        if (m_partitioning != null) {
+            retval.setStatementPartitioning(m_partitioning);
+        }
 
         return retval;
     }

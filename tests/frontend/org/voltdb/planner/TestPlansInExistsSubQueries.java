@@ -63,6 +63,10 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
         sql = "select * from P1 as parent where (A,C) in (select 2, C from r2 where r2.c > parent.c group by c)";
         failToCompile(sql, errorMsg);
+
+        sql = "select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c and "
+                + "exists (select c from p1 where p1.c = r1.c ))";
+        failToCompile(sql, errorMsg);
     }
 
     public void testExistsWithUserParams() {
