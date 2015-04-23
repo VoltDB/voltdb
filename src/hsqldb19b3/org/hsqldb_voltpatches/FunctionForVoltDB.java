@@ -220,6 +220,11 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+            new FunctionId("bin", Type.SQL_VARCHAR, FUNC_VOLT_BIN, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -418,6 +423,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
 
         case FunctionId.FUNC_VOLT_HEX:
+        case FunctionId.FUNC_VOLT_BIN:
             voltResolveToBigintType(0);
             dataType = Type.SQL_VARCHAR;
             break;

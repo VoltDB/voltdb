@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2015 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -70,22 +70,22 @@ using namespace voltdb;
 
 struct FunctionTest : public Test {
         FunctionTest() :
-        	Test(),
-        	m_executorContext(new ExecutorContext(0, 0, (UndoQuantum *)0, (Topend *)0,
-        										  new Pool(),
-												  (VoltDBEngine *)0, "localhost",
-												  0, (DRTupleStream *)0, (DRTupleStream *)0)) {}
+                Test(),
+                m_executorContext(new ExecutorContext(0, 0, (UndoQuantum *)0, (Topend *)0,
+                                                                                          new Pool(),
+                                                                                                  (VoltDBEngine *)0, "localhost",
+                                                                                                  0, (DRTupleStream *)0, (DRTupleStream *)0)) {}
         ~FunctionTest() {
-        	delete m_executorContext;
+                delete m_executorContext;
         }
         ExecutorContext *m_executorContext;
 };
 
 static int testBin(uint64_t input, std::string output) {
-	std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
-	ConstantValueExpression *const_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(0xffULL));
-	argument->push_back(const_val_exp);
-	NValue expected = ValueFactory::getTempStringValue("11111111");
+        std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+        ConstantValueExpression *const_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(0xffULL));
+        argument->push_back(const_val_exp);
+        NValue expected = ValueFactory::getTempStringValue("11111111");
     AbstractExpression* bin_exp = ExpressionUtil::functionFactory(FUNC_VOLT_BIN, argument);
     NValue answer = bin_exp->eval();
     int cmpout = answer.compare(expected);
@@ -94,20 +94,20 @@ static int testBin(uint64_t input, std::string output) {
 }
 
 TEST_F(FunctionTest, BinTest) {
-	ASSERT_EQ(testBin(0xffULL, "11111111"), 0);
-	ASSERT_EQ(testBin(0ULL, "0"), 0);
-	const size_t BIGINT_SIZE = sizeof(uint64_t) * CHAR_BIT;
-	// Walking ones.
-	std::string expected("1");
-	std::string expectedz("1111111111111111111111111111111111111111111111111111111111111111");
-	for (int idx = 0; idx < (BIGINT_SIZE-1); idx += 1) {
-		uint64_t input = 1ULL << idx;
-		ASSERT_EQ(testBin(input, expected), 0);
-		expected = expected + "0";
-		expectedz[idx] = '0';
-		ASSERT_EQ(testBin(~input, expectedz), 0);
-		expectedz[idx] = '1';
-	}
+        ASSERT_EQ(testBin(0xffULL, "11111111"), 0);
+        ASSERT_EQ(testBin(0ULL, "0"), 0);
+        const size_t BIGINT_SIZE = sizeof(uint64_t) * CHAR_BIT;
+        // Walking ones.
+        std::string expected("1");
+        std::string expectedz("1111111111111111111111111111111111111111111111111111111111111111");
+        for (int idx = 0; idx < (BIGINT_SIZE-1); idx += 1) {
+                uint64_t input = 1ULL << idx;
+                ASSERT_EQ(testBin(input, expected), 0);
+                expected = expected + "0";
+                expectedz[idx] = '0';
+                ASSERT_EQ(testBin(~input, expectedz), 0);
+                expectedz[idx] = '1';
+        }
 }
 
 int main() {

@@ -202,7 +202,7 @@ class TableAndIndexTest : public Test {
 
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
                                                                       warehouseTupleSchema, warehouseColumnNames,
-                                                                      signature, (DRTupleStream *)0, false,
+                                                                      signature, false,
                                                                       0, false, false);
 
             // add other indexes
