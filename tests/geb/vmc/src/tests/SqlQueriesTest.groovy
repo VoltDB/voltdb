@@ -34,6 +34,7 @@ import vmcTest.pages.*
  * This class contains tests of the 'SQL Query' tab of the VoltDB Management
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
+
 class SqlQueriesTest extends TestBase {
 
     static final int DEFAULT_NUM_ROWS_TO_INSERT = 2
