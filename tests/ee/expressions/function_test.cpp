@@ -71,10 +71,16 @@ using namespace voltdb;
 struct FunctionTest : public Test {
         FunctionTest() :
                 Test(),
-                m_executorContext(new ExecutorContext(0, 0, (UndoQuantum *)0, (Topend *)0,
-                                                                                          new Pool(),
-                                                                                                  (VoltDBEngine *)0, "localhost",
-                                                                                                  0, (DRTupleStream *)0, (DRTupleStream *)0)) {}
+                m_executorContext(new ExecutorContext(0,
+                                                      0,
+                                                      (UndoQuantum *)0,
+                                                      (Topend *)0,
+                                                      new Pool(),
+                                                      (VoltDBEngine *)0,
+                                                      "localhost",
+                                                      0,
+                                                      (DRTupleStream *)0,
+                                                      (DRTupleStream *)0)) {}
         ~FunctionTest() {
                 delete m_executorContext;
         }
@@ -89,6 +95,8 @@ static int testBin(uint64_t input, std::string output) {
     AbstractExpression* bin_exp = ExpressionUtil::functionFactory(FUNC_VOLT_BIN, argument);
     NValue answer = bin_exp->eval();
     int cmpout = answer.compare(expected);
+    expected.free();
+    delete bin_exp;
     // std::cout << "input: " << std::hex << input << " vs. " << output << " == " << cmpout << "\n";
     return cmpout;
 }
