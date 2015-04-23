@@ -49,18 +49,19 @@ import org.voltdb.types.QuantifierType;
 public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testInExistsGuard() {
-        String errorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
+        String errorMsg = PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE;
         String sql;
-/* These are now supported cases.
+
         sql = "select p2.c from p2 where p2.c > ? and exists (select c from r1 where r1.c = p2.c)";
         failToCompile(sql, errorMsg);
 
         sql = "select p2.c from p2 where p2.a in (select c from r1)";
         failToCompile(sql, errorMsg);
-*/
-        //TODO: clarify message to complain about use of partitioned tables in subquery.
-        errorMsg = "Subquery expressions are only supported in single partition procedures";
+
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from p1 where p1.c = r2.c)";
+        failToCompile(sql, errorMsg);
+
+        sql = "select * from P1 as parent where (A,C) in (select 2, C from r2 where r2.c > parent.c group by c)";
         failToCompile(sql, errorMsg);
     }
 

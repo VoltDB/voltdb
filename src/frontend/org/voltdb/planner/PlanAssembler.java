@@ -379,6 +379,9 @@ public class PlanAssembler {
      * @param parsedStmt Current SQL statement to generate plan for
      * @return The best cost plan or null.
      */
+    public static String IN_EXISTS_SCALAR_ERROR_MESSAGE = "Subquery expressions are only supported for "
+            + "single partition procedures and AdHoc replicated tables";
+
     public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
         List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueryScans();
@@ -399,6 +402,27 @@ public class PlanAssembler {
                 m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
                 return null;
             }
+
+            // guards against IN/EXISTS/Scalar subqueries
+            if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
+                // no partition tables in parent query
+                for (Table tb: parsedStmt.m_tableList) {
+                    if (! tb.getIsreplicated()) {
+                        m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
+                        return null;
+                    }
+                }
+
+                // no partition tables in subqueries
+                for (AbstractExpression e: subqueryExprs) {
+                    assert(e instanceof SelectSubqueryExpression);
+                    SelectSubqueryExpression subExpr = (SelectSubqueryExpression)e;
+                    if (! subExpr.getSubqueryScan().getIsReplicated()) {
+                        m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
+                        return null;
+                    }
+                }
+             }
 
             if (!getBestCostPlanForExpressionSubQueries(subqueryExprs)) {
                 // There was at least one sub-query and we should have a compiled plan for it
@@ -456,21 +480,6 @@ public class PlanAssembler {
         }
 
         failIfNonDeterministicDml(parsedStmt, retval);
-
-////FIXME: This guard code was in place in Mike's original branch.
-//// Is this really safe already, or are we getting ahead of ourselves?
-//// If it's safe, remove this garbage comment:
-////        if ( ! subqueryExprs.isEmpty() ) {
-////            if ( ! (m_partitioning.isInferredSingle() ||
-////                    m_partitioning.wasSpecifiedAsSingle())) {
-////                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
-////                return null;
-////             }
-////        }
-
-        if (m_partitioning != null) {
-            retval.setStatementPartitioning(m_partitioning);
-        }
 
         return retval;
     }
@@ -538,7 +547,7 @@ public class PlanAssembler {
             // multiple times during the parent statement execution.
             if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
                 // fail the whole plan
-                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
+                m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
                 return false;
             }
         }
