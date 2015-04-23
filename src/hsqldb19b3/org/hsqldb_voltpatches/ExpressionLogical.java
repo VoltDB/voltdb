@@ -660,7 +660,7 @@ public class ExpressionLogical extends Expression {
 
                     // compatibility for scalars only
                 // A VoltDB extension to support X'..' as numeric literals
-                } else if (convertBinaryIntegerLiteral(session, nodes[LEFT],
+                } else if (voltConvertBinaryIntegerLiteral(session, nodes[LEFT],
                             nodes[RIGHT])) {
                     // End VoltDB extension
                 } else {
@@ -1708,24 +1708,21 @@ public class ExpressionLogical extends Expression {
      * If one child is an integer, and the other is a VARBINARY literal, try to convert the
      * literal to an integer.
      */
-    private boolean convertBinaryIntegerLiteral(Session session, Expression lhs, Expression rhs) {
+    private boolean voltConvertBinaryIntegerLiteral(Session session, Expression lhs, Expression rhs) {
         Expression nonIntegralExpr;
+        int whichChild;
         if (lhs.dataType.isIntegralType()) {
             nonIntegralExpr = rhs;
+            whichChild = RIGHT;
         }
         else if (rhs.dataType.isIntegralType()) {
             nonIntegralExpr = lhs;
+            whichChild = LEFT;
         } else {
             return false;
         }
 
-        if (nonIntegralExpr.opType == OpTypes.VALUE && nonIntegralExpr.dataType.isBinaryType()) {
-            int whichChild = (nonIntegralExpr == rhs) ? RIGHT : LEFT;
-            ExpressionValue exprVal = (ExpressionValue)nonIntegralExpr;
-            return exprVal.mutateToBigintType(this, whichChild);
-        }
-
-        return false;
+        return ExpressionValue.voltMutateToBigintType(nonIntegralExpr, this, whichChild);
     }
     // End VoltDB extension
 }

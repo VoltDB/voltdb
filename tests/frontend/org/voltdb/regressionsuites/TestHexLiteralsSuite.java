@@ -23,7 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -390,6 +389,21 @@ public class TestHexLiteralsSuite extends RegressionSuite {
                "MixedTypeMath", "X'21'", "X'21'", "X'21'", "X'21'");
    }
 
+   @Test
+   public void testIntegerHexLiteralDefaultValues() throws Exception {
+       Client client = getClient();
+
+       // Insert one row, so calls below produce just one row.
+       client.callProcedure("@AdHoc", "insert into t_defaults (pk) values (0);");
+
+       validateTableOfLongs(client, "select * from t_defaults;",
+               new long[][] {{
+                   0,
+                   0, 127, -127, -127, 127, 109, -109,
+                   0, Long.MAX_VALUE, Long.MIN_VALUE + 1, Long.MIN_VALUE + 1, Long.MAX_VALUE, 1000001, -1000001
+               }});
+   }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -412,6 +426,29 @@ public class TestHexLiteralsSuite extends RegressionSuite {
                 + "  BI BIGINT,\n"
                 + "  TI TINYINT,\n"
                 + "  VB VARBINARY(8)\n"
+                + ");\n"
+                ;
+
+        literalSchema +=
+                "CREATE TABLE T_DEFAULTS (\n"
+                + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
+
+                + "  TI1 TINYINT DEFAULT X'00',\n"
+                + "  TI2 TINYINT DEFAULT X'7F',\n" // max for type
+                + "  TI3 TINYINT DEFAULT X'FfffFfffFfffFf81',\n" // min for type
+                + "  TI4 TINYINT DEFAULT -X'7F',\n" // min for type, using unary minus
+                + "  TI5 TINYINT DEFAULT -X'FfffFfffFfffFf81',\n" // max for type, using unary minus
+                + "  TI6 TINYINT DEFAULT X'6D',\n" // decimal 109
+                + "  TI7 TINYINT DEFAULT -X'6D',\n" // decimal -109
+
+                + "  BI1 BIGINT DEFAULT X'00',\n"
+                + "  BI2 BIGINT DEFAULT X'7FFFFFFFFFFFFFFF',\n" // max for type
+                + "  BI3 BIGINT DEFAULT X'8000000000000001',\n" // min for type
+                + "  BI4 BIGINT DEFAULT -X'7FFFFFFFFFFFFFFF',\n" // min for type, with unary minus
+                + "  BI5 BIGINT DEFAULT -X'8000000000000001',\n" // min for type with unary minus
+                + "  BI6 BIGINT DEFAULT  X'0F4241',\n" // decimal 1,000,001
+                + "  BI7 BIGINT DEFAULT -X'0F4241',\n" // decimal -1,000,001
+
                 + ");\n"
                 ;
 

@@ -108,41 +108,25 @@ public class ExpressionValue extends Expression {
      * convert it to a BIGINT constant.  Returns true for a
      * successful conversion and false otherwise.
      *
-     * We assume that the VARBINARY constant is representing a
-     * 64-bit two's complement integer:
-     * - a constant with no digits returns false (no conversion)
-     * - a constant with more than 16 digits returns false (too many digits)
-     * - a constant that is shorter than 16 digits is implicitly zero-extended
-     *   (i.e., constants with less than 16 digits are always positive)
-     *
-     * These are the VoltDB classes that handle hex literal constants:
-     *   voltdb.ParameterConverter
-     *   voltdb.expressions.ConstantValueExpression
+     * For more details on how the conversion is performed, see BinaryData.toLong().
      *
      * @param parent      Reference of parent expression
      * @param childIndex  Index of this node in parent
      * @return true for a successful conversion and false otherwise.
      */
-    boolean mutateToBigintType(Expression parent, int childIndex) {
-        if (valueData == null) {
-            return false;
+    public static boolean voltMutateToBigintType(Expression maybeConstantNode, Expression parent, int childIndex) {
+        if (maybeConstantNode.opType == OpTypes.VALUE && maybeConstantNode.dataType.isBinaryType()) {
+            ExpressionValue exprVal = (ExpressionValue)maybeConstantNode;
+            if (exprVal.valueData == null) {
+                return false;
+            }
+
+            BinaryData data = (BinaryData)exprVal.valueData;
+            parent.nodes[childIndex] = new ExpressionValue(data.toLong(), Type.SQL_BIGINT);
+
+            return true;
         }
-
-        byte[] data = ((BinaryData)valueData).getBytes();
-        if (data == null || data.length <= 0 || data.length > 16) {
-            return false;
-        }
-
-        byte[] dataWithLeadingZeros = new byte[] {0, 0, 0, 0, 0, 0, 0, 0};
-        int lenDiff = 8 - data.length;
-        for (int j = lenDiff; j < 8; ++j) {
-            dataWithLeadingZeros[j] = data[j - lenDiff];
-        }
-
-        BigInteger bi = new BigInteger(dataWithLeadingZeros);
-        parent.nodes[childIndex] = new ExpressionValue(bi.longValue(), Type.SQL_BIGINT);
-
-        return true;
+        return false;
     }
     // End VoltDB extension
 }

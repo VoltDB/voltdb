@@ -451,10 +451,7 @@ public class ExpressionArithmetic extends Expression {
 
         for (int i = 0; i < nodes.length; ++i) {
             Expression e = nodes[i];
-            if (e.opType == OpTypes.VALUE && e.dataType.isBinaryType()) {
-                ExpressionValue exprVal = (ExpressionValue)e;
-                exprVal.mutateToBigintType(this, i);
-            }
+            ExpressionValue.voltMutateToBigintType(e, this, i);
         }
     }
     // End VoltDB extension

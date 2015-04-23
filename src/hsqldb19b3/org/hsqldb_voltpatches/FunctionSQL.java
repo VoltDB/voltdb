@@ -2372,7 +2372,7 @@ public class FunctionSQL extends Expression {
             node.dataType = Type.SQL_BIGINT;
         }
         else if (node.dataType.isBinaryType() && node.opType == OpTypes.VALUE) {
-            boolean success = ((ExpressionValue)node).mutateToBigintType(this, nodeIdx);
+            boolean success = ExpressionValue.voltMutateToBigintType(node, this, nodeIdx);
             if (! success) {
                 throw Error.error(ErrorCode.X_42561);
             }

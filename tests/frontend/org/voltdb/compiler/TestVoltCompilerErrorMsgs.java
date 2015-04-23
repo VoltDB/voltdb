@@ -252,5 +252,36 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
         ddlErrorTest("invalid format for a constant decimal value",
                 "create procedure insHex as insert into blah (decval) values (x'80');");
 
+        // In arithmetic or logical expressions, we catch malformed (for BIGINT) x-literals
+        // in HSQL.
+
+        ddlErrorTest("malformed numeric constant",
+                "create procedure selHex as select 30 + X'' from blah;");
+
+        // (too many hex digits)
+        ddlErrorTest("malformed numeric constant",
+                "create procedure selHex as select tinyval from blah where X'0000000000000000FF' < tinyval;");
+    }
+
+    public void testHexLiteralDefaultValues() throws Exception {
+        ddlErrorTest("malformed numeric constant",
+                "create table t (bi bigint default X'');");
+
+        ddlErrorTest("malformed numeric constant",
+                "create table t (bi bigint default X'FFFF0000FFFF0000FF');");
+
+        ddlErrorTest("numeric value out of range",
+                "create table t (ti tinyint default X'80');");
+
+        ddlErrorTest("numeric value out of range",
+                "create table t (ti tinyint default X'FF');");
+
+        // This does not fail, but it seems like it should fail with an
+        // out of range error.  -128 is reserved for the TINYINT null value
+        // This is ENG-8148.
+        ddlNonErrorTest("create table t (ti tinyint default -X'80');");
+
+        ddlErrorTest("numeric value out of range",
+                "create table t (ti tinyint default -X'81');");
     }
 }
