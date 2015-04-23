@@ -164,7 +164,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
-                    if (m_consumerDRGateway != null) {
+                    if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
                         m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId);
                     }
                 }

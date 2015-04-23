@@ -92,17 +92,13 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRAGENT">
+    <!-- logger name="DRAGENT">
         <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
+    </logger -->
 
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRSTATS">
+    <!-- logger name="DR">
         <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
+    </logger -->
 
     <!-- Always let CSVLoader and its ilk to write to the console. -->
     <logger name="CSVLOADER">

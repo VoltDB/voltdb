@@ -23,19 +23,24 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-/**
- * Actual regression tests for SQL that I found that was broken and
- * have fixed.  Didn't like any of the other potential homes that already
- * existed for this for one reason or another.
- */
-
 public class TestHexLiteralsSuite extends RegressionSuite {
+
+    /*
+     * Make sure that x-quoted literals (indicating a sequence of bytes
+     * denoted by hexadecimal digits) are not interpreted as integers,
+     * but that they *do* work as VARBINARY literals.
+     */
 
     static private long[] interestingValues = new long[] {
             Long.MIN_VALUE,
@@ -50,72 +55,61 @@ public class TestHexLiteralsSuite extends RegressionSuite {
         };
 
     private static String longToHexLiteral(long val) {
-        return "X'" + makeEvenDigits(val) + "'";
+        return "X'" + makeSixteenDigits(val) + "'";
     }
 
-    private static String makeEvenDigits(long val) {
+    private static String makeSixteenDigits(long val) {
         String valAsHex = Long.toHexString(val).toUpperCase();
-        if ((valAsHex.length() % 2) == 1) {
-            valAsHex = "0" + valAsHex;
+        if (valAsHex.length() < 16) {
+            int numZerosNeeded = 16 - valAsHex.length();
+            StringBuffer sb = new StringBuffer();
+            for (int i = 0; i < numZerosNeeded; ++i) {
+                sb.append('0');
+            }
+            sb.append(valAsHex);
+            valAsHex = sb.toString();
         }
 
         return valAsHex;
     }
 
     @Test
-    public void testHexLiteralsAsParams() throws Exception {
+    public void testHexLiteralsAsVarbinaryParams() throws Exception {
         Client client = getClient();
 
         for (int i = 0; i < interestingValues.length; ++i) {
             long val = interestingValues[i];
-            client.callProcedure("T.Insert", i, longToHexLiteral(val));
+            client.callProcedure("InsertVarbinary", i, longToHexLiteral(val));
             // Verify that the right constant was inserted
-            VoltTable vt = client.callProcedure("@AdHoc", "select bi from t where pk = ?", i)
+            VoltTable vt = client.callProcedure("@AdHoc", "select vb from t where pk = ?", i)
                     .getResults()[0];
-            validateRowOfLongs(vt, new long[] {val});
+            assertTrue(vt.advanceRow());
+            assertTrue(Arrays.equals(longToBytes(val), vt.getVarbinary(0)));
         }
 
-        // 0 digits is not a valid value
-        verifyProcFails(client, "Unable to convert string x'' to long value for target parameter",
-                "T.Insert", 21, "x''");
+        // Mixed case literals are okay.
+        ClientResponse cr = client.callProcedure("InsertVarbinary", 20, "X'AaBbCcDdEeFf'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        // Too many digits (more than 16) won't fit into a BIGINT.
-        verifyProcFails(client, "Unable to convert string x'FFFFffffFFFFffffF' to long value for target parameter",
-                "T.Insert", 21, "x'FFFFffffFFFFffffF'");
+        // Must be an even number of digits
+        verifyProcFails(client, "String is not properly hex-encoded",
+                "InsertVarbinary", 21, "x'F'");
+
+        verifyProcFails(client, "String is not properly hex-encoded",
+                "InsertVarbinary", 21, "x'XYZZY'");
+
+        // Too many digits for type
+        verifyProcFails(client, "The size 9 of the value exceeds the size of the VARBINARY\\(8\\) column",
+                "InsertVarbinary", 21, "x'FfffFfffFfffFfffFf'");
     }
 
-    @Test
-    public void testProcsWithEmbeddedHexLiteralsSelect() throws Exception {
-        Client client = getClient();
-
-        // Insert one row, so calls below produce just one row.
-        client.callProcedure("T.Insert", 0, 0);
-
-        // For each interesting value,
-        // invoke a corresponding procedure that does XOR against that value.
-        // Make sure that the literal in the procedure was interpreted correctly.
-
-        for (long val : interestingValues) {
-            VoltTable result = client.callProcedure("HEX_LITERAL_PROC_" + makeEvenDigits(val),
-                    0xF0F0F0F0F0F0F0F0L)
-                    .getResults()[0];
-            assertTrue(result.advanceRow());
-            String actual = result.getString(0);
-            long expectedNum = val ^ 0xF0F0F0F0F0F0F0F0L;
-            if (expectedNum != Long.MIN_VALUE && val != Long.MIN_VALUE) {
-                String expected = Long.toHexString(expectedNum).toUpperCase();
-                assertEquals(expected, actual);
-            }
-            else {
-                // Input or output to bit op was null value
-                // So output of HEX will be null.
-                assertEquals(null, actual);
-            }
-        }
+    private static byte[] longToBytes(long x) {
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        buffer.putLong(x);
+        return buffer.array();
     }
-
     @Test
-    public void testProcsWithEmbeddedHexLiteralsWhere() throws Exception {
+    public void testProcsWithEmbeddedVarbinaryLiterals() throws Exception {
         Client client = getClient();
 
         // Insert all the interesting values in the table,
@@ -123,21 +117,27 @@ public class TestHexLiteralsSuite extends RegressionSuite {
         // embedded in the where clause
 
         for (int i = 0; i < interestingValues.length; ++i) {
-            client.callProcedure("T.Insert", i, interestingValues[i]);
+            client.callProcedure("InsertVarbinary", i, longToBytes(interestingValues[i]));
         }
+
+        VoltTable vvt = client.callProcedure("@AdHoc", "select * from t").getResults()[0];
+        System.out.println(vvt);
 
         for (int i = 0; i < interestingValues.length; ++i) {
             long val = interestingValues[i];
-            String procName = "HEX_LITERAL_PROC_WHERE_" + makeEvenDigits(interestingValues[i]);
+            String digits = makeSixteenDigits(val);
+            String procName = "XQUOTE_VARBINARY_PROC_" + digits;
             VoltTable vt = client.callProcedure(procName).getResults()[0];
-            if (val != Long.MIN_VALUE) {
-                assertTrue(vt.advanceRow());
-                assertEquals(i, vt.getLong(0));
-            }
-            else {
-                assertFalse(vt.advanceRow());
-            }
+            validateRowOfLongs(vt, new long[] {i});
         }
+    }
+
+    @Test
+    public void testIntegerHexLiteralsFail() throws IOException {
+        Client client = getClient();
+
+        verifyProcFails(client, "Unable to convert string X'15' to long value for target parameter",
+                "InsertBigint", 0, "X'15'");
     }
 
     //
@@ -159,22 +159,22 @@ public class TestHexLiteralsSuite extends RegressionSuite {
         String literalSchema =
                 "CREATE TABLE T (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
-                + "  BI BIGINT\n"
+                + "  BI BIGINT,"
+                + "  VB VARBINARY(8)\n"
                 + ");\n"
                 ;
 
-        // Create a bunch of procedures with various embedded literals
-        // in the select list
-        for (long val : interestingValues) {
-            literalSchema += "CREATE PROCEDURE HEX_LITERAL_PROC_" + makeEvenDigits(val) + " AS\n"
-                    + "  SELECT HEX(BITXOR(X'" + makeEvenDigits(val) + "', ?)) FROM T;\n";
-        }
+        literalSchema += "CREATE PROCEDURE InsertVarbinary AS "
+                + "INSERT INTO T (PK, VB) VALUES (?, ?);";
+
+        literalSchema += "CREATE PROCEDURE InsertBigint AS "
+                + "INSERT INTO T (PK, BI) VALUES (?, ?);";
 
         // Create a bunch of procedures with various embedded literals
         // in the where clause
         for (long val : interestingValues) {
-            literalSchema += "CREATE PROCEDURE HEX_LITERAL_PROC_WHERE_" + makeEvenDigits(val) + " AS\n"
-                    + "  SELECT PK FROM T WHERE BI = X'" + makeEvenDigits(val) + "';\n";
+            literalSchema += "CREATE PROCEDURE XQUOTE_VARBINARY_PROC_" + makeSixteenDigits(val) + " AS\n"
+                    + "  SELECT PK FROM T WHERE VB = " + longToHexLiteral(val) + ";\n";
         }
 
         try {
