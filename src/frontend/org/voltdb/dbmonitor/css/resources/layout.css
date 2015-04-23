@@ -1073,7 +1073,7 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
 .warninghead { margin:0; padding:0;}
 .warninghead img { margin:5px 5px 0 0; position:relative;top:2px;}
 .paging_extStyleLF { width: 185px!important; margin-bottom:10px;}
-.navigationLabel {display: inline!important; margin: 5px!important;}
+.navigationLabel {display: inline!important; margin: 5px!important;color: #000000;}
 .paginate_enabled_next.paginate_button, .paginate_disabled_next.paginate_button {float: right!important;}
 #txtDrReplica { cursor: default;}
 .warningDr a{color:#ea151d;}
