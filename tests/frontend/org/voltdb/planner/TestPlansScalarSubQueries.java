@@ -286,6 +286,13 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         }
     }
 
+    public void testScalarGuard() {
+        String errorMessage = PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE;
+
+        failToCompile("select * from r5 where (a,c) > ALL (select a, c from p1);", errorMessage);
+        failToCompile("select r2.c from r2 where r2.c = (select p1.a from p1 where p1.a = r2.c);", errorMessage);
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
