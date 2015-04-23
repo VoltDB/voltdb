@@ -599,4 +599,62 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
 		
 		return query
 	}
+
+    //for view
+
+    /*
+     * get query to create a view
+     */
+    def String getQueryToCreateView() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#create") {
+        }
+
+        while ((line = br.readLine()) != "#delete") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+	 *	Get delete query
+	 */
+    def String getQueryToDeleteView() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * get viewname that is created and deleted
+     */
+    def String getViewname() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#name") {
+        }
+
+        while ((line = br.readLine()) != null) {
+            query = query + line + "\n"
+        }
+
+        return query
+    }
 }
