@@ -32,6 +32,7 @@ function alertNodeClicked(obj) {
             AlertThreshold: $.cookie("alert-threshold"),
             username: $.cookie("username"),
             password: $.cookie("password")
+            
         };
 
         var win = window.open(newUrl + '?data=' + JSON.stringify(data), '_parent');
