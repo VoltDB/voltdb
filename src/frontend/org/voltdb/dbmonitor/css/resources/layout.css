@@ -1356,6 +1356,7 @@ top: 3px;}
  
  .objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
  .queryInput { float:none; width:100%;}
+  .tblScroll { overflow:auto; width:100%; }
  }
 
 @media (width: 320px) {
