@@ -1,4 +1,4 @@
-
+﻿
 (function(window) {
 
     var IMonitorGraphUI = (function () {
@@ -722,6 +722,9 @@
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
             
+            if ($.isEmptyObject(memDetails) || memDetails[currentServer].PHYSICALMEMORY == null || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].RSS == null || memDetails[currentServer].TIMESTAMP == null || memDetails[currentServer].TIMESTAMP == undefined)
+                return;
+
             if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
                 physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
                 
@@ -779,6 +782,9 @@
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
 
+            if ($.isEmptyObject(transacDetail) || transacDetail["CurrentTimedTransactionCount"] == null || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["currentTimerTick"] == null || transacDetail["currentTimerTick"] == undefined)
+                return;
+
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
@@ -833,6 +839,9 @@
             var cpuDetail = cpuDetails;
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
+
+            if ($.isEmptyObject(cpuDetail) || cpuDetail[currentServer].PERCENT_USED == null || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == null || cpuDetail[currentServer].TIMESTAMP == undefined)
+                return;
 
             if (percentageUsage < 0)
                 percentageUsage = 0;
@@ -892,6 +901,10 @@
             var partitionDataDay = monitor.partitionDataDay;
             var partitionDetail = partitionDetails;
             var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
+
+            if ($.isEmptyObject(partitionDetail) || partitionDetail["partitionDetail"]["timeStamp"] == null || partitionDetail["partitionDetail"]["timeStamp"] == undefined)
+                return;
+
             $.each(partitionDetail["partitionDetail"], function (datatype, datavalue) {
                 $.each(datavalue, function (partitionKey, partitionValue) {
                     var keyValue = partitionKey;
