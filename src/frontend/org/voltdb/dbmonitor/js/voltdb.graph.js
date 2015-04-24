@@ -1025,6 +1025,9 @@
             var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
 
+            if ($.isEmptyObject(drDetail) || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == null || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == null || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
+                return;
+
             if (drSecCount >= 6 || monitor.drFirstData) {
                 drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
                 drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
