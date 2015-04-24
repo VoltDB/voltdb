@@ -79,7 +79,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         results.advanceRow();
         assertEquals("CC_T_WITH_EXEC_DELETE", results.get("TABLE_NAME", VoltType.STRING));
         assertEquals("{\"partitionColumn\":\"A1\","
-                + "\"limitPartitionRowsDeleteStmt\":\"DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1 = 0;\"}",
+                + "\"limitPartitionRowsDeleteStmt\":\"DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1=0;\"}",
                 results.get("REMARKS", VoltType.STRING));
 
         assertEquals(false, results.advanceRow());
