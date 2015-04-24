@@ -18,7 +18,6 @@
 package org.voltdb.importer;
 
 import org.voltdb.*;
-import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.network.Connection;
@@ -46,35 +45,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         public void handleResponse(ClientResponse response);
     }
 
-    public static final class SyncCallback implements Callback {
-        private final SettableFuture<ClientResponse> m_responseFuture = SettableFuture.create();
-
-        public ClientResponse getResponse(long timeoutMs) throws InterruptedException
-        {
-            try {
-                return m_responseFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
-            } catch (TimeoutException e) {
-                return null;
-            } catch (ExecutionException e) {
-                VoltDB.crashLocalVoltDB("Should never happen", true, e);
-                return null;
-            }
-        }
-
-        @Override
-        public void handleResponse(ClientResponse response)
-        {
-            m_responseFuture.set(response);
-        }
-    }
-
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
-    private Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
-    private Map<Long, ImportHandler> m_handlers = new HashMap<Long, ImportHandler>();
-    private final String m_name;
+    private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
+    private final Map<Long, ImportHandler> m_handlers = new HashMap<Long, ImportHandler>();
     private final boolean m_leaveCallback;
-    private final SettableFuture<ClientResponseImpl> m_retFuture;
+    private boolean m_stopped = false;
 
     /**
      * @param connectionId    The connection ID for this adapter, needs to be unique for this
@@ -94,25 +70,22 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      */
     public ImportClientResponseAdapter(long connectionId, String name, boolean leaveCallback) {
         m_connectionId = connectionId;
-        m_name = name;
         m_leaveCallback = leaveCallback;
-        m_retFuture = null;
     }
 
     //None of the values matter (other than the future) just using this as a shortcut to collect stats internally
     public ImportClientResponseAdapter(SettableFuture<ClientResponseImpl> fut) {
-        m_retFuture = fut;
         m_leaveCallback = false;
-        m_name = "";
         m_connectionId = 0;
     }
 
-    //Use thise for backpressure handling.
     public synchronized void registerHandler(ImportHandler handler) {
+        m_stopped = false;
         m_handlers.put(handler.getId(), handler);
     }
 
     public void unregisterHandler(ImportHandler handler) {
+        m_stopped = true;
         m_handlers.remove(handler.getId());
     }
 
@@ -131,17 +104,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         final long handle = m_handles.incrementAndGet();
         m_callbacks.put( handle, c);
         return handle;
-    }
-
-    public Supplier<Pair<Long, SyncCallback>> getSyncCallbackSupplier() {
-        return new Supplier<Pair<Long, SyncCallback>>() {
-            @Override
-            public Pair<Long, SyncCallback> get() {
-                final SyncCallback callback = new SyncCallback();
-                final long handle = registerCallback(callback);
-                return Pair.of(handle, callback);
-            }
-        };
     }
 
     @Override
@@ -166,10 +128,10 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void enqueue(DeferredSerialization ds) {
+        if (m_stopped) {
+            return;
+        }
         try {
-            // serialize() touches not-threadsafe state around Initiator
-            // stats.  In the normal code path, this is protected by a lock
-            // in NIOWriteStream.enqueue().
             ByteBuffer buf = null;
             synchronized(this) {
                 int sz = ds.getSerializedSize();
@@ -178,8 +140,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
                     ds.serialize(buf);
                 }
             }
-            //If buf is null we will send a UNEXPECTED error.
-            //TODO: Need to track down why handle is ahead looks like some race.
             if (buf != null) {
                 enqueue(buf);
             }
@@ -194,13 +154,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
         try {
             b.position(4);
             resp.initFromBuffer(b);
-
-            //Go for a different behavior if we are using this adapter as a gussied up future for
-            //an internal request
-            if (m_retFuture != null) {
-                m_retFuture.set(resp);
-                return;
-            }
 
             Callback callback = null;
             if (m_leaveCallback) {
@@ -221,8 +174,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     @Override
     public void enqueue(ByteBuffer[] b)
     {
-        if (b.length != 1)
-        {
+        if (b.length != 1) {
             throw new RuntimeException("Can't use chained ByteBuffers to enqueue");
         }
         enqueue(b[0]);
@@ -265,12 +217,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public String getHostnameAndIPAndPort() {
-        return m_name;
+        return "ImportAdapter";
     }
 
     @Override
     public String getHostnameOrIP() {
-        return m_name;
+        return "ImportAdapter";
     }
 
     @Override

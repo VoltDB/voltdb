@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
 
@@ -56,7 +57,8 @@ public class AsyncBenchmark {
     // Benchmark start time
     long benchmarkStartTS;
 
-    final List<PrintWriter> writers = new ArrayList<PrintWriter>();
+    static final List<PrintWriter> writers = new ArrayList<PrintWriter>();
+    static final AtomicLong finalInsertCount = new AtomicLong(0);
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -203,7 +205,7 @@ public class AsyncBenchmark {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public void runBenchmark() throws Exception {
+    public void runBenchmark(int idx) throws Exception {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
@@ -217,12 +219,13 @@ public class AsyncBenchmark {
 
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
+        long icnt = 0;
         System.out.println("Warming up...");
         final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
         while (warmupEndTime > System.currentTimeMillis()) {
-            PrintWriter writer = writers.get(0);
-            writer.println(String.valueOf(System.nanoTime()));
-            writer.flush();
+            PrintWriter writer = writers.get(idx);
+            writer.println(String.valueOf(icnt));
+            icnt++;
         }
 
         // print periodic statistics to the console
@@ -235,14 +238,15 @@ public class AsyncBenchmark {
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
-            PrintWriter writer = writers.get(0);
-            writer.println(String.valueOf(System.nanoTime()));
-            writer.flush();
+            PrintWriter writer = writers.get(idx);
+            writer.println(String.valueOf(icnt));
+            icnt++;
         }
+        writers.get(0).flush();
 
         // cancel periodic stats printing
         timer.cancel();
-
+        finalInsertCount.addAndGet(icnt);
         // print the summary results
         printResults();
     }
@@ -250,15 +254,17 @@ public class AsyncBenchmark {
     public static class BenchmarkRunner extends Thread {
         private final AsyncBenchmark benchmark;
         private final CountDownLatch cdl;
-        public BenchmarkRunner(AsyncBenchmark bm, CountDownLatch c) {
+        private final int idx;
+        public BenchmarkRunner(AsyncBenchmark bm, CountDownLatch c, int iidx) {
             benchmark = bm;
             cdl = c;
+            idx = iidx;
         }
 
         @Override
         public void run() {
             try {
-                benchmark.runBenchmark();
+                benchmark.runBenchmark(idx);
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
@@ -277,13 +283,13 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(AsyncBenchmark.class.getName(), args);
-        int count = 10;
-        CountDownLatch cdl = new CountDownLatch(count);
-        for (int i = 0; i < count; i++) {
+        CountDownLatch cdl = new CountDownLatch(writers.size());
+        for (int i = 0; i < writers.size(); i++) {
             AsyncBenchmark benchmark = new AsyncBenchmark(config);
-            BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl);
+            BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl, i);
             runner.start();
         }
         cdl.await();
+        System.out.println("Total: " + finalInsertCount.get());
     }
 }

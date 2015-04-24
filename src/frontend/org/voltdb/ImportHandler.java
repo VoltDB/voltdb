@@ -17,14 +17,11 @@
 
 package org.voltdb;
 
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
@@ -34,7 +31,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
-
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -59,17 +56,9 @@ public class ImportHandler {
     private final static AtomicLong m_idGenerator = new AtomicLong(0);
     private final long m_id;
     private final AtomicLong m_pendingCount = new AtomicLong(0);
-    private static final long MAX_PENDING_TRANSACTIONS = 10000;
+    private static final long MAX_PENDING_TRANSACTIONS = 1000;
 
     private class ImportCallback implements ImportClientResponseAdapter.Callback {
-
-        //TODO: This is when we need to callback into the bundle.
-        private final ImportContext m_importerContext;
-        private final ImportHandler m_handler;
-        public ImportCallback(ImportContext importContext, ImportHandler handler) {
-            m_importerContext = importContext;
-            m_handler = handler;
-        }
 
         @Override
         public void handleResponse(ClientResponse response) {
@@ -94,7 +83,6 @@ public class ImportHandler {
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + System.currentTimeMillis(), 2);
         m_importContext = importContext;
         VoltDB.instance().getClientInterface().bindAdapter(m_adapter, null);
-        m_adapter.registerHandler(this);
     }
 
     public long getId() {
@@ -105,6 +93,7 @@ public class ImportHandler {
      * Submit ready for data
      */
     public void readyForData() {
+        m_adapter.registerHandler(this);
         m_es.submit(new Runnable() {
             @Override
             public void run() {
@@ -115,6 +104,8 @@ public class ImportHandler {
     }
 
     public void stop() {
+        //Unregister the handler to stop procesing responses.
+        m_adapter.unregisterHandler(this);
         m_es.submit(new Runnable() {
 
             @Override
@@ -128,7 +119,6 @@ public class ImportHandler {
             }
         });
         try {
-            m_adapter.unregisterHandler(this);
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
         } catch (InterruptedException ex) {
@@ -141,7 +131,6 @@ public class ImportHandler {
         //Handle back pressure....how to count bytes here?
     }
 
-    //Do something fancy with this.
     private ByteBuffer getBuffer(int sz) {
         return DBBPool.allocateDirectAndPool(sz).b();
     }
@@ -153,12 +142,13 @@ public class ImportHandler {
             m_failedCount.incrementAndGet();
             return false;
         }
+        int counter = 1;
+        int maxSleepNano = 100000;
         while (m_pendingCount.get() > MAX_PENDING_TRANSACTIONS) {
             try {
-                Thread.sleep(100);
-            } catch (InterruptedException ex) {
-
-            }
+                int nanos = 500 * counter++;
+                Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
+            } catch (InterruptedException ex) { }
         }
         m_callCount.incrementAndGet();
         final long nowNanos = System.nanoTime();
@@ -175,13 +165,10 @@ public class ImportHandler {
             pset.flattenToBuffer(taskbuf);
             taskbuf.flip();
             task.initFromBuffer(taskbuf);
-            long cbhandle = m_adapter.registerCallback(new ImportCallback(ic, this));
-            task.setClientHandle(cbhandle);
-            //pbuf.clear();
+            taskbuf.clear();
         } catch (IOException ex) {
             m_failedCount.incrementAndGet();
             m_logger.error("Failed to serialize parameters for stream: " + proc, ex);
-            taskbuf.clear();
             return false;
         }
 
@@ -193,7 +180,6 @@ public class ImportHandler {
         if (catProc == null) {
             m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
             m_failedCount.incrementAndGet();
-            taskbuf.clear();
             return false;
         }
         final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)catProc.getAttachment();
@@ -206,27 +192,29 @@ public class ImportHandler {
             } catch (Exception e) {
                 m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
                 m_failedCount.incrementAndGet();
-                taskbuf.clear();
                 return false;
             }
-            //TODO: this should be property
+            //TODO: this should be property or should this be silently handled?
             if (!m_partitions.contains(partition)) {
                 //Not our partition dont do anything.
                 m_unpartitionedCount.incrementAndGet();
-                taskbuf.clear();
                 return false;
             }
         }
-
-        //Submmit the transaction.
-        boolean success = VoltDB.instance().getClientInterface().createTransaction(m_adapter.connectionId(), task,
-                catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
-                task.getSerializedSize(), nowNanos);
+        long cbhandle = m_adapter.registerCallback(new ImportCallback());
+        task.setClientHandle(cbhandle);
+        boolean success;
+        //Synchronize this to create good handles across all ImportHandlers
+        synchronized(ImportHandler.class) {
+            //Submmit the transaction.
+             success = VoltDB.instance().getClientInterface().createTransaction(m_adapter.connectionId(), task,
+                    catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
+                    task.getSerializedSize(), nowNanos);
+        }
         if (success) {
             m_pendingCount.incrementAndGet();
             m_submitSuccessCount.incrementAndGet();
         }
-        taskbuf.clear();
         return success;
     }
 }
