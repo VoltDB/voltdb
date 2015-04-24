@@ -34,7 +34,8 @@ import vmcTest.pages.*
  * This class contains tests of the 'SQL Query' tab of the VoltDB Management
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
-class SqlQueriesTest extends SqlQueriesTestBase {
+
+class SqlQueriesTest extends TestBase {
 
     static final int DEFAULT_NUM_ROWS_TO_INSERT = 2
     static final boolean DEFAULT_INSERT_JSON = false
@@ -65,7 +66,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     @Shared def systemStoredProcsFile  = new File(SYSTEM_STORED_PROCS_FILE)
     @Shared def defaultStoredProcsFile = new File(DEFAULT_STORED_PROCS_FILE)
     @Shared def userStoredProcsFile    = new File(USER_STORED_PROCS_FILE)
-    
+
     @Shared def sqlQueryLines = []
     @Shared def tableLines = []
     @Shared def viewLines  = []
@@ -74,12 +75,12 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     @Shared def userStoredProcLines = []
 
     @Shared def fileLinesPairs = [
-        [sqlQueriesFile, sqlQueryLines],
-        [tablesFile, tableLines],
-        [viewsFile, viewLines],
-        [systemStoredProcsFile, systemStoredProcLines],
-        [defaultStoredProcsFile, defaultStoredProcLines],
-        [userStoredProcsFile, userStoredProcLines],
+            [sqlQueriesFile, sqlQueryLines],
+            [tablesFile, tableLines],
+            [viewsFile, viewLines],
+            [systemStoredProcsFile, systemStoredProcLines],
+            [defaultStoredProcsFile, defaultStoredProcLines],
+            [userStoredProcsFile, userStoredProcLines],
     ]
     @Shared def slurper = new JsonSlurper()
 
@@ -91,15 +92,29 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     def setup() { // called before each test
-        // SqlQueriesTestBase.setup gets called first (automatically)
+        // TestBase.setup gets called first (automatically)
+        int count = 0
 
+        while(count<numberOfTrials) {
+            count ++
+            try{
+                when: 'click the SQL Query link (if needed)'
+                ensureOnSqlQueryPage()
+                then: 'should be on SQL Query page'
+                at SqlQueryPage
+                break
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+
+
+            }
+        }
         // Create tables from the 'genqa' app, needed for testing (e.g.
         // PARTITIONED_TABLE, REPLICATED_TABLE), if they don't already exist
         boolean createdNewTable = false;
         for (int i=0; i < GENQA_TEST_TABLES.size(); i++) {
             if (!createdGenqaTestTable.get(i)) {
                 createdGenqaTestTable.set(i, createTableIfDoesNotExist(page, GENQA_TEST_TABLES.get(i),
-                                                                       GENQA_TEST_TABLE_PARTITION_COLUMN.get(i)))
+                        GENQA_TEST_TABLE_PARTITION_COLUMN.get(i)))
                 createdNewTable = createdNewTable || createdGenqaTestTable.get(i)
             }
         }
@@ -157,31 +172,31 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         if (getTables(sqp).contains(tableName)) {
             return false
         } else {
-            String ddl = 'Create table ' + tableName + ' (\n' + 
-                         '  rowid                     BIGINT        NOT NULL,\n' +
-                         '  rowid_group               TINYINT       NOT NULL,\n' +
-                         '  type_null_tinyint         TINYINT,\n' +
-                         '  type_not_null_tinyint     TINYINT       NOT NULL,\n' +
-                         '  type_null_smallint        SMALLINT,\n' +
-                         '  type_not_null_smallint    SMALLINT      NOT NULL,\n' +
-                         '  type_null_integer         INTEGER,\n' +
-                         '  type_not_null_integer     INTEGER       NOT NULL,\n' +
-                         '  type_null_bigint          BIGINT,\n' +
-                         '  type_not_null_bigint      BIGINT        NOT NULL,\n' +
-                         '  type_null_timestamp       TIMESTAMP,\n' +
-                         '  type_not_null_timestamp   TIMESTAMP     NOT NULL,\n' +
-                         '  type_null_float           FLOAT,\n' +
-                         '  type_not_null_float       FLOAT         NOT NULL,\n' +
-                         '  type_null_decimal         DECIMAL,\n' +
-                         '  type_not_null_decimal     DECIMAL       NOT NULL,\n' +
-                         '  type_null_varchar25       VARCHAR(32),\n' +
-                         '  type_not_null_varchar25   VARCHAR(32)   NOT NULL,\n' +
-                         '  type_null_varchar128      VARCHAR(128),\n' +
-                         '  type_not_null_varchar128  VARCHAR(128)  NOT NULL,\n' +
-                         '  type_null_varchar1024     VARCHAR(1024),\n' +
-                         '  type_not_null_varchar1024 VARCHAR(1024) NOT NULL,\n' +
-                         '  PRIMARY KEY (rowid)\n' +
-                         ');'
+            String ddl = 'Create table ' + tableName + ' (\n' +
+                    '  rowid                     BIGINT        NOT NULL,\n' +
+                    '  rowid_group               TINYINT       NOT NULL,\n' +
+                    '  type_null_tinyint         TINYINT,\n' +
+                    '  type_not_null_tinyint     TINYINT       NOT NULL,\n' +
+                    '  type_null_smallint        SMALLINT,\n' +
+                    '  type_not_null_smallint    SMALLINT      NOT NULL,\n' +
+                    '  type_null_integer         INTEGER,\n' +
+                    '  type_not_null_integer     INTEGER       NOT NULL,\n' +
+                    '  type_null_bigint          BIGINT,\n' +
+                    '  type_not_null_bigint      BIGINT        NOT NULL,\n' +
+                    '  type_null_timestamp       TIMESTAMP,\n' +
+                    '  type_not_null_timestamp   TIMESTAMP     NOT NULL,\n' +
+                    '  type_null_float           FLOAT,\n' +
+                    '  type_not_null_float       FLOAT         NOT NULL,\n' +
+                    '  type_null_decimal         DECIMAL,\n' +
+                    '  type_not_null_decimal     DECIMAL       NOT NULL,\n' +
+                    '  type_null_varchar25       VARCHAR(32),\n' +
+                    '  type_not_null_varchar25   VARCHAR(32)   NOT NULL,\n' +
+                    '  type_null_varchar128      VARCHAR(128),\n' +
+                    '  type_not_null_varchar128  VARCHAR(128)  NOT NULL,\n' +
+                    '  type_null_varchar1024     VARCHAR(1024),\n' +
+                    '  type_not_null_varchar1024 VARCHAR(1024) NOT NULL,\n' +
+                    '  PRIMARY KEY (rowid)\n' +
+                    ');'
             if (partitionColumn) {
                 ddl += '\nPartition table ' + tableName + ' on column ' + partitionColumn + ';'
             }
@@ -330,7 +345,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def upsertInto(SqlQueryPage sqp, List<String> tables, int numToInsert, int minIntValue) {
         insertOrUpsertInto(sqp, tables, numToInsert, minIntValue, 'upsert')
     }
-    
+
     /**
      * Tests the query result format options (which normally are "HTML", "CSV"
      * and "Monospace").
@@ -402,7 +417,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             views = Arrays.asList(testViews.split(','))
         }
         debugPrint "\nViews to test:  " + views
-        
+
         when: 'perform initial count queries on all Tables'
         def cqResults = queryCount(page, tables)
 
@@ -491,7 +506,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         expect: 'List of displayed Tables should match expected list'
         printAndCompare('Tables', TABLES_FILE, isRunningGenqa(page), tableLines, getTables(page))
     }
-    
+
     /**
      * Check that the list of Views displayed on the page matches the expected
      * list (for the 'genqa' test app).
@@ -508,7 +523,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def checkSystemStoredProcs() {
         expect: 'List of displayed System Stored Procedures should match expected list'
         printAndCompare('System Stored Procedures', SYSTEM_STORED_PROCS_FILE, true,
-                        systemStoredProcLines, page.getSystemStoredProcedures())
+                systemStoredProcLines, page.getSystemStoredProcedures())
     }
 
     /**
@@ -518,7 +533,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def checkDefaultStoredProcs() {
         expect: 'List of displayed Default Stored Procedures should match expected list'
         printAndCompare('Default Stored Procedures', DEFAULT_STORED_PROCS_FILE, isRunningGenqa(page),
-                        defaultStoredProcLines, page.getDefaultStoredProcedures())
+                defaultStoredProcLines, page.getDefaultStoredProcedures())
     }
 
     /**
@@ -528,7 +543,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def checkUserStoredProcs() {
         expect: 'List of displayed User Stored Procedures should match expected list'
         printAndCompare('User Stored Procedures', USER_STORED_PROCS_FILE, isRunningGenqa(page),
-                        userStoredProcLines, page.getUserStoredProcedures())
+                userStoredProcLines, page.getUserStoredProcedures())
     }
 
     /**
@@ -568,7 +583,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         then: 'check the error status, and query result'
         expectedResponse.result == qResult
         expectedResponse.status == status
-        
+
         cleanup: 'delete all rows from the tables'
         runQuery(page, 'delete from partitioned_table;\ndelete from replicated_table')
 
@@ -675,30 +690,33 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         page.setQueryText("SELECT * FROM " + tablename)
         then: 'run the query'
         page.runQuery()
-        waitFor(5) {
-            page.cancelpopupquery.isDisplayed()
-            page.okpopupquery.isDisplayed()
-            page.switchadminport.isDisplayed()
-            page.queryexecutionerror.isDisplayed()
-            page.queryerrortxt.isDisplayed()
-        }
-        page.cancelpopupquery.click()
-        println("all popup query verified for selecting data from table!!")
+        try {
+            waitFor(5) {
+                page.cancelpopupquery.isDisplayed()
+                page.okpopupquery.isDisplayed()
+                page.switchadminport.isDisplayed()
+                page.queryexecutionerror.isDisplayed()
+                page.queryerrortxt.isDisplayed()
+            }
+            page.cancelpopupquery.click()
+            println("all popup query verified for selecting data from table!!")
 
-        when: 'set delete query in the box'
-        page.setQueryText(deleteQuery)
-        then: 'run the query'
-        page.runQuery()
-        waitFor(5) {
-            page.cancelpopupquery.isDisplayed()
-            page.okpopupquery.isDisplayed()
-            page.switchadminport.isDisplayed()
-            page.queryexecutionerror.isDisplayed()
-            page.queryerrortxt.isDisplayed()
-        }
-        page.cancelpopupquery.click()
-        println("all popup for query verified for deleting data from table!!")
+            when: 'set delete query in the box'
+            page.setQueryText(deleteQuery)
+            then: 'run the query'
+            page.runQuery()
+            waitFor(5) {
+                page.cancelpopupquery.isDisplayed()
+                page.okpopupquery.isDisplayed()
+                page.switchadminport.isDisplayed()
+                page.queryexecutionerror.isDisplayed()
+                page.queryerrortxt.isDisplayed()
+            }
+            page.cancelpopupquery.click()
+            println("all popup for query verified for deleting data from table!!")
+        }catch(geb.error.RequiredPageContentNotPresent e) {println("element not found")}
 
+        catch(geb.waiting.WaitTimeoutException e) {println("waiting time exceed here")}
     }
 
 

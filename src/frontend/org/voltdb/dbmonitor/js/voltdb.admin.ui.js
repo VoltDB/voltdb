@@ -108,7 +108,6 @@ function loadAdminPage() {
         chkAutoSnapshotValue: $("#chkAutoSnapshot").is(":checked"),
         iconAutoSnapshotOption: $("#autoSnapshotIcon"),
         txtAutoSnapshot: $("#txtAutoSnapshot"),
-        spanAutoSpanEdited: "",
         //File Prefix objects
         tBoxFilePrefix: $("#txtPrefix"),
         tBoxFilePrefixValue: $("#txtPrefix").text(),
@@ -188,7 +187,6 @@ function loadAdminPage() {
         txtDrMaster: $("#txtDrMaster"),
         spanDrMasterEdited: "",
         loadingDrMaster: $("#loadingDrMaster"),
-        drMasterEditedValue: "",
         updateDrMasterErrorFieldMsg: $("#updateDrMasterErrorFieldMsg"),
         drMasterLabel: $("#row-DrConfig").find("td:first-child").text(),
 
@@ -299,12 +297,10 @@ function loadAdminPage() {
     });
 
     adminEditObjects.chkAutoSnapsot.on('ifChanged', function () {
-        adminEditObjects.spanAutoSpanEdited = getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked"));
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked")));
     });
 
     adminEditObjects.chkDrMaster.on('ifChanged', function () {
-        adminEditObjects.drMasterEditedValue = getOnOffText(adminEditObjects.chkDrMaster.is(":checked"));
         adminEditObjects.txtDrMaster.text(getOnOffText(adminEditObjects.chkDrMaster.is(":checked")));
     });
 
@@ -608,7 +604,7 @@ function loadAdminPage() {
                         toggleSecurityEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.securityLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -646,29 +642,6 @@ function loadAdminPage() {
                 toggleSecurityEdit(editStates.ShowEdit);
             });
         }
-    });
-
-
-    $("#loginWarnPopup").popup({
-        afterOpen: function (event, ui, ele) {
-            var popup = $(this)[0];
-
-            $("#btnLoginWarningOk").unbind("click");
-            $("#btnLoginWarningOk").on('click', function () {
-                if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
-                    location.reload(true);
-                }
-
-                if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-                    $("#navDbmonitor").click();
-                }
-
-                $("#navAdmin").hide();
-                popup.close();
-            });
-        },
-        closeContent: '',
-        modal: true
     });
 
     var showUpdateMessage = function (msg) {
@@ -1078,7 +1051,7 @@ function loadAdminPage() {
         adminEditObjects.tBoxFilePrefix.val(adminEditObjects.tBoxFilePrefixValue);
         adminEditObjects.ddlAutoSnapshotFreqUnit.val(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapshotValue));
-
+        VoltDbAdminConfig.isSnapshotEditMode = false;
         if (state == editStates.ShowLoading) {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.iconAutoSnapshotOption.hide();
@@ -1128,6 +1101,7 @@ function loadAdminPage() {
             adminEditObjects.loadingSnapshotPrefix.hide();
             adminEditObjects.loadingSnapshotRetained.hide();
             adminEditObjects.loadingSnapshot.hide();
+            VoltDbAdminConfig.isSnapshotEditMode = true;
         } else {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
@@ -1276,7 +1250,7 @@ function loadAdminPage() {
                         toggleAutoSnapshotEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.snapshotLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -1419,7 +1393,7 @@ function loadAdminPage() {
                         toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.heartbeatTimeoutLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -1550,7 +1524,7 @@ function loadAdminPage() {
                         toggleQueryTimeoutEdit(editStates.ShowEdit);
                         var msg = '"' + adminEditObjects.queryTimeoutFieldLabel + '". ';
                         if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                         } else {
                             msg += "Please try again later.";
                         }
@@ -1604,8 +1578,8 @@ function loadAdminPage() {
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
                 '    <td>Stream</td>' +
-                '    <td width="10%">' +
-                '       <input id="txtStream" name="txtStream" type="text" size="30">' +
+                '    <td width="15%">' +
+                '       <input id="txtStream" name="txtStream" type="text" size="38">' +
                 '       <label id="errorStream" for="txtStream" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td width="8%" align="right"><input type="checkbox" checked="true" id="chkStream" class="chkStream"/></td>' +
@@ -1614,7 +1588,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td>Type </td>' +
                 '    <td>' +
-                '       <input id="txtType" name="txtType" type="text" size="30">' +
+                '       <input id="txtType" name="txtType" type="text" size="38">' +
                 '       <label id="errorType" for="txtType" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
@@ -1646,11 +1620,11 @@ function loadAdminPage() {
                 '                </tr>' +
                 '                <tr>' +
                 '                    <td>' +
-                '                        <input size="15" id="txtName0" name="txtName0" class="newStreamProperty" type="text">' +
+                '                        <input size="15" id="txtName0" name="txtName0" class="newStreamPropertyName newStreamProperty" type="text">' +
                 '                        <label id="errorName0" for="txtName0" class="error" style="display: none;"></label>' +
                 '                    </td>' +
                 '                    <td>' +
-                '                        <input size="15" id="txtValue0" name="txtValue0" class="newStreamProperty" type="text">' +
+                '                        <input size="15" id="txtValue0" name="txtValue0" class="newStreamPropertyValue newStreamProperty" type="text">' +
                 '                        <label id="errorValue0" for="txtValue0" class="error" style="display: none;"></label>' +
                 '                    </td>' +
                 '                    <td><div class="securityDelete" id="delRow0" onclick="deleteRow(this)"></div></td>' +
@@ -1684,11 +1658,11 @@ function loadAdminPage() {
 
                 var newRow = '<tr>' +
                     '   <td>' +
-                    '       <input size="15" id="' + nameId + '" name="' + nameId + '" class="newStreamProperty" type="text">' +
+                    '       <input size="15" id="' + nameId + '" name="' + nameId + '" class="newStreamPropertyName newStreamProperty" type="text">' +
                     '       <label id="errorName' + count + '" for="' + nameId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
-                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newStreamProperty" type="text">' +
+                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newStreamPropertyValue newStreamProperty" type="text">' +
                     '       <label id="errorValue' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td><div class="securityDelete" id="deleteFirstProperty" onclick="deleteRow(this)"></div></td>' +
@@ -1738,9 +1712,9 @@ function loadAdminPage() {
             $("#btnAddConfigSave").unbind("click");
             $("#btnAddConfigSave").on("click", function (e) {
 
-                var newStreamProperties = $(".newStreamProperty");
-                for (var i = 0; i < newStreamProperties.length; i++) {
-                    $(newStreamProperties[i]).rules("add", {
+                var newStreamPropertyNames = $(".newStreamPropertyName");
+                for (var i = 0; i < newStreamPropertyNames.length; i++) {
+                    $(newStreamPropertyNames[i]).rules("add", {
                         required: true,
                         regex: /^[a-zA-Z0-9_\-.]+$/,
                         messages: {
@@ -1792,8 +1766,8 @@ function loadAdminPage() {
                     var newStreamProperties = $(".newStreamProperty");
                     for (var i = 0; i < newStreamProperties.length; i += 2) {
                         newConfig["property"].push({
-                            "name": $(newStreamProperties[i]).val(),
-                            "value": $(newStreamProperties[i + 1]).val(),
+                            "name": encodeURIComponent($(newStreamProperties[i]).val()),
+                            "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
                         });
                     }
 
@@ -1856,7 +1830,7 @@ function loadAdminPage() {
 
                             var msg = '"Export Configuration". ';
                             if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                                msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                             } else if (result.statusstring != "") {
                                 msg += result.statusstring;
                             } else {
@@ -1984,7 +1958,7 @@ function loadAdminPage() {
             $("#btnSaveSecUser").on("click", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
-                var password = $('#txtPassword').val();
+                var password = encodeURIComponent($('#txtPassword').val());
                 var role = $('#selectRole').val();
                 var requestType = "POST";
                 var requestUser = "";
@@ -2021,7 +1995,7 @@ function loadAdminPage() {
                                 }
                                 var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                                    msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                    msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                                 }
                                 else if (result.statusstring != "") {
                                     msg += " " + result.statusstring;
@@ -2058,7 +2032,7 @@ function loadAdminPage() {
 
                                 var msg = errorStatus;
                                 if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                                    msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                    msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
                                 } else if (result.statusstring != "") {
                                     msg += " " + result.statusstring;
                                 } else {
@@ -2157,6 +2131,7 @@ function loadAdminPage() {
         } else {
             adminEditObjects.chkDrMaster.iCheck('uncheck');
         }
+        VoltDbAdminConfig.isDrMasterEditMode = false;
 
         if (state == editStates.ShowOkCancel) {
             adminEditObjects.loadingDrMaster.hide();
@@ -2166,6 +2141,7 @@ function loadAdminPage() {
             adminEditObjects.chkDrMaster.parent().addClass("customCheckbox");
             adminEditObjects.iconDrMasterOption.hide();
             adminEditObjects.txtDrMaster.show();
+            VoltDbAdminConfig.isDrMasterEditMode = true;
         } else if (state == editStates.ShowLoading) {
             adminEditObjects.loadingDrMaster.show();
             adminEditObjects.btnEditDrMasterOk.hide();
@@ -2356,6 +2332,8 @@ function loadAdminPage() {
         this.toggleStates = {};
         this.orgUserList = [];
         this.drReplicaEnabled = true;
+        this.isDrMasterEditMode = false;
+        this.isSnapshotEditMode = false;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue) {
             this.hostId = hostIdvalue;
@@ -2416,7 +2394,8 @@ function loadAdminPage() {
             adminDOMObjects.jsonAPI.removeClass().addClass(getOnOffClass(adminConfigValues.jsonEnabled));
             adminDOMObjects.jsonAPILabel.text(getOnOffText(adminConfigValues.jsonEnabled));
             adminDOMObjects.autoSnapshot.removeClass().addClass(getOnOffClass(adminConfigValues.snapshotEnabled));
-            adminDOMObjects.autoSnapshotLabel.text(adminEditObjects.spanAutoSpanEdited == "" ? getOnOffText(adminConfigValues.snapshotEnabled) : adminConfigValues.spanAutoSpanEdited);
+            if (!VoltDbAdminConfig.isSnapshotEditMode)
+                adminDOMObjects.autoSnapshotLabel.text(getOnOffText(adminConfigValues.snapshotEnabled));
             adminDOMObjects.filePrefix.text(adminConfigValues.filePrefix != null ? adminConfigValues.filePrefix : "");
             adminDOMObjects.frequency.text(adminConfigValues.frequency != null ? adminConfigValues.frequency : "");
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != null ? "Hrs" : "");
@@ -2470,7 +2449,8 @@ function loadAdminPage() {
                 adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
                 adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
                 //adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
-                adminEditObjects.txtDrMaster.text(adminEditObjects.drMasterEditedValue == "" ? getOnOffText(adminConfigValues.drListen) : adminEditObjects.drMasterEditedValue);
+                if (!VoltDbAdminConfig.isDrMasterEditMode)
+                    adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
                 adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
                 if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
                     getDrReplicaStatus(true);

@@ -442,7 +442,9 @@ var loadPage = function (serverName, portid) {
                     location.reload(true);
                 } else {
                     if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-                        $("#navDbmonitor").click();
+                        setTimeout(function () {
+                            $("#navDbmonitor").trigger("click");
+                        }, 500);
                     }
 
                     $("#navAdmin").hide();
@@ -657,7 +659,7 @@ var loadPage = function (serverName, portid) {
                         if (!VoltDbUI.hasPermissionToView)
                             return;
                         else
-                            $("#loginWarningPopupMsg").text("Security settings has been changed. You no longer have permission to view Admin Tab.");
+                            $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view Admin Tab.");
 
                         if (!$("#loginWarningPopup").is(":visible")) {
                             $("#loginWarnPopup").trigger("click");
@@ -694,7 +696,6 @@ var loadPage = function (serverName, portid) {
         });
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
-
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
                 if (replicaDetail.hasOwnProperty(currentServer))
@@ -705,9 +706,9 @@ var loadPage = function (serverName, portid) {
                     if (getCurrentServer() != undefined) {
                         var drResult = drDetails["Details"]["STATUS"];
                         if (drResult != -2) {
-                            VoltDbUI.drEnabled = (drDetails[currentServer]['ENABLED'] != null && drDetails[currentServer]['ENABLED'] != "false") ? true : false;
+                            VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
                             //show master/replica table
-                            if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drEnabled)) {
+                            if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
                                 var userPreference = getUserPreferences();
                                 VoltDbUI.isDRInfoRequired = true;
                                 VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
@@ -722,7 +723,7 @@ var loadPage = function (serverName, portid) {
 
                                 $("#divDrWrapperAdmin").show();
 
-                                if (VoltDbUI.drEnabled) {
+                                if (VoltDbUI.drMasterEnabled) {
                                     $("#drMasterSection").show();
                                     $(".replicaWrapper").css('top', '-27px');
                                     //show master table
@@ -737,12 +738,9 @@ var loadPage = function (serverName, portid) {
                                     if (userPreference["DrReplicationRate"]) {
                                         $("#ChartDrReplicationRate").show();
                                     }
-                                    refreshDrReplicaSection();
-                                    voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
-                                        MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
-                                    });
+                                    refreshDrReplicaSection(graphView, currentTab);
                                     //to show DR Mode and DR tables
-                                    if (VoltDbUI.drEnabled) {
+                                    if (VoltDbUI.drMasterEnabled) {
                                         $("#dbDrMode").text("Both");
                                         $('#drMasterSection').css('display', 'block');
                                     } else {
@@ -754,7 +752,7 @@ var loadPage = function (serverName, portid) {
                                     $('#liDrReplication').css('display', 'none');
                                     $("#ChartDrReplicationRate").hide();
                                     //to show DR Mode
-                                    if (VoltDbUI.drEnabled) {
+                                    if (VoltDbUI.drMasterEnabled) {
                                         $("#dbDrMode").text("Master");
                                         $('#drMasterSection').css('display', 'block');
                                     } else {
@@ -772,6 +770,14 @@ var loadPage = function (serverName, portid) {
                                 $("#ChartDrReplicationRate").hide();
                                 $("#divDrWrapperAdmin").hide();
                             }
+                        } else {
+                            VoltDbUI.isDRInfoRequired = false;
+                            $("#divDrReplication").hide();
+                            $('#liDrReplication').css('display', 'none');
+                            $('#liDrTables').css('display', 'none');
+                            showHideLastLineClass(false);
+                            $("#ChartDrReplicationRate").hide();
+                            $("#divDrWrapperAdmin").hide();
                         }
                     }
                 });
@@ -1127,6 +1133,9 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
             var replicaLatencyMs = 0;
             var replicaLatencyTrans = 0;
+
+            // if (!$.isEmptyObject(response)) {
+            
             for (var key in response) {
 
                 for (var i = 0; i <= response[key].length - 1; i++) {
@@ -1151,12 +1160,12 @@ var loadPage = function (serverName, portid) {
             }
 
             var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
-                                            "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
-                                                    "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                                                    "<th id='Th3' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Total Buffer</th>" +
-                                                    "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
-                                                    "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
-                                                    "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
+                "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
+                "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
+                "<th id='Th3' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Total Buffer</th>" +
+                "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
+                "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
+                "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
             $("#tblMAster_wrapper").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
 
             table = $("#tblDrMAster").DataTable({
@@ -1174,11 +1183,9 @@ var loadPage = function (serverName, portid) {
                         $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
                     }
 
-
                     $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
                 "sDom": '<"clear">ilprtp',
-                "order": [],
                 "aoColumns": [
                     null,
                     { "bSearchable": false },
@@ -1189,9 +1196,9 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
-            if (!$.isEmptyObject(response)) {
-                $("#tblMAster_wrapper").find(".paginationDefault").remove();
-            }
+
+            $("#tblMAster_wrapper").find(".paginationDefault").remove();
+
 
             //Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
@@ -1207,11 +1214,9 @@ var loadPage = function (serverName, portid) {
             $("#tblDrMAster").next().hide();
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
-
-             //$("#tblDrMAster").find(".sorting_asc").removeClass("sorting_asc");
-
-            $("#drMasterSection").find(".pagination").hide();
+            //  }
         });
+
         $('#filterPartitionId').on('keyup', function () {
             table.search(this.value).draw();
         });
@@ -1227,74 +1232,74 @@ var loadPage = function (serverName, portid) {
             var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
 
             var htmlcontent = "";
+            // if (!$.isEmptyObject(response)) {
+            for (var key in response) {
+                htmlcontent = htmlcontent + "<tr>";
+                htmlcontent = htmlcontent + "<td>" + response[key].HOST_ID + "</td>" +
+                    "<td>" + response[key].STATE + "</td>" +
+                    "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
+                    "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
+                htmlcontent = htmlcontent + "</tr>";
 
-            if (!$.isEmptyObject(response)) {
-                for (var key in response) {
-                    htmlcontent = htmlcontent + "<tr>";
-                    htmlcontent = htmlcontent + "<td>" + response[key].HOST_ID + "</td>" +
-                        "<td>" + response[key].STATE + "</td>" +
-                        "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
-                        "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
-                    htmlcontent = htmlcontent + "</tr>";
-
-                }
-
-
-                if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
-                    $("#tblDrReplica").DataTable().destroy();
-                }
-                var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Host ID</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
-                                                   "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
-                                            "<tbody>";
-                $("#drReplicaSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
-
-                replicaTable = $("#tblDrReplica").DataTable({
-                    stateSave: true,
-                    pageLength: 5,
-                    "sPaginationType": "extStyleLF",
-                    "bAutoWidth": false,
-                    "language": {
-                        "zeroRecords": "No data to be displayed"
-                    },
-                    "fnDrawCallback": function () {
-
-                        if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
-                            $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
-                        } else {
-                            $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
-                        }
-
-
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
-                    },
-                    "order": [],
-                    "sDom": '<"clear">ilprtp',
-                    "aoColumns": [
-                        null,
-                        { "bSearchable": false },
-                        { "bSearchable": false },
-                        { "bSearchable": false }
-                    ]
-                });
-
-
-                $("#tblReplica_wrapper").find(".paginationDefault").remove();
-
-
-                //  Customizing DataTables to make it as existing pagination
-                $(".paginate_disabled_previous").html("Prev");
-                $(".paginate_enabled_next").html("Next");
-                $(".paginate_disabled_next").html("Next");
-                $(".paginate_enabled_previous").html("Prev");
-
-                $("#tblDrReplica").next().hide();
-                $("#tblDrReplica_info").hide();
-                $("#tblDrReplica_length").hide();
-
-                //$("#tblDrReplica").find(".sorting_asc").removeClass("sorting_asc");
-
-                $("#drReplicaSection").find(".pagination").hide();
             }
+
+
+            if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
+                $("#tblDrReplica").DataTable().destroy();
+            }
+            var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Host ID</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
+                                               "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
+                                        "<tbody>";
+            $("#drReplicaSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
+
+            replicaTable = $("#tblDrReplica").DataTable({
+                stateSave: true,
+                pageLength: 5,
+                "sPaginationType": "extStyleLF",
+                "bAutoWidth": false,
+                "language": {
+                    "zeroRecords": "No data to be displayed"
+                },
+                "fnDrawCallback": function () {
+
+                    if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                    } else {
+                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                    }
+
+
+                    $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                },
+                "sDom": '<"clear">ilprtp',
+                "aoColumns": [
+                    null,
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false }
+                ]
+            });
+
+
+            $("#tblReplica_wrapper").find(".paginationDefault").remove();
+
+            //  Customizing DataTables to make it as existing pagination
+            $(".paginate_disabled_previous").html("Prev");
+            $(".paginate_enabled_next").html("Next");
+            $(".paginate_disabled_next").html("Next");
+            $(".paginate_enabled_previous").html("Prev");
+
+            $(".paginate_disabled_previous").attr("title", "Previous Page");
+            $(".paginate_enabled_next").attr("title", "Next Page");
+            $(".paginate_disabled_next").attr("title", "Next Page");
+            $(".paginate_enabled_previous").attr("title", "Previous Page");
+            $(".paginate_enabled_previous").attr("title", "Previous Page");
+
+            $("#tblDrReplica").next().hide();
+            $("#tblDrReplica_info").hide();
+            $("#tblDrReplica_length").hide();
+
+            //  }
         });
 
         $('#filterHostID').on('keyup', function () {
@@ -1483,6 +1488,12 @@ var loadPage = function (serverName, portid) {
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').on('click', function () {
         voltDbRenderer.isProcedureSortClicked = true;
         currentProcedureAction = VoltDbUI.ACTION_STATES.SORT;
+
+        if (this.id != 'PROCEDURE') {
+            $("#tblStoredProcedures").find('#PROCEDURE').attr('data-name', 'none');
+            $("#tblStoredProcedures").find('#PROCEDURE').removeAttr('class');
+        }
+
         if (VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.NONE || VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.SORTED) {
             if ($(this).data('name') == "none") {
                 $(this).data('name', 'ascending');
@@ -1588,6 +1599,11 @@ var loadPage = function (serverName, portid) {
     $('#TABLE_NAME,#TUPLE_COUNT,#MAX_ROWS,#MIN_ROWS,#AVG_ROWS,#TABLE_TYPE').unbind('click');
     $('#TABLE_NAME,#TUPLE_COUNT,#MAX_ROWS,#MIN_ROWS,#AVG_ROWS,#TABLE_TYPE').on('click', function () {
         voltDbRenderer.isTableSortClicked = true;
+
+        if (this.id != 'TABLE_NAME') {
+            $("#tblDataTables").find('#TABLE_NAME').attr('data-name', 'none');
+            $("#tblDataTables").find('#TABLE_NAME').removeAttr('class');
+        }
         if (VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.NONE || VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.SORTED) {
             if ($(this).data('name') == "none") {
                 $(this).data('name', 'ascending');
@@ -1606,9 +1622,9 @@ var loadPage = function (serverName, portid) {
 
             //apply css to display sort arrow image
             if ($(this).hasClass("sorttable_sorted")) {
-                if (this.id == voltDbRenderer.tableSortColumn)
+                if (this.id == voltDbRenderer.tableSortColumn) {
                     $("#" + voltDbRenderer.tableSortColumn).data('name', 'descending');
-                else
+                } else
                     $("#" + voltDbRenderer.tableSortColumn).data('name', 'none');
 
 
@@ -1987,7 +2003,7 @@ var adjustGraphSpacing = function () {
     var iVoltDbUi = (function () {
         this.isSchemaTabLoading = false;
         this.isFirstHit = true;
-        this.drEnabled = false;
+        this.drMasterEnabled = false;
         this.drStatus = '';
         this.drReplicationRole = "NONE";
         this.isDRInfoRequired = false;

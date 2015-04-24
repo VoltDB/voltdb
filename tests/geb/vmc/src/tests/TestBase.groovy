@@ -26,11 +26,20 @@ package vmcTest.tests
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.List
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+
 import geb.Page
 import geb.spock.GebReportingSpec
+
 import org.junit.Rule
 import org.junit.rules.TestName
 import org.openqa.selenium.Dimension
+
 import spock.lang.Shared
 import vmcTest.pages.*
 
@@ -45,7 +54,8 @@ class TestBase extends GebReportingSpec {
     static final boolean DEFAULT_DEBUG_PRINT = false
     static final int DEFAULT_WINDOW_WIDTH  = 1500
     static final int DEFAULT_WINDOW_HEIGHT = 1000
-    static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    static final int MAX_SECS_WAIT_FOR_PAGE = 60
+    static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
 
 	static int numberOfTrials 	= 20
 	static int waitTime 		= 30
@@ -53,6 +63,8 @@ class TestBase extends GebReportingSpec {
 	
     static Boolean doesDBMonitorPageOpenFirst = null
     @Shared boolean firstDebugMessage = true
+
+    private static final ExecutorService executor = Executors.newFixedThreadPool(5);
 
     def setupSpec() { // called once (per test class), before any tests
         // If the window is not the right size, resize it
@@ -82,14 +94,60 @@ class TestBase extends GebReportingSpec {
             doesDBMonitorPageOpenFirst = page.isDbMonitorPageOpen()
             debugPrint 'DB Monitor page was opened initially: ' + doesDBMonitorPageOpenFirst + ' [in TestBase.setup()]'
         }
+    }
 
+    /**
+     * If already on the VoltDBManagementCenterPage, do nothing; otherwise,
+     * point the browser to the VoltDBManagementCenterPage's URL; if it does
+     * not work the first time, allow a second attempt.
+     */
+    def ensureOnVoltDBManagementCenterPage() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            // Attempt to catch any problems here, including a failure due
+            // to the VoltDBManagementCenterPage not being shown, or a hang
+            // (waiting for the browser/VMC to come up, I suspect)
+            try {
+                debugPrint 'Attempting to reach VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
+                waitForVoltDBManagementCenterPage()
+                debugPrint 'Succeeded:  reached VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
+            } catch (Throwable e) {
+                // If an exception is encountered, make a second attempt
+                String message = '\nCaught an exception attempting to reach VoltDBManagementCenterPage ' +
+                                 '[in TestBase.ensureOnVoltDBManagementCenterPage()]'
+                System.err.println message + ':'
+                e.printStackTrace()
+                println message + '; see Standard error for details.'
+                println 'Will refresh page and try again... (' + sdf.format(new Date()) + ')'
+                driver.navigate().refresh()
+                waitForVoltDBManagementCenterPage()
+                println '... second attempt succeeded, at :  ' + sdf.format(new Date())
+            }
+        }
         page.loginIfNeeded()
     }
 
-    def ensureOnVoltDBManagementCenterPage() {
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            to VoltDBManagementCenterPage
-        }
+    /**
+     * Point the browser to the VoltDBManagementCenterPage's URL, using a
+     * FutureTask with a time limit, so that this will not hang.
+     */
+    def waitForVoltDBManagementCenterPage() {
+        Future<VoltDBManagementCenterPage> toVMCPage = new FutureTask(new Callable() {
+            @Override
+            public VoltDBManagementCenterPage call() {
+                return toVoltDBManagementCenterPage();
+            }})
+        executor.execute(toVMCPage)
+        toVMCPage.get(MAX_SECS_WAIT_FOR_PAGE, TimeUnit.SECONDS)
+    }
+
+    /**
+     * Point the browser to the VoltDBManagementCenterPage; this is a separate
+     * method only so that it can be called via a FutureTask, and therefore
+     * killed if it exceeds the maximum time, since otherwise it sometimes
+     * hangs (when run on Jenkins).
+     */
+    private VoltDBManagementCenterPage toVoltDBManagementCenterPage() {
+        to VoltDBManagementCenterPage
     }
 
     /**
@@ -215,13 +273,6 @@ class TestBase extends GebReportingSpec {
     }
 
     def cleanupSpec() {
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            when: 'Open VMC page'
-            ensureOnVoltDBManagementCenterPage()
-            then: 'to be on VMC page'
-            at VoltDBManagementCenterPage
-        }
-
-        page.loginIfNeeded()
+        
     }
 }

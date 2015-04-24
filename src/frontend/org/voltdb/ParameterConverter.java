@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -224,7 +225,7 @@ public class ParameterConverter {
         System.err.flush();*/
 
         // Get blatant null out of the way fast, as it avoids some inline checks
-        // There are some suble null values that aren't java null coming up, but wait until
+        // There are some subtle null values that aren't java null coming up, but wait until
         // after the basics to check for those.
         if (param == null) {
             return nullValueForType(expectedClz);
@@ -271,16 +272,25 @@ public class ParameterConverter {
             if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(expectedClz);
         }
         else if (inputClz == String.class) {
-            if (((String) param).equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
+            String stringParam = (String)param;
+            if (stringParam.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
             else if (expectedClz == String.class) return param;
             // Hack allows hex-encoded strings to be passed into byte[] params
             else if (expectedClz == byte[].class) {
-                return Encoder.hexDecode((String) param);
+                // regular expressions can be expensive, so don't invoke SQLParser
+                // unless the param really looks like an x-quoted literal
+                if (stringParam.startsWith("X") || stringParam.startsWith("x")) {
+                    String hexDigits = SQLParser.getDigitsFromHexLiteral(stringParam);
+                    if (hexDigits != null) {
+                        stringParam = hexDigits;
+                    }
+                }
+                return Encoder.hexDecode(stringParam);
             }
             // We allow all values to be passed as strings for csv loading, json, etc...
             // This code handles primitive types. Complex types come later.
             if (expectedClz.isPrimitive()) {
-                return convertStringToPrimitive((String) param, expectedClz);
+                return convertStringToPrimitive(stringParam, expectedClz);
             }
         }
         else if (inputClz == byte[].class) {

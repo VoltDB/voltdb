@@ -302,7 +302,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             }
         }
 
-        if ((neededType == VoltType.FLOAT) || (neededType == VoltType.DECIMAL)) {
+        if ((neededType == VoltType.FLOAT || neededType == VoltType.DECIMAL)
+                && getValueType() != VoltType.VARBINARY) {
             if (m_valueType == null ||
                     (m_valueType != VoltType.NUMERIC && ! m_valueType.isExactNumeric())) {
                 try {
@@ -318,7 +319,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             return;
         }
 
-        if (neededType.isInteger()) {
+        if (neededType.isInteger() && getValueType() != VoltType.VARBINARY) {
             long value = 0;
             try {
                 value = Long.parseLong(getValue());

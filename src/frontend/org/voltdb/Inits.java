@@ -546,33 +546,6 @@ public class Inits {
         }
     }
 
-    /**
-     * Set the port used for replication.
-     * Command line is highest precedence, followed by deployment xml,
-     * finally followed by the default value of 5555.
-     *
-     */
-    class PickReplicationPort extends InitWork {
-        PickReplicationPort() {
-        }
-
-        @Override
-        public void run() {
-            int replicationPort = VoltDB.DEFAULT_DR_PORT;
-            if (m_deployment.getDr() != null) {
-                // set the replication port from the deployment file
-                replicationPort = m_deployment.getDr().getPort();
-            }
-
-            // allow command line override
-            if (m_config.m_drAgentPortStart > 0)
-                replicationPort = m_config.m_drAgentPortStart;
-
-            // other places use config to figure out the port
-            m_config.m_drAgentPortStart = replicationPort;
-        }
-    }
-
     class SetupReplicationRole extends InitWork {
         SetupReplicationRole() {
         }

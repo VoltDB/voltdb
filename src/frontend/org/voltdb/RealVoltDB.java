@@ -38,6 +38,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -166,9 +167,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.2";
+    static final String m_defaultVersionString = "5.2EA2";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.2EA2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1588,8 +1589,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             String[] zkInterface = m_config.m_zkInterface.split(":");
             stringer.key("zkPort").value(zkInterface[1]);
             stringer.key("zkInterface").value(zkInterface[0]);
-            stringer.key("drPort").value(m_config.m_drAgentPortStart);
-            stringer.key("drInterface").value(m_config.m_drInterface);
+            stringer.key("drPort").value(VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
+            stringer.key("drInterface").value(VoltDB.getDefaultReplicationInterface());
             stringer.key("publicInterface").value(m_config.m_publicInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
@@ -1712,6 +1713,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         for (String line : lines) {
             hostLog.info(line.trim());
         }
+        hostLog.info("The internal DR cluster timestamp is " +
+                    new Date(m_clusterCreateTime).toString() + ".");
 
         final ZooKeeper zk = m_messenger.getZK();
         ZKUtil.ByteArrayCallback operationModeFuture = new ZKUtil.ByteArrayCallback();
@@ -2186,7 +2189,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
             // 6.1. If we are a DR master, update the DR table signature hash
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.updateCatalog(m_catalogContext);
+                m_nodeDRGateway.updateCatalog(m_catalogContext,
+                        VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
             }
 
             new ConfigLogging().logCatalogAndDeployment();
@@ -2605,11 +2609,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private void prepareReplication() {
         try {
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled());
+                m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled(),
+                        VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
+                        VoltDB.getDefaultReplicationInterface());
             }
             if (m_consumerDRGateway != null) {
-                // TODO: don't always request a snapshot
-                m_consumerDRGateway.initialize(false);
+                m_consumerDRGateway.initialize(m_config.m_startAction.doesRecover());
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
@@ -2832,5 +2837,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Override
     public void setClusterCreateTime(long clusterCreateTime) {
         m_clusterCreateTime = clusterCreateTime;
+        hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
+                new Date(m_clusterCreateTime).toString() + ".");
     }
 }

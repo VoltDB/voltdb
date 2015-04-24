@@ -47,14 +47,14 @@ import org.voltdb.utils.Encoder;
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final Database m_database;
-    final Cluster m_cluster;
-    final HSQLInterface m_hsql;
-    final byte[] m_catalogHash;
-    final AdHocCompilerCache m_cache;
-    static PlannerStatsCollector m_plannerStats;
+    private final Database m_database;
+    private final Cluster m_cluster;
+    private final HSQLInterface m_hsql;
+    private final byte[] m_catalogHash;
+    private final AdHocCompilerCache m_cache;
+    private static PlannerStatsCollector m_plannerStats;
 
-    public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
+    private static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
     public PlannerTool(final Cluster cluster, final Database database, byte[] catalogHash)
     {
@@ -88,13 +88,15 @@ public class PlannerTool {
         hostLog.debug("hsql loaded");
 
         // Create and register a singleton planner stats collector, if this is the first time.
-        // In mock test environments there may be no stats agent.
-        synchronized (this) {
-            if (m_plannerStats == null) {
-                final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
-                if (statsAgent != null) {
-                    m_plannerStats = new PlannerStatsCollector(-1);
-                    statsAgent.registerStatsSource(StatsSelector.PLANNER, -1, m_plannerStats);
+        if (m_plannerStats == null) {
+            synchronized (this.getClass()) {
+                if (m_plannerStats == null) {
+                    final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
+                    // In mock test environments there may be no stats agent.
+                    if (statsAgent != null) {
+                        m_plannerStats = new PlannerStatsCollector(-1);
+                        statsAgent.registerStatsSource(StatsSelector.PLANNER, -1, m_plannerStats);
+                    }
                 }
             }
         }
