@@ -755,7 +755,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("does not support WHERE clauses containing only constants") > 0);
             }
-
             adHocQuery = "ROLLBACK;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);

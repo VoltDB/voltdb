@@ -352,7 +352,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 T1 where (select ID from R2 T2 where ID = 3) IN " +
                 "(SELECT ID FROM R2 T3 where T3.ID  = 3) ").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}, {4}, {5}});
 
         // Cardinality error
@@ -448,7 +447,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 ////                    "          order by dept DESC " +
                     "        ) " +
                     "group by dept;").getResults()[0];
-            /* enable for debug */ System.out.println(vt);
+            //* enable for debug */ System.out.println(vt);
             validateTableOfLongs(vt, new long[][] {{1,10}});
 
 
@@ -456,7 +455,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     " group by dept " +
                     " having max(wage) in (select wage from R1) order by dept desc";
             /* enable for debug */ vt = client.callProcedure("@Explain", sql).getResults()[0];
-            /* enable for debug */ System.out.println(vt);
+            //* enable for debug */ System.out.println(vt);
             //TODO: Whatever @Explain is testung here should be covered in a planner test instead.
             assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
 
@@ -467,7 +466,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
             sql = "select dept from " + tb + " group by dept " +
                     " having max(wage) + 1 - 1 in (select wage from R1) order by dept desc";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{2}, {1} });
 
             // subquery with having
@@ -536,7 +535,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "select ID from " + tb + " where ID in " +
                             "( SELECT ID from R1 WHERE ID > 2 " +
                             " EXCEPT SELECT ID from R2 WHERE ID <= 2);").getResults()[0];
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] {{3}, {4}, {5}});
         }
     }
@@ -782,28 +781,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where exists " +
                 "( select WAGE from R1 where R1.WAGE = R2.WAGE);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{202}});
 
         // R2.202 and R1.101 have the same WAGE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where not exists " +
                 "( select WAGE from R1 where R1.WAGE = R2.WAGE);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{200}, {201}, {203}});
 
         // NULL not equal NULL, R2.200 and R2.203 have NULL WAGE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 RR2 where exists " +
                 "( select 1 from R2 where RR2.WAGE = R2.WAGE);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{201}, {202}});
 
         // NULL not equal NULL, R2.200 and R2.203 have NULL WAGE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 RR2 where RR2.WAGE in " +
                 "( select WAGE from R2 limit 4 offset 1);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{201}, {202}});
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 RR2 where RR2.WAGE =ANY " +
@@ -813,7 +808,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where (WAGE in " +
                 "( select WAGE from R1 limit 4 offset 1)) is null;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{200}, {203}});
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where (WAGE =ANY " +
@@ -1029,30 +1023,25 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where ID = 2) FROM R1 where R1.ID < 3 order by R1.ID desc;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {2, 1, 2}, {1, 1, 2} });
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where ID = ?) FROM R1 where R1.ID < 3 order by R1.ID desc;", 2).getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {2, 1, 2}, {1, 1, 2} });
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where R2.ID = R1.ID and R2.WAGE = 50) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {  {5l, 2l, 5l}, {4l, 2l, Long.MIN_VALUE} });
 
         // Seq scan
         vt = client.callProcedure("@AdHoc",
                 "select R1.DEPT, (SELECT ID FROM R2 where R2.ID = 1) FROM R1 where R1.DEPT = 2;").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1} });
 
         try {
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
         } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
             String errMsg = (isHSQL()) ? "cardinality violation" :
                 "More than one row returned by a scalar/row subquery";
             assertTrue(ex.getMessage().contains(errMsg));
@@ -1068,93 +1057,77 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // Index Scan
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.ID = (SELECT ID FROM R2 where ID = ?);", 2).getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {2} });
 
         // Index Scan correlated
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.ID = (SELECT ID/2 FROM R2 where ID = R1.ID * 2);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {1}, {2} });
 
         // Seq Scan
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.DEPT = (SELECT DEPT FROM R2 where ID = ?);", 1).getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
 
         // Seq Scan correlated
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.DEPT = (SELECT DEPT FROM R2 where ID = R1.ID * 2);").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {1} });
 
         // Different comparison operators
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.DEPT > (SELECT DEPT FROM R2 where ID = 3);").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {4}, {5} });
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where (SELECT DEPT FROM R2 where ID = 3) != R1.DEPT;").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {4}, {5} });
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.DEPT >= ALL (SELECT DEPT FROM R2);").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {4}, {5} });
 
         // Index scan
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.ID > ALL (SELECT ID FROM R2 WHERE R2.ID < 4);").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {4}, {5} });
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.ID >= ALL (SELECT ID FROM R2 order by ID asc);").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {5} });
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.ID >= ALL (SELECT ID FROM R2 order by ID desc);").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {5} });
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID FROM R1 where R1.ID <= ALL (SELECT ID FROM R2 order by ID desc);").getResults()[0];
-                System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {1} });
 
         // NLIJ
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {4, 1} });
 
         // @TODO NLIJ correlated
         vt = client.callProcedure("@AdHoc",
                 "select R2.ID, R2.ID FROM R1, R2 where R2.ID = (SELECT id FROM R2 where ID = R1.ID);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {1, 1}, {2,2}, {3,3}, {4,4}, {5,5} });
 
         // NLJ
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {4, 1} });
 
         // NLJ correlated
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R2.ID FROM R1, R2 where R2.DEPT = (SELECT DEPT FROM R2 where ID = R1.ID + 4);").getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {1, 4}, {1,5} });
 
         // Having
         vt = client.callProcedure("@AdHoc",
                 "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
                         "(select R2.ID from R2 where R2.ID = ?);", 2).getResults()[0];
-        System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {5} });
 
         // Having correlated -- parent TVE in the aggregated child expression
@@ -1162,7 +1135,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                     "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
                     "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {5} });
         } catch (ProcCallException ex) {
             System.out.println(ex.getMessage());
@@ -1199,75 +1171,61 @@ public class TestSubQueriesSuite extends RegressionSuite {
             // R1 2,  10,  1 = R2 4,  10,  1
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) = (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {2} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) != (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1}, {3} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) > (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {3} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) < (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) >= (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {2}, {3} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) <= (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1}, {2} });
 
             // R1 2,  10,  1 = R2 4,  10,  1 and 5,  10,  1
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) =ALL (SELECT WAGE, DEPT FROM R2 where ID in (4,5));").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {2} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) =ALL (SELECT WAGE, DEPT FROM R2);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { });
 
             // R1 3,  10,  2 >= ALL R2 except R2.7
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where ID = 3 and (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2 where ID < 7 ORDER BY WAGE, DEPT DESC);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {3} });
 
             // R1 3,  10,  2 < R2 except R2.7 50 2
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.DEPT, R1.TM) < ALL (SELECT DEPT, TM FROM R2);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.DEPT, R1.TM) <= ALL (SELECT DEPT, TM FROM R2);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1}, {2} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.DEPT, R1.TM) <= ALL (SELECT DEPT, TM FROM R2 ORDER BY DEPT, TM ASC);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1}, {2} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.DEPT, R1.TM) <= ALL (SELECT DEPT, TM FROM R2 ORDER BY DEPT, TM DESC);").getResults()[0];
-            System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1}, {2} });
 
         }
