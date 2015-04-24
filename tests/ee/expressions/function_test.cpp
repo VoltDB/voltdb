@@ -71,19 +71,22 @@ using namespace voltdb;
 struct FunctionTest : public Test {
         FunctionTest() :
                 Test(),
+                m_pool(new Pool()),
                 m_executorContext(new ExecutorContext(0,
                                                       0,
                                                       (UndoQuantum *)0,
                                                       (Topend *)0,
-                                                      new Pool(),
+                                                      m_pool,
                                                       (VoltDBEngine *)0,
                                                       "localhost",
                                                       0,
                                                       (DRTupleStream *)0,
                                                       (DRTupleStream *)0)) {}
         ~FunctionTest() {
+                delete m_pool;
                 delete m_executorContext;
         }
+        Pool            *m_pool;
         ExecutorContext *m_executorContext;
 };
 
