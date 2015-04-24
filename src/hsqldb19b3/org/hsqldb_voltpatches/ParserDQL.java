@@ -1817,13 +1817,25 @@ public class ParserDQL extends ParserBase {
                             return null;
                         }
 
-                        /************************* Volt DB Extensions *************************/
-                        if (sq.queryExpression.isSingleColumn()) {
-                            return new Expression(OpTypes.SCALAR_SUBQUERY, sq);
+                        // A VoltDB extension to adapt to the hsqldb 2.3.2 change for fuller subquery support.
+                        SubQuery td = sq;
+                        // End of VoltDB extension
+                        // BEGIN Cherry-picked code change from hsqldb-2.3.2
+                        if (td.queryExpression.isSingleColumn()) {
+                            e = new Expression(OpTypes.SCALAR_SUBQUERY, td);
                         } else {
-                            return new Expression(OpTypes.ROW_SUBQUERY, sq);
+                            e = new Expression(OpTypes.ROW_SUBQUERY, td);
                         }
-                        /**********************************************************************/
+
+                        return e;
+                        /* Disable 5 lines ...
+                        if (!sq.queryExpression.isSingleColumn()) {
+                            throw Error.error(ErrorCode.W_01000);
+                        }
+
+                        return new Expression(OpTypes.SCALAR_SUBQUERY, sq);
+                        ... disabled 5 lines. */
+                        // END Cherry-picked code change from hsqldb-2.3.2
 
                     default :
                         rewind(position);

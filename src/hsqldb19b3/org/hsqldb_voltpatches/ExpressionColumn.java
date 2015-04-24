@@ -239,8 +239,7 @@ public class ExpressionColumn extends Expression {
 
     void collectObjectNames(Set set) {
 
-        /************************* Volt DB Extensions *************************/
-        // Implementation is taken from the HSQL 2.3.0
+        // BEGIN Cherry-picked code change from hsqldb-2.3.2
         switch (opType) {
 
             case OpTypes.SEQUENCE :
@@ -270,7 +269,22 @@ public class ExpressionColumn extends Expression {
 
                 return;
         }
-        /**********************************************************************/
+        /* Disable 13 lines
+        if (opType == OpTypes.SEQUENCE) {
+            HsqlName name = ((NumberSequence) valueData).getName();
+
+            set.add(name);
+
+            return;
+        }
+
+        set.add(column.getName());
+
+        if (column.getName().parent != null) {
+            set.add(column.getName().parent);
+        }
+        ... disabled 13 lines */
+        // END Cherry-picked code change from hsqldb-2.3.2
     }
 
     String getColumnName() {

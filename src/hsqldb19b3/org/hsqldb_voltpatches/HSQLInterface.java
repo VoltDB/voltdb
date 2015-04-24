@@ -406,7 +406,7 @@ public class HSQLInterface {
     /**
      * Take an equality-test expression that represents in-list
      * and munge it into the simpler thing we want to output
-     * to the ParsedExrpession classes.
+     * to the AbstractParsedStmt for its AbstractExpression classes.
      */
     private void inFixup(VoltXMLElement inElement) {
         // make this an in expression

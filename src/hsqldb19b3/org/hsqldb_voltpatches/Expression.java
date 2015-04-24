@@ -579,12 +579,12 @@ public class Expression {
     boolean isComposedOf(OrderedHashSet expressions,
                          OrderedIntHashSet excludeSet) {
 
-        /************************* Volt DB Extensions *************************/
+        // BEGIN Cherry-picked code change from hsqldb-2.3.2
         if (opType == OpTypes.VALUE || opType == OpTypes.DYNAMIC_PARAM
                 || opType == OpTypes.PARAMETER || opType == OpTypes.VARIABLE) {
             return true;
         }
-        /**********************************************************************/
+        // END Cherry-picked code change from hsqldb-2.3.2
 
         if (excludeSet.contains(opType)) {
             return true;
