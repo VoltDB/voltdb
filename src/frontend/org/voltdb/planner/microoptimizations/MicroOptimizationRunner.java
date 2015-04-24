@@ -29,7 +29,7 @@ public class MicroOptimizationRunner {
     static {
         // The orders here is important
         optimizations.add(new PushdownLimits());
-        optimizations.add(new ReplaceWithIndexCounter());
+//        optimizations.add(new ReplaceWithIndexCounter());
         optimizations.add(new ReplaceWithIndexLimit());
 
         // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.

@@ -40,7 +40,7 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
+CTX.CPPFLAGS += """-Wall -Wextra -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
@@ -428,6 +428,7 @@ if whichtests in ("${eetestsuite}", "structures"):
      CompactingMapIndexCountTest
      CompactingHashTest
      CompactingPoolTest
+     benchmarkTest
     """
 
 if whichtests in ("${eetestsuite}", "plannodes"):
