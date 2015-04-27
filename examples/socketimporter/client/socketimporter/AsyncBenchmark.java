@@ -117,7 +117,7 @@ public class AsyncBenchmark {
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    PrintWriter connectToOneServerWithRetry(String server, int port) {
+    static PrintWriter connectToOneServerWithRetry(String server, int port) {
         int sleep = 1000;
         while (true) {
             try {
@@ -142,7 +142,7 @@ public class AsyncBenchmark {
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    void connect(String servers) throws InterruptedException {
+    static void connect(String servers) throws InterruptedException {
         System.out.println("Connecting to Socket Streaming Interface...");
 
         String[] serverArray = servers.split(",");
@@ -209,9 +209,6 @@ public class AsyncBenchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
-
-        // connect to one or more servers, loop until success
-        connect(config.servers);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
@@ -283,6 +280,10 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(AsyncBenchmark.class.getName(), args);
+
+        // connect to one or more servers, loop until success
+        connect(config.servers);
+
         CountDownLatch cdl = new CountDownLatch(writers.size());
         for (int i = 0; i < writers.size(); i++) {
             AsyncBenchmark benchmark = new AsyncBenchmark(config);

@@ -100,6 +100,10 @@
         <level value="INFO"/>
     </logger -->
 
+    <!-- logger name="DBBPOOL">
+        <level value="TRACE"/>
+    </logger -->
+
     <!-- Always let CSVLoader and its ilk to write to the console. -->
     <logger name="CSVLOADER">
         <level value="INFO"/>
