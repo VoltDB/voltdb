@@ -39,13 +39,13 @@ A key feature of VoltDB is the ability to partition both the data and the stored
 
 Although a simple application like Hello World does not need partitioning, it is a good thing to learn how to do it. So let’s go ahead and remove any existing data in the table and add the following PARTITION TABLE statement to your schema. We will partition on the language; that is, the DIALECT column. So start sqlcmd and type the following statements:
 
-	 DELETE * FROM Helloworld;
+      TRUNCATE TABLE Helloworld;
       PARTITION TABLE Helloworld ON COLUMN Dialect;
 
-Note that the partitioning is automatic and transparent to simple queries. For example, you can access the database by repeating your earlier queries:
+Note that the partitioning is automatic and transparent to ad hoc queries. For example, you can access the database by repeating your earlier queries:
 
-	INSERT INTO helloworld VALUES ('Hello','World','English');
-	SELECT hello, world FROM helloworld WHERE dialect='English';
+      INSERT INTO helloworld VALUES ('Hello','World','English');
+      SELECT hello, world FROM helloworld WHERE dialect='English';
 
 USING STORED PROCEDURES
 =======================
@@ -66,7 +66,7 @@ In the simplest case, a single query, you can define the stored procedure in the
 
 Note the use of question marks as placeholders where specific arguments passed in as parameters to the stored procedure will be inserted.
 
-For more complex stored procedures. which involve multiple queries and other processing, you can write the stored procedure using Java. Even if you are not familiar with Java, VoltDB stored procedures can be easy to write since they all follow the same basic structure. See the Using VoltDB manual for more information.
+For more complex stored procedures, which involve multiple queries and other processing, you can write the stored procedure using Java. Even if you are not familiar with Java, VoltDB stored procedures can be easy to write since they all follow the same basic structure. See the Using VoltDB manual for more information.
 
 
 WRITING THE CLIENT APPLICATION
@@ -86,7 +86,7 @@ All that’s left to do is compile the client application (setting CLASSPATH to 
 	export CLASSPATH=.:../../../voltdb/*
 	javac Client.java
 
-To see the full application in action, we can start with a fresh copy database. From the shell prompt use the “voltadmin shutdown” command to stop the current database. You can then create a new database and once it is running, use the sqlcmd utility to load the schema (provided in the file hello world.sql). Then run the client application:
+To see the full application in action, we can start with a fresh copy of the database. From the shell prompt use the “voltadmin shutdown” command to stop the current database. You can then create a new database and once it is running, use the sqlcmd utility to load the schema (provided in the file hello world.sql). Then run the client application:
 
 	$ voltdb create &
 	$ sqlcmd < helloworld.sql
