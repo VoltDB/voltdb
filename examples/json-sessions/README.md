@@ -29,7 +29,7 @@ run.sh actions
 * *run.sh* : start the server
 * *run.sh server* : start the server
 * *run.sh init* : load the schema and stored procedures
-* *run.sh srccompile* : compile all Java clients and stored procedures
+* *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
 * *run.sh client* : start the client, more than 1 client is permitted
 - *run.sh clean* : remove compilation and runtime artifacts
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
