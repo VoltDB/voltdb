@@ -21,6 +21,8 @@ import java.util.ArrayList;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.ParsedSelectStmt.LimitOffset;
+import org.voltdb.plannodes.LimitPlanNode;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
@@ -33,6 +35,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT_ALL,
         EXCEPT
     };
+
+    // Limit plan node information.
+    LimitOffset m_limitOffset = new LimitOffset();
 
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
@@ -52,11 +57,38 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         // Set operation type
         m_unionType = UnionType.valueOf(type);
 
-        assert(stmtNode.children.size() == m_children.size());
-        int i = 0;
-        for (VoltXMLElement selectSQL : stmtNode.children) {
-            AbstractParsedStmt nextSelectStmt = m_children.get(i++);
-            nextSelectStmt.parse(selectSQL);
+        int selectCounter = 0;
+        VoltXMLElement limitElement = null, offsetElement = null, orderbyElement = null;
+        for (VoltXMLElement child : stmtNode.children) {
+            if (SELECT_NODE_NAME.equals(child.name) ||
+                    UNION_NODE_NAME.equals(child.name)) {
+                assert(selectCounter < m_children.size());
+                AbstractParsedStmt nextStmt = m_children.get(selectCounter++);
+                nextStmt.parse(child);
+            } else if (child.name.equalsIgnoreCase("limit")) {
+                limitElement = child;
+            } else if (child.name.equalsIgnoreCase("offset")) {
+                offsetElement = child;
+            } else if (child.name.equalsIgnoreCase("ordercolumns")) {
+                orderbyElement = child;
+            }
+
+        }
+        // Parse LIMIT/OFFSET
+        ParsedSelectStmt.parseLimitAndOffset(limitElement, offsetElement, m_limitOffset);
+//        // Parse ORDER BY
+//        ArrayList<ParsedColInfo> orderColumns = null;
+//        if (orderbyElement != null) {
+//            // Create a fake ParsedSelectStmt to parse the order by columns
+//            ParsedSelectStmt parsedSelectStmt = new ParsedSelectStmt(m_paramValues, m_db);
+//            parsedSelectStmt.parseOrderColumns(orderbyElement, false);
+//            // Copy order by columns back to the union statement
+//            orderColumns.addAll(parsedSelectStmt.orderByColumns());
+//        }
+
+        // prepare the limit plan node if it needs one.
+        if (hasLimitOrOffset()) {
+            ParsedSelectStmt.prepareLimitPlanNode(this, m_limitOffset);
         }
     }
 
@@ -68,23 +100,25 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
         m_tableList.clear();
+        // Parse parameters first to satisfy a dependency of expression parsing
+        // which happens during table scan parsing.
+        parseParameters(stmtNode);
+
         assert(stmtNode.children.size() > 1);
         AbstractParsedStmt childStmt = null;
-        boolean first = true;
-        for (VoltXMLElement childSQL : stmtNode.children) {
-            if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+        for (VoltXMLElement child : stmtNode.children) {
+            if (child.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 childStmt = new ParsedSelectStmt(m_paramValues, m_db);
-            } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+            } else if (child.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 childStmt = new ParsedUnionStmt(m_paramValues, m_db);
             } else {
-                throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
+                // skip Order By, Limit/Offset. They will be processed later
+                // by the 'parse' method
+                continue;
             }
             childStmt.m_paramsById.putAll(m_paramsById);
-            childStmt.parseTablesAndParams(childSQL);
-            if (first) {
-                first = false;
-                promoteUnionParametersFromChild(childStmt);
-            }
+            childStmt.parseTablesAndParams(child);
+            promoteUnionParametersFromChild(childStmt);
             m_children.add(childStmt);
             // Add statement's tables to the consolidated list
             m_tableList.addAll(childStmt.m_tableList);
@@ -118,12 +152,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     @Override
     public boolean hasLimitOrOffset() {
-        for (AbstractParsedStmt childStmt : m_children) {
-            if ( childStmt.hasLimitOrOffset()) {
-                return true;
-            }
-        }
-        return false;
+        return m_limitOffset.hasLimitOrOffset();
     }
 
     @Override
@@ -134,5 +163,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         }
         return true;
+    }
+
+    public LimitPlanNode getLimitNodeTop() {
+        return m_limitOffset.getLimitNodeTop();
     }
 }

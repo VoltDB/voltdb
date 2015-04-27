@@ -21,8 +21,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
@@ -57,7 +59,7 @@ public abstract class AbstractParsedStmt {
     public String m_sql;
 
     // The initial value is a safety net for the case of parameter-less statements.
-    private ParameterValueExpression[] m_paramList = new ParameterValueExpression[0];
+    private TreeMap<Integer, ParameterValueExpression> m_paramsByIndex = new TreeMap<Integer, ParameterValueExpression>();
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
@@ -223,12 +225,8 @@ public abstract class AbstractParsedStmt {
     void parseTablesAndParams(VoltXMLElement root) {
         // Parse parameters first to satisfy a dependency of expression parsing
         // which happens during table scan parsing.
-        for (VoltXMLElement node : root.children) {
-            if (node.name.equalsIgnoreCase("parameters")) {
-                parseParameters(node);
-                break;
-            }
-        }
+        parseParameters(root);
+
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
                 parseTable(node);
@@ -693,9 +691,17 @@ public abstract class AbstractParsedStmt {
      * Populate the statement's paramList from the "parameters" element
      * @param paramsNode
      */
-    private void parseParameters(VoltXMLElement paramsNode) {
-        m_paramList = new ParameterValueExpression[paramsNode.children.size()];
-
+    protected void parseParameters(VoltXMLElement root) {
+        VoltXMLElement paramsNode = null;
+        for (VoltXMLElement node : root.children) {
+            if (node.name.equalsIgnoreCase("parameters")) {
+                paramsNode = node;
+                break;
+            }
+        }
+        if (paramsNode == null) {
+            return;
+        }
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
@@ -710,7 +716,7 @@ public abstract class AbstractParsedStmt {
                     pve.setParamIsVector();
                 }
                 m_paramsById.put(id, pve);
-                m_paramList[index] = pve;
+                m_paramsByIndex.put(index, pve);
             }
         }
     }
@@ -737,7 +743,7 @@ public abstract class AbstractParsedStmt {
     // The list is required later at the top-level statement for
     // proper cataloging, so promote it here to each parent union.
     protected void promoteUnionParametersFromChild(AbstractParsedStmt childStmt) {
-        m_paramList = childStmt.m_paramList;
+        m_paramsByIndex.putAll(childStmt.m_paramsByIndex);
     }
 
     /**
@@ -762,8 +768,8 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + m_sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (ParameterValueExpression param : m_paramList) {
-            retval += param.toString() + " ";
+        for (Map.Entry<Integer, ParameterValueExpression> param : m_paramsByIndex.entrySet()) {
+            retval += param.getValue().toString() + " ";
         }
 
         retval += "\nTABLE SOURCES:\n\t";
@@ -804,7 +810,7 @@ public abstract class AbstractParsedStmt {
         AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         subquery.m_paramsById.putAll(m_paramsById);
-        subquery.m_paramList = m_paramList;
+        subquery.m_paramsByIndex = m_paramsByIndex;
         AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_paramValues, m_db, m_joinOrder);
         return subquery;
     }
@@ -838,7 +844,7 @@ public abstract class AbstractParsedStmt {
     }
 
     public ParameterValueExpression[] getParameters() {
-        return m_paramList;
+        return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
     }
 
     public boolean hasLimitOrOffset()
@@ -883,6 +889,21 @@ public abstract class AbstractParsedStmt {
         // skeptically second-guesses that pending its own verification. This case is now verified.
         pve.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
         return pve.getParameterIndex();
+    }
+
+    protected AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
+        // The id was previously passed to parameterCountIndexById, so if not -1,
+        // it has already been asserted to be a valid id for a parameter, and the
+        // parameter's type has been refined to INTEGER.
+        if (id != -1) {
+            return m_paramsById.get(id);
+        }
+        // The limit/offset is a non-parameterized literal value that needs to be wrapped in a
+        // BIGINT constant so it can be used in the addition expression for the pushed-down limit.
+        ConstantValueExpression constant = new ConstantValueExpression();
+        constant.setValue(Long.toString(value));
+        constant.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        return constant;
     }
 
     /**

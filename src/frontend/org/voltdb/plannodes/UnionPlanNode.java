@@ -34,7 +34,7 @@ public class UnionPlanNode extends AbstractPlanNode {
     }
 
     // Union Type
-    private final ParsedUnionStmt.UnionType m_unionType;
+    private ParsedUnionStmt.UnionType m_unionType;
 
     public UnionPlanNode() {
         super();
@@ -111,5 +111,6 @@ public class UnionPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
+        m_unionType = ParsedUnionStmt.UnionType.valueOf(jobj.getString( Members.UNION_TYPE.name() ));
     }
 }

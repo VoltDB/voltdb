@@ -24,6 +24,7 @@
 package org.voltdb.planner;
 
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -232,13 +233,13 @@ public class TestUnion extends PlannerTestCase {
         failToCompile("select DESC from T1 UNION select DESC from T1");
     }
 
-    public void testUnionOrderby() {
-        String errorMsg = "UNION tuple set operator with ORDER BY or LIMIT/OFFSET is not supported";
-
-        failToCompile("(select B from T2 UNION select B from T2) order by B", errorMsg);
-        failToCompile("(select B from T2 UNION select B from T2) limit 5", errorMsg);
-        failToCompile("(select B from T2 UNION select B from T2) order by B limit 5", errorMsg);
-    }
+//    public void testUnionOrderby() {
+//        String errorMsg = "UNION tuple set operator with ORDER BY or LIMIT/OFFSET is not supported";
+//
+//        failToCompile("(select B from T2 UNION select B from T2) order by B", errorMsg);
+//        failToCompile("(select B from T2 UNION select B from T2) limit 5", errorMsg);
+//        failToCompile("(select B from T2 UNION select B from T2) order by B limit 5", errorMsg);
+//    }
 
     public void testSubqueryUnionWithParamENG7783() {
         AbstractPlanNode pn = compile(
@@ -253,6 +254,61 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(pn.getChild(0).getChild(0).getChild(0) instanceof SeqScanPlanNode);
         assertTrue(pn.getChild(0).getChild(0).getChild(0).getChild(0) instanceof UnionPlanNode);
 
+    }
+
+    public void testUnsupportedOrderBy() {
+        String errorMsg = "invalid ORDER BY expression";
+        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by C+1", errorMsg);
+    }
+
+    public void testUnionLimitOffset() {
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 UNION select B from T2 limit 3 offset 2");
+            checkLimitNode(pn.getChild(0), 3, 2);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 UNION (select B from T2 limit 3 offset 2) ");
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 INTERSECT select B from T2 limit 3");
+            checkLimitNode(pn.getChild(0), 3, 0);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 EXCEPT select B from T2 offset 2");
+            checkLimitNode(pn.getChild(0), -1, 2);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "(select C from T3 EXCEPT select B from T2 offset 2) UNION select F from T6 limit 4 offset 5");
+            checkLimitNode(pn.getChild(0), 4, 5);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+            UnionPlanNode upn = (UnionPlanNode) pn.getChild(0).getChild(0);
+            checkLimitNode(upn.getChild(0), -1, 2);
+            assertTrue(upn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            // T1 is partitioned
+            AbstractPlanNode pn = compile(
+                    "select A from T1 EXCEPT select B from T2 offset 2");
+            checkLimitNode(pn.getChild(0), -1, 2);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+    }
+
+    private void checkLimitNode(AbstractPlanNode pn, int limit, int offset) {
+        assertTrue(pn != null);
+        assertTrue(pn instanceof LimitPlanNode);
+        LimitPlanNode lpn = (LimitPlanNode) pn;
+        assertEquals(limit, lpn.getLimit());
+        assertEquals(offset, lpn.getOffset());
     }
 
     @Override

@@ -625,6 +625,10 @@ public class PlanAssembler {
             subUnionRoot.addAndLinkChild(selectPlan.rootPlanGraph);
         }
 
+        if (m_parsedUnion.hasLimitOrOffset()) {
+            subUnionRoot = handleUnionLimitOperator(subUnionRoot);
+        }
+
         CompiledPlan retval = new CompiledPlan();
         retval.rootPlanGraph = subUnionRoot;
         retval.setReadOnly(true);
@@ -828,7 +832,7 @@ public class PlanAssembler {
         }
 
         if (m_parsedSelect.hasLimitOrOffset()) {
-            root = handleLimitOperator(root);
+            root = handleSelectLimitOperator(root);
         }
 
         CompiledPlan plan = new CompiledPlan();
@@ -1441,13 +1445,14 @@ public class PlanAssembler {
      * @param root top of the original plan
      * @return new plan's root node
      */
-    private AbstractPlanNode handleLimitOperator(AbstractPlanNode root)
+    private AbstractPlanNode handleSelectLimitOperator(AbstractPlanNode root)
     {
         // The coordinator's top limit graph fragment for a MP plan.
         // If planning "order by ... limit", getNextSelectPlan()
         // will have already added an order by to the coordinator frag.
         // This is the only limit node in a SP plan
         LimitPlanNode topLimit = m_parsedSelect.getLimitNodeTop();
+        assert(topLimit != null);
 
         /*
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
@@ -1461,7 +1466,7 @@ public class PlanAssembler {
             if (sendNode == null) {
                 canPushDown = false;
             } else {
-                canPushDown = m_parsedSelect.m_limitCanPushdown;
+                canPushDown = m_parsedSelect.getCanPushdownLimit();
             }
         }
 
@@ -1506,6 +1511,37 @@ public class PlanAssembler {
                 sendNode.addAndLinkChild(distLimit);
             }
         }
+        // In future, inline LIMIT for join, Receive
+        // Then we do not need to distinguish the order by node.
+
+        if (isInlineLimitPlanNodePossible(root)) {
+            root.addInlinePlanNode(topLimit);
+        } else if (root instanceof ProjectionPlanNode &&
+                isInlineLimitPlanNodePossible(root.getChild(0)) ) {
+            // In future, inlined this projection node for OrderBy and Aggregate
+            // Then we could delete this ELSE IF block.
+            root.getChild(0).addInlinePlanNode(topLimit);
+        } else {
+            topLimit.addAndLinkChild(root);
+            root = topLimit;
+        }
+        return root;
+    }
+
+    /**
+     * Add a limit, and return the new root.
+     * @param root top of the original plan
+     * @return new plan's root node
+     */
+    private AbstractPlanNode handleUnionLimitOperator(AbstractPlanNode root)
+    {
+        // The coordinator's top limit graph fragment for a MP plan.
+        // If planning "order by ... limit", getNextSelectPlan()
+        // will have already added an order by to the coordinator frag.
+        // This is the only limit node in a SP plan
+        LimitPlanNode topLimit = m_parsedUnion.getLimitNodeTop();
+        assert(topLimit != null);
+
         // In future, inline LIMIT for join, Receive
         // Then we do not need to distinguish the order by node.
 
