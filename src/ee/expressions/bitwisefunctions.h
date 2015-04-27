@@ -55,7 +55,6 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_HEX>() const {
     std::stringstream ss;
     ss << std::hex << std::uppercase << inputDecimal; // decimal_value
     std::string res (ss.str());
-
     return getTempStringValue(res.c_str(),res.length());
 }
 
