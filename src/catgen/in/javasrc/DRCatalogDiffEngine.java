@@ -21,23 +21,45 @@
 
 package org.voltdb.catalog;
 
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 
+/**
+ * Specialized CatalogDiffEngine that checks the following conditions:
+ * 1. The localCatalog contains all DR tables contained in the remote catalog
+ * 2. All shared DR tables contain the same columns in the same order
+ * 3. All shared DR tables have the same partition column
+ * 4. All shared DR tables have the same row limits/delete policies
+ * 5. All shared DR tables have the same unique indexes/primary keys
+ */
 public class DRCatalogDiffEngine extends CatalogDiffEngine {
-    public DRCatalogDiffEngine(Catalog prev, Catalog next) {
-        super(prev, next);
+    public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog) {
+        super(localCatalog, remoteCatalog);
     }
 
-    public static String serializeCatalogCommandsForDr(Database catalog) {
+    public static String serializeCatalogCommandsForDr(Catalog catalog) {
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         StringBuilder sb = new StringBuilder();
-        for (Table t : catalog.getTables()) {
-            if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(catalog, t)) {
+        for (Table t : db.getTables()) {
+            if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
                 t.writeFieldCommands(sb);
                 t.writeChildCommands(sb);
             }
         }
-        return sb.toString();
+        return Encoder.compressAndBase64Encode(sb.toString());
+    }
+
+    public static Catalog deserializeCatalogCommandsForDr(String encodedCatalogCommands) {
+        String catalogCommands = Encoder.decodeBase64AndDecompress(encodedCatalogCommands);
+        Catalog deserializedMasterCatalog = new Catalog();
+        Cluster c = deserializedMasterCatalog.getClusters().add("cluster");
+        c.getDatabases().add("database");
+        deserializedMasterCatalog.execute(catalogCommands);
+        return deserializedMasterCatalog;
     }
 
     @Override
@@ -93,10 +115,12 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     }
 
     @Override
-    protected String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) { return null; }
+    protected String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
+        return null;
+    }
 
     @Override
-    public String[] checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
-            final CatalogType prevType,
-            final String field) { return null; }
+    public String[] checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
+        return null;
+    }
 }

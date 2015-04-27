@@ -538,7 +538,6 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertFalse(diff.supported());
-        System.out.println(diff.errors());
         assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1_C2} from Table{T1} on replica"));
         assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on master"));
     }
@@ -647,13 +646,8 @@ public class TestDRCatalogDiffs {
     private CatalogDiffEngine runCatalogDiff(String masterSchema, String replicaSchema) throws Exception {
         Catalog masterCatalog = createCatalog(masterSchema);
         Catalog replicaCatalog = createCatalog(replicaSchema);
-        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog.getClusters().get("cluster").getDatabases().get("database"));
-
-        Catalog deserializedMasterCatalog = new Catalog();
-        Cluster c = deserializedMasterCatalog.getClusters().add("cluster");
-        c.getDatabases().add("database");
-        deserializedMasterCatalog.execute(commands);
-
+        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog);
+        Catalog deserializedMasterCatalog = DRCatalogDiffEngine.deserializeCatalogCommandsForDr(commands);
         return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog);
     }
 
