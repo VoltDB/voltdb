@@ -27,7 +27,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     public DRCatalogDiffEngine(Catalog prev, Catalog next) {
         super(prev, next);
     }
-    
+
     public static String serializeCatalogCommandsForDr(Database catalog) {
         StringBuilder sb = new StringBuilder();
         for (Table t : catalog.getTables()) {
@@ -78,7 +78,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 "cachekeyprefix".equals(field)) {
                 return null;
             }
-        } else if (!isUniqueIndexColumn(suspect)) {
+        } else if (isUniqueIndex(suspect) == isUniqueIndex(prevType) && !isUniqueIndexColumn(suspect)) {
             return null;
         }
         return "Incompatible schema between master and replica: field " + field + " in schema object " + suspect;

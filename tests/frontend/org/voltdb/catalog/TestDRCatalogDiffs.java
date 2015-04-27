@@ -432,6 +432,59 @@ public class TestDRCatalogDiffs {
     }
 
     @Test
+    public void testIndexOnlyUniqueOnReplica() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 VARCHAR(50));\n" +
+                "CREATE INDEX foo ON T1 (C1, C2);\n" +
+                "DR TABLE T1;";
+        String replicaSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 VARCHAR(50));\n" +
+                "CREATE UNIQUE INDEX foo ON T1 (C1, C2);\n" +
+                "DR TABLE T1;";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertFalse(diff.supported());
+        assertTrue(diff.errors().contains("field unique in schema object Index{FOO}"));
+    }
+
+    @Test
+    public void testIndexOnlyUniqueOnMaster() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 VARCHAR(50));\n" +
+                "CREATE UNIQUE INDEX foo ON T1 (C1, C2);\n" +
+                "DR TABLE T1;";
+        String replicaSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 VARCHAR(50));\n" +
+                "CREATE INDEX foo ON T1 (C1, C2);\n" +
+                "DR TABLE T1;";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertFalse(diff.supported());
+        assertTrue(diff.errors().contains("field unique in schema object Index{FOO}"));
+    }
+
+    @Test
+    public void testUniqueIndexOnDifferentTable() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 VARCHAR(50) NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 VARCHAR(50) NOT NULL);\n" +
+                "CREATE UNIQUE INDEX foo ON T1 (C1, C2);\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
+        String replicaSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 VARCHAR(50) NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 VARCHAR(50) NOT NULL);\n" +
+                "CREATE UNIQUE INDEX foo ON T2 (C1, C2);\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertFalse(diff.supported());
+        assertTrue(diff.errors().contains("Missing Index{FOO} from Table{T1} on replica"));
+        assertTrue(diff.errors().contains("Missing Index{FOO} from Table{T2} on master"));
+    }
+
+    @Test
     public void testExtraPrimaryKeyOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 VARCHAR(50));\n" +
