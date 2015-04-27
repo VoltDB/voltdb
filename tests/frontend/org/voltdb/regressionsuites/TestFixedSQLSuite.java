@@ -2178,6 +2178,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable vt;
         vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
+
+        String sql1 = sql.replace("SELECT ID", "SELECT COUNT(ID)");
+        assertTrue(sql1.contains("SELECT COUNT(ID) FROM"));
+        vt = client.callProcedure("@AdHoc", sql1, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+
+        String sql2 = sql.replace("SELECT ID", "SELECT COUNT(*)");
+        assertTrue(sql2.contains("SELECT COUNT(*) FROM"));
+        vt = client.callProcedure("@AdHoc", sql2, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
     }
 
     public void testENG8120() throws Exception {
