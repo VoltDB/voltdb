@@ -92,7 +92,6 @@ protected:
     voltdb::Table* table;
     voltdb::CatalogId database_id;
     voltdb::VoltDBEngine m_engine;
-    voltdb::MockDRTupleStream drStream;
     char signature[20];
 
     char *m_exceptionBuffer;
@@ -117,7 +116,7 @@ protected:
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
-        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames, signature, &drStream, false);
+        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames, signature);
         if (pkey) {
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);

@@ -4,7 +4,8 @@ CREATE TABLE timedata
 (
   uuid VARCHAR(36) NOT NULL,
   val BIGINT NOT NULL,
-  update_ts TIMESTAMP NOT NULL
+  update_ts TIMESTAMP NOT NULL,
+  CONSTRAINT PK_timedate PRIMARY KEY (uuid, update_ts)
 );
 
 -- Partition this table to get parallelism.
