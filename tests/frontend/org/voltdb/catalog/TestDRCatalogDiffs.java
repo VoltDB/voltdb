@@ -646,7 +646,7 @@ public class TestDRCatalogDiffs {
     private CatalogDiffEngine runCatalogDiff(String masterSchema, String replicaSchema) throws Exception {
         Catalog masterCatalog = createCatalog(masterSchema);
         Catalog replicaCatalog = createCatalog(replicaSchema);
-        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog);
+        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog).getSecond();
         Catalog deserializedMasterCatalog = DRCatalogDiffEngine.deserializeCatalogCommandsForDr(commands);
         return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog);
     }

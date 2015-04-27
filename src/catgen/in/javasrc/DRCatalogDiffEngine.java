@@ -21,9 +21,9 @@
 
 package org.voltdb.catalog;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.voltcore.utils.Pair;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -40,7 +40,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         super(localCatalog, remoteCatalog);
     }
 
-    public static String serializeCatalogCommandsForDr(Catalog catalog) {
+    public static Pair<Long, String> serializeCatalogCommandsForDr(Catalog catalog) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         StringBuilder sb = new StringBuilder();
         for (Table t : db.getTables()) {
@@ -50,7 +50,10 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 t.writeChildCommands(sb);
             }
         }
-        return Encoder.compressAndBase64Encode(sb.toString());
+        String catalogCommands = sb.toString();
+        PureJavaCrc32 crc = new PureJavaCrc32();
+        crc.update(catalogCommands.getBytes(Constants.UTF8ENCODING));
+        return Pair.of(crc.getValue(), Encoder.compressAndBase64Encode(sb.toString()));
     }
 
     public static Catalog deserializeCatalogCommandsForDr(String encodedCatalogCommands) {
