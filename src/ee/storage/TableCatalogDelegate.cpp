@@ -136,14 +136,21 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
         }
         index_columns[catalog_colref->index()] = catalog_colref->column()->index();
     }
-
+    // partial index predicate
+    const std::string predicateAsText = catalogIndex.predicatejson();
+    AbstractExpression* predicate = NULL;
+    if (!predicateAsText.empty()) {
+        predicate = ExpressionUtil::loadExpressionFromJson(predicateAsText);
+    }
     *scheme = TableIndexScheme(catalogIndex.name(),
                                (TableIndexType)catalogIndex.type(),
                                index_columns,
                                indexedExpressions,
+                               predicate,
                                catalogIndex.unique(),
                                true, // support counting indexes (wherever supported)
                                expressionsAsText,
+                               predicateAsText,
                                schema);
     return true;
 }
@@ -153,7 +160,8 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
  */
 static std::string
 getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
-                  const std::string& expressionsAsText, vector<int32_t> columnIndexes) {
+                  const std::string& expressionsAsText, vector<int32_t> columnIndexes,
+                  const std::string& predicateAsText) {
     // add the uniqueness of the index
     std::string retval = isUnique ? "U" : "M";
 
@@ -192,6 +200,10 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
     if (expressionsAsText.length() != 0) {
         retval += expressionsAsText;
     }
+    // Add partial index predicate if any
+    if (!predicateAsText.empty()) {
+        retval += predicateAsText;
+    }
     return retval;
 }
 
@@ -214,11 +226,14 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
 
     const std::string expressionsAsText = catalogIndex.expressionsjson();
 
+    const std::string predicateAsText = catalogIndex.predicatejson();
+
     return getIndexIdFromMap((TableIndexType)catalogIndex.type(),
                              true, //catalogIndex.countable(), // always counting for now
                              catalogIndex.unique(),
                              expressionsAsText,
-                             columnIndexes);
+                             columnIndexes,
+                             predicateAsText);
 }
 
 std::string
@@ -236,7 +251,8 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
                              true, // indexScheme.countable, // // always counting for now
                              indexScheme.unique,
                              indexScheme.expressionsAsText,
-                             columnIndexes);
+                             columnIndexes,
+                             indexScheme.predicateAsText);
 }
 
 
@@ -365,6 +381,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    bool drEnabled = catalogTable.isDRed();
     materialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -373,12 +390,14 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
     SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureHash));
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, signatureHash, materialized,
+                                                    schema, columnNames, signatureHash,
+                                                    materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
                                                     catalogTable.tuplelimit(),
-                                                    compactionThreshold);
+                                                    compactionThreshold,
+                                                    drEnabled);
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
@@ -484,6 +503,11 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
                                            catalog::Table const &catalogTable,
                                            std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream());
+    if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
+        DRTupleStreamDisableGuard guardReplicated(ExecutorContext::getExecutorContext()->drReplicatedStream());
+    }
+
     ///////////////////////////////////////////////
     // Create a new table so two tables exist
     ///////////////////////////////////////////////

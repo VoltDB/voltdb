@@ -66,6 +66,8 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
@@ -75,6 +77,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
@@ -85,7 +88,6 @@ import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.VoltTypeUtil;
 
 
 /**
@@ -104,6 +106,7 @@ public class DDLCompiler {
     static final String REPLICATE = "REPLICATE";
     static final String EXPORT = "EXPORT";
     static final String ROLE = "ROLE";
+    static final String DR = "DR";
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
@@ -356,6 +359,26 @@ public class DDLCompiler {
     }
 
     /**
+     * Check whether or not a procedure name is acceptible.
+     * @param identifier the identifier to check
+     * @param statement the statement where the identifier is
+     * @return the given identifier unmodified
+     * @throws VoltCompilerException
+     */
+    private String checkProcedureIdentifier(
+            final String identifier, final String statement
+            ) throws VoltCompilerException {
+        String retIdent = checkIdentifierStart(identifier, statement);
+        if (retIdent.contains(".")) {
+            String msg = String.format(
+                "Invalid procedure name containing dots \"%s\" in DDL: \"%s\"",
+                identifier, statement.substring(0,statement.length()-1));
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+        return retIdent;
+    }
+
+   /**
      * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
      * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
@@ -381,7 +404,7 @@ public class DDLCompiler {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, PARTITION, ROLE, or EXPORT
+        // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
@@ -426,36 +449,28 @@ public class DDLCompiler {
             return true;
         }
 
-        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
-        statementMatcher = SQLParser.matchCreateProcedureAsSQL(statement);
-        if (statementMatcher.matches()) {
-            String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
-            String sqlStatement = statementMatcher.group(3) + ";";
-
-            ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
-
-            // Parse the ALLOW and PARTITION clauses.
-            // Populate descriptor roles and returned partition data as needed.
-            CreateProcedurePartitionData partitionData =
-                    parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
-
-            m_tracker.add(descriptor);
-
-            // add partitioning if specified
-            addProcedurePartitionInfo(clazz, partitionData, statement);
-
-            return true;
-        }
-
         // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
         // ### <code-block> ### LANGUAGE <language-name>
         statementMatcher = SQLParser.matchCreateProcedureAsScript(statement);
         if (statementMatcher.matches()) {
 
+            // Dots are okay in script procedures because they are a class name
             String className = checkIdentifierStart(statementMatcher.group(1), statement);
             String codeBlock = statementMatcher.group(3);
-            Language language = Language.valueOf(statementMatcher.group(4).toUpperCase());
+            String languageToken = statementMatcher.group(4);
+            if (languageToken == null) {
+                throw m_compiler.new VoltCompilerException("LANGUAGE clause is bad or missing.");
+            }
+            languageToken = languageToken.toUpperCase();
+
+            Language language;
+            try {
+                language = Language.valueOf(languageToken);
+            }
+            catch (IllegalArgumentException e) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Language \"%s\" is not a supported", languageToken));
+            }
 
             Class<?> scriptClass = null;
 
@@ -470,6 +485,8 @@ public class DDLCompiler {
                     throw m_compiler.new VoltCompilerException(ex);
                 }
             } else {
+                // Not sure how to get here with exception handling above, but help yourself
+                // to a belt with those suspenders!
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Language \"%s\" is not a supported", language.name()));
             }
@@ -487,6 +504,28 @@ public class DDLCompiler {
 
             // add partitioning if specified
             addProcedurePartitionInfo(procName, partitionData, statement);
+
+            return true;
+        }
+
+        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
+        statementMatcher = SQLParser.matchCreateProcedureAsSQL(statement);
+        if (statementMatcher.matches()) {
+            String clazz = checkProcedureIdentifier(statementMatcher.group(1), statement);
+            String sqlStatement = statementMatcher.group(3) + ";";
+
+            ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
+
+            // Parse the ALLOW and PARTITION clauses.
+            // Populate descriptor roles and returned partition data as needed.
+            CreateProcedurePartitionData partitionData =
+                    parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
+
+            m_tracker.add(descriptor);
+
+            // add partitioning if specified
+            addProcedurePartitionInfo(clazz, partitionData, statement);
 
             return true;
         }
@@ -709,7 +748,13 @@ public class DDLCompiler {
 
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
-                tableXML.attributes.put("export", targetName);
+                if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid EXPORT statement: table %s is a DR table.", tableName));
+                }
+                else {
+                    tableXML.attributes.put("export", targetName);
+                }
             }
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
@@ -717,6 +762,42 @@ public class DDLCompiler {
                             tableName));
             }
 
+            return true;
+        }
+
+        // matches if it is DR TABLE <table-name> [DISABLE]
+        // group 1 -- table name
+        // group 2 -- NULL: enable dr
+        //            NOT NULL: disable dr
+        // TODO: maybe I should write one fit all regex for this.
+        statementMatcher = SQLParser.matchDRTable(statement);
+        if (statementMatcher.matches()) {
+            String tableName;
+            if (statementMatcher.group(1).equalsIgnoreCase("*")) {
+                tableName = "*";
+            } else {
+                tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            }
+
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                if (tableXML.attributes.containsKey("export")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid DR statement: table %s is an export table", tableName));
+                }
+                else {
+                    if ((statementMatcher.group(2) != null)) {
+                        tableXML.attributes.put("drTable", "DISABLE");
+                    }
+                    else {
+                        tableXML.attributes.put("drTable", "ENABLE");
+                    }
+                }
+            }
+            else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "While configuring dr, table %s was not present in the catalog.", tableName));
+            }
             return true;
         }
 
@@ -764,6 +845,13 @@ public class DDLCompiler {
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
+        if (DR.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid DR TABLE statement: \"%s\", " +
+                    "expected syntax: DR TABLE <table> [DISABLE]",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
         // Not a VoltDB-specific DDL statement.
         return false;
     }
@@ -785,7 +873,13 @@ public class DDLCompiler {
     private CreateProcedurePartitionData parseCreateProcedureClauses(
             ProcedureDescriptor descriptor,
             String clauses) throws VoltCompilerException {
-        assert clauses != null;
+
+        // Nothing to do if there were no clauses.
+        // Null means there's no partition data to return.
+        // There's also no roles to add.
+        if (clauses == null || clauses.isEmpty()) {
+            return null;
+        }
         CreateProcedurePartitionData data = null;
 
         Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);
@@ -871,6 +965,7 @@ public class DDLCompiler {
                 String tableName = e.attributes.get("name");
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
+                String drTable = e.attributes.get("drTable");
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
                 }
@@ -882,6 +977,9 @@ public class DDLCompiler {
                 }
                 else {
                     m_tracker.removeExportedTable(tableName);
+                }
+                if (drTable != null) {
+                    m_tracker.addDRedTable(tableName, drTable);
                 }
             }
         }
@@ -1262,7 +1360,7 @@ public class DDLCompiler {
             }
         }
 
-        table.setSignature(VoltTypeUtil.getSignatureForTable(name, columnTypes));
+        table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
 
         /*
          * Validate that the total size
@@ -1490,9 +1588,18 @@ public class DDLCompiler {
         }
 
         // Duplicate indexes have identical columns in identical order.
-        return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
-    }
+        if ( ! Arrays.equals(idx1baseTableOrder, idx2baseTableOrder) ) {
+            return false;
+        }
 
+        // Check the predicates
+        if (idx1.getPredicatejson().length() > 0) {
+            return idx1.getPredicatejson().equals(idx2.getPredicatejson());
+        } else if (idx2.getPredicatejson().length() > 0) {
+            return idx2.getPredicatejson().equals(idx1.getPredicatejson());
+        }
+        return true;
+    }
 
     /**
      * This function will recursively find any function expression with ID functionId.
@@ -1531,6 +1638,8 @@ public class DDLCompiler {
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
+        // "parse" the WHERE expression for partial index if any
+        AbstractExpression predicate = null;
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<AbstractExpression>();
@@ -1546,6 +1655,9 @@ public class DDLCompiler {
                     expr.finalizeValueTypes();
                     exprs.add(expr);
                 }
+            } else if (subNode.name.equals("predicate")) {
+                assert(subNode.children.size() == 1);
+                predicate = buildPartialIndexPredicate(dummy, name, subNode.children.get(0), table);
             }
         }
 
@@ -1648,6 +1760,15 @@ public class DDLCompiler {
         }
         index.setAssumeunique(assumeUnique);
 
+        if (predicate != null) {
+            try {
+                index.setPredicatejson(convertToJSONObject(predicate));
+            } catch (JSONException e) {
+                throw m_compiler.new VoltCompilerException("Unexpected error serializing predicate for partial index '" +
+                        name + "' on type '" + table.getTypeName() + "': " + e.toString());
+            }
+        }
+
         // check if an existing index duplicates another index (if so, drop it)
         // note that this is an exact dup... uniqueness, counting-ness and type
         // will make two indexes different
@@ -1694,6 +1815,14 @@ public class DDLCompiler {
             stringer.endObject();
         }
         stringer.endArray();
+        return stringer.toString();
+    }
+
+    private static String convertToJSONObject(AbstractExpression expr) throws JSONException {
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        expr.toJSONString(stringer);
+        stringer.endObject();
         return stringer.toString();
     }
 
@@ -2048,9 +2177,12 @@ public class DDLCompiler {
             Table srcTable, List<AbstractExpression> groupbyExprs)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
-        // Match based on one of two algorithms depending on whether expressions are all simple columns.
-        if (groupbyExprs == null) {
-            for (Index index : allIndexes) {
+        StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
+
+        for (Index index : allIndexes) {
+            boolean matchedAll = true;
+            // Match based on one of two algorithms depending on whether expressions are all simple columns.
+            if (groupbyExprs == null) {
                 String expressionjson = index.getExpressionsjson();
                 if ( ! expressionjson.isEmpty()) {
                     continue;
@@ -2063,7 +2195,6 @@ public class DDLCompiler {
                     continue;
                 }
 
-                boolean matchedAll = true;
                 for (int i = 0; i < indexedColRefs.size(); ++i) {
                     int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
                     int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
@@ -2072,18 +2203,12 @@ public class DDLCompiler {
                         break;
                     }
                 }
-                if (matchedAll) {
-                    return index;
-                }
-            }
-        } else {
-            for (Index index : allIndexes) {
+            } else {
                 String expressionjson = index.getExpressionsjson();
                 if (expressionjson.isEmpty()) {
                     continue;
                 }
                 List<AbstractExpression> indexedExprs = null;
-                StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
@@ -2095,19 +2220,85 @@ public class DDLCompiler {
                     continue;
                 }
 
-                boolean matchedAll = true;
                 for (int i = 0; i < indexedExprs.size(); ++i) {
                     if ( ! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
                         matchedAll = false;
                         break;
                     }
                 }
-                if (matchedAll) {
-                    return index;
+            }
+            if (matchedAll && !index.getPredicatejson().isEmpty()) {
+                // Additional check for partial indexes to make sure matview WHERE clause
+                // covers the partial index predicate
+                List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
+                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                try {
+                    String encodedPredicate = matviewinfo.getPredicate();
+                    if (!encodedPredicate.isEmpty()) {
+                        String predicate = Encoder.hexDecodeToString(encodedPredicate);
+                        AbstractExpression matViewPredicate = AbstractExpression.fromJSONString(predicate, tableScan);
+                        coveringExprs.addAll(ExpressionUtil.uncombineAny(matViewPredicate));
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    assert(false);
+                    return null;
                 }
+                matchedAll = SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs);
+            }
+            if (matchedAll) {
+                return index;
             }
         }
         return null;
+    }
+
+    /**
+     * Build the abstract expression representing the partial index predicate.
+     * Verify it satisfies the rules. Throw error messages otherwise.
+     *
+     * @param dummy AbstractParsedStmt
+     * @param indexName The name of the index being checked.
+     * @param predicateXML The XML representing the predicate.
+     * @param table Table
+     * @throws VoltCompilerException
+     * @return AbstractExpression
+     */
+    private AbstractExpression buildPartialIndexPredicate(
+            AbstractParsedStmt dummy, String indexName, VoltXMLElement predicateXML, Table table) throws VoltCompilerException {
+
+        if (predicateXML == null) {
+            return null;
+        }
+
+        // Make sure all column expressions refer to the same index table before we can parse the XML
+        // to avoid the AbstractParsedStmt exception/assertion
+        String tableName = table.getTypeName();
+        assert(tableName != null);
+        String msg = "Partial index \"" + indexName + "\" ";
+
+        // Make sure all column expressions refer the index table
+        List<VoltXMLElement> columnRefs= predicateXML.findChildren("columnref");
+        for (VoltXMLElement columnRef : columnRefs) {
+            String columnRefTableName = columnRef.attributes.get("table");
+            if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {
+                msg += "with expression(s) involving other tables is not supported.";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+        // Now it safe to parse the expression tree
+        AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
+
+        if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+            msg += "with aggregate expression(s) is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+        // @TODO: un-comment once subqueries are supported
+//        if (!predicate.findAllSubexpressionsOfClass(SubqueryExpression.class).isEmpty()) {
+//            msg += "with subquery expression(s) is not supported.";
+//            throw m_compiler.new VoltCompilerException(msg);
+//        }
+        return predicate;
     }
 
     /**

@@ -1564,6 +1564,8 @@ public class Scanner {
                 }
                 break;
 
+            // A VoltDB extension -- disable broken handling for binary literals
+            /* disable 19 lines ...
             case 'b' :
             case 'B' :
                 if (charAt(currentPosition + 1) == '\'') {
@@ -1583,6 +1585,8 @@ public class Scanner {
                     return;
                 }
                 break;
+            ... disabled 19 lines */
+            // End of VoltDB extension
 
             case 'n' :
             case 'N' :

@@ -192,10 +192,10 @@ public class AsyncCompilerAgent {
             // do a couple of additional checks if it's DDL
             if (hasDDL) {
                 // check that the DDL is allowed
-                if (!SQLLexer.isPermitted(stmt)) {
+                String rejectionExplanation = SQLLexer.checkPermitted(stmt);
+                if (rejectionExplanation != null) {
                     AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "AdHoc DDL contains an unsupported DDL statement: " + stmt);
+                            AsyncCompilerResult.makeErrorResult(w, rejectionExplanation);
                     w.completionHandler.onCompletion(errResult);
                     return;
                 }
@@ -250,20 +250,11 @@ public class AsyncCompilerAgent {
 
             // Is it forbidden by the replication role and configured schema change method?
             // master and UAC method chosen:
-            if (!w.onReplica && !w.useAdhocDDL) {
+            if (!w.useAdhocDDL) {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
                             "Cluster is configured to use @UpdateApplicationCatalog " +
                             "to change application schema.  AdHoc DDL is forbidden.");
-                w.completionHandler.onCompletion(errResult);
-                return;
-            }
-            // Any adhoc DDL on the replica is forbidden (master changes appear as UAC
-            else if (w.onReplica) {
-                AsyncCompilerResult errResult =
-                    AsyncCompilerResult.makeErrorResult(w,
-                            "AdHoc DDL is forbidden on a DR replica cluster. " +
-                            "Apply schema changes to the master and they will propogate to replicas.");
                 w.completionHandler.onCompletion(errResult);
                 return;
             }
@@ -277,7 +268,7 @@ public class AsyncCompilerAgent {
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
         if (w.invocationName.equals("@UpdateApplicationCatalog") &&
-            w.operationBytes != null && !w.onReplica && w.useAdhocDDL)
+            w.operationBytes != null && w.useAdhocDDL)
         {
             AsyncCompilerResult errResult =
                 AsyncCompilerResult.makeErrorResult(w,
@@ -286,7 +277,7 @@ public class AsyncCompilerAgent {
             w.completionHandler.onCompletion(errResult);
             return;
         }
-        else if (w.invocationName.equals("@UpdateClasses") && !w.onReplica && !w.useAdhocDDL) {
+        else if (w.invocationName.equals("@UpdateClasses") && !w.useAdhocDDL) {
             AsyncCompilerResult errResult =
                 AsyncCompilerResult.makeErrorResult(w,
                         "Cluster is configured to use @UpdateApplicationCatalog " +

@@ -18,13 +18,24 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.util.Map;
 
 public interface NodeDRGateway {
+
+    /*
+     * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
+     */
+    public abstract void blockOnDRStateConvergence();
 
     /**
      * Start listening on the ports
      */
-    public abstract void bindPorts();
+    public abstract void bindPorts(boolean drProducerEnabled, int listenPort, String portInterface);
+
+    /**
+     * @return true if bindPorts has been called.
+     */
+    public abstract boolean isStarted();
 
     /**
      * Called by an EE to make the buffer server is aware it's going to be
@@ -41,10 +52,22 @@ public interface NodeDRGateway {
      */
     public abstract boolean offer(final Object ib);
 
+    /**
+     * Queues up a task to move all the InvocationBuffers to the PersistentBinaryDeque
+     * @param nofsync do not force the sync to disk (when True)
+     * @return the FutureTask indicating completion
+     */
+    public abstract void forceAllBuffersToDisk(boolean nofsync);
+
     public abstract boolean isActive();
     public abstract void setActive(boolean active);
 
     public abstract void start();
     public abstract void shutdown() throws InterruptedException;
 
+    public abstract void updateCatalog(final CatalogContext catalog, final int listenPort);
+
+    public abstract int getDRClusterId();
+
+    public void truncateDRLogsForRestore(Map<Integer, Long> sequenceNumbers);
 }

@@ -82,6 +82,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -94,6 +95,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Query;
+import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
@@ -127,6 +129,13 @@ public class TestJSONInterface extends TestCase {
         }
         s = s.substring(1);
         return s;
+    }
+
+    static String getHTTPURL(Integer port, String path) {
+        if (port == null) {
+            port = VoltDB.DEFAULT_HTTP_PORT;
+        }
+        return String.format("http://localhost:%d/%s", port, path);
     }
 
     public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
@@ -196,12 +205,21 @@ public class TestJSONInterface extends TestCase {
         return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
     }
 
+    private static String putUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+        return httpUrlOverJSON("PUT", url, user, password, scheme, expectedCode, expectedCt, params);
+    }
+
+    private static String deleteUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+        return httpUrlOverJSON("DELETE", url, user, password, scheme, expectedCode, expectedCt, null);
+    }
+
     private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setRequestMethod(method);
         conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         if (user != null && password != null) {
             if (scheme.equalsIgnoreCase("hashed")) {
                 MessageDigest md = MessageDigest.getInstance("SHA-1");
@@ -272,12 +290,12 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getHashedPasswordForHTTPVar(String password) {
+    public static String getHashedPasswordForHTTPVar(String password, ClientAuthHashScheme scheme) {
         assert (password != null);
 
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance("SHA-1");
+            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
         } catch (NoSuchAlgorithmException e) {
             fail();
         }
@@ -289,19 +307,19 @@ public class TestJSONInterface extends TestCase {
         }
 
         String retval = Encoder.hexEncode(hashedPassword);
-        assertEquals(40, retval.length());
+        assertEquals(ClientAuthHashScheme.getHexencodedDigestLength(scheme), retval.length());
         return retval;
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */);
+        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */, ClientAuthHashScheme.HASH_SHA256);
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */);
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */, ClientAuthHashScheme.HASH_SHA256);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -313,7 +331,7 @@ public class TestJSONInterface extends TestCase {
         }
         if (password != null) {
             if (preHash) {
-                params.put("Hashedpassword", getHashedPasswordForHTTPVar(password));
+                params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, scheme));
             } else {
                 params.put("Password", password);
             }
@@ -326,7 +344,16 @@ public class TestJSONInterface extends TestCase {
 
         varString = getHTTPVarString(params);
 
-        return callProcOverJSONRaw(varString, expectedCode);
+        String ret = callProcOverJSONRaw(varString, expectedCode);
+        if (preHash) {
+            //If prehash make same call with SHA1 to check expected code.
+            params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthHashScheme.HASH_SHA1));
+            varString = getHTTPVarString(params);
+
+            varString = getHTTPVarString(params);
+            String ignret = callProcOverJSONRaw(varString, expectedCode);
+        }
+        return ret;
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
@@ -1030,7 +1057,7 @@ public class TestJSONInterface extends TestCase {
             // test not enabled
             ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
             try {
-                callProcOverJSON("Insert", pset, null, null, false, false, 403); // HTTP_FORBIDDEN
+                callProcOverJSON("Insert", pset, null, null, false, false, 403, ClientAuthHashScheme.HASH_SHA256); // HTTP_FORBIDDEN
             } catch (Exception e) {
                 // make sure failed due to permissions on http
                 assertTrue(e.getMessage().contains("403"));
@@ -1225,8 +1252,8 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
-            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 404);
         } finally {
             if (server != null) {
                 server.shutdown();
@@ -1569,6 +1596,84 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
+    public void testUsers() throws Exception {
+        try {
+            String simpleSchema
+            = "CREATE TABLE foo (\n"
+            + "    bar BIGINT NOT NULL,\n"
+            + "    PRIMARY KEY (bar)\n"
+            + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            builder.setUseDDLSchema(true);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get users
+            String json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            assertEquals(json, "");
+            getUrlOverJSON("http://localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
+
+            //Put users
+            ObjectMapper mapper = new ObjectMapper();
+            UsersType.User user = new UsersType.User();
+            user.setName("foo");
+            user.setPassword("foo");
+            String map = mapper.writeValueAsString(user);
+            Map<String,String> params = new HashMap<>();
+            params.put("user", map);
+            putUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 201,  "application/json", params);
+
+            //Get users
+            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            JSONArray jarray = new JSONArray(json);
+            assertEquals(jarray.length(), 1);
+            JSONObject jobj = jarray.getJSONObject(0);
+            assertTrue(jobj.getString("id").contains("/deployment/users/foo"));
+            assertTrue(jobj.getString("roles").equalsIgnoreCase("null"));
+
+            //Post users
+            user.setRoles("foo");
+            map = mapper.writeValueAsString(user);
+            params.put("user", map);
+            postUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
+
+            //Get users
+            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            jarray = new JSONArray(json);
+            assertEquals(jarray.length(), 1);
+            jobj = jarray.getJSONObject(0);
+            assertTrue(jobj.getString("roles").equals("foo"));
+
+            //Delete users
+            deleteUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
+
+            //Get users
+            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            assertEquals(json, "");
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
 
     public void testProfile() throws Exception {
         try {

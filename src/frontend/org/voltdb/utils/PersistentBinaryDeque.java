@@ -81,10 +81,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
     /**
      * Processors also log using this facility.
      */
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private final VoltLogger m_usageSpecificLog;
 
     private final File m_path;
     private final String m_nonce;
+    private boolean m_initializedFromExistingFiles = false;
 
     //Segments that are no longer being written to and can be polled
     //These segments are "immutable". They will not be modified until deletion
@@ -98,10 +99,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
      *
      * @param nonce
      * @param path
+     * @param logger
      * @throws IOException
      */
-    public PersistentBinaryDeque(final String nonce, final File path) throws IOException {
-        this(nonce, path, true);
+    public PersistentBinaryDeque(final String nonce, final File path, VoltLogger logger) throws IOException {
+        this(nonce, path, logger, true);
     }
 
     /**
@@ -114,10 +116,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @param deleteEmpty
      * @throws IOException
      */
-    public PersistentBinaryDeque(final String nonce, final File path, final boolean deleteEmpty) throws IOException {
+    public PersistentBinaryDeque(final String nonce, final File path, VoltLogger logger, final boolean deleteEmpty) throws IOException {
         EELibraryLoader.loadExecutionEngineLibrary(true);
         m_path = path;
         m_nonce = nonce;
+        m_usageSpecificLog = logger;
 
         if (!path.exists() || !path.canRead() || !path.canWrite() || !path.canExecute() || !path.isDirectory()) {
             throw new IOException(path + " is not usable ( !exists || !readable " +
@@ -161,6 +164,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         PBDSegment qs = new PBDSegment( index, pathname );
                         try {
                             qs.open(false);
+                            m_initializedFromExistingFiles = true;
                             if (deleteEmpty) {
                                 if (qs.getNumEntries() == 0) {
                                     LOG.info("Found Empty Segment with entries: " + qs.getNumEntries() + " For: " + pathname.getName());
@@ -223,6 +227,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized void offer(BBContainer object) throws IOException {
+        offer(object, true);
+    }
+
+    @Override
+    public synchronized void offer(BBContainer object, boolean allowCompression) throws IOException {
         assertions();
         if (m_closed) {
             throw new IOException("Closed");
@@ -230,7 +239,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         PBDSegment tail = m_segments.peekLast();
         //If we are mostly empty, don't do compression, otherwise compress to reduce space and IO
-        final boolean compress = object.b().isDirect() && (m_segments.size() > 1 || tail.sizeInBytes() > 1024 * 512);
+        final boolean compress = object.b().isDirect() && allowCompression &&
+                (m_segments.size() > 1 || tail.sizeInBytes() > 1024 * 512);
         if (!tail.offer(object, compress)) {
             //Check to see if the tail is completely consumed so we can close and delete it
             if (!tail.hasMoreEntries() && tail.m_discardCount == tail.getNumEntries()) {
@@ -389,9 +399,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
             return;
         }
         m_closed = true;
-        if (!m_segments.peekLast().hasMoreEntries()) {
-            m_segments.pollLast().closeAndDelete();
-        }
         for (PBDSegment segment : m_segments) {
             segment.close();
         }
@@ -444,7 +451,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
         assertions();
         if (m_segments.isEmpty()) {
-            exportLog.debug("PBD " + m_nonce + " has no finished segments");
+            m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
             return;
         }
 
@@ -469,7 +476,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     int numObjects = readBuffer.getInt();
                     int size = readBuffer.getInt();
                     int objectsProcessed = 0;
-                    exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
+                    m_usageSpecificLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
                     for (int ii = 0; ii < numObjects; ii++) {
                         final int nextObjectLength = readBuffer.getInt();
                         final int nextObjectFlags = readBuffer.getInt();
@@ -499,7 +506,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         }
                         try {
                             //Handoff the object to the truncator and await a decision
-                            ByteBuffer retval = truncator.parse(nextObject.b());
+                            ByteBuffer retval = truncator.parse(nextObject);
                             if (retval == null) {
                                 //Nothing to do, leave the object alone and move to the next
                                 continue;
@@ -624,6 +631,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return m_numObjects;
     }
 
+    @Override
+    public boolean initializedFromExistingFiles() {
+        return m_initializedFromExistingFiles;
+    }
+
     private static final boolean assertionsOn;
     static {
         boolean assertOn = false;
@@ -632,7 +644,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private void assertions() {
-        if (!assertionsOn) return;
+        if (!assertionsOn || m_closed) return;
         int numObjects = 0;
         for (PBDSegment segment : m_segments) {
             try {

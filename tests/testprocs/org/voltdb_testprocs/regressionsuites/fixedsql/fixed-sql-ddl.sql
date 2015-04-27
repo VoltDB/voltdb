@@ -22,7 +22,7 @@ CREATE TABLE VarLength (
 );
 
 CREATE TABLE P1 (
-  ID INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER DEFAULT 0 NOT NULL,
   DESC VARCHAR(300),
   NUM INTEGER,
   RATIO FLOAT,
@@ -31,7 +31,7 @@ CREATE TABLE P1 (
 PARTITION TABLE P1 ON COLUMN ID;
 
 CREATE TABLE R1 (
-  ID INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER DEFAULT 0 NOT NULL,
   DESC VARCHAR(300),
   NUM INTEGER,
   RATIO FLOAT,
@@ -39,7 +39,7 @@ CREATE TABLE R1 (
 );
 
 CREATE TABLE P2 (
-  ID INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER DEFAULT 0 NOT NULL,
   DESC VARCHAR(300),
   NUM INTEGER NOT NULL,
   RATIO FLOAT NOT NULL,
@@ -48,15 +48,28 @@ CREATE TABLE P2 (
 PARTITION TABLE P2 ON COLUMN ID;
 
 CREATE TABLE R2 (
-  ID INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER DEFAULT 0 NOT NULL,
   DESC VARCHAR(300),
   NUM INTEGER NOT NULL,
   RATIO FLOAT NOT NULL,
   CONSTRAINT R2_PK_TREE PRIMARY KEY (ID)
 );
 
+CREATE TABLE R3 (
+  ID INTEGER DEFAULT 0 NOT NULL,
+  NUM INTEGER
+);
+create index idx1 on R3 (id);
+create unique index idx2 on R3 (id,num);
+
+-- not suppose to define index on this table
+CREATE TABLE R4 (
+  ID INTEGER DEFAULT 0 NOT NULL,
+  NUM INTEGER
+);
+
 CREATE TABLE P1_DECIMAL (
-  ID INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER DEFAULT 0 NOT NULL,
   CASH DECIMAL NOT NULL,
   CREDIT DECIMAL NOT NULL,
   RATIO FLOAT NOT NULL,
@@ -64,7 +77,7 @@ CREATE TABLE P1_DECIMAL (
 );
 
 CREATE TABLE R1_DECIMAL (
-  ID INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER DEFAULT 0 NOT NULL,
   CASH DECIMAL NOT NULL,
   CREDIT DECIMAL NOT NULL,
   RATIO FLOAT NOT NULL,
@@ -73,8 +86,8 @@ CREATE TABLE R1_DECIMAL (
 
 CREATE TABLE COUNT_NULL (
   TRICKY TINYINT,
-  ID INTEGER DEFAULT '0' NOT NULL,
-  NUM INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER DEFAULT 0 NOT NULL,
+  NUM INTEGER DEFAULT 0 NOT NULL,
   PRIMARY KEY (ID)
 );
 
@@ -284,4 +297,53 @@ create procedure one_string_scalar_param as
        select id from P1 where desc in (?)
        order by id;
 -- End stored procedures for ENG-7354 --
+-- ********************************** --
+
+-- ********************************** --
+-- Stored procedure for ENG-7724      --
+CREATE TABLE product_changes (
+  location              VARCHAR(12) NOT NULL, 
+  product_id               VARCHAR(18) NOT NULL, 
+  start_date               TIMESTAMP,  
+  safety_time_promo        SMALLINT,
+  safety_time_base         SMALLINT,
+  POQ                      SMALLINT,
+  case_size                INTEGER,
+  multiple                 INTEGER,
+  lead_time                SMALLINT,
+  supplier                 VARCHAR(12), 
+  facings                  INTEGER,
+  minimum_deep             FLOAT, 
+  maximum_deep             INTEGER,
+  backroom_sfty_stck       INTEGER,
+  cost                     FLOAT, 
+  selling_price            FLOAT,
+  model                    VARCHAR(12), 
+  assortment_adj           FLOAT,
+  safety_stock_days        SMALLINT
+);
+PARTITION TABLE product_changes ON COLUMN location;
+CREATE INDEX product_changes_sku ON product_changes (location, product_id);
+
+
+CREATE PROCEDURE voltdbSelectProductChanges AS
+SELECT
+  location,
+  product_id,
+  start_date,
+  facings,
+  minimum_deep,
+  maximum_deep,
+  backroom_sfty_stck,
+  supplier,
+  safety_time_base,
+  selling_price,
+  cost,
+  supplier,
+  safety_stock_days
+FROM product_changes
+WHERE location = ? 
+AND product_id = ? 
+ORDER by location, product_id, start_date;
+PARTITION PROCEDURE voltdbSelectProductChanges ON TABLE product_changes COLUMN location PARAMETER 0;
 -- ********************************** --

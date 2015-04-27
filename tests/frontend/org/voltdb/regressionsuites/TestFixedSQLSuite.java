@@ -1973,18 +1973,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         VoltTable vt;
 
-        // where desc in ?
-        //
-        // Cast parameter as an Object (not Object[]),
-        // and it's treated as a single array-typed parameter in the callee.
-        //
-        // VoltDB produces an error in this case, but this seems wrong:
-        //
         verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, (Object)stringArgs);
-
-        verifyProcFails(client, "Array / Scalar parameter mismatch",
-                "@AdHoc", adHocQueryWithListParam, (Object[])stringArgs);
+                "@AdHoc", adHocQueryWithListParam, stringArgs);
 
         // where desc in ?
         // scalar parameter fails
@@ -2093,6 +2083,191 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
         assertTrue(callback.getClientResponse().getStatusString().contains(
                 "Array / Scalar parameter mismatch"));
+    }
+
+    public void testENG7724() throws Exception {
+        Client client = getClient();
+        VoltTable vt = client.callProcedure("voltdbSelectProductChanges", 1, 1).getResults()[0];
+        assertEquals(13, vt.getColumnCount());
+    }
+
+    private void runQueryGetDecimal(Client client, String sql, double value) throws Exception {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(value, vt.getDecimalAsBigDecimal(0).doubleValue(), 0.0001);
+    }
+
+    private void runQueryGetDouble(Client client, String sql, double value) throws Exception {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(value, vt.getDouble(0), 0.0001);
+    }
+
+    public void testENG7480() throws Exception {
+        Client client = getClient();
+
+        String sql;
+        sql = "insert into R1 Values(1, 'MA', 2, 2.2);";
+        client.callProcedure("@AdHoc", sql);
+        // query constants interpreted as DECIMAL
+
+        //
+        // operation between float and decimal
+        //
+        sql = "SELECT 0.1 + (1-0.1) + ratio FROM R1";
+        runQueryGetDouble(client, sql, 3.2);
+
+        sql = "SELECT 0.1 + (1-0.1) - ratio FROM R1";
+        runQueryGetDouble(client, sql, -1.2);
+
+        sql = "SELECT 0.1 + (1-0.1) / ratio FROM R1";
+        runQueryGetDouble(client, sql, 0.509090909091);
+
+        sql = "SELECT 0.1 + (1-0.1) * ratio FROM R1";
+        runQueryGetDouble(client, sql, 2.08);
+
+        // reverse order
+        sql = "SELECT 0.1 + ratio + (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 3.2);
+
+        sql = "SELECT 0.1 + ratio - (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.4);
+
+        sql = "SELECT 0.1 + ratio / (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.544444444444);
+
+        sql = "SELECT 0.1 + ratio * (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.08);
+
+
+        //
+        // operation between decimal and integer
+        //
+        if (isHSQL()) {
+            // not compatible with Hsql
+            return;
+        }
+
+        sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
+        runQueryGetDecimal(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + (1-0.1) - NUM FROM R1";
+        runQueryGetDecimal(client, sql, -1.0);
+
+        sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
+        runQueryGetDouble(client, sql, 0.55);
+
+        sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
+        runQueryGetDouble(client, sql, 1.9);
+
+        // reverse order
+        sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.2);
+
+        sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.322222222222);
+
+        sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.9);
+    }
+
+    private void nullIndexSearchKeyChecker(Client client, String sql) throws Exception {
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+    }
+
+    public void testENG8120() throws Exception {
+        // hsqldb does not handle null
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        String[] tables = {"R1", "R3", "R4"};
+        for (String tb : tables)
+        {
+            sql = "insert into " + tb + "  (id, num) Values(?, ?);";
+            client.callProcedure("@AdHoc", sql, 1, null);
+            client.callProcedure("@AdHoc", sql, 2, null);
+            client.callProcedure("@AdHoc", sql, 3, 3);
+            client.callProcedure("@AdHoc", sql, 4, 4);
+
+            sql = "select count(*) from " + tb;
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{4});
+
+            // activate # of searchkey is 1
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // activate # of searchkey is 2
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // post predicate
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // nest loop index join
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
+
+            if (tb != "R4") {
+                vt = client.callProcedure("@Explain", sql, null).getResults()[0];
+                assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
+                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4\""));
+            }
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+        }
+
     }
 
     //

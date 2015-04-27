@@ -302,7 +302,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             }
         }
 
-        if ((neededType == VoltType.FLOAT) || (neededType == VoltType.DECIMAL)) {
+        if ((neededType == VoltType.FLOAT || neededType == VoltType.DECIMAL)
+                && getValueType() != VoltType.VARBINARY) {
             if (m_valueType == null ||
                     (m_valueType != VoltType.NUMERIC && ! m_valueType.isExactNumeric())) {
                 try {
@@ -318,7 +319,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             return;
         }
 
-        if (neededType.isInteger()) {
+        if (neededType.isInteger() && getValueType() != VoltType.VARBINARY) {
             long value = 0;
             try {
                 value = Long.parseLong(getValue());
@@ -382,7 +383,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             try {
                 Long.parseLong(getValue());
             } catch (NumberFormatException e) {
-                //TODO: Or DECIMAL? Either is OK for integer comparison, but math gets different results?
+                // DECIMAL is not OK, because the value may be bigger/smaller than our decimal range.
                 columnType = VoltType.FLOAT;
             }
             m_valueType = columnType;
@@ -398,6 +399,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (m_valueType != VoltType.NUMERIC) {
             return;
         }
+        // By default, constants should be treated as DECIMAL other than FLOAT to preserve the precision
+        // However, the range of DECIMAL of our implementation is small
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
@@ -428,6 +431,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String unused) {
+        if (m_isNull) {
+            return "NULL";
+        }
         if (m_valueType == VoltType.STRING) {
             return "'" + m_value + "'";
         }

@@ -353,6 +353,31 @@
 
         };
 
+        this.GetPartitionIdleTimeInformation = function (onConnectionAdded) {
+            try {
+                var processName = "GRAPH_PARTITIONIDLETIME";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["STARVATION"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+
         this.GetCPUInformation = function (onConnectionAdded) {
             try {
                 //GRAPH_CPU
@@ -423,7 +448,7 @@
                 var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
                 var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
                 var values = ['0', '0', undefined];
-                var isAdmin = false;
+                var isAdmin = true;
                 _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
@@ -447,6 +472,60 @@
                 console.log(e.message);
             }
 
+        };
+        
+        this.GetTableInformationClientPort = function (onConnectionAdded) {
+            try {
+                var processName = "TABLE_INFORMATION_CLIENTPORT";
+                var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
+                var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
+                var values = ['0', '0', undefined];
+                var isAdmin = true;
+                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    _connection.admin = true;
+                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        connection.admin = false; //Once necessary data has been fetched, set the admin privileges to false.
+                        onConnectionAdded(connection, status);
+                    });
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+        
+        this.SetConnectionForSQLExecution = function (useAdminPort) {
+            try {
+                var processNameSuffix = useAdminPort ? '' : '_CLIENTPORT';
+                var processName = "TABLE_INFORMATION" + processNameSuffix;
+                var procedureNames = ['@Statistics'];
+                var parameters = ["TABLE"];
+                var values = ['0'];
+                //For SQL Query tab, we need to pass admin as false. This way, if the database is paused, users can't accidentally send 
+                //requests that might change database contents. However, if the user has admin privileges he should be given an option to 
+                //run the query even when the database is paused. This is done by passing admin as true.
+                var isAdmin = useAdminPort ? true : false;
+                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                    }, null, false);
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
         };
 
         this.GetShortApiProfile = function (onConnectionAdded) {
@@ -935,6 +1014,44 @@
 
         };
         //end admin configuration
+        
+        //Update User configuration
+        this.UpdateUserConfiguration = function (updatedData, onConnectionAdded, userId, requestType) {
+            try {
+                var processName = "SHORTAPI_USERUPDATEDEPLOYMENT";
+                var procedureNames = [];
+                var parameters = [];
+                var values = [];
+                var shortApiDetails = {
+                    isShortApiCall: true,
+                    isUpdateConfiguration: true,
+                    apiPath: 'deployment/users/' + userId,
+                    updatedData: 'user=' + JSON.stringify(updatedData),
+                    requestType: requestType
+                };
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            }, shortApiDetails);
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    }, shortApiDetails);
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
 
     });
 

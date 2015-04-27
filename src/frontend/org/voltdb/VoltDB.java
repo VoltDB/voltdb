@@ -35,6 +35,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -50,7 +51,7 @@ public class VoltDB {
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_ZK_PORT = 7181;
     public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
@@ -154,7 +155,7 @@ public class VoltDB {
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
-        public int m_httpPort = Integer.MAX_VALUE;
+        public int m_httpPort = Constants.HTTP_PORT_DISABLED;
         public String m_httpPortInterface = "";
 
         public String m_publicInterface = "";
@@ -414,8 +415,6 @@ public class VoltDB {
                 }
 
                 else if (arg.equals("replica")) {
-                    // We're starting a replica, so we must create a new database.
-                    m_startAction = StartAction.CREATE;
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -478,12 +477,7 @@ public class VoltDB {
 
             // If no action is specified, issue an error.
             if (null == m_startAction) {
-                if (org.voltdb.utils.MiscUtils.isPro()) {
-                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, collect, or compile.");
-                } else
-                {
-                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
-                }
+                hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
                 System.out.println("Please refer to VoltDB documentation for command line usage.");
                 System.out.flush();
                 System.exit(-1);
@@ -518,7 +512,7 @@ public class VoltDB {
 
             if (m_startAction == null) {
                     isValid = false;
-                    hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
+                    hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
                 }
 
             if (m_leader == null) {
@@ -542,15 +536,6 @@ public class VoltDB {
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
-                }
-
-                if (m_replicationRole == ReplicationRole.REPLICA) {
-                    if (m_startAction.doesRecover()) {
-                        isValid = false;
-                        hostLog.fatal("Replica cluster only supports create database");
-                    } else {
-                        m_startAction = StartAction.CREATE;
-                    }
                 }
             }
 
@@ -923,6 +908,33 @@ public class VoltDB {
      */
     public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
         singleton = testInstance;
+    }
+
+    /**
+     * Selects the a specified m_drInterface over a specified m_externalInterface from m_config
+     * @return an empty string when neither are specified
+     */
+    public static String getDefaultReplicationInterface() {
+        if (m_config.m_drInterface == null || m_config.m_drInterface.isEmpty()) {
+            if (m_config.m_externalInterface == null) {
+                return "";
+            }
+            else {
+                return m_config.m_externalInterface;
+            }
+        }
+        else {
+            return m_config.m_drInterface;
+        }
+    }
+
+    public static int getReplicationPort(int deploymentFilePort) {
+        if (m_config.m_drAgentPortStart != -1) {
+            return m_config.m_drAgentPortStart;
+        }
+        else {
+            return deploymentFilePort;
+        }
     }
 
     @Override

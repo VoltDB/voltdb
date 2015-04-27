@@ -25,12 +25,21 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogType;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.ConnectorProperty;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
@@ -63,7 +72,11 @@ public class CatalogDiffEngine {
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
 
-    private SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
+    private final SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
+
+    //Track new tables to help determine which export table is new or
+    //modified
+    private final SortedSet<String> m_newTablesForExport = new TreeSet<>();
 
     //A very rough guess at whether only deployment changes are in the catalog update
     //Can be improved as more deployment things are going to be allowed to conflict
@@ -181,6 +194,17 @@ public class CatalogDiffEngine {
             // A column index does not generally provide coverage for an expression index,
             // though there are some special cases not being recognized, here,
             // like expression indexes that list a mix of non-column expressions and unique columns.
+            return false;
+        }
+
+        // partial indexes must have identical predicates
+        if (existingIndex.getPredicatejson().length() > 0) {
+            if (existingIndex.getPredicatejson().equals(newIndex.getPredicatejson())) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (newIndex.getPredicatejson().length() > 0) {
             return false;
         }
 
@@ -302,6 +326,23 @@ public class CatalogDiffEngine {
     }
 
     /**
+     * If it is not a new table make sure that the soon to be exported
+     * table is empty or has no tuple allocated memory associated with it
+     *
+     * @param tName table name
+     */
+    private void trackExportOfAlreadyExistingTables(String tName) {
+        if (tName == null || tName.trim().isEmpty()) return;
+        if (!m_newTablesForExport.contains(tName)) {
+            String errorMessage = String.format(
+                    "Unable to change table %s to an export table because the table is not empty",
+                    tName
+                    );
+            m_tablesThatMustBeEmpty.put(tName, errorMessage);
+        }
+    }
+
+    /**
      * @return null if the CatalogType can be dynamically added or removed
      * from a running system. Return an error string if it can't be changed on
      * a non-empty table. There will be a subsequent check for empty table
@@ -317,7 +358,6 @@ public class CatalogDiffEngine {
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
-            suspect instanceof Connector ||
             suspect instanceof SnapshotSchedule ||
             // refs are safe to add drop if the thing they reference is
             suspect instanceof ConstraintRef ||
@@ -329,10 +369,39 @@ public class CatalogDiffEngine {
             // So, in short, all of these constraints will pass or fail tests of other catalog differences
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
-            suspect instanceof Constraint ||
-            // Support add/drop of the top level object.
-            suspect instanceof Table)
+            suspect instanceof Constraint)
         {
+            return null;
+        }
+
+        else if (suspect instanceof Table) {
+            Table tbl = (Table)suspect;
+            if (   ChangeType.ADDITION == changeType
+                && CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)
+            ) {
+                m_newTablesForExport.add(tbl.getTypeName());
+            }
+            // Support add/drop of the top level object.
+            return null;
+        }
+
+        else if (suspect instanceof Connector) {
+            if (ChangeType.ADDITION == changeType) {
+                for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
+                    trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
+                }
+            }
+            return null;
+        }
+
+        else if (suspect instanceof ConnectorTableInfo) {
+            if (ChangeType.ADDITION == changeType) {
+                trackExportOfAlreadyExistingTables(((ConnectorTableInfo)suspect).getTable().getTypeName());
+            }
+            return null;
+        }
+
+        else if (suspect instanceof ConnectorProperty) {
             return null;
         }
 
@@ -360,8 +429,16 @@ public class CatalogDiffEngine {
             // overrides the grandfathering-in of added/dropped Column-typed
             // sub-components of Procedure, Connector, etc. as checked in the loop, below.
             // Is this safe/correct?
+            Column column = (Column) suspect;
+            Table table = (Table) column.getParent();
             if (m_inStrictMatViewDiffMode) {
                 return "May not dynamically add, drop, or rename materialized view columns.";
+            }
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+                return "May not dynamically add, drop, or rename export table columns.";
+            }
+            if (table.getIsdred()) {
+                return "May not dynamically add, drop, or rename DR table columns.";
             }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
@@ -469,6 +546,13 @@ public class CatalogDiffEngine {
 
         if ((suspect instanceof Column) && (parent instanceof Table) && (changeType == ChangeType.ADDITION)) {
             Column column = (Column)suspect;
+            Table table = (Table)column.getParent();
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+                return null;
+            }
+            if (table.getIsdred()) {
+                return null;
+            }
             retval[0] = parent.getTypeName();
             retval[1] = String.format(
                     "Unable to add NOT NULL column %s because table %s is not empty and no default value was specified.",
@@ -477,35 +561,6 @@ public class CatalogDiffEngine {
         }
 
         return null;
-    }
-
-    private boolean areTableColumnsMutable(Table table) {
-        //WARNING: There used to be a test here that the table's list of views was empty,
-        // but what it actually appeared to be testing was whether the table HAD views prior
-        // to any redefinition in the current catalog.
-        // This means that dropping mat views and changing the underlying columns in one "live"
-        // catalog change would not be an option -- they would have to be broken up into separate
-        // steps.
-        // Fortunately, for now, all the allowed "live column changes" seem to be supported without
-        // disrupting materialized views.
-        // In the future it MAY be required that column mutability gets re-checked after all of the
-        // mat view definitions (drops and adds) have been processed, in case certain kinds of
-        // underlying column change might cause special problems for certain specific cases of
-        // materialized view definition.
-
-        // no export tables
-        Database db = (Database) table.getParent();
-        for (Connector connector : db.getConnectors()) {
-            for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
-                if (tinfo.getTable() == table) {
-                    m_errors.append("May not change the columns of export table " +
-                            table.getTypeName() + ".\n");
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
     /**
@@ -584,17 +639,40 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
             return null;
-        if (suspect instanceof Constraint && field.equals("index"))
+        if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
             return null;
-        if (suspect instanceof Table) {
-            if (field.equals("signature") || field.equals("tuplelimit"))
-                return null;
-        }
-
+        if (suspect instanceof Connector && "enabled".equals(field))
+            return null;
+        if (suspect instanceof Connector && "loaderclass".equals(field))
+            return null;
 
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
+
+        if (suspect instanceof Cluster && field.equals("drProducerPort")) {
+            // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
+            if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
+                restrictionQualifier = " while DR is enabled";
+            }
+            else {
+                return null;
+            }
+        }
+        if (suspect instanceof Constraint && field.equals("index"))
+            return null;
+        if (suspect instanceof Table) {
+            if (field.equals("signature") ||
+                field.equals("tuplelimit"))
+                return null;
+
+            // Always allow disabling DR on table
+            if (field.equalsIgnoreCase("isdred")) {
+                Boolean isDRed = (Boolean) suspect.getField(field);
+                assert isDRed != null;
+                if (!isDRed) return null;
+            }
+        }
 
         // whitelist certain column changes
         if (suspect instanceof Column) {
@@ -608,13 +686,12 @@ public class CatalogDiffEngine {
             m_requiresSnapshotIsolation = true;
 
             // now assume parent is a Table
-            Table parentTable = (Table) parent;
-            if ( ! areTableColumnsMutable(parentTable)) {
-                // Note: "return false;" vs. fall through, here
-                // overrides the grandfathering-in of modified fields of
-                // Column-typed sub-components of Procedure and ColumnRef.
-                // Is this safe/correct?
-                return ""; // error msg already appended
+            Table table = (Table) parent;
+            if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
+                return "May not dynamically change the columns of export tables.";
+            }
+            if (table.getIsdred()) {
+                return "May not dynamically modify DR table columns.";
             }
 
             if (field.equals("index")) {
@@ -655,14 +732,14 @@ public class CatalogDiffEngine {
                 }
                 if (oldTypeInt == newTypeInt) {
                     if (oldType == VoltType.STRING && oldInBytes == false && newInBytes == true) {
-                        restrictionQualifier = "narrowing from " + oldSize + "CHARACTERS to "
+                        restrictionQualifier = " narrowing from " + oldSize + "CHARACTERS to "
                     + newSize * CatalogSizing.MAX_BYTES_PER_UTF8_CHARACTER + " BYTES";
                     } else {
-                        restrictionQualifier = "narrowing from " + oldSize + " to " + newSize;
+                        restrictionQualifier = " narrowing from " + oldSize + " to " + newSize;
                     }
                 }
                 else {
-                    restrictionQualifier = "from " + oldType.toSQLString() +
+                    restrictionQualifier = " from " + oldType.toSQLString() +
                                            " to " + newType.toSQLString();
                 }
             }
@@ -712,6 +789,10 @@ public class CatalogDiffEngine {
                                        restrictionQualifier +
                                        " rescued by context '" + parent + "'");
                 }
+                return null;
+            }
+            // allow export connector property changes
+            if (parent instanceof Connector && suspect instanceof ConnectorProperty) {
                 return null;
             }
 
@@ -764,6 +845,13 @@ public class CatalogDiffEngine {
                         retval[0]);
                 return retval;
             }
+            if (field.equalsIgnoreCase("isdred")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to enable DR on table %s because it is not empty.",
+                        retval[0]);
+                return retval;
+            }
         }
 
         // handle narrowing columns and some modifications on empty tables
@@ -774,6 +862,9 @@ public class CatalogDiffEngine {
 
             // for now, no changes to export tables
             if (CatalogUtil.isTableExportOnly(db, table)) {
+                return null;
+            }
+            if (table.getIsdred()) {
                 return null;
             }
 
@@ -874,7 +965,7 @@ public class CatalogDiffEngine {
         // if no tablename, then it's just not possible
         if (response == null) {
             m_supported = false;
-            m_errors.append(errorMessage);
+            m_errors.append(errorMessage + "\n");
         }
         // otherwise, it's possible if a specific table is empty
         // collect the error message(s) and decide if it can be done inside @UAC

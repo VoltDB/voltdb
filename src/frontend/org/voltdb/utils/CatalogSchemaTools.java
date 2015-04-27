@@ -281,10 +281,8 @@ public abstract class CatalogSchemaTools {
 
         if (catalog_tbl.getTuplelimit() != Integer.MAX_VALUE) {
             table_sb.append(add + spacer + "LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
-            CatalogMap<Statement> deleteMap = catalog_tbl.getTuplelimitdeletestmt();
-            if (deleteMap.size() > 0) {
-                assert(deleteMap.size() == 1);
-                String deleteStmt = deleteMap.iterator().next().getSqltext();
+            String deleteStmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(catalog_tbl);
+            if (deleteStmt != null) {
                 if (deleteStmt.endsWith(";")) {
                     // StatementCompiler appends the semicolon, we don't want it here.
                     deleteStmt = deleteStmt.substring(0, deleteStmt.length() - 1);
@@ -353,15 +351,31 @@ public abstract class CatalogSchemaTools {
                     add = ", ";
                 }
             }
-            sb.append(");\n");
-        }
+            sb.append(")");
 
+            String jsonPredicate = catalog_idx.getPredicatejson();
+            if (!jsonPredicate.isEmpty()) {
+                try {
+                    AbstractExpression predicate = AbstractExpression.fromJSONString(jsonPredicate,
+                        new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName()));
+                    sb.append(" WHERE " + predicate.explain(catalog_tbl.getTypeName()));
+                } catch (JSONException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+            sb.append(";\n");
+        }
         if (isExportTableWithTarget != null) {
             sb.append("EXPORT TABLE " + catalog_tbl.getTypeName());
             if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
                 sb.append(" TO STREAM " + isExportTableWithTarget);
             }
             sb.append(";\n");
+        }
+
+        if (catalog_tbl.getIsdred()) {
+            sb.append("DR TABLE " + catalog_tbl.getTypeName() + ";\n");
         }
 
         sb.append("\n");

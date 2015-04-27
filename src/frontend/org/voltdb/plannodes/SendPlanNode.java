@@ -55,7 +55,7 @@ public class SendPlanNode extends AbstractPlanNode {
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
-        m_outputSchema.sortByTveIndex();
+        // output schema for SendPlanNode should not ever be changed
     }
 
 

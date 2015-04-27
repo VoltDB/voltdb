@@ -69,6 +69,14 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         teardownSystem();
     }
 
+    /**
+     * A (public) method used to start the client, without also starting the
+     * server; needed by FullDdlSqlTest.java, in the GEB/VMC tests.
+     */
+    public void startClient() throws Exception
+    {
+        startClient(null);
+    }
 
     @Test
     public void testCreateUniqueIndex() throws Exception {
@@ -230,7 +238,12 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         threw = false;
         try {
-            m_client.callProcedure("T12.insert", 3, 2);
+            // Attempt to add an identical row: using the same partition key
+            // guarantees that this will go to the same partition as the earlier
+            // insert; using the the same constraint key (in the same partition)
+            // means that the ASSUMEUNIQUE constraint will be violoated, so an
+            // exception should be thrown
+            m_client.callProcedure("T12.insert", 1, 2);
         } catch (ProcCallException pce) {
             threw = true;
         }
@@ -282,6 +295,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testExportTable() throws Exception
     {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         assertTrue(findTableInSystemCatalogResults("T25"));
         assertEquals(getTableType("T25"), "EXPORT");
         //Export table created with STREAM syntax
@@ -649,5 +664,43 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(verifyTableColumnType("T54", "C2", "VARCHAR"));
         assertFalse(isColumnNullable("T54", "C1"));
         assertTrue(isColumnNullable("T54", "C2"));
+    }
+
+
+    @Test
+    public void testTableDR() throws Exception
+    {
+        // Test for T56 (DR table exists)
+        assertTrue(findTableInSystemCatalogResults("T56"));
+        assertTrue(doesColumnExist("T56", "C1" ));
+        assertTrue(doesColumnExist("T56", "C2" ));
+        assertTrue(isColumnNullable("T56", "C2"));
+        assertTrue(isDRedTable("T56"));
+
+        // Test for T57 (DR partitioned table exists)
+        assertTrue(findTableInSystemCatalogResults("T57"));
+        assertTrue(doesColumnExist("T57", "C1" ));
+        assertTrue(doesColumnExist("T57", "C2" ));
+        assertTrue(isColumnPartitionColumn("T57", "C2"));
+        assertTrue(isDRedTable("T57"));
+
+        // Test that T58 and T59 have been dropped
+        assertFalse(findTableInSystemCatalogResults("T58"));
+        assertFalse(findTableInSystemCatalogResults("T59"));
+
+        // Test that the DR flag is false for T60 and T61 (after disable)
+        assertTrue(findTableInSystemCatalogResults("T60"));
+        assertTrue(doesColumnExist("T60", "C1" ));
+        assertTrue(doesColumnExist("T60", "C2" ));
+        assertTrue(doesColumnExist("T60", "C3" ));
+        assertTrue(verifyTableColumnType("T60", "C3", "INTEGER"));
+        assertFalse(isDRedTable("T60"));
+        assertTrue(findTableInSystemCatalogResults("T61"));
+        assertTrue(doesColumnExist("T61", "C1" ));
+        assertTrue(doesColumnExist("T61", "C2" ));
+        assertTrue(doesColumnExist("T61", "C3" ));
+        assertTrue(isColumnPartitionColumn("T61", "C3"));
+        assertTrue(verifyTableColumnType("T61", "C3", "INTEGER"));
+        assertFalse(isDRedTable("T61"));
     }
 }

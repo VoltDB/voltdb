@@ -103,7 +103,7 @@ public class TestClientFeatures extends TestCase {
     public void testPerCallTimeout() throws Exception {
         CSL csl = new CSL();
 
-        ClientConfig config = new ClientConfig(null, null, csl);
+        ClientConfig config = new ClientConfig(null, null, csl, ClientAuthHashScheme.HASH_SHA1);
         config.setProcedureCallTimeout(500);
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
@@ -415,5 +415,24 @@ public class TestClientFeatures extends TestCase {
         assertFalse(client.backpressureBarrier(System.nanoTime(), TimeUnit.MINUTES.toNanos(1)));
         assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
         assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(20));
+    }
+
+    public void testDefaultConfigValues() {
+        final ClientConfig dut = new ClientConfig();
+        assertEquals(ClientAuthHashScheme.HASH_SHA256, dut.m_hashScheme);
+        assertTrue(dut.m_username.isEmpty());
+        assertTrue(dut.m_password.isEmpty());
+        assertTrue(dut.m_cleartext);
+        assertFalse(dut.m_heavyweight);
+        assertEquals(3000, dut.m_maxOutstandingTxns);
+        assertEquals(Integer.MAX_VALUE, dut.m_maxTransactionsPerSecond);
+        assertFalse(dut.m_autoTune);
+        assertEquals(5, dut.m_autoTuneTargetInternalLatency);
+        assertEquals(TimeUnit.MINUTES.toNanos(2), dut.m_procedureCallTimeoutNanos);
+        assertEquals(TimeUnit.MINUTES.toMillis(2), dut.m_connectionResponseTimeoutMS);
+        assertTrue(dut.m_useClientAffinity);
+        assertFalse(dut.m_reconnectOnConnectionLoss);
+        assertEquals(TimeUnit.SECONDS.toMillis(1), dut.m_initialConnectionRetryIntervalMS);
+        assertEquals(TimeUnit.SECONDS.toMillis(8), dut.m_maxConnectionRetryIntervalMS);
     }
 }

@@ -118,6 +118,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import org.voltdb.client.ClientAuthHashScheme;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -150,6 +151,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
+    public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -619,13 +621,29 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
 
-            message.flip().position(1);//skip version
+            message.flip();
+            int aversion = message.get(); //Get version
+            ClientAuthHashScheme hashScheme = ClientAuthHashScheme.HASH_SHA1;
+            //If auth version is more than zero we read auth hashing scheme.
+            if (aversion > 0) {
+                try {
+                    hashScheme = ClientAuthHashScheme.get(message.get());
+                } catch (IllegalArgumentException ex) {
+                    authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
+                    //Send negative response
+                    responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                    socket.write(responseBuffer);
+                    socket.close();
+                    return null;
+                }
+            }
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
             final String username = fds.readString();
-            final byte password[] = new byte[20];
-            //We should be left with SHA-1 bytes only.
-            if (message.remaining() != 20) {
+            final int digestLen = ClientAuthHashScheme.getDigestLength(hashScheme);
+            final byte password[] = new byte[digestLen];
+            //We should be left with SHA bytes only which varies based on scheme.
+            if (message.remaining() != digestLen) {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress()
                         + "): user " + username + " failed authentication.");
                 //Send negative response
@@ -666,12 +684,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (ap == AuthProvider.KERBEROS) {
                     arq = context.authSystem.new KerberosAuthenticationRequest(socket);
                 } else {
-                    arq = context.authSystem.new HashAuthenticationRequest(username, password);
+                    arq = context.authSystem.new HashAuthenticationRequest(username, password, hashScheme);
                 }
                 /*
                  * Authenticate the user.
                  */
-                boolean authenticated = arq.authenticate();
+                boolean authenticated = arq.authenticate(hashScheme);
 
                 if (!authenticated) {
                     Exception faex = arq.getAuthenticationFailureException();
@@ -783,7 +801,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public void started(final Connection c) {
             m_connection = c;
             m_cihm.put(c.connectionId(),
-                       new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
+                       new ClientInterfaceHandleManager( m_isAdmin, c, null, m_acg.get()));
             m_acg.get().addMember(this);
             if (!m_acg.get().hasBackPressure()) {
                 c.enableReadSelection();
@@ -1238,6 +1256,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             buf.flip();
             c.writeStream().enqueue(buf);
         }
+
+        if (cihm.repairCallback != null) {
+            cihm.repairCallback.repairCompleted(partitionId, initiatorHSId);
+        }
     }
 
     /**
@@ -1255,7 +1277,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_snapshotDaemon.init(this, messenger, new Runnable() {
             @Override
             public void run() {
-                bindAdapter(m_snapshotDaemonAdapter);
+                bindAdapter(m_snapshotDaemonAdapter, null);
             }
         },
         gse);
@@ -1264,9 +1286,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Tell the clientInterface about a connection adapter.
      */
-    public void bindAdapter(final Connection adapter) {
+    public void bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
         m_cihm.put(adapter.connectionId(),
-                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter,
+                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
                     AdmissionControlGroup.getDummy()));
     }
 
@@ -2157,6 +2179,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             error.flattenToBuffer(buffer).flip();
             c.writeStream().enqueue(buffer);
         }
+        else
+        if ((error = m_invocationValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
+                SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
         else {
             /*
              * Round trip the invocation to initialize it for command logging
@@ -2451,6 +2481,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (ds != null) {
                         oldValue = ByteBuffer.allocate(ds.getSerializedSize());
                         ds.serialize(oldValue);
+                        oldValue.flip();
                     }
 
                     if (buf.equals(oldValue)) return;

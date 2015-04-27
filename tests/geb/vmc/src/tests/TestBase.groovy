@@ -26,17 +26,26 @@ package vmcTest.tests
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.List
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+
 import geb.Page
 import geb.spock.GebReportingSpec
+
 import org.junit.Rule
 import org.junit.rules.TestName
 import org.openqa.selenium.Dimension
+
 import spock.lang.Shared
 import vmcTest.pages.*
 
 /**
  * This class is the base class for all of the test classes; it provides
- * initialization and convenience method(s).
+ * initialization and convenience methods.
  */
 class TestBase extends GebReportingSpec {
     @Rule public TestName tName = new TestName()
@@ -45,9 +54,13 @@ class TestBase extends GebReportingSpec {
     static final boolean DEFAULT_DEBUG_PRINT = false
     static final int DEFAULT_WINDOW_WIDTH  = 1500
     static final int DEFAULT_WINDOW_HEIGHT = 1000
-    static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    static final int MAX_SECS_WAIT_FOR_PAGE = 60
+    static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
 
+    static Boolean doesDBMonitorPageOpenFirst = null
     @Shared boolean firstDebugMessage = true
+
+    private static final ExecutorService executor = Executors.newFixedThreadPool(5);
 
     def setupSpec() { // called once (per test class), before any tests
         // If the window is not the right size, resize it
@@ -56,8 +69,8 @@ class TestBase extends GebReportingSpec {
         int desiredHeight = getIntSystemProperty("windowHeight", DEFAULT_WINDOW_HEIGHT)
         if (winSize.width != desiredWidth || winSize.height != desiredHeight) {
             driver.manage().window().setSize(new Dimension(desiredWidth, desiredHeight))
-            debugPrint "Window resized, from (" + winSize.width + ", " + winSize.height +
-                       ") to (" + desiredWidth + ", " + desiredHeight + ")"
+            debugPrint 'Window resized, from (' + winSize.width + ', ' + winSize.height +
+                       ') to (' + desiredWidth + ', ' + desiredHeight + ') [in TestBase.setupSpec()]'
         }
     }
 
@@ -67,17 +80,70 @@ class TestBase extends GebReportingSpec {
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
-            then: 'to be on VMC page'
+            then: 'should be on VMC page'
             at VoltDBManagementCenterPage
         }
 
+        // Confirm that the 'DB Monitor' page opens initially, the first time
+        // (this is used by NavigatePagesTest)
+        if (doesDBMonitorPageOpenFirst == null) {
+            doesDBMonitorPageOpenFirst = page.isDbMonitorPageOpen()
+            debugPrint 'DB Monitor page was opened initially: ' + doesDBMonitorPageOpenFirst + ' [in TestBase.setup()]'
+        }
+    }
+
+    /**
+     * If already on the VoltDBManagementCenterPage, do nothing; otherwise,
+     * point the browser to the VoltDBManagementCenterPage's URL; if it does
+     * not work the first time, allow a second attempt.
+     */
+    def ensureOnVoltDBManagementCenterPage() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            // Attempt to catch any problems here, including a failure due
+            // to the VoltDBManagementCenterPage not being shown, or a hang
+            // (waiting for the browser/VMC to come up, I suspect)
+            try {
+                debugPrint 'Attempting to reach VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
+                waitForVoltDBManagementCenterPage()
+                debugPrint 'Succeeded:  reached VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
+            } catch (Throwable e) {
+                // If an exception is encountered, make a second attempt
+                String message = '\nCaught an exception attempting to reach VoltDBManagementCenterPage ' +
+                                 '[in TestBase.ensureOnVoltDBManagementCenterPage()]'
+                System.err.println message + ':'
+                e.printStackTrace()
+                println message + '; see Standard error for details.'
+                println 'Will refresh page and try again... (' + sdf.format(new Date()) + ')'
+                driver.navigate().refresh()
+                waitForVoltDBManagementCenterPage()
+                println '... second attempt succeeded, at :  ' + sdf.format(new Date())
+            }
+        }
         page.loginIfNeeded()
     }
 
-    def ensureOnVoltDBManagementCenterPage() {
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            to VoltDBManagementCenterPage
-        }
+    /**
+     * Point the browser to the VoltDBManagementCenterPage's URL, using a
+     * FutureTask with a time limit, so that this will not hang.
+     */
+    def waitForVoltDBManagementCenterPage() {
+        Future<VoltDBManagementCenterPage> toVMCPage = new FutureTask(new Callable() {
+            @Override
+            public VoltDBManagementCenterPage call() {
+                return toVoltDBManagementCenterPage();
+            }})
+        executor.execute(toVMCPage)
+        toVMCPage.get(MAX_SECS_WAIT_FOR_PAGE, TimeUnit.SECONDS)
+    }
+
+    /**
+     * Point the browser to the VoltDBManagementCenterPage; this is a separate
+     * method only so that it can be called via a FutureTask, and therefore
+     * killed if it exceeds the maximum time, since otherwise it sometimes
+     * hangs (when run on Jenkins).
+     */
+    private VoltDBManagementCenterPage toVoltDBManagementCenterPage() {
+        to VoltDBManagementCenterPage
     }
 
     /**
@@ -118,7 +184,7 @@ class TestBase extends GebReportingSpec {
             try {
                 return Boolean.parseBoolean(sysPropValue)
             } catch (Throwable e) {
-                println "Property '" + propertyName + "' should be int, not '" + sysPropValue + "'."
+                println "Property '" + propertyName + "' should be boolean, not '" + sysPropValue + "'."
                 return defaultValue
             }
         }
@@ -127,13 +193,20 @@ class TestBase extends GebReportingSpec {
     /**
      * Returns a list of lines from the specified file.
      * @param file - the file whose lines are to be returned.
+     * @param commentChars - the character(s) that indicate the beginning of a
+     * comment, which should be ignored (default is '#').
+     * @param includeBlankLines - whether or not to include blank (or
+     * white-space only) lines in the output (default is true).
      * @return a list of lines from the specified file.
      */
-    def List<String> getFileLines(File file) {
+    def List<String> getFileLines(File file, String commentChars='#',
+                                  boolean includeBlankLines=true) {
         def lines = []
         if (file.size() > 0) {
-            file.eachLine {
-                line -> if (!line.trim().startsWith('#')) { lines.add(line) }
+            file.eachLine { line ->
+                def trimmedLine = line.trim()
+                if ((includeBlankLines || !trimmedLine.isEmpty()) &&
+                    !trimmedLine.startsWith(commentChars)) { lines.add(line) }
             }
         }
         return lines
@@ -195,4 +268,14 @@ class TestBase extends GebReportingSpec {
         debugPrint(text, getBooleanSystemProperty("debugPrint", DEFAULT_DEBUG_PRINT))
     }
 
+    def cleanupSpec() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            when: 'Open VMC page'
+            ensureOnVoltDBManagementCenterPage()
+            then: 'to be on VMC page'
+            at VoltDBManagementCenterPage
+        }
+
+        page.loginIfNeeded()
+    }
 }

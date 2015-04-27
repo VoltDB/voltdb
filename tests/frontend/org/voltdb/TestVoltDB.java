@@ -87,10 +87,6 @@ public class TestVoltDB extends TestCase {
         VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
         assertEquals(StartAction.SAFE_RECOVER, cfg16.m_startAction);
 
-        String args17[] = { "replica" };
-        VoltDB.Configuration cfg17 = new VoltDB.Configuration(args17);
-        assertEquals(ReplicationRole.REPLICA, cfg17.m_replicationRole);
-
         // test host:port formats
         String args18[] = {"create", "port", "localhost:5678"};
         VoltDB.Configuration cfg18 = new VoltDB.Configuration(args18);
@@ -120,6 +116,26 @@ public class TestVoltDB extends TestCase {
 
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
+
+        String args23[] = { "create", "replica" };
+        VoltDB.Configuration cfg23 = new VoltDB.Configuration(args23);
+        assertEquals(StartAction.CREATE, cfg23.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg23.m_replicationRole);
+
+        String args24[] = { "recover", "replica" };
+        VoltDB.Configuration cfg24 = new VoltDB.Configuration(args24);
+        assertEquals(StartAction.RECOVER, cfg24.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg24.m_replicationRole);
+
+        String args25[] = { "rejoin", "replica" };
+        VoltDB.Configuration cfg25 = new VoltDB.Configuration(args25);
+        assertEquals(StartAction.REJOIN, cfg25.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg25.m_replicationRole);
+
+        String args26[] = { "live rejoin", "replica" };
+        VoltDB.Configuration cfg26 = new VoltDB.Configuration(args26);
+        assertEquals(StartAction.LIVE_REJOIN, cfg26.m_startAction);
+        assertEquals(ReplicationRole.REPLICA, cfg26.m_replicationRole);
     }
 
     public void testConfigurationValidate() {
@@ -149,21 +165,17 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(args6);
         assertFalse(config.validate());
 
-        // replica with non-create
-        String[] args7 = {"create", "host", "hola", "deployment", "teststring4", "replica", "recover"};
-        config = new VoltDB.Configuration(args7);
-        assertFalse(config.validate());
+        if (config.m_isEnterprise) {
+            // replica with explicit recover
+            String[] args7 = {"host", "hola", "replica", "recover"};
+            config = new VoltDB.Configuration(args7);
+            assertTrue(config.validate());
+        }
 
         // replica with explicit create
         String[] args8 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica", "create"};
         config = new VoltDB.Configuration(args8);
         assertTrue(config.validate());
-
-        // replica with default action of create
-        String[] args9 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica"};
-        config = new VoltDB.Configuration(args9);
-        assertTrue(config.validate());
-        assertEquals(StartAction.CREATE, config.m_startAction);
 
         // valid config
         String[] args10 = {"create", "leader", "localhost", "deployment", "te", "catalog", "catalog.jar"};
@@ -189,6 +201,12 @@ public class TestVoltDB extends TestCase {
         String[] args201 = {"rejoinhost", "localhost"};
         config = new VoltDB.Configuration(args201);
         assertEquals(config.validate(), MiscUtils.isPro());
+
+        // valid rejoin config
+        String[] args300 = {"live", "rejoin", "host", "localhost", "replica"};
+        config = new VoltDB.Configuration(args300);
+        assertEquals(MiscUtils.isPro(), config.validate());
+        assertEquals(StartAction.LIVE_REJOIN, config.m_startAction);
     }
 
     /**

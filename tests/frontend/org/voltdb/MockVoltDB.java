@@ -77,6 +77,7 @@ public class MockVoltDB implements VoltDBInterface
     boolean m_noLoadLib = false;
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
+    long m_clusterCreateTime = 0;
     VoltDB.Configuration voltconfig = null;
     private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
     public int m_hostId = 0;
@@ -193,6 +194,12 @@ public class MockVoltDB implements VoltDBInterface
         getDatabase().getTables().add(tableName);
         getTable(tableName).setIsreplicated(isReplicated);
         getTable(tableName).setSignature(tableName);
+    }
+
+    public void setDRProducerClusterId(int clusterId)
+    {
+        getCluster().setDrproducerenabled(true);
+        getCluster().setDrclusterid(clusterId);
     }
 
     public void configureLogging(boolean enabled, boolean sync,
@@ -547,6 +554,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public NodeDRGateway getNodeDRGateway()
+    {
+        return null;
+    }
+
+    @Override
     public SiteTracker getSiteTrackerForSnapshot() {
         return m_siteTracker;
     }
@@ -621,7 +634,26 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public long getClusterCreateTime() {
+        return m_clusterCreateTime;
+    }
+
+    @Override
+    public void setClusterCreateTime(long clusterCreateTime) {
+        m_clusterCreateTime = clusterCreateTime;
+    }
+
+    @Override
     public void halt() {
         assert (true);
+    }
+
+    @Override
+    public ConsumerDRGateway getConsumerDRGateway() {
+        return null;
+    }
+
+    @Override
+    public void onSyncSnapshotCompletion() {
     }
 }

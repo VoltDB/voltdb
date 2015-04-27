@@ -1,0 +1,18 @@
+drop procedure p if exists;
+drop table t if exists;
+create table t (i integer not null);
+
+file -inlinebatch EOF
+partition table t on column i;
+create index tidx on t(i);
+create procedure p as
+    select * from t;
+
+EOF
+
+exec p;
+
+explain select * from t;
+
+drop procedure p;
+drop table t;

@@ -42,7 +42,7 @@ public class SQLPatternPartString extends SQLPatternPart
     }
 
     @Override
-    Pattern compile()
+    Pattern compile(String label)
     {
         // Shouldn't really be used, but this is an obvious implementation.
         return Pattern.compile(m_str);

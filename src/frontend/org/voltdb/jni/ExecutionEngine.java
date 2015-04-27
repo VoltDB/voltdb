@@ -56,7 +56,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
-        APPLY_BINARY_LOG(1);
+        GET_DR_TUPLESTREAM_STATE(1),
+        SET_DR_SEQUENCE_NUMBERS(2);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -334,6 +335,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         TIME_OUT_MILLIS = newLatency;
     }
 
+    public int getTimeoutLatency() {
+        return TIME_OUT_MILLIS;
+    }
+
     public long fragmentProgressUpdate(int indexFromFragmentTask,
             String planNodeName,
             String lastAccessedTable,
@@ -568,7 +573,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -662,14 +667,36 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract void updateHashinator(HashinatorConfig config);
 
     /**
-     * Execute an arbitrary task that is described by the task id and serialized task parameters.
-     * The return value is also opaquely encoded. This means you don't have to update the IPC
-     * client when adding new task types
+     * Apply binary log data. To be able to advance the DR sequence number and
+     * regenerate binary log for chaining correctly, proper spHandle and
+     * lastCommittedSpHandle from the current transaction need to be passed in.
+     * @param log                      The binary log data
+     * @param txnId                    The txnId of the current transaction
+     * @param spHandle                 The spHandle of the current transaction
+     * @param lastCommittedSpHandle    The spHandle of the last committed transaction
+     * @param uniqueId                 The uniqueId of the current transaction
+     * @param undoToken                For undo
+     * @throws EEException
+     */
+    public abstract void applyBinaryLog(ByteBuffer log,
+                                        long txnId,
+                                        long spHandle,
+                                        long lastCommittedSpHandle,
+                                        long uniqueId,
+                                        long undoToken) throws EEException;
+
+    /**
+     * Execute an arbitrary non-transactional task that is described by the task id and
+     * serialized task parameters. The return value is also opaquely encoded. This means
+     * you don't have to update the IPC client when adding new task types.
+     *
+     * This method shouldn't be used to perform transactional tasks such as mutating
+     * table data because it doesn't setup transaction context in the EE.
      * @param taskId
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task);
+    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException;
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
@@ -715,6 +742,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int hostId,
             byte hostname[],
             long tempTableMemory,
+            boolean createDrReplicatedStream,
             int compactionThreshold);
 
     /**
@@ -764,7 +792,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
             long undoToken);
 
     /**
@@ -780,7 +808,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoToken);
 
     /**
      * Serialize the result temporary table.
@@ -912,13 +943,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native long nativeTableHashCode(long pointer, int tableId);
 
+    protected native int nativeApplyBinaryLog(long pointer,
+                                              long txnId,
+                                              long spHandle,
+                                              long lastCommittedSpHandle,
+                                              long uniqueId,
+                                              long undoToken);
+
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.
      * This is a generic entry point into the EE that doesn't need to be updated in the IPC
      * client every time you add a new task
      * @param pointer
+     * @return error code
      */
-    protected native void nativeExecuteTask(long pointer);
+    protected native int nativeExecuteTask(long pointer);
 
     /**
      * Perform an export poll or ack action. Poll data will be returned via the usual
@@ -950,6 +989,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
+
+    public native static byte[] getTestDRBuffer();
 
     /**
      * Start collecting statistics (starts timer).
@@ -992,5 +1033,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     @Deprecated
     public void setInitialLogDurationForTest(long newDuration) {
         INITIAL_LOG_DURATION = newDuration;
+    }
+
+    /**
+     * Useful in unit tests.  Gets the initial frequency with which
+     * the long-running query info message will be logged.
+     */
+    @Deprecated
+    public long getInitialLogDurationForTest() {
+        return INITIAL_LOG_DURATION;
     }
 }

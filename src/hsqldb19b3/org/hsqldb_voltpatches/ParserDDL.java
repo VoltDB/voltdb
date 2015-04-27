@@ -3161,11 +3161,18 @@ public class ParserDDL extends ParserRoutine {
             indexExprs = null;
         }
 
+        // A VoltDB extension to support partial index
+        Expression predicate = null;
+        if (readIfThis(Tokens.WHERE)) {
+            predicate = XreadBooleanValueExpression();
+        }
+
         indexColumns = getColumnList(set, table);
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
             table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs,
-            Boolean.valueOf(assumeUnique)
+            Boolean.valueOf(assumeUnique),
+            predicate
         /* disable 4 lines ...
         int[]    indexColumns = readColumnList(table, true);
         String   sql          = getLastPart();

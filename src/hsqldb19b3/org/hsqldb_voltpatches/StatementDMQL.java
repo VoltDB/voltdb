@@ -44,6 +44,9 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
+import org.hsqldb_voltpatches.types.NumberType;
+// End of VoltDB extension
 
 /**
  * Statement implementation for DML and base DQL statements.
@@ -920,6 +923,10 @@ public abstract class StatementDMQL extends Statement {
                     queryExpr.getLeftQueryExpression(), parameters, session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
                     queryExpr.getRightQueryExpression(), parameters, session);
+            if (queryExpr.sortAndSlice.hasOrder() || queryExpr.sortAndSlice.hasLimit()) {
+                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                        queryExpr.operatorName() + " tuple set operator with ORDER BY or LIMIT/OFFSET is not supported.");
+            }
             /**
              * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
@@ -941,7 +948,7 @@ public abstract class StatementDMQL extends Statement {
             return unionExpr;
         } else {
             throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    queryExpr.operatorName() + "  tuple set operator is not supported.");
+                    queryExpr.operatorName() + " tuple set operator is not supported.");
         }
     }
 
@@ -1296,7 +1303,11 @@ public abstract class StatementDMQL extends Statement {
             parameter.attributes.put("index", String.valueOf(index));
             ++index;
             parameter.attributes.put("id", expr.getUniqueId(session));
-            parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
+            if (paramType == NumberType.SQL_NUMERIC_DEFAULT_INT) {
+                parameter.attributes.put("valuetype", "BIGINT");
+            } else {
+                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
+            }
             // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
             // that values passed to parameters such as the one in "col in ?" must be vectors.
             // So, it can just be forwarded as a boolean.

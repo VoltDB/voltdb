@@ -20,7 +20,7 @@ h1 {font:16px Arial, Helvetica, sans-serif;}
 .btn:hover{background-color:#76bd1d; color:#fff;}
 .graphOpacity {opacity: 0.5}
 h1, h2, h3, h4, h5, h6 {margin:0!important;}
-
+.errorValue{ color: #c70000;}
 
 /*****Global Ends******/
 /******sprite*************/
@@ -40,7 +40,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring, 
-ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu
+ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig 
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 ul.servers-list li.pauseActiveMonitoring{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;background-color: #f0f3f4}
 
@@ -651,7 +651,7 @@ display:block;
  margin:0; padding:0; float:left; font:16px/10px Arial, Helvetica, sans-serif; height:42px;
 }
 #nav ul li a {
-  display:block; margin:0; padding:28px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px; text-decoration: none;
+  display:block; margin:0; padding:28px 15px 0 15px; color:#000000; border-right:1px solid #CCCCCC; height:42px; text-decoration: none;
 }
 #nav ul li a:hover {background:#AA1F2F; color:#FFFFFF;}
 #nav ul li a.active { background:#76bd1d;color:#FFFFFF;}
@@ -671,11 +671,11 @@ ul.topRightList li a:hover { color: #222222 !important;text-decoration: none !im
 .contentQuery {background:#CCCCCC; padding:20px;}
 .queryResult { background:#FFFFFF; padding:15px;}
 
-.blockWrapper{background:; margin-bottom:20px;}
-.objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;}
+.blockWrapper{margin-bottom:20px;}
+.objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;position: relative;}
 .queryInput{float:right; width:68%;}
 #queryForm{ background:#FFFFFF;}
-.queryInput .query textarea{width:98%; padding:1%; resize:none!important; height:186px;border: 1px solid #CCCCCC;line-height:25px; font-size:18px;}
+.queryInput .query textarea{width:98%; padding:1%; resize:none!important; height:215px;border: 1px solid #CCCCCC;line-height:25px; font-size:18px;}
 .queryInput .query textarea:focus{outline:none;}
 .textWritingArea { padding:13px;}
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
@@ -710,13 +710,16 @@ h1.icon-queryResult{background-position:15px -1039px;}
 .resultHtml, .resultCsv, .resultMonospace{width:100%; overflow:auto;height:400px;}
 .queryResult pre{line-height:20px;}
 #overlay, #adminActionOverlay{ position: fixed;height: 100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 9999;}
-.loading{ background: #fff url(images/loader.GIF) no-repeat center center;height: 75px;width: 75px;margin: 20% auto;}
+#schemaOverlay{ position: fixed;height:100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 999; top:10.5%;}
+#sqlQueryOverlay {position: absolute;height:100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 999;left: 0px;}
+.loading{ background: #fff url(images/loader.GIF) no-repeat center center;height: 75px;width: 75px;margin: 20% auto; z-index: 99999;}
+.loading-medium{ background: #fff url(images/loader-medium.GIF) no-repeat center center;height: 30px;width: 30px;margin: 38% auto;}
 .loading-small{ background: #fff url(images/loader-small.GIF) no-repeat center center;height: 20px;width: 20px;
                 position: absolute;top: 11px;left: 102px;}
 
 .imgError {position: relative;top: 5px;padding: 0 5px 0 0;}
 .overlay-contentError {padding: 20px;
-border-bottom: 1px solid #dbdbdb;
+/*border-bottom: 1px solid #dbdbdb;*/
 margin-bottom: 15px;
 min-width:200px;
 overflow: auto;}
@@ -762,6 +765,8 @@ ul.helpSchemaList {}
 ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px  Arial, Helvetica, sans-serif} 
 .VDBQueryHelp {}
 .VDBQueryHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
+.errorQueryDbPause p { line-height: 20px;}
+.errorQueryDbPause { width: 550px;}
 
 /**admin**/
 .adminIcons, 
@@ -784,7 +789,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .arrow, 
 .labelCollapsed, 
 .labelExpanded,
-a.restoreConfirmationDisable { background-image:url(images/admin-icons.png);}
+a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd { background-image:url(images/admin-icons.png);}
 label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
@@ -795,8 +800,8 @@ label.error { color: #c70000; width: auto; display: block; line-height: 0px; fon
 ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px;}
 ul.adminClusterList li { margin:0; padding:0; float:left; width:50px; height:100%; line-height:75px; text-align:center; margin-right:5px;}
 ul.adminClusterList li a{display:block;}
-ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -106px; width:40px; height:36px;}
-ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -151px; width:40px; height:36px;}
+ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -11px; width:40px; height:36px;}
+ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -56px; width:40px; height:36px;}
 ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
 ul.adminClusterList li a.promote-disabled, ul.adminClusterList li a.promote-disabled:hover{ display:inline-block; background-position:-70px -56px;width:40px; height:36px; color:#bbb;}
 ul.adminClusterList li a.restore, ul.adminClusterList li a.restoreConfirmationDisable { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
@@ -806,7 +811,7 @@ ul.adminClusterList li a.saveme { display:inline-block;background-position:-120p
 ul.adminClusterList li a.restoreConfirmationDisable {display: inline-block;  width:40px; height:36px; background-position:-310px -12px; color:#bbb;}
 
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739px -56px; width:40px; height:36px;}
+ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-786px -56px; width:40px; height:36px;}
 /*ul.adminClusterList li a:hover{color:#000;}*/
 .adminTxt01 { margin:0 0 0 6px;}
 .adminTxt02 { margin:0 0 0 2px;}
@@ -842,8 +847,12 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739
 .headerAdminContent h1 {padding: 18px 0 0 20px; font-size:17px;}
 .adminPorts { margin:0 0 10px 0; background:#FFFFFF;}
 .adminTbl { margin:0; padding:0;}
+.adminTbl2 th { margin:0; padding:15px 25px 15px 20px;border-bottom: 1px solid #CCCCCC; 
+					font-weight:bold; font-size:14px;}
+.adminTbl2 th:nth-child(1) { text-align:left}
 .adminTbl1 tr td { margin:0; padding:2px 2px 2px 2px; border-left:none; border-right:none; line-height:38px; /*height:32px;*/}
 .adminTbl2 tr td { margin:0; padding:15px 25px 15px 20px; border-left:none; border-right:none;}
+.network tr td:nth-child(2), .network tr td:nth-child(3) { text-align:center;}
 .adminTbl1 tr td a.save {position:relative;top:4px}
 
 .onIcon			 { background-position: -266px -58px; width: 31px; height: 17px; position:relative; top:4px;}
@@ -863,8 +872,8 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739
 
 .adminTbl1 td .edit, .adminTbl1 td .editDisabled {top:9px;}
 .hasSubLabel{} 
-.labelCollapsed{ background-position:-422px -11px; padding-left:22px;}
-.labelExpanded{ background-position:-422px -55px; padding-left:22px;}
+.labelCollapsed{ background-position:-468px -11px; padding-left:22px;}
+.labelExpanded{ background-position:-468px -55px; padding-left:22px;}
 .adminTbl2 tr td:nth-child(1){font-weight:bold;}
 
 .adminWrapper{position:relative;}
@@ -882,9 +891,12 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
-.tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 7px 4px;}
+.tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
+.tblSave tr td#tdSnapshotName input[type="text"] {position: relative; top:4px;}
+
+
 .tblRestore th {}
-.tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 7px 4px;}
+.tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 3px 4px;position: relative; top:6px; margin-bottom: 4px;}
 .restoreCont {overflow:auto; height:200px}
 .restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
@@ -896,13 +908,13 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 /*a.serverHighlight {color:#76bd1d;}*/
 .stopDisable { color: #aaaaaa!important;}
 .tblshutdown tr {border:1px solid #CCCCCC;}
-.tblshutdown tr:hover, .tblshutdown tr.activeHost { background: #F0F3F4}
-.tblshutdown tr.activeHost td a { color:#76bd1d;}
+.tblshutdown tr:hover, .tblshutdown tr.activeHostMonitoring { background: #F0F3F4}
+.tblshutdown tr.activeHostMonitoring td a { color:#76bd1d;}
 
 
 .tblshutdown tr td  { border:none;}
-.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
-.tblshutdown tr td a.disableServer { display:inline-block;background-position:-933px -150px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.shutdown { display:inline-block;background-position:-786px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-978px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;line-height: 39px;}
 .shutdownServerPause {position: relative; top: 17px; right:3px; color: #cccccc;}
@@ -915,8 +927,11 @@ td.pauseCursorDefault a{cursor: default;}
 .confirmationInfo{font-weight: bold;}
 td.heartbeattd, td.securitytd, td.queryTimeOut, td.tdSnapshotPrefix,td.tdSnapshotFrequency,td.tdSnapshotRetained, td.snapshottd { position: relative;}
 td.heartbeattd span, td.queryTimeOut span{position:relative; top:auto;}
+div.userSecurity{ position: relative;height: 38px;}
 td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px;left:1px;*/}
 .customCheckbox{display:inline-block !important;}
+.loadingSecurity { left: 300px;top: 9px;}
+.editUserWrapper {width: 350px;padding: 20px; overflow: auto;}
 
 .btnSave { background-color: #aa1f2f;
 			cursor: pointer;
@@ -957,13 +972,87 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 
 .resizeCon {width:452px}
 .resizeRestore{width:95%}
-a.restoreBtn { cursor: default; background-color: #999;
+
+/*a.restoreBtn { cursor: default; background-color: #999;
 padding: 8px 10px;
 text-align: center;
 color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
-}
+}*/
+.refreshBtn { float:right; background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;}
+.schm { margin: 9px;display: none;}
+.securWrapper { /*margin:10px 40px;*/ margin:0 0 -3px 0;}
+.secTbl tr th,.secTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; /*padding:5px 0 10px 10px;*/ padding:5px 0 0 40px;}
 
+.secTbl tr th { font-weight:bold; background:#FBFBFB;}
+.secTbl input[type="text"]{ margin:0 0 10px 0;}
+.userName { float:left;font-weight:bold;font-size:14px; padding:0 0 0 40px;}
+.secLine { border-bottom:1px solid #CCCCCC;}
+.editBtn { float:right; padding:0 35px 0 0}
+.editBtn ul li { float:left;margin: 0 0 0 5px;}
+a.restoreBtn{cursor: default; background-color: #999; padding: 8px 10px; text-align: center; color: #fff; font: 14px Arial, Helvetica, sans-serif; text-shadow: none; text-decoration: none; border-radius: 0; border: none; }
+
+/****Export details*******/
+.btnEd { cursor: pointer; background: #D0D2D2; padding: 5px; font-weight: bold; font-size: 12px;}
+.properTbl tr td:first-child
+.btnEd { cursor: pointer; background: #D0D2D2; padding: 5px; font-weight: bold; font-size: 12px;}
+.securityDelete {background-position:-1042px -12px; width:25px; height:20px; position:relative; top:5px; cursor:pointer;}
+.userPlus {font-size:15px;position:relative;top:2px}
+.errorSecurity { height: auto!important;line-height: 12px!important;padding-top: 0px!important;}
+.adminTbl1 tr.subLabelRow td.configExport {padding-left: 40px;font-weight: bold;}
+.exportDelete {background-position:-422px -10px; width:25px; height:20px; cursor:pointer; position:relative; top:4px; left:5px;}
+.exportTbl { margin:0; padding:0;}
+.exportTbl tr td { white-space: nowrap}
+.properTbl {position: relative;top: 3px;}
+
+.properTbl tr td:first-child{ padding: 0 0 0 60px;}
+.properTbl tr td input[type="text"]{ width:204px;}
+.properbtn {padding: 0 35px 0 0;}
+.adminTbl1 tr.subLabelRow td.expoStream { padding-left: 40px;font-weight: bold;cursor: pointer;}
+.expoProper {padding-left: 70px!important; font-weight: bold;}
+
+.streamTbl {position: relative;top: 3px;}
+.streamTbl tr th,.streamTbl tr td { border-bottom:1px solid #CCCCCC; text-align:left; /*padding:5px 0 10px 10px;*/ padding:5px 0 0 40px;}
+.streamTbl tr th:first-child,.streamTbl tr td:first-child { padding-left: 80px;}
+.streamTbl tr th { font-weight:bold; background:#FBFBFB;}
+.configalign { float:left}
+.configBtn { float:right}
+.proLeft { float: left;font-weight: bold;}
+.addProBtn { float: right;padding: 0;}
+.configWrapper { width: 500px;padding: 20px; overflow:auto;}
+.configurTbl {  }
+.configurTbl tr td { border: none;padding: 5px 0;}
+.configurTbl tr td input[type="text"]{}
+.propertiesAlign { margin: 10px 0 0 0;border-top: 1px solid #CCCCCC; padding:20px 0 10px 0}
+.addConfigProperWrapper { overflow: auto; max-height:180px;}
+.addConfigProperTbl { border: 1px solid #CCCCCC; }
+.addConfigProperTbl tr th { font-weight: bold; background: #FBFBFB}
+.addConfigProperTbl tr th, .addConfigProperTbl tr td { border-bottom: 1px solid #CCCCCC;padding: 8px 5px 10px 5px;text-align: left;}
+.addConfigProperTbl tr td { padding-left:10px}
+.addConfigProperTbl tr td label.error { line-height:12px;height: auto;}
+.addConfigHeader { float: left;}
+.deleteAddConfig {float: right;padding: 8px 20px 0 20px; font-size: 12px; font-weight: bold; position: relative; top: 6px;}
+.deleteAddConfig a { color: #c70000;}
+#chkStreamValue { padding-left: 2px;}
+.plusAdd {background-position:-418px -61px; width: 31px; height: 17px; display: inline-block; position: relative;top: 8px;}
+.loadExport { position: relative; left: 3px; top: 5px; }
+.loadExportConfig { margin: 0 0 0 29%;}
+.iconDeleteAddConfig {background-position:0px -1570px; width:20px; height:20px; float:left; position:relative; top:6px;}
+
+/****Export details Ends*******/
+a.changePsd {color: #0079bb;}
+a:hover.changePsd { text-decoration: underline; }
+
+/****Partition Idle Time*******/
+.legend {margin: 0 0 0 90px;}
+.legend ul {margin: 0 0 0 10px;padding: 0}
+.legend ul li { margin: 0 10px;padding: 0;float: left; }
+.dotGray {background-color: #D3D3D3;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotBlue  {background-color: #4C76B0;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotOrange {background-color: #FF8C00;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.dotMaroon {background-color: #FFF700;border-radius: 50%;height: 12px;position: relative;top: 11px;width: 12px;right: 14px;}
+.partitionHeight { width: 90%;height: 358px;}
+.partitionHeightDisplay {width: 90%;height: 0px;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -971,12 +1060,13 @@ font: 14px Arial, Helvetica, sans-serif;
 .userN {display:none;}
 .displayPre { height:100px;}
 ul.rightShowhideList { float:none;}
-  
 ul.rightShowhideList li {padding:10px 0;}/*admin*/
 #popServerList{ position:absolute;right:0;top: 186px;}
 
 
 .overlay-content { min-width:250px;}
+.errorQueryDbPause { width:265px}
+div.popup {position: relative; right: 10px;}
 }
 @media (min-width: 639px) and  (max-width:640px)
  {
@@ -1035,15 +1125,14 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 
 .documentation span { float:left; padding-bottom:20px} 
 
-.objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
-.queryInput { float:none; width:100%;}
+/*.objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
+.queryInput { float:none; width:100%;}*/
 .tblScroll {overflow:auto; width:100%}
 .adminContentLeft { width:100%}
 .adminPorts { margin-top:10px;}
 .adminContentRight {width:100%;}
 .parameterValue{ }
 .returnValue{ color:#0079bb;}
-.errorValue{color:red}
 
 h3.systemHeader{}
 .editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}
@@ -1076,6 +1165,8 @@ top: 3px;}
 	#serverConfigAdmin{ top:99px; width:421px;}
 	.adminRight{ padding-top:15px;}
 	.adminDirectories {overflow:auto; width:auto;}
+	.errorQueryDbPause { width:320px; }
+    .partitionHeight {height: 350px; margin-top:30px}
 	
    
 }
@@ -1086,6 +1177,7 @@ top: 3px;}
         right: -1px;
         top: 205px;
     }
+    .partitionHeight {height: 350px; margin-top:30px}
 
     .rightShowhideList li a {
         margin: 0 0 0 46px;
@@ -1187,16 +1279,35 @@ top: 3px;}
     .resizeRestore {
         width: 90%;
     }
+	.popup_close {right:10px;}
+	.refreshBtn { margin-bottom:10px;}
 	
 }
-
 	 
  @media (min-width: 480px) and (max-width: 700px) {
 		 .adminRight{ padding-top:15px;}
 		 #serverConfigAdmin{ top:99px;}
          .resizeCon {width:330px}
         .resizeRestore{width:80%}
+		.configWrapper { width:380px;}
+		
 		 
+ }
+
+@media (width: 768px) {
+	 #nav { left:180px;}
+	.userN {
+		display: block;
+		text-overflow: ellipsis;
+		overflow: hidden;
+		width: 100px;
+		text-align: right; }
+}
+@media (max-width: 980px) { 
+ 
+ .objectExplorer { float:none; width:94%; margin-bottom:15px; padding:3%;}
+ .queryInput { float:none; width:100%;}
+
  }
 
 @media (width: 320px) {
@@ -1206,9 +1317,20 @@ top: 3px;}
   input.icoSS { width:135px!important;}
   .restoreCont {overflow:auto; height:146px}
    .adminServer { }	
-  .adminLeft { float:none; width:100%}	
+  .adminLeft { float:none; width:100%}
+  .partitionHeight {height: 300px; margin-top:75px}
+  
+  
  
  }
+@media (width: 360px) and (max-width:438px) {
+    .partitionHeight {height: 300px; }
+}
+
+@media (min-width: 768px) and (max-width:1246px) {
+    .partitionHeight {height: 310px;}
+
+}
 @media screen and (orientation:landscape) {
 	.popup_cont {top:5%;}
 	
@@ -1227,6 +1349,7 @@ top: 3px;}
 			 
 			 .restoreInfo .overlay-content { height:120px;}
 			 .restoreCont {height:120px;}
+			 .configWrapper{height: 133px;}
 			 }
 		 
 @media (min-width: 480px) and (max-width: 1024px) and (orientation:landscape)   {		 

@@ -5,6 +5,10 @@ Quick hacky description on running the long-running export test.
 -- The jars are not in repo and must be downloaded and added to classpath.
 -- To add zookeeper jars in your classpath set ZKLIB to point to directory where these jars exist.
 -- If running under apprunner export APPRUNNER_CLIENT_CLASSPATH="/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar"
+-- If running on your desktop and you have the lab home mounted locally (e.g. at /nfshome), export RBMQLIB and ZKLIB:
+        export RBMQLIB=/nfshome/opt/rabbitmq
+        export ZKLIB=/nfshome/opt/kafka/libs
+
 ./run.sh catalog
 
 TO RUN remote Export Client Test:

@@ -137,7 +137,6 @@ $(document).ready(function () {
                 }
             });
 		}
-        history.replaceState(null, null, hash);
         navigate(hash);
         return false;
     });
@@ -163,7 +162,6 @@ $(document).ready(function () {
         else {
             console.log("not visible");
         }
-         history.replaceState(null, null, hash);
         navigate(hash);
         return false;
     });
@@ -193,7 +191,6 @@ $(document).ready(function () {
         if ($(dropdownid).is(":visible")) {
             hash = "#" + toppage;
         }
-        // history.replaceState(null, null, hash);
         navigate(hash);
         return false;
     });

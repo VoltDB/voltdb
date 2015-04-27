@@ -39,6 +39,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -224,6 +225,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                 List<DBBPool.BBContainer> outputBuffers)
         {
@@ -343,7 +350,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, String clusterName, String databaseName,
+    public byte[] loadTable(long txnId, long spHandle, long unqiueId, String clusterName, String databaseName,
             String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) throws VoltAbortException
     {
@@ -351,7 +358,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
             boolean shouldDRStream,
             boolean undo)
     {
@@ -412,6 +419,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public TupleStreamStateInfo getDRTupleStreamStateInfo()
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
     public void toggleProfiler(int toggle)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -455,6 +474,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -470,7 +490,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long txnId,
             long spHandle,
             long uniqueId,
-            boolean readOnly) throws EEException
+            boolean readOnly)
+            throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -531,7 +552,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void applyBinaryLog(byte log[]) {
+    public void applyBinaryLog(long txnId, long spHandle, long uniqueId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 }

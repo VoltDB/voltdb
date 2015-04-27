@@ -73,7 +73,6 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.AuthSystem;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -192,7 +191,7 @@ public class TestClientInterface {
         m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, null, VoltDB.DEFAULT_ADMIN_PORT,
                 m_context, m_messenger, ReplicationRole.NONE,
                 m_cartographer, m_allPartitions));
-        m_ci.bindAdapter(m_cxn);
+        m_ci.bindAdapter(m_cxn, null);
 
         //m_mb = m_ci.m_mailbox;
     }
@@ -743,6 +742,9 @@ public class TestClientInterface {
             m_ci.schedulePeriodicWorks();
 
             //Shouldn't get anything
+            assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
+
+            statsAnswers.offer(dsOf(getClientResponse("foo")));
             assertNull(responsesDS.poll(50, TimeUnit.MILLISECONDS));
 
             //Change the bytes of the topology results and expect a topology update

@@ -322,6 +322,14 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
                 "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                 "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);" +
+                "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T WHERE D1 > 3 " +
                 "GROUP BY D1 + D2, ABS(D3);",
 
                 // schema with indexes (should have no warnings)
@@ -330,6 +338,8 @@ public class TestDDLCompiler extends TestCase {
                "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
                "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
+               "CREATE INDEX T_TREE_5 ON T(D1, D2, D3) WHERE D1 > 3;\n" +
+               "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
                "FROM T " +
@@ -337,6 +347,14 @@ public class TestDDLCompiler extends TestCase {
                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
                "FROM T " +
+               "GROUP BY D1 + D2, ABS(D3);" +
+               "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+               "FROM T WHERE D1 > 3 " +
+               "GROUP BY D1, D2, D3;\n" +
+               "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+               "FROM T WHERE D1 > 3 " +
                "GROUP BY D1 + D2, ABS(D3);",
 
                // schema with no indexes and mat view with no min / max
@@ -355,10 +373,15 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
                 "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
                 "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
+                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3) WHERE D1 > 0;\n" +
                 "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T WHERE D2 > 0 " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT2 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
                 "FROM T " +
-                "GROUP BY D1, D2, D3;",
+                "GROUP BY D1, D2, D3;\n",
 
                 // schemas with index but can not be used for mat view with min / max
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
@@ -379,7 +402,7 @@ public class TestDDLCompiler extends TestCase {
                 "GROUP BY D1, D2-D3, D3;",
         };
 
-        int expectWarning[] = { 2, 0, 0, 1, 2 };
+        int expectWarning[] = { 4, 0, 0, 2, 2 };
         // boilerplate for making a project
         final String simpleProject =
                 "<?xml version=\"1.0\"?>\n" +
@@ -461,6 +484,27 @@ public class TestDDLCompiler extends TestCase {
             // cleanup after the test
             jarOut.delete();
         }
+    }
+
+    public void testExportDRTable() {
+        File jarOut = new File("exportDrTables.jar");
+        jarOut.deleteOnExit();
+
+        VoltCompiler compiler = new VoltCompiler();
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(
+        "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+        "DR TABLE T;\n" +
+        "EXPORT TABLE T;");
+        String schemaPath = schemaFile.getPath();
+
+        try {
+            assertFalse(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+
+        // cleanup after the test
+        jarOut.delete();
     }
 
     public void testNullAnnotation() throws IOException {

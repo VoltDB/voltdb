@@ -26,14 +26,10 @@ package org.voltdb;
 import java.io.File;
 
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
@@ -87,6 +83,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                 );
         builder.addPartitionInfo("FOO", "ID");
         builder.setUseDDLSchema(useLiveDDL);
+        builder.setDRMasterHost("localhost"); // fake DR connection so that replica can start
         boolean success = builder.compile(m_pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToDeployment);
@@ -107,13 +104,14 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                 );
         builder.addPartitionInfo("BAZ", "ID");
         builder.setUseDDLSchema(useLiveDDL);
+        builder.setDRMasterHost("localhost");
         builder.setDeadHostTimeout(6);
         success = builder.compile(m_pathToOtherCatalog, 2, 1, 0);
         assertTrue("2nd schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToOtherDeployment);
     }
 
-    void verifyDeploymentOnlyUAC() throws Exception
+    int getHeartbeatTimeout() throws Exception
     {
         boolean found = false;
         int timeout = -1;
@@ -125,20 +123,17 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             }
         }
         assertTrue(found);
+        return timeout;
+    }
+
+    void verifyDeploymentOnlyUAC() throws Exception
+    {
+        int timeout = getHeartbeatTimeout();
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
         ClientResponse results =
             m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
         assertEquals(ClientResponse.SUCCESS, results.getStatus());
-        found = false;
-        timeout = -1;
-        result = m_client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
-        while (result.advanceRow()) {
-            if (result.getString("PROPERTY").equalsIgnoreCase("heartbeattimeout")) {
-                found = true;
-                timeout = Integer.valueOf(result.getString("VALUE"));
-            }
-        }
-        assertTrue(found);
+        timeout = getHeartbeatTimeout();
         assertEquals(6, timeout);
     }
 
@@ -151,12 +146,10 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
     // GOing to want to retest this after we promote a replica, so bust it out
     void verifyMasterWithUAC() throws Exception
     {
-        assertFalse(findTableInSystemCatalogResults("FOO"));
         // UAC should work.
         ClientResponse results = m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
         assertEquals(ClientResponse.SUCCESS, results.getStatus());
         assertTrue(findTableInSystemCatalogResults("FOO"));
-        verifyDeploymentOnlyUAC();
 
         // Adhoc DDL should be rejected
         assertFalse(findTableInSystemCatalogResults("BAR"));
@@ -201,6 +194,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
         try {
             startSystem(config);
+            verifyDeploymentOnlyUAC();
             verifyMasterWithUAC();
         }
         finally {
@@ -233,23 +227,22 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         }
         assertTrue(findTableInSystemCatalogResults("FOO"));
 
-        // Deployment-only UAC should work, though
-        verifyDeploymentOnlyUAC();
         // And so should adhoc queries
         verifyAdhocQuery();
 
-        // Also, @UpdateClasses should only work with adhoc DDL
-        assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
-        InMemoryJarfile jarfile = new InMemoryJarfile();
-        VoltCompiler comp = new VoltCompiler();
-        comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
-        try {
-            m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+        // If the procedure doesn't already exist, add it using @UpdateClasses
+        if (!findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc")) {
+            // Also, @UpdateClasses should only work with adhoc DDL
+            InMemoryJarfile jarfile = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
+            try {
+                m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            } catch (ProcCallException pce) {
+                fail("Should be able to call @UpdateClasses when adhoc DDL enabled.");
+            }
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
         }
-        catch (ProcCallException pce) {
-            fail("Should be able to call @UpdateClasses when adhoc DDL enabled.");
-        }
-        assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
     }
 
     public void testMasterWithAdhocDDL() throws Exception
@@ -262,49 +255,13 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
         try {
             startSystem(config);
+            // Deployment-only UAC should work, though
+            verifyDeploymentOnlyUAC();
             verifyMasterWithAdhocDDL();
         }
         finally {
             teardownSystem();
         }
-    }
-
-    void verifyUACfromMasterToReplica() throws Exception
-    {
-        // uac from master?
-        TxnEgo txnid = TxnEgo.makeZero(MpInitiator.MP_INIT_PID);
-        Object[] params = new Object[2];
-        params[0] = ClientUtils.fileToBytes(new File(m_pathToCatalog));
-        params[1] = null;
-        txnid = txnid.makeNext();
-        // We're going to get odd responses for the sentinels, so catch and ignore the exceptions
-        try {
-            ((ClientImpl)m_client).callProcedure(txnid.getTxnId(), 0L, "@SendSentinel", 0);
-        } catch (ProcCallException pce) {}
-        try {
-            ((ClientImpl)m_client).callProcedure(txnid.getTxnId(), 0L, "@SendSentinel", 1);
-        } catch (ProcCallException pce) {}
-        ClientResponse r = ((ClientImpl)m_client).callProcedure(txnid.getTxnId(), 0L,
-                "@UpdateApplicationCatalog", params);
-        assertEquals(ClientResponse.SUCCESS, r.getStatus());
-
-        // adhoc queries still work
-        verifyAdhocQuery();
-        // undo our previous catalog update through the remote side so the promote test works
-        params = new Object[2];
-        params[0] = ClientUtils.fileToBytes(new File(m_pathToOtherCatalog));
-        params[1] = null;
-        txnid = txnid.makeNext();
-        // We're going to get odd responses for the sentinels, so catch and ignore the exceptions
-        try {
-            ((ClientImpl)m_client).callProcedure(txnid.getTxnId(), 0L, "@SendSentinel", 0);
-        } catch (ProcCallException pce) {}
-        try {
-            ((ClientImpl)m_client).callProcedure(txnid.getTxnId(), 0L, "@SendSentinel", 1);
-        } catch (ProcCallException pce) {}
-        r = ((ClientImpl)m_client).callProcedure(txnid.getTxnId(), 0L,
-                "@UpdateApplicationCatalog", params);
-        assertEquals(ClientResponse.SUCCESS, r.getStatus());
     }
 
     public void testReplicaWithUAC() throws Exception
@@ -319,7 +276,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
         try {
             startSystem(config);
-            // UAC with schema should fail
+            // UAC with schema should succeed
             assertFalse(findTableInSystemCatalogResults("FOO"));
             boolean threw = false;
             try {
@@ -327,22 +284,20 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 threw = true;
-                assertTrue(pce.getMessage().contains("Write procedure @UpdateApplicationCatalog is not allowed"));
             }
-            assertTrue("@UAC should have failed", threw);
-            assertFalse(findTableInSystemCatalogResults("FOO"));
+            assertFalse("@UAC add table should be accepted on the consumer cluster", threw);
+            assertTrue(findTableInSystemCatalogResults("FOO"));
 
-            // deployment-only UAC should fail
+            // deployment-only UAC should succeed
             threw = false;
             try {
                 m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
             }
             catch (ProcCallException pce) {
                 threw = true;
-                assertTrue(pce.getMessage().contains("Write procedure @UpdateApplicationCatalog is not allowed"));
             }
-            assertTrue("@UAC should have failed", threw);
-
+            assertFalse("@UAC to new catalog on consumer cluster should have succeed", threw);
+            assertEquals(getHeartbeatTimeout(), 6);
             // Adhoc DDL should be rejected
             assertFalse(findTableInSystemCatalogResults("BAR"));
             threw = false;
@@ -353,12 +308,12 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             catch (ProcCallException pce) {
                 threw = true;
                 System.out.println(pce.getMessage());
-                assertTrue(pce.getMessage().contains("Write procedure @AdHoc is not allowed"));
+                assertTrue(pce.getMessage().contains("AdHoc DDL is forbidden"));
             }
             assertTrue("Adhoc DDL should have failed", threw);
             assertFalse(findTableInSystemCatalogResults("BAR"));
 
-            // @UpdateClasses should be rejected
+            // @UpdateClasses (which is an AdHoc capability) should be rejected
             assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
             threw = false;
             try {
@@ -369,12 +324,10 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 threw = true;
-                assertTrue(pce.getMessage().contains("Write procedure @UpdateClasses is not allowed"));
+                assertTrue(pce.getMessage().contains("@UpdateClasses is forbidden"));
             }
             assertTrue("@UpdateClasses should have failed", threw);
             assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
-
-            verifyUACfromMasterToReplica();
 
             // Promote, should behave like the original master test
             m_client.callProcedure("@Promote");
@@ -405,7 +358,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 threw = true;
-                assertTrue(pce.getMessage().contains("Write procedure @UpdateApplicationCatalog is not allowed"));
+                assertTrue(pce.getMessage().contains("Cluster is configured to use AdHoc DDL"));
             }
             assertTrue("@UAC should have failed", threw);
             assertFalse(findTableInSystemCatalogResults("FOO"));
@@ -417,24 +370,32 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 threw = true;
-                assertTrue(pce.getMessage().contains("Write procedure @UpdateApplicationCatalog is not allowed"));
             }
-            assertTrue("@UAC should have failed", threw);
+            assertFalse("@UAC should should succeed with just a deployment file", threw);
+            assertEquals(getHeartbeatTimeout(), 6);
 
             // Adhoc DDL should be rejected
             assertFalse(findTableInSystemCatalogResults("BAR"));
-            threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
                         "create table BAR (ID integer, VAL varchar(50));");
             }
             catch (ProcCallException pce) {
+                fail("@AdHoc should succeed on replica cluster");
+            }
+            assertTrue(findTableInSystemCatalogResults("BAR"));
+
+            // Adhoc DML updates should be rejected in the replica
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc", "insert into BAR values (100, 'ABC');");
+            }
+            catch (ProcCallException pce) {
                 threw = true;
                 System.out.println(pce.getMessage());
-                assertTrue(pce.getMessage().contains("Write procedure @AdHoc is not allowed"));
+                assertTrue(pce.getMessage().contains("Write procedure @AdHoc_RW_MP is not allowed in replica cluster"));
             }
             assertTrue("Adhoc DDL should have failed", threw);
-            assertFalse(findTableInSystemCatalogResults("BAR"));
 
             // @UpdateClasses should be rejected
             assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
@@ -449,10 +410,8 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                 threw = true;
                 assertTrue(pce.getMessage().contains("Write procedure @UpdateClasses is not allowed"));
             }
-            assertTrue("@UpdateClasses should have failed", threw);
-            assertFalse(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
-
-            verifyUACfromMasterToReplica();
+            assertFalse("@UpdateClasses should have worked", threw);
+            assertTrue(findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc"));
 
             // adhoc queries still work
             ClientResponse result = m_client.callProcedure("@AdHoc", "select * from baz;");

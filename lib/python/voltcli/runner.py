@@ -135,7 +135,7 @@ class JavaRunner(object):
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
-        java_args.append('-Djava.library.path="%s"' % os.environ['VOLTDB_VOLTDB'])
+        java_args.append('-Djava.library.path=%s' % utility.quote_shell_arg(os.environ['VOLTDB_VOLTDB']))
         java_args.extend(('-classpath', classpath))
         java_args.append(java_class)
         for arg in args:
@@ -143,9 +143,13 @@ class JavaRunner(object):
                 java_args.append(arg)
         daemonizer = utility.kwargs_get(kwargs, 'daemonizer')
         if daemonizer:
-            # Does not return if successful.
+            # Run as a daemon process. Does not return.
             daemonizer.start_daemon(*java_args)
+        elif utility.kwargs_get_boolean(kwargs, 'exec'):
+            # Replace the current process. Does not return.
+            utility.exec_cmd(*java_args)
         else:
+            # Run as a sub-process. Returns when the sub-process exits.
             return utility.run_cmd(*java_args)
 
     def compile(self, outdir, *srcfiles):
@@ -461,6 +465,28 @@ class VerbRunner(object):
         if required:
             utility.abort('Resource file "%s" is missing.' % name)
         return None
+
+    def voltdb_connect(self, host, port, username=None, password=None):
+        """
+        Create a VoltDB client connection.
+        """
+        self.voltdb_disconnect()
+        try:
+            kwargs = {}
+            if username:
+                kwargs['username'] = username
+                if password:
+                    kwargs['password'] = password
+            self.client = FastSerializer(host, port, **kwargs)
+        except Exception, e:
+            utility.abort(e)
+
+    def voltdb_disconnect(self):
+        """
+        Close a VoltDB client connection.
+        """
+        if self.client:
+            self.client.close()
 
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb

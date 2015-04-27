@@ -1,0 +1,1 @@
+[(inline batch delimited by 'EOF' in scripts/batching/file_inlinebatch_error.in):3]: DDL Error: "object name already exists: T in statement [create table t (i integer)]"

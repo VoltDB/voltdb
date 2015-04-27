@@ -32,9 +32,11 @@ namespace voltdb {
 
 BinaryLogSink::BinaryLogSink() {}
 
-void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool) {
+void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
+    int64_t __attribute__ ((unused)) uniqueId = 0;
+    int64_t __attribute__ ((unused)) sequenceNumber = -1;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
@@ -45,8 +47,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
 
         int64_t tableHandle = 0;
-        int64_t  __attribute__ ((unused)) txnId = 0;
-        int64_t  __attribute__ ((unused)) spHandle = 0;
+
         uint32_t checksum = 0;
         const char * rowData = NULL;
         switch (type) {
@@ -60,7 +61,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
             if (tableIter == tables.end()) {
-                throwFatalException("Where is my table at yo? %jd", (intmax_t)tableHandle);
+                throwFatalException("Unable to find table hash %jd while applying a binary log insert/delete record",
+                                    (intmax_t)tableHandle);
             }
 
             PersistentTable *table = tableIter->second;
@@ -71,24 +73,68 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             tempTuple.deserializeFromDR(rowInput, pool);
 
             if (type == DR_RECORD_DELETE) {
-                TableTuple deleteTuple = table->lookupTuple(tempTuple);
-                table->deleteTuple(deleteTuple, false);
+                TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
+                if (deleteTuple.isNullTuple()) {
+                    char msg[1024 * 100];
+                    snprintf(msg, 1024 * 100,
+                             "Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+                    VOLT_ERROR("%s", msg);
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+                }
+                table->deleteTuple(deleteTuple, true);
             } else {
-                table->insertTuple(tempTuple);
+                table->insertPersistentTuple(tempTuple, true);
             }
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
-            txnId = taskInfo.readLong();
-            spHandle = taskInfo.readLong();
+            uniqueId = taskInfo.readLong();
+            int64_t tempSequenceNumber = taskInfo.readLong();
+            if (sequenceNumber >= 0) {
+                if (tempSequenceNumber < sequenceNumber) {
+                    throwFatalException("Found out of order sequencing inside a binary log segment. Expected %jd but found %jd",
+                                        (intmax_t)(sequenceNumber + 1), (intmax_t)tempSequenceNumber);
+                } else if (tempSequenceNumber == sequenceNumber) {
+                    throwFatalException("Found duplicate transaction %jd in a binary log segment",
+                                        (intmax_t)tempSequenceNumber);
+                } else if (tempSequenceNumber > sequenceNumber + 1) {
+                    throwFatalException("Found sequencing gap inside a binary log segment. Expected %jd but found %jd",
+                                        (intmax_t)(sequenceNumber + 1), (intmax_t)tempSequenceNumber);
+                }
+            }
+            sequenceNumber = tempSequenceNumber;
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;
         }
         case DR_RECORD_END_TXN: {
-            spHandle = taskInfo.readLong();
+            int64_t tempSequenceNumber = taskInfo.readLong();
+            if (tempSequenceNumber != sequenceNumber) {
+                throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
+                                    (intmax_t)sequenceNumber, (intmax_t)tempSequenceNumber);
+            }
+
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+            break;
+        }
+        case DR_RECORD_TRUNCATE_TABLE: {
+            tableHandle = taskInfo.readLong();
+            std::string tableName = taskInfo.readTextString();
+
+            checksum = taskInfo.readInt();
+            validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+
+            boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+            if (tableIter == tables.end()) {
+                throwFatalException("Unable to find table %s hash %jd while applying binary log for truncate record",
+                                    tableName.c_str(), (intmax_t)tableHandle);
+            }
+
+            PersistentTable *table = tableIter->second;
+
+            table->truncateTable(engine, true);
             break;
         }
         case DR_RECORD_UPDATE:
