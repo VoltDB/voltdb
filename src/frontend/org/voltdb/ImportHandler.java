@@ -32,6 +32,7 @@ import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -52,16 +53,22 @@ public class ImportHandler {
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
     private static final ImportClientResponseAdapter m_adapter =
-            new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer", true);
+            new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer", false);
     private final static AtomicLong m_idGenerator = new AtomicLong(0);
     private final long m_id;
     private final AtomicLong m_pendingCount = new AtomicLong(0);
-    private static final long MAX_PENDING_TRANSACTIONS = 1000;
+    private static final long MAX_PENDING_TRANSACTIONS = 5000;
 
     private class ImportCallback implements ImportClientResponseAdapter.Callback {
 
+        final BBContainer m_cont;
+
+        public ImportCallback(final BBContainer cont) {
+            m_cont = cont;
+        }
         @Override
         public void handleResponse(ClientResponse response) {
+            m_cont.discard();
             m_pendingCount.decrementAndGet();
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 m_successCount.incrementAndGet();
@@ -131,8 +138,8 @@ public class ImportHandler {
         //Handle back pressure....how to count bytes here?
     }
 
-    private ByteBuffer getBuffer(int sz) {
-        return DBBPool.allocateDirectAndPool(sz).b();
+    private final BBContainer getBuffer(int sz) {
+        return DBBPool.allocateDirect(sz);
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
@@ -156,7 +163,8 @@ public class ImportHandler {
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
         //type + procname(len + name) + connectionId (long) + params
         int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
-        final ByteBuffer taskbuf = getBuffer(sz);
+        final BBContainer tcont = getBuffer(sz);
+        final ByteBuffer taskbuf = tcont.b();
         try {
             taskbuf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
             taskbuf.putInt((int )proc.length());
@@ -165,10 +173,10 @@ public class ImportHandler {
             pset.flattenToBuffer(taskbuf);
             taskbuf.flip();
             task.initFromBuffer(taskbuf);
-            taskbuf.clear();
         } catch (IOException ex) {
             m_failedCount.incrementAndGet();
             m_logger.error("Failed to serialize parameters for stream: " + proc, ex);
+            tcont.discard();
             return false;
         }
 
@@ -180,6 +188,7 @@ public class ImportHandler {
         if (catProc == null) {
             m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
             m_failedCount.incrementAndGet();
+            tcont.discard();
             return false;
         }
         final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)catProc.getAttachment();
@@ -192,16 +201,18 @@ public class ImportHandler {
             } catch (Exception e) {
                 m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
                 m_failedCount.incrementAndGet();
+                tcont.discard();
                 return false;
             }
             //TODO: this should be property or should this be silently handled?
             if (!m_partitions.contains(partition)) {
                 //Not our partition dont do anything.
                 m_unpartitionedCount.incrementAndGet();
+                tcont.discard();
                 return false;
             }
         }
-        long cbhandle = m_adapter.registerCallback(new ImportCallback());
+        long cbhandle = m_adapter.registerCallback(new ImportCallback(tcont));
         task.setClientHandle(cbhandle);
         boolean success;
         //Synchronize this to create good handles across all ImportHandlers
