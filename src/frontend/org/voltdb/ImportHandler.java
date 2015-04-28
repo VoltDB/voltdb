@@ -138,7 +138,7 @@ public class ImportHandler {
         //Handle back pressure....how to count bytes here?
     }
 
-    private final BBContainer getBuffer(int sz) {
+    private BBContainer getBuffer(int sz) {
         return DBBPool.allocateDirect(sz);
     }
 
@@ -146,6 +146,16 @@ public class ImportHandler {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
             m_logger.warn("Can not invoke procedure from streaming interface when server is paused.");
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+        Procedure catProc = m_catalogContext.procedures.get(proc);
+        if (catProc == null) {
+            catProc = m_catalogContext.m_defaultProcs.checkForDefaultProcedure(proc);
+        }
+
+        if (catProc == null) {
+            m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -180,17 +190,6 @@ public class ImportHandler {
             return false;
         }
 
-        Procedure catProc = m_catalogContext.procedures.get(task.procName);
-        if (catProc == null) {
-            catProc = m_catalogContext.m_defaultProcs.checkForDefaultProcedure(task.procName);
-        }
-
-        if (catProc == null) {
-            m_logger.error("Can not invoke procedure from streaming interface procedure not found.");
-            m_failedCount.incrementAndGet();
-            tcont.discard();
-            return false;
-        }
         final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)catProc.getAttachment();
 
         int partition = -1;
@@ -227,5 +226,21 @@ public class ImportHandler {
             m_submitSuccessCount.incrementAndGet();
         }
         return success;
+    }
+
+    /**
+     * Log info message
+     * @param message
+     */
+    public void info(String message) {
+        m_logger.info(message);
+    }
+
+    /**
+     * Log error message
+     * @param message
+     */
+    public void error(String message) {
+        m_logger.error(message);
     }
 }

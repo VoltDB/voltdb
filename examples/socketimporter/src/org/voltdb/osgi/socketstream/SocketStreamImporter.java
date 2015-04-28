@@ -146,6 +146,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
     @Override
     public void readyForData() {
         try {
+            info("Configured and ready with properties: " + m_properties);
             String procedure = m_properties.getProperty("procedure");
             while (true) {
                 Socket clientSocket = m_serverSocket.accept();

@@ -43,9 +43,9 @@ public interface ImportContext {
 
     /**
      * Call this to get the ingested data passed to procedure.
-     * @param ic
-     * @param procName
-     * @param fieldList
+     * @param ic Import Context invoking the procedure.
+     * @param procName procedure to invoke.
+     * @param fieldList parameters to the procedure.
      * @return true if successfully accepted the work.
      */
     public boolean callProcedure(ImportContext ic, String procName, Object... fieldList);
@@ -61,5 +61,17 @@ public interface ImportContext {
      * @return
      */
     public String getName();
+
+    /**
+     * log info message
+     * @param message message to log to Volt server logging system.
+     */
+    public void info(String message);
+
+    /**
+     * log error message
+     * @param message message to log to Volt server logging system.
+     */
+    public void error(String message);
 
 }

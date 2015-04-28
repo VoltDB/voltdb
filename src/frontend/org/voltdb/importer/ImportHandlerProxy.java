@@ -30,6 +30,8 @@ public class ImportHandlerProxy implements ImportContext {
 
     private Object m_handler = null;
     private Method m_invoker;
+    private Method m_info_log;
+    private Method m_error_log;
 
     /**
      * These must be implemented in tghe bundle even if you are not using any properties.
@@ -84,6 +86,29 @@ public class ImportHandlerProxy implements ImportContext {
         m_handler = handler;
         try {
             m_invoker = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);
+            m_info_log = m_handler.getClass().getMethod("info", String.class);
+            m_error_log = m_handler.getClass().getMethod("error", String.class);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    @Override
+    public void info(String message) {
+        try {
+            if (m_info_log != null) {
+                m_info_log.invoke(m_handler, message);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+    @Override
+    public void error(String message) {
+        try {
+            if (m_error_log != null) {
+                m_error_log.invoke(m_handler, message);
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
