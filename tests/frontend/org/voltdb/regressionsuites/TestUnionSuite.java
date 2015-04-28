@@ -519,10 +519,10 @@ public class TestUnionSuite extends RegressionSuite {
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");
         project.addStmtProcedure("InsertD", "INSERT INTO D VALUES(?, ?);");
         // Test that parameterized query with union compiles properly.
-//        project.addStmtProcedure("UnionBCD",
-//                "((SELECT I FROM B WHERE PKEY = ?) UNION " +
-//                "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(''||?))) UNION " +
-//                "        SELECT I FROM D WHERE PKEY = ? and I = 4");
+        project.addStmtProcedure("UnionBCD",
+                "((SELECT I FROM B WHERE PKEY = ?) UNION " +
+                "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(''||?))) UNION " +
+                "        SELECT I FROM D WHERE PKEY = ? and I = 4");
 
         // local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -531,15 +531,15 @@ public class TestUnionSuite extends RegressionSuite {
         }
         builder.addServerConfig(config);
 
-//        // Cluster
-//        config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        if (!config.compile(project)) fail();
-//        builder.addServerConfig(config);
-//
-//        // HSQLDB
-//        config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        if (!config.compile(project)) fail();
-//        builder.addServerConfig(config);
+        // Cluster
+        config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
+
+        // HSQLDB
+        config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
         return builder;
     }
