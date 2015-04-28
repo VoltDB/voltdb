@@ -1292,6 +1292,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client,
                 "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent group by id;",
                 expected);
+        validateTableOfLongs(client,
+                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent group by id order by id;",
+                expected);
     }
 
     static public junit.framework.Test suite()
