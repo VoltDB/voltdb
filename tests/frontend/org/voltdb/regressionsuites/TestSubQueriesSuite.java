@@ -1368,7 +1368,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
         boolean success;
 
-        config = new LocalCluster("subselect-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("subselect-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
