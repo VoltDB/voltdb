@@ -301,6 +301,38 @@ public class TestDRCatalogDiffs {
     }
 
     @Test
+    public void testDeletePolicyWithDifferentWhereClauseConstant() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
+                "PARTITION TABLE T1 ON COLUMN C1;\n" +
+                "DR TABLE T1;";
+        String replicaSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 100));\n" +
+                "PARTITION TABLE T1 ON COLUMN C1;\n" +
+                "DR TABLE T1;";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertFalse(diff.supported());
+        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+    }
+
+    @Test
+    public void testDeletePolicyWithDifferentWhereClauseOperator() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
+                "PARTITION TABLE T1 ON COLUMN C1;\n" +
+                "DR TABLE T1;";
+        String replicaSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 = 50));\n" +
+                "PARTITION TABLE T1 ON COLUMN C1;\n" +
+                "DR TABLE T1;";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertFalse(diff.supported());
+        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+    }
+
+    @Test
     public void testDifferentRowLimitWithSameDeletePolicy() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
@@ -646,13 +678,11 @@ public class TestDRCatalogDiffs {
 
     @Test
     public void testNoDRTablesOnMaster() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);";
         String replicaSchema =
                 "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "DR TABLE T2;";
 
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        CatalogDiffEngine diff = runCatalogDiff("", replicaSchema);
         assertTrue(diff.errors(), diff.supported());
     }
 
@@ -669,10 +699,7 @@ public class TestDRCatalogDiffs {
 
     @Test
     public void testNoDRTablesOnEitherSide() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, "");
+        CatalogDiffEngine diff = runCatalogDiff("", "");
         assertTrue(diff.errors(), diff.supported());
     }
 
