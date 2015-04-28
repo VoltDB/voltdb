@@ -119,21 +119,6 @@ public class TestDRCatalogDiffs {
     }
 
     @Test
-    public void testExtraDRTableOnReplica() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;\n" +
-                "DR TABLE T2;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
     public void testExtraColumnOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL);\n" +
@@ -313,6 +298,22 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertFalse(diff.supported());
         assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+    }
+
+    @Test
+    public void testDifferentRowLimitWithSameDeletePolicy() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
+                "PARTITION TABLE T1 ON COLUMN C1;\n" +
+                "DR TABLE T1;";
+        String replicaSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 50 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
+                "PARTITION TABLE T1 ON COLUMN C1;\n" +
+                "DR TABLE T1;";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertFalse(diff.supported());
+        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
     }
 
     @Test
@@ -640,6 +641,38 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertTrue(diff.errors(), diff.supported());
+    }
+
+    @Test
+    public void testNoDRTablesOnMaster() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);";
+        String replicaSchema =
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T2;";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
+        assertTrue(diff.errors(), diff.supported());
+    }
+
+    @Test
+    public void testEmptySchemaOnReplica() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, "");
+        assertFalse(diff.errors(), diff.supported());
+        assertTrue(diff.errors().contains("Missing DR table T1 on replica cluster"));
+    }
+
+    @Test
+    public void testNoDRTablesOnEitherSide() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);";
+
+        CatalogDiffEngine diff = runCatalogDiff(masterSchema, "");
         assertTrue(diff.errors(), diff.supported());
     }
 
