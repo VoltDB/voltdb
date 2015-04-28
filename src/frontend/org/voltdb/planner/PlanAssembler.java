@@ -554,6 +554,11 @@ public class PlanAssembler {
                 m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
                 return false;
             }
+
+            // Generate the output schema for this subquery, which also has the side effect of
+            // creating inlined projections where needed to define the schema for the EE.
+            // For top-level queries, this is normally done in QueryPlanner.compileFromXML.
+            bestPlan.rootPlanGraph.generateOutputSchema(m_catalogDb);
         }
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
@@ -922,6 +927,18 @@ public class PlanAssembler {
         return plan;
     }
 
+    /**
+     * Return true if the plan referenced by root node needs a
+     * projection node appended to the top.
+     *
+     * This method does a lot of "if this node is an
+     * instance of this class.... else if this node is an
+     * instance of this other class..."   Perhaps it could be replaced
+     * by a virtual method on AbstractPlanNode?
+     *
+     * @param root   The root node of a plan
+     * @return true if a project node is required
+     */
     private boolean needProjectionNode (AbstractPlanNode root) {
         if ( root instanceof AggregatePlanNode ||
              root.getPlanNodeType() == PlanNodeType.PROJECTION) {

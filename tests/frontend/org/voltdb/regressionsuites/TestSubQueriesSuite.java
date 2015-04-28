@@ -1273,6 +1273,27 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
+    public void testScalarSubqueryWithOrderByOrGroupBy() throws Exception {
+        Client client = getClient();
+
+        long[][] expected = new long[100][1];
+        for (int i = 0; i < 100; ++i) {
+            client.callProcedure("@AdHoc",  "insert into R_ENG8145_1 values (?, ?);", i, i * 2);
+            client.callProcedure("@AdHoc",  "insert into R_ENG8145_2 values (?, ?);", i, i * 2);
+            long val = 100 - ((i * 2) + 1);
+            if (val < 0)
+                val = 0;
+            expected[i][0] = val;
+        }
+
+        validateTableOfLongs(client,
+                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent order by id;",
+                expected);
+        validateTableOfLongs(client,
+                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent group by id;",
+                expected);
+    }
+
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;
@@ -1334,7 +1355,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) );" +
                 "PARTITION TABLE P4 ON COLUMN ID;" +
 
-                ""
+                "CREATE TABLE R_ENG8145_1 (" +
+                "ID integer, NUM integer);" +
+
+                "CREATE TABLE R_ENG8145_2 (" +
+                "ID integer, NUM integer);"
                 ;
         try {
             project.addLiteralSchema(literalSchema);
@@ -1343,7 +1368,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
         boolean success;
 
-        config = new LocalCluster("subselect-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("subselect-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
