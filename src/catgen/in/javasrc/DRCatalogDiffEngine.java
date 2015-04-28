@@ -53,7 +53,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         String catalogCommands = sb.toString();
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(catalogCommands.getBytes(Constants.UTF8ENCODING));
-        return Pair.of(crc.getValue(), Encoder.compressAndBase64Encode(sb.toString()));
+        return Pair.of(crc.getValue(), Encoder.compressAndBase64Encode(catalogCommands));
     }
 
     public static Catalog deserializeCatalogCommandsForDr(String encodedCatalogCommands) {
