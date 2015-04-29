@@ -49,11 +49,11 @@ import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
-public class TestSubQueries extends PlannerTestCase {
+public class TestPlansSubQueries extends PlannerTestCase {
 
-    // Supported
     public void testUnsupportedSyntax() {
-        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
+        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)",
+                "Subquery expressions are only supported in SELECT statements");
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
@@ -274,7 +274,6 @@ public class TestSubQueries extends PlannerTestCase {
                 "       from (select C, COUNT(*) A from P1 GROUP BY C ORDER BY A LIMIT 6) T1 group by A) T2 " +
                 "group by A_count order by A_count";
         planNodes = compileToFragments(sql);
-        printExplainPlan(planNodes);
         // send node
         pn = planNodes.get(1).getChild(0);
         // P1 has PRIMARY KEY INDEX on column A: GROUP BY C should not use its INDEX to speed up.
@@ -1623,13 +1622,15 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(planNodes.get(1).toExplainPlanString().contains("INDEX INNER JOIN"));
 
         // Distinct with GROUP BY
+        // TODO: group by partition column cases can be supported
+        String errorMessage = "Join of multiple partitioned tables has insufficient join criteria";
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
-                "where T1.A = P2.A");
+                "where T1.A = P2.A", errorMessage);
 
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A FROM P1 GROUP BY A, C) T1, P2 " +
-                "where T1.A = P2.A");
+                "where T1.A = P2.A", errorMessage);
 
         planNodes = compileToFragments(
                 "SELECT * " +
@@ -2098,7 +2099,7 @@ public class TestSubQueries extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
     }
 
 }

@@ -650,7 +650,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
         AbstractPlanNode.enableVerboseExplainForDebugging();
         AbstractExpression.enableVerboseExplainForDebugging();
     }
