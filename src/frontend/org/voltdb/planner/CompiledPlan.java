@@ -319,4 +319,13 @@ public class CompiledPlan {
     public StatementPartitioning getStatementPartitioning() {
         return m_partitioning;
     }
+
+    public String toString() {
+        if (rootPlanGraph != null) {
+            return "CompiledPlan: \n" + rootPlanGraph.toExplainPlanString();
+        }
+        else {
+            return "CompiledPlan: [null plan graph]";
+        }
+    }
 }
