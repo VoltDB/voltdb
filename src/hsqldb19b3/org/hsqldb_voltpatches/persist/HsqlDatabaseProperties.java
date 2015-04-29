@@ -55,7 +55,7 @@ import org.hsqldb_voltpatches.lib.java.JavaSystem;
 public class HsqlDatabaseProperties extends HsqlProperties {
 
     private static final String hsqldb_method_class_names =
-        "hsqldb.method_class_names";
+        "hsqldb_voltpatches.method_class_names";
     private static HashSet accessibleJavaMethodNames;
 
     static {
@@ -75,7 +75,7 @@ public class HsqlDatabaseProperties extends HsqlProperties {
     }
 
     /**
-     * If the system property "hsqldb.method_class_names" is not set, then
+     * If the system property "hsqldb_voltpatches.method_class_names" is not set, then
      * static methods of all available Java classes can be accessed as functions
      * in HSQLDB. If the property is set, then only the list of semicolon
      * seperated method names becomes accessible. An empty property value means
@@ -158,12 +158,12 @@ public class HsqlDatabaseProperties extends HsqlProperties {
      * system properties supported by HSQLDB
      */
     public static final String system_lockfile_poll_retries_property =
-        "hsqldb.lockfile_poll_retries";
+        "hsqldb_voltpatches.lockfile_poll_retries";
     public static final String system_max_char_or_varchar_display_size =
-        "hsqldb.max_char_or_varchar_display_size";
+        "hsqldb_voltpatches.max_char_or_varchar_display_size";
 
     //
-    public static final String hsqldb_inc_backup = "hsqldb.incremental_backup";
+    public static final String hsqldb_inc_backup = "hsqldb_voltpatches.incremental_backup";
 
     //
     public static final String  db_version  = "version";
@@ -178,34 +178,34 @@ public class HsqlDatabaseProperties extends HsqlProperties {
     public static final String url_default_schema = "default_schema";
 
     //
-    public static final String hsqldb_applog = "hsqldb.applog";
+    public static final String hsqldb_applog = "hsqldb_voltpatches.applog";
     public static final String hsqldb_cache_file_scale =
-        "hsqldb.cache_file_scale";
+        "hsqldb_voltpatches.cache_file_scale";
     public static final String hsqldb_cache_free_count_scale =
-        "hsqldb.cache_free_count_scale";
-    public static final String hsqldb_cache_scale = "hsqldb.cache_scale";
+        "hsqldb_voltpatches.cache_free_count_scale";
+    public static final String hsqldb_cache_scale = "hsqldb_voltpatches.cache_scale";
     public static final String hsqldb_cache_size_scale =
-        "hsqldb.cache_size_scale";
-    public static final String hsqldb_cache_version = "hsqldb.cache_version";
+        "hsqldb_voltpatches.cache_size_scale";
+    public static final String hsqldb_cache_version = "hsqldb_voltpatches.cache_version";
     public static final String hsqldb_compatible_version =
-        "hsqldb.compatible_version";
+        "hsqldb_voltpatches.compatible_version";
     public static final String hsqldb_default_table_type =
-        "hsqldb.default_table_type";
-    public static final String hsqldb_defrag_limit = "hsqldb.defrag_limit";
+        "hsqldb_voltpatches.default_table_type";
+    public static final String hsqldb_defrag_limit = "hsqldb_voltpatches.defrag_limit";
     private static final String hsqldb_files_readonly =
-        "hsqldb.files_readonly";
-    public static final String hsqldb_lock_file     = "hsqldb.lock_file";
-    public static final String hsqldb_log_size      = "hsqldb.log_size";
-    public static final String hsqldb_nio_data_file = "hsqldb.nio_data_file";
-    public static final String hsqldb_max_nio_scale = "hsqldb.max_nio_scale";
+        "hsqldb_voltpatches.files_readonly";
+    public static final String hsqldb_lock_file     = "hsqldb_voltpatches.lock_file";
+    public static final String hsqldb_log_size      = "hsqldb_voltpatches.log_size";
+    public static final String hsqldb_nio_data_file = "hsqldb_voltpatches.nio_data_file";
+    public static final String hsqldb_max_nio_scale = "hsqldb_voltpatches.max_nio_scale";
     public static final String hsqldb_raf_buffer_scale =
-        "hsqldb.raf_buffer_scale";
+        "hsqldb_voltpatches.raf_buffer_scale";
     private static final String hsqldb_original_version =
-        "hsqldb.original_version";
-    public static final String hsqldb_script_format  = "hsqldb.script_format";
-    public static final String hsqldb_temp_directory = "hsqldb.temp_directory";
+        "hsqldb_voltpatches.original_version";
+    public static final String hsqldb_script_format  = "hsqldb_voltpatches.script_format";
+    public static final String hsqldb_temp_directory = "hsqldb_voltpatches.temp_directory";
     public static final String hsqldb_result_max_memory_rows =
-        "hsqldb.result_max_memory_rows";
+        "hsqldb_voltpatches.result_max_memory_rows";
 
     //
     private static final String sql_compare_in_locale =
@@ -380,7 +380,7 @@ public class HsqlDatabaseProperties extends HsqlProperties {
 
         // garbage collect per Record or Cache Row objects created
         // the default, "0" means no garbage collection is forced by
-        // hsqldb (the Java Runtime will do it's own garbage collection
+        // hsqldb_voltpatches (the Java Runtime will do it's own garbage collection
         // in any case).
         setProperty(runtime_gc_interval, 0);
 

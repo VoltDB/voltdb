@@ -460,7 +460,7 @@ public final class DateTimeType extends DTIType {
                 Date d = new Date(ts);
                 String utc = org.apache.commons.lang3.time.DateFormatUtils.formatUTC(d, "yyyy-MM-dd HH:mm:ss");
                 a = String.format("%s.%03d", utc, ts % 1000);
-                // $FALL-THROUGH$
+                // fall through
             // End of VoltDB extension
             case Types.SQL_CLOB :
                 a = a.toString();
@@ -883,7 +883,7 @@ public final class DateTimeType extends DTIType {
             case Types.SQL_TIME_WITH_TIME_ZONE :
                 zone = true;
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_TIME : {
                 TimeData t       = (TimeData) a;
                 int      seconds = normaliseTime(t.getSeconds() + t.getZone());
@@ -905,7 +905,7 @@ public final class DateTimeType extends DTIType {
             case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
                 zone = true;
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_TIMESTAMP : {
                 TimestampData ts = (TimestampData) a;
 

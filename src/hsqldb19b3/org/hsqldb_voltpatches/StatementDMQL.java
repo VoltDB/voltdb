@@ -31,10 +31,10 @@
 
 package org.hsqldb_voltpatches;
 
+// A VoltDB extension to support indexed expressions and the assume unique attribute
 import java.util.ArrayList;
 import java.util.List;
-
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+// End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
@@ -262,7 +262,7 @@ public abstract class StatementDMQL extends Statement {
                     return;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case ResultConstants.RETURN_GENERATED_KEYS :
                 generatedIndexes = new int[]{ colIndex };
                 break;
@@ -815,7 +815,6 @@ public abstract class StatementDMQL extends Statement {
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
     }
-
     /************************* Volt DB Extensions *************************/
 
     private static class Pair<T, U> {
@@ -871,7 +870,7 @@ public abstract class StatementDMQL extends Statement {
      * @param cols - output collection containing the column references
      */
 
-    static protected void extractColumnReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
+    static protected void extractColumnReferences(VoltXMLElement element, List<VoltXMLElement> cols) {
         if ("columnref".equalsIgnoreCase(element.name)) {
             cols.add(element);
         } else {
@@ -955,7 +954,7 @@ public abstract class StatementDMQL extends Statement {
 
     /** return a list of VoltXMLElements that need to be added to the statement XML for LIMIT and OFFSET */
     protected static List<VoltXMLElement> voltGetLimitOffsetXMLFromSortAndSlice(Session session, SortAndSlice sortAndSlice)
-            throws HSQLParseException {
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         List<VoltXMLElement> result = new ArrayList<>();
 
         if (sortAndSlice == null || sortAndSlice == SortAndSlice.noSort) {
@@ -1028,8 +1027,7 @@ public abstract class StatementDMQL extends Statement {
         // and uniq them later
         org.hsqldb_voltpatches.lib.HsqlList col_list = new org.hsqldb_voltpatches.lib.HsqlArrayList();
         select.collectAllExpressions(col_list, Expression.columnExpressionSet, Expression.emptyExpressionSet);
-        if (select.queryCondition != null)
-        {
+        if (select.queryCondition != null) {
             Expression.collectAllExpressions(col_list, select.queryCondition,
                                              Expression.columnExpressionSet,
                                              Expression.emptyExpressionSet);
@@ -1039,28 +1037,21 @@ public abstract class StatementDMQL extends Statement {
                                              Expression.columnExpressionSet,
                                              Expression.emptyExpressionSet);
         }
-        for (RangeVariable rv : select.rangeVariables)
-        {
-            if (rv.indexCondition != null)
-            {
+        for (RangeVariable rv : select.rangeVariables) {
+            if (rv.indexCondition != null) {
                 Expression.collectAllExpressions(col_list, rv.indexCondition,
                                                  Expression.columnExpressionSet,
                                                  Expression.emptyExpressionSet);
-
             }
-            if (rv.indexEndCondition != null)
-            {
+            if (rv.indexEndCondition != null) {
                 Expression.collectAllExpressions(col_list, rv.indexEndCondition,
                                                  Expression.columnExpressionSet,
                                                  Expression.emptyExpressionSet);
-
             }
-            if (rv.nonIndexJoinCondition != null)
-            {
+            if (rv.nonIndexJoinCondition != null) {
                 Expression.collectAllExpressions(col_list, rv.nonIndexJoinCondition,
                                                  Expression.columnExpressionSet,
                                                  Expression.emptyExpressionSet);
-
             }
         }
 
@@ -1068,11 +1059,10 @@ public abstract class StatementDMQL extends Statement {
         VoltXMLElement cols = new VoltXMLElement("columns");
         query.children.add(cols);
 
-        java.util.ArrayList<Expression> orderByCols = new java.util.ArrayList<Expression>();
-        java.util.ArrayList<Expression> groupByCols = new java.util.ArrayList<Expression>();
-        java.util.ArrayList<Expression> displayCols = new java.util.ArrayList<Expression>();
-        java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>> aliases =
-                new java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>>();
+        List<Expression> orderByCols = new ArrayList<>();
+        List<Expression> groupByCols = new ArrayList<>();
+        List<Expression> displayCols = new ArrayList<>();
+        List<Pair<Integer, HsqlNameManager.SimpleName>> aliases = new ArrayList<>();
 
         /*
          * select.exprColumn stores all of the columns needed by HSQL to
@@ -1222,7 +1212,7 @@ public abstract class StatementDMQL extends Statement {
         // Columns from USING expression in join are not qualified.
         // if join is INNER then the column from USING expression can be from any table
         // participating in join. In case of OUTER join, it must be the outer column
-        java.util.List<VoltXMLElement> exprCols = new java.util.ArrayList<VoltXMLElement>();
+        List<VoltXMLElement> exprCols = new ArrayList<>();
         extractColumnReferences(query, exprCols);
         resolveUsingColumns(exprCols, select.rangeVariables);
 
@@ -1236,7 +1226,7 @@ public abstract class StatementDMQL extends Statement {
      * @param columns list of columns to resolve
      * @return rvs list of range variables
      */
-    static protected void resolveUsingColumns(java.util.List<VoltXMLElement> columns, RangeVariable[] rvs)
+    static protected void resolveUsingColumns(List<VoltXMLElement> columns, RangeVariable[] rvs)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
 
         // Only one OUTER join for a whole select is supported so far

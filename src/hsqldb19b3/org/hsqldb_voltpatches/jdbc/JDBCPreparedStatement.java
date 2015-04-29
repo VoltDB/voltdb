@@ -1573,7 +1573,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 millis     += zoneOffset;
                 zoneOffset = 0;
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_TIME_WITH_TIME_ZONE :
                 break;
             default :
@@ -1645,7 +1645,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 millis     += zoneOffset;
                 zoneOffset = 0;
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
                 parameterValues[i] = new TimestampData(millis / 1000,
                         x.getNanos(), zoneOffset / 1000);
@@ -1655,7 +1655,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 millis     += zoneOffset;
                 zoneOffset = 0;
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_TIME_WITH_TIME_ZONE :
                 parameterValues[i] = new TimeData((int) (millis / 1000),
                         x.getNanos(), zoneOffset / 1000);
@@ -3898,7 +3898,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 }
                 Util.throwError(Error.error(ErrorCode.X_42565));
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
                 if (o instanceof byte[]) {
@@ -3948,7 +3948,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.TINYINT :
             case Types.SQL_SMALLINT :
             case Types.SQL_INTEGER :
@@ -3973,7 +3973,7 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
                     Util.throwError(e);
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 try {
                     o = outType.convertToDefaultType(connection.sessionProxy,

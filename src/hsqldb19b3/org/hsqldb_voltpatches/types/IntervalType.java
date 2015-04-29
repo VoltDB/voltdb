@@ -473,7 +473,7 @@ public final class IntervalType extends DTIType {
             case Types.SQL_CLOB :
                 a = a.toString();
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_CHAR :
             case Types.SQL_VARCHAR :
             case Types.VARCHAR_IGNORECASE : {
@@ -805,7 +805,7 @@ public final class IntervalType extends DTIType {
                     return new IntervalSecondData(seconds, nanos, this, true);
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "IntervalType");
         }

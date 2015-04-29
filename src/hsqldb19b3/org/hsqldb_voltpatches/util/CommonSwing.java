@@ -72,7 +72,7 @@ class CommonSwing {
                 CommonSwing.class.getResource("Hourglass.gif")).getImage());
         } else if (target.equalsIgnoreCase("Frame")) {
             return (new ImageIcon(
-                CommonSwing.class.getResource("hsqldb.gif")).getImage());
+                CommonSwing.class.getResource("hsqldb_voltpatches.gif")).getImage());
         } else if (target.equalsIgnoreCase("Execute")) {
             return (new ImageIcon(
                 CommonSwing.class.getResource("run_exc.gif")).getImage());

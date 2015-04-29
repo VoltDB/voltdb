@@ -55,7 +55,7 @@ import org.hsqldb_voltpatches.rights.Grantee;
  *
  * @author Peter Hudson - Logicscope Realisations Ltd
  * @version  1.7.0 (1.0.0.3)
- *      Revision History: 1.0.0.1 First release in hsqldb 1.61
+ *      Revision History: 1.0.0.1 First release in hsqldb_voltpatches 1.61
  *      1.0.0.2 'nowait' support to prevent deadlock 1.0.0.3 multiple row
  *      queue for each trigger
  */

@@ -221,7 +221,7 @@ implements ActionListener, WindowListener, KeyListener {
         if ((defDriver != null && defURL != null) || (defDatabase != null)) {
             if (defDatabase != null) {
                 defDriver   = "org.hsqldb_voltpatches.jdbcDriver";
-                defURL      = "jdbc:hsqldb:" + defDatabase;
+                defURL      = "jdbc:hsqldb_voltpatches:" + defDatabase;
                 defUser     = "SA";
                 defPassword = "";
             }
@@ -260,7 +260,7 @@ implements ActionListener, WindowListener, KeyListener {
         System.out.println("-password passw");
         System.out.println("Alternative the database argument is used,");
         System.out.println(
-            "and the hsqldb Driver Standalone is choosen for user 'SA'.");
+            "and the hsqldb_voltpatches Driver Standalone is choosen for user 'SA'.");
         System.out.println("-database db");
         System.out.println(
             "-query qu                   the query qu will be read during initialization");
@@ -276,7 +276,7 @@ implements ActionListener, WindowListener, KeyListener {
         System.out.println(
             "1. Example: java org.hsqldb_voltpatches.util.ZaurusDatabaseManager +");
         System.out.println("  -driver 'org.hsqldb_voltpatches.jdbcDriver' +");
-        System.out.println("  -url 'jdbc:hsqldb:test'");
+        System.out.println("  -url 'jdbc:hsqldb_voltpatches:test'");
         System.out.println(
             "2. Example: java org.hsqldb_voltpatches.util.ZaurusDatabaseManager +");
         System.out.println("  -database 'test'");
@@ -575,7 +575,7 @@ implements ActionListener, WindowListener, KeyListener {
             try {
                 System.out.println("Starting Opera on index.html");
                 Runtime.getRuntime().exec(new String[] {
-                    "opera", "/home/QtPalmtop/help/html/hsqldb/index.html"
+                    "opera", "/home/QtPalmtop/help/html/hsqldb_voltpatches/index.html"
                 });
             } catch (IOException e) {
                 System.out.println("A problem with Opera occured.");

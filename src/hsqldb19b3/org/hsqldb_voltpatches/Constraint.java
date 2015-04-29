@@ -115,10 +115,10 @@ public final class Constraint implements SchemaObject {
                             UNIQUE         = 2,
                             CHECK          = 3,
                             PRIMARY_KEY    = 4,
-                            TEMP           = 5,
-    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
-                            LIMIT          = 6;
-    // End of VoltDB extension
+                            // A VoltDB extension to support table row limits
+                            LIMIT          = 6,
+                            // End of VoltDB extension
+                            TEMP           = 5;
     ConstraintCore          core;
     private HsqlName        name;
     int                     constType;
@@ -601,9 +601,11 @@ public final class Constraint implements SchemaObject {
             case FOREIGN_KEY :
                 return core.refCols.length == 1 && core.refCols[0] == colIndex
                        && core.mainTable == core.refTable;
+
             // A VoltDB extension to support LIMIT PARTITION ROWS syntax
             case LIMIT :
                 return false; // LIMIT PARTITION ROWS depends on no columns
+
             // End of VoltDB extension
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
@@ -636,8 +638,8 @@ public final class Constraint implements SchemaObject {
             // A VoltDB extension to support LIMIT PARTITION ROWS syntax
             case LIMIT :
                 return false; // LIMIT PARTITION ROWS depends on no columns
-            // End of VoltDB extension
 
+            // End of VoltDB extension
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
         }
@@ -661,8 +663,8 @@ public final class Constraint implements SchemaObject {
             // A VoltDB extension to support LIMIT PARTITION ROWS syntax
             case LIMIT :
                 return false; // LIMIT PARTITION ROWS depends on no columns
-            // End of VoltDB extension
 
+            // End of VoltDB extension
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
         }
@@ -1040,7 +1042,6 @@ public final class Constraint implements SchemaObject {
             isNotNull = true;
         }
     }
-
     /************************* Volt DB Extensions *************************/
 
     // !!!!!!!!
@@ -1048,24 +1049,17 @@ public final class Constraint implements SchemaObject {
     // NEED TO MAKE SURE THEY GET ADDED TO Constraint.duplicate()
     // AT THE TOP OF THE FILE OR ALTER WILL HATE YOU --izzy
 
-    // A VoltDB extension to support indexed expressions
-    Expression[] indexExprs;
-    // End of VoltDB extension
-    // A VoltDB extension to support the assume unique attribute
-    boolean assumeUnique = false;
-    // End of VoltDB extension
-    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
-    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
+    Expression[] indexExprs; // For VoltDB, support indexed expressions, not just columns
+    boolean assumeUnique = false; // For VoltDB, support the assume unique attribute.
+    int rowsLimit = Integer.MAX_VALUE; // For VoltDB, support LIMIT PARTITION ROWS syntax
     String rowsLimitDeleteStmt;
-    // End of VoltDB extension
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     // and new kinds of constraints
     public Constraint withExpressions(Expression[] exprs) {
         indexExprs = exprs;
         return this;
     }
-    // End of VoltDB extension
 
     /**
      * @return The name of this constraint instance's type.
@@ -1119,7 +1113,7 @@ public final class Constraint implements SchemaObject {
         return constraint;
     }
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     public boolean isUniqueWithExprs(Expression[] indexExprs2) {
         if (constType != UNIQUE || (indexExprs == null) || ! indexExprs.equals(indexExprs2)) {
             return false;
@@ -1127,13 +1121,13 @@ public final class Constraint implements SchemaObject {
         return true;
     }
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     // Is this for temp constraints only? What's a temp constraint?
     public boolean hasExprs() {
         return indexExprs != null;
     }
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     public String getExprList(StringBuffer sb) {
         String sep = "";
         for(Expression ex : indexExprs) {

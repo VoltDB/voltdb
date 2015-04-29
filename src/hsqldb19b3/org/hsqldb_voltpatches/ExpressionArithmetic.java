@@ -290,7 +290,7 @@ public class ExpressionArithmetic extends Expression {
                     break;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case OpTypes.SUBTRACT :
             case OpTypes.MULTIPLY :
             case OpTypes.DIVIDE :

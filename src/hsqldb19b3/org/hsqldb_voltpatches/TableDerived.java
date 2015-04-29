@@ -48,9 +48,9 @@ public class TableDerived extends Table {
 
     QueryExpression queryExpression;
     View            view;
-    
-    /*************** VOLTDB *********************/
+    // A VoltDB extension to support subquery serialization
     Expression      dataExpression;
+    // End of VoltDB extension
 
     public TableDerived(Database database, HsqlName name, int type) {
 

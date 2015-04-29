@@ -37,7 +37,6 @@ import java.math.BigInteger;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.OpTypes;
-import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.Types;
@@ -59,9 +58,9 @@ public final class NumberType extends Type {
     static final int bigintPrecision              = 19;
     static final int doublePrecision              = 0;
     static final int defaultNumericPrecision      = 100;
-    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    // CHERRY PICK code change from hsqldb-2.2.8
     public static final int defaultNumericScale          = 32;
-    // END Cherry-picked code change from hsqldb-2.2.8
+    // End of CHERRY PICK from hsqldb-2.2.8
     static final int bigintSquareNumericPrecision = 40;
 
     //
@@ -557,7 +556,7 @@ public final class NumberType extends Type {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_BIGINT : {
                 if (b instanceof Long) {
                     long longa = ((Number) a).longValue();
@@ -586,7 +585,7 @@ public final class NumberType extends Type {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_REAL :
             case Types.SQL_FLOAT :
             case Types.SQL_DOUBLE : {
@@ -709,7 +708,7 @@ public final class NumberType extends Type {
                 a = ((ClobData) a).getSubString(
                     session, 0L, (int) ((ClobData) a).length(session));
 
-            // $FALL-THROUGH$
+            // fall through
             case Types.SQL_CHAR :
             case Types.SQL_VARCHAR :
             case Types.VARCHAR_IGNORECASE : {
@@ -810,9 +809,9 @@ public final class NumberType extends Type {
             } else if (a instanceof Double) {
                 otherType = Type.SQL_DOUBLE;
             } else if (a instanceof BigDecimal) {
-                // BEGIN Cherry-picked code change from hsqldb-2.2.8
+                // CHERRY PICK code change from hsqldb-2.2.8
                 otherType = Type.SQL_DECIMAL_DEFAULT;
-/*
+                /* disable 9 lines ...
                 if (typeCode == Types.SQL_DECIMAL
                         || typeCode == Types.SQL_NUMERIC) {
                     return convertToTypeLimits(session, a);
@@ -822,13 +821,12 @@ public final class NumberType extends Type {
 
                 otherType = getNumberType(Types.SQL_DECIMAL,
                                           JavaSystem.precision(val), scale);
-*/
-                // END Cherry-picked code change from hsqldb-2.2.8
+                ... disabled 9 lines */
+                // End of CHERRY PICK
             } else {
                 throw Error.error(ErrorCode.X_42561);
             }
-
-            // BEGIN Cherry-picked code change from hsqldb-2.2.8
+            // CHERRY PICK code change from hsqldb-2.2.8
             switch (typeCode) {
 
                 case Types.TINYINT :
@@ -859,7 +857,7 @@ public final class NumberType extends Type {
                 default :
                     throw Error.error(ErrorCode.X_42561);
             }
-            // END Cherry-picked code change from hsqldb-2.2.8
+            // End of CHERRY PICK code change from hsqldb-2.2.8
         } else if (a instanceof String) {
             otherType = Type.SQL_VARCHAR;
         } else {
@@ -964,8 +962,8 @@ public final class NumberType extends Type {
             throw Error.error(ErrorCode.X_42561);
         }
     }
+    // CHERRY PICK code chahne  from hsqldb-2.2.8
 
-    // BEGIN Cherry-picked code change from hsqldb-2.2.8
     /**
      * Type narrowing from DOUBLE/DECIMAL/NUMERIC to BIGINT / INT / SMALLINT / TINYINT
      * following SQL rules. When conversion is from a non-integral type,
@@ -1005,8 +1003,8 @@ public final class NumberType extends Type {
         } else if (a instanceof Double || a instanceof Float) {
             double d = ((Number) a).doubleValue();
 
-            if (session instanceof Session) {
-                if (!((Session) session).database.sqlConvertTruncate) {
+            if (session instanceof org.hsqldb_voltpatches.Session) {
+                if (!((org.hsqldb_voltpatches.Session) session).database.sqlConvertTruncate) {
                     d = java.lang.Math.rint(d);
                 }
             }
@@ -1056,8 +1054,8 @@ public final class NumberType extends Type {
         } else if (a instanceof Double || a instanceof Float) {
             double d = ((Number) a).doubleValue();
 
-            if (session instanceof Session) {
-                if (!((Session) session).database.sqlConvertTruncate) {
+            if (session instanceof org.hsqldb_voltpatches.Session) {
+                if (!((org.hsqldb_voltpatches.Session) session).database.sqlConvertTruncate) {
                     d = java.lang.Math.rint(d);
                 }
             }
@@ -1073,7 +1071,7 @@ public final class NumberType extends Type {
             throw Error.error(ErrorCode.X_42561);
         }
     }
-    // END Cherry-picked code change from hsqldb-2.2.8
+    // End of CHERRY PICK
 
     /**
      * Converter from a numeric object to Double. Input is checked to be
@@ -1810,7 +1808,7 @@ public final class NumberType extends Type {
                 // End of VoltDB extension
             }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 return a;
         }
@@ -1850,7 +1848,7 @@ public final class NumberType extends Type {
                 // End of VoltDB extension
             }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 return a;
         }

@@ -246,14 +246,12 @@ public class QuerySpecification extends QueryExpression {
                                                rangeVariables.length, false);
         }
 
-    /************************* Volt DB Extensions *************************/
+        // A VoltDB extension to support mysql-compatible GROUP BY <column-alias>
         resolveColumnReferencesInGroupBy();
-    /**********************************************************************/
-
+        // End of VoltDB extension
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
-
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to support mysql-compatible GROUP BY <column-alias>
     void resolveColumnReferencesInGroupBy() {
         if (! isAggregated) {
             return;
@@ -342,7 +340,7 @@ public class QuerySpecification extends QueryExpression {
         }
         unresolvedExpressions = newUnresolvedExpressions;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 
     void resolveColumnRefernecesInOrderBy(SortAndSlice sortAndSlice) {
 
@@ -1071,10 +1069,10 @@ public class QuerySpecification extends QueryExpression {
         // A VoltDB extension to support OFFSET without LIMIT
         if (sortAndSlice.limitCondition != null
                 && sortAndSlice.limitCondition.getRightNode() != null) {
-        // End of VoltDB extension
         /* disable 1 line ...
         if (sortAndSlice.limitCondition != null) {
         ... disabled 1 line */
+        // End of VoltDB extension
             Integer limit =
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);
@@ -1946,7 +1944,6 @@ public class QuerySpecification extends QueryExpression {
             set.add(name);
         }
     }
-
     /************************* Volt DB Extensions *************************/
     Expression getHavingCondition() { return havingCondition; }
 
@@ -1962,7 +1959,7 @@ public class QuerySpecification extends QueryExpression {
      * @param header    A string to be prepended to output
      */
     private void dumpExprColumns(String header){
-        System.out.println("\n\n*********************************************");
+        System.out.println("\n\n---------------------------------------------");
         System.out.println(header);
         try {
             System.out.println(getSQL());

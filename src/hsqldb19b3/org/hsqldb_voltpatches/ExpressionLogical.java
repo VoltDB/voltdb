@@ -128,7 +128,7 @@ public class ExpressionLogical extends Expression {
                     isColumnEqual = true;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case OpTypes.GREATER_EQUAL :
             case OpTypes.GREATER :
             case OpTypes.SMALLER :
@@ -1510,7 +1510,7 @@ public class ExpressionLogical extends Expression {
                                           : null;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case OpTypes.GREATER :
             case OpTypes.GREATER_EQUAL :
             case OpTypes.SMALLER :
@@ -1540,7 +1540,7 @@ public class ExpressionLogical extends Expression {
                     return this;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
                 return null;
         }

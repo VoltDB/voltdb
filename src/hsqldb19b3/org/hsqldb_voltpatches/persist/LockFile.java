@@ -275,7 +275,7 @@ import org.hsqldb_voltpatches.lib.StringConverter;
  * however, this option has been rejected due to the relative complexity of
  * guaranteeing acceptably safe, deterministic behaviour.  On the other hand,
  * if it can be guaranteed that certain site invariants hold (in particular,
- * that only one version of the hsqldb jar will ever be used to open database
+ * that only one version of the hsqldb_voltpatches jar will ever be used to open database
  * instances at the site) and it is desirable or required to experiment with
  * a lower interval, then it is recommended for now simply to recompile the
  * jar using a different value in the static field assignment.  Note that great
@@ -349,7 +349,7 @@ import org.hsqldb_voltpatches.lib.StringConverter;
  * performed at the level of the <tt>newLockFile()</tt> factory method.
  * Similarly, the HSQLDB ANT build script now detects the presence or abscence
  * of JDK 1.4+ features such as java.nio and only attempts to build and deploy
- * <tt>NIOLockFile</tt> to the hsqldb.jar if such features are reported
+ * <tt>NIOLockFile</tt> to the hsqldb_voltpatches.jar if such features are reported
  * present. <p>
  *
  * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
@@ -415,14 +415,14 @@ public class LockFile {
      * heartbeat poll retries.
      */
     public static final String POLL_RETRIES_PROPERTY =
-        "hsqldb.lockfile.poll.retries";
+        "hsqldb_voltpatches.lockfile.poll.retries";
 
     /**
      * System property that can be used to override the default number of
      * milliseconds between each heartbeat poll retry.
      */
     public static final String POLL_INTERVAL_PROPERTY =
-        "hsqldb.lockfile.poll.interval";
+        "hsqldb_voltpatches.lockfile.poll.interval";
 
     /** Whether <tt>java.nio</tt> file locking is attempted by default. */
     public static final boolean USE_NIO_FILELOCK_DEFAULT = false;
@@ -432,7 +432,7 @@ public class LockFile {
      * attempted.
      */
     public static final String USE_NIO_FILELOCK_PROPERTY =
-        "hsqldb.lockfile.nio.filelock";
+        "hsqldb_voltpatches.lockfile.nio.filelock";
 
     /**
      * Statically computed indication of <tt>java.nio.channels.FileLock</tt>

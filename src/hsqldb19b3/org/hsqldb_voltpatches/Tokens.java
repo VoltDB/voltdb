@@ -783,12 +783,12 @@ public class Tokens {
     static final String        T_BITAND           = "BITAND";
     static final String        T_BITOR            = "BITOR";
     static final String        T_BITXOR           = "BITXOR";
-    // CHERRY PICK -- mysterious
+    // CHERRY PICK code -- mysterious
     static final String        T_CONCAT_WORD      = "CONCAT";
     // End of CHERRY PICK
     static final String        T_ROUNDMAGIC       = "ROUNDMAGIC";
     static final String        T_ASCII            = "ASCII";
-    // CHERRY PICK -- mysterious
+    // CHERRY PICK code -- mysterious
     /* disable 1 line ...
     static final String        T_CONCAT_WORD      = "CONCAT_WORD";
     ... disabled 1 line */
@@ -1439,7 +1439,7 @@ public class Tokens {
     // A VoltDB extension to make WEEK public
     public static final int WEEK                    = 617;
     /* disable 1 line ...
-    static final int WEEK                           = 617;
+    static final int        WEEK                    = 617;
     ... disabled 1 line */
     // End of VoltDB extension
     static final int        OCTETLENGTH             = 618;
@@ -1523,7 +1523,7 @@ public class Tokens {
     static final int SQL_TSI_QUARTER     = 688;
     static final int SQL_TSI_YEAR        = 689;
 
-    // todo - goes into general hsqldb list
+    // todo - goes into general hsqldb_voltpatches list
     static final int FILE  = 691;
     static final int FILES = 692;
     static final int CACHE = 693;

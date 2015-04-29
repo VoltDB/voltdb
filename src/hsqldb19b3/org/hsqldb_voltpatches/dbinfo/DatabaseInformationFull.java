@@ -539,17 +539,17 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
      * Currently, the database properties reported are: <p>
      *
      * <OL>
-     *     <LI>hsqldb.cache_file_scale - the scaling factor used to translate data and index structure file pointers
-     *     <LI>hsqldb.cache_scale - base-2 exponent scaling allowable cache row count
-     *     <LI>hsqldb.cache_size_scale - base-2 exponent scaling allowable cache byte count
-     *     <LI>hsqldb.cache_version -
-     *     <LI>hsqldb.catalogs - whether to report the database catalog (database uri)
-     *     <LI>hsqldb.compatible_version -
-     *     <LI>hsqldb.files_readonly - whether the database is in files_readonly mode
-     *     <LI>hsqldb.gc_interval - # new records forcing gc ({0|NULL}=>never)
-     *     <LI>hsqldb.max_nio_scale - scale factor for cache nio mapped buffers
-     *     <LI>hsqldb.nio_data_file - whether cache uses nio mapped buffers
-     *     <LI>hsqldb.original_version -
+     *     <LI>hsqldb_voltpatches.cache_file_scale - the scaling factor used to translate data and index structure file pointers
+     *     <LI>hsqldb_voltpatches.cache_scale - base-2 exponent scaling allowable cache row count
+     *     <LI>hsqldb_voltpatches.cache_size_scale - base-2 exponent scaling allowable cache byte count
+     *     <LI>hsqldb_voltpatches.cache_version -
+     *     <LI>hsqldb_voltpatches.catalogs - whether to report the database catalog (database uri)
+     *     <LI>hsqldb_voltpatches.compatible_version -
+     *     <LI>hsqldb_voltpatches.files_readonly - whether the database is in files_readonly mode
+     *     <LI>hsqldb_voltpatches.gc_interval - # new records forcing gc ({0|NULL}=>never)
+     *     <LI>hsqldb_voltpatches.max_nio_scale - scale factor for cache nio mapped buffers
+     *     <LI>hsqldb_voltpatches.nio_data_file - whether cache uses nio mapped buffers
+     *     <LI>hsqldb_voltpatches.original_version -
      *     <LI>sql.enforce_strict_size - column length specifications enforced strictly (raise exception on overflow)?
      *     <LI>textdb.all_quoted - default policy regarding whether to quote all character field values
      *     <LI>textdb.cache_scale - base-2 exponent scaling allowable cache row count
@@ -6256,7 +6256,7 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
             if (table.isView()
                     && session.getGrantee().isFullyAccessibleByRole(table)) {
 
-                // $FALL-THROUGH$
+                // fall through
             } else {
                 continue;
             }
@@ -6381,7 +6381,7 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
             if (table.isView()
                     && session.getGrantee().isFullyAccessibleByRole(table)) {
 
-                // $FALL-THROUGH$
+                // fall through
             } else {
                 continue;
             }
@@ -6500,7 +6500,7 @@ extends org.hsqldb_voltpatches.dbinfo.DatabaseInformationMain {
             if (table.isView()
                     && session.getGrantee().isFullyAccessibleByRole(table)) {
 
-                // $FALL-THROUGH$
+                // fall through
             } else {
                 continue;
             }

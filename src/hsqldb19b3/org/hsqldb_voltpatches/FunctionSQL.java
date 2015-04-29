@@ -400,7 +400,7 @@ public class FunctionSQL extends Expression {
             // A VoltDB extension to customize the SQL function set support
             case FUNC_SUBSTRING_BINARY :
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // $FALL-THROUGH$
+                // fall through
             case FUNC_SUBSTRING_CHAR :
             /* disable 2 lines ...
             case FUNC_SUBSTRING_CHAR :
@@ -471,7 +471,7 @@ public class FunctionSQL extends Expression {
             // A VoltDB extension to customize the SQL function set support
             case FUNC_OVERLAY_BINARY :
                 voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // $FALL-THROUGH$
+                // fall through
             case FUNC_OVERLAY_CHAR :
             /* disable 2 lines ...
             case FUNC_OVERLAY_CHAR :
@@ -1272,7 +1272,7 @@ public class FunctionSQL extends Expression {
                     throw Error.error(ErrorCode.X_42565);
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case FUNC_OCTET_LENGTH : {
                 if (nodes[0].dataType == null) {
                     nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
@@ -1323,8 +1323,7 @@ public class FunctionSQL extends Expression {
             }
             case FUNC_POWER : {
                 if (nodes[0].dataType == null) {
-                    // A VoltDB extension to customize the SQL function set support
-                    // VoltDB swapped out this odd propagation of nulls.
+                    // A VoltDB extension to swap out this odd propagation of nulls.
                     // VoltDB simply gives missing types the benefit of the doubt.
                     nodes[0].dataType = Type.SQL_DOUBLE;
                     // For VoltDB, the retest for null below is now redundant.
@@ -1335,12 +1334,9 @@ public class FunctionSQL extends Expression {
                 }
 
                 if (nodes[1].dataType == null) {
-                    // VoltDB swapped out this odd propagation of nulls.
-                    // ORIGINAL HSQL CODE: nodes[0].dataType = nodes[1].dataType;
+                    // A VoltDB extension swapped out this odd propagation of nulls.
                     // VoltDB simply gives missing types the benefit of the doubt.
                     nodes[1].dataType = Type.SQL_DOUBLE;
-                    // A VoltDB extension to customize the SQL function set support
-                    // VoltDB swapped out this odd propagation of nulls.
                     /* disable 1 line ...
                     nodes[0].dataType = nodes[1].dataType;
                     ... disabled 1 line */
@@ -1389,7 +1385,7 @@ public class FunctionSQL extends Expression {
                     break;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case FUNC_FLOOR :
             case FUNC_CEILING : {
                 if (nodes[0].dataType == null) {
@@ -1703,7 +1699,7 @@ public class FunctionSQL extends Expression {
 
                 dataType = DateTimeType.getDateTimeType(
                     Types.SQL_TIMESTAMP_WITH_TIME_ZONE, precision);
-                ... disabled 1 line */
+                ... disabled 8 lines */
                 // End of VoltDB extension
 
                 break;

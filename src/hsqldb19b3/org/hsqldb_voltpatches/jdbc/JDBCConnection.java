@@ -174,7 +174,7 @@ import java.sql.SQLInput;
  * <hr>
  *
  * When using HSQLDB, the database connection <b>&lt;url&gt;</b> must start with
- * <b>'jdbc:hsqldb:'</b><p>
+ * <b>'jdbc:hsqldb_voltpatches:'</b><p>
  *
  * Since 1.7.2, connection properties (&lt;key-value-pairs&gt;) may be appended
  * to the database connection <b>&lt;url&gt;</b>, using the form: <p>
@@ -197,9 +197,9 @@ import java.sql.SQLInput;
  *
  * <div class="GeneralExample">
  * <ol>
- * <li> <b>'jdbc:hsqldb:hsql://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:hsql://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
  *
- * <li> <b>'jdbc:hsqldb:hsqls://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:hsqls://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
  *         (with TLS).
  * </ol>
  * </div> <p>
@@ -209,9 +209,9 @@ import java.sql.SQLInput;
  *
  * <div class="GeneralExample">
  * <ol>
- * <li> <b>'jdbc:hsqldb:http://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:http://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
  *
- * <li> <b>'jdbc:hsqldb:https://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:https://host[:port][/&lt;alias&gt;][&lt;key-value-pairs&gt;]'</b>
  *      (with TLS).
  * </ol>
  * </div><p>
@@ -238,10 +238,10 @@ import java.sql.SQLInput;
  *
  * <div class="GeneralExample">
  * <ol>
- * <li> <b>'jdbc:hsqldb:.[&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:.[&lt;key-value-pairs&gt;]'</b>
  *     (the legacy form, extended)
  *
- * <li> <b>'jdbc:hsqldb:mem:&lt;alias&gt;[&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:mem:&lt;alias&gt;[&lt;key-value-pairs&gt;]'</b>
  *      (the new form)
  * </ol>
  * </div> <p>
@@ -268,13 +268,13 @@ import java.sql.SQLInput;
  *
  * <div class="GeneralExample">
  * <ol>
- * <li> <b>'jdbc:hsqldb:&lt;path&gt;[&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:&lt;path&gt;[&lt;key-value-pairs&gt;]'</b>
  *      (the legacy form, extended)
  *
- * <li> <b>'jdbc:hsqldb:file:&lt;path&gt;[&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:file:&lt;path&gt;[&lt;key-value-pairs&gt;]'</b>
  *      (same semantics as the legacy form)
  *
- * <li> <b>'jdbc:hsqldb:res:&lt;path&gt;[&lt;key-value-pairs&gt;]'</b>
+ * <li> <b>'jdbc:hsqldb_voltpatches:res:&lt;path&gt;[&lt;key-value-pairs&gt;]'</b>
  *      (new form with 'files_in_jar' semantics)
  * </ol>
  * </div> <p>
@@ -298,7 +298,7 @@ import java.sql.SQLInput;
  * </ul>
  * </div> <p>
  *
- * For example: <b>'jdbc:hsqldb:file:test'</b> connects to a database
+ * For example: <b>'jdbc:hsqldb_voltpatches:file:test'</b> connects to a database
  * composed of some subset of the files listed above, where the expansion
  * of <b>&lt;path&gt;</b> is <b>'test'</b> prefixed with the canonical path of
  * the JVM's effective working directory at the time the designated database
@@ -317,7 +317,7 @@ import java.sql.SQLInput;
  * <p>
  *
  * Under <em>Windows</em> <sup><font size="-2">TM</font> </sup>, <b>
- * 'jdbc:hsqldb:file:c:\databases\test'</b> connects to a database located
+ * 'jdbc:hsqldb_voltpatches:file:c:\databases\test'</b> connects to a database located
  * on drive <b>'C:'</b> in the directory <b>'databases'</b>, composed
  * of some subset of the files: <p>
  *
@@ -332,7 +332,7 @@ import java.sql.SQLInput;
  *    +--test.lck
  * </pre>
  *
- * Under most variations of UNIX, <b>'jdbc:hsqldb:file:/databases/test'</b>
+ * Under most variations of UNIX, <b>'jdbc:hsqldb_voltpatches:file:/databases/test'</b>
  * connects to a database located in the directory <b>'databases'</b> directly
  * under root, once again composed of some subset of the files: <p>
  *
@@ -378,9 +378,9 @@ import java.sql.SQLInput;
  *
  * <b>res: protocol Connections:</b><p>
  *
- * The <b>'jdbc:hsqldb:res:&lt;path&gt;'</b> database connection
+ * The <b>'jdbc:hsqldb_voltpatches:res:&lt;path&gt;'</b> database connection
  * <b>&lt;url&gt;</b> has different semantics than the
- * <b>'jdbc:hsqldb:file:&lt;path&gt;'</b> form. The semantics are similar to
+ * <b>'jdbc:hsqldb_voltpatches:file:&lt;path&gt;'</b> form. The semantics are similar to
  * those of a <b>'files_readonly'</b> database, but with some additional
  * points to consider. <p>
  *

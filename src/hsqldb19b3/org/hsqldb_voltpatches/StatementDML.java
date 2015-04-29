@@ -31,9 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.List;
-
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
@@ -42,7 +39,6 @@ import org.hsqldb_voltpatches.index.IndexAVL;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.navigator.RangeIterator;
 import org.hsqldb_voltpatches.navigator.RowIterator;
@@ -541,7 +537,7 @@ public class StatementDML extends StatementDMQL {
         newData.beforeFirst();
 
         while (newData.hasNext()) {
-            Object[] data = newData.getNext();
+            Object[] data = (Object[]) newData.getNext();
 
             baseTable.insertRow(session, store, data);
 
@@ -1247,7 +1243,6 @@ public class StatementDML extends StatementDMQL {
 
         return true;
     }
-
     /************************* Volt DB Extensions *************************/
 
     private SortAndSlice m_sortAndSlice = null;
@@ -1296,7 +1291,8 @@ public class StatementDML extends StatementDMQL {
     /**
      * Appends XML for ORDER BY/LIMIT/OFFSET to this statement's XML.
      * */
-    private void voltAppendSortAndSlice(Session session, VoltXMLElement xml) throws HSQLParseException {
+    private void voltAppendSortAndSlice(Session session, VoltXMLElement xml)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         if (m_sortAndSlice == null || m_sortAndSlice == SortAndSlice.noSort) {
             return;
         }
@@ -1305,25 +1301,25 @@ public class StatementDML extends StatementDMQL {
         if (targetTable.getBaseTable() != targetTable) {
             // This check is unreachable, but if writable views are ever supported there
             // will be some more work to do to resolve columns in ORDER BY properly.
-            throw new HSQLParseException("DELETE with ORDER BY, LIMIT or OFFSET is currently unsupported on views.");
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException("DELETE with ORDER BY, LIMIT or OFFSET is currently unsupported on views.");
         }
 
         if (m_sortAndSlice.hasLimit() && !m_sortAndSlice.hasOrder()) {
-            throw new HSQLParseException("DELETE statement with LIMIT or OFFSET but no ORDER BY would produce "
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException("DELETE statement with LIMIT or OFFSET but no ORDER BY would produce "
                     + "non-deterministic results.  Please use an ORDER BY clause.");
         }
         else if (m_sortAndSlice.hasOrder() && !m_sortAndSlice.hasLimit()) {
             // This is harmless, but the order by is meaningless in this case.  Should
             // we let this slide?
-            throw new HSQLParseException("DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.  "
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException("DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.  "
                     + "Consider removing the ORDER BY clause, as it has no effect here.");
         }
 
-        List<VoltXMLElement> newElements = voltGetLimitOffsetXMLFromSortAndSlice(session, m_sortAndSlice);
+        java.util.List<VoltXMLElement> newElements = voltGetLimitOffsetXMLFromSortAndSlice(session, m_sortAndSlice);
 
         // This code isn't shared with how SELECT's ORDER BY clauses are serialized since there's
         // some extra work that goes on there to handle references to SELECT clauses aliases, etc.
-        HsqlArrayList exprList = m_sortAndSlice.exprList;
+        org.hsqldb_voltpatches.lib.HsqlArrayList exprList = m_sortAndSlice.exprList;
         if (exprList != null) {
             VoltXMLElement orderColumnsXml = new VoltXMLElement("ordercolumns");
             for (int i = 0; i < exprList.size(); ++i) {
@@ -1354,7 +1350,7 @@ public class StatementDML extends StatementDMQL {
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     @Override
     VoltXMLElement voltGetStatementXML(Session session)

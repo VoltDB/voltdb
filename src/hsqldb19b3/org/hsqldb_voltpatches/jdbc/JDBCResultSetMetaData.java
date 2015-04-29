@@ -347,7 +347,7 @@ public class JDBCResultSetMetaData implements ResultSetMetaData {
      *
      *      <li> Otherwise, the computed length according to SQL Standard is
      *           returned. For very large values, the value of the system property
-     *           hsqldb.max_xxxchar_display_size or the magic value
+     *           hsqldb_voltpatches.max_xxxchar_display_size or the magic value
      *           32766 (0x7FFE) (tested usable/accepted by most tools and
      *           compatible with assumptions made by java.io read/write
      *           UTF) when the system property is not defined or is not

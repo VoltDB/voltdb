@@ -70,7 +70,6 @@ public class StatementQuery extends StatementDMQL {
         checkAccessRights(session);
     }
 
-    @Override
     Result getResult(Session session) {
 
         Result result = queryExpression.getResult(session,
@@ -81,7 +80,6 @@ public class StatementQuery extends StatementDMQL {
         return result;
     }
 
-    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -99,7 +97,6 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
-    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         queryExpression.getBaseTableNames(set);
@@ -111,7 +108,6 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
-    @Override
     void getTableNamesForWrite(OrderedHashSet set) {}
 
     /************************* Volt DB Extensions *************************/

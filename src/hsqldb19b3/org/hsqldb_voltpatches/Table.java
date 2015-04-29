@@ -66,12 +66,6 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.index.IndexAVL;
@@ -89,8 +83,8 @@ import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.LobData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.LobData;
 
 // fredt@users 20020130 - patch 491987 by jimbag@users - made optional
 // fredt@users 20020405 - patch 1.7.0 by fredt - quoted identifiers
@@ -182,7 +176,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 type = MEMORY_TABLE;
 
-            // $FALL-THROUGH$
+            // fall through
             case MEMORY_TABLE :
                 persistenceScope = SCOPE_FULL;
                 isSchemaBased    = true;
@@ -2656,13 +2650,13 @@ public class Table extends TableBase implements SchemaObject {
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     VoltXMLElement voltGetTableXML(Session session)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
-        Map<String, String> autoGenNameMap = new HashMap<String, String>();
+        java.util.Map<String, String> autoGenNameMap = new java.util.HashMap<String, String>();
 
         // add table metadata
         String tableName = getName().name;
@@ -2702,7 +2696,7 @@ public class Table extends TableBase implements SchemaObject {
         // See VoltXMLElement.java for further explanation of TEH HORROR
         constraints.attributes.put("name", "constraints");
         table.children.add(constraints);
-        List<VoltXMLElement> revisitList = new ArrayList<VoltXMLElement>();
+        java.util.List<VoltXMLElement> revisitList = new java.util.ArrayList<VoltXMLElement>();
         for (Constraint constraint : getConstraints()) {
             VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
             if (constraintChild != null) {
@@ -2747,8 +2741,9 @@ public class Table extends TableBase implements SchemaObject {
         return table;
     }
 
-    // A VoltDB extension to support indexed expressions
-    public final Index createAndAddExprIndexStructure(HsqlName name, int[] columns, Expression[] indexExprs, boolean unique, boolean constraint) {
+    // VoltDB support for indexed expressions
+    public final Index createAndAddExprIndexStructure(
+            HsqlName name, int[] columns, Expression[] indexExprs, boolean unique, boolean constraint) {
 
         Index newExprIndex = createIndexStructure(name, columns, null, null, unique, constraint, false);
         newExprIndex = newExprIndex.withExpressions(indexExprs);

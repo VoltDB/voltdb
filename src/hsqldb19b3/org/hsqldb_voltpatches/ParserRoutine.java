@@ -671,19 +671,19 @@ public class ParserRoutine extends ParserDML {
                 case Tokens.SQLSTATE :
                     conditionType = StatementHandler.SQL_STATE;
 
-                // $FALL-THROUGH$
+                // fall through
                 case Tokens.SQLEXCEPTION :
                     if (conditionType == StatementHandler.NONE) {
                         conditionType = StatementHandler.SQL_EXCEPTION;
                     }
 
-                // $FALL-THROUGH$
+                // fall through
                 case Tokens.SQLWARNING :
                     if (conditionType == StatementHandler.NONE) {
                         conditionType = StatementHandler.SQL_WARNING;
                     }
 
-                // $FALL-THROUGH$
+                // fall through
                 case Tokens.NOT :
                     if (conditionType == StatementHandler.NONE) {
                         conditionType = StatementHandler.SQL_NOT_FOUND;

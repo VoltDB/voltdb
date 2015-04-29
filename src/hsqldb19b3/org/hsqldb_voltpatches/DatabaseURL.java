@@ -60,7 +60,7 @@ public class DatabaseURL {
     public static final String S_HSQLS             = "hsqls://";
     public static final String S_HTTP              = "http://";
     public static final String S_HTTPS             = "https://";
-    public static final String S_URL_PREFIX        = "jdbc:hsqldb:";
+    public static final String S_URL_PREFIX        = "jdbc:hsqldb_voltpatches:";
     public static final String url_connection_type = "connection_type";
     public static final String url_database        = "database";
 
