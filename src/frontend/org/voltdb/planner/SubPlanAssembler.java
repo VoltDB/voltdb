@@ -38,7 +38,6 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -1410,6 +1409,7 @@ public abstract class SubPlanAssembler {
                 // The AbstractSubqueryExpression must be wrapped up into a
                 // ScalarValueExpression which extracts the actual row/column from
                 // the subquery
+                // ENG-8175: this part of code seems not working for float/varchar type index ?!
                 expr2 = ExpressionUtil.addScalarValueExpression((AbstractSubqueryExpression)expr2);
             }
             scanNode.addSearchKeyExpression(expr2);

@@ -472,8 +472,6 @@ public abstract class ExpressionUtil {
         scalarExpr.setLeft(expr);
         scalarExpr.setValueType(expr.getValueType());
         scalarExpr.setValueSize(expr.getValueSize());
-        expr.setValueType(expr.getValueType());
-        expr.setValueSize(expr.getValueSize());
         return scalarExpr;
     }
 }
