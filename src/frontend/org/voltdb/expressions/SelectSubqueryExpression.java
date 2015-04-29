@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -49,6 +50,13 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     // They may originate at different levels in the subquery hierarchy.
     private List<Integer> m_allParameterIdxList = new ArrayList<Integer>();
 
+    // SelectSubqueryExpression can be changed to a ScalarSubqueryExpression in certain contexts
+    // By default, AbstractSubqueryExpression use the BigInt as the return type because of possible
+    // optimization all the other IN/EXISTS into EXISTS (SELECT 1 FROM...).
+    // However, scalar subquery is used quite different and temporary hides under this class.
+    // Eventually, scalar subquery is changed to a expression with one child as SelectSubqueryExpression.
+    private VoltType m_scalarExprType = null;
+
     /**
      * Create a new SubqueryExpression. The type can be either:
      *    SCALAR_SUBQUERY   - SELECT A, (SELECT C...) FROM .... - single row one column
@@ -69,6 +77,12 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         }
         m_args = new ArrayList<AbstractExpression>();
         resolveCorrelations();
+
+        m_scalarExprType = m_valueType;
+        if (m_subquery.getOutputSchema().size() == 1) {
+            // potential scalar sub-query
+            m_scalarExprType = m_subquery.getOutputSchema().get(0).getType();
+        }
     }
 
     /**
@@ -101,6 +115,14 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     @Override
     public AbstractPlanNode getSubqueryNode() {
         return m_subqueryNode;
+    }
+
+    /**
+     * This function should only be called when this expression should be changed to ScalarSubqueryExpression.
+     */
+    public void changeToScalarExprType() {
+        m_valueType = m_scalarExprType;
+        m_valueSize = m_valueType.getMaxLengthInBytes();
     }
 
     /**
