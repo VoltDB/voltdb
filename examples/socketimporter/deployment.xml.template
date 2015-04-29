@@ -8,6 +8,8 @@
         <configuration bundle="file:__PATH_MARKER__/socketstream.jar" enabled="true">
             <property name="port">7001</property>
             <property name="procedure">importTable.insert</property>
+            <!-- ignore this property if you decode your own values and pass to procedure. -->
+            <property name="decode">true</property>
         </configuration>
     </import>
 </deployment>

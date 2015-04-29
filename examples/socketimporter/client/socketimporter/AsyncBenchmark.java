@@ -221,7 +221,7 @@ public class AsyncBenchmark {
         final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
         while (warmupEndTime > System.currentTimeMillis()) {
             PrintWriter writer = writers.get(idx);
-            writer.println(String.valueOf(icnt));
+            writer.println(String.valueOf(icnt) + "," + System.currentTimeMillis());
             icnt++;
         }
 
@@ -236,7 +236,7 @@ public class AsyncBenchmark {
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
             PrintWriter writer = writers.get(idx);
-            writer.println(String.valueOf(icnt));
+            writer.println(String.valueOf(icnt) + "," + System.currentTimeMillis());
             icnt++;
         }
         writers.get(0).flush();

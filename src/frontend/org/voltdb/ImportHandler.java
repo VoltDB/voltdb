@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -32,7 +33,9 @@ import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import java.util.ArrayList;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.importer.ImportContext.Format;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -58,6 +61,7 @@ public class ImportHandler {
     private final long m_id;
     private final AtomicLong m_pendingCount = new AtomicLong(0);
     private static final long MAX_PENDING_TRANSACTIONS = 5000;
+    private final CSVParser m_csvParser = new CSVParser();
 
     private class ImportCallback implements ImportClientResponseAdapter.Callback {
 
@@ -142,6 +146,24 @@ public class ImportHandler {
         return DBBPool.allocateDirect(sz);
     }
 
+    /**
+     * Handle decoding of params passed in data based on format specified.
+     * @param format currently CSV supported
+     * @param data data to decode.
+     * @return list of objects to be passed to the callProcedure.
+     * @throws IOException
+     */
+    public List<Object> decodeParameters(Format format, String data) throws IOException {
+        switch (format) {
+            case CSV:
+                return m_csvParser.parseLineList(data);
+            default:
+                List<Object> list = new ArrayList<Object>();
+                list.add(data);
+                return list;
+        }
+    }
+
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
@@ -221,10 +243,11 @@ public class ImportHandler {
                     catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                     task.getSerializedSize(), nowNanos);
         }
-        if (success) {
-            m_pendingCount.incrementAndGet();
-            m_submitSuccessCount.incrementAndGet();
+        if (!success) {
+            tcont.discard();
         }
+        m_pendingCount.incrementAndGet();
+        m_submitSuccessCount.incrementAndGet();
         return success;
     }
 

@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
@@ -42,6 +43,8 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
 
     private Properties m_properties;
     private ServerSocket m_serverSocket;
+    private boolean m_decoderEnabled = false;
+    private String m_procedure;
     private final ArrayList<ClientConnectionHandler> m_clients = new ArrayList<ClientConnectionHandler>();
 
     // Register ImportHandlerProxy service.
@@ -87,6 +90,11 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
     public void configure(Properties p) {
         m_properties = (Properties) p.clone();
         String s = (String )m_properties.get("port");
+        m_decoderEnabled = Boolean.parseBoolean(m_properties.get("decode").toString());
+        m_procedure = (String )m_properties.get("procedure");
+        if (m_procedure == null || m_procedure.trim().length() == 0) {
+            throw new RuntimeException("Missing procedure.");
+        }
         try {
             if (m_serverSocket != null) {
                 m_serverSocket.close();
@@ -94,6 +102,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
             m_serverSocket = new ServerSocket(Integer.parseInt(s));
         } catch (IOException ex) {
            ex.printStackTrace();
+           throw new RuntimeException(ex.getCause());
         }
     }
 
@@ -119,7 +128,13 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                         String line = in.readLine();
                         //You should convert your data to params here.
                         if (line == null) break;
-                        if (!callProcedure(m_importHandlerProxy, m_procedure, line)) {
+                        List<Object> args = new ArrayList<Object>();
+                        //If you want to use some of builtin decoders you can use them.
+                        //We will add support for more decoders to get params.
+                        if (m_decoderEnabled) {
+                            args = decodeParameters(Format.CSV, line);
+                        }
+                        if (!callProcedure(m_importHandlerProxy, m_procedure, args.toArray())) {
                             System.out.println("Inserted failed: " + line);
                         }
                     }
@@ -127,7 +142,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                     System.out.println("Client Closed.");
                 }
             } catch (IOException ioe) {
-                //TODO
+                ioe.printStackTrace();
             }
         }
 
