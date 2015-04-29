@@ -1,4 +1,7 @@
 This directory contains the source files for the revised Hello, World! example described in the VoltDB Performance Guide (doc/PerfGuide.pdf).
 
-The tutorial is designed to demonstrate coding practices that can maximize your use of VoltDB. A shell script (run.sh) is provided to help build and run the example.
+The tutorial is designed to demonstrate coding practices that can maximize your use of VoltDB. A shell script (run.sh) is provided to help build and run the example. To run the example, use the following commands:
 
+        ./run.sh &        — create the database
+        ./run.sh init     — load the schema and stored procedures
+        ./run.sh client   — run the client application
