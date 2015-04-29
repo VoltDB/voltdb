@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
@@ -473,9 +472,8 @@ public abstract class ExpressionUtil {
         scalarExpr.setLeft(expr);
         scalarExpr.setValueType(expr.getValueType());
         scalarExpr.setValueSize(expr.getValueSize());
-        // reset scalarSubqueryExpr type to BIGINT
-        expr.setValueType(VoltType.BIGINT);
-        expr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        expr.setValueType(expr.getValueType());
+        expr.setValueSize(expr.getValueSize());
         return scalarExpr;
     }
 }

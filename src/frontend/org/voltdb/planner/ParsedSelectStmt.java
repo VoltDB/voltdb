@@ -667,6 +667,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.tableAlias = scalarSubqueryExpr.getSubqueryScan().getTableAlias();
             // Need to add a ScalarValueExpression on top of the subquery expression
             // to be able to extract the subquery expression result
+
+            scalarSubqueryExpr.changeToScalarExprType();
             col.expression = ExpressionUtil.addScalarValueExpression(scalarSubqueryExpr);
         }
         else
