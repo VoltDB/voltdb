@@ -443,9 +443,9 @@ public abstract class AbstractParsedStmt {
         AbstractParsedStmt subqueryStmt = parseSubquery(subqueryElmt);
         // add table to the query cache
         String withoutAlias = null;
-        StmtSubqueryScan tableCache = addSubqueryToStmtCache(subqueryStmt, withoutAlias);
+        StmtSubqueryScan stmtSubqueryScan = addSubqueryToStmtCache(subqueryStmt, withoutAlias);
         // Set to the default SELECT_SUBQUERY. May be overridden depending on the context
-        return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, tableCache);
+        return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, stmtSubqueryScan);
     }
 
     /**
