@@ -38,11 +38,7 @@ public class AllTypesMultiOpsJavaError extends VoltProcedure {
     public final static int UPDATE   = 1;
     public final static int DELETE   = 2;
     public final static int TRUNCATE = 3;
-    // Note: Need to make these all:
-    //          public static final SQLStmt XXX_STMT = new SQLStmt("...");
-    //       The reflection mechanism can't find them if they are in
-    //       non-static member functions like this, so they don't get
-    //       planned.
+
     public static final SQLStmt INSERT_STMT = new SQLStmt(
             "INSERT INTO ALL_TYPES VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
     public static final SQLStmt UPDATE_STMT = new SQLStmt(

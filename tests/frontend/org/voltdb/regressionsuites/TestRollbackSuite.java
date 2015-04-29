@@ -99,14 +99,16 @@ public class TestRollbackSuite extends RegressionSuite {
             client.callProcedure("MultiPartitionParamSerializationError", 0);
             fail("MultiPartitionParamSerializationError should have thrown a ProcCallException, not succeeded");
         }
-        catch (ProcCallException e) {}
+        catch (ProcCallException e) {
+        }
 
         try
         {
             client.callProcedure("SinglePartitionParamSerializationError", 0);
             fail("SinglePartitionParamSerializationError should have thrown a ProcCallException, not succeeded");
         }
-        catch (ProcCallException e) {}
+        catch (ProcCallException e) {
+        }
 
         VoltTable results = client.callProcedure("@Statistics", "procedure", 0).getResults()[0];
         System.out.println("results: " + results);
@@ -1092,5 +1094,4 @@ public class TestRollbackSuite extends RegressionSuite {
     public static void main(String args[]) {
         org.junit.runner.JUnitCore.runClasses(TestRollbackSuite.class);
     }
-
 }
