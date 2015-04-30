@@ -20,6 +20,8 @@
 
 #include <string>
 
+#define throwSerializableEEException(...) { char msg[8192]; snprintf(msg, 8192, __VA_ARGS__); throw voltdb::SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg); }
+
 namespace voltdb {
 
 class ReferenceSerializeOutput;

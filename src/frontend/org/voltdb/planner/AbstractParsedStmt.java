@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
@@ -70,7 +71,7 @@ public abstract class AbstractParsedStmt {
     public String m_sql;
 
     // The initial value is a safety net for the case of parameter-less statements.
-    private ParameterValueExpression[] m_paramList = new ParameterValueExpression[0];
+    private TreeMap<Integer, ParameterValueExpression> m_paramsByIndex = new TreeMap<Integer, ParameterValueExpression>();
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
@@ -443,9 +444,9 @@ public abstract class AbstractParsedStmt {
         AbstractParsedStmt subqueryStmt = parseSubquery(subqueryElmt);
         // add table to the query cache
         String withoutAlias = null;
-        StmtSubqueryScan tableCache = addSubqueryToStmtCache(subqueryStmt, withoutAlias);
+        StmtSubqueryScan stmtSubqueryScan = addSubqueryToStmtCache(subqueryStmt, withoutAlias);
         // Set to the default SELECT_SUBQUERY. May be overridden depending on the context
-        return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, tableCache);
+        return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, stmtSubqueryScan);
     }
 
     /**
@@ -1013,9 +1014,8 @@ public abstract class AbstractParsedStmt {
      * @param paramsNode
      */
     private void parseParameters(VoltXMLElement paramsNode) {
-        m_paramList = new ParameterValueExpression[paramsNode.children.size()];
-
         long max_parameter_id = -1;
+
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
@@ -1033,7 +1033,7 @@ public abstract class AbstractParsedStmt {
                     pve.setParamIsVector();
                 }
                 m_paramsById.put(id, pve);
-                m_paramList[index] = pve;
+                m_paramsByIndex.put(index, pve);
             }
         }
         if (max_parameter_id >= NEXT_PARAMETER_ID) {
@@ -1063,7 +1063,7 @@ public abstract class AbstractParsedStmt {
     // The list is required later at the top-level statement for
     // proper cataloging, so promote it here to each parent union.
     protected void promoteUnionParametersFromChild(AbstractParsedStmt childStmt) {
-        m_paramList = childStmt.m_paramList;
+        m_paramsByIndex.putAll(childStmt.m_paramsByIndex);
     }
 
     /**
@@ -1088,8 +1088,8 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + m_sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (ParameterValueExpression param : m_paramList) {
-            retval += param.toString() + " ";
+        for (Map.Entry<Integer, ParameterValueExpression> paramEntry : m_paramsByIndex.entrySet()) {
+            retval += paramEntry.getValue().toString() + " ";
         }
 
         retval += "\nTABLE SOURCES:\n\t";
@@ -1130,7 +1130,8 @@ public abstract class AbstractParsedStmt {
         AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         subquery.m_paramsById.putAll(m_paramsById);
-        subquery.m_paramList = m_paramList;
+        subquery.m_paramsByIndex = m_paramsByIndex;
+
         AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_db, m_joinOrder);
         return subquery;
     }
@@ -1140,7 +1141,6 @@ public abstract class AbstractParsedStmt {
         // Propagate parameters from the parent to the child
         subQuery.m_parentStmt = this;
         subQuery.m_paramsById.putAll(m_paramsById);
-        subQuery.m_paramList = m_paramList;
 
         AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
         return subQuery;
@@ -1180,7 +1180,7 @@ public abstract class AbstractParsedStmt {
         if (m_parentStmt != null) {
             return m_parentStmt.getParameters();
         } else {
-            return m_paramList;
+            return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
         }
     }
 

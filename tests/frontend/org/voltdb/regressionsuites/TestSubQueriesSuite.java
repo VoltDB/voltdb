@@ -72,6 +72,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
+    private void truncateData(Client client) throws IOException, ProcCallException {
+        ClientResponse cr = null;
+
+        for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "delete from " + tb);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
+    }
+
     /**
      * Simple sub-query
      * @throws NoConnectionsException
@@ -1015,7 +1024,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     // Test scalar subqueries
-    public void testSelectScalarSubSelects() throws NoConnectionsException, IOException, ProcCallException
+    public void testSelectScalarSubSelects() throws Exception
     {
         Client client = getClient();
         loadData(false);
@@ -1046,6 +1055,68 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "More than one row returned by a scalar/row subquery";
             assertTrue(ex.getMessage().contains(errMsg));
         }
+
+        // ENG-8145
+        subTestScalarSubqueryWithOrderByOrGroupBy();
+
+        //
+        // ENG-8159, ENG-8160
+        // test Scalar sub-query with non-integer type
+        //
+        subTestScalarSubqueryWithNonIntegerType();
+    }
+
+    private void subTestScalarSubqueryWithOrderByOrGroupBy() throws Exception {
+        Client client = getClient();
+
+        long[][] expected = new long[100][1];
+        for (int i = 0; i < 100; ++i) {
+            client.callProcedure("@AdHoc",  "insert into R_ENG8145_1 values (?, ?);", i, i * 2);
+            client.callProcedure("@AdHoc",  "insert into R_ENG8145_2 values (?, ?);", i, i * 2);
+            long val = 100 - ((i * 2) + 1);
+            if (val < 0)
+                val = 0;
+            expected[i][0] = val;
+        }
+
+        validateTableOfLongs(client,
+                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent order by id;",
+                expected);
+        validateTableOfLongs(client,
+                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent group by id;",
+                expected);
+        validateTableOfLongs(client,
+                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent group by id order by id;",
+                expected);
+    }
+
+    private void subTestScalarSubqueryWithNonIntegerType() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        // truncate tables are not used but will be good if we add more tests on the other R1,R2,R3,P1... tables.
+        truncateData(client);
+
+        VoltTable vt;
+        String sql;
+        client.callProcedure("R4.insert", 1, "foo1", -1, 1.1);
+        client.callProcedure("R4.insert", 2, "foo2", -1, 2.2);
+
+        // test FLOAT
+        sql = "select ID, (select SUM(RATIO) from R4) from R4 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        assertEquals(1, vt.getLong(0)); assertEquals(3.3, vt.getDouble(1), 0.0001);
+        assertTrue(vt.advanceRow());
+        assertEquals(2, vt.getLong(0)); assertEquals(3.3, vt.getDouble(1), 0.0001);
+
+        // test VARCHAR
+        sql = "select ID, (select MIN(DESC) from R4) from R4 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        assertEquals(1, vt.getLong(0)); assertEquals("foo1", vt.getString(1));
+        assertTrue(vt.advanceRow());
+        assertEquals(2, vt.getLong(0)); assertEquals("foo1", vt.getString(1));
     }
 
     public void testWhereScalarSubSelects() throws NoConnectionsException, IOException, ProcCallException
@@ -1229,30 +1300,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(vt, new long[][] { {1}, {2} });
 
         }
-    }
-
-    public void testScalarSubqueryWithOrderByOrGroupBy() throws Exception {
-        Client client = getClient();
-
-        long[][] expected = new long[100][1];
-        for (int i = 0; i < 100; ++i) {
-            client.callProcedure("@AdHoc",  "insert into R_ENG8145_1 values (?, ?);", i, i * 2);
-            client.callProcedure("@AdHoc",  "insert into R_ENG8145_2 values (?, ?);", i, i * 2);
-            long val = 100 - ((i * 2) + 1);
-            if (val < 0)
-                val = 0;
-            expected[i][0] = val;
-        }
-
-        validateTableOfLongs(client,
-                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent order by id;",
-                expected);
-        validateTableOfLongs(client,
-                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent group by id;",
-                expected);
-        validateTableOfLongs(client,
-                "select (select count(*) from R_ENG8145_1 where ID > parent.num) from R_ENG8145_2 parent group by id order by id;",
-                expected);
     }
 
     public void testScalarStarSubqueryWithOrderBy() throws Exception {
