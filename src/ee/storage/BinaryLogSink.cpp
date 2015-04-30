@@ -61,8 +61,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
             if (tableIter == tables.end()) {
-                throwFatalException("Unable to find table hash %jd while applying a binary log insert/delete record",
-                                    (intmax_t)tableHandle);
+                throwSerializableEEException("Unable to find table hash %jd while applying a binary log insert/delete record",
+                                             (intmax_t)tableHandle);
             }
 
             PersistentTable *table = tableIter->second;
@@ -75,12 +75,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             if (type == DR_RECORD_DELETE) {
                 TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
                 if (deleteTuple.isNullTuple()) {
-                    char msg[1024 * 100];
-                    snprintf(msg, 1024 * 100,
-                             "Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
-                    VOLT_ERROR("%s", msg);
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+                    throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                                                 type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
                 }
                 table->deleteTuple(deleteTuple, true);
             } else {
@@ -128,8 +124,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
             if (tableIter == tables.end()) {
-                throwFatalException("Unable to find table %s hash %jd while applying binary log for truncate record",
-                                    tableName.c_str(), (intmax_t)tableHandle);
+                throwSerializableEEException("Unable to find table %s hash %jd while applying binary log for truncate record",
+                                             tableName.c_str(), (intmax_t)tableHandle);
             }
 
             PersistentTable *table = tableIter->second;

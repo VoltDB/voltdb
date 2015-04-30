@@ -93,6 +93,9 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select hex(FLOAT_TYPE) from bit;", errorMsg);
         failToCompile("select hex(INTEGER_TYPE) from bit;", errorMsg);
 
+        failToCompile("select bin(FLOAT_TYPE) from bit;", errorMsg);
+        failToCompile("select bin(INTEGER_TYPE) from bit;", errorMsg);
+
         // compile on constants
         compile("select BIT_SHIFT_LEFT(3, tinyint_type), BIT_SHIFT_RIGHT(3, tinyint_type) from bit");
         compile("select BIT_SHIFT_LEFT(3, INTEGER_TYPE), BIT_SHIFT_RIGHT(3, INTEGER_TYPE) from bit");
@@ -109,6 +112,8 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select BIT_SHIFT_RIGHT(-9223372036854775809, tinyint_type)from bit", errorMsg);
 
         failToCompile("select hex(9223372036854775809) from bit;", errorMsg);
+
+        failToCompile("select bin(9223372036854775809) from bit;", errorMsg);
 
         // invalid syntax
         errorMsg = "user lacks privilege or object not found";
