@@ -373,7 +373,7 @@ public class SetFunction implements Serializable {
         if (setType == OpTypes.COUNT) {
             return Type.SQL_INTEGER;
         }
-        
+
         // A VoltDB extension to handle aggfnc(*) syntax errors.
         // If the argument node does not have
         // a data type, it may be '*'.  If the
