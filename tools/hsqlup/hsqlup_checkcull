@@ -1,3 +1,5 @@
+#!/bin/bash
+
 if [ ! -d "$1" ]; then
     echo Baseline directory does not exist: $1
     exit 1
