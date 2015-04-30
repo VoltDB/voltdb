@@ -46,7 +46,7 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         testLoadQueryPlanTree("select * from l,t where lname=? and l.a=t.a order by l.b limit ?;");
         testLoadQueryPlanTree("select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;");
         testLoadQueryPlanTree("select count(*) from l where lname=? and id < ?;");
-        testLoadQueryPlanTree("select l.id from l union select l.id from l;");
+        testLoadQueryPlanTree("select l.id from l union all select a from t;");
     }
 
     public void testLoadQueryPlanTree(String sql) throws JSONException {

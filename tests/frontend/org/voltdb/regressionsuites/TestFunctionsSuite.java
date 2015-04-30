@@ -3298,7 +3298,11 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     private static String longToHexLiteral(long val) {
-        return "x'" + Long.toHexString(val) + "'";
+        String hexDigits = Long.toHexString(val);
+        if (hexDigits.length() % 2 == 1) {
+            hexDigits = "0" + hexDigits;
+        }
+        return "x'" + hexDigits + "'";
     }
 
     private void validateBitwiseAndOrXor(VoltTable vt, long bignum, long in) {

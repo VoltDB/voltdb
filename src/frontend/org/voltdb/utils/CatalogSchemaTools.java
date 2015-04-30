@@ -287,7 +287,7 @@ public abstract class CatalogSchemaTools {
                     // StatementCompiler appends the semicolon, we don't want it here.
                     deleteStmt = deleteStmt.substring(0, deleteStmt.length() - 1);
                 }
-                table_sb.append(" EXECUTE (" + deleteStmt + ")");
+                table_sb.append("\n" + spacer + spacer + "EXECUTE (" + deleteStmt + ")");
             }
         }
 

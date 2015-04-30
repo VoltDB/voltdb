@@ -64,6 +64,14 @@ public class TestUnionSuite extends RegressionSuite {
         result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B where PKEY = 2 UNION SELECT I FROM C WHERE I = 3;")
                 .getResults()[0];
         assertEquals(3, result.getRowCount());
+        result = client.callProcedure("@Explain", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;").getResults()[0];
+        String resultStr = result.toString();
+        assertTrue(resultStr.contains("(PKEY = ?0)"));
+        assertTrue(resultStr.contains("(column#1 = ?1)"));
+
+        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B WHERE PKEY=? UNION SELECT I FROM C WHERE PKEY = ? AND I = 3;", 3, 2)
+                .getResults()[0];
+        assertEquals(2, result.getRowCount());
 
         String sql;
         // data

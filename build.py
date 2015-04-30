@@ -392,6 +392,7 @@ if whichtests in ("${eetestsuite}", "execution"):
 if whichtests in ("${eetestsuite}", "expressions"):
     CTX.TESTS['expressions'] = """
      expression_test
+     function_test
     """
 
 if whichtests in ("${eetestsuite}", "indexes"):

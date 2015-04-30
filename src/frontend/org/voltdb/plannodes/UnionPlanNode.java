@@ -24,6 +24,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.ParsedUnionStmt;
+import org.voltdb.planner.ParsedUnionStmt.UnionType;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 
@@ -111,6 +112,6 @@ public class UnionPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_unionType = ParsedUnionStmt.UnionType.valueOf(jobj.getString( Members.UNION_TYPE.name() ));
+        m_unionType = UnionType.valueOf(jobj.getString(Members.UNION_TYPE.name()));
     }
 }

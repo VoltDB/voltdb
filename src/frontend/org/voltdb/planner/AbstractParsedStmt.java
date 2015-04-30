@@ -768,8 +768,8 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + m_sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (Map.Entry<Integer, ParameterValueExpression> param : m_paramsByIndex.entrySet()) {
-            retval += param.getValue().toString() + " ";
+        for (Map.Entry<Integer, ParameterValueExpression> paramEntry : m_paramsByIndex.entrySet()) {
+            retval += paramEntry.getValue().toString() + " ";
         }
 
         retval += "\nTABLE SOURCES:\n\t";

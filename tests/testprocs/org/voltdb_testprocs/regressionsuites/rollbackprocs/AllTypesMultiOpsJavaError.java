@@ -34,15 +34,24 @@ import org.voltdb.types.TimestampType;
     singlePartition = false
 )
 public class AllTypesMultiOpsJavaError extends VoltProcedure {
-    public final static int INSERT = 0;
-    public final static int UPDATE = 1;
-    public final static int DELETE = 2;
-    public final SQLStmt[] statements =
-        {new SQLStmt("INSERT INTO ALL_TYPES VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"),
-         new SQLStmt("UPDATE ALL_TYPES SET TINY = ?, SMALL = ?, BIG = ?,"
+    public final static int INSERT   = 0;
+    public final static int UPDATE   = 1;
+    public final static int DELETE   = 2;
+    public final static int TRUNCATE = 3;
+
+    public static final SQLStmt INSERT_STMT = new SQLStmt(
+            "INSERT INTO ALL_TYPES VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    public static final SQLStmt UPDATE_STMT = new SQLStmt(
+            "UPDATE ALL_TYPES SET TINY = ?, SMALL = ?, BIG = ?,"
                      + " T = ?, RATIO = ?, MONEY = ?, INLINED = ?, UNINLINED = ?"
-                     + " WHERE ID = ?;"),
-         new SQLStmt("DELETE FROM ALL_TYPES WHERE ID = ?;")};
+                     + " WHERE ID = ?;");
+    public static final SQLStmt DELETE_STMT = new SQLStmt("DELETE FROM ALL_TYPES WHERE ID = ?;");
+    public static final SQLStmt TRUNCATE_STMT = new SQLStmt("TRUNCATE TABLE ALL_TYPES;");
+    public final SQLStmt[] statements =
+        {INSERT_STMT,
+         UPDATE_STMT,
+         DELETE_STMT,
+         TRUNCATE_STMT};
 
     public long run(int[] order, int id) {
         byte base = 1;
@@ -56,17 +65,19 @@ public class AllTypesMultiOpsJavaError extends VoltProcedure {
             case INSERT:
                 voltQueueSQL(statements[i], id, base + 1, base + 2, base + 3,
                              new TimestampType().getTime(),
-                             (double) base / 100.0, new BigDecimal(base),
+                             base / 100.0, new BigDecimal(base),
                              String.valueOf(base + 32),
                              String.valueOf(uninlineable));
             case UPDATE:
                 voltQueueSQL(statements[i], base + 1, base + 2, base + 3,
                              new TimestampType().getTime(),
-                             (double) base / 100.0, new BigDecimal(base),
+                             base / 100.0, new BigDecimal(base),
                              String.valueOf(base + 32),
                              String.valueOf(uninlineable), id);
             case DELETE:
                 voltQueueSQL(statements[i], id);
+            case TRUNCATE:
+                voltQueueSQL(statements[i]);
             }
 
             base++;
