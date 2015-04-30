@@ -288,21 +288,24 @@ public class TestHSQLDB extends TestCase {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
         assertNotNull(hsql);
 
-        // The elements of this arraylist tells us the statement to
+        // The elements of this ArrayList tells us the statement to
         // execute, and whether we expect an exception when we execute
-        // the statement.
-        ArrayList<Pair<Boolean, String>> allddl = new ArrayList<Pair<Boolean, String>>();
-        allddl.add(Pair.of(false, "CREATE TABLE t (i INTEGER, j INTEGER);"));
-        allddl.add(Pair.of(false, "CREATE VIEW vw1 (sm) as SELECT count(*) from t group by i;"));
-        allddl.add(Pair.of(true, "CREATE VIEW vw (sm) AS SELECT sum(*) from t group by i;"));
-        for (Pair<Boolean, String> ddl : allddl) {
+        // the statement.  If the first element of the pair begins
+        // with the string "Expected", we expect an error.  If
+        // the First begins with something else, we don't expect errors.
+        // In either case and the string tells what to complain about.
+        ArrayList<Pair<String, String>> allddl = new ArrayList<Pair<String, String>>();
+        allddl.add(Pair.of("Unexpected Table Creation Failure.", "CREATE TABLE t (i INTEGER, j INTEGER);"));
+        allddl.add(Pair.of("Unexpected count(*) call failure.", "CREATE VIEW vw1 (sm) as SELECT count(*) from t group by i;"));
+        allddl.add(Pair.of("Expected sum(*) call failure.", "CREATE VIEW vw (sm) AS SELECT sum(*) from t group by i;"));
+        for (Pair<String, String> ddl : allddl) {
             boolean sawException = false;
             try {
                 hsql.runDDLCommand(ddl.getRight());
             } catch (HSQLParseException e1) {
                 sawException = true;
             }
-            assertTrue(sawException == ddl.getLeft());
+            assertEquals(ddl.getLeft(), ddl.getLeft().startsWith("Expected", 0), sawException);
         }
     }
 
