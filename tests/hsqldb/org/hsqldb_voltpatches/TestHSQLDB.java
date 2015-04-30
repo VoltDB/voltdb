@@ -282,6 +282,26 @@ public class TestHSQLDB extends TestCase {
         assertNotNull(xml);
     }
 
+    public void testSumStarFails() {
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        assertNotNull(hsql);
+
+        // create table t (i integer, j integer);
+        // create view vw (gb, ct, sm) as select i, count(*), sum(*) from t group by i;
+
+        String[] allddl = new String[]{"CREATE TABLE t (i INTEGER, j INTEGER);",
+                                    "CREATE VIEW vw (sm) AS SELECT sum(*) from t group by i;"};
+        boolean sawException = false;
+        try {
+            for (String ddl : allddl) {
+                hsql.runDDLCommand(ddl);
+            }
+        } catch (HSQLParseException e1) {
+            sawException = true;
+        }
+        assertTrue(sawException);
+    }
+
     /*public void testSimpleSQL() {
         HSQLInterface hsql = setupTPCCDDL();
         assertFalse(hsql == null);
