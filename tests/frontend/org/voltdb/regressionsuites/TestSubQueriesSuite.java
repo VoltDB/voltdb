@@ -1302,6 +1302,80 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
+    public void testScalarStarSubqueryWithOrderBy() throws Exception {
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "insert into R_ENG8173_1 values (0, 'foo', 50);");
+        client.callProcedure("@AdHoc", "insert into R_ENG8173_1 values (1, 'goo', 25);");
+
+        // These queries were failing because we weren't calling "resolveColumnIndexes"
+        // for subqueries that appeared on the select list (as part of a projection node).
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT *, (SELECT SUM(NUM) FROM R_ENG8173_1) FROM R_ENG8173_1 A1 ORDER BY DESC;")
+                .getResults()[0];
+
+        assertTrue (vt.advanceRow());
+        assertEquals(0, vt.getLong(0));
+        assertEquals("foo", vt.getString(1));
+        assertEquals(50, vt.getLong(2));
+        assertEquals(75, vt.getLong(3));
+
+        assertTrue (vt.advanceRow());
+        assertEquals(1, vt.getLong(0));
+        assertEquals("goo", vt.getString(1));
+        assertEquals(25, vt.getLong(2));
+        assertEquals(75, vt.getLong(3));
+
+        assertFalse(vt.advanceRow());
+
+        validateTableOfLongs(client,
+                "SELECT  "
+                + "(SELECT "
+                + "  SUM(NUM) + SUM(ID) "
+                + " FROM R_ENG8173_1) "
+                + "FROM R_ENG8173_1 A1 ORDER BY DESC;",
+                new long[][] {{76}, {76}});
+
+        // Similar queries from ENG-8174
+        client.callProcedure("@AdHoc", "insert into R4 values (0,null,null,null);");
+        client.callProcedure("@AdHoc", "insert into R4 values (1,'foo1',-1,1.1);");
+
+        vt = client.callProcedure("@AdHoc", "select NUM V, (select SUM(RATIO) from R4) from R4 order by V;")
+                .getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0); assertTrue(vt.wasNull());
+        assertEquals(1.1, vt.getDouble(1));
+
+        assertTrue(vt.advanceRow());
+        assertEquals(-1, vt.getLong(0));
+        assertEquals(1.1, vt.getDouble(1));
+        assertFalse(vt.advanceRow());
+
+
+        vt = client.callProcedure("@AdHoc", "select RATIO V, (select SUM(NUM) from R4) from R4 order by V;")
+                .getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getDouble(0); assertTrue(vt.wasNull());
+        assertEquals(-1, vt.getLong(1));
+
+        assertTrue(vt.advanceRow());
+        assertEquals(1.1, vt.getDouble(0));
+        assertEquals(-1, vt.getLong(1));
+        assertFalse(vt.advanceRow());
+
+
+        vt = client.callProcedure("@AdHoc", "select NUM V, (select MAX(DESC) from R4) from R4 order by V;")
+                .getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0); assertTrue(vt.wasNull());
+        assertEquals("foo1", vt.getString(1));
+
+        assertTrue(vt.advanceRow());
+        assertEquals(-1, vt.getLong(0));
+        assertEquals("foo1", vt.getString(1));
+        assertFalse(vt.advanceRow());
+    }
+
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;
@@ -1367,7 +1441,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "ID integer, NUM integer);" +
 
                 "CREATE TABLE R_ENG8145_2 (" +
-                "ID integer, NUM integer);"
+                "ID integer, NUM integer);" +
+
+                "CREATE TABLE R_ENG8173_1 (" +
+                "ID integer, DESC VARCHAR(300), NUM integer);"
                 ;
         try {
             project.addLiteralSchema(literalSchema);
