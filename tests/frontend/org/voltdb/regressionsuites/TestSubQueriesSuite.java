@@ -1335,6 +1335,45 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 + " FROM R_ENG8173_1) "
                 + "FROM R_ENG8173_1 A1 ORDER BY DESC;",
                 new long[][] {{76}, {76}});
+
+        // Similar queries from ENG-8174
+        client.callProcedure("@AdHoc", "insert into R4 values (0,null,null,null);");
+        client.callProcedure("@AdHoc", "insert into R4 values (1,'foo1',-1,1.1);");
+
+        vt = client.callProcedure("@AdHoc", "select NUM V, (select SUM(RATIO) from R4) from R4 order by V;")
+                .getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0); assertTrue(vt.wasNull());
+        assertEquals(1.1, vt.getDouble(1));
+
+        assertTrue(vt.advanceRow());
+        assertEquals(-1, vt.getLong(0));
+        assertEquals(1.1, vt.getDouble(1));
+        assertFalse(vt.advanceRow());
+
+
+        vt = client.callProcedure("@AdHoc", "select RATIO V, (select SUM(NUM) from R4) from R4 order by V;")
+                .getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getDouble(0); assertTrue(vt.wasNull());
+        assertEquals(-1, vt.getLong(1));
+
+        assertTrue(vt.advanceRow());
+        assertEquals(1.1, vt.getDouble(0));
+        assertEquals(-1, vt.getLong(1));
+        assertFalse(vt.advanceRow());
+
+
+        vt = client.callProcedure("@AdHoc", "select NUM V, (select MAX(DESC) from R4) from R4 order by V;")
+                .getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0); assertTrue(vt.wasNull());
+        assertEquals("foo1", vt.getString(1));
+
+        assertTrue(vt.advanceRow());
+        assertEquals(-1, vt.getLong(0));
+        assertEquals("foo1", vt.getString(1));
+        assertFalse(vt.advanceRow());
     }
 
     static public junit.framework.Test suite()
