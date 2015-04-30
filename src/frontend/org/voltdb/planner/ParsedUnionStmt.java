@@ -18,9 +18,14 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.LimitOffset;
 import org.voltdb.plannodes.LimitPlanNode;
 
@@ -37,7 +42,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     };
 
     // Limit plan node information.
-    LimitOffset m_limitOffset = new LimitOffset();
+    private LimitOffset m_limitOffset = new LimitOffset();
+    // Order by
+    private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
 
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
@@ -76,15 +83,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
         // Parse LIMIT/OFFSET
         ParsedSelectStmt.parseLimitAndOffset(limitElement, offsetElement, m_limitOffset);
-//        // Parse ORDER BY
-//        ArrayList<ParsedColInfo> orderColumns = null;
-//        if (orderbyElement != null) {
-//            // Create a fake ParsedSelectStmt to parse the order by columns
-//            ParsedSelectStmt parsedSelectStmt = new ParsedSelectStmt(m_paramValues, m_db);
-//            parsedSelectStmt.parseOrderColumns(orderbyElement, false);
-//            // Copy order by columns back to the union statement
-//            orderColumns.addAll(parsedSelectStmt.orderByColumns());
-//        }
+        // Parse ORDER BY
+        if (orderbyElement != null) {
+            parseOrderColumns(orderbyElement);
+        }
 
         // prepare the limit plan node if it needs one.
         if (hasLimitOrOffset()) {
@@ -168,4 +170,80 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     public LimitPlanNode getLimitNodeTop() {
         return m_limitOffset.getLimitNodeTop();
     }
+
+    private void parseOrderColumns(VoltXMLElement columnsNode) {
+        ParsedSelectStmt firstSelectChild = getFirstSelectStmt();
+        for (VoltXMLElement child : columnsNode.children) {
+            parseOrderColumn(child, firstSelectChild);
+        }
+    }
+
+    /**
+     * This is a stripped down version of the ParsedSelectStmt.parseOrderColumn. Since the SET ops
+     * are not allowed to have aggregate expressions (HAVING, GROUP BY) (except the individual SELECTS)
+     * all the logic handling the aggregates is omitted here
+     * @param orderByNode
+     * @param firstSelectChild
+     */
+    private void parseOrderColumn(VoltXMLElement orderByNode, ParsedSelectStmt firstSelectChild) {
+
+        ParsedColInfo.ExpressionAdjuster adjuster = new ParsedColInfo.ExpressionAdjuster() {
+            @Override
+            public AbstractExpression adjust(AbstractExpression expr) {
+                // Union itself can't have aggregate expression
+                return expr;
+            }
+        };
+        // Get the display columns from the first child
+        List<ParsedColInfo> displayColumns = firstSelectChild.orderByColumns();
+        ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(firstSelectChild, orderByNode, adjuster);
+
+        AbstractExpression order_exp = order_col.expression;
+        assert(order_exp != null);
+        // Mark the order by column if it is in displayColumns
+        // The ORDER BY column MAY be identical to a simple display column, in which case,
+        // tagging the actual display column as being also an order by column
+        // helps later when trying to determine ORDER BY coverage (for determinism).
+        for (ParsedColInfo col : displayColumns) {
+            if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
+                col.orderBy = true;
+                col.ascending = order_col.ascending;
+
+                order_col.alias = col.alias;
+                order_col.columnName = col.columnName;
+                order_col.tableName = col.tableName;
+                break;
+            }
+        }
+        assert( ! (order_exp instanceof ConstantValueExpression));
+        assert( ! (order_exp instanceof ParameterValueExpression));
+
+        m_orderColumns.add(order_col);
+    }
+
+    /**
+     * Return the first child SELECT statement
+     * @return ParsedSelectStmt
+     */
+    private ParsedSelectStmt getFirstSelectStmt() {
+        assert (!m_children.isEmpty());
+        AbstractParsedStmt firstChild = m_children.get(0);
+        if (firstChild instanceof ParsedSelectStmt) {
+            return (ParsedSelectStmt) firstChild;
+        } else {
+            assert(firstChild instanceof ParsedUnionStmt);
+            return ((ParsedUnionStmt)firstChild).getFirstSelectStmt();
+        }
+    }
+
+    @Override
+    public List<ParsedColInfo> orderByColumns() {
+        return Collections.unmodifiableList(m_orderColumns);
+    }
+
+    @Override
+    public boolean hasOrderByColumns() {
+        return ! m_orderColumns.isEmpty();
+    }
+
 }

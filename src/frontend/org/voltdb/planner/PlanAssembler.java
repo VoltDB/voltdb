@@ -625,6 +625,12 @@ public class PlanAssembler {
             subUnionRoot.addAndLinkChild(selectPlan.rootPlanGraph);
         }
 
+        // order by
+        if (m_parsedUnion.hasOrderByColumns()) {
+            subUnionRoot = handleOrderBy(m_parsedUnion, subUnionRoot);
+        }
+
+        // limit/offset
         if (m_parsedUnion.hasLimitOrOffset()) {
             subUnionRoot = handleUnionLimitOperator(subUnionRoot);
         }
@@ -1429,7 +1435,8 @@ public class PlanAssembler {
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
     private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
-        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedDeleteStmt);
+        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt ||
+                parsedStmt instanceof ParsedDeleteStmt);
 
         if (! isOrderByNodeRequired(parsedStmt, root)) {
             return root;

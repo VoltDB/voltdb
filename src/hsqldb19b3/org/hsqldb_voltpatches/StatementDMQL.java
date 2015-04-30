@@ -954,22 +954,21 @@ public abstract class StatementDMQL extends Statement {
                 }
             }
 
-//            if (queryExpr.sortAndSlice.hasOrder() || queryExpr.sortAndSlice.hasLimit()) {
-//                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-//                        queryExpr.operatorName() + " tuple set operator with ORDER BY or LIMIT/OFFSET is not supported.");
-//            }
             /**
-             * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
+             * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation
+             * only if they don't have their own limit/offset/order by clauses
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
              * associativity - (Select1 EXCEPT Select2) EXCEPT Select3 vs. Select1 EXCEPT (Select2 EXCEPT Select3)
              */
-            if ("union".equalsIgnoreCase(leftExpr.name) &&
+            boolean canMergeLeft = !hasLimitOrOrder(leftExpr);
+            if (canMergeLeft && "union".equalsIgnoreCase(leftExpr.name) &&
                     queryExpr.operatorName().equalsIgnoreCase(leftExpr.attributes.get("uniontype"))) {
                 unionExpr.children.addAll(leftExpr.children);
             } else {
                 unionExpr.children.add(leftExpr);
             }
-            if (exprType != QueryExpression.EXCEPT && exprType != QueryExpression.EXCEPT_ALL &&
+            boolean canMergeRight = !hasLimitOrOrder(rightExpr);
+            if (canMergeRight && exprType != QueryExpression.EXCEPT && exprType != QueryExpression.EXCEPT_ALL &&
                 "union".equalsIgnoreCase(rightExpr.name) &&
                 queryExpr.operatorName().equalsIgnoreCase(rightExpr.attributes.get("uniontype"))) {
                 unionExpr.children.addAll(rightExpr.children);
@@ -981,6 +980,21 @@ public abstract class StatementDMQL extends Statement {
             throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                     queryExpr.operatorName() + " tuple set operator is not supported.");
         }
+    }
+
+    /**
+     * Return true if the input element itself contains one of the limit/offset/ordercolumns elements
+     * @param xmlElement
+     */
+    private static boolean hasLimitOrOrder(VoltXMLElement xmlElement) {
+        String names[] = {"limit", "offset", "ordercolumns"};
+        for (String name : names) {
+            List<VoltXMLElement> elements = xmlElement.findChildren(name);
+            if (!elements.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
