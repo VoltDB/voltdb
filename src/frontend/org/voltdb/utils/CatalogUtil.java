@@ -1577,17 +1577,26 @@ public abstract class CatalogUtil {
             if (user.isPlaintext()) {
                 sha1hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA1);
                 sha256hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA256);
+            } else if (user.getPassword().length() == 104) {
+                int sha1len = ClientAuthHashScheme.getHexencodedDigestLength(ClientAuthHashScheme.HASH_SHA1);
+                sha1hex = sha1hex.substring(0, sha1len);
+                sha256hex = sha256hex.substring(sha1len);
+            } else {
+                hostLog.fatal("Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.");
+                System.exit(-1);
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
+            // generate salt only once for sha1 and sha256
+            String saltGen = BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr);
             String hashedPW =
                     BCrypt.hashpw(
                             sha1hex,
-                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+                            saltGen);
             String hashedPW256 =
                     BCrypt.hashpw(
                             sha256hex,
-                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+                            saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
 

@@ -369,13 +369,11 @@ public class TestCatalogUtil extends TestCase {
             "<jsonapi enabled='true'/>" +
             "</httpd>" +
             "<users> " +
-            "<user name=\"joe\" password=\"1E4E888AC66F8DD41E00C5A7AC36A32A9950D271\" plaintext=\"false\" roles=\"louno,administrator\"/>" +
-            "<user name=\"jane\" password=\"AAF4C61DDCC5E8A2DABEDE0F3B482CD9AEA9434D\" plaintext=\"false\" roles=\"launo\"/>" +
+            "<user name=\"joe\" password=\"D033E22AE348AEB5660FC2140AEC35850C4DA9978C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918\" plaintext=\"false\" roles=\"louno,administrator\"/>" +
             "</users>" +
             "</deployment>";
 
         catalog_db.getGroups().add("louno");
-        catalog_db.getGroups().add("launo");
 
         final File tmpRole = VoltProjectBuilder.writeStringToTempFile(depRole);
 
@@ -387,11 +385,6 @@ public class TestCatalogUtil extends TestCase {
         User joe = db.getUsers().get("joe");
         assertNotNull(joe);
         assertNotNull(joe.getGroups().get("louno"));
-        assertNotNull(joe.getShadowpassword());
-
-        User jane = db.getUsers().get("jane");
-        assertNotNull(jane);
-        assertNotNull(jane.getGroups().get("launo"));
         assertNotNull(joe.getShadowpassword());
     }
 

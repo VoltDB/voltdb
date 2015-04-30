@@ -479,8 +479,4 @@ public class TestSecuritySuite extends RegressionSuite {
 
         return builder;
     }
-
-    public static void main(String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestRollbackSuite.class);
-    }
 }
