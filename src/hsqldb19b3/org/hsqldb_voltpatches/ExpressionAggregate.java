@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
+import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
@@ -63,12 +64,10 @@ public class ExpressionAggregate extends Expression {
         nodes               = e.nodes;
     }
 
-    @Override
     boolean isSelfAggregate() {
         return true;
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb   = new StringBuffer(64);
@@ -138,7 +137,6 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -205,7 +203,6 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
-    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -218,7 +215,6 @@ public class ExpressionAggregate extends Expression {
         return unresolvedSet;
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -230,18 +226,10 @@ public class ExpressionAggregate extends Expression {
         if (nodes[LEFT].isParam) {
             throw Error.error(ErrorCode.X_42567);
         }
-        // If the argument node does not have
-        // a data type, it may be '*'.  In any case,
-        // we can't continue, or SetFunction.getType
-        // will crash.
-        if (nodes[LEFT].dataType == null) {
-            throw Error.error(ErrorCode.U_S0500);
-        }
 
         dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
     }
 
-    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {

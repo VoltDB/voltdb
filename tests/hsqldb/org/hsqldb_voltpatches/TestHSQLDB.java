@@ -29,9 +29,11 @@ import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
@@ -286,20 +288,22 @@ public class TestHSQLDB extends TestCase {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
         assertNotNull(hsql);
 
-        // create table t (i integer, j integer);
-        // create view vw (gb, ct, sm) as select i, count(*), sum(*) from t group by i;
-
-        String[] allddl = new String[]{"CREATE TABLE t (i INTEGER, j INTEGER);",
-                                    "CREATE VIEW vw (sm) AS SELECT sum(*) from t group by i;"};
-        boolean sawException = false;
-        try {
-            for (String ddl : allddl) {
-                hsql.runDDLCommand(ddl);
+        // The elements of this arraylist tells us the statement to
+        // execute, and whether we expect an exception when we execute
+        // the statement.
+        ArrayList<Pair<Boolean, String>> allddl = new ArrayList<Pair<Boolean, String>>();
+        allddl.add(Pair.of(false, "CREATE TABLE t (i INTEGER, j INTEGER);"));
+        allddl.add(Pair.of(false, "CREATE VIEW vw1 (sm) as SELECT count(*) from t group by i;"));
+        allddl.add(Pair.of(true, "CREATE VIEW vw (sm) AS SELECT sum(*) from t group by i;"));
+        for (Pair<Boolean, String> ddl : allddl) {
+            boolean sawException = false;
+            try {
+                hsql.runDDLCommand(ddl.getRight());
+            } catch (HSQLParseException e1) {
+                sawException = true;
             }
-        } catch (HSQLParseException e1) {
-            sawException = true;
+            assertTrue(sawException == ddl.getLeft());
         }
-        assertTrue(sawException);
     }
 
     /*public void testSimpleSQL() {
