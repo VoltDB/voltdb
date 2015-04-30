@@ -56,6 +56,10 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         testLoadQueryPlanTree("select a, (select b from t limit 1) b from l ");
         testLoadQueryPlanTree("select a FROM t where a = (SELECT a FROM l where a = ?)");
         testLoadQueryPlanTree("select a FROM t where (b,b) in (SELECT a, a FROM l where l.a = t.a)");
+
+        // UNION
+        testLoadQueryPlanTree("select l.id from l union all select a from t;");
+
     }
 
     public void testLoadQueryPlanTree(String sql) throws JSONException {

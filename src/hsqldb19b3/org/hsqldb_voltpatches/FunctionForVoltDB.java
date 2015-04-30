@@ -127,6 +127,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_BIT_SHIFT_LEFT         = 20027;
         static final int FUNC_VOLT_BIT_SHIFT_RIGHT        = 20028;
         static final int FUNC_VOLT_HEX                    = 20029;
+        static final int FUNC_VOLT_BIN                    = 20030;
 
         private static final FunctionId[] instances = {
 
@@ -218,6 +219,11 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("hex", Type.SQL_VARCHAR, FUNC_VOLT_HEX, -1,
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bin", Type.SQL_VARCHAR, FUNC_VOLT_BIN, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
 
         };
 
@@ -417,6 +423,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
 
         case FunctionId.FUNC_VOLT_HEX:
+        case FunctionId.FUNC_VOLT_BIN:
             voltResolveToBigintType(0);
             dataType = Type.SQL_VARCHAR;
             break;
