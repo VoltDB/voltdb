@@ -247,7 +247,7 @@ PRIMARY ENTRY POINTS
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="90000000">
         <arg value="eecheck" />
         <arg value="junit" />
         <arg value="sqlcmdtest" />

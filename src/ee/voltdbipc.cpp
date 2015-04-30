@@ -970,10 +970,12 @@ int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
     offset += sizeof(tuplesProcessed);
 
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(currMemoryInBytes);
-    offset += sizeof(tuplesProcessed);
+    offset += sizeof(currMemoryInBytes);
 
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(peakMemoryInBytes);
-    offset += sizeof(tuplesProcessed);
+    offset += sizeof(peakMemoryInBytes);
+
+    writeOrDie(m_fd, (unsigned char*)message, offset);
 
     int32_t length;
     ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
