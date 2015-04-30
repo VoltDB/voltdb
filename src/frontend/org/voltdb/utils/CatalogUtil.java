@@ -1486,17 +1486,22 @@ public abstract class CatalogUtil {
             if (user.isPlaintext()) {
                 sha1hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA1);
                 sha256hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA256);
+            } else if (user.getPassword().length() == ClientAuthHashScheme.getHexencodedDigestLength(ClientAuthHashScheme.HASH_SHABOTH)) {
+                int sha1len = ClientAuthHashScheme.getHexencodedDigestLength(ClientAuthHashScheme.HASH_SHA1);
+                sha1hex = sha1hex.substring(0, sha1len);
+                sha256hex = sha256hex.substring(sha1len);
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
+            String saltGen = BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr);
             String hashedPW =
                     BCrypt.hashpw(
                             sha1hex,
-                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+                            saltGen);
             String hashedPW256 =
                     BCrypt.hashpw(
                             sha256hex,
-                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+                            saltGen);
             catUser.setShadowpassword(hashedPW);
             catUser.setSha256shadowpassword(hashedPW256);
 

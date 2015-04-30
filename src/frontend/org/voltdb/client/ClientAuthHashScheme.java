@@ -22,7 +22,7 @@ package org.voltdb.client;
  * @author akhanzode
  */
 public enum ClientAuthHashScheme {
-    HASH_SHA1(0), HASH_SHA256(1);
+    HASH_SHA1(0), HASH_SHA256(1), HASH_SHABOTH(2);
 
     //Modify this if you add a new scheme.
     private static final ClientAuthHashScheme theList[] = { ClientAuthHashScheme.HASH_SHA1, ClientAuthHashScheme.HASH_SHA256 };
@@ -63,6 +63,7 @@ public enum ClientAuthHashScheme {
         switch (scheme) {
             case HASH_SHA1 : return 40;
             case HASH_SHA256 : return 64;
+            case HASH_SHABOTH : return 104;
             default : throw new IllegalArgumentException("Invalid Hash Scheme for Authentication.");
         }
     }
