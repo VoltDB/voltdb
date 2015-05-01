@@ -185,12 +185,13 @@ public:
              it != m_fragment->executeListEnd(); ++it) {
             assert(it->second != NULL);
             const vector<AbstractPlanNode*>& planNodeList = *it->second;
-            std::vector<AbstractExecutor*> executorList;
+            auto_ptr<vector<AbstractExecutor*> > executorList(new vector<AbstractExecutor*>());
             BOOST_FOREACH (AbstractPlanNode* planNode, planNodeList) {
                 initPlanNode(engine, planNode);
-                executorList.push_back(planNode->getExecutor());
+                executorList->push_back(planNode->getExecutor());
             }
-            m_subplanExecListMap.insert(make_pair(it->first, &executorList));
+            m_subplanExecListMap.insert(make_pair(it->first, executorList.get()));
+            executorList.release();
         }
     }
 
@@ -307,9 +308,11 @@ ExecutorVector::~ExecutorVector()
     //
     // Also, why do we need to call erase here?
     map<int, vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.begin();
-    for (; it != m_subplanExecListMap.end(); ++it) {
+    while (it != m_subplanExecListMap.end()) {
         vector<AbstractExecutor*>* executorList = it->second;
-        m_subplanExecListMap.erase(it);
+        // Note: we need to increment the iterator here
+        // to avoid invalidating it.
+        m_subplanExecListMap.erase(it++);
         delete executorList;
     }
 }
