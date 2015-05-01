@@ -6,112 +6,22 @@ function QueryUI(queryString, userName) {
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
             MatchOneQuotedString = /'[^']*'/m,
-            MatchQuotedQuotes = /''/g,
-            QuotedQuoteLiteral = "''",
             MatchDoubleQuotes = /\"/g,
             EscapedDoubleQuoteLiteral = '\\"',
-            MatchDisguisedQuotedQuotes = /#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#/g,
-            DisguisedQuotedQuoteLiteral = "#COMMAND_PARSER_DISGUISED_QUOTED_QUOTE#",
             QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
             // That's 900000 strings per statement batch -- that should be enough.
             MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
             QuotedStringNonceBase = 100000,
 
-            // TODO: drop the remaining vars when semi-colon injection is no longer supported
-
-            // Normally, statement boundaries are guessed by the parser, which inserts semicolons as needed.
-            // The guessing is based on the assumption that the user is smart enough to not use SQL statement
-            // keywords as schema names.  To err on the safe side, avoid splitting (require a semicolon) before
-            // VoltDB proprietary non-SQL statement keywords, ("partition", "explain", "explainproc", "exec",
-            // and "execute") because they could theoretically occur mid-statement as (legacy?) names in user
-            // schema. Take a chance that they are not using SQL statement keywords like "select" and "delete"
-            // as unquoted names in queries.
-            // Similarly, do not enable statement splitting before "alter" or "drop" because it would be more
-            // trouble than it is worth to disable it when these keywords occur in the
-            // middle of an "alter table ... alter|drop column ..." statement.
-            // The intent is to avoid writing another full sql parser, here.
-            // Any statement keyword that does not get listed here simply requires an explicit semicolon before
-            // it to mark the end of the preceding statement.
-            // Note on            (?!\s+on) :
-            // This subpattern consumes no input itself but ensures that the next
-            // character is not 'on'.
-            MatchStatementStarts =
-                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition(?!\s+on)|exec|execute|explain|explainproc)\s/gim,
-            //     ($1--------------------------------------------------------------------------------------------------------------------)
-            GenerateSplitStatements = ';$1 ',
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
-            MatchParameterSeparators = /[\s,]+/g,
-
-            // There are some easily recognizable patterns that contain statement keywords mid-statement.
-            // As suggested above, cases like "alter" and "drop" that are not so easily recognized are
-            // always ignored by the statement splitter -- the user must separate them from the prior
-            // statement with a semicolon.
-            // For these other keywords, the usual statement splitting can be easily disabled in special
-            // cases:
-            // - Any "select" that occurs in "insert into ... select"
-            //   -- handled with its own more elaborate pattern: insert into <table-identifier> [(<column-list>)] select
-            // - Any SQL statement keyword after "explain ".
-            // - Any "select " that follows open parentheses (with optional whitespace)
-            //   -- these could either be subselects or the select statement arguments to a setop
-            //      (e.g. union).
-            // - Any "select " that follows a trailing setop keyword:
-            //   "union", "intersect", "except", or "all"
-            //   -- actually for ease of implementation (pattern simplicity) also disable command
-            //      splitting for the unlikely case of a setop followed by other statements:
-            //      "insert", "update", "delete", "truncate"
-            //
-            // The pattern grouping uses "(?:" anonymous pattern groups to preserve $1 as the prefix
-            // pattern and $2 as the suffix keyword. The intent is to temporarily disguise the suffix
-            // keyword to prevent a statement-splitting semicolon from getting inserted before it.
-            // If "explain" on ddl statements (?) (create|partition) is ever supported,
-            // add them as options to the $2 suffix keyword pattern.
-            MatchNonBreakingInsertIntoSelect =
-                /(\s*(?:insert|upsert)\s+into(?=\"|\s)\s*(?:[a-z][a-z0-9_]*|\"(?:[^\"]|\"\")+\")\s*(?:\((?:\"(?:[^\"]|\"\")+\"|[^\")])+\))?[(\s]*)(select)/gim,
-            //   ($1-----------------------------------------------------------------------------------------------------------------------------)($2----)
-            // Note on            (?=\"|\s) :
-            // This subpattern consumes no input itself but ensures that the next
-            // character is either whitespace or a double quote. This is handy
-            // when a keyword is followed by an identifier:
-            //   INSERT INTO"Foo"SELECT ...
-            // HSQL doesn't require whitespace between keywords and quoted
-            // identifiers.
-            // A more detailed explanation of the MatchNonBreakingInsertIntoSelect pattern
-            // can be found in the comments for the functionally identical InsertIntoSelect
-            // variable and related pattern variables in SQLCommand.java.
-            MatchNonBreakingCompoundKeywords =
-                /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
-            //   ($1------------------------------------------------)   ($2------------------------------------------------------)
-            // Note on           ([\s\S])
-            // It matches the any character including the new line character
-            MatchCreateView = /(\s*(?:create\s+view\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)(select)/gim,
-            //                 ($1-----------------------------------------------------------------------)($2----)
-            MatchCreateSingleQueryProcedure =
-                /(\s*(?:create\s+procedure\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
-            //   ($1----------------------------------------------------------------------------)($2------------------------------------------------------)
-
-            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
-            // There are three keywords that may start statements to escape:
-            //
-            //   partition, execute, and delete
-            //
-            // They require escaping when they are immediately preceded by
-            // "limit", "rows <n>", and "execute(", respectively.
-            MatchLimitPartition = /(\s*limit\s+)(partition)/gim,
-            MatchRowcountExecute = /(\s*rows\s+\d+\s+)(execute)/gim,
-            MatchExecuteDelete = /(\s*execute\s*\(\s*)(delete)/gim,
-
-            MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
-            GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
+            MatchParameterSeparators = /[\s,]+/g;
 
         // Avoid false positives for statement grammar inside quoted strings by
         // substituting a nonce for each string.
         function disguiseQuotedStrings(src, stringBankOut) {
             var nonceNum, nextString;
-            // Temporarily disguise quoted quotes as non-quotes to simplify the work of
-            // extracting quoted strings.
-            src = src.replace(MatchQuotedQuotes, DisguisedQuotedQuoteLiteral);
 
             // Extract quoted strings to keep their content from getting confused with interesting
             // statement syntax.
@@ -141,8 +51,6 @@ function QueryUI(queryString, userName) {
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
                                   stringBank[nonceNum - QuotedStringNonceBase]);
             }
-            // Clean up by restoring the replaced quoted quotes.
-            src = src.replace(MatchDisguisedQuotedQuotes, QuotedQuoteLiteral);
             return src;
         }
 
@@ -154,37 +62,11 @@ function QueryUI(queryString, userName) {
             // Eliminate line comments permanently.
             src = src.replace(MatchEndOfLineComments, '');
 
-            // Extract quoted strings to keep their content from getting confused with interesting
-            // statement syntax. This is required for statement splitting even if only at explicit
-            // semi-colon boundaries -- semi-colns might appear in quoted text.
+            // Extract quoted strings to keep their content from getting confused with
+            // interesting statement syntax. This is required for statement splitting at 
+            // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
 
-            // TODO: drop the following section when semi-colon injection is no longer supported
-
-            // Disguise compound keywords temporarily to avoid triggering statement splits.
-            //* Enable this to debug in the browser */ console.log("pre-processed queries:'" + src + "'");
-            src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchCreateView, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchCreateSingleQueryProcedure, GenerateDisguisedCompoundKeywords);
-
-            src = src.replace(MatchLimitPartition, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchRowcountExecute, GenerateDisguisedCompoundKeywords);
-            src = src.replace(MatchExecuteDelete, GenerateDisguisedCompoundKeywords);
-
-            if (!src.match("^explain")) {
-                // Start a new statement before each remaining statement keyword.
-                src = src.replace(MatchStatementStarts, GenerateSplitStatements);
-                //* Enable this to debug in the browser */ console.log("mid-processed queries:'" + src + "'");
-            }
-
-            // Restore disguised compound keywords post-statement-split.
-            src = src.replace(MatchCompoundKeywordDisguise, '');
-            //* Enable this to debug in the browser */ console.log("post-processed queries:'" + src + "'");
-
-            // TODO: drop the preceding section when semi-colon injection is no longer supported
-
-            // Finally, get to work -- break the input into separate statements for processing.
             splitStmts = src.split(';');
 
             statementBank = [];
@@ -338,6 +220,7 @@ function QueryUI(queryString, userName) {
                         connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback);
                     }
         }
+
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
             if (success) {
@@ -360,7 +243,15 @@ function QueryUI(queryString, userName) {
                 printResult(format, target, id + '_' + j, tables[j]);
 
         } else {
-            target.append('<span class="errorValue">Error: ' + response.statusstring + '\r\n</span>');
+            // This inline encoder hack is intended to use html's &#nnnn; character encoding to
+            // properly escape characters that would otherwise mean something as html
+            // -- including angle brackets and such that are commonly used to suggest that the
+            // user correct their ddl grammar. Angle-bracketed place-holders were being
+            // rendered as invisible meaningless html tags.
+            // See http://stackoverflow.com/questions/18749591/encode-html-entities-in-javascript#18750001
+            var encodedStatus = response.statusstring.replace(/[\u00A0-\u9999<>\&]/gim,
+                function(i) { return '&#'+i.charCodeAt(0)+';'; });
+            target.append('<span class="errorValue">Error: ' + encodedStatus + '\r\n</span>');
         }
     }
 
