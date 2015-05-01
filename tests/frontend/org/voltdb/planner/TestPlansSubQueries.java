@@ -2097,6 +2097,33 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertEquals(2, planNodes.size());
     }
 
+    /**
+     * Expression subquery currently is not optimized to use any index. But this does not prevent the
+     * parent query to use index for other purposes.
+     */
+    public void testExpressionSubqueryWithIndexScan() {
+        AbstractPlanNode pn;
+        String sql;
+
+        // INDEX on A, for sort order only
+        sql = "SELECT A FROM R4 where A in (select A from R4 where A > 3) order by A;";
+        pn = compile(sql);
+
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        assertEquals(0, ((IndexScanPlanNode)pn).getSearchKeyExpressions().size());
+        assertNotNull(((IndexScanPlanNode)pn).getPredicate());
+
+        // INDEX on A, uniquely match A = 4,
+        sql = "SELECT A FROM R4 where A = 4 and C in (select A from R4 where A > 3);";
+        pn = compile(sql);
+
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        assertEquals(1, ((IndexScanPlanNode)pn).getSearchKeyExpressions().size());
+        assertNotNull(((IndexScanPlanNode)pn).getPredicate());
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
