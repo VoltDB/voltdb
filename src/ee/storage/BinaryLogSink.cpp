@@ -24,6 +24,7 @@
 #include "common/types.h"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
+#include "indexes/tableindex.h"
 
 #include<boost/unordered_map.hpp>
 #include<crc/crc32c.h>
@@ -37,11 +38,12 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
+    PoolBackedTupleStorage indexKeyTuple;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
         const uint8_t drVersion = taskInfo.readByte();
-        if (drVersion != 0) {
+        if (drVersion > 1) {
             throwFatalException("Unsupported DR version %d", drVersion);
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
@@ -51,10 +53,15 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         uint32_t checksum = 0;
         const char * rowData = NULL;
         switch (type) {
+        case DR_RECORD_DELETE_BY_INDEX:
         case DR_RECORD_DELETE:
         case DR_RECORD_INSERT: {
             tableHandle = taskInfo.readLong();
             int32_t rowLength = taskInfo.readInt();
+            uint32_t indexCrc = 0;
+            if (DR_RECORD_DELETE_BY_INDEX == type) {
+                indexCrc = taskInfo.readInt();
+            }
             rowData = reinterpret_cast<const char *>(taskInfo.getRawPointer(rowLength));
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
@@ -67,13 +74,33 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             PersistentTable *table = tableIter->second;
 
-            TableTuple tempTuple = table->tempTuple();
+            TableTuple tempTuple;
+            if (DR_RECORD_DELETE_BY_INDEX == type) {
+                std::pair<const TableIndex*, uint32_t> index = table->getSmallestUniqueIndex();
+                if (!index.first || indexCrc != index.second) {
+                    throwSerializableEEException("Unable to find unique index %u while applying a binary log delete record",
+                                                 indexCrc);
+                }
+                indexKeyTuple.init(index.first->getKeySchema(), pool);
+                indexKeyTuple.allocateActiveTuple();
+                tempTuple = indexKeyTuple;
+            } else {
+                tempTuple = table->tempTuple();
+            }
 
             ReferenceSerializeInputLE rowInput(rowData,  rowLength);
             tempTuple.deserializeFromDR(rowInput, pool);
 
-            if (type == DR_RECORD_DELETE) {
-                TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
+            if (type == DR_RECORD_DELETE || type == DR_RECORD_DELETE_BY_INDEX) {
+                TableTuple deleteTuple;
+                if (type == DR_RECORD_DELETE_BY_INDEX) {
+                    const TableIndex* index = table->getSmallestUniqueIndex().first;
+                    IndexCursor indexCursor(index->getTupleSchema());
+                    index->moveToKey(&tempTuple, indexCursor);
+                    deleteTuple = index->nextValueAtKey(indexCursor);
+                } else {
+                    deleteTuple = table->lookupTupleByValues(tempTuple);
+                }
                 if (deleteTuple.isNullTuple()) {
                     throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
                                                  type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
