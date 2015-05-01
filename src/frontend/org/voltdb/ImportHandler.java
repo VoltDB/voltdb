@@ -60,8 +60,8 @@ public class ImportHandler {
     private final static AtomicLong m_idGenerator = new AtomicLong(0);
     private final long m_id;
     private final AtomicLong m_pendingCount = new AtomicLong(0);
-    private static final long MAX_PENDING_TRANSACTIONS = 5000;
-    private final CSVParser m_csvParser = new CSVParser();
+    private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
+    private static final CSVParser m_csvParser = new CSVParser();
 
     private class ImportCallback implements ImportClientResponseAdapter.Callback {
 
@@ -108,6 +108,7 @@ public class ImportHandler {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
+                m_logger.info("Importer ready importing data for: " + m_importContext.getName());
                 m_importContext.readyForData();
                 m_logger.info("Importer finished importing data for: " + m_importContext.getName());
             }
@@ -133,7 +134,7 @@ public class ImportHandler {
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
         } catch (InterruptedException ex) {
-            m_logger.warn("Importer did not gracefully stopped.", ex);
+            m_logger.warn("Importer did not stop gracefully.", ex);
         }
     }
 

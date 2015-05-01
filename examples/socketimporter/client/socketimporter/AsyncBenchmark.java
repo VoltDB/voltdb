@@ -27,10 +27,11 @@
 package socketimporter;
 
 import com.google_voltpatches.common.net.HostAndPort;
-import java.io.PrintWriter;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -57,7 +58,7 @@ public class AsyncBenchmark {
     // Benchmark start time
     long benchmarkStartTS;
 
-    static final List<PrintWriter> writers = new ArrayList<PrintWriter>();
+    static final Map<HostAndPort, OutputStream> haplist = new HashMap<HostAndPort, OutputStream>();
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
     /**
@@ -70,7 +71,7 @@ public class AsyncBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 20;
+        int duration = 2000;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
@@ -117,12 +118,12 @@ public class AsyncBenchmark {
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    static PrintWriter connectToOneServerWithRetry(String server, int port) {
+    static OutputStream connectToOneServerWithRetry(String server, int port) {
         int sleep = 1000;
         while (true) {
             try {
                 Socket pushSocket = new Socket(server, port);
-                PrintWriter out = new PrintWriter(pushSocket.getOutputStream(), true);
+                OutputStream out = pushSocket.getOutputStream();
                 System.out.printf("Connected to VoltDB node at: %s.\n", server);
                 return out;
             }
@@ -158,8 +159,8 @@ public class AsyncBenchmark {
                     if (hap.hasPort()) {
                         port = hap.getPort();
                     }
-                    PrintWriter writer = connectToOneServerWithRetry(hap.getHostText(), port);
-                    writers.add(writer);
+                    OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), port);
+                    haplist.put(hap, writer);
                     connections.countDown();
                 }
             }).start();
@@ -205,7 +206,7 @@ public class AsyncBenchmark {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public void runBenchmark(int idx) throws Exception {
+    public void runBenchmark(HostAndPort hap) throws Exception {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
@@ -213,55 +214,69 @@ public class AsyncBenchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
-
-        // Run the benchmark loop for the requested warmup time
-        // The throughput may be throttled depending on client configuration
         long icnt = 0;
-        System.out.println("Warming up...");
-        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-        while (warmupEndTime > System.currentTimeMillis()) {
-            PrintWriter writer = writers.get(idx);
-            writer.println(String.valueOf(icnt) + "," + System.currentTimeMillis());
-            icnt++;
+        try {
+            // Run the benchmark loop for the requested warmup time
+            // The throughput may be throttled depending on client configuration
+            System.out.println("Warming up...");
+            final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
+            while (warmupEndTime > System.currentTimeMillis()) {
+                String s = String.valueOf(icnt) + "," + System.currentTimeMillis() + "\n";
+                writeFully(s, hap, warmupEndTime);
+                icnt++;
+            }
+
+            // print periodic statistics to the console
+            benchmarkStartTS = System.currentTimeMillis();
+            schedulePeriodicStats();
+
+
+            // Run the benchmark loop for the requested duration
+            // The throughput may be throttled depending on client configuration
+            System.out.println("\nRunning benchmark...");
+            final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+            while (benchmarkEndTime > System.currentTimeMillis()) {
+                String s = String.valueOf(icnt) + "," + System.currentTimeMillis() + "\n";
+                writeFully(s, hap, benchmarkEndTime);
+                icnt++;
+            }
+            haplist.get(hap).flush();
+        } finally {
+            // cancel periodic stats printing
+            timer.cancel();
+            finalInsertCount.addAndGet(icnt);
+            // print the summary results
+            printResults();
         }
+    }
 
-        // print periodic statistics to the console
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
-
-
-        // Run the benchmark loop for the requested duration
-        // The throughput may be throttled depending on client configuration
-        System.out.println("\nRunning benchmark...");
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-        while (benchmarkEndTime > System.currentTimeMillis()) {
-            PrintWriter writer = writers.get(idx);
-            writer.println(String.valueOf(icnt) + "," + System.currentTimeMillis());
-            icnt++;
+    private void writeFully(String data, HostAndPort hap, long endTime) {
+        while (System.currentTimeMillis() < endTime) {
+            try {
+                OutputStream writer = haplist.get(hap);
+                writer.write(data.getBytes());
+                return;
+            } catch (IOException ex) {
+                OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), hap.getPort());
+                haplist.put(hap, writer);
+            }
         }
-        writers.get(0).flush();
-
-        // cancel periodic stats printing
-        timer.cancel();
-        finalInsertCount.addAndGet(icnt);
-        // print the summary results
-        printResults();
     }
 
     public static class BenchmarkRunner extends Thread {
         private final AsyncBenchmark benchmark;
         private final CountDownLatch cdl;
-        private final int idx;
-        public BenchmarkRunner(AsyncBenchmark bm, CountDownLatch c, int iidx) {
+        private final HostAndPort hap;
+        public BenchmarkRunner(AsyncBenchmark bm, CountDownLatch c, HostAndPort iidx) {
             benchmark = bm;
             cdl = c;
-            idx = iidx;
+            hap = iidx;
         }
 
         @Override
         public void run() {
             try {
-                benchmark.runBenchmark(idx);
+                benchmark.runBenchmark(hap);
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
@@ -284,10 +299,10 @@ public class AsyncBenchmark {
         // connect to one or more servers, loop until success
         connect(config.servers);
 
-        CountDownLatch cdl = new CountDownLatch(writers.size());
-        for (int i = 0; i < writers.size(); i++) {
+        CountDownLatch cdl = new CountDownLatch(haplist.size());
+        for (HostAndPort hap : haplist.keySet()) {
             AsyncBenchmark benchmark = new AsyncBenchmark(config);
-            BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl, i);
+            BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl, hap);
             runner.start();
         }
         cdl.await();
