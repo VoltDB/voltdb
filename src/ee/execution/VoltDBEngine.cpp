@@ -107,6 +107,9 @@ static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
+// Somehow all the std:: prefixes got removed
+// from this file.  Might be good to delete
+// the following line and put them back?
 using namespace std;
 
 namespace voltdb {
@@ -182,13 +185,12 @@ public:
              it != m_fragment->executeListEnd(); ++it) {
             assert(it->second != NULL);
             const vector<AbstractPlanNode*>& planNodeList = *it->second;
-            auto_ptr<vector<AbstractExecutor*> > executorList(new vector<AbstractExecutor*>());
+            std::vector<AbstractExecutor*> executorList;
             BOOST_FOREACH (AbstractPlanNode* planNode, planNodeList) {
                 initPlanNode(engine, planNode);
-                executorList->push_back(planNode->getExecutor());
+                executorList.push_back(planNode->getExecutor());
             }
-            m_subplanExecListMap.insert(make_pair(it->first, executorList.get()));
-            executorList.release();
+            m_subplanExecListMap.insert(make_pair(it->first, &executorList));
         }
     }
 
@@ -300,10 +302,14 @@ private:
 
 ExecutorVector::~ExecutorVector()
 {
+    // We could avoid having call delete here if we stored an instance in the
+    // map, rather than a pointer to it?
+    //
+    // Also, why do we need to call erase here?
     map<int, vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.begin();
-    while (it != m_subplanExecListMap.end()) {
+    for (; it != m_subplanExecListMap.end(); ++it) {
         vector<AbstractExecutor*>* executorList = it->second;
-        m_subplanExecListMap.erase(it++);
+        m_subplanExecListMap.erase(it);
         delete executorList;
     }
 }

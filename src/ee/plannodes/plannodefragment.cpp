@@ -89,9 +89,15 @@ void PlanNodeFragment::constructTree(AbstractPlanNode* node)
 
 PlanNodeFragment::~PlanNodeFragment()
 {
-    for (PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin(); mapIt != m_stmtExecutionListMap.end();) {
+    // The need to delete this could be avoided just by storing
+    // an actual instance (instead of a pointer) in the map?
+    //
+    // Also, why is the call to erase needed below?
+    for (PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin();
+         mapIt != m_stmtExecutionListMap.end();
+         ++mapIt) {
         std::vector<AbstractPlanNode*>* execList = mapIt->second;
-        m_stmtExecutionListMap.erase(mapIt++);
+        m_stmtExecutionListMap.erase(mapIt);
         delete execList;
     }
 
