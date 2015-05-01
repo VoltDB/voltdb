@@ -605,9 +605,14 @@ if __name__ == "__main__":
 
     # Write the summary
     time1 = time.time()
-    valid_percent = '{0:.2f}'.format(100.00 * valid_statements / total_statements)
-    invalid_percent = '{0:.2f}'.format(100.00 * invalid_statements / total_statements)
-    mismatched_percent = '{0:.2f}'.format(100.00 * mismatched_statements / total_statements)
+    if total_statements > 0:
+        valid_percent = '{0:.2f}'.format(100.00 * valid_statements / total_statements)
+        invalid_percent = '{0:.2f}'.format(100.00 * invalid_statements / total_statements)
+        mismatched_percent = '{0:.2f}'.format(100.00 * mismatched_statements / total_statements)
+    else:
+        valid_percent = '0.00'
+        invalid_percent = '0.00'
+        mismatched_percent = '0.00'
     statistics["totals"] = "\n<td align=right>" + str(valid_statements) + "</td>" + \
                            "\n<td align=right>" + valid_percent + "%</td>" + \
                            "\n<td align=right>" + str(invalid_statements) + "</td>" + \
