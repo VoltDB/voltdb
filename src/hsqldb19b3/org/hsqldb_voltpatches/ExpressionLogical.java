@@ -906,7 +906,11 @@ public class ExpressionLogical extends Expression {
                     != nodes[RIGHT].dataType.typeComparisonGroup) {
                 if (convertDateTimeLiteral(session, nodes[LEFT],
                                            nodes[RIGHT])) {
-
+                                               
+                // A VoltDB extension to support X'..' as numeric literals
+                } else if (voltConvertBinaryIntegerLiteral(session, nodes[LEFT],
+                            nodes[RIGHT])) {
+                // End VoltDB extension
                     // compatibility for BIT with number and BOOLEAN - convert bit to other type
                 } else if (nodes[LEFT].dataType.isBitType()
                            || nodes[LEFT].dataType.isBooleanType()) {
@@ -2376,4 +2380,26 @@ public class ExpressionLogical extends Expression {
 
         return cost;
     }
+    // A VoltDB extension to support X'..' as numeric literals
+    /**
+     * If one child is an integer, and the other is a VARBINARY literal, try to convert the
+     * literal to an integer.
+     */
+    private boolean voltConvertBinaryIntegerLiteral(Session session, Expression lhs, Expression rhs) {
+        Expression nonIntegralExpr;
+        int whichChild;
+        if (lhs.dataType.isIntegralType()) {
+            nonIntegralExpr = rhs;
+            whichChild = RIGHT;
+        }
+        else if (rhs.dataType.isIntegralType()) {
+            nonIntegralExpr = lhs;
+            whichChild = LEFT;
+        } else {
+            return false;
+        }
+
+        return ExpressionValue.voltMutateToBigintType(nonIntegralExpr, this, whichChild);
+    }
+    // End VoltDB extension
 }

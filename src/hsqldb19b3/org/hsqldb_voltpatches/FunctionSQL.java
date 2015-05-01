@@ -48,6 +48,9 @@ import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.Types;
 
+// A VoltDB extension to allow use of X'..' as numeric literals
+import java.math.BigInteger;
+// End VoltDB extension
 /**
  * Implementation of SQL standard function calls
  *
@@ -2592,17 +2595,35 @@ public class FunctionSQL extends Expression {
         dataType = Type.SQL_BIGINT;
     }
 
-    protected void voltResolveToBigintType(SessionInterface session, int i) {
-        if (nodes[i].dataType == null) {
-            nodes[i].dataType = Type.SQL_BIGINT;
+    protected void voltResolveToBigintType(SessionInterface session, int nodeIdx) {
+        Expression node = nodes[nodeIdx];
+
+        if (node.dataType == null) {
+            node.dataType = Type.SQL_BIGINT;
+            return;
         }
-        else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
-            if (! nodes[i].dataType.isIntegralType() || nodes[i].valueData == null) {
+
+        if (node.dataType.typeCode == Types.SQL_BIGINT) {
+            return;
+        }
+
+        if (node.valueData == null) {
+            throw Error.error(ErrorCode.X_42561);
+        }
+
+        if (node.dataType.isIntegralType()) {
+            // Only constants are checked here for long type range limits
+            NumberType.checkValueIsInLongLimits(session, node.valueData);
+            node.dataType = Type.SQL_BIGINT;
+        }
+        else if (node.dataType.isBinaryType() && node.opType == OpTypes.VALUE) {
+            boolean success = ExpressionValue.voltMutateToBigintType(node, this, nodeIdx);
+            if (! success) {
                 throw Error.error(ErrorCode.X_42561);
             }
-            // Only constants are checked here for long type range limits
-            NumberType.checkValueIsInLongLimits(session, nodes[i].valueData);
-            nodes[i].dataType = Type.SQL_BIGINT;
+        }
+        else {
+            throw Error.error(ErrorCode.X_42561);
         }
     }
 

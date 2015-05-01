@@ -877,6 +877,12 @@ public final class NumberType extends Type {
             case Types.SQL_DECIMAL :
                 break;
 
+            // A VoltDB extension to use X'..' as default values for integers
+            case Types.SQL_VARBINARY:
+                a = ValuePool.getLong(((BinaryData)a).toLong());
+                break;
+
+            // End VoltDB extension
             case Types.SQL_BIT :
             case Types.SQL_BIT_VARYING :
                 if (otherType.precision == 1) {

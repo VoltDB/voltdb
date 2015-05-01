@@ -872,4 +872,9 @@ public class ParserBase {
         }
     }
     /**********************************************************************/
+    // A VoltDB extension to make it easier to see SQL statement being parsed in the debugger
+    public String toString() {
+        return "A subclass of ParserBase parsing <<" + scanner.sqlString + ">>";
+    }
+    // End of VoltDB extension
 }
