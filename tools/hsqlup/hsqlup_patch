@@ -1,0 +1,23 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    echo Source directory does not exist: $1
+    exit 1
+fi
+
+# This script generates and then removes backups of the "before" version of the touched files.
+# For now, all that needs to be done is to edit some packaging symbols to keep our patched hsqldb
+# library code from conflicting with original hsqldb library code in case both are even deployed on
+# the same machine.
+# In particular, replace the whole word "hsqldb" with "hsqldb_voltpatches".
+# The cases we care about are java package name and JDBC driver name.
+# All other cases of the word hsqldb -- in comments, error messages, etc. --
+# are assumed to be safe to change / don't care cases.
+find $1 -type f | xargs sed -i -e 's/\([^A-Za-z_]\)\(hsqldb\)\([^A-Za-z_]\)/\1\2_voltpatches\3/g' 
+
+# Consider leaving this trash when debugging.
+# find $1 -type f -name "*.bak" | xargs rm -f
+
+
+
+
