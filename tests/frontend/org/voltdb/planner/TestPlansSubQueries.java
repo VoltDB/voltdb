@@ -28,6 +28,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -46,6 +47,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
@@ -2121,12 +2123,16 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         assertEquals(1, ((IndexScanPlanNode)pn).getSearchKeyExpressions().size());
-        assertNotNull(((IndexScanPlanNode)pn).getPredicate());
+        AbstractExpression comp = ((IndexScanPlanNode)pn).getSearchKeyExpressions().get(0);
+        assertEquals(ExpressionType.VALUE_CONSTANT, comp.getExpressionType());
+        assertEquals("4", ((ConstantValueExpression)comp).getValue());
+
+        assertNotNull(((IndexScanPlanNode) pn).getPredicate());
     }
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
     }
 
 }

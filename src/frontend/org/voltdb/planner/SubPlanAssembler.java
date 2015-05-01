@@ -310,10 +310,7 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        // Track the running list of filter expressions that remain as each is either cherry-picked
-        // for optimized coverage via the index keys.
-        // Filter out comparison expressions with quantifiers (ALL/ANY) - currently the index scan
-        // does not support them
+        // we copy the expressions to a new list because that we will remove expression from the list
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
         filtersToCover.addAll(exprs);
 
