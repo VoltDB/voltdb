@@ -28,6 +28,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -46,6 +47,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
@@ -2097,9 +2099,40 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertEquals(2, planNodes.size());
     }
 
+    /**
+     * Expression subquery currently is not optimized to use any index. But this does not prevent the
+     * parent query to use index for other purposes.
+     */
+    public void testExpressionSubqueryWithIndexScan() {
+        AbstractPlanNode pn;
+        String sql;
+
+        // INDEX on A, for sort order only
+        sql = "SELECT A FROM R4 where A in (select A from R4 where A > 3) order by A;";
+        pn = compile(sql);
+
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        assertEquals(0, ((IndexScanPlanNode)pn).getSearchKeyExpressions().size());
+        assertNotNull(((IndexScanPlanNode)pn).getPredicate());
+
+        // INDEX on A, uniquely match A = 4,
+        sql = "SELECT A FROM R4 where A = 4 and C in (select A from R4 where A > 3);";
+        pn = compile(sql);
+
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        assertEquals(1, ((IndexScanPlanNode)pn).getSearchKeyExpressions().size());
+        AbstractExpression comp = ((IndexScanPlanNode)pn).getSearchKeyExpressions().get(0);
+        assertEquals(ExpressionType.VALUE_CONSTANT, comp.getExpressionType());
+        assertEquals("4", ((ConstantValueExpression)comp).getValue());
+
+        assertNotNull(((IndexScanPlanNode) pn).getPredicate());
+    }
+
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
     }
 
 }

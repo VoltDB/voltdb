@@ -53,7 +53,6 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.JoinType;
-import org.voltdb.types.QuantifierType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -311,20 +310,9 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        // Track the running list of filter expressions that remain as each is either cherry-picked
-        // for optimized coverage via the index keys.
-        // Filter out comparison expressions with quantifiers (ALL/ANY) - currently the index scan
-        // does not support them
+        // we copy the expressions to a new list because that we will remove expression from the list
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
-        for (AbstractExpression expr : exprs) {
-            if (ComparisonExpression.reverses.containsKey(expr.getExpressionType())) {
-                assert(expr instanceof ComparisonExpression);
-                if (((ComparisonExpression) expr).getQuantifier() != QuantifierType.NONE) {
-                    continue;
-                }
-            }
-            filtersToCover.add(expr);
-        }
+        filtersToCover.addAll(exprs);
 
         String exprsjson = index.getExpressionsjson();
         // This list remains null if the index is just on simple columns.
@@ -1062,6 +1050,14 @@ public abstract class SubPlanAssembler {
         ComparisonExpression normalizedExpr = null;
         AbstractExpression originalFilter = null;
         for (AbstractExpression filter : filtersToCover) {
+
+            // ENG-8203: Not going to try to use index with sub-query expression
+            if (filter.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).size() > 0) {
+                // Including RowSubqueryExpression and SelectSubqueryExpression
+                // SelectSubqueryExpression also can be scalar sub-query
+                continue;
+            }
+
             // Expression type must be resolvable by an index scan
             if ((filter.getExpressionType() == targetComparator) ||
                 (filter.getExpressionType() == altTargetComparator)) {
@@ -1410,6 +1406,9 @@ public abstract class SubPlanAssembler {
                 // ScalarValueExpression which extracts the actual row/column from
                 // the subquery
                 // ENG-8175: this part of code seems not working for float/varchar type index ?!
+
+                // DEAD CODE with the guards on index: ENG-8203
+                assert(false);
                 expr2 = ExpressionUtil.addScalarValueExpression((AbstractSubqueryExpression)expr2);
             }
             scanNode.addSearchKeyExpression(expr2);
