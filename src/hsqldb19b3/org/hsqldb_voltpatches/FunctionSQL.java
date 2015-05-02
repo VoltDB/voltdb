@@ -2307,7 +2307,7 @@ public class FunctionSQL extends Expression {
         return isSQLValueFunction;
     }
 
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to customize the SQL function set support
 
     // FunctionCustom adds a few values to the range of FUNC_ constants above that should probaby be
     // kept unique. types.DTIType and Types add a few values to the range used by VoltDB for
@@ -2612,8 +2612,8 @@ public class FunctionSQL extends Expression {
         }
 
         if (node.dataType.isIntegralType()) {
-            // Only constants are checked here for long type range limits
-            NumberType.checkValueIsInLongLimits(session, node.valueData);
+            // Convert the constant, validating that it is in range
+            node.valueData = NumberType.convertToLong(session, node.valueData);
             node.dataType = Type.SQL_BIGINT;
         }
         else if (node.dataType.isBinaryType() && node.opType == OpTypes.VALUE) {
@@ -2628,20 +2628,18 @@ public class FunctionSQL extends Expression {
     }
 
     protected void voltResolveToBigintCompatibleType(SessionInterface session, int i) {
-        if (nodes[i].dataType == null) {
-            nodes[i].dataType = Type.SQL_BIGINT;
-        }
-        else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
+        if (nodes[i].dataType != null &&
+            nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
             if (! nodes[i].dataType.isIntegralType()) {
                 throw Error.error(ErrorCode.X_42561);
             }
-            if (nodes[i].valueData != null) {                       // is constant
-                // check constants in range
-                NumberType.checkValueIsInLongLimits(session, nodes[i].valueData);
-                nodes[i].dataType = Type.SQL_BIGINT;
+            if (nodes[i].valueData != null) { // is a constant
+                // Convert the constant, validating that it is in range
+                nodes[i].valueData = NumberType.convertToLong(session, nodes[i].valueData);
             }
         }
+        nodes[i].dataType = Type.SQL_BIGINT;
     }
 
-    /**********************************************************************/
+    // End of VoltDB extension
 }

@@ -1414,26 +1414,17 @@ public class ParserDDL extends ParserRoutine {
                             c.getName().name, table.getSchemaName(),
                             table.getName(), SchemaObject.INDEX);
 
-                    // A VoltDB extension to support indexed expressions and the assume unique attribute
-                    Index index = null;
-                    if (c.voltIndexedExprs != null) {
-                        // Special case handling for VoltDB indexed expressions
-                        index = table.createAndAddExprIndexStructure(session, indexName,
-                            c.core.mainCols, c.voltIndexedExprs, true, true).setAssumeUnique(c.voltAssumeUnique);
-                    } else {
-                        index = table.createAndAddIndexStructure(session, indexName,
-                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.voltAssumeUnique);
-                    }
-                    /* disable 3 lines ...
                     Index index = table.createAndAddIndexStructure(session,
                         indexName, c.core.mainCols, null, null, true, true,
                         false);
-                    ... disabled 3 lines */
-                    // End of VoltDB extension
                     Constraint newconstraint = new Constraint(c.getName(),
                         table, index, SchemaObject.ConstraintTypes.UNIQUE);
-                    // A VoltDB extension to support the assume unique attribute
-                    newconstraint = newconstraint.voltSetAssumeUnique(c.voltAssumeUnique);
+                    // A VoltDB extension to support indexed expressions and the assume unique attribute
+                    index.withExpressions(c.voltIndexedExprs)
+                    .setAssumeUnique(c.voltAssumeUnique);
+
+                    newconstraint.voltWithExpressions(c.voltIndexedExprs)
+                    .voltSetAssumeUnique(c.voltAssumeUnique);
                     // End of VoltDB extension
 
                     table.addConstraint(newconstraint);
@@ -5498,7 +5489,8 @@ public class ParserDDL extends ParserRoutine {
         session.getGrantee().checkSchemaUpdateOrGrantRights(schema.name);
         session.checkDDLWrite();
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
+
     /**
      * Responsible for handling Volt limit constraints section of CREATE TABLE ...
      *
@@ -5649,5 +5641,5 @@ public class ParserDDL extends ParserRoutine {
                                    null, writeLockNames);
     }
 
-    /**********************************************************************/
+    // End of VoltDB extension
 }

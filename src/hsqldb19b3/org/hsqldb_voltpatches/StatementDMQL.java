@@ -829,7 +829,7 @@ public abstract class StatementDMQL extends Statement {
     public void clearStructures(Session session) {
         session.sessionContext.clearStructures(this);
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     private static class Pair<T, U> {
         protected final T m_first;
@@ -1295,5 +1295,5 @@ public abstract class StatementDMQL extends Statement {
             }
         }
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

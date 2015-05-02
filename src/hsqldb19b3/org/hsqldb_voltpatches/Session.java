@@ -2326,10 +2326,11 @@ public class Session implements SessionInterface {
             return false;
         }
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     long nextExpressionNodeId = 1;
-    java.util.Map<Long, Long> hsqlExpressionNodeIdsToVoltNodeIds = new java.util.HashMap<Long, Long>();
+    final java.util.Map<Long, Long> hsqlExpressionNodeIdsToVoltNodeIds =
+            new java.util.HashMap<Long, Long>();
 
     public long getNodeIdForExpression(long hsqlId) {
         Long id = hsqlExpressionNodeIdsToVoltNodeIds.get(hsqlId);
@@ -2344,5 +2345,5 @@ public class Session implements SessionInterface {
         nextExpressionNodeId = 1;
         hsqlExpressionNodeIdsToVoltNodeIds.clear();
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

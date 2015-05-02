@@ -2036,7 +2036,7 @@ public class RangeVariable {
 
         // End of VoltDB extension
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -2168,5 +2168,5 @@ public class RangeVariable {
 
         return Expression.voltCombineWithAnd(joinCond, whereCond);
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

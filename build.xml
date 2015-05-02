@@ -243,11 +243,11 @@ PRIMARY ENTRY POINTS
 <target name="check"
     depends="licensecheck, default, voltdbipc"
     description="Run Java and C++ JNI testcases." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="90000000">
         <arg value="eecheck" />
         <arg value="junit" />
         <arg value="sqlcmdtest" />

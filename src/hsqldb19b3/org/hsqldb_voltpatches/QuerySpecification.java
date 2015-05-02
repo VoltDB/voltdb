@@ -2698,7 +2698,8 @@ public class QuerySpecification extends QueryExpression {
 
         return true;
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
+
     Expression getHavingCondition() { return havingCondition; }
 
     /**
@@ -2734,5 +2735,5 @@ public class QuerySpecification extends QueryExpression {
 
         System.out.println("\n\n");
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

@@ -1382,101 +1382,8 @@ public class TableWorks {
             database.persistentStoreCollection.removeStore(oldTable);
         }
     }
-    /************************* Volt DB Extensions *************************/
-
-    /**
-     * A VoltDB extended variant of addIndex that supports indexed generalized non-column expressions.
-     *
-     * @param cols int[]
-     * @param indexExprs Expression[]
-     * @param name HsqlName
-     * @param unique boolean
-     * @param predicate Expression
-     * @return new index
-     */
-    Index addExprIndex(int[] col, Expression[] indexExprs, HsqlName name, boolean unique, Expression predicate) {
-
-        Index newindex;
-
-        if (table.isEmpty(session) || table.isIndexingMutable()) {
-            newindex =
-                table.createAndAddExprIndexStructure(session, name, col, indexExprs, unique, false);
-        } else {
-            newindex = table.createIndexStructure(name, col, null, null,
-                    unique, false, false).withExpressions(indexExprs);
-
-            Table tn = table.moveDefinition(session, table.tableType, null,
-                                            null, newindex, -1, 0, emptySet,
-                                            emptySet);
-            moveData(table, tn, -1, 0);
-
-            table = tn;
-
-            setNewTableInSchema(table);
-            updateConstraints(table, emptySet);
-        }
-
-        database.schemaManager.addSchemaObject(newindex);
-        database.schemaManager.recompileDependentObjects(table);
-
-        if (predicate != null) {
-            newindex = newindex.withPredicate(predicate);
-        }
-
-        return newindex;
-    } /* addExprIndex */
-
-    /**
-    * A VoltDB extended variant of addIndex that supports partial index predicate.
-     *
-     * @param col int[]
-     * @param name HsqlName
-     * @param unique boolean
-     * @param predicate Expression
-     * @return new index
-     */
-    Index addIndex(int[] col, HsqlName name, boolean unique, Expression predicate) {
-        return addIndex(col, name, unique).withPredicate(predicate);
-    }
-
-    /**
-     * A VoltDB extended variant of addUniqueConstraint that supports indexed generalized non-column expressions.
-     * @param cols
-     * @param indexExprs
-     * @param name HsqlName
-     */
-    public void addUniqueExprConstraint(int[] cols,
-            Expression[] indexExprs, HsqlName name, boolean assumeUnique) {
-
-        checkModifyTable();
-        database.schemaManager.checkSchemaObjectNotExists(name);
-
-        if (table.getUniqueConstraintForExprs(indexExprs) != null) {
-            throw Error.error(ErrorCode.X_42522);
-        }
-
-        // create an autonamed index
-        HsqlName indexname = database.nameManager.newAutoName("IDX",
-            name.name, table.getSchemaName(), table.getName(),
-            SchemaObject.INDEX);
-        Index exprIndex = table.createIndexStructure(indexname, cols, null, null, true, true, false);
-        exprIndex = exprIndex.withExpressions(indexExprs);
-        Constraint constraint = new Constraint(name, table,
-                exprIndex, SchemaObject.ConstraintTypes.UNIQUE).voltSetAssumeUnique(assumeUnique);
-        Table tn = table.moveDefinition(session, table.tableType, null,
-                                        constraint, exprIndex, -1, 0, emptySet, emptySet);
-
-        moveData(table, tn, -1, 0);
-
-        table = tn;
-
-        database.schemaManager.addSchemaObject(constraint);
-        setNewTableInSchema(table);
-        updateConstraints(table, emptySet);
-        database.schemaManager.recompileDependentObjects(table);
-    } /* addUniqueExprConstraint */
-
     // A VoltDB extension to support LIMIT PARTITION ROWS
+
     void addLimitConstraint(Constraint c)
     {
         // Find any pre-existing LIMIT constraint on the table and remove it
@@ -1495,6 +1402,4 @@ public class TableWorks {
         database.schemaManager.addSchemaObject(c);
     }
     // End of VoltDB extension
-
-    /**********************************************************************/
 }

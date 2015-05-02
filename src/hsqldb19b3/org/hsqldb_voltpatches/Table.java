@@ -3017,7 +3017,7 @@ public class Table extends TableBase implements SchemaObject {
     public void materialise(Session session) {}
 
     public void materialiseCorrelated(Session session) {}
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to support LIMIT PARTITION ROWS and expression indexes
 
     /**
      * Returns the UNIQUE constraint with the given expression signature -- a VoltDB extension.
@@ -3142,17 +3142,6 @@ public class Table extends TableBase implements SchemaObject {
         return table;
     }
 
-    // VoltDB support for indexed expressions
-    public final Index createAndAddExprIndexStructure(Session session,
-            HsqlName name, int[] columns, Expression[] indexExprs, boolean unique, boolean constraint) {
-
-        Index newExprIndex = createIndexStructure(name, columns, null, null, unique, constraint, false);
-        newExprIndex = newExprIndex.withExpressions(indexExprs);
-        addIndex(session, newExprIndex);
-        return newExprIndex;
-    } /* createAndAddExprIndexStructure */
-
-    // A VoltDB extension to support LIMIT PARTITION ROWS
     Constraint getLimitConstraint() {
         Constraint result = null;
         for (Constraint constraint : getConstraints()) {
@@ -3164,7 +3153,6 @@ public class Table extends TableBase implements SchemaObject {
         }
         return result;
     }
-    // End of VoltDB extension
 
     /* (non-Javadoc)
      * @see java.lang.Object#toString()
@@ -3173,5 +3161,5 @@ public class Table extends TableBase implements SchemaObject {
     public String toString() {
         return super.toString() + ":" + getName().name;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

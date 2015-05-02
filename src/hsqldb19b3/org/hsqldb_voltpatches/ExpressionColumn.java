@@ -1253,7 +1253,7 @@ public class ExpressionColumn extends Expression {
 
         return super.duplicate();
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     /**
      * VoltDB added method to provide detail for a non-catalog-dependent
@@ -1288,5 +1288,5 @@ public class ExpressionColumn extends Expression {
         }
         return exp;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

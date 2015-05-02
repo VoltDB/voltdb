@@ -2034,7 +2034,9 @@ public class IndexAVL implements Index {
         }
     }
 
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to support indexed expressions,
+    // the assumeunique attribute and partial indexes
+    
     // VoltDB supports indexed expressions
     private org.hsqldb_voltpatches.Expression[] exprs;
     // VoltDB allows a unique index on a partitioned table without the partition column included.
@@ -2202,5 +2204,5 @@ public class IndexAVL implements Index {
     public org.hsqldb_voltpatches.Expression getPredicate() {
         return predicate;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

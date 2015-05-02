@@ -404,11 +404,9 @@ public class DatabaseURL {
         return props;
     }
 
-    /************************* Volt DB Extensions *************************/
-    /**
-     * Stub to allow disabling of server package dependency
-     * -- these values probably don't even matter.
-     */
+    // A VoltDB extension to disable the server package dependency
+    // -- these values probably don't even matter.
+
     private static interface ServerConstants {
         // default port for each protocol
         final int SC_DEFAULT_HSQL_SERVER_PORT  = 9001;
@@ -416,5 +414,5 @@ public class DatabaseURL {
         final int SC_DEFAULT_HTTP_SERVER_PORT  = 80;
         final int SC_DEFAULT_HTTPS_SERVER_PORT = 443;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

@@ -1145,7 +1145,7 @@ public class QueryExpression implements RangeGroup {
         leftQueryExpression.replaceRangeVariables(ranges, newRanges);
         rightQueryExpression.replaceRangeVariables(ranges, newRanges);
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     private static final String[] m_setOperatorNames = new String[] {
         "NOUNION",
@@ -1188,5 +1188,5 @@ public class QueryExpression implements RangeGroup {
     public QueryExpression getRightQueryExpression() {
         return rightQueryExpression;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

@@ -1630,7 +1630,7 @@ public class StatementDML extends StatementDMQL {
     public void clearStructures(Session session) {
         session.sessionContext.clearStructures(this);
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     private SortAndSlice m_sortAndSlice = null;
 
@@ -1764,5 +1764,5 @@ public class StatementDML extends StatementDMQL {
         xml.attributes.put("table", targetTable.getName().name);
         return xml;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

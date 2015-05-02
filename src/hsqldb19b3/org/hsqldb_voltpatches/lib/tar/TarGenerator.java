@@ -719,10 +719,9 @@ public class TarGenerator {
         // Be conservative, because these files contain passwords
     }
 
-    /************************* Volt DB Extensions *************************/
-
+    // A VoltDB extension to support explicit tar outputstream pre-configuration
     public TarGenerator(java.util.zip.GZIPOutputStream outputStream) throws IOException {
         archive = new TarFileOutputStream(outputStream);
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

@@ -1044,7 +1044,7 @@ public final class Constraint implements SchemaObject {
             }
         }
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees and support indexed expressions
 
     // !!!!!!!!
     // NOTE!  IF YOU ARE GOING TO ADD NEW MEMBER FIELDS HERE YOU
@@ -1145,5 +1145,5 @@ public final class Constraint implements SchemaObject {
 
         return str;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

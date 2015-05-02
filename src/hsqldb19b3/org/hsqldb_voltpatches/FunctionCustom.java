@@ -3961,11 +3961,12 @@ public class FunctionCustom extends FunctionSQL {
 
         return sb.toString();
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to customize the SQL function set support
 
     public static final String FUNC_CONCAT_ID_STRING = String.valueOf(FUNC_CONCAT);
 
     private static String DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR = "Custom Function";
     private static String DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD = "Custom Function Special Case";
-    /**********************************************************************/
+
+    // End of VoltDB extension
 }

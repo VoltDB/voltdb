@@ -2155,7 +2155,7 @@ public class Expression implements Cloneable {
     public void setCollation(Collation collation) {
         this.collation = collation;
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     // VoltDB support for indexed expressions
     public void voltCollectAllColumnExpressions(ArrayList<ExpressionColumn> list) {
@@ -2779,5 +2779,6 @@ public class Expression implements Cloneable {
         }
         return result;
     }
-    /**********************************************************************/
+
+    // End of VoltDB extension
 }

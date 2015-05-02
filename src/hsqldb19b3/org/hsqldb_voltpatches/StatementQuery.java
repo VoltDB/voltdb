@@ -115,14 +115,14 @@ public class StatementQuery extends StatementDMQL {
                ? ResultProperties.updatablePropsValue
                : ResultProperties.defaultPropsValue;
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     /**
-     * VoltDB added method to get a non-catalog-dependent
+     * VoltDB added method to get an abstract parse tree
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @return XML, correctly indented, representing this object.
+     * @return VoltXMLElement, a free-form (schema-less) abstract parse tree.
      * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     @Override
@@ -131,5 +131,5 @@ public class StatementQuery extends StatementDMQL {
     {
         return voltGetXMLExpression(queryExpression, parameters, session);
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }
