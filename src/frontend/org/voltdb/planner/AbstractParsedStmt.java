@@ -869,6 +869,21 @@ public abstract class AbstractParsedStmt {
         throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
     }
 
+    protected AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
+        // The id was previously passed to parameterCountIndexById, so if not -1,
+        // it has already been asserted to be a valid id for a parameter, and the
+        // parameter's type has been refined to INTEGER.
+        if (id != -1) {
+            return m_paramsById.get(id);
+        }
+        // The limit/offset is a non-parameterized literal value that needs to be wrapped in a
+        // BIGINT constant so it can be used in the addition expression for the pushed-down limit.
+        ConstantValueExpression constant = new ConstantValueExpression();
+        constant.setValue(Long.toString(value));
+        constant.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        return constant;
+    }
+
     /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
     /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
     /// the parameter is being used in a BIGINT context.
@@ -889,21 +904,6 @@ public abstract class AbstractParsedStmt {
         // skeptically second-guesses that pending its own verification. This case is now verified.
         pve.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
         return pve.getParameterIndex();
-    }
-
-    protected AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
-        // The id was previously passed to parameterCountIndexById, so if not -1,
-        // it has already been asserted to be a valid id for a parameter, and the
-        // parameter's type has been refined to INTEGER.
-        if (id != -1) {
-            return m_paramsById.get(id);
-        }
-        // The limit/offset is a non-parameterized literal value that needs to be wrapped in a
-        // BIGINT constant so it can be used in the addition expression for the pushed-down limit.
-        ConstantValueExpression constant = new ConstantValueExpression();
-        constant.setValue(Long.toString(value));
-        constant.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        return constant;
     }
 
     /**

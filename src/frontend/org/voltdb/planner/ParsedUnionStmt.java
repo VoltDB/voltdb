@@ -144,27 +144,24 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isOrderDeterministic() {
-        for (AbstractParsedStmt childStmt : m_children) {
-            if ( ! childStmt.isOrderDeterministic()) {
-                return false;
-            }
-        }
-        return true;
+        ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+        return orderByColumnsDetermineAllDisplayColumns(nonOrdered);
+    }
+
+    @Override
+    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
+        // Set OP should not have its own subqueries
+        return isOrderDeterministic();
+    }
+
+    private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
+    {
+        return ParsedSelectStmt.orderByColumnsDetermineAllDisplayColumns(getFirstSelectStmt().displayColumns(), m_orderColumns, nonOrdered);
     }
 
     @Override
     public boolean hasLimitOrOffset() {
         return m_limitOffset.hasLimitOrOffset();
-    }
-
-    @Override
-    public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
-        for (AbstractParsedStmt childStmt : m_children) {
-            if ( ! childStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries()) {
-                return false;
-            }
-        }
-        return true;
     }
 
     public LimitPlanNode getLimitNodeTop() {

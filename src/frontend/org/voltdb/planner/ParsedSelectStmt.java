@@ -1424,11 +1424,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
+    private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
+    {
+        return orderByColumnsDetermineAllDisplayColumns(m_displayColumns, m_orderColumns, nonOrdered);
+    }
 
-    private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered)
+    private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
+            ArrayList<AbstractExpression> outNonOrdered) {
+        return orderByColumnsDetermineAllColumns(m_orderColumns, candidateColumns, outNonOrdered);
+    }
+
+    static boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
+            List<ParsedColInfo> orderColumns,
+            List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
-        for (ParsedColInfo displayCol : m_displayColumns) {
+        for (ParsedColInfo displayCol : displayColumns) {
             if (displayCol.orderBy) {
                 continue;
             }
@@ -1446,11 +1457,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             candidateColumns.add(displayCol);
         }
-        return orderByColumnsDetermineAllColumns(candidateColumns, null);
+        return orderByColumnsDetermineAllColumns(orderColumns, candidateColumns, null);
     }
 
-    private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
-                                                      ArrayList<AbstractExpression> outNonOrdered) {
+    private static boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
+                                                      List<ParsedColInfo> candidateColumns,
+                                                      List<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
         ArrayList<AbstractExpression> candidateExprHardCases = null;
         // First try to get away with a brute force N by M search for exact equalities.
@@ -1462,7 +1474,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             AbstractExpression candidateExpr = candidateCol.expression;
             if (orderByExprs == null) {
                 orderByExprs = new HashSet<AbstractExpression>();
-                for (ParsedColInfo orderByCol : m_orderColumns) {
+                for (ParsedColInfo orderByCol : orderColumns) {
                     orderByExprs.add(orderByCol.expression);
                 }
             }

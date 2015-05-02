@@ -250,34 +250,6 @@ public class TestUnion extends PlannerTestCase {
 
     }
 
-    public void testUnionOrderby() {
-        {
-            AbstractPlanNode pn = compile("select B from T2 UNION select B from T2 order by B");
-            pn = pn.getChild(0);
-            String[] columnNames = {"B"};
-            checkOrderByNode(pn, columnNames);
-        }
-        {
-            AbstractPlanNode pn = compile("(select B as B1, B as B2 from T2 UNION select B as B1, B as B2 from T2) order by B1 asc, B2 desc");
-            pn = pn.getChild(0);
-            String[] columnNames = {"B1", "B2"};
-            checkOrderByNode(pn, columnNames);
-        }
-        {
-            // T1 is partitioned
-            AbstractPlanNode pn = compile("(select A from T1 UNION select B from T2) order by A");
-            pn = pn.getChild(0);
-            String[] columnNames = {"A"};
-            checkOrderByNode(pn, columnNames);
-        }
-    }
-
-    public void testInvalidOrderBy() {
-        String errorMsg = "invalid ORDER BY expression";
-        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by C+1", errorMsg);
-        failToCompile("(select C from T3 UNION select B from T2) order by B");
-    }
-
     public void testUnionLimitOffset() {
         {
             AbstractPlanNode pn = compile(
@@ -318,6 +290,52 @@ public class TestUnion extends PlannerTestCase {
             checkLimitNode(pn.getChild(0), -1, 2);
             assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
         }
+    }
+
+    public void testUnionOrderby() {
+        {
+            AbstractPlanNode pn = compile("select B from T2 UNION select B from T2 order by B");
+            pn = pn.getChild(0);
+            String[] columnNames = {"B"};
+            checkOrderByNode(pn, columnNames);
+        }
+        {
+            AbstractPlanNode pn = compile("(select B as B1, B as B2 from T2 UNION select B as B1, B as B2 from T2) order by B1 asc, B2 desc");
+            pn = pn.getChild(0);
+            String[] columnNames = {"B1", "B2"};
+            checkOrderByNode(pn, columnNames);
+        }
+        {
+            // T1 is partitioned
+            AbstractPlanNode pn = compile("(select A from T1 UNION select B from T2) order by A");
+            pn = pn.getChild(0);
+            String[] columnNames = {"A"};
+            checkOrderByNode(pn, columnNames);
+        }
+    }
+
+    public void testUnionDeterminism() {
+        {
+            CompiledPlan plan = compileAdHocPlan("select B, DESC from T2 UNION select A, DESC from T1");
+            boolean isDeterministic = plan.isOrderDeterministic();
+            assertEquals(false, isDeterministic);
+        }
+        {
+            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc");
+            boolean isDeterministic = plan.isOrderDeterministic();
+            assertEquals(false, isDeterministic);
+        }
+        {
+            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc, DESC desc");
+            boolean isDeterministic = plan.isOrderDeterministic();
+            assertEquals(true, isDeterministic);
+        }
+    }
+
+    public void testInvalidOrderBy() {
+        String errorMsg = "invalid ORDER BY expression";
+        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by C+1", errorMsg);
+        failToCompile("(select C from T3 UNION select B from T2) order by B");
     }
 
     public void testMultiUnionOrderby() {
