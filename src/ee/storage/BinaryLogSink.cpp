@@ -31,6 +31,36 @@
 
 namespace voltdb {
 
+class CachedIndexKeyTuple {
+public:
+    CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
+
+    operator TableTuple& () {
+        return m_tuple;
+    }
+
+    inline bool hasCachedTuple(uint32_t indexCrc) {
+        return m_storageSize > 0 && indexCrc == m_cachedIndexCrc;
+    }
+
+    void allocateTuple(std::pair<const TableIndex*, uint32_t> indexPair) {
+        const TupleSchema* schema = indexPair.first->getKeySchema();
+        size_t tupleLength = schema->tupleLength() + TUPLE_HEADER_SIZE;
+        if (tupleLength > m_storageSize) {
+            m_tupleStorage.reset(new char[tupleLength]);
+            m_storageSize = tupleLength;
+        }
+        m_tuple.setSchema(schema);
+        m_tuple.move(m_tupleStorage.get());
+        m_cachedIndexCrc = indexPair.second;
+    }
+private:
+    TableTuple m_tuple;
+    uint32_t m_cachedIndexCrc;
+    size_t m_storageSize;
+    boost::scoped_array<char> m_tupleStorage;
+};
+
 BinaryLogSink::BinaryLogSink() {}
 
 void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
@@ -38,7 +68,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
-    PoolBackedTupleStorage indexKeyTuple;
+
+    CachedIndexKeyTuple indexKeyTuple;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
@@ -76,13 +107,14 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             TableTuple tempTuple;
             if (DR_RECORD_DELETE_BY_INDEX == type) {
-                std::pair<const TableIndex*, uint32_t> index = table->getSmallestUniqueIndex();
-                if (!index.first || indexCrc != index.second) {
-                    throwSerializableEEException("Unable to find unique index %u while applying a binary log delete record",
-                                                 indexCrc);
+                if (!indexKeyTuple.hasCachedTuple(indexCrc)) {
+                    std::pair<const TableIndex*, uint32_t> index = table->getSmallestUniqueIndex();
+                    if (!index.first || indexCrc != index.second) {
+                        throwSerializableEEException("Unable to find unique index %u while applying a binary log delete record",
+                                                     indexCrc);
+                    }
+                    indexKeyTuple.allocateTuple(index);
                 }
-                indexKeyTuple.init(index.first->getKeySchema(), pool);
-                indexKeyTuple.allocateActiveTuple();
                 tempTuple = indexKeyTuple;
             } else {
                 tempTuple = table->tempTuple();
