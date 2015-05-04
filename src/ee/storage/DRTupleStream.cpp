@@ -200,7 +200,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the row size in to the row header
     // rowlength does not include the 4 byte length prefix or record header
     // but does include the null array.
-    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, 4);
+    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, rowMetadataSz);
     // No need to subtract out the length of this size prefix itself, since it's
     // balanced out by the checksum at the end
     if (DR_RECORD_DELETE_BY_INDEX == type) {
