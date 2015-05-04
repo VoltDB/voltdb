@@ -772,10 +772,6 @@ public class AsyncBenchmark {
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
-        if(totalConnections.get() == 1)
-            // If Volt is running on one node only, no need to run this test on multi-partition
-            config.multisingleratio = 0;
-
         // Run the benchmark loop for the requested duration or txn count
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");

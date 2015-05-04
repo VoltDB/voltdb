@@ -45,18 +45,19 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltZK;
 
 public class StateMachineSnipits extends ZKTestBase {
     VoltLogger log = new VoltLogger("HOST");
     private final int NUM_AGREEMENT_SITES = 4;
+    private final String stateMachineManagerRoot = "/test/db/statemachine";
 
     @Before
     public void setUp() throws Exception {
         setUpZK(NUM_AGREEMENT_SITES);
         ZooKeeper zk = m_messengers.get(0).getZK();
-        ZKUtil.addIfMissing(zk, "/db", CreateMode.PERSISTENT, null);
-        ZKUtil.addIfMissing(zk, VoltZK.syncStateMachine, CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, "/test", CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, "/test/db", CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, stateMachineManagerRoot, CreateMode.PERSISTENT, null);
     }
 
     @After
@@ -75,7 +76,8 @@ public class StateMachineSnipits extends ZKTestBase {
         SynchronizedStatesManager ssm = null;
         try {
             assert(siteId < NUM_AGREEMENT_SITES);
-            ssm = new SynchronizedStatesManager(m_messengers.get(siteId).getZK(), communityName,
+            ssm = new SynchronizedStatesManager(m_messengers.get(siteId).getZK(),
+                    stateMachineManagerRoot, communityName,
                     managerId, numberOfStateMachines);
         }
         catch (KeeperException | InterruptedException e) {
