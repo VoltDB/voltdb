@@ -205,7 +205,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // balanced out by the checksum at the end
     if (DR_RECORD_DELETE_BY_INDEX == type) {
         // Do need to subtract out the length of the index checksum
-        hdr.writeInt((int32_t)io.position() - TXN_RECORD_HEADER_SIZE - sizeof(int32_t));
+        hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE - sizeof(int32_t)));
         hdr.writeInt(uniqueIndexCrc);
     } else {
         hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE));
