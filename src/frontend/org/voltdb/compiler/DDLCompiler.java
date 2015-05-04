@@ -2278,7 +2278,7 @@ public class DDLCompiler {
         String msg = "Partial index \"" + indexName + "\" ";
 
         // Make sure all column expressions refer the index table
-        List<VoltXMLElement> columnRefs= predicateXML.findChildren("columnref");
+        List<VoltXMLElement> columnRefs= predicateXML.findChildrenRecursively("columnref");
         for (VoltXMLElement columnRef : columnRefs) {
             String columnRefTableName = columnRef.attributes.get("table");
             if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {

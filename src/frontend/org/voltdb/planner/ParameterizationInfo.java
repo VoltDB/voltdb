@@ -19,6 +19,7 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -78,30 +79,50 @@ class ParameterizationInfo {
     public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
                                     Map<String, Integer> idToParamIndexMap,
                                     List<String> paramValues) {
-
+        List<VoltXMLElement> unionChildren = null;
         if (parameterizedXmlSQL.name.equals("union")) {
-            // UNION has its parameters on the individual selects level
-            for (VoltXMLElement xmlChildSQL : parameterizedXmlSQL.children) {
-                parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
-            }
-        } else {
-            // find the parameters xml node
-            VoltXMLElement paramsNode = null;
-            for (VoltXMLElement child : parameterizedXmlSQL.children) {
-                if (child.name.equals("parameters")) {
-                    paramsNode = child;
+            // Set ops may may have their own nodes to parameterize (limit/offset)
+            // in addition to children's nodes. Process children  first
+            unionChildren = new ArrayList<VoltXMLElement>();
+            Iterator<VoltXMLElement> iter = parameterizedXmlSQL.children.iterator();
+            while (iter.hasNext()) {
+                VoltXMLElement xmlChildSQL = iter.next();
+                if ("select".equals(xmlChildSQL.name) || "union".equals(xmlChildSQL.name)) {
+                    parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
+                    // Temporarily remove it from the list
+                    iter.remove();
+                    unionChildren.add(xmlChildSQL);
                 }
             }
-            assert(paramsNode != null);
-
-            // don't optimize plans with params yet
-            if (paramsNode.children.size() > 0) {
-                return;
-            }
-
-            parameterizeRecursively(parameterizedXmlSQL, paramsNode,
-                    idToParamIndexMap, paramValues);
         }
+        // Parameterize itself
+        parameterizeItself(parameterizedXmlSQL, idToParamIndexMap, paramValues);
+        if (unionChildren != null) {
+            // Add union children back
+            parameterizedXmlSQL.children.addAll(unionChildren);
+        }
+    }
+
+    static void parameterizeItself(VoltXMLElement parameterizedXmlSQL,
+                                    Map<String, Integer> idToParamIndexMap,
+                                    List<String> paramValues) {
+        // find the parameters xml node
+        VoltXMLElement paramsNode = null;
+        for (VoltXMLElement child : parameterizedXmlSQL.children) {
+            if (child.name.equals("parameters")) {
+                paramsNode = child;
+                break;
+            }
+        }
+        assert(paramsNode != null);
+
+        // don't optimize plans with params yet
+        if (paramsNode.children.size() > 0) {
+            return;
+        }
+
+        parameterizeRecursively(parameterizedXmlSQL, paramsNode,
+                idToParamIndexMap, paramValues);
     }
 
     static void parameterizeRecursively(VoltXMLElement node,
