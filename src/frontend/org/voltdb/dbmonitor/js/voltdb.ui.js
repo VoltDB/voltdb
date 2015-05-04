@@ -725,7 +725,7 @@ var loadPage = function (serverName, portid) {
 
                                 if (VoltDbUI.drMasterEnabled) {
                                     $("#drMasterSection").show();
-                                    $(".replicaWrapper").css('top', '-27px');
+                                    //$(".replicaWrapper").css('top', '0');
                                     //show master table
                                     refreshDrMasterSection();
                                 } else {
@@ -741,10 +741,12 @@ var loadPage = function (serverName, portid) {
                                     refreshDrReplicaSection(graphView, currentTab);
                                     //to show DR Mode and DR tables
                                     if (VoltDbUI.drMasterEnabled) {
+                                        $("#drSection").addClass("drHeightBoth");
                                         $("#dbDrMode").text("Both");
                                         $('#drMasterSection').css('display', 'block');
                                     } else {
                                         $("#dbDrMode").text("Replica");
+                                        $("#drSection").addClass("drHeightIndividual");
                                         $('#drMasterSection').css('display', 'none');
                                     }
                                     $('#drReplicaSection').css('display', 'block');
@@ -1135,7 +1137,7 @@ var loadPage = function (serverName, portid) {
             var replicaLatencyTrans = 0;
 
             // if (!$.isEmptyObject(response)) {
-            
+
             for (var key in response) {
 
                 for (var i = 0; i <= response[key].length - 1; i++) {
