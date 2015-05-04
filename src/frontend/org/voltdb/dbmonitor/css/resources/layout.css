@@ -1094,6 +1094,7 @@ tr.drSubSection td { font-weight:normal!important; padding-left:40px!important;}
     position: relative;
     left: 3px;
 }
+#tblDrReplica { border-right: none!important;border-top: none!important; border-bottom: none!important;}
 
 /****DR Ends*******/
 
