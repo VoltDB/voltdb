@@ -157,7 +157,8 @@ public:
             return maxExportSerializationSize();
         }
         size_t bytes = 0;
-        for (std::vector<int>::const_iterator cit = interestingColumns->cbegin(); cit != interestingColumns->cend(); ++cit) {
+        std::vector<int> cols = *interestingColumns;
+        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
             bytes += maxExportSerializedColumnSize(*cit);
         }
         return bytes;
@@ -798,7 +799,8 @@ inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
     if (!interestingColumns) {
         serializeToExport(io, colOffset, nullArray);
     } else {
-        for (std::vector<int>::const_iterator cit = interestingColumns->cbegin(); cit != interestingColumns->cend(); ++cit) {
+        std::vector<int> cols = *interestingColumns;
+        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
             serializeColumnToExport(io, colOffset, *cit, nullArray);
         }
     }
