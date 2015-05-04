@@ -369,6 +369,7 @@ static void writeOrDie(int fd, const unsigned char *data, ssize_t sz) {
  * This is used by the signal dispatcher
  */
 static VoltDBIPC *currentVolt = NULL;
+static bool staticDebugVerbose = false;
 
 /**
  * Utility used for deserializing ParameterSet passed from Java.
@@ -403,8 +404,9 @@ VoltDBIPC::~VoltDBIPC() {
 bool VoltDBIPC::execute(struct ipc_command *cmd) {
     int8_t result = kErrorCode_None;
 
-    if (0)
+    if (staticDebugVerbose) {
         std::cout << "IPC client command: " << ntohl(cmd->command) << std::endl;
+    }
 
     // commands must match java's ExecutionEngineIPC.Command
     // could enumerate but they're only used in this one place.
@@ -1622,6 +1624,9 @@ void *eethread(void *ptr) {
             }
             assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
         }
+        if (staticDebugVerbose) {
+            std::cout << "Completed  command: " << ntohl(cmd->command) << std::endl;
+        }
         bool terminate = voltipc->execute(cmd);
         if (terminate) {
             close(fd);
@@ -1636,7 +1641,7 @@ int main(int argc, char **argv) {
     //Create a pool ref to init the thread local in case a poll message comes early
     voltdb::ThreadLocalPool poolRef;
     const int pid = getpid();
-    printf("==%d==\n", pid);
+    printf("== pid = %d ==\n", pid);
     fflush(stdout);
     int sock = -1;
     int fd = -1;
@@ -1650,7 +1655,7 @@ int main(int argc, char **argv) {
         assert(eecountStr);
         eecount = atoi(eecountStr);
         assert(eecount >= 0);
-        printf("==%d==\n", eecount);
+        printf("== eecount = %d ==\n", eecount);
     }
 
     boost::shared_array<pthread_t> eeThreads(new pthread_t[eecount]);
@@ -1689,7 +1694,7 @@ int main(int argc, char **argv) {
     }
 
     port = ntohs(address.sin_port);
-    printf("==%d==\n", port);
+    printf("== port = %d ==\n", port);
     fflush(stdout);
 
     if ((listen(sock, 1)) != 0) {
