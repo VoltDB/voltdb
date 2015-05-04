@@ -64,13 +64,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         // Set operation type
         m_unionType = UnionType.valueOf(type);
 
-        int selectCounter = 0;
+        int idx = 0;
         VoltXMLElement limitElement = null, offsetElement = null, orderbyElement = null;
         for (VoltXMLElement child : stmtNode.children) {
             if (SELECT_NODE_NAME.equals(child.name) ||
                     UNION_NODE_NAME.equals(child.name)) {
-                assert(selectCounter < m_children.size());
-                AbstractParsedStmt nextStmt = m_children.get(selectCounter++);
+                assert(idx < m_children.size());
+                AbstractParsedStmt nextStmt = m_children.get(idx++);
                 nextStmt.parse(child);
             } else if (child.name.equalsIgnoreCase("limit")) {
                 limitElement = child;
@@ -156,7 +156,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
     {
-        return ParsedSelectStmt.orderByColumnsDetermineAllDisplayColumns(getFirstSelectStmt().displayColumns(), m_orderColumns, nonOrdered);
+        return ParsedSelectStmt.orderByColumnsDetermineAllDisplayColumns(getLeftmostSelectStmt().displayColumns(), m_orderColumns, nonOrdered);
     }
 
     @Override
@@ -169,9 +169,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     private void parseOrderColumns(VoltXMLElement columnsNode) {
-        ParsedSelectStmt firstSelectChild = getFirstSelectStmt();
+        ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
         for (VoltXMLElement child : columnsNode.children) {
-            parseOrderColumn(child, firstSelectChild);
+            parseOrderColumn(child, leftmostSelectChild);
         }
     }
 
@@ -180,9 +180,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * are not allowed to have aggregate expressions (HAVING, GROUP BY) (except the individual SELECTS)
      * all the logic handling the aggregates is omitted here
      * @param orderByNode
-     * @param firstSelectChild
+     * @param leftmostSelectChild
      */
-    private void parseOrderColumn(VoltXMLElement orderByNode, ParsedSelectStmt firstSelectChild) {
+    private void parseOrderColumn(VoltXMLElement orderByNode, ParsedSelectStmt leftmostSelectChild) {
 
         ParsedColInfo.ExpressionAdjuster adjuster = new ParsedColInfo.ExpressionAdjuster() {
             @Override
@@ -192,8 +192,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
         };
         // Get the display columns from the first child
-        List<ParsedColInfo> displayColumns = firstSelectChild.orderByColumns();
-        ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(firstSelectChild, orderByNode, adjuster);
+        List<ParsedColInfo> displayColumns = leftmostSelectChild.orderByColumns();
+        ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(leftmostSelectChild, orderByNode, adjuster);
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
@@ -219,17 +219,17 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     /**
-     * Return the first child SELECT statement
+     * Return the leftmost child SELECT statement
      * @return ParsedSelectStmt
      */
-    private ParsedSelectStmt getFirstSelectStmt() {
+    private ParsedSelectStmt getLeftmostSelectStmt() {
         assert (!m_children.isEmpty());
         AbstractParsedStmt firstChild = m_children.get(0);
         if (firstChild instanceof ParsedSelectStmt) {
             return (ParsedSelectStmt) firstChild;
         } else {
             assert(firstChild instanceof ParsedUnionStmt);
-            return ((ParsedUnionStmt)firstChild).getFirstSelectStmt();
+            return ((ParsedUnionStmt)firstChild).getLeftmostSelectStmt();
         }
     }
 

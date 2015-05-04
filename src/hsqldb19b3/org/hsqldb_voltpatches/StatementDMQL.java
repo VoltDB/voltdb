@@ -998,7 +998,6 @@ public abstract class StatementDMQL extends Statement {
     }
 
     /**
-     * @TODO Is there a better way to extract the display column - not a member of QuerySpecification?
      * Return a list of the display columns for the left most statement from a set op
      * @return
      */

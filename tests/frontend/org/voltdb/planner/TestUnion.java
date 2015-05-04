@@ -421,6 +421,18 @@ public class TestUnion extends PlannerTestCase {
         checkLimitNode(pn, 3, 2);
     }
 
+    public void testUnionOrderByLimitParams() {
+        AbstractPlanNode pn = compile(
+                "select C from T3 where C = ? UNION select B from T2 order by C limit ? offset ?");
+        String[] columnNames = {"C"};
+        pn = pn.getChild(0);
+        checkOrderByNode(pn, columnNames);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+        assert (pn instanceof LimitPlanNode);
+        assertTrue(pn.toExplainPlanString().contains("LIMIT with parameter"));
+    }
+
     private void checkOrderByNode(AbstractPlanNode pn, String columns[]) {
         assertTrue(pn != null);
         assertTrue(pn instanceof OrderByPlanNode);
@@ -432,7 +444,6 @@ public class TestUnion extends PlannerTestCase {
     }
 
     private void checkLimitNode(AbstractPlanNode pn, int limit, int offset) {
-        assertTrue(pn != null);
         assertTrue(pn instanceof LimitPlanNode);
         LimitPlanNode lpn = (LimitPlanNode) pn;
         assertEquals(limit, lpn.getLimit());

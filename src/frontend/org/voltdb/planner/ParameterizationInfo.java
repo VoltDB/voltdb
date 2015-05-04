@@ -81,8 +81,8 @@ class ParameterizationInfo {
                                     List<String> paramValues) {
         List<VoltXMLElement> unionChildren = null;
         if (parameterizedXmlSQL.name.equals("union")) {
-            // UNION may have its own parameters (limit/offset) and on the individual selects levels
-            // Process children parameters first
+            // Set ops may may have their own nodes to parameterize (limit/offset)
+            // in addition to children's nodes. Process children  first
             unionChildren = new ArrayList<VoltXMLElement>();
             Iterator<VoltXMLElement> iter = parameterizedXmlSQL.children.iterator();
             while (iter.hasNext()) {
@@ -95,7 +95,7 @@ class ParameterizationInfo {
                 }
             }
         }
-        // Process itself
+        // Parameterize itself
         parameterizeItself(parameterizedXmlSQL, idToParamIndexMap, paramValues);
         if (unionChildren != null) {
             // Add union children back
