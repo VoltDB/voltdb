@@ -739,6 +739,8 @@ var loadPage = function (serverName, portid) {
                                         $("#ChartDrReplicationRate").show();
                                     }
                                     refreshDrReplicaSection(graphView, currentTab);
+                                    $("#drSection").removeClass("drHeightBoth");
+                                    $("#drSection").removeClass("drHeightIndividual");
                                     //to show DR Mode and DR tables
                                     if (VoltDbUI.drMasterEnabled) {
                                         $("#drSection").addClass("drHeightBoth");
@@ -746,6 +748,7 @@ var loadPage = function (serverName, portid) {
                                         $('#drMasterSection').css('display', 'block');
                                     } else {
                                         $("#dbDrMode").text("Replica");
+
                                         $("#drSection").addClass("drHeightIndividual");
                                         $('#drMasterSection').css('display', 'none');
                                     }
