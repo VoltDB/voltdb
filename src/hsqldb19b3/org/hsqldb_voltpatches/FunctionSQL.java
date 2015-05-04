@@ -1917,11 +1917,19 @@ public class FunctionSQL extends Expression {
                     .append(Tokens.T_FROM).append(' ')                   //
                     .append(nodes[2].getSQL());
 
+    // A VoltDB extension to control SQL functions,
+    // their types and whether they are implemented in VoltDB.
+                if (nodes.length > 3)
+    // End VoltDB extension
                 if (nodes[3] != null) {
                     sb.append(' ').append(Tokens.T_FOR).append(' ').append(
                         nodes[3].getSQL());
                 }
 
+    // A VoltDB extension to control SQL functions,
+    // their types and whether they are implemented in VoltDB.
+                if (nodes.length > 4)
+    // End VoltDB extension
                 if (nodes[4] != null) {
                     if (Boolean.TRUE.equals(nodes[4].valueData)) {
                         sb.append(' ').append(Tokens.T_USING).append(
