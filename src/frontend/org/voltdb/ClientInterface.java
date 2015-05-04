@@ -1287,10 +1287,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Tell the clientInterface about a connection adapter.
      */
-    public void bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
-        m_cihm.put(adapter.connectionId(),
-                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
-                    AdmissionControlGroup.getDummy()));
+    public ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
+        if (m_cihm.get(adapter.connectionId()) == null) {
+            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
+                        AdmissionControlGroup.getDummy());
+            m_cihm.put(adapter.connectionId(), cihm);
+        }
+        return m_cihm.get(adapter.connectionId());
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID

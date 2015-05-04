@@ -28,7 +28,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import static org.voltdb.ClientInterface.getPartitionForProcedure;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
@@ -39,6 +38,7 @@ import org.voltdb.importer.ImportContext.Format;
 
 /**
  * This class packs the parameters and dispatches the transactions.
+ * Make sure responses over network thread does not touch this class.
  * @author akhanzode
  */
 public class ImportHandler {
@@ -48,76 +48,49 @@ public class ImportHandler {
     // Atomically allows the catalog reference to change between access
     private final CatalogContext m_catalogContext;
     private final AtomicLong m_failedCount = new AtomicLong();
-    private final AtomicLong m_successCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final AtomicLong m_unpartitionedCount = new AtomicLong();
-    private final AtomicLong m_callCount = new AtomicLong();
     private final List<Integer> m_partitions;
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
-    private static final ImportClientResponseAdapter m_adapter =
-            new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer", false);
-    private final static AtomicLong m_idGenerator = new AtomicLong(0);
-    private final long m_id;
-    private final AtomicLong m_pendingCount = new AtomicLong(0);
+    private boolean m_stopped = false;
+
+    private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
+
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
     private static final CSVParser m_csvParser = new CSVParser();
-
-    private class ImportCallback implements ImportClientResponseAdapter.Callback {
-
-        final BBContainer m_cont;
-
-        public ImportCallback(final BBContainer cont) {
-            m_cont = cont;
-        }
-        @Override
-        public void handleResponse(ClientResponse response) {
-            m_cont.discard();
-            m_pendingCount.decrementAndGet();
-            if (response.getStatus() == ClientResponse.SUCCESS) {
-                m_successCount.incrementAndGet();
-            } else {
-                m_failedCount.incrementAndGet();
-            }
-        }
-
-    }
 
     // The real handler gets created for each importer.
     public ImportHandler(ImportContext importContext, CatalogContext catContext, List<Integer> partitions) {
         m_catalogContext = catContext;
         m_partitions = partitions;
 
-        m_id = m_idGenerator.incrementAndGet();
-
         //Need 2 threads one for data processing and one for stop.
-        m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + System.currentTimeMillis(), 2);
+        m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
         VoltDB.instance().getClientInterface().bindAdapter(m_adapter, null);
-    }
-
-    public long getId() {
-        return m_id;
     }
 
     /**
      * Submit ready for data
      */
     public void readyForData() {
-        m_adapter.registerHandler(this);
         m_es.submit(new Runnable() {
             @Override
             public void run() {
                 m_logger.info("Importer ready importing data for: " + m_importContext.getName());
-                m_importContext.readyForData();
+                try {
+                    m_importContext.readyForData();
+                } catch (Throwable t) {
+                    m_logger.error("ImportContext stopped with following exception", t);
+                }
                 m_logger.info("Importer finished importing data for: " + m_importContext.getName());
             }
         });
     }
 
     public void stop() {
-        //Unregister the handler to stop procesing responses.
-        m_adapter.unregisterHandler(this);
+        m_stopped = true;
         m_es.submit(new Runnable() {
 
             @Override
@@ -133,7 +106,7 @@ public class ImportHandler {
         try {
             m_es.shutdown();
             m_es.awaitTermination(1, TimeUnit.DAYS);
-        } catch (InterruptedException ex) {
+        } catch (Exception ex) {
             m_logger.warn("Importer did not stop gracefully.", ex);
         }
     }
@@ -154,7 +127,7 @@ public class ImportHandler {
      * @return list of objects to be passed to the callProcedure.
      * @throws IOException
      */
-    public List<Object> decodeParameters(Format format, String data) throws IOException {
+    public static List<Object> decodeParameters(Format format, String data) throws IOException {
         switch (format) {
             case CSV:
                 return m_csvParser.parseLineList(data);
@@ -167,8 +140,8 @@ public class ImportHandler {
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED) {
-            m_logger.warn("Can not invoke procedure from streaming interface when server is paused.");
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
+            m_logger.warn("Can not invoke procedure from streaming interface when server is paused or updating catalog.");
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -184,25 +157,28 @@ public class ImportHandler {
         }
         int counter = 1;
         int maxSleepNano = 100000;
-        while (m_pendingCount.get() > MAX_PENDING_TRANSACTIONS) {
+        while (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS) {
             try {
                 int nanos = 500 * counter++;
                 Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
+                if (m_stopped) {
+                    return false;
+                }
             } catch (InterruptedException ex) { }
         }
-        m_callCount.incrementAndGet();
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
         //type + procname(len + name) + connectionId (long) + params
         int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
+        //This is released in callback from adapter side.
         final BBContainer tcont = getBuffer(sz);
         final ByteBuffer taskbuf = tcont.b();
         try {
             taskbuf.put((byte )ProcedureInvocationType.ORIGINAL.getValue());
             taskbuf.putInt((int )proc.length());
             taskbuf.put(proc.getBytes());
-            taskbuf.putLong(ImportHandler.m_adapter.connectionId());
+            taskbuf.putLong(m_adapter.connectionId());
             pset.flattenToBuffer(taskbuf);
             taskbuf.flip();
             task.initFromBuffer(taskbuf);
@@ -234,21 +210,18 @@ public class ImportHandler {
                 return false;
             }
         }
-        long cbhandle = m_adapter.registerCallback(new ImportCallback(tcont));
-        task.setClientHandle(cbhandle);
+
         boolean success;
         //Synchronize this to create good handles across all ImportHandlers
         synchronized(ImportHandler.class) {
-            //Submmit the transaction.
-             success = VoltDB.instance().getClientInterface().createTransaction(m_adapter.connectionId(), task,
-                    catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
-                    task.getSerializedSize(), nowNanos);
+            success = m_adapter.createTransaction(catProc, task, tcont, partition, nowNanos);
         }
         if (!success) {
             tcont.discard();
+            m_failedCount.incrementAndGet();
+        } else {
+            m_submitSuccessCount.incrementAndGet();
         }
-        m_pendingCount.incrementAndGet();
-        m_submitSuccessCount.incrementAndGet();
         return success;
     }
 

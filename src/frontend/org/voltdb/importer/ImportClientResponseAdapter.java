@@ -18,13 +18,10 @@
 package org.voltdb.importer;
 
 import org.voltdb.*;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.Pair;
 import org.voltdb.client.ClientResponse;
 
 import java.io.IOException;
@@ -35,6 +32,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import org.voltcore.utils.DBBPool;
+import org.voltdb.catalog.Procedure;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses. It calls
@@ -48,9 +47,52 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
-    private final Map<Long, ImportHandler> m_handlers = new HashMap<Long, ImportHandler>();
-    private final boolean m_leaveCallback;
-    private boolean m_stopped = false;
+    private final Map<Long, ImportCallback> m_pendingCallbacks = Collections.synchronizedMap(new HashMap<Long, ImportCallback>());
+
+    private class ImportCallback implements Callback {
+
+        private DBBPool.BBContainer m_cont;
+        private Long m_id;
+        public ImportCallback(final DBBPool.BBContainer cont) {
+            m_cont = cont;
+        }
+
+        public void setId(Long id) {
+            m_id = id;
+        }
+
+        public synchronized void discard() {
+            if (m_cont != null) {
+                m_cont.discard();
+                m_cont = null;
+            }
+        }
+
+        @Override
+        public void handleResponse(ClientResponse response) {
+            discard();
+            m_pendingCallbacks.remove(m_id);
+        }
+
+    }
+
+    public long getPendingCount() {
+        return m_pendingCallbacks.size();
+    }
+
+    public boolean createTransaction(Procedure catProc, StoredProcedureInvocation task,
+            DBBPool.BBContainer tcont, int partition, long nowNanos) {
+            ImportCallback cb = new ImportCallback(tcont);
+            long cbhandle = registerCallback(cb);
+            cb.setId(cbhandle);
+            task.setClientHandle(cbhandle);
+            m_pendingCallbacks.put(cbhandle, cb);
+
+            //Submmit the transaction.
+            return VoltDB.instance().getClientInterface().createTransaction(connectionId(), task,
+                    catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
+                    task.getSerializedSize(), nowNanos);
+    }
 
     /**
      * @param connectionId    The connection ID for this adapter, needs to be unique for this
@@ -58,41 +100,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      * @param name            Human readable name identifying the adapter, will stand in for hostname
      */
     public ImportClientResponseAdapter(long connectionId, String name) {
-        this(connectionId, name, false);
-    }
-
-
-    /**
-     * @param connectionId    The connection ID for this adapter, needs to be unique for this
-     *                        node.
-     * @param name            Human readable name identifying the adapter, will stand in for hostname
-     * @param leaveCallback   Don't remove callbacks when invoking them, they are reused
-     */
-    public ImportClientResponseAdapter(long connectionId, String name, boolean leaveCallback) {
         m_connectionId = connectionId;
-        m_leaveCallback = leaveCallback;
-    }
-
-    //None of the values matter (other than the future) just using this as a shortcut to collect stats internally
-    public ImportClientResponseAdapter(SettableFuture<ClientResponseImpl> fut) {
-        m_leaveCallback = false;
-        m_connectionId = 0;
-    }
-
-    public synchronized void registerHandler(ImportHandler handler) {
-        m_stopped = false;
-        m_handlers.put(handler.getId(), handler);
-    }
-
-    public void unregisterHandler(ImportHandler handler) {
-        m_stopped = true;
-        m_handlers.remove(handler.getId());
-    }
-
-    public static
-        Pair<ImportClientResponseAdapter, ListenableFuture<ClientResponseImpl>>  getAsListenableFuture() {
-        final SettableFuture<ClientResponseImpl> fut = SettableFuture.create();
-        return Pair.of(new ImportClientResponseAdapter(fut), (ListenableFuture<ClientResponseImpl>)fut);
     }
 
     public void registerCallback(long handle, Callback c) {
@@ -115,9 +123,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     @Override
     public boolean hadBackPressure() {
         //TODO: Notify of backpressure for the ImportHandler
-        for (ImportHandler handler : m_handlers.values()) {
-            handler.hadBackPressure();
-        }
         return true;
     }
 
@@ -128,9 +133,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void enqueue(DeferredSerialization ds) {
-        if (m_stopped) {
-            return;
-        }
         try {
             ByteBuffer buf = null;
             synchronized(this) {
@@ -152,11 +154,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             resp.initFromBuffer(b);
 
             Callback callback = null;
-            if (m_leaveCallback) {
-                callback = m_callbacks.get(resp.getClientHandle());
-            } else {
-                callback = m_callbacks.remove(resp.getClientHandle());
-            }
+            callback = m_callbacks.remove(resp.getClientHandle());
             if (callback != null) {
                 callback.handleResponse(resp);
             }
