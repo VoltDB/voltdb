@@ -298,17 +298,9 @@ private:
 
 ExecutorVector::~ExecutorVector()
 {
-    // We could avoid having call delete here if we stored an instance in the
-    // map, rather than a pointer to it?
-    //
-    // Also, why do we need to call erase here?
-    std::map<int, std::vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.begin();
-    while (it != m_subplanExecListMap.end()) {
-        std::vector<AbstractExecutor*>* executorList = it->second;
-        // Note: we need to increment the iterator here
-        // to avoid invalidating it.
-        m_subplanExecListMap.erase(it++);
-        delete executorList;
+    typedef  std::map<int, std::vector<AbstractExecutor*>*>::value_type MapEntry;
+    BOOST_FOREACH(MapEntry &entry, m_subplanExecListMap) {
+        delete entry.second;
     }
 }
 

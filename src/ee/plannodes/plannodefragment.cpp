@@ -46,6 +46,9 @@
 #include <stdexcept>
 #include <sstream>
 #include <memory>
+
+#include <boost/foreach.hpp>
+
 #include "common/FatalException.hpp"
 #include "plannodefragment.h"
 #include "catalog/catalog.h"
@@ -89,17 +92,9 @@ void PlanNodeFragment::constructTree(AbstractPlanNode* node)
 
 PlanNodeFragment::~PlanNodeFragment()
 {
-    // The need to delete this could be avoided just by storing
-    // an actual instance (instead of a pointer) in the map?
-    //
-    // Also, why is the call to erase needed below?
-    PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin();
-    while (mapIt != m_stmtExecutionListMap.end()) {
-        std::vector<AbstractPlanNode*>* execList = mapIt->second;
-        // Note: we need to increment the iterator to avoid
-        // invalidating it in the call to erase.
-        m_stmtExecutionListMap.erase(mapIt++);
-        delete execList;
+    typedef  std::map<int, std::vector<AbstractPlanNode*>* >::value_type MapEntry;
+    BOOST_FOREACH(MapEntry& entry, m_stmtExecutionListMap) {
+        delete entry.second;
     }
 
     std::map<CatalogId, AbstractPlanNode*>::iterator it = m_idToNodeMap.begin();
