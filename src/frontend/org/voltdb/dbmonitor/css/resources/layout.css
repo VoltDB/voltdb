@@ -3138,7 +3138,9 @@ ul.drList {
 }
 
 .drContent {
-    background: #FFFFFF;
+        background: #FFFFFF;
+        overflow: auto;
+        width: 100%;
 }
 
     .drContent table td {
@@ -3333,6 +3335,12 @@ a:hover.changePsd {
 }
 
 /*********************************************media Qu********************/
+@media (max-width: 360px) {
+    .headerAdminContent {  height: 65px;}
+    .drAdminHeaderRight { float: none;}
+    ul.drList li { margin-left: 0;}
+
+}
 @media (max-width: 479px) {
     .serverStat {
         float: none;
