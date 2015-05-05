@@ -373,10 +373,7 @@ public class FunctionSQL extends Expression {
 
             case FUNC_MOD :
                 name      = Tokens.T_MOD;
-                parseList = singleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // End of VoltDB extension
+                parseList = doubleParamList;
                 break;
 
             case FUNC_LN :
@@ -826,13 +823,12 @@ public class FunctionSQL extends Expression {
                 // non-integral arguments are accepted with conversion
 
                 /** @todo - check if widening has an effect */
+                // A VoltDB extension to customize the SQL function set support
                 Object value =
-                    ((NumberType) nodes[0].dataType).divide(nodes[0],
-                        nodes[1]);
-
-                value = ((NumberType) nodes[0].dataType).subtract(nodes[0],
-                        value, nodes[1].dataType);
-
+                        ((NumberType) nodes[0].dataType).mod(data[0],
+                                data[1]);
+                // End of VoltDB extension
+                
                 // result type is the same as argList[1]
                 return ((NumberType) dataType).convertToTypeLimits(session,
                         value);
@@ -1358,6 +1354,11 @@ public class FunctionSQL extends Expression {
                         || !nodes[1].dataType.isNumberType()) {
                     throw Error.error(ErrorCode.X_42565);
                 }
+                // A VoltDB extension
+                if (!nodes[0].dataType.isIntegralType() || !nodes[1].dataType.isIntegralType()) {
+                    throw new RuntimeException("unsupported non-integral type for SQL MOD function");
+                }
+                // End of VoltDB extension
 
                 nodes[0].dataType =
                     ((NumberType) nodes[0].dataType).getIntegralType();
