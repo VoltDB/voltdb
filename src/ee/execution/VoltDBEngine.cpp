@@ -667,7 +667,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     }
 
     int64_t tuplesModified = m_tuplesModifiedStack.top();
-    m_tuplesModifiedStack.pop();
     resetExecutionMetadata();
 
     // assume this is sendless dml
@@ -700,6 +699,12 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 }
 
 void VoltDBEngine::resetExecutionMetadata() {
+
+    if (m_tuplesModifiedStack.size() != 0) {
+        m_tuplesModifiedStack.pop();
+    }
+    assert (m_tuplesModifiedStack.size() == 0);
+
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
     if (m_currExecutorVec == NULL) {
