@@ -214,7 +214,8 @@ public class AdHocCompilerCache implements Serializable {
     public synchronized void put(String sql,
                                  String parsedToken,
                                  AdHocPlannedStatement planIn,
-                                 String[] extractedLiterals)
+                                 String[] extractedLiterals,
+                                 boolean hasUserQuestionMark)
     {
         assert(sql != null);
         assert(parsedToken != null);
@@ -262,13 +263,15 @@ public class AdHocCompilerCache implements Serializable {
         }
 
         // then deal with the
-        AdHocPlannedStatement cachedPlan = m_literalCache.get(sql);
-        if (cachedPlan == null) {
-            m_literalCache.put(sql, plan);
-            ++m_literalInsertions;
-        }
-        else {
-            assert(cachedPlan.equals(plan));
+        if (! hasUserQuestionMark) {
+            AdHocPlannedStatement cachedPlan = m_literalCache.get(sql);
+            if (cachedPlan == null) {
+                m_literalCache.put(sql, plan);
+                ++m_literalInsertions;
+            }
+            else {
+                assert(cachedPlan.equals(plan));
+            }
         }
     }
 

@@ -103,14 +103,15 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         PartitioningForStatement infer = PartitioningForStatement.inferPartitioning();
-        return planSql(sqlIn, infer);
+        return planSql(sqlIn, infer, null);
     }
 
-    AdHocPlannedStatement planSql(String sqlIn, PartitioningForStatement partitioning) {
+    AdHocPlannedStatement planSql(String sqlIn, PartitioningForStatement partitioning, final Object[] userParams) {
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
         }
+        boolean hasUserQuestionMark = userParams != null;
         try {
             if ((sqlIn == null) || (sqlIn.length() == 0)) {
                 throw new RuntimeException("Can't plan empty or null SQL.");
@@ -178,12 +179,15 @@ public class PlannerTool {
                         if (matched != null) {
                             CorePlan core = matched.core;
                             ParameterSet params = planner.extractedParamValues(core.parameterTypes);
+                            if (hasUserQuestionMark) {
+                                params = ParameterSet.fromArrayNoCopy(userParams);;
+                            }
                             AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
                                                                                    null);
                             ahps.setBoundConstants(matched.constants);
-                            m_cache.put(sql, parsedToken, ahps, extractedLiterals);
+                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark);
                             cacheUse = CacheUse.HIT2;
                             return ahps;
                         }
@@ -208,23 +212,14 @@ public class PlannerTool {
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
             if (partitioning.isInferred()) {
-                if (planner.compiledAsParameterizedPlan()) {
-                    assert(parsedToken != null);
-                    // Note the parameter index of the partitioning key, so that the actual
-                    // parameter value can vary with each invocation.
-                    // It may default to -1 if single partitioning is not possible or for replicated DML.
-                    core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
+                // Note either the parameter index (per force to a user-provided parameter) or
+                // the actual constant value of the partitioning key inferred from the plan.
+                // Either or both of these two values may simply default
+                // to -1 and to null, respectively.
+                core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
+                core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
 
-                    // Again, plans with inferred partitioning are the only ones supported in the cache.
-                    m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals);
-                } else {
-                    // Note either the parameter index (per force to a user-provided parameter) or
-                    // the actual constant value of the partitioning key inferred from the plan.
-                    // Either or both of these two values may simply default
-                    // to -1 and to null, respectively.
-                    core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
-                    core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
-                }
+                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark);
             }
             return ahps;
         }
