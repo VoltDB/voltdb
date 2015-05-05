@@ -31,15 +31,8 @@ import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogType;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.ConnectorProperty;
-import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
@@ -319,7 +312,7 @@ public class CatalogDiffEngine {
      *   LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
      * constraint.
      */
-    static private boolean isTableLimitDeleteStmt(final CatalogType catType) {
+    static protected boolean isTableLimitDeleteStmt(final CatalogType catType) {
         if (catType instanceof Statement && catType.getParent() instanceof Table)
             return true;
         return false;
@@ -348,7 +341,7 @@ public class CatalogDiffEngine {
      * a non-empty table. There will be a subsequent check for empty table
      * feasability.
      */
-    private String checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType)
+    protected String checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType)
     {
         //Will catch several things that are actually just deployment changes, but don't care
         //to be more specific at this point
@@ -513,7 +506,7 @@ public class CatalogDiffEngine {
      * String 1 is name of a table if the change could be made if the table of that name had no tuples.
      * String 2 is the error message to show the user if that table isn't empty.
      */
-    private String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
+    protected String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
         String[] retval = new String[2];
 
         // handle adding an index - presumably unique
@@ -603,7 +596,7 @@ public class CatalogDiffEngine {
      * can be given if it turns out we really can't make the change.
      * Return "" if the error has already been handled.
      */
-    private String checkModifyWhitelist(final CatalogType suspect,
+    protected String checkModifyWhitelist(final CatalogType suspect,
                                         final CatalogType prevType,
                                         final String field)
     {

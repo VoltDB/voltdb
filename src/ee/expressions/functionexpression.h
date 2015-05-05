@@ -244,6 +244,7 @@ static const int FUNC_VOLT_BITNOT                      = 20026;
 static const int FUNC_VOLT_BIT_SHIFT_LEFT              = 20027;
 static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
 static const int FUNC_VOLT_HEX                         = 20029;
+static const int FUNC_VOLT_BIN                         = 20030;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions
