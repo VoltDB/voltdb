@@ -50,14 +50,12 @@ SubqueryExpression::SubqueryExpression(
 
 SubqueryExpression::~SubqueryExpression()
 {
-    // This is curious: m_tveParams is a shared_ptr to
-    // a std::vector, but we're deleting values from it here.
-    //
-    // This suggests that we're the sole owner of this vector.
-    // Why not just use a scoped_ptr or non-pointer member vector?
     if (m_tveParams.get() != NULL) {
+        // When we support C++11, we should store unique_ptrs
+        // in this vector so cleanup happens automatically.
         size_t i = m_tveParams->size();
         while (i--) {
+
             delete (*m_tveParams)[i];
         }
     }
