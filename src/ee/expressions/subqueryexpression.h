@@ -20,7 +20,7 @@
 
 #include "expressions/abstractexpression.h"
 
-#include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include <vector>
 
@@ -60,7 +60,7 @@ class SubqueryExpression : public AbstractExpression {
     std::vector<int> m_otherParamIdxs;
 
     // The list of the corresponding TVE for each parameter index
-    boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
+    boost::scoped_ptr<const std::vector<AbstractExpression*> > m_tveParams;
 };
 
 }
