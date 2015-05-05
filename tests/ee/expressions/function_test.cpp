@@ -130,14 +130,21 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(getSomeValue(input));
     argument->push_back(const_val_exp);
     AbstractExpression* bin_exp = ExpressionUtil::functionFactory(operation, argument);
-    NValue answer = bin_exp->eval();
-    NValue expected = getSomeValue(output);
     int cmpout;
-    if (expect_null) {
-        // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
-        cmpout = answer.isNull() ? 0 : 1;
-    } else {
-        cmpout = answer.compare(expected);
+    NValue expected = getSomeValue(output);
+    NValue answer;
+    try {
+        answer = bin_exp->eval();
+        if (expect_null) {
+            // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
+            cmpout = answer.isNull() ? 0 : 1;
+        } else {
+            cmpout = answer.compare(expected);
+        }
+    } catch (SQLException &ex) {
+        delete bin_exp;
+        expected.free();
+        throw;
     }
     if (staticVerboseFlag) {
         std::cout << "input: " << std::hex << input
@@ -145,8 +152,6 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
                   << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
                   << ", comp:     " << std::dec << cmpout << "\n";
     }
-    delete bin_exp;
-    expected.free();
     return cmpout;
 }
 /**
@@ -166,22 +171,27 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
 
     NValue expected = getSomeValue(output);
     AbstractExpression* bin_exp = ExpressionUtil::functionFactory(operation, argument);
-    NValue answer = bin_exp->eval();
     int cmpout;
-    if (expect_null) {
-        // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
-        cmpout = answer.isNull() ? 0 : 1;
-    } else {
-        cmpout = answer.compare(expected);
+    NValue answer;
+    try {
+        answer = bin_exp->eval();
+        if (expect_null) {
+            // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
+            cmpout = answer.isNull() ? 0 : 1;
+        } else {
+            cmpout = answer.compare(expected);
+        }
+        if (staticVerboseFlag) {
+            std::cout << std::hex << "input: test(" << linput << ", " << rinput << ")"
+                      << ", answer: \"" << answer.debug() << "\""
+                      << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
+                      << ", comp:     " << std::dec << cmpout << "\n";
+        }
+    } catch (SQLException &ex) {
+        expected.free();
+        delete bin_exp;
+        throw;
     }
-    if (staticVerboseFlag) {
-        std::cout << std::hex << "input: test(" << linput << ", " << rinput << ")"
-                  << ", answer: \"" << answer.debug() << "\""
-                  << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
-                  << ", comp:     " << std::dec << cmpout << "\n";
-    }
-    expected.free();
-    delete bin_exp;
     return cmpout;
 }
 
