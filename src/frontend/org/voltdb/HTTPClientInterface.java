@@ -234,7 +234,7 @@ public class HTTPClientInterface {
         }
     }
 
-    private AuthenticationResult getAuthenticationResult(Request request) {
+    private synchronized AuthenticationResult getAuthenticationResult(Request request) {
         boolean adminMode = false;
 
         String username = null;
