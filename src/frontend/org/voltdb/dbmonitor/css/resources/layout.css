@@ -824,7 +824,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
     padding: 15px 15px 15px 28px;
     font-size: 13px;
     font-weight: bold;
-    width: 200px;
+    width: 194px;
 }
 
 .icon-procedures {
@@ -3241,6 +3241,12 @@ tr.drSubSection td {
     border-right: none !important;
     border-top: none !important;
 }
+#tblDrReplica {
+    
+    border-bottom: none !important;
+    border-right: none !important;
+    border-top: none !important;
+}
 
 .drHeightBoth {
     min-height: 360px;
@@ -3338,7 +3344,7 @@ a:hover.changePsd {
     }
 
     .displayPre {
-        height: 100px;
+        height: 115px;
     }
 
     ul.rightShowhideList {
@@ -3648,6 +3654,7 @@ a:hover.changePsd {
 
     table.dataTable {
         top: 0 !important;
+        z-index: 1;
     }
 
     .replicaWrapper {
@@ -3729,7 +3736,7 @@ a:hover.changePsd {
     }
 
     .partitionHeight {
-        height: 350px;
+        height: 300px;
         margin-top: 30px;
     }
 
@@ -3957,6 +3964,7 @@ a:hover.changePsd {
     .partitionHeight {
         height: 310px;
     }
+    .drScroll { overflow: visible!important;}
 }
 
 @media screen and (orientation:landscape) {

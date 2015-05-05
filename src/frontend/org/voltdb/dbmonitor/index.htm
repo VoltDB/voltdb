@@ -45,7 +45,6 @@
     <script src="js/jquery.dataTables.js"></script>
     <script src="js/jqueryDatatablePlugins.js"></script>
 
-
 </head>
 <body>
     <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
@@ -116,7 +115,6 @@
                             <div class="clear"></div>
                         </div>
                         <div class="clear"></div>
-
                         <!-- Server List popup-->
                         <div id="popServerList" style="display: none;">
                             <div class="slide-pop-wrapper">
@@ -290,7 +288,6 @@
                             </div>
                         </div>
                     </div>
-
                     <div class="drWrapper" id="divDrReplication" style="display:none">
                         <div class="content drHeader" id="drHeader">
                             <div class="leftShowhide">
@@ -305,7 +302,6 @@
                                     <li>Mode</li>
                                     <li id="dbDrMode" class="drArrow">Master</li>
                                 </ul>
-
                                 <ul class="drList">
                                     <!-- <li>State</li>
                                      <li class="drArrow">On</li>-->
@@ -315,8 +311,6 @@
                                         </a>
                                     </li>
                                 </ul>
-
-
 
                                 <div class="clear"></div>
                             </div>
@@ -332,14 +326,12 @@
                                     </div>
                                     <div class="clear"></div>
 
-
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
                                         <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                     </div>
-
-                                    <div class="tblScroll">
+                                    <div class="drMasterContainer">
                                         <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">
                                             <thead>
                                                 <tr role="row">
@@ -350,15 +342,12 @@
                                                     <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>
                                                     <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>
                                                 </tr>
-
                                             </thead>
                                             <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
                                         </table>
                                     </div>
                                 </div>
-
                             </div>
-
 
                             <div id="drReplicaSection" class="replicaWrapper" style="display:block">
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
@@ -369,14 +358,12 @@
                                     </div>
                                     <div class="clear"></div>
 
-
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
                                         <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                     </div>
-
-                                    <div class="tblScroll">
+                                    <div class="drReplicaContainer">
                                         <table width="100%" border="0" cellspacing="0" id="tblDrReplica" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">
                                             <thead>
                                                 <tr>
@@ -385,7 +372,6 @@
                                                     <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>
                                                     <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>
                                                 </tr>
-
                                             </thead>
                                             <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
                                         </table>
@@ -395,22 +381,16 @@
                         </div>
 
 
-
-
                     </div>
-
                 </div>
             </div>
-
             <!--Admin-->
-
             <div id="admin" class="container contents">
                 <!-- Loading -->
                 <div id="adminActionOverlay" style="display: none;">
                     <div class="loading"></div>
                 </div>
                 <!-- Loading -->
-
                 <div class="adminWrapper">
                     <div class="adminLeft">
                         <h1 class="headText clusterIcon">Cluster</h1>
@@ -422,7 +402,6 @@
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
-
 
                         </div>
                         <div class="clear"></div>
@@ -504,7 +483,6 @@
                                         <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a>
                                     </td>
                                 </tr>
-
                                 <tr class="child-row-6 subLabelRow">
                                     <td colspan="4">
                                         <div id="loadingUserList" class="userSecurity" style="display: none;">
@@ -530,13 +508,11 @@
                                             <div class="clear secLine"></div>
                                             <form id="frmUserList" method="get" action="">
                                                 <div id="editUserList">
-
                                                 </div>
                                             </form>
                                         </div>
                                     </td>
                                 </tr>
-
                                 <tr class="hasSubLabel parent" id="row-1">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">HTTP Access</a></td>
                                     <td align="right">
@@ -716,7 +692,6 @@
                                 </tr>
                             </table>
                         </div>
-
                         <div class="drWrapperAdmin" id="divDrWrapperAdmin" style="display:none">
                             <div class="headerAdminContent">
                                 <h1>
@@ -750,7 +725,6 @@
                                         <td width="16%">&nbsp;</td>
                                     </tr>
                                     <tr id="row-DrConfig">
-
                                         <td class="configLabel">Master</td>
                                         <td align="right" class="tdDrConfig">
                                             <div id="drMasterIcon" class="offIcon"></div>
@@ -764,7 +738,6 @@
                                             <a href="javascript:void(0);" id="drMasterEdit" class="edit" title="Edit">&nbsp;</a>
                                         </td>
                                     </tr>
-
                                     <tr>
                                         <td class="configLabel">Replica <span id="replicaSource" style="font-weight:normal"></span></td>
                                         <td align="right">
@@ -775,7 +748,6 @@
                                         <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
                                         <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
-
                                     <!--<tr class="child-row-8 subLabelRow" id="Tr1">
                                         <td class="configLabel">Source </td>
                                         <td align="right" class="">
@@ -786,12 +758,9 @@
                                         <td>&nbsp;</td>
                                         <td>&nbsp;</td>
                                     </tr>-->
-
                                 </table>
-
                             </div>
                         </div>
-
                     </div>
                     <div class="adminContentRight">
                         <div class="adminPorts">
@@ -871,7 +840,6 @@
                     <div class="clear"></div>
                 </div>
             </div>
-
             <!--Schema Tab-->
             <div id="schema" class="contents">
             </div>
@@ -1018,9 +986,7 @@
         </div>
     </div>
     <!-- POPUP Alerts -->
-
     <div style="display: none"><a href="#error" id="errorPopup">Error</a></div>
-
     <!--Error popup-->
     <div id="error" style="display: none">
         <div class="overlay-title errorIcon ">Error</div>
@@ -1172,7 +1138,6 @@
                     The configuration overview shows the settings for various database features that are configurable in the deployment file. If a setting is editable on the running cluster,
                     a pencil icon appears to the right of the option. Click on the pencil to edit the setting then click on OK to save and apply your changes.
                 </p>
-
                 <h2 class="help">Network Interfaces &amp; Directories</h2>
                 <p>
                     To the right of the configuration overview is a list of the network interfaces, ports, and directories configured for the cluster. These settings are also settable in the
@@ -1199,7 +1164,6 @@
             </div>
         </div>
     </div>
-
 
     <!--help popup ends-->
     <!-- POPUP shutDownConfirmationPop -->
@@ -1375,21 +1339,16 @@
                                             <!--<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>-->
                                         </td>
                                     </tr>
-
                                 </table>
-
                             </div>
                         </form>
                         <form id="formRestoreSnapshot" method="get" action="">
                             <div class="restoreSnapshot">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList"></table>
-
                             </div>
                             <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>
                         </form>
-
                     </div>
-
                 </div>
                 <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn">Restore</a> <a id="btnRestoreCancel" class="btn btn-gray">Cancel</a></div>
             </div>
@@ -1506,7 +1465,6 @@
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateSnapshotErrorOk">Ok</a></div>
-
             </div>
         </div>
     </div>
@@ -1525,7 +1483,6 @@
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateDrMasterOk">Ok</a></div>
-
             </div>
         </div>
     </div>
@@ -1562,7 +1519,6 @@
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSecurityUserErrorOk">Ok</a></div>
-
             </div>
         </div>
     </div>
@@ -1576,18 +1532,15 @@
         </div>
         <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
     </div>
-
     <!-- POPUP StopServerErrorPopup-->
     <!--Add Configuration Popup-->
     <div id="addConfigPopup" style="display: none">
         <div id="addConfigInnerPopup">
-
             <div class="overlay-title icon-alert">
                 <div id="addConfigHeader" class="addConfigHeader">Add Configuration</div>
                 <div id="deleteAddConfig" class="deleteAddConfig "><a href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this Configuration</a></div>
                 <div class="clear"></div>
             </div>
-
             <div id="addConfigControls">
                 <div class="clear"></div>
                 <form id="formAddConfiguration" method="get" action="" novalidate style="overflow:auto;">
@@ -1597,14 +1550,12 @@
                 <br />
                 <div class="overlay-btns"><a id="btnAddConfigSave" class="btn">Save</a> <a id="btnAddConfigCancel" class="btn btn-gray">Cancel</a></div>
             </div>
-
             <div id="saveConfigConfirmation" style="display: none;">
                 <div class="overlay-content ">
                     <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveConfigText">save</span>?</div>
                 </div>
                 <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
-
         </div>
     </div>
     <!--Add Configuration Popup-->
@@ -1630,38 +1581,31 @@
         </div>
     </div>
     <!-- Query error because of Paused Database Popup-->
-
     <a href="#addUserPopup" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
     <div id="addUserPopup" style="display: none">
         <div id="addUserInnerPopup" data-isupdate="" data-username="" data-role="">
-
             <div class="overlay-title icon-alert">
                 <div id="addUserHeader" class="addConfigHeader">Add User</div>
                 <div id="deleteUser" class="deleteAddConfig"><a id="deleteSecUser" href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this User</a></div>
                 <div class="clear"></div>
             </div>
-
             <div id="addUserControl">
                 <div class="clear"></div>
                 <form id="frmAddUser" method="get" action="" novalidate style="overflow:auto;">
                     <div id="addUserWrapper" class="editUserWrapper">
-
                     </div>
                 </form>
                 <br />
                 <div class="overlay-btns"><a id="btnSaveUser" class="btn">Save</a> <a id="btnCancelUser" class="btn btn-gray">Cancel</a></div>
             </div>
-
             <div id="saveUserControl" style="display: none;">
                 <div class="overlay-content ">
                     <div class="confirmationInfo">Are you sure you want to <span id="userSaveDelete" data-status=""></span>?</div>
                 </div>
                 <div class="overlay-btns"><a id="btnSaveSecUser" class="btn closeBtn">Yes</a> <a id="btnCancelSaveSecUser" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
-
         </div>
     </div>
-
     <!--DR warning POPUP  -->
     <div id="drPartitionWarning" style="display: none">
         <div class="overlay-title"><div class="warninghead"><img src="css/resources/images/Information.png" />Warning</div></div>
@@ -1673,7 +1617,6 @@
                 <div class="clear"></div>
             </div>
         </div>
-
     </div>
     <!-- DR warning POPUP end  -->
     <!-- POPUP DRStatePop -->
@@ -1710,7 +1653,6 @@
     <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
     <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
     <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
-
     <!-- Placed at the end of the document so the pages load faster -->
 </body>
 </html>

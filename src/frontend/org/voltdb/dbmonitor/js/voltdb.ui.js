@@ -1171,7 +1171,7 @@ var loadPage = function (serverName, portid) {
                 "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
                 "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                 "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
-            $("#tblMAster_wrapper").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
+            $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
 
             table = $("#tblDrMAster").DataTable({
                 stateSave: true,
@@ -1201,7 +1201,7 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
-
+            $("#tblDrMAster").wrapAll("<div class='tblScroll drScroll'>");
             $("#tblMAster_wrapper").find(".paginationDefault").remove();
 
 
@@ -1216,7 +1216,7 @@ var loadPage = function (serverName, portid) {
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
 
-            $("#tblDrMAster").next().hide();
+            $(".tblScroll").next().hide();
             $("#tblDrMAster_info").hide();
             $("#tblDrMAster_length").hide();
             //  }
@@ -1255,7 +1255,7 @@ var loadPage = function (serverName, portid) {
             var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Host ID</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
                                                "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
                                         "<tbody>";
-            $("#drReplicaSection").find(".tblScroll").html(content + htmlcontent + "</tbody></table>");
+            $("#drReplicaSection").find(".drReplicaContainer").html(content + htmlcontent + "</tbody></table>");
 
             replicaTable = $("#tblDrReplica").DataTable({
                 stateSave: true,
@@ -1285,7 +1285,7 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
-
+            $("#tblDrReplica").wrapAll("<div class='tblScroll drScroll'>");
             $("#tblReplica_wrapper").find(".paginationDefault").remove();
 
             //  Customizing DataTables to make it as existing pagination
@@ -1300,7 +1300,7 @@ var loadPage = function (serverName, portid) {
             $(".paginate_enabled_previous").attr("title", "Previous Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
 
-            $("#tblDrReplica").next().hide();
+            $(".tblScroll").next().hide();
             $("#tblDrReplica_info").hide();
             $("#tblDrReplica_length").hide();
 
@@ -1745,7 +1745,7 @@ var loadPage = function (serverName, portid) {
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    }, 5000);
+    }, 25000);
 
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
