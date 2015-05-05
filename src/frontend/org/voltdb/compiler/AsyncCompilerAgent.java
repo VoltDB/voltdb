@@ -161,6 +161,19 @@ public class AsyncCompilerAgent {
         // when the batch has one statement.
         PartitioningForStatement partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+
+        // currently on version V4.0.1.x, it does not support multiple AdHoc queries with ? and user parameters
+        // it fails before on the hsqldb planner.
+        // it does not hurt to add a guard here also.
+
+        boolean hasUserInputParamsForAdHoc = false;
+        if (work.userParamSet != null && work.userParamSet.length > 0) {
+            if (work.sqlStatements.length != 1) {
+                throw new RuntimeException("Multiple AdHoc queries with question marks in a procedure call are not supported");
+            }
+            hasUserInputParamsForAdHoc = true;
+        }
+
         for (final String sqlStatement : work.sqlStatements) {
             if (inferSP) {
                 partitioning = PartitioningForStatement.inferPartitioning();
@@ -171,7 +184,8 @@ public class AsyncCompilerAgent {
                 partitioning = PartitioningForStatement.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
+                        hasUserInputParamsForAdHoc? work.userParamSet: null);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
