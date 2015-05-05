@@ -107,19 +107,14 @@ static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
-// Somehow all the std:: prefixes got removed
-// from this file.  Might be good to delete
-// the following line and put them back?
-using namespace std;
-
 namespace voltdb {
 
 // These typedefs prevent confusion in the parsing of BOOST_FOREACH.
-typedef pair<string, CatalogDelegate*> LabeledCD;
-typedef pair<string, catalog::Column*> LabeledColumn;
-typedef pair<string, catalog::Index*> LabeledIndex;
-typedef pair<string, catalog::Table*> LabeledTable;
-typedef pair<string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, CatalogDelegate*> LabeledCD;
+typedef std::pair<std::string, catalog::Column*> LabeledColumn;
+typedef std::pair<std::string, catalog::Index*> LabeledIndex;
+typedef std::pair<std::string, catalog::Table*> LabeledTable;
+typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
 
 /**
  * A list of executors for runtime.
@@ -131,7 +126,7 @@ public:
      * this class from a plan serialized to JSON.
      */
     static boost::shared_ptr<ExecutorVector> fromJsonPlan(VoltDBEngine* engine,
-                                                          const string& jsonPlan,
+                                                          const std::string& jsonPlan,
                                                           int64_t fragId) {
         PlanNodeFragment *pnf = NULL;
         try {
@@ -184,8 +179,8 @@ public:
         for (PlanNodeFragment::PlanNodeMapIterator it = m_fragment->executeListBegin();
              it != m_fragment->executeListEnd(); ++it) {
             assert(it->second != NULL);
-            const vector<AbstractPlanNode*>& planNodeList = *it->second;
-            auto_ptr<vector<AbstractExecutor*> > executorList(new vector<AbstractExecutor*>());
+            const std::vector<AbstractPlanNode*>& planNodeList = *it->second;
+            std::auto_ptr<std::vector<AbstractExecutor*> > executorList(new std::vector<AbstractExecutor*>());
             BOOST_FOREACH (AbstractPlanNode* planNode, planNodeList) {
                 initPlanNode(engine, planNode);
                 executorList->push_back(planNode->getExecutor());
@@ -200,14 +195,14 @@ public:
 
     const TempTableLimits& limits() const { return m_limits; }
 
-    /** Return a string with helpful info about this object. */
-    string debug() const {
-        ostringstream oss;
-        map<int, vector<AbstractExecutor*>* >::const_iterator it;
+    /** Return a std::string with helpful info about this object. */
+    std::string debug() const {
+        std::ostringstream oss;
+        std::map<int, std::vector<AbstractExecutor*>* >::const_iterator it;
         oss << "Fragment ID: " << m_fragId << ", ";
-        oss << "Temp table memory in bytes: " << m_limits.getAllocated() << endl;
+        oss << "Temp table memory in bytes: " << m_limits.getAllocated() << std::endl;
         for (it = m_subplanExecListMap.begin(); it != m_subplanExecListMap.end(); ++it) {
-            vector<AbstractExecutor*>& executorList = *it->second;
+            std::vector<AbstractExecutor*>& executorList = *it->second;
            oss << "Statement id:" << it->first << ", list size: " << executorList.size() << ", ";
             BOOST_FOREACH (AbstractExecutor* ae, executorList) {
                 oss << ae->getPlanNode()->debug(" ") << "\n";
@@ -268,7 +263,7 @@ private:
         // If this PlanNode has an internal PlanNode (e.g.,
         // AbstractScanPlanNode can have internal Projections), set
         // that internal node's executor as well.
-        map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
+        std::map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
         for (internal_it = node->getInlinePlanNodes().begin();
              internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;
@@ -290,13 +285,13 @@ private:
 
     // Get the executors list for a given subplan. The default plan id = 0
     // represents the top level parent plan
-    vector<AbstractExecutor*>& getExecutorList(int planId = 0) {
+    std::vector<AbstractExecutor*>& getExecutorList(int planId = 0) {
         assert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
         return *(m_subplanExecListMap.find(planId)->second);
     }
 
     const int64_t m_fragId;
-    map<int, vector<AbstractExecutor*>* > m_subplanExecListMap;
+    std::map<int, std::vector<AbstractExecutor*>* > m_subplanExecListMap;
     TempTableLimits m_limits;
     boost::scoped_ptr<PlanNodeFragment> m_fragment;
 };
@@ -307,9 +302,9 @@ ExecutorVector::~ExecutorVector()
     // map, rather than a pointer to it?
     //
     // Also, why do we need to call erase here?
-    map<int, vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.begin();
+    std::map<int, std::vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.begin();
     while (it != m_subplanExecListMap.end()) {
-        vector<AbstractExecutor*>* executorList = it->second;
+        std::vector<AbstractExecutor*>* executorList = it->second;
         // Note: we need to increment the iterator here
         // to avoid invalidating it.
         m_subplanExecListMap.erase(it++);
@@ -381,7 +376,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     mallopt(M_CHECK_ACTION, 3);             // DEFAULT_CHECK_ACTION
 #endif // LINUX
     // Be explicit about running in the standard C locale for now.
-    locale::global(locale("C"));
+    std::locale::global(std::locale("C"));
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 }
 
@@ -390,7 +385,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int64_t siteId,
                          int32_t partitionId,
                          int32_t hostId,
-                         string hostname,
+                         std::string hostname,
                          int64_t tempTableMemoryLimit,
                          bool createDrReplicatedStream,
                          int32_t compactionThreshold)
@@ -477,7 +472,7 @@ VoltDBEngine::~VoltDBEngine() {
     }
 
     // Delete table delegates and release any table reference counts.
-    typedef pair<int64_t, Table*> TID;
+    typedef std::pair<int64_t, Table*> TID;
 
     BOOST_FOREACH (LabeledCD cd, m_catalogDelegates) {
         delete cd.second;
@@ -506,20 +501,20 @@ Table* VoltDBEngine::getTable(int32_t tableId) const
     return findInMapOrNull(tableId, m_tables);
 }
 
-Table* VoltDBEngine::getTable(string name) const
+Table* VoltDBEngine::getTable(std::string name) const
 {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_tablesByName);
 }
 
-TableCatalogDelegate* VoltDBEngine::getTableDelegate(string name) const
+TableCatalogDelegate* VoltDBEngine::getTableDelegate(std::string name) const
 {
     // Caller responsible for checking null return value.
     CatalogDelegate * delegate = findInMapOrNull(name, m_delegatesByName);
     return dynamic_cast<TableCatalogDelegate*>(delegate);
 }
 
-catalog::Table* VoltDBEngine::getCatalogTable(string name) const {
+catalog::Table* VoltDBEngine::getCatalogTable(std::string name) const {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *catalogTable = labeledTable.second;
@@ -756,7 +751,7 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
-bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload) {
+bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catalogPayload) {
     assert(m_executorContext != NULL);
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
     if (executorContext == NULL) {
@@ -818,9 +813,9 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 void
 VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 {
-    vector<string> deletion_vector;
+    std::vector<std::string> deletion_vector;
     m_catalog->getDeletedPaths(deletion_vector);
-    set<string> deletions(deletion_vector.begin(), deletion_vector.end());
+    std::set<std::string> deletions(deletion_vector.begin(), deletion_vector.end());
 
     // delete any empty persistent tables, forcing them to be rebuilt
     // (Unless the are actually being deleted -- then this does nothing)
@@ -843,10 +838,10 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     }
 
     // delete tables in the set
-    BOOST_FOREACH (string path, deletions) {
+    BOOST_FOREACH (std::string path, deletions) {
         VOLT_TRACE("delete path:");
 
-        map<string, CatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
+        std::map<std::string, CatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
         if (pos == m_catalogDelegates.end()) {
            continue;
         }
@@ -863,7 +858,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
             m_delegatesByName.erase(table->name());
             StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
-                const string signature = tcd->signature();
+                const std::string signature = tcd->signature();
                 streamedtable->setSignatureAndGeneration(signature, timestamp);
                 m_exportingTables.erase(signature);
             }
@@ -885,7 +880,7 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
     }
 
     // make sure each column has same metadata
-    map<string, catalog::Column*>::const_iterator outerIter;
+    std::map<std::string, catalog::Column*>::const_iterator outerIter;
     for (outerIter = t1->columns().begin();
          outerIter != t1->columns().end();
          outerIter++)
@@ -893,7 +888,7 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
         int index = outerIter->second->index();
         int size = outerIter->second->size();
         int32_t type = outerIter->second->type();
-        string name = outerIter->second->name();
+        std::string name = outerIter->second->name();
         bool nullable = outerIter->second->nullable();
         bool inBytes = outerIter->second->inbytes();
 
@@ -1042,18 +1037,18 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             // find all of the indexes to add
             //////////////////////////////////////////
 
-            const vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
+            const std::vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
 
             // iterate over indexes for this table in the catalog
             BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
                 catalog::Index* foundIndex = labeledIndex.second;
-                string indexName = foundIndex->name();
-                string catalogIndexId = TableCatalogDelegate::getIndexIdString(*foundIndex);
+                std::string indexName = foundIndex->name();
+                std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*foundIndex);
 
                 // Look for an index on the table to match the catalog index
                 bool found = false;
                 BOOST_FOREACH (TableIndex* currIndex, currentIndexes) {
-                    string currentIndexId = currIndex->getId();
+                    std::string currentIndexId = currIndex->getId();
                     if (catalogIndexId == currentIndexId) {
                         // rename the index if needed (or even if not)
                         currIndex->rename(indexName);
@@ -1095,13 +1090,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 
             // iterate through all of the existing indexes
             BOOST_FOREACH (TableIndex* currIndex, currentIndexes) {
-                string currentIndexId = currIndex->getId();
+                std::string currentIndexId = currIndex->getId();
 
                 bool found = false;
                 // iterate through all of the catalog indexes,
                 //  looking for a match.
                 BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
-                    string catalogIndexId =
+                    std::string catalogIndexId =
                         TableCatalogDelegate::getIndexIdString(*(labeledIndex.second));
                     if (catalogIndexId == currentIndexId) {
                         found = true;
@@ -1120,9 +1115,9 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             // now find all of the materialized views to remove
             ///////////////////////////////////////////////////
 
-            vector<catalog::MaterializedViewInfo*> survivingInfos;
-            vector<MaterializedViewMetadata*> survivingViews;
-            vector<MaterializedViewMetadata*> obsoleteViews;
+            std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+            std::vector<MaterializedViewMetadata*> survivingViews;
+            std::vector<MaterializedViewMetadata*> obsoleteViews;
 
             const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
             persistenttable->segregateMaterializedViews(views.begin(), views.end(),
@@ -1180,7 +1175,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
  * delete or modify the corresponding exectution engine objects.
  */
 bool
-VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayload)
+VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogPayload)
 {
     // clean up execution plans when the tables underneath might change
     if (m_plans) {
@@ -1296,7 +1291,7 @@ void VoltDBEngine::rebuildTableCollections()
                                                   tcd->getTable()->getTableStats());
 
             // add all of the indexes to the stats source
-            const vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
+            const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
             BOOST_FOREACH (TableIndex *index, tindexes) {
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
                                                       catTable->relativeIndex(),
@@ -1327,7 +1322,7 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
     }
 
     PlanSet& plans = *m_plans;
-    string plan = m_topend->planForFragmentId(fragId);
+    std::string plan = m_topend->planForFragmentId(fragId);
     if (plan.length() == 0) {
         char msg[1024];
         snprintf(msg, 1024, "Fetched empty plan from frontend for PlanFragment '%jd'",
@@ -1390,8 +1385,8 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
 
             if (srcCatalogTable->tuplelimitDeleteStmt().size() > 0) {
                 catalog::Statement* stmt = srcCatalogTable->tuplelimitDeleteStmt().begin()->second;
-                const string b64String = stmt->fragments().begin()->second->plannodetree();
-                string jsonPlan = getTopend()->decodeBase64AndDecompress(b64String);
+                const std::string b64String = stmt->fragments().begin()->second->plannodetree();
+                std::string jsonPlan = getTopend()->decodeBase64AndDecompress(b64String);
                 srcPTable->swapPurgeExecutorVector(ExecutorVector::fromJsonPlan(this,
                                                                                 jsonPlan,
                                                                                 -1));
@@ -1432,7 +1427,7 @@ bool VoltDBEngine::isLocalSite(const NValue& value)
     return index == m_partitionId;
 }
 
-typedef pair<string, Table*> TablePair;
+typedef std::pair<std::string, Table*> TablePair;
 
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
@@ -1458,13 +1453,13 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     }
 }
 
-string VoltDBEngine::debug(void) const
+std::string VoltDBEngine::debug(void) const
 {
     if ( ! m_plans) {
         return "";
     }
     PlanSet& plans = *m_plans;
-    ostringstream output;
+    std::ostringstream output;
 
     BOOST_FOREACH (boost::shared_ptr<ExecutorVector> ev_guard, plans) {
         ev_guard->debug();
@@ -1493,7 +1488,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                            bool interval, int64_t now)
 {
     Table *resultTable = NULL;
-    vector<CatalogId> locatorIds;
+    std::vector<CatalogId> locatorIds;
 
     for (int ii = 0; ii < numLocators; ii++) {
         CatalogId locator = static_cast<CatalogId>(locators[ii]);
@@ -1633,7 +1628,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
 {
     int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     try {
-        vector<int> positions;
+        std::vector<int> positions;
         remaining = tableStreamSerializeMore(tableId, streamType, serialize_in, positions);
         if (remaining >= 0) {
             char *resultBuffer = getReusedResultBuffer();
@@ -1644,7 +1639,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             }
             ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
             // Write the array size as a regular integer.
-            assert(positions.size() <= numeric_limits<int32_t>::max());
+            assert(positions.size() <= std::numeric_limits<int32_t>::max());
             results.writeInt((int32_t)positions.size());
             // Copy the position vector's contiguous storage to the returned results buffer.
             BOOST_FOREACH (int ipos, positions) {
@@ -1671,7 +1666,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
         const TableStreamType streamType,
         ReferenceSerializeInputBE &serializeIn,
-        vector<int> &retPositions)
+        std::vector<int> &retPositions)
 {
     // Deserialize the output buffer ptr/offset/length values into a COWStreamProcessor.
     int nBuffers = serializeIn.readInt();
@@ -1764,9 +1759,9 @@ void VoltDBEngine::processRecoveryMessage(RecoveryProtoMsg *message) {
 }
 
 int64_t
-VoltDBEngine::exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, string tableSignature)
+VoltDBEngine::exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, std::string tableSignature)
 {
-    map<string, Table*>::iterator pos = m_exportingTables.find(tableSignature);
+    std::map<std::string, Table*>::iterator pos = m_exportingTables.find(tableSignature);
 
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {
@@ -1791,13 +1786,13 @@ VoltDBEngine::exportAction(bool syncAction, int64_t ackOffset, int64_t seqNo, st
     return 0;
 }
 
-void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, string tableSignature) {
+void VoltDBEngine::getUSOForExportTable(size_t &ackOffset, int64_t &seqNo, std::string tableSignature) {
 
     // defaults mean failure
     ackOffset = 0;
     seqNo = -1;
 
-    map<string, Table*>::iterator pos = m_exportingTables.find(tableSignature);
+    std::map<std::string, Table*>::iterator pos = m_exportingTables.find(tableSignature);
 
     // return no data and polled offset for unavailable tables.
     if (pos == m_exportingTables.end()) {
@@ -1839,8 +1834,8 @@ void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int
 }
 
 void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
-    ReferenceSerializeInputBE taskInfo(taskParams, numeric_limits<std::size_t>::max());
-    vector<CatalogId> tableIds;
+    ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+    std::vector<CatalogId> tableIds;
     const int32_t numTables = taskInfo.readInt();
     for (int ii = 0; ii < numTables; ii++) {
         tableIds.push_back(static_cast<int32_t>(taskInfo.readLong()));
@@ -1863,10 +1858,10 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
     // Delete at earliest convenience
     boost::scoped_ptr<TheHashinator> hashinator_guard(hashinator);
 
-    vector<int64_t> mispartitionedRowCounts;
+    std::vector<int64_t> mispartitionedRowCounts;
 
     BOOST_FOREACH (CatalogId tableId, tableIds) {
-        map<CatalogId, Table*>::iterator table = m_tables.find(tableId);
+        std::map<CatalogId, Table*>::iterator table = m_tables.find(tableId);
         if (table == m_tables.end()) {
             throwFatalException("Unknown table id %d", tableId);
         }
@@ -1887,7 +1882,7 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
         size += 2 * sizeof(int64_t);
     }
     m_resultOutput.writeInt(static_cast<int32_t>(size));
-    pair<int64_t, int64_t> stateInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueId();
+    std::pair<int64_t, int64_t> stateInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueId();
     m_resultOutput.writeLong(stateInfo.first);
     m_resultOutput.writeLong(stateInfo.second);
     if (m_drReplicatedStream) {
@@ -1925,7 +1920,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         collectDRTupleStreamStateInfo();
         break;
     case TASK_TYPE_SET_DR_SEQUENCE_NUMBERS: {
-        ReferenceSerializeInputBE taskInfo(taskParams, numeric_limits<std::size_t>::max());
+        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
         int64_t partitionSequenceNumber = taskInfo.readLong();
         int64_t mpSequenceNumber = taskInfo.readLong();
         if (partitionSequenceNumber >= 0) {
@@ -1965,10 +1960,10 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
     m_tuplesModifiedStack.pop();
 }
 
-static string dummy_last_accessed_plan_node_name("no plan node in progress");
+static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
 void VoltDBEngine::reportProgressToTopend() {
-    string tableName;
+    std::string tableName;
     int64_t tableSize;
 
     assert(m_currExecutorVec);
@@ -2000,7 +1995,7 @@ void VoltDBEngine::reportProgressToTopend() {
                 "A SQL query was terminated after %.2f seconds because it exceeded the query timeout period.",
                 static_cast<double>(m_tupleReportThreshold) / -1000.0);
 
-        throw InterruptException(string(buff));
+        throw InterruptException(std::string(buff));
     }
 }
 
