@@ -179,7 +179,7 @@ public class PlannerTool {
                         if (matched != null) {
                             CorePlan core = matched.core;
                             ParameterSet params = planner.extractedParamValues(core.parameterTypes);
-                            if (userParams != null) {
+                            if (hasUserQuestionMark) {
                                 params = ParameterSet.fromArrayNoCopy(userParams);;
                             }
                             AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
