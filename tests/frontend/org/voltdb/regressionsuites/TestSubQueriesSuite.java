@@ -1010,26 +1010,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
     }
 
-    public void notestENG8196_minimumn_unit_test_case() throws Exception {
-        Client client = getClient();
-        loadData(false);
-        VoltTable vt;
-
-        try {
-            vt = client.callProcedure("@AdHoc",
-                    "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
-        } catch (ProcCallException ex) {
-            String errMsg = (isHSQL()) ? "cardinality violation" :
-                "More than one row returned by a scalar/row subquery";
-            assertTrue(ex.getMessage().contains(errMsg));
-        }
-
-        // Any questions after the run time exception for sub-query will trigger memory leak.
-        // It should be related to the clean up in the global scope sub-query context.
-        vt = client.callProcedure("@AdHoc", "select * from R1;").getResults()[0];
-        assertTrue(vt.advanceRow());
-    }
-
     // Test scalar subqueries
     public void testSelectScalarSubSelects() throws Exception
     {
@@ -1054,16 +1034,14 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "select R1.DEPT, (SELECT ID FROM R2 where R2.ID = 1) FROM R1 where R1.DEPT = 2;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1} });
 
-
-        // Turn the next commented query on when ENG8196 is fixed.
-//        try {
-//            vt = client.callProcedure("@AdHoc",
-//                    "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
-//        } catch (ProcCallException ex) {
-//            String errMsg = (isHSQL()) ? "cardinality violation" :
-//                "More than one row returned by a scalar/row subquery";
-//            assertTrue(ex.getMessage().contains(errMsg));
-//        }
+        try {
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
+        } catch (ProcCallException ex) {
+            String errMsg = (isHSQL()) ? "cardinality violation" :
+                "More than one row returned by a scalar/row subquery";
+            assertTrue(ex.getMessage().contains(errMsg));
+        }
 
         // ENG-8145
         subTestScalarSubqueryWithOrderByOrGroupBy();
@@ -1080,7 +1058,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         int len = 100;
 
         if (isValgrind()) {
-            // valgrind is to slow with 100 rows, use a small number
+            // valgrind is too slow with 100 rows, use a small number
             len = 10;
         }
 
