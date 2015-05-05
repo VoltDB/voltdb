@@ -196,6 +196,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientStats.java" />
             <include name="src/frontend/org/voltdb/client/ClientAffinityStats.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
+            <include name="src/frontend/org/voltdb/client/VoltBulkLoader/BulkLoaderFailureCallBack.java" />
+            <include name="src/frontend/org/voltdb/client/VoltBulkLoader/VoltBulkLoader.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
