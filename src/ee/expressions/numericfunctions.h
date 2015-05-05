@@ -202,5 +202,20 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
 }
 
 
+template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& base = arguments[0];
+    const NValue& mod = arguments[1];
+    VOLT_TRACE("mod  %d to %d",
+    		base.castAsIntegerAndGetValue(),
+			mod.castAsIntegerAndGetValue());
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double baseValue = base.castAsDoubleAndGetValue();
+    double modValue = mod.castAsIntegerAndGetValue();
+    double resultDouble = std::fmod(baseValue, modValue);
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
 
 }

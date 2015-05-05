@@ -350,9 +350,8 @@ public class FunctionSQL extends Expression {
 
             case FUNC_MOD :
                 name      = Tokens.T_MOD;
-                parseList = singleParamList;
+                parseList = doubleParamList;
                 // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
@@ -778,12 +777,9 @@ public class FunctionSQL extends Expression {
 
                 /** @todo - check if widening has an effect */
                 Object value =
-                    ((NumberType) nodes[0].dataType).divide(nodes[0],
-                        nodes[1]);
-
-                value = ((NumberType) nodes[0].dataType).subtract(nodes[0],
-                        value, nodes[1].dataType);
-
+                    ((NumberType) nodes[0].dataType).mod(data[0],
+                            data[1]);
+                
                 // result type is the same as argList[1]
                 return ((NumberType) dataType).convertToTypeLimits(session,
                         value);
