@@ -50,6 +50,11 @@ SubqueryExpression::SubqueryExpression(
 
 SubqueryExpression::~SubqueryExpression()
 {
+    // This is curious: m_tveParams is a shared_ptr to
+    // a std::vector, but we're deleting values from it here.
+    //
+    // This suggests that we're the sole owner of this vector.
+    // Why not just use a scoped_ptr or non-pointer member vector?
     if (m_tveParams.get() != NULL) {
         size_t i = m_tveParams->size();
         while (i--) {
@@ -87,6 +92,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
                 }
                 paramsChanged = true;
             }
+            // Update the value stored in the executor context's parameter container:
             prevParam = param.copyNValue();
         }
     }

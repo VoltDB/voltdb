@@ -107,6 +107,9 @@ static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
+// Somehow all the std:: prefixes got removed
+// from this file.  Might be good to delete
+// the following line and put them back?
 using namespace std;
 
 namespace voltdb {
@@ -300,9 +303,15 @@ private:
 
 ExecutorVector::~ExecutorVector()
 {
+    // We could avoid having call delete here if we stored an instance in the
+    // map, rather than a pointer to it?
+    //
+    // Also, why do we need to call erase here?
     map<int, vector<AbstractExecutor*>* >::iterator it = m_subplanExecListMap.begin();
     while (it != m_subplanExecListMap.end()) {
         vector<AbstractExecutor*>* executorList = it->second;
+        // Note: we need to increment the iterator here
+        // to avoid invalidating it.
         m_subplanExecListMap.erase(it++);
         delete executorList;
     }

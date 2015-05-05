@@ -26,6 +26,13 @@
 
 namespace voltdb {
 
+/**
+ * An expression that produces a temp table from a subquery.
+ * Note that this expression type's eval method is a little
+ * different from the others: eval will return a subquery id,
+ * which can then be retrieved from the executor context
+ * by invoking its getSubqueryOutputTable method.
+ */
 class SubqueryExpression : public AbstractExpression {
     public:
     SubqueryExpression(ExpressionType subqueryType,

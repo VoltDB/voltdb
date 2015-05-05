@@ -243,8 +243,8 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     // The outer_expr OP ANY inner_expr evaluates as follows:
     // There is an exact match OP (outer_expr, inner_expr) == true => TRUE
     // There no match and the inner_expr produces a row where inner_expr is NULL => NULL
-    // There no match and the inner_expr produces only non- NULL rows or empty => FASLE
-    // The outer_expr is NULL or empty and the inner_expr is empty => FASLE
+    // There no match and the inner_expr produces only non- NULL rows or empty => FALSE
+    // The outer_expr is NULL or empty and the inner_expr is empty => FALSE
     // The outer_expr is NULL or empty and the inner_expr produces any row => NULL
 
     // The outer_expr OP ALL inner_expr evaluates as follows:
