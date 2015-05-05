@@ -2435,6 +2435,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("foofoofoo", result.getString(1));
+
+        boolean sawException = false;
+        try {
+            cr = client.callProcedure("REPEAT", 1000000, 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertTrue("Exception expected here.", false);
+        } catch (ProcCallException ex) {
+            sawException = true;
+        }
+        assertTrue("SQLException expected for oversize REPEAT function", sawException);
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
