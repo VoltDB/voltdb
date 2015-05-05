@@ -260,6 +260,7 @@ TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
         m_wrapper.endTransaction();
     }
     m_wrapper.periodicFlush(-1, addPartitionId(9));
+    delete index;
 
     for (int i = 10; i < 20; i++)
     {
