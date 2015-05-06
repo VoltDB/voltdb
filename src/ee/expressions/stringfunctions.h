@@ -139,7 +139,7 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
     const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
     if ((count * valueUTF8Length) > ThreadLocalPool::POOLED_MAX_VALUE_LENGTH) {
         char msg[1024];
-        snprintf(msg, sizeof(msg), "data exception: string too long (%d > %d)",
+        snprintf(msg, sizeof(msg), "REPEAT function call would create a string of size %d which is larger than the maximum size %d",
                  count * valueUTF8Length, ThreadLocalPool::POOLED_MAX_VALUE_LENGTH);
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                            msg);

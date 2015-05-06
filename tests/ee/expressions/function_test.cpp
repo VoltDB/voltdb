@@ -152,6 +152,8 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
                   << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
                   << ", comp:     " << std::dec << cmpout << "\n";
     }
+    delete bin_exp;
+    expected.free();
     return cmpout;
 }
 /**
@@ -170,7 +172,7 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
     argument->push_back(rhsexp);
 
     NValue expected = getSomeValue(output);
-    AbstractExpression* bin_exp = ExpressionUtil::functionFactory(operation, argument);
+    AbstractExpression *bin_exp = ExpressionUtil::functionFactory(operation, argument);
     int cmpout;
     NValue answer;
     try {
@@ -181,17 +183,19 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
         } else {
             cmpout = answer.compare(expected);
         }
-        if (staticVerboseFlag) {
-            std::cout << std::hex << "input: test(" << linput << ", " << rinput << ")"
-                      << ", answer: \"" << answer.debug() << "\""
-                      << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
-                      << ", comp:     " << std::dec << cmpout << "\n";
-        }
     } catch (SQLException &ex) {
         expected.free();
         delete bin_exp;
         throw;
     }
+    if (staticVerboseFlag) {
+        std::cout << std::hex << "input: test(" << linput << ", " << rinput << ")"
+                  << ", answer: \"" << answer.debug() << "\""
+                  << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
+                  << ", comp:     " << std::dec << cmpout << "\n";
+    }
+    expected.free();
+    delete bin_exp;
     return cmpout;
 }
 
