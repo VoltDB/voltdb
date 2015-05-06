@@ -645,7 +645,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         assert(m_currExecutorVec);
         // Launch the target plan through its top-most executor list.
         m_executorContext->executeExecutors(0);
-        m_executorContext->cleanupExecutors(0);
+        m_executorContext->cleanupAllExecutors();
     }
     catch (const SerializableEEException &e) {
         serializeException(e);
@@ -1946,7 +1946,7 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
         m_tuplesModifiedStack.pop();
         throw;
     }
-    m_executorContext->cleanupExecutors(0);
+    m_executorContext->cleanupAllExecutors();
     // restore original DML statement state.
     m_currExecutorVec->setupContext(m_executorContext);
     m_tuplesModifiedStack.pop();

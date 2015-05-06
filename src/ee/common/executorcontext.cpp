@@ -122,7 +122,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.
-        cleanupExecutors(subqueryId);
+        cleanupExecutorsForSubquery(subqueryId);
         // Normally, each executor cleans its memory pool as it finishes execution,
         // but in the case of a throw, it may not have had the chance.
         // So, clean up all the memory pools now.
@@ -160,7 +160,16 @@ Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
     return executorList.back()->getPlanNode()->getOutputTable();
 }
 
-void ExecutorContext::cleanupExecutors(int subqueryId) const
+void ExecutorContext::cleanupAllExecutors() const
+{
+    typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+    BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
+        int subqueryId = entry.first;
+        cleanupExecutorsForSubquery(subqueryId);
+    }
+}
+
+void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {

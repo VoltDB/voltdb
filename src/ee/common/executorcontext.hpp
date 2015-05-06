@@ -197,7 +197,9 @@ class ExecutorContext {
 
     Table* getSubqueryOutputTable(int subqueryId) const;
 
-    void cleanupExecutors(int subqueryId) const;
+    void cleanupAllExecutors() const;
+
+    void cleanupExecutorsForSubquery(int subqueryId) const;
 
     DRTupleStream* drStream() {
         return m_drStream;
