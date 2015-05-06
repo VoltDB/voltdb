@@ -76,7 +76,7 @@ inline std::ostream& operator<<(std::ostream& out, const FatalException& fe)
 
 // Purposely avoiding inheritance from FatalException for now, because the handling seems just a little dodgy.
 // Instead, FatalException functionality is accessed via a data member that never actually gets thrown/caught.
-// In contrast, exception is working out well as a base class, in the normal case when (re)throw goes uncaught.
+// In contrast, std::runtime_error is working out well as a base class, in the normal case when (re)throw goes uncaught.
 
 // Macro-ized base class to aid experimentation
 #define FatalLogicErrorBase std::runtime_error

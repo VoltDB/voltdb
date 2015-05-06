@@ -296,21 +296,17 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="check_sql"
-    depends="licensecheck, compile, voltdbipc"
+    depends="licensecheck, compile, voltdbipc, eecheck"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='9000000'>
         <isset property="timeoutLength"/>
     </condition>
 
     <exec executable="ant" failonerror="true" timeout="9000000">
-        <arg value="eecheck" />
         <arg value="junit_sql" />
-        <arg value="distcheck" />
-        <arg value="pythonfser" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
-        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 

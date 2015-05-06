@@ -128,8 +128,8 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", nestedLoopIndexJoin).getResults()[0];
         System.err.println(vt);
         assertTrue(vt.toString().contains("NESTLOOP INDEX INNER JOIN"));
-        assertTrue(vt.toString().contains("inline INDEX SCAN of \"PTABLE\""));
-        assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"RTABLE\""));
+        assertTrue(vt.toString().contains("inline INDEX SCAN of \"PTABLE (P)\""));
+        assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"RTABLE (R)\""));
 
         vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {8});

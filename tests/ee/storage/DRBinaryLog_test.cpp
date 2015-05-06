@@ -54,7 +54,11 @@ static int64_t addPartitionId(int64_t value) {
 
 class DRBinaryLogTest : public Test {
 public:
-    DRBinaryLogTest() : m_undoToken(0), m_context(new ExecutorContext( 1, 1, NULL, &m_topend, &m_pool, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream)) {
+    DRBinaryLogTest()
+      : m_undoToken(0)
+      , m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
+            NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream))
+    {
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
