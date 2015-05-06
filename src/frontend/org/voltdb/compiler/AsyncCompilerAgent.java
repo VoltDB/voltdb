@@ -169,7 +169,7 @@ public class AsyncCompilerAgent {
         boolean hasUserInputParamsForAdHoc = false;
         if (work.userParamSet != null && work.userParamSet.length > 0) {
             if (work.sqlStatements.length != 1) {
-                throw new RuntimeException("Multiple AdHoc queries with question marks in a procedure call are not supported");
+                generateErrorResult("Multiple AdHoc queries with question marks in a procedure call are not supported", work);
             }
             hasUserInputParamsForAdHoc = true;
         }
