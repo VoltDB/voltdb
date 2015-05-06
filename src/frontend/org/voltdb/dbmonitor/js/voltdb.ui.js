@@ -729,7 +729,7 @@ var loadPage = function (serverName, portid) {
                                     //show master table
                                     refreshDrMasterSection();
                                 } else {
-                                    $(".replicaWrapper").css('top', '0');
+                                    //$(".replicaWrapper").css('top', '0');
                                     $("#drMasterSection").hide();
                                 }
 
@@ -746,9 +746,10 @@ var loadPage = function (serverName, portid) {
                                         $("#drSection").addClass("drHeightBoth");
                                         $("#dbDrMode").text("Both");
                                         $('#drMasterSection').css('display', 'block');
+                                        $(".replicaWrapper").css('top', '-27px');
                                     } else {
                                         $("#dbDrMode").text("Replica");
-
+                                        $(".replicaWrapper").css('top', '0px');
                                         $("#drSection").addClass("drHeightIndividual");
                                         $('#drMasterSection').css('display', 'none');
                                     }
@@ -1745,7 +1746,7 @@ var loadPage = function (serverName, portid) {
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    }, 25000);
+    }, 5000);
 
 
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
