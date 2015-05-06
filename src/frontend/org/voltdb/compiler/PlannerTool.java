@@ -178,9 +178,14 @@ public class PlannerTool {
                         }
                         if (matched != null) {
                             CorePlan core = matched.core;
-                            ParameterSet params = planner.extractedParamValues(core.parameterTypes);
-                            if (hasUserQuestionMark) {
+                            ParameterSet params = null;
+                            if (planner.compiledAsParameterizedPlan()) {
+                                params = planner.extractedParamValues(core.parameterTypes);
+                            } else if (hasUserQuestionMark) {
                                 params = ParameterSet.fromArrayNoCopy(userParams);;
+                            } else {
+                                // No constants AdHoc queries
+                                params = ParameterSet.emptyParameterSet();
                             }
                             AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                                                                                    core,
