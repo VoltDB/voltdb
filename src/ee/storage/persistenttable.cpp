@@ -1594,7 +1594,7 @@ void PersistentTable::computeSmallestUniqueIndex() {
         m_smallestUniqueIndexCrc = vdbcrc::crc32cInit();
         m_smallestUniqueIndexCrc = vdbcrc::crc32c(m_smallestUniqueIndexCrc,
                 &(m_smallestUniqueIndex->getColumnIndices()[0]),
-                m_smallestUniqueIndex->getColumnIndices().size());
+                m_smallestUniqueIndex->getColumnIndices().size() * sizeof(int));
         m_smallestUniqueIndexCrc = vdbcrc::crc32cFinish(m_smallestUniqueIndexCrc);
     }
 }
