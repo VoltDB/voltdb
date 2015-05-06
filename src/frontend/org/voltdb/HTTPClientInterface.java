@@ -272,19 +272,19 @@ public class HTTPClientInterface {
         }
         String admin = request.getParameter(PARAM_ADMIN);
 
-        AuthenticatedConnectionCache connection = m_connections.get();
+        AuthenticatedConnectionCache connection_cache = m_connections.get();
 
         // first check for a catalog update and purge the cached connections
         // if one has happened since we were here last
         if (m_shouldUpdateCatalog.compareAndSet(true, false))
         {
-            if (connection != null) {
-                connection.closeAll();
-                connection = null;
+            if (connection_cache != null) {
+                connection_cache.closeAll();
+                connection_cache = null;
             }
         }
 
-        if (connection == null) {
+        if (connection_cache == null) {
             Configuration config = VoltDB.instance().getConfig();
             int port = config.m_port;
             int adminPort = config.m_adminPort;
