@@ -472,7 +472,6 @@ inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
     assert(m_tmpOutputTable);
-
     //
     // OPTIMIZATION: NESTED LIMIT for serial aggregation
     //

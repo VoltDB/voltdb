@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -46,7 +47,7 @@ public class HTTPClientInterface {
     private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
-    AuthenticatedConnectionCache m_connections = null;
+    AtomicReference<AuthenticatedConnectionCache> m_connections = new AtomicReference();
     static final int CACHE_TARGET_SIZE = 10;
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
@@ -271,19 +272,19 @@ public class HTTPClientInterface {
         }
         String admin = request.getParameter(PARAM_ADMIN);
 
+        AuthenticatedConnectionCache connection_cache = m_connections.get();
+
         // first check for a catalog update and purge the cached connections
         // if one has happened since we were here last
         if (m_shouldUpdateCatalog.compareAndSet(true, false))
         {
-            if (m_connections != null) {
-                m_connections.closeAll();
-                // Just null the old object so we'll create a new one with
-                // updated state below
-                m_connections = null;
+            if (connection_cache != null) {
+                connection_cache.closeAll();
+                connection_cache = null;
             }
         }
 
-        if (m_connections == null) {
+        if (connection_cache == null) {
             Configuration config = VoltDB.instance().getConfig();
             int port = config.m_port;
             int adminPort = config.m_adminPort;
@@ -301,7 +302,7 @@ public class HTTPClientInterface {
             if (config.m_adminInterface.length() > 0) {
                 adminInterface = config.m_adminInterface;
             }
-            m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
+            m_connections.set(new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort));
         }
 
         // check for admin mode
@@ -345,7 +346,7 @@ public class HTTPClientInterface {
 
         try {
             // get a connection to localhost from the pool
-            Client client = m_connections.getClient(username, password, hashedPasswordBytes, adminMode);
+            Client client = m_connections.get().getClient(username, password, hashedPasswordBytes, adminMode);
             if (client != null) {
                 return new AuthenticationResult(client, adminMode, username, "");
             }
@@ -368,7 +369,7 @@ public class HTTPClientInterface {
     public void releaseClient(AuthenticationResult authResult, boolean force) {
         if (authResult != null && authResult.m_client != null) {
             assert(m_connections != null);
-            m_connections.releaseClient(authResult.m_client, force);
+            m_connections.get().releaseClient(authResult.m_client, force);
         }
     }
 

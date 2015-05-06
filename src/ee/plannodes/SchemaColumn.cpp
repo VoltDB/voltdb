@@ -15,6 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdexcept>
+
 #include "SchemaColumn.h"
 
 using namespace std;

@@ -709,11 +709,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                      WHERE STAFF.EMPNUM = WORKS.EMPNUM);";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on subquery");
+                fail("did not fail on subquery In/Exists");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+                assertTrue(pcex.getMessage().indexOf("Subquery expressions are only supported in SELECT statements") > 0);
             }
+
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
                     "           FROM STAFF \n" +
                     "           WHERE NOT EXISTS (SELECT * FROM WORKS \n" +
@@ -721,11 +722,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                ORDER BY EMPNUM;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on exists clause");
             }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+            catch (Exception ex) {
+                fail("did fail on exists clause");
             }
+
             adHocQuery = "   SELECT STAFF.EMPNAME \n" +
                     "          FROM STAFF \n" +
                     "          WHERE STAFF.EMPNUM IN \n" +
@@ -738,11 +739,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on subquery");
             }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+            catch (Exception ex) {
+                fail("did fail on subquery");
             }
+
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
                     "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +

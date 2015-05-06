@@ -391,11 +391,11 @@ public class RegressionSuite extends TestCase {
                         expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {
-            validateRowOfLongs(vt, expected[i]);
+            validateRowOfLongs("at row " + i + ", ", vt, expected[i]);
         }
     }
 
-    static public void validateRowOfLongs(VoltTable vt, long [] expected) {
+    static public void validateRowOfLongs(String messagePrefix, VoltTable vt, long [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
@@ -422,14 +422,24 @@ public class RegressionSuite extends TestCase {
                     }
                 }
             }
+
+            String message = "at column " + i +", ";
+            if (messagePrefix != null) {
+                message = messagePrefix + message;
+            }
+
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
-                assertEquals("At index " + i + ", ", expected[i], actual);
+                assertEquals(message, expected[i], actual);
             } else {
                 VoltType type = vt.getColumnType(i);
-                assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
             }
         }
+    }
+
+    static public void validateRowOfLongs(VoltTable vt, long [] expected) {
+        validateRowOfLongs(null, vt, expected);
     }
 
     static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {

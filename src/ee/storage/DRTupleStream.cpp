@@ -26,7 +26,9 @@
 #include "common/executorcontext.hpp"
 #include "common/UniqueId.hpp"
 #include "crc/crc32c.h"
+#include "indexes/tableindex.h"
 
+#include <vector>
 #include <cstdio>
 #include <limits>
 #include <iostream>
@@ -128,7 +130,9 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t spHandle,
                                   int64_t uniqueId,
                                   TableTuple &tuple,
-                                  DRRecordType type)
+                                  DRRecordType type,
+                                  const TableIndex *uniqueIndex /*= NULL*/,
+                                  uint32_t uniqueIndexCrc /*= 0*/)
 {
     size_t startingUso = m_uso;
 
@@ -136,6 +140,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     if (!m_enabled) return m_uso;
 
     size_t rowHeaderSz = 0;
+    size_t rowMetadataSz = 0;
     size_t tupleMaxLength = 0;
 
     // Transaction IDs for transactions applied to this tuple stream
@@ -156,7 +161,12 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
-    tupleMaxLength = computeOffsets(tuple, &rowHeaderSz) + TXN_RECORD_HEADER_SIZE;
+    const std::vector<int>* interestingColumns = NULL;
+    if (DR_RECORD_DELETE == type && uniqueIndex) {
+        type = DR_RECORD_DELETE_BY_INDEX;
+        interestingColumns = &(uniqueIndex->getColumnIndices());
+    }
+    tupleMaxLength = computeOffsets(tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -178,22 +188,28 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // the nullarray lives in rowheader after the 4 byte header length prefix
     uint8_t *nullArray =
-        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position() + sizeof(int32_t));
+        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position() + rowMetadataSz);
 
     // Reserve the row header by moving the position beyond the row header.
     // The row header includes the 4 byte length prefix and the null array.
     const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
 
     // write the tuple's data
-    tuple.serializeToExport(io, 0, nullArray);
+    tuple.serializeToDR(io, 0, nullArray, interestingColumns);
 
     // write the row size in to the row header
     // rowlength does not include the 4 byte length prefix or record header
     // but does include the null array.
-    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, 4);
-    //The TXN_RECORD_HEADER_SIZE is 4 bytes longer because it includes the checksum at the end
-    //so there is no need to subtract and additional 4 bytes to make the length prefix not inclusive
-    hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE));
+    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, rowMetadataSz);
+    // No need to subtract out the length of this size prefix itself, since it's
+    // balanced out by the checksum at the end
+    if (DR_RECORD_DELETE_BY_INDEX == type) {
+        // Do need to subtract out the length of the index checksum
+        hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE - sizeof(int32_t)));
+        hdr.writeInt(uniqueIndexCrc);
+    } else {
+        hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE));
+    }
 
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
@@ -211,20 +227,20 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 }
 
 size_t
-DRTupleStream::computeOffsets(TableTuple &tuple,
-                                   size_t *rowHeaderSz)
+DRTupleStream::computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns)
 {
     // round-up columncount to next multiple of 8 and divide by 8
-    const int columnCount = tuple.sizeInValues();
+    const int columnCount = interestingColumns ? (int)interestingColumns->size() : tuple.sizeInValues();
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
     // row header is 32-bit length of row plus null mask
-    *rowHeaderSz = sizeof(int32_t) + nullMaskLength;
+    rowMetadataSz = sizeof(int32_t) + (/*index crc*/ interestingColumns ? sizeof(int32_t) : 0);
+    rowHeaderSz = rowMetadataSz + nullMaskLength;
 
     //Can return 0 for a single column varchar with null
-    size_t dataSz = tuple.maxExportSerializationSize();
+    size_t dataSz = tuple.maxDRSerializationSize(interestingColumns);
 
-    return *rowHeaderSz + dataSz;
+    return rowHeaderSz + dataSz;
 }
 
 // Set m_opened = false first otherwise checkOpenTransaction() may
