@@ -32,7 +32,11 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-////import org.hsqldb_voltpatches.dbinfo.DatabaseInformation;
+// A VoltDB extension to eliminate a module dependency
+/* disable 1 line
+import org.hsqldb_voltpatches.dbinfo.DatabaseInformation;
+... disabled 1 line. */
+// End of VoltDB extension
 import org.hsqldb_voltpatches.error.Error;
 import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.FrameworkLogger;
@@ -73,7 +77,11 @@ public class Database {
     public HsqlProperties      urlProperties;
     private final String       path;
     public Collation           collation;
-    ////public DatabaseInformation dbInfo;
+    // A VoltDB extension to eliminate a module dependency
+    /* disable 1 line
+    public DatabaseInformation dbInfo;
+    ... disabled 1 line */
+    // End of VoltDB extension
 
     /** indicates the state of the database */
     private volatile int dbState;
@@ -227,12 +235,20 @@ public class Database {
             isReferentialIntegrity = true;
             sessionManager         = new SessionManager(this);
             collation              = collation.newDatabaseInstance();
-            ////dbInfo = DatabaseInformation.newDatabaseInformation(this);
+            // A VoltDB extension to eliminate a module dependency
+            /* disable 1 line
+            dbInfo = DatabaseInformation.newDatabaseInformation(this);
+            ... disabled 1 line */
+            // End of VoltDB extension
             txManager              = new TransactionManager2PL(this);
 
-            ////lobManager.createSchema();
-            ////sessionManager.getSysLobSession().setSchema(
-            ////    SqlInvariants.LOBS_SCHEMA);
+            // A VoltDB extension to eliminate a module dependency
+            /* disable 3 lines
+            lobManager.createSchema();
+            sessionManager.getSysLobSession().setSchema(
+                SqlInvariants.LOBS_SCHEMA);
+            ... disabled 3 lines */
+            // End of VoltDB extension
             schemaManager.setSchemaChangeTimestamp();
             schemaManager.createSystemTables();
 
@@ -251,7 +267,11 @@ public class Database {
             }
 
             ////lobManager.open();
-            ////dbInfo.setWithContent(true);
+            // A VoltDB extension to eliminate a module dependency
+            /* disable 1 line
+            dbInfo.setWithContent(true);
+             */
+            // End of VoltDB extension
 
             checkpointRunner = new CheckpointRunner();
             timeoutRunner    = new TimeoutRunner();
@@ -297,7 +317,10 @@ public class Database {
         nameManager      = null;
         schemaManager    = null;
         sessionManager   = null;
-        ////dbInfo           = null;
+        // A VoltDB extension to eliminate a module dependency
+        /* disable 1 line
+        dbInfo           = null;
+        ... disabled 1 line */
         checkpointRunner = null;
         timeoutRunner    = null;
     }
