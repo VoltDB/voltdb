@@ -20,9 +20,10 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
     @Override
@@ -62,5 +63,12 @@ public class DummyCommandLog implements CommandLog {
     {
         // No real command log, obviously not enabled
         return false;
+    }
+
+    @Override
+    public void requestTruncationSnapshot(final boolean queueIfPending)
+    {
+        // Don't perform truncation snapshot if Command Logging is disabled
+        return;
     }
 }
