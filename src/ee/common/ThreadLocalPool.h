@@ -45,6 +45,8 @@ public:
     ThreadLocalPool();
     ~ThreadLocalPool();
 
+    static const int POOLED_MAX_VALUE_LENGTH;
+
     /**
      * Return the nearest power-of-two-plus-or-minus buffer size that
      * will be allocated for an object of the given length
