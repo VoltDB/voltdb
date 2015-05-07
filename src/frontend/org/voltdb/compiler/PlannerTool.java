@@ -192,7 +192,8 @@ public class PlannerTool {
                                                                                    params,
                                                                                    null);
                             ahps.setBoundConstants(matched.constants);
-                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark);
+                            // parameterized plan from the cache does not have exception
+                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
                             cacheUse = CacheUse.HIT2;
                             return ahps;
                         }
@@ -224,7 +225,7 @@ public class PlannerTool {
                 core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
                 core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
 
-                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark);
+                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
             }
             return ahps;
         }
