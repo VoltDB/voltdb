@@ -34,6 +34,9 @@ public abstract class StmtTableScan {
 
     public static final int NULL_ALIAS_INDEX = -1;
 
+    // The statement id this table belongs to
+    protected int m_stmtId = 0;
+
     // table alias
     protected String m_tableAlias = null;
 
@@ -44,8 +47,9 @@ public abstract class StmtTableScan {
     // Partitioning column info
     protected List<SchemaColumn> m_partitioningColumns = null;
 
-    protected StmtTableScan(String tableAlias) {
+    protected StmtTableScan(String tableAlias, int stmtId) {
         m_tableAlias = tableAlias;
+        m_stmtId = stmtId;
     }
 
     public String getTableAlias() {
@@ -66,17 +70,20 @@ public abstract class StmtTableScan {
 
     abstract public List<Index> getIndexes();
 
-    abstract public String getColumnName(int m_columnIndex);
+    public int getStatementId() {
+        return m_stmtId;
+    }
 
+    abstract public String getColumnName(int m_columnIndex);
 
     abstract public void processTVE(TupleValueExpression expr, String columnName);
 
-
-    public void resolveTVE(TupleValueExpression expr, String columnName) {
-
+    public void resolveTVE(TupleValueExpression expr) {
+        String columnName = expr.getColumnName();
         processTVE(expr, columnName);
+        expr.setOrigStmtId(m_stmtId);
 
-        if (!m_scanColumnNameSet.contains(columnName)) {
+        if ( ! m_scanColumnNameSet.contains(columnName)) {
             SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
                     columnName, columnName, (TupleValueExpression) expr.clone());
             m_scanColumnNameSet.add(columnName);

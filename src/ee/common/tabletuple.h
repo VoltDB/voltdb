@@ -56,6 +56,7 @@
 #include <cassert>
 #include <ostream>
 #include <iostream>
+#include <vector>
 
 class CopyOnWriteTest_TestTableTupleFlags;
 
@@ -146,49 +147,19 @@ public:
         size_t bytes = 0;
         int cols = sizeInValues();
         for (int i = 0; i < cols; ++i) {
-            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
-            voltdb::ValueType columnType = columnInfo->getVoltType();
-            switch (columnType) {
-              case VALUE_TYPE_TINYINT:
-                  bytes += sizeof (int8_t);
-                  break;
+            bytes += maxExportSerializedColumnSize(i);
+        }
+        return bytes;
+    }
 
-              case VALUE_TYPE_SMALLINT:
-                  bytes += sizeof (int16_t);
-                  break;
-
-              case VALUE_TYPE_INTEGER:
-                  bytes += sizeof (int32_t);
-                  break;
-
-              case VALUE_TYPE_BIGINT:
-              case VALUE_TYPE_TIMESTAMP:
-              case VALUE_TYPE_DOUBLE:
-                bytes += sizeof (int64_t);
-                break;
-
-              case VALUE_TYPE_DECIMAL:
-                //1-byte scale, 1-byte precision, 16 bytes all the time right now
-                bytes += 18;
-                break;
-
-              case VALUE_TYPE_VARCHAR:
-              case VALUE_TYPE_VARBINARY:
-                  // 32 bit length preceding value and
-                  // actual character data without null string terminator.
-                  if (!getNValue(i).isNull())
-                  {
-                      bytes += (sizeof (int32_t) +
-                                ValuePeeker::peekObjectLength_withoutNull(getNValue(i)));
-                  }
-                break;
-              default:
-                // let caller handle this error
-                throwDynamicSQLException(
-                        "Unknown ValueType %s found during Export serialization.",
-                        valueToString(columnType).c_str() );
-                return (size_t)0;
-            }
+    size_t maxDRSerializationSize(const std::vector<int>* interestingColumns) const {
+        if (!interestingColumns) {
+            return maxExportSerializationSize();
+        }
+        size_t bytes = 0;
+        std::vector<int> cols = *interestingColumns;
+        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
+            bytes += maxExportSerializedColumnSize(*cit);
         }
         return bytes;
     }
@@ -328,6 +299,9 @@ public:
     void serializeTo(voltdb::SerializeOutput &output);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
+    void serializeToDR(voltdb::ExportSerializeOutput &io,
+                       int colOffset, uint8_t *nullArray,
+                       const std::vector<int>* interestingColumns);
 
     void freeObjectColumns();
     size_t hashCode(size_t seed) const;
@@ -390,6 +364,56 @@ private:
         assert(m_schema);
         assert(m_data);
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
+    }
+
+    inline void serializeColumnToExport(ExportSerializeOutput &io, int colOffset, int colIndex, uint8_t *nullArray) const {
+        // NULL doesn't produce any bytes for the NValue
+        // Handle it here to consolidate manipulation of
+        // the null array.
+        if (isNull(colIndex)) {
+            // turn on colIndex'th bit of nullArray
+            int byte = (colOffset + colIndex) >> 3;
+            int bit = (colOffset + colIndex) % 8;
+            int mask = 0x80 >> bit;
+            nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
+        } else {
+            getNValue(colIndex).serializeToExport_withoutNull(io);
+        }
+    }
+
+    inline size_t maxExportSerializedColumnSize(int colIndex) const {
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
+        voltdb::ValueType columnType = columnInfo->getVoltType();
+        switch (columnType) {
+          case VALUE_TYPE_TINYINT:
+              return sizeof (int8_t);
+          case VALUE_TYPE_SMALLINT:
+              return sizeof (int16_t);
+          case VALUE_TYPE_INTEGER:
+              return sizeof (int32_t);
+          case VALUE_TYPE_BIGINT:
+          case VALUE_TYPE_TIMESTAMP:
+          case VALUE_TYPE_DOUBLE:
+              return sizeof (int64_t);
+          case VALUE_TYPE_DECIMAL:
+              //1-byte scale, 1-byte precision, 16 bytes all the time right now
+              return 18;
+          case VALUE_TYPE_VARCHAR:
+          case VALUE_TYPE_VARBINARY:
+              // 32 bit length preceding value and
+              // actual character data without null string terminator.
+              if (!isNull(colIndex))
+              {
+                  return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(getNValue(colIndex)));
+              }
+              return (size_t)0;
+          default:
+            // let caller handle this error
+            throwDynamicSQLException(
+                    "Unknown ValueType %s found during Export serialization.",
+                    valueToString(columnType).c_str() );
+            return (size_t)0;
+        }
     }
 };
 
@@ -765,18 +789,20 @@ TableTuple::serializeToExport(ExportSerializeOutput &io,
 {
     int columnCount = sizeInValues();
     for (int i = 0; i < columnCount; i++) {
-        // NULL doesn't produce any bytes for the NValue
-        // Handle it here to consolidate manipulation of
-        // the nullarray.
-        if (isNull(i)) {
-            // turn on i'th bit of nullArray
-            int byte = (colOffset + i) >> 3;
-            int bit = (colOffset + i) % 8;
-            int mask = 0x80 >> bit;
-            nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
-            continue;
+        serializeColumnToExport(io, colOffset, i, nullArray);
+    }
+}
+
+inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
+                              int colOffset, uint8_t *nullArray,
+                              const std::vector<int>* interestingColumns) {
+    if (!interestingColumns) {
+        serializeToExport(io, colOffset, nullArray);
+    } else {
+        std::vector<int> cols = *interestingColumns;
+        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
+            serializeColumnToExport(io, colOffset, *cit, nullArray);
         }
-        getNValue(i).serializeToExport_withoutNull(io);
     }
 }
 

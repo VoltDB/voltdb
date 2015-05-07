@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
@@ -358,17 +357,15 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         PlanNodeTree pnt = new PlanNodeTree();
         try {
             JSONObject jobj = new JSONObject( aggplan );
-            JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadFromJSONPlan(jobj, db);
 
             if( plannedStatement.core.collectorFragment != null ) {
                 //multi-partition query plan
                 String collplan = new String(plannedStatement.core.collectorFragment, Constants.UTF8ENCODING);
                 PlanNodeTree collpnt = new PlanNodeTree();
                 //reattach plan fragments
-                jobj = new JSONObject( collplan );
-                jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                collpnt.loadFromJSONArray(jarray, db);
+                JSONObject jobMP = new JSONObject( collplan );
+                collpnt.loadFromJSONPlan(jobMP, db);
                 assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
                 pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
             }

@@ -271,9 +271,9 @@ public class QueryPlanner {
                 m_partitioning.resetAnalysisState();
             }
         }
+
         // if parameterization isn't requested or if it failed, plan here
         CompiledPlan plan = compileFromXML(m_xmlSQL, null);
-
         if (plan == null) {
             if (m_debuggingStaticModeToRetryOnError) {
                 plan = compileFromXML(m_xmlSQL, null);
@@ -340,7 +340,8 @@ public class QueryPlanner {
 
         // Init Assembler. Each plan assembler requires a new instance of the PlanSelector
         // to keep track of the best plan
-        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
+        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning,
+                (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
@@ -360,7 +361,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.getReadOnly()) {
+        if (bestPlan.isReadOnly()) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
@@ -368,9 +369,10 @@ public class QueryPlanner {
             bestPlan.rootPlanGraph = sendNode;
         }
 
-        // Execute the generateOutputSchema and resolveColumnIndexes Once from the top plan node for only best plan
+        // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
+
         if (parsedStmt instanceof ParsedSelectStmt) {
             List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
             ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
@@ -381,7 +383,7 @@ public class QueryPlanner {
 
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic
-        bestPlan.resetPlanNodeIds();
+        bestPlan.resetPlanNodeIds(1);
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
         List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
@@ -392,6 +394,11 @@ public class QueryPlanner {
             return null;
         }
 
+        /*/ enable for debug ...
+        if (receives.size() > 1) {
+            System.out.println(plan.rootPlanGraph.toExplainPlanString());
+        }
+        // ... enable for debug */
         if (receives.size() == 1) {
             ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);

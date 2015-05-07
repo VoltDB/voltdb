@@ -27,6 +27,7 @@
 
 namespace voltdb {
 class StreamBlock;
+class TableIndex;
 
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
 
@@ -38,7 +39,7 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 0;
+    static const uint8_t DR_VERSION = 1;
 
     DRTupleStream();
 
@@ -63,7 +64,9 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
-                       DRRecordType type);
+                       DRRecordType type,
+                       const TableIndex *uniqueIndex = NULL,
+                       uint32_t uniqueIndexCrc = 0);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
@@ -72,7 +75,7 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId);
 
-    size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
+    size_t computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns);
 
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
@@ -102,7 +105,9 @@ public:
                            int64_t spHandle,
                            int64_t uniqueId,
                            TableTuple &tuple,
-                           DRRecordType type) {
+                           DRRecordType type,
+                           const TableIndex *uniqueIndex = NULL,
+                           uint32_t uniqueIndexCrc = 0) {
         return 0;
     }
 

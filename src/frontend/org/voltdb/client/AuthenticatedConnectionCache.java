@@ -299,7 +299,6 @@ public class AuthenticatedConnectionCache {
             closeClient(e.getValue().client);
         }
         m_connections.clear();
-        m_connections = null;
     }
 
     /**

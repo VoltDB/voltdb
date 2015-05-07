@@ -34,6 +34,8 @@
 #include <cfloat>
 #include <limits>
 
+#include "boost/scoped_ptr.hpp"
+
 using namespace std;
 using namespace voltdb;
 
@@ -42,6 +44,10 @@ static const double floatDelta = 0.000000000001;
 
 class NValueTest : public Test {
     ThreadLocalPool m_pool;
+    boost::scoped_ptr<Pool> m_testPool;
+    boost::scoped_ptr<ExecutorContext> m_executorContext;
+    static PlannerDomRoot m_emptyRoot;
+
 public:
     string str;
     ValueType vt;
@@ -52,6 +58,8 @@ public:
     NValue viaDouble;
     NValue lower;
     NValue upper;
+
+    static PlannerDomValue emptyDom() { return m_emptyRoot.rootObject(); }
 
     void deserDecHelper()
     {
@@ -75,8 +83,19 @@ public:
         scaledDirect = (int64_t)(floatDirect * scale);
     }
 
+    ExecutorContext * getExecutorContextForTest(Pool* testPool)
+    {
+        m_testPool.reset(testPool);
+        ExecutorContext *newExec = new ExecutorContext(0, 0, NULL, NULL, testPool,
+                                                       (NValueArray*)NULL, (VoltDBEngine*)NULL,
+                                                       "", 0, NULL, NULL);
+        m_executorContext.reset(newExec);
+        return m_executorContext.get();
+    }
 
 };
+// An empty JSON object to get simple (non-quantified) behavior from comparators
+PlannerDomRoot NValueTest::m_emptyRoot("{}");
 
 TEST_F(NValueTest, DeserializeDecimal)
 {
@@ -765,9 +784,7 @@ TEST_F(NValueTest, TestCastToDouble) {
 TEST_F(NValueTest, TestCastToString) {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
 
     NValue tinyInt = ValueFactory::getTinyIntValue(120);
     NValue smallInt = ValueFactory::getSmallIntValue(120);
@@ -808,8 +825,6 @@ TEST_F(NValueTest, TestCastToString) {
 
     // Make valgrind happy
     stringValue.free();
-    delete poolHolder;
-    delete testPool;
 }
 
 TEST_F(NValueTest, TestCastToDecimal) {
@@ -2050,9 +2065,8 @@ TEST_F(NValueTest, TestSubstring)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
+
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2134,17 +2148,13 @@ TEST_F(NValueTest, TestSubstring)
         }
         testString.free();
     }
-    delete poolHolder;
-    delete testPool;
 }
 
 TEST_F(NValueTest, TestExtract)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
@@ -2268,8 +2278,6 @@ TEST_F(NValueTest, TestExtract)
     result = longAgo.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
 
-    delete poolHolder;
-    delete testPool;
 }
 
 static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int length, Pool* testPool)
@@ -2337,10 +2345,7 @@ TEST_F(NValueTest, TestInList)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
 
     int int_set1[] = { 10, 2, -3 };
     int int_set2[] = { 0, 1, 100, 10000, 1000000 };
@@ -2393,14 +2398,14 @@ TEST_F(NValueTest, TestInList)
            ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               int_constants_lhs1_1[kk],
                                               in_list_of_int_constants1);
         EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
         delete in_expression;
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               int_constants_lhs1_2[kk],
                                               in_list_of_int_constants2);
         EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
@@ -2420,14 +2425,14 @@ TEST_F(NValueTest, TestInList)
            ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               int_constants_lhs2_1[ll],
                                               in_list_of_int_constants2);
         EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
         delete in_expression;
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               int_constants_lhs2_2[ll],
                                               in_list_of_int_constants1);
         EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
@@ -2486,14 +2491,14 @@ TEST_F(NValueTest, TestInList)
            ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               string_constants_lhs1_1[kk],
                                               in_list_of_string_constants1);
         EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
         delete in_expression;
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               string_constants_lhs1_2[kk],
                                               in_list_of_string_constants2);
         EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
@@ -2513,22 +2518,19 @@ TEST_F(NValueTest, TestInList)
            ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               string_constants_lhs2_1[ll],
                                               in_list_of_string_constants2);
         EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
         delete in_expression;
 
         in_expression =
-            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+            ExpressionUtil::comparisonFactory(emptyDom(), EXPRESSION_TYPE_COMPARE_IN,
                                               string_constants_lhs2_2[ll],
                                               in_list_of_string_constants1);
         EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
         delete in_expression;
     }
-
-    delete poolHolder;
-    delete testPool;
 }
 
 bool checkValueVector(vector<NValue> &values) {
@@ -2545,10 +2547,7 @@ bool checkValueVector(vector<NValue> &values) {
 TEST_F(NValueTest, TestDedupAndSort) {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
 
     std::vector<NValue> vectorValues;
     NValue arrayValue;
@@ -2738,23 +2737,18 @@ TEST_F(NValueTest, TestDedupAndSort) {
     v2.free();
     v3.free();
     v4.free();
-    arrayValue.free();
 
     /////////////////////////////////////////////////////////////
     // Cleanup
     /////////////////////////////////////////////////////////////
-
-    delete poolHolder;
-    delete testPool;
+    arrayValue.free();
 }
 
 TEST_F(NValueTest, TestTimestampStringParse)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
 
     bool failed = false;
     const char* trials[] = {
@@ -3012,17 +3006,13 @@ TEST_F(NValueTest, TestTimestampStringParse)
             break;
         }
     }
-    delete poolHolder;
-    delete testPool;
 }
 
 TEST_F(NValueTest, TestTimestampStringParseShort)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
 
     std::string peekString;
 
@@ -3071,18 +3061,13 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
         EXPECT_FALSE(true);
     }
-
-    delete poolHolder;
-    delete testPool;
 }
 
 TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
     Pool* testPool = new Pool();
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, "", 0, NULL, NULL);
+    getExecutorContextForTest(testPool);
 
     std::string peekString;
 
@@ -3217,9 +3202,6 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
         EXPECT_FALSE(true);
     }
-
-    delete poolHolder;
-    delete testPool;
 }
 
 int main() {
