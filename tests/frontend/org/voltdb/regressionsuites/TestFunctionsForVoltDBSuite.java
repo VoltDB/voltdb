@@ -608,17 +608,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "Could not convert to number");
     }
 
-    public void testRepeat() throws Exception {
-        System.out.println("STARTING Repeat Test");
-        Client client = getClient();
-
-        // ENG-7015 If the result of the REPEAT function would be too large we throw an exception.
-        ClientResponse cr;
-        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        verifyStmtFails(client, "select REPEAT('foo', 1000000) from R3 where id = 1;", "VOLTDB ERROR: SQL ERROR\\s*REPEAT function call would create a string of size \\d+ which is larger than the maximum size \\d+");
-    }
-
     public void testSINCE_EPOCH() throws Exception {
         System.out.println("STARTING SINCE_EPOCH");
         Client client = getClient();
