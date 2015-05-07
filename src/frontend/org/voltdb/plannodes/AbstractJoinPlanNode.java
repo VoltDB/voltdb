@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -114,6 +115,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     {
         if (predicate != null) {
             m_wherePredicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_wherePredicate = null;
         }
     }
 
@@ -124,6 +127,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     {
         if (predicate != null) {
             m_preJoinPredicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_preJoinPredicate = null;
         }
     }
 
@@ -134,6 +139,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     {
         if (predicate != null) {
             m_joinPredicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_joinPredicate = null;
         }
     }
 
@@ -158,12 +165,20 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
 
-        generateRealOutputSchema();
+        // Generate the output schema for subqueries
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
+
+        generateRealOutputSchema(db);
     }
 
-    protected void generateRealOutputSchema() {
+    protected void generateRealOutputSchema(Database db) {
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
+            // generate its subquery output schema
+            aggNode.generateOutputSchema(db);
+
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
         } else {
             m_outputSchema = m_outputSchemaPreInlineAgg;
@@ -227,6 +242,16 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
         m_outputSchemaPreInlineAgg = new_output_schema;
         m_hasSignificantOutputSchema = true;
+
+        // Finally, resolve predicates
+        resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
+        resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
+        resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
+
+        // Resolve subquery expression indexes
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
 
         resolveRealOutputSchema();
     }
@@ -351,6 +376,16 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             }
         }
         return result;
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_preJoinPredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_joinPredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_wherePredicate, aeClass));
+        return collected;
     }
 
 }

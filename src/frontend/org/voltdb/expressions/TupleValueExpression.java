@@ -46,6 +46,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected int m_tableIdx = 0;
 
     private boolean m_hasAggregate = false;
+    /** The statement id this TVE refers to */
+    private int m_origStmtId = -1;
 
     /**
      * Create a new TupleValueExpression
@@ -105,6 +107,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
+        clone.m_origStmtId = m_origStmtId;
         return clone;
     }
 
@@ -196,6 +199,21 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableIdx = idx;
     }
 
+    /**
+     *  Set the parent TVE indicator
+     * @param parentTve
+     */
+    public void setOrigStmtId(int origStmtId) {
+        m_origStmtId = origStmtId;
+    }
+
+    /**
+     * @return parent TVE indicator
+     */
+    public int getOrigStmtId() {
+        return m_origStmtId;
+    }
+
     public void setTypeSizeBytes(VoltType SchemaColumnType, int size, boolean bytes) {
         setValueType(SchemaColumnType);
         setValueSize(size);
@@ -212,6 +230,14 @@ public class TupleValueExpression extends AbstractValueExpression {
             return false;
         }
         TupleValueExpression expr = (TupleValueExpression) obj;
+        if (m_origStmtId != -1 && expr.m_origStmtId != -1) {
+            // Implying both sides have statement id set
+            // If one of the ids is not set it is considered to be a wild card
+            // matching any other id.
+            if (m_origStmtId != expr.m_origStmtId) {
+                return false;
+            }
+        }
 
         if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
@@ -339,7 +365,7 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String tableName = m_tableName;
+        String tableName = (m_tableAlias != null) ? m_tableAlias : m_tableName;
         String columnName = m_columnName;
         if (columnName == null || columnName.equals("")) {
             columnName = "column#" + m_columnIndex;

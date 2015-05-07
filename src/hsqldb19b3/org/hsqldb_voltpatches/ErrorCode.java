@@ -608,6 +608,11 @@ public interface ErrorCode {
     int X_46102 = 6012;                                   // invalid JAR name in path
     int X_46103 = 6013;                                   // unresolved class name
 
+    // A VoltDB extension to implement subquery syntax limitations
+    int X_47000 = 7000;                                   // invalid WHERE expression
+    int X_47001 = 7001;                                   // subquery WHERE expression with parent aggregates
+
+    // End of VoltDB extension
     // Unknown Error: Catch-All - xxxx
     int X_99000 = 6500;                                   // Unknown Error: Catch-All
     int X_99099 = 6501;                                   // Error converting vendor code to SQL state code

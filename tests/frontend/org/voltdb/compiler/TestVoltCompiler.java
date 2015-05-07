@@ -2300,6 +2300,11 @@ public class TestVoltCompiler extends TestCase {
                 "as select num, count(*) from (select num from t) subt group by num; \n";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
 
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total) " +
+                "as select num, count(*) from t where id in (select id from t) group by num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
@@ -3712,12 +3717,7 @@ public class TestVoltCompiler extends TestCase {
         ddl =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
-        // @TODO: Remove TRY/CATCH once subqueries are supported
-        try {
-            checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
-        } catch (PlanningErrorException e) {
-            assertTrue(e.getMessage().contains("Unsupported subquery syntax within an expression."));
-        }
+        checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
 }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {

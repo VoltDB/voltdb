@@ -70,6 +70,7 @@ namespace voltdb
 
     private:
         AggregateExecutorBase* m_aggExec;
+
     };
 }
 

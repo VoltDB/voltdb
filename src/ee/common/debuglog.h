@@ -230,6 +230,8 @@ public:
         }
     }
 
+    static std::string stringStackTrace();
+
 private:
     char** m_traceSymbols;
     std::vector<std::string> m_traces;

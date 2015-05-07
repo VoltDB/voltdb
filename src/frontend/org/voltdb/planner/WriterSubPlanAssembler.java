@@ -65,9 +65,11 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     @Override
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
-            // Analyze join conditions
             assert (m_parsedStmt.m_joinTree != null);
+            // Clone the node to make make sure that analyze expression is called
+            // only once on the node.
             JoinNode tableNode = (JoinNode) m_parsedStmt.m_joinTree.clone();
+            // Analyze join conditions
             tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
             // these just shouldn't happen right?
             assert(m_parsedStmt.m_noTableSelectionList.size() == 0);

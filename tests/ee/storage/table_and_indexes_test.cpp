@@ -53,7 +53,9 @@ static int64_t addPartitionId(int64_t value) {
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, "", 0, &drStream, &drReplicatedStream);
+            NValueArray* noParams = NULL;
+            VoltDBEngine* noEngine = NULL;
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, noEngine, "", 0, &drStream, &drReplicatedStream);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
@@ -192,8 +194,10 @@ class TableAndIndexTest : public Test {
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
+                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 districtTable->addIndex(index);
+                districtTableReplica->addIndex(replicaIndex);
             }
 
             districtTempTable = dynamic_cast<TempTable*>(
@@ -228,8 +232,10 @@ class TableAndIndexTest : public Test {
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
+                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 customerTable->addIndex(index);
+                customerTableReplica->addIndex(replicaIndex);
             }
 
             customerTempTable =  dynamic_cast<TempTable*>(

@@ -910,10 +910,6 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@ApplyBinaryLogSP",
-                ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
-        Procedures.put("@ApplyBinaryLogMP",
-                       ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("varbinary", "varbinary", "int", "int", "int")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
@@ -1136,7 +1132,6 @@ public class SQLCommand
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
             return SQLParser.parseQuery(m_testFrontEndResult);
-
         } catch (Exception ioe) {}
         return null;
     }
