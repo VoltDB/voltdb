@@ -29,6 +29,7 @@ import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -40,7 +41,6 @@ import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -424,20 +424,28 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertEquals(ExpressionType.OPERATOR_EXISTS, e.getExpressionType());
         AbstractSubqueryExpression subExpr = (AbstractSubqueryExpression) e.getLeft();
         AbstractPlanNode sn = subExpr.getSubqueryNode();
-        //* enable to debug */ System.out.println(sn.toExplainPlanString());
-////        assertTrue(sn instanceof ProjectionPlanNode);
-////        sn = sn.getChild(0);
-////TODO: This ORDER BY serves no purpose?
-        assertTrue(sn instanceof OrderByPlanNode);
-        assertNotNull(sn.getInlinePlanNode(PlanNodeType.LIMIT));
-        sn = sn.getChild(0);
-////TODO: This PROJECTION (not even inline) serves no purpose?
-        assertTrue(sn instanceof ProjectionPlanNode);
+        // Added LIMIT 1
+        assertEquals(true, sn instanceof LimitPlanNode);
+        assertEquals(1, ((LimitPlanNode)sn).getLimit());
         sn = sn.getChild(0);
         assertTrue(sn instanceof SeqScanPlanNode);
-
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(sn);
         assertNotNull(aggNode.getPostPredicate());
+
+//        //* enable to debug */ System.out.println(sn.toExplainPlanString());
+//////        assertTrue(sn instanceof ProjectionPlanNode);
+//////        sn = sn.getChild(0);
+//////TODO: This ORDER BY serves no purpose?
+//        assertTrue(sn instanceof SeqScanPlanNode);
+//        assertNotNull(sn.getInlinePlanNode(PlanNodeType.AGGREGATE));
+//        sn = sn.getChild(0);
+//////TODO: This PROJECTION (not even inline) serves no purpose?
+//        assertTrue(sn instanceof ProjectionPlanNode);
+//        sn = sn.getChild(0);
+//        assertTrue(sn instanceof SeqScanPlanNode);
+//
+//        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(sn);
+//        assertNotNull(aggNode.getPostPredicate());
     }
 
     public void testInHaving() {
@@ -604,9 +612,81 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
     }
 
-    public void testSendReceiveInSubquery() {
-        //      compileToFragments("select * from r1, (select * from r2 left join P1 on r2.a = p1.c left join r1 on p1.c = r1.a) t where r1.c = 1");
-    }
+    public void testExistsSimplification() {
+        {
+            // LIMIT is 0 EXISTS => FALSE
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select a, c  from r2 limit 0) ");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "0");
+        }
+        {
+            // LIMIT is 0 EXISTS => FALSE
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select count(*)  from r2 limit 0) ");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "0");
+        }
+        {
+            // table-agg-without-having-groupby OFFSET > 0 => FALSE
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select count(*)  from r2 offset 1) ");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "0");
+        }
+        {
+            // table-agg-without-having-groupby  => TRUE
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select max(a)  from r2) ");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "1");
+        }
+        {
+            // table-agg-without-having-groupby by limit is a parameter => EXISTS
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select max(a)  from r2 limit ?) ");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            AbstractExpression p = ((SeqScanPlanNode) pn.getChild(0)).getPredicate();
+            assertEquals(true, p != null);
+            assertEquals(ExpressionType.OPERATOR_EXISTS, p.getExpressionType());
+        }
+        {
+            // Subquery => select 1 from r2 limit 1 offset 2
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select a, c  from r2 order by a offset 2) ");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyTrivialSchemaLimitOffset(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), 1, 2);
+        }
+        {
+            // User's limit ?
+            // Subquery => EXISTS (select 1 from r2 limit ?)
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select a, c  from r2 order by a limit ?) ");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyTrivialSchemaLimitOffset(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), -1, 0);
+        }
+        {
+            // Subquery subquery-without-having with group by and no limit => select max(c) from r2 limit 1
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select a, max(c) from r2 group by a order by max(c))");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyAggregateSubquery(((SeqScanPlanNode)pn.getChild(0)).getPredicate(), 1, 0, false);
+        }
+        {
+         // Subquery subquery-without-having with group by and offset 3 => subquery-without-having with group by and offset 3
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                " (select a, max(c) from r2 group by a order by max(c) offset 2)");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyAggregateSubquery(((SeqScanPlanNode)pn.getChild(0)).getPredicate(), 2, 1, false);
+        }
+        {
+            // Subquery subquery-wit-having with group by => subquery-with-having with group by
+            AbstractPlanNode pn = compile("select a from r1 where exists " +
+                    " (select a, max(c) from r2 group by a having max(c) > 2 order by max(c))");
+            assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
+            verifyAggregateSubquery(((SeqScanPlanNode)pn.getChild(0)).getPredicate(), 2, 1, true);
+        }
+   }
 
     // HSQL failed to parse  these statement
     public void testHSQLFailed() {
@@ -648,6 +728,42 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     //      AbstractExpression e = spn.getPredicate();
     //      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
     //    }
+
+    private void verifyCVEPredicate(AbstractExpression p, String value) {
+        assertEquals(true, p != null);
+        assertEquals(ExpressionType.VALUE_CONSTANT, p.getExpressionType());
+        assertEquals(value, ((ConstantValueExpression) p).getValue());
+
+    }
+
+    private void verifyAggregateSubquery (AbstractExpression exists, int columnCount, int groupByCount, boolean hasHaving) {
+        assertEquals(true, exists != null);
+        assertEquals(ExpressionType.OPERATOR_EXISTS, exists.getExpressionType());
+        AbstractSubqueryExpression se = (AbstractSubqueryExpression)exists.getLeft();
+        AbstractPlanNode sn = se.getSubqueryNode();
+        assertEquals(true, sn instanceof AbstractScanPlanNode);
+        AbstractPlanNode inline = sn.getInlinePlanNode(PlanNodeType.AGGREGATE);
+        assertEquals(true, inline != null);
+        assertEquals(columnCount, inline.getOutputSchema().size());
+        AggregatePlanNode agg = (AggregatePlanNode) inline;
+        assertEquals(groupByCount, agg.getGroupByExpressions().size());
+        assertEquals(hasHaving, agg.getPostPredicate() != null);
+    }
+
+    private void verifyTrivialSchemaLimitOffset(AbstractExpression exists, int limit, int offset) {
+        assertEquals(true, exists != null);
+        assertEquals(ExpressionType.OPERATOR_EXISTS, exists.getExpressionType());
+        AbstractSubqueryExpression se = (AbstractSubqueryExpression)exists.getLeft();
+        AbstractPlanNode pn = se.getSubqueryNode();
+        assertEquals(true, pn instanceof SeqScanPlanNode);
+        AbstractPlanNode inline = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
+        assertEquals(true, inline != null);
+        assertEquals(1, inline.getOutputSchema().size());
+        inline = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+        assertEquals(true, inline != null);
+        assertEquals(limit, ((LimitPlanNode) inline).getLimit());
+        assertEquals(offset, ((LimitPlanNode) inline).getOffset());
+    }
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();

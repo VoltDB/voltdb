@@ -467,4 +467,16 @@ public class ConstantValueExpression extends AbstractValueExpression {
         return m_value;
     }
 
+    /**
+     * Create a new CVe for a given type and value
+     * @param dataType
+     * @param value
+     * @return
+     */
+    public static ConstantValueExpression makeExpression(VoltType dataType, String value) {
+        ConstantValueExpression constantExpr = new ConstantValueExpression();
+        constantExpr.setValueType(dataType);
+        constantExpr.setValue(value);
+        return constantExpr;
+    }
 }
