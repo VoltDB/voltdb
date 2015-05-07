@@ -96,6 +96,14 @@ class AbstractExecutor {
         // LEAVE as blank on purpose
     }
 
+    inline bool outputTempTableIsEmpty() const {
+        if (m_tmpOutputTable != NULL) {
+            return m_tmpOutputTable->activeTupleCount() == 0;
+        }
+
+        return true;
+    }
+
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;

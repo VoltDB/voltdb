@@ -91,14 +91,14 @@ ExecutorContext* ExecutorContext::getExecutorContext() {
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
 
-Table* ExecutorContext::executeExecutors(int subqueryId) const
+Table* ExecutorContext::executeExecutors(int subqueryId)
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     return executeExecutors(executorList, subqueryId);
 }
 
 Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                                         int subqueryId) const
+                                         int subqueryId)
 {
     // Walk through the list and execute each plannode.
     // The query planner guarantees that for a given plannode,
@@ -122,7 +122,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.
-        cleanupExecutorsForSubquery(subqueryId);
+        cleanupAllExecutors();
         // Normally, each executor cleans its memory pool as it finishes execution,
         // but in the case of a throw, it may not have had the chance.
         // So, clean up all the memory pools now.
@@ -160,13 +160,16 @@ Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
     return executorList.back()->getPlanNode()->getOutputTable();
 }
 
-void ExecutorContext::cleanupAllExecutors() const
+void ExecutorContext::cleanupAllExecutors()
 {
     typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
     BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
         int subqueryId = entry.first;
         cleanupExecutorsForSubquery(subqueryId);
     }
+
+    // Clear any cached results from executed subqueries
+    m_subqueryContextMap.clear();
 }
 
 void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
@@ -176,6 +179,18 @@ void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
         assert(executor);
         executor->cleanupTempOutputTable();
     }
+}
+
+bool ExecutorContext::allOutputTempTablesAreEmpty() const {
+    typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+    BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
+        BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
+            if (! executor->outputTempTableIsEmpty()) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 } // end namespace voltdb
