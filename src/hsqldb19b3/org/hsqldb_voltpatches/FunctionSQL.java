@@ -43,9 +43,6 @@ import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
 
-// A VoltDB extension to allow use of X'..' as numeric literals
-import java.math.BigInteger;
-// End VoltDB extension
 /**
  * Implementation of SQL standard function calls
  *
@@ -283,6 +280,17 @@ public class FunctionSQL extends Expression {
                     Tokens.X_KEYSET, 2, Tokens.CHARACTERS, Tokens.OCTETS,
                     Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to support more flexible call syntax
+                // Allowing commas in the place of the traditional separator
+                // keywords "IN" and "USING", because that is more
+                // convenient to canonically re-generate.
+                parseListAlt = new short[] {
+                        Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                        Tokens.QUESTION, Tokens.X_OPTION, 5, Tokens.COMMA,
+                        Tokens.X_KEYSET, 2, Tokens.CHARACTERS, Tokens.OCTETS,
+                        Tokens.CLOSEBRACKET
+                    };
+                // End of VoltDB extension
                 break;
 
             case FUNC_OCCURENCES_REGEX :
@@ -312,6 +320,21 @@ public class FunctionSQL extends Expression {
                     Tokens.TIMEZONE_MINUTE, Tokens.FROM, Tokens.QUESTION,
                     Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to support more flexible call syntax
+                // Allowing commas in the place of the traditional separator
+                // keyword "FROM", because that is more
+                // convenient to canonically re-generate.
+                parseListAlt = new short[] {
+                        Tokens.OPENBRACKET, Tokens.X_KEYSET, 18, Tokens.YEAR,
+                        Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
+                        Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
+                        Tokens.QUARTER, Tokens.DAY_OF_YEAR, Tokens.DAY_OF_MONTH,
+                        Tokens.DAY_NAME, Tokens.MONTH_NAME,
+                        Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR,
+                        Tokens.WEEKDAY, Tokens.WEEK, Tokens.TIMEZONE_MINUTE,
+                        Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET
+                    };
+                // End of VoltDB extension
                 break;
 
             case FUNC_CHAR_LENGTH :
@@ -462,6 +485,20 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 1, Tokens.QUESTION,        //
                     Tokens.FROM, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to support more flexible call syntax
+                // TRIM ( [ LEADING|TRAILING|BOTH ,] value [, value] )
+                // This syntax is not standard, but it's "intuitive"
+                // and convenient to canonically re-generate.
+                parseListAlt = new short[] {
+                        Tokens.OPENBRACKET, Tokens.X_OPTION, 6,
+                        Tokens.X_KEYSET, 3,
+                        Tokens.LEADING, Tokens.TRAILING, Tokens.BOTH,
+                        Tokens.COMMA,
+                        Tokens.QUESTION,
+                        Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION,
+                        Tokens.CLOSEBRACKET
+                    };
+                // End of VoltDB extension
                 break;
 
             /*
@@ -486,6 +523,18 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 2, Tokens.USING, Tokens.CHARACTERS,
                     Tokens.CLOSEBRACKET
                 };
+                // A VoltDB extension to support more flexible call syntax
+                // Allowing commas in the place of the traditional separator
+                // keywords "FROM", "FOR" and "USING", because that is more
+                // convenient to canonically re-generate.
+                parseListAlt = new short[] {
+                    Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                    Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION,
+                    Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.CHARACTERS,
+                    Tokens.CLOSEBRACKET
+                    };
+                // End of VoltDB extension
                 break;
 
             case FUNC_CURRENT_CATALOG :
@@ -1526,14 +1575,25 @@ public class FunctionSQL extends Expression {
                                             Type.SQL_INTEGER);
                 }
 
+                // A VoltDB extension to support more flexible call syntax.
+                // When using comma separators, one string argument may
+                // have been provided. It is syntactically the first string
+                // argument so the second defaults to null.
+                // However, the intent is for the FIRST argument to be the
+                // optional one, NOT the SECOND. So, swap the two.
+                // This leaves the first string argument null to be replaced
+                // with the default value ' '.
+                if (nodes[2] == null) {
+                	nodes[2] = nodes[1];
+                	nodes[1] = null;
+                }
+
+                // End of VoltDB extension
                 if (nodes[2].dataType == null) {
                     throw Error.error(ErrorCode.X_42567);
                 }
 
                 dataType = nodes[2].dataType;
-                // A VoltDB extension to customize the SQL function set support
-                parameterArg = 2;
-                // End of VoltDB extension
 
                 if (dataType.isCharacterType()) {
                     funcType = FUNC_TRIM_CHAR;
@@ -2072,12 +2132,14 @@ public class FunctionSQL extends Expression {
 
     /************************* Volt DB Extensions *************************/
 
-    // FunctionCustom adds a few values to the range of FUNC_ constants above that should probaby be
+    // FunctionCustom adds a few values to the range of FUNC_ constants above that should probably be
     // kept unique. types.DTIType and Types add a few values to the range used by VoltDB for
     // implementing EXTRACT variants. These are based on other ranges of constants that
     // DO overlap with these FUNC_ constant, so they are dynamically adjusted with the
-    // following fixed offset when used as function ids.
-    private final static int   SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+    // following fixed offset when used as function ids. The Tokens.java constants that are used
+    // to parameterize the TRIM functions have a similar overlap issue and need their own offset.
+    private final static int SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+    private final static int SQL_TRIM_VOLT_FUNC_OFFSET = 2000;
 
     // Assume that 10000-19999 are available for VoltDB-specific use
     // in specialized implementations of existing HSQL functions.
@@ -2103,105 +2165,136 @@ public class FunctionSQL extends Expression {
         }
         int volt_funcType = funcType;
 
+        String volt_alias = null;
+        int keywordConstant = 0;
+
         switch (funcType) {
+        case FUNC_TRIM_CHAR :
+            volt_alias = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            switch (keywordConstant) {
+
+                case Tokens.BOTH :
+                    volt_alias = "trim(both";
+                    break;
+
+                case Tokens.LEADING :
+                    volt_alias = "trim(leading";
+                    break;
+
+                case Tokens.TRAILING :
+                    volt_alias = "trim(trailing";
+                    break;
+
+                default :
+                    throw Error.runtimeError(ErrorCode.U_S0500,
+                                             "FunctionSQL");
+            }
+            assert(volt_alias != null);
+            exp.attributes.put("function_id", String.valueOf(keywordConstant + SQL_TRIM_VOLT_FUNC_OFFSET));
+            exp.attributes.put("volt_alias", volt_alias);
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+
         case FUNC_SUBSTRING_CHAR :
             // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
             if (nodes.length == 2 || nodes[2] == null) {
-                exp.attributes.put("volt_alias", "substring_from");
                 volt_funcType = FUNC_VOLT_SUBSTRING_CHAR_FROM;
-            } else {
-                exp.attributes.put("volt_alias", "substring_from_for");
             }
-            break;
+            exp.attributes.put("function_id", String.valueOf(volt_funcType));
+            return exp;
+
         case FUNC_EXTRACT :
             // A little tweaking is needed here because VoltDB wants to define separate functions for each extract "field" (hard-coded node[0] value).
-            String volt_alias = null;
-            int keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            volt_alias = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
             switch (keywordConstant) {
             case Tokens.DAY_NAME :
             // case DTIType.DAY_NAME :
-                volt_alias = "day_name";
+                volt_alias = "extract(day_name";
                 break;
             case Tokens.MONTH_NAME :
             // case DTIType.MONTH_NAME :
-                volt_alias = "month_name";
+                volt_alias = "extract(month_name";
                 break;
             case Tokens.QUARTER :
             // case DTIType.QUARTER :
-                volt_alias = "quarter";
+                volt_alias = "extract(quarter";
                 break;
             case Tokens.DAY_OF_YEAR :
             // case DTIType.DAY_OF_YEAR :
-                volt_alias = "day_of_year";
+                volt_alias = "extract(day_of_year";
                 break;
             case Tokens.WEEKDAY :
-                volt_alias = "weekday";
+                volt_alias = "extract(weekday";
                 break;
             case Tokens.DAY_OF_WEEK :
             // case DTIType.DAY_OF_WEEK :
-                volt_alias = "day_of_week";
+                volt_alias = "extract(day_of_week";
                 break;
             case Tokens.WEEK:
                 keywordConstant = Tokens.WEEK_OF_YEAR;
             case Tokens.WEEK_OF_YEAR :
             // case DTIType.WEEK_OF_YEAR :
-                volt_alias = "week_of_year";
+                volt_alias = "extract(week_of_year";
                 break;
             case Types.SQL_INTERVAL_YEAR :
-                volt_alias = "interval_year";
+                volt_alias = "extract(interval_year";
                 break;
             case Types.SQL_INTERVAL_MONTH :
-                volt_alias = "interval_month";
+                volt_alias = "extract(interval_month";
                 break;
             case Types.SQL_INTERVAL_DAY :
-                volt_alias = "interval_day";
+                volt_alias = "extract(interval_day";
                 break;
             case Types.SQL_INTERVAL_HOUR :
-                volt_alias = "interval_hour";
+                volt_alias = "extract(interval_hour";
                 break;
             case Types.SQL_INTERVAL_MINUTE :
-                volt_alias = "interval_minute";
+                volt_alias = "extract(interval_minute";
                 break;
             case Types.SQL_INTERVAL_SECOND :
-                volt_alias = "interval_second";
+                volt_alias = "extract(interval_second";
                 break;
             case Tokens.YEAR :
-                volt_alias = "year";
+                volt_alias = "extract(year";
                 break;
             case Tokens.MONTH :
-                volt_alias = "month";
+                volt_alias = "extract(month";
                 break;
             case Tokens.DAY_OF_MONTH :
             // case DTIType.DAY_OF_MONTH :
                 keywordConstant = Tokens.DAY;
             case Tokens.DAY :
-                volt_alias = "day";
+                volt_alias = "extract(day";
                 break;
             case Tokens.HOUR :
-                volt_alias = "hour";
+                volt_alias = "extract(hour";
                 break;
             case Tokens.MINUTE :
-                volt_alias = "minute";
+                volt_alias = "extract(minute";
                 break;
             case Tokens.SECOND :
-                volt_alias = "interval_second";
+                volt_alias = "extract(second";
                 break;
             case Tokens.SECONDS_MIDNIGHT :
             // case DTIType.SECONDS_MIDNIGHT :
-                volt_alias = "seconds_midnight";
+                volt_alias = "extract(seconds_midnight";
                 break;
             case Tokens.TIMEZONE_HOUR :
             // case DTIType.TIMEZONE_HOUR :
-                volt_alias = "timezone_hour";
+                volt_alias = "extract(timezone_hour";
                 break;
             case Tokens.TIMEZONE_MINUTE :
             // case DTIType.TIMEZONE_MINUTE :
-                volt_alias = "timezone_minute";
+                volt_alias = "extract(timezone_minute";
                 break;
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
+            assert(volt_alias != null);
             exp.attributes.put("function_id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
             exp.attributes.put("volt_alias", volt_alias);
             // Having accounted for the first argument, remove it from the child expression list.
@@ -2231,6 +2324,8 @@ public class FunctionSQL extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
+            assert(volt_alias != null);
+            assert(-1 != since_epoch_func);
             exp.attributes.put("function_id", String.valueOf(since_epoch_func));
             exp.attributes.put("volt_alias", volt_alias);
 
@@ -2244,23 +2339,24 @@ public class FunctionSQL extends Expression {
             int to_timestamp_func = -1;
             switch (keywordConstant) {
             case Tokens.SECOND :
-                volt_alias = "to_timestamp_second";
+                volt_alias = "to_timestamp(second";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND;
                 break;
             case Tokens.MILLIS :
             case Tokens.MILLISECOND :
-                volt_alias = "to_timestamp_millisecond";
+                volt_alias = "to_timestamp(millisecond";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
                 break;
             case Tokens.MICROS :
             case Tokens.MICROSECOND :
-                volt_alias = "to_timestamp_microsecond";
+                volt_alias = "to_timestamp(microsecond";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
                 break;
             default:
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
+            assert(-1 != to_timestamp_func);
             exp.attributes.put("function_id", String.valueOf(to_timestamp_func));
             exp.attributes.put("volt_alias", volt_alias);
 
@@ -2274,47 +2370,49 @@ public class FunctionSQL extends Expression {
             int truncate_func = -1;
             switch (keywordConstant) {
             case Tokens.YEAR :
-                volt_alias = "truncate_year";
+                volt_alias = "truncate(year";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_YEAR;
                 break;
             case Tokens.QUARTER :
-                volt_alias = "truncate_quarter";
+                volt_alias = "truncate(quarter";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_QUARTER;
                 break;
             case Tokens.MONTH :
-                volt_alias = "truncate_month";
+                volt_alias = "truncate(month";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MONTH;
                 break;
             case Tokens.DAY :
-                volt_alias = "truncate_day";
+                volt_alias = "truncate(day";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_DAY;
                 break;
             case Tokens.HOUR :
-                volt_alias = "truncate_hour";
+                volt_alias = "truncate(hour";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_HOUR;
                 break;
             case Tokens.MINUTE :
-                volt_alias = "truncate_minute";
+                volt_alias = "truncate(minute";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MINUTE;
                 break;
             case Tokens.SECOND :
-                volt_alias = "truncate_second";
+                volt_alias = "truncate(second";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_SECOND;
                 break;
             case Tokens.MILLIS:
             case Tokens.MILLISECOND :
-                volt_alias = "truncate_millisecond";
+                volt_alias = "truncate(millisecond";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MILLISECOND;
                 break;
             case Tokens.MICROS:
             case Tokens.MICROSECOND :
-                volt_alias = "truncate_microseconcd";
+                volt_alias = "truncate(microseconcd";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MICROSECOND;
                 break;
             default:
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
+            assert(volt_alias != null);
+            assert(-1 != truncate_func);
             exp.attributes.put("function_id", String.valueOf(truncate_func));
             exp.attributes.put("volt_alias", volt_alias);
 
@@ -2326,25 +2424,9 @@ public class FunctionSQL extends Expression {
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);
             }
-            break;
+            exp.attributes.put("function_id", String.valueOf(volt_funcType));
+            return exp;
         }
-
-        exp.attributes.put("function_id", String.valueOf(volt_funcType));
-
-        switch (funcType) {
-        case FUNC_SUBSTRING_CHAR :
-            // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
-            if (nodes.length == 2 || nodes[2] == null) {
-                exp.attributes.put("volt_alias", "substring_from");
-            } else {
-                exp.attributes.put("volt_alias", "substring_from_for");
-            }
-            break;
-        default :
-            break;
-        }
-
-        return exp;
     }
 
     public static int voltGetCurrentTimestampId() {

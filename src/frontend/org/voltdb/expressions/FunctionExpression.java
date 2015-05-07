@@ -17,7 +17,6 @@
 
 package org.voltdb.expressions;
 
-import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -53,6 +52,8 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     public void setAttributes(String name, String volt_alias, int id) {
+        assert(name != null);
+        assert(volt_alias != null);
         m_name = name;
         m_alias = volt_alias;
         m_functionId = id;
@@ -161,17 +162,16 @@ public class FunctionExpression extends AbstractExpression {
             // (when asserts are turned off) with an NPE on the next line.
             return false;
         }
-        if (m_name.equals(expr.m_name) == false) {
+        if ( ! m_name.equals(expr.m_name)) {
             return false;
         }
+        assert(m_alias != null);
         if (m_alias == null) {
-            if (expr.m_alias != null) {
-                return false;
-            }
-        } else {
-            if (m_alias.equals(expr.m_alias) == false) {
-                return false;
-            }
+            // This, too, is unpossible.
+            return false;
+        }
+        if ( ! m_alias.equals(expr.m_alias)) {
+            return false;
         }
         if (m_functionId != expr.m_functionId) {
             return false;
@@ -198,10 +198,10 @@ public class FunctionExpression extends AbstractExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+        assert(m_name != null);
+        assert(m_alias != null);
         stringer.key(Members.NAME.name()).value(m_name);
-        if (m_alias != null) {
-            stringer.key(Members.ALIAS.name()).value(m_alias);
-        }
+        stringer.key(Members.ALIAS.name()).value(m_alias);
         stringer.key(Members.FUNCTION_ID.name()).value(m_functionId);
         stringer.key(Members.PARAMETER_ARG.name()).value(m_parameterArg);
     }
@@ -211,6 +211,8 @@ public class FunctionExpression extends AbstractExpression {
     {
         m_name = obj.getString(Members.NAME.name());
         m_alias = obj.getString(Members.ALIAS.name());
+        assert(m_name != null);
+        assert(m_alias != null);
         m_functionId = obj.getInt(Members.FUNCTION_ID.name());
         m_parameterArg = obj.getInt(Members.PARAMETER_ARG.name());
     }
@@ -291,12 +293,36 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String result = m_name;
-        String connector = "(";
-        // This is temporary and will be replaced once the Unit Attribute is in the XML
-        if (FunctionForVoltDB.isUnitFunction(m_functionId)) {
-            result += connector + m_alias.substring(m_name.length()+1);
-            connector = ", ";
+        assert(m_name != null);
+        assert(m_alias != null);
+        String result = m_name + "(";
+        String connector = "";
+        // The main purpose of m_alias is to allow functions with leading
+        // keyword arguments to be treated as distinct functions in the
+        // VoltDB implementation but to be "unified" back to their original/
+        // generic form by this method.
+        // This is useful in the usual "explain plan" output AND in the
+        // re-generation of SQL syntax for round trips back to the parser.
+        // For example, SQL function invocations like
+        //   "trim(leading 'X' from field)" and
+        //   "trim(trailing 'X' from field)"
+        // get invoked as separate volt functions.
+        // They are modeled internally as something more like
+        // "trim_leading('X', field)" and "trim_trailing('X', field)".
+        // Note: it's actually the function Id, not the alias that drives
+        // the implementation.
+        // The m_alias is solely to support this formatting special case.
+        // We slightly extended the supported SQL grammar to allow consistent
+        // use of comma separators even in non-traditional cases like:
+        //   "trim(leading, 'X', field)" as a normalized equivalent of
+        //   "trim(leading 'X' from field)".
+        // Other cases that use this mechanism are variants of the SQL functions
+        // "extract", "suince_epoch", "to_timestamp", and "truncate".
+
+        int prefixlength = result.length();
+        if (m_alias.length() > prefixlength) { // m_alias != m_name
+            assert(m_alias.startsWith(result));
+            result = m_alias + ", ";
         }
         if (m_args != null) {
             for (AbstractExpression arg : m_args) {

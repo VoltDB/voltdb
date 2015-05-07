@@ -335,8 +335,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new UnaryFunctionExpression<FUNC_VOLT_HEX>((*arguments)[0]);
             break;
         case FUNC_VOLT_BIN:
-                ret = new UnaryFunctionExpression<FUNC_VOLT_BIN>((*arguments)[0]);
-                break;
+            ret = new UnaryFunctionExpression<FUNC_VOLT_BIN>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
@@ -365,6 +365,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_LEFT:
             ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
             break;
+        case FUNC_OVERLAY_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
+            break;
         case FUNC_POSITION_CHAR:
             ret = new GeneralFunctionExpression<FUNC_POSITION_CHAR>(*arguments);
             break;
@@ -374,20 +377,23 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_REPEAT:
             ret = new GeneralFunctionExpression<FUNC_REPEAT>(*arguments);
             break;
+        case FUNC_REPLACE:
+            ret = new GeneralFunctionExpression<FUNC_REPLACE>(*arguments);
+            break;
         case FUNC_RIGHT:
             ret = new GeneralFunctionExpression<FUNC_RIGHT>(*arguments);
             break;
         case FUNC_SUBSTRING_CHAR:
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
             break;
-        case FUNC_TRIM_CHAR:
-            ret = new GeneralFunctionExpression<FUNC_TRIM_CHAR>(*arguments);
+        case FUNC_TRIM_BOTH_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_BOTH_CHAR>(*arguments);
             break;
-        case FUNC_REPLACE:
-            ret = new GeneralFunctionExpression<FUNC_REPLACE>(*arguments);
+        case FUNC_TRIM_LEADING_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_LEADING_CHAR>(*arguments);
             break;
-        case FUNC_OVERLAY_CHAR:
-            ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
+        case FUNC_TRIM_TRAILING_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_TRAILING_CHAR>(*arguments);
             break;
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
@@ -401,17 +407,17 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
             break;
+        case FUNC_VOLT_FORMAT_CURRENCY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
+            break;
+        case FUNC_VOLT_SET_FIELD:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
-            break;
-        case FUNC_VOLT_SET_FIELD:
-            ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);
-            break;
-        case FUNC_VOLT_FORMAT_CURRENCY:
-            ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
             break;
         default:
             return NULL;
