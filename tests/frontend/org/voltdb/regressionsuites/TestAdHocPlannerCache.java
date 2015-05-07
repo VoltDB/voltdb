@@ -37,6 +37,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
     private static final int CACHE_MISS2 = 1;
     private static final int CACHE_HIT1 = 2;
     private static final int CACHE_HIT2 = 3;
+    private static final int QUERY_EXCEPTION = 4;
 
     private long m_cache1_level = 0;
     private long m_cache2_level = 0;
@@ -86,6 +87,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
                 ++m_cache1_hits;
             } else if (cacheType == CACHE_HIT2) {
                 ++m_cache2_hits;
+            } else if (cacheType == QUERY_EXCEPTION) {
+                // Has not gone through the planner cache code
             } else {
                 fail("Wrong input cache type");
             }
@@ -226,6 +229,16 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
+        checkPlannerCache(client, QUERY_EXCEPTION);
+
+        // fewer parameters
+        try {
+            client.callProcedure("@AdHoc", sql + sql, 0);
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(errorMsg));
+        }
+        checkPlannerCache(client, QUERY_EXCEPTION);
 
         try {
             client.callProcedure("@AdHoc", "select * from r1;" + sql, 0, 0);
@@ -233,6 +246,16 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
+        checkPlannerCache(client, QUERY_EXCEPTION);
+
+        // by pass the pre-planner check
+        try {
+            client.callProcedure("@AdHoc", sql + sql);
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 1, passed 0"));
+        }
+        checkPlannerCache(client, CACHE_MISS1);
 
         // positive tests
         sql = "SELECT ID FROM R1 B order by ID;";
@@ -244,28 +267,60 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         //
         // Pass in incorrect number of parameters
         //
-        errorMsg = "Too many actual arguments were passed for the parameters in the sql statement(s)";
         try {
             client.callProcedure("@AdHoc", sql, 1);
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(errorMsg));
+            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 0, passed 1"));
         }
+        checkPlannerCache(client, CACHE_MISS1);
 
         sql = "SELECT ID FROM R1 B WHERE num = 0 and B.ID > ? order by ID;";
         try {
             client.callProcedure("@AdHoc", sql, 1, 500);
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(errorMsg));
+            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 1, passed 2"));
         }
+        checkPlannerCache(client, CACHE_MISS1);
 
         try {
             client.callProcedure("@AdHoc", sql);
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Number of arguments provided was 0 where 1 was expected"));
+            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 1, passed 0"));
         }
+        checkPlannerCache(client, CACHE_MISS1);
+
+        VoltTable vt;
+
+        // rename table with "TB" to run it as a new query to the system
+        sql = "SELECT ID FROM R1 TB WHERE TB.ID > ? order by ID;";
+        vt = client.callProcedure("@AdHoc", sql, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_MISS2);
+
+        try {
+            vt = client.callProcedure("@AdHoc", sql, 1, 500).getResults()[0];
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 1, passed 2"));
+        }
+        checkPlannerCache(client, CACHE_MISS1);
+
+        try {
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 1, passed 0"));
+        }
+        checkPlannerCache(client, CACHE_MISS1);
+
+        // no parameters passed in for multiple adhoc queries
+        try {
+            vt = client.callProcedure("@AdHoc", sql + sql).getResults()[0];
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 1, passed 0"));
+        }
+        checkPlannerCache(client, CACHE_MISS1);
     }
 
     public void testAdHocBadParameters() throws IOException, ProcCallException {

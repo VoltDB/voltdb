@@ -74,6 +74,27 @@ class ParameterizationInfo {
         return info;
     }
 
+    public static int findUserParametersRecursively(final VoltXMLElement xmlSQL) {
+        int count = 0;
+        if (xmlSQL.name.equals("union")) {
+            // UNION has its parameters on the individual selects level
+            for (VoltXMLElement xmlChildSQL : xmlSQL.children) {
+                count += findUserParametersRecursively(xmlChildSQL);
+            }
+        } else {
+            // find the parameters xml node
+            for (VoltXMLElement child : xmlSQL.children) {
+                if (child.name.equals("parameters")) {
+                    count += child.children.size();
+                    // there is ONLY one parameters element per query
+                    break;
+                }
+            }
+        }
+
+        return count;
+    }
+
     public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
                                     Map<String, Integer> idToParamIndexMap,
                                     List<String> paramValues) {

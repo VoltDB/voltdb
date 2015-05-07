@@ -166,12 +166,10 @@ public class AsyncCompilerAgent {
         // it fails before on the hsqldb planner.
         // it does not hurt to add a guard here also.
 
-        boolean hasUserInputParamsForAdHoc = false;
         if (work.userParamSet != null && work.userParamSet.length > 0) {
             if (work.sqlStatements.length != 1) {
                 generateErrorResult("Multiple AdHoc queries with question marks in a procedure call are not supported", work);
             }
-            hasUserInputParamsForAdHoc = true;
         }
 
         for (final String sqlStatement : work.sqlStatements) {
@@ -184,8 +182,7 @@ public class AsyncCompilerAgent {
                 partitioning = PartitioningForStatement.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
-                        hasUserInputParamsForAdHoc? work.userParamSet: null);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning, work.userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
