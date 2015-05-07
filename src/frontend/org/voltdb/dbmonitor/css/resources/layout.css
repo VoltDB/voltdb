@@ -3093,7 +3093,7 @@ a.restoreBtn {
 
 .replicaWrapper {
     position: relative;
-    top: -27px;
+    /*top: -27px;*/
 }
 
 ul.drList {
@@ -3138,9 +3138,9 @@ ul.drList {
 }
 
 .drContent {
-        background: #FFFFFF;
-        overflow: auto;
-        width: 100%;
+    background: #FFFFFF;
+    overflow: auto;
+    width: 100%;
 }
 
     .drContent table td {
@@ -3243,8 +3243,8 @@ tr.drSubSection td {
     border-right: none !important;
     border-top: none !important;
 }
+
 #tblDrReplica {
-    
     border-bottom: none !important;
     border-right: none !important;
     border-top: none !important;
@@ -3335,12 +3335,21 @@ a:hover.changePsd {
 }
 
 /*********************************************media Qu********************/
-@media (max-width: 360px) {
-    .headerAdminContent {  height: 65px;}
-    .drAdminHeaderRight { float: none;}
-    ul.drList li { margin-left: 0;}
 
+@media (max-width: 360px) {
+    .headerAdminContent {
+        height: 65px;
+    }
+
+    .drAdminHeaderRight {
+        float: none;
+    }
+
+    ul.drList li {
+        margin-left: 0;
+    }
 }
+
 @media (max-width: 479px) {
     .serverStat {
         float: none;
@@ -3454,7 +3463,7 @@ a:hover.changePsd {
     }
 
     input.search-box {
-        width: 166px;
+        width: 153px;
     }
 
     .chart {
@@ -3666,7 +3675,7 @@ a:hover.changePsd {
     }
 
     .replicaWrapper {
-        top: 20px;
+        top: 20px !important;
     }
 
     .drHeightBoth {
@@ -3962,17 +3971,21 @@ a:hover.changePsd {
     }
 }
 
-@media (width: 360px) and (max-width:438px) {
+@media (min-width: 300px) and (max-width:438px) {
     .partitionHeight {
         height: 300px;
     }
 }
 
+
 @media (min-width: 768px) and (max-width:1246px) {
     .partitionHeight {
         height: 310px;
     }
-    .drScroll { overflow: visible!important;}
+
+    .drScroll {
+        overflow: visible !important;
+    }
 }
 
 @media screen and (orientation:landscape) {

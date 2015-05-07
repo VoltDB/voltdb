@@ -1140,8 +1140,6 @@ var loadPage = function (serverName, portid) {
             var replicaLatencyMs = 0;
             var replicaLatencyTrans = 0;
 
-            // if (!$.isEmptyObject(response)) {
-
             for (var key in response) {
 
                 for (var i = 0; i <= response[key].length - 1; i++) {
@@ -1184,14 +1182,15 @@ var loadPage = function (serverName, portid) {
                 },
                 "fnDrawCallback": function () {
                     if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                     } else {
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
                     }
 
-                    $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
-                "sDom": '<"clear">ilprtp',
+
+                "sDom": 'p<"tblScroll drScroll"t>',
                 "aoColumns": [
                     null,
                     { "bSearchable": false },
@@ -1202,7 +1201,13 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
-            $("#tblDrMAster").wrapAll("<div class='tblScroll drScroll'>");
+
+            // $("#tblDrMAster").wrap("<div class='tblScroll drScroll'>");
+            //var org_html = $("#tblDrMAster")[0].outerHTML;
+            ////console.log(org_html);
+            //var new_html = "<div class='tblScroll drScroll'>" + org_html + "</div>";
+            //$("#tblDrMAster_wrapper").find("table").replaceWith(new_html);
+
             $("#tblMAster_wrapper").find(".paginationDefault").remove();
 
 
@@ -1216,11 +1221,6 @@ var loadPage = function (serverName, portid) {
             $(".paginate_enabled_next").attr("title", "Next Page");
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
-
-            $(".tblScroll").next().hide();
-            $("#tblDrMAster_info").hide();
-            $("#tblDrMAster_length").hide();
-            //  }
         });
 
         $('#filterPartitionId').on('keyup', function () {
@@ -1269,15 +1269,15 @@ var loadPage = function (serverName, portid) {
                 "fnDrawCallback": function () {
 
                     if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                     } else {
-                        $(this).parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
                     }
 
 
-                    $(this).parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
-                "sDom": '<"clear">ilprtp',
+                "sDom": 'p<"tblScroll drScroll"t>',
                 "aoColumns": [
                     null,
                     { "bSearchable": false },
@@ -1286,7 +1286,6 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
-            $("#tblDrReplica").wrapAll("<div class='tblScroll drScroll'>");
             $("#tblReplica_wrapper").find(".paginationDefault").remove();
 
             //  Customizing DataTables to make it as existing pagination
@@ -1300,10 +1299,6 @@ var loadPage = function (serverName, portid) {
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
-
-            $(".tblScroll").next().hide();
-            $("#tblDrReplica_info").hide();
-            $("#tblDrReplica_length").hide();
 
             //  }
         });
