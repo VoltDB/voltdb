@@ -690,7 +690,8 @@ void VoltDBEngine::resetExecutionMetadata() {
     // If we get here, we've completed execution successfully, or
     // recovered after an error.  In any case, we should be able to
     // assert that temp tables are now cleared.
-    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty());
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty(),
+                                   "Output temp tables not cleaned up after execution");
 
     if (m_tuplesModifiedStack.size() != 0) {
         m_tuplesModifiedStack.pop();
