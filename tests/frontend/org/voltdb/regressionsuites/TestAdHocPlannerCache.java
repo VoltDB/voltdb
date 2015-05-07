@@ -33,7 +33,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestAdHocPlannerCache extends RegressionSuite {
-    private static final int CACHE_MISS = 1;
+    private static final int CACHE_MISS1 = 0;
+    private static final int CACHE_MISS2 = 1;
     private static final int CACHE_HIT1 = 2;
     private static final int CACHE_HIT2 = 3;
 
@@ -74,7 +75,10 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
     private void checkPlannerCache(Client client, int... cacheTypes) throws NoConnectionsException, IOException, ProcCallException {
         for (int cacheType : cacheTypes) {
-            if (cacheType == CACHE_MISS) {
+            if (cacheType == CACHE_MISS1) {
+                ++m_cache1_level;
+                ++m_cache_misses;
+            } else if (cacheType == CACHE_MISS2) {
                 ++m_cache1_level;
                 ++m_cache2_level;
                 ++m_cache_misses;
@@ -111,7 +115,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 B order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
-        checkPlannerCache(client, CACHE_MISS);
+        checkPlannerCache(client, CACHE_MISS2);
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
@@ -125,7 +129,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 C order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
-        checkPlannerCache(client, CACHE_MISS);
+        checkPlannerCache(client, CACHE_MISS2);
 
 
         //
@@ -134,7 +138,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 B WHERE B.ID > 1 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS);
+        checkPlannerCache(client, CACHE_MISS2);
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2, 3});
@@ -152,7 +156,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 B WHERE B.ID > ? ORDER BY ID;";
         vt = client.callProcedure("@AdHoc", sql, 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS);
+        checkPlannerCache(client, CACHE_MISS2);
 
         vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
@@ -168,7 +172,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 B WHERE num = 0 and B.ID > ? order by ID;";
         vt = client.callProcedure("@AdHoc", sql, 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2});
-        checkPlannerCache(client, CACHE_MISS);
+        checkPlannerCache(client, CACHE_MISS2);
 
         vt = client.callProcedure("@AdHoc", sql, 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2});
@@ -182,7 +186,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 B WHERE num = 1 and B.ID > ? order by ID;";
         vt = client.callProcedure("@AdHoc", sql, 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
-        checkPlannerCache(client, CACHE_MISS);
+        checkPlannerCache(client, CACHE_MISS2);
 
         vt = client.callProcedure("@AdHoc", sql, 3).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
@@ -192,7 +196,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 B WHERE num = ? and B.ID > ? order by ID;";
         vt = client.callProcedure("@AdHoc", sql, 0, 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2});
-        checkPlannerCache(client, CACHE_MISS);
+        checkPlannerCache(client, CACHE_MISS2);
 
         vt = client.callProcedure("@AdHoc", sql, 1, 2).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
@@ -200,7 +204,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
     }
 
     public void testAdHocParameters() throws IOException, ProcCallException {
-        System.out.println("testAdHocParametersNegative...");
+        System.out.println("testAdHocParameters...");
         resetStatistics();
 
         Client client = getClient();
@@ -235,7 +239,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         VoltTable[] vts = client.callProcedure("@AdHoc", sql + sql).getResults();
         validateTableOfScalarLongs(vts[0], new long[]{1, 2, 3});
         validateTableOfScalarLongs(vts[1], new long[]{1, 2, 3});
-        checkPlannerCache(client, CACHE_MISS, CACHE_HIT1);
+        checkPlannerCache(client, CACHE_MISS2, CACHE_HIT1);
 
         //
         // Pass in incorrect number of parameters
@@ -262,6 +266,71 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains("Number of arguments provided was 0 where 1 was expected"));
         }
+    }
+
+    public void testAdHocBadParameters() throws IOException, ProcCallException {
+        System.out.println("testAdHocBadParameters...");
+        resetStatistics();
+
+        Client client = getClient();
+        String sql;
+        VoltTable vt;
+
+        client.callProcedure("R1.insert", 1, "foo1", 0, 1.1);
+        client.callProcedure("R1.insert", 2, "foo2", 0, 2.2);
+        client.callProcedure("R1.insert", 3, "foo3", 1, 3.3);
+
+        // Integer <-> Float
+        sql = "SELECT ID FROM R1 B WHERE B.ID > 1.8 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_MISS1);
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_HIT1);
+
+        sql = "SELECT ID FROM R1 B WHERE B.ID > 1 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_MISS2);
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_HIT1);
+
+        sql = "SELECT ID FROM R1 B WHERE B.ID > 2 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_HIT2);
+
+        sql = "SELECT ID FROM R1 B WHERE B.ID > ? order by ID;";
+        try {
+            vt = client.callProcedure("@AdHoc", sql, 1.8).getResults()[0];
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (1.8) of type: "
+                    + "java.lang.Double is not a match or is out of range for the target parameter type: long"));
+        }
+
+        // change the where clause to get the new query pattern
+
+        // try the normal integer value first
+        sql = "SELECT ID FROM R1 B WHERE B.NUM > 0 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS2);
+
+        // try the float value second, it has bad parameterization
+        sql = "SELECT ID FROM R1 B WHERE B.NUM > 0.8 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS1);
+
+        sql = "SELECT ID FROM R1 B WHERE B.NUM > 0.9 order by ID;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS1);
     }
 
     //
