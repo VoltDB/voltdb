@@ -40,6 +40,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
@@ -89,13 +90,11 @@ public class PlanAssembler {
     private static class ParsedResultAccumulator {
         public final boolean m_orderIsDeterministic;
         public final boolean m_hasLimitOrOffset;
-        public final int m_planId;
-        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset,
-                int planId)
+
+        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset)
         {
             m_orderIsDeterministic = orderIsDeterministic;
             m_hasLimitOrOffset  = hasLimitOrOffset;
-            m_planId = planId;
         }
     }
 
@@ -258,6 +257,7 @@ public class PlanAssembler {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
 
+            // FIXME: is the following scheme/comment obsolete?
             // FIXME: turn it on when we are able to push down DISTINCT
 //            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
 //                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
@@ -336,7 +336,7 @@ public class PlanAssembler {
         // When subqueries in WHERE clauses of DML are allowed, we will need to make sure the
         // subqueries are content-deterministic too.
 
-        if (plan == null || plan.getReadOnly()) {
+        if (plan == null || plan.isReadOnly()) {
             return;
         }
 
@@ -379,12 +379,55 @@ public class PlanAssembler {
      * @param parsedStmt Current SQL statement to generate plan for
      * @return The best cost plan or null.
      */
+    public static String IN_EXISTS_SCALAR_ERROR_MESSAGE = "Subquery expressions are only supported for "
+            + "single partition procedures and AdHoc queries referencing only replicated tables.";
+
     public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
-        List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueries();
-        ParsedResultAccumulator subQueryResult = null;
+        List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueryScans();
+        ParsedResultAccumulator fromSubqueryResult = null;
         if (! subqueryNodes.isEmpty()) {
-            subQueryResult = getBestCostPlanForSubQueries(subqueryNodes);
+            fromSubqueryResult = getBestCostPlanForFromSubQueries(subqueryNodes);
+            if (fromSubqueryResult == null) {
+                // There was at least one sub-query and we should have a compiled plan for it
+                return null;
+            }
+        }
+
+        // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
+        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
+                SelectSubqueryExpression.class);
+        if ( ! subqueryExprs.isEmpty() ) {
+            if (parsedStmt instanceof ParsedSelectStmt == false) {
+                m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
+                return null;
+            }
+
+            // guards against IN/EXISTS/Scalar subqueries
+            if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
+                // no partition tables in parent query
+                for (Table tb: parsedStmt.m_tableList) {
+                    if (! tb.getIsreplicated()) {
+                        m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
+                        return null;
+                    }
+                }
+
+                // no partition tables in subqueries
+                for (AbstractExpression e: subqueryExprs) {
+                    assert(e instanceof SelectSubqueryExpression);
+                    SelectSubqueryExpression subExpr = (SelectSubqueryExpression)e;
+                    if (! subExpr.getSubqueryScan().getIsReplicated()) {
+                        m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
+                        return null;
+                    }
+                }
+             }
+
+            if (!getBestCostPlanForExpressionSubQueries(subqueryExprs)) {
+                // There was at least one sub-query and we should have a compiled plan for it
+                return null;
+            }
         }
 
         // set up the plan assembler for this statement
@@ -405,11 +448,14 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-        if (subQueryResult != null && retval != null) {
-            boolean orderIsDeterministic;
-            if (subQueryResult.m_orderIsDeterministic) {
-                orderIsDeterministic = retval.isOrderDeterministic();
-            } else {
+        if (retval == null) {
+            return null;
+        }
+
+        if (fromSubqueryResult != null) {
+            // Calculate the combined state of determinism for the parent and child statements
+            boolean orderIsDeterministic = retval.isOrderDeterministic();
+            if (orderIsDeterministic && ! fromSubqueryResult.m_orderIsDeterministic) {
                 //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
                 // is subject to false negatives for determinism. It misses the subtlety of parent
                 // queries that surgically add orderings for specific "key" columns of a subquery result
@@ -422,13 +468,11 @@ public class PlanAssembler {
                 // to identify dependencies / uniqueness constraints in subquery results
                 // that can be exploited to impose determinism with fewer parent order by columns
                 // -- like just the keys.
-                orderIsDeterministic = retval.isOrderDeterministic() &&
-                        parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
+                orderIsDeterministic = parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
             }
             boolean hasLimitOrOffset =
-                    subQueryResult.m_hasLimitOrOffset || retval.hasLimitOrOffset();
+                    fromSubqueryResult.m_hasLimitOrOffset || retval.hasLimitOrOffset();
             retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
-
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
             // the final best parent plan
@@ -437,7 +481,7 @@ public class PlanAssembler {
 
         failIfNonDeterministicDml(parsedStmt, retval);
 
-        if (retval != null && m_partitioning != null) {
+        if (m_partitioning != null) {
             retval.setStatementPartitioning(m_partitioning);
         }
 
@@ -453,33 +497,70 @@ public class PlanAssembler {
     }
 
     /**
-     * Generate the best cost plans for the immediate sub-queries of the
-     * current SQL statement context.
-     * @param parsedStmt - SQL context containing sub queries
-     * @return ChildPlanResult
+     * Generate best cost plans for a list of FROM sub-queries.
+     * @param subqueryNodes - list of FROM sub-queries.
+     * @return ParsedResultAccumulator
      */
-    private ParsedResultAccumulator getBestCostPlanForSubQueries(List<StmtSubqueryScan> subqueryNodes) {
-        int nextPlanId = 0;
+    private ParsedResultAccumulator getBestCostPlanForFromSubQueries(List<StmtSubqueryScan> subqueryNodes) {
+        int nextPlanId = m_planSelector.m_planId;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
-            ParsedResultAccumulator parsedResult = planForParsedSubquery(subqueryScan, nextPlanId);
-            if (parsedResult == null) {
+            nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
+            CompiledPlan subqueryBestPlan = subqueryScan.getBestCostPlan();
+           if (subqueryBestPlan == null) {
                 throw new PlanningErrorException(m_recentErrorMsg);
             }
-            nextPlanId = parsedResult.m_planId;
-            orderIsDeterministic &= parsedResult.m_orderIsDeterministic;
+            orderIsDeterministic &= subqueryBestPlan.isOrderDeterministic();
             // Offsets or limits in subqueries are only significant (only effect content determinism)
             // when they apply to un-ordered subquery contents.
             hasSignificantOffsetOrLimit |=
-                    (( ! parsedResult.m_orderIsDeterministic) && parsedResult.m_hasLimitOrOffset);
+                    (( ! subqueryBestPlan.isOrderDeterministic() ) && subqueryBestPlan.hasLimitOrOffset());
         }
 
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
 
-        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit, nextPlanId);
+        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit);
     }
+
+
+    /**
+     * Generate best cost plans for each Subquery expression from the list
+     * @param subqueryExprs - list of subquery expressions
+     * @return true if a best plan was generated for each subquery, false otherwise
+     */
+    private boolean getBestCostPlanForExpressionSubQueries(List<AbstractExpression> subqueryExprs) {
+        int nextPlanId = m_planSelector.m_planId;
+
+        for (AbstractExpression expr : subqueryExprs) {
+            if (!(expr instanceof SelectSubqueryExpression)) {
+                // it can be IN (values)
+                continue;
+            }
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
+            StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
+            nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
+            CompiledPlan bestPlan = subqueryScan.getBestCostPlan();
+            if (bestPlan == null) {
+                return false;
+            }
+
+            subqueryExpr.setSubqueryNode(bestPlan.rootPlanGraph);
+            // The subquery plan must not contain Receive/Send nodes because it will be executed
+            // multiple times during the parent statement execution.
+            if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
+                // fail the whole plan
+                m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
+                return false;
+            }
+        }
+        // need to reset plan id for the entire SQL
+        m_planSelector.m_planId = nextPlanId;
+
+        return true;
+    }
+
 
     /**
      * Generate a unique and correct plan for the current SQL statement context.
@@ -641,7 +722,7 @@ public class PlanAssembler {
         return retval;
     }
 
-    private ParsedResultAccumulator planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
+    private int planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
         AbstractParsedStmt subQuery = subqueryScan.getSubqueryStmt();
         assert(subQuery != null);
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
@@ -658,7 +739,7 @@ public class PlanAssembler {
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for subquery statement for table " + tbAlias;
             }
-            return null;
+            return selector.m_planId;
         }
         subqueryScan.setSubqueriesPartitioning(currentPartitioning);
 
@@ -667,11 +748,7 @@ public class PlanAssembler {
         compiledPlan.rootPlanGraph = subqueryScan.processReceiveNode(compiledPlan.rootPlanGraph);
 
         subqueryScan.setBestCostPlan(compiledPlan);
-
-        ParsedResultAccumulator parsedResult = new ParsedResultAccumulator(
-                compiledPlan.isOrderDeterministic(), compiledPlan.hasLimitOrOffset(),
-                selector.m_planId);
-        return parsedResult;
+        return selector.m_planId;
     }
 
     /**
@@ -845,6 +922,18 @@ public class PlanAssembler {
         return plan;
     }
 
+    /**
+     * Return true if the plan referenced by root node needs a
+     * projection node appended to the top.
+     *
+     * This method does a lot of "if this node is an
+     * instance of this class.... else if this node is an
+     * instance of this other class..."   Perhaps it could be replaced
+     * by a virtual method on AbstractPlanNode?
+     *
+     * @param root   The root node of a plan
+     * @return true if a project node is required
+     */
     private boolean needProjectionNode (AbstractPlanNode root) {
         if ( root instanceof AggregatePlanNode ||
              root.getPlanNodeType() == PlanNodeType.PROJECTION) {
@@ -1017,6 +1106,8 @@ public class PlanAssembler {
         }
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
+        //FIXME: does this assert need to be relaxed in the face of non-from-clause subquery support?
+        // It was not in Mike A's original branch.
         assert (m_parsedUpdate.m_tableList.size() == 1);
         Table targetTable = m_parsedUpdate.m_tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
@@ -1094,7 +1185,11 @@ public class PlanAssembler {
             retval.replicatedTableDML = true;
         }
 
-        retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
+        //FIXME: This assumption was only safe when we didn't support updates
+        // w/ possibly non-deterministic subqueries.
+        // Is there some way to integrate a "subquery determinism" check here?
+        // because we didn't support updates with limits, either.
+        retval.statementGuaranteesDeterminism(false, true);
 
         return retval;
     }
@@ -1141,8 +1236,7 @@ public class PlanAssembler {
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
-        StmtSubqueryScan subquery = m_parsedInsert.isInsertWithSubquery() ?
-                m_parsedInsert.getSubqueries().get(0) : null;
+        StmtSubqueryScan subquery = m_parsedInsert.getSubqueryScan();
 
         CompiledPlan retval = null;
         if (subquery != null) {

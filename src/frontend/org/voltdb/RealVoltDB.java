@@ -167,9 +167,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.2EA2";
+    static final String m_defaultVersionString = "5.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.2EA2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -765,16 +765,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             int.class,
                             String.class,
                             ClientInterface.class,
-                            byte.class,
-                            boolean.class,
-                            String.class);
+                            byte.class);
                     m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
                             m_messenger.getHostId(),
                             drProducerHost,
                             m_clientInterface,
-                            drConsumerClusterId,
-                            usingCommandLog,
-                            clSnapshotPath);
+                            drConsumerClusterId);
                     m_globalServiceElector.registerService(m_consumerDRGateway);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);

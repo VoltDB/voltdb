@@ -2261,7 +2261,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             if (tb != "R4") {
                 vt = client.callProcedure("@Explain", sql, null).getResults()[0];
                 assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
-                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4\""));
+                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4"));
             }
             nullIndexSearchKeyChecker(client, sql);
 

@@ -61,6 +61,7 @@
 #include "common/ValuePeeker.hpp"
 #include "common/PlannerDomValue.h"
 #include "common/NValue.hpp"
+#include "common/SQLException.h"
 #include "expressions/expressions.h"
 #include "expressions/expressionutil.h"
 #include "expressions/functionexpression.h"
@@ -79,15 +80,29 @@ struct FunctionTest : public Test {
                                   (UndoQuantum *)0,
                                   (Topend *)0,
                                   &m_pool,
+                                  NULL,
                                   (VoltDBEngine *)0,
                                   "localhost",
                                   0,
                                   (DRTupleStream *)0,
                                   (DRTupleStream *)0) {}
+        /**
+         * A template for calling unary function call expressions.  For any C++
+         * type T, define the function "NValue getSomeValue(T val)" to
+         * convert the T value to an NValue below.
+         */
         template <typename INPUT_TYPE, typename OUTPUT_TYPE>
         int testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output, bool expect_null = false);
-        int testBinary(int operation, int64_t left_input, int64_t right_input, int64_t output, bool expect_null = false);
-        static const size_t BIGINT_SIZE = int(sizeof(int64_t) * CHAR_BIT);
+
+        /**
+         * A template for calling binary function call expressions.  For any C++
+         * type T, define the function "NValue getSomeValue(T val)" to
+         * convert the T value to an NValue below.
+         */
+        template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE, typename OUTPUT_TYPE>
+        int testBinary(int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input, OUTPUT_TYPE output, bool expect_null = false);
+
+        static const int64_t BIGINT_SIZE = int64_t(sizeof(int64_t) * CHAR_BIT);
 private:
         Pool            m_pool;
         ExecutorContext m_executorContext;
@@ -104,7 +119,11 @@ static NValue getSomeValue(const int64_t val)
 }
 
 /**
- * Test a unary expression.
+ * Test a unary function call expression.
+ * @returns: -1 if the result of the function evaluation is less than the expected result.
+ *            0 if the result of the function evaluation is as expected.
+ *            1 if the result of the function evaluation is greater than the expected result.
+ * Note that this function may throw an exception from the call to AbstractExpression::eval().
  */
 template <typename INPUT_TYPE, typename OUTPUT_TYPE>
 int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output, bool expect_null) {
@@ -112,14 +131,21 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(getSomeValue(input));
     argument->push_back(const_val_exp);
     AbstractExpression* bin_exp = ExpressionUtil::functionFactory(operation, argument);
-    NValue answer = bin_exp->eval();
-    NValue expected = getSomeValue(output);
     int cmpout;
-    if (expect_null) {
-        // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
-        cmpout = answer.isNull() ? 0 : 1;
-    } else {
-        cmpout = answer.compare(expected);
+    NValue expected = getSomeValue(output);
+    NValue answer;
+    try {
+        answer = bin_exp->eval();
+        if (expect_null) {
+            // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
+            cmpout = answer.isNull() ? 0 : 1;
+        } else {
+            cmpout = answer.compare(expected);
+        }
+    } catch (SQLException &ex) {
+        delete bin_exp;
+        expected.free();
+        throw;
     }
     if (staticVerboseFlag) {
         std::cout << "input: " << std::hex << input
@@ -131,23 +157,37 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
     expected.free();
     return cmpout;
 }
-
-int FunctionTest::testBinary(int operation, int64_t linput, int64_t rinput, int64_t output, bool expect_null) {
+/**
+ * Test a binary function call expression.
+ * @returns: -1 if the result of the function evaluation is less than the expected result.
+ *            0 if the result of the function evaluation is as expected.
+ *            1 if the result of the function evaluation is greater than the expected result.
+ * Note that this function may throw an exception from the call to AbstractExpression::eval().
+ */
+template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE, typename OUTPUT_TYPE>
+int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_TYPE rinput, OUTPUT_TYPE output, bool expect_null) {
     std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
-    ConstantValueExpression *lhsexp = new ConstantValueExpression(ValueFactory::getBigIntValue(linput));
-    ConstantValueExpression *rhsexp = new ConstantValueExpression(ValueFactory::getBigIntValue(rinput));
+    ConstantValueExpression *lhsexp = new ConstantValueExpression(getSomeValue(linput));
+    ConstantValueExpression *rhsexp = new ConstantValueExpression(getSomeValue(rinput));
     argument->push_back(lhsexp);
     argument->push_back(rhsexp);
 
-    NValue expected = ValueFactory::getBigIntValue(output);
-    AbstractExpression* bin_exp = ExpressionUtil::functionFactory(operation, argument);
-    NValue answer = bin_exp->eval();
+    NValue expected = getSomeValue(output);
+    AbstractExpression *bin_exp = ExpressionUtil::functionFactory(operation, argument);
     int cmpout;
-    if (expect_null) {
-        // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
-        cmpout = answer.isNull() ? 0 : 1;
-    } else {
-        cmpout = answer.compare(expected);
+    NValue answer;
+    try {
+        answer = bin_exp->eval();
+        if (expect_null) {
+            // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
+            cmpout = answer.isNull() ? 0 : 1;
+        } else {
+            cmpout = answer.compare(expected);
+        }
+    } catch (SQLException &ex) {
+        expected.free();
+        delete bin_exp;
+        throw;
     }
     if (staticVerboseFlag) {
         std::cout << std::hex << "input: test(" << linput << ", " << rinput << ")"
@@ -161,45 +201,45 @@ int FunctionTest::testBinary(int operation, int64_t linput, int64_t rinput, int6
 }
 
 TEST_F(FunctionTest, BinTest) {
-        ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
-                            0xffULL,
-                            "11111111"),
-                  0);
-        ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
-                            0x0ULL,
-                            "0"),
-                  0);
-        ASSERT_EQ(testUnary(FUNC_VOLT_BIN, 0x8000000000000000, "", true), 0);
+    ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
+                        0xffLL,
+                        "11111111"),
+              0);
+    ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
+                        0x0LL,
+                        "0"),
+              0);
+    ASSERT_EQ(testUnary(FUNC_VOLT_BIN, int64_t(0x8000000000000000), "", true), 0);
 
-        // Walking ones.
-        std::string expected("1");
-        std::string expectedz("1111111111111111111111111111111111111111111111111111111111111111");
-        for (int idx = 0; idx < (BIGINT_SIZE-1); idx += 1) {
-                int64_t input = 1ULL << idx;
-                ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
-                                    input,
-                                    expected),
-                          0);
-                expected = expected + "0";
-                expectedz[(BIGINT_SIZE-1) - idx] = '0';
-                ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
-                                    ~input,
-                                    expectedz),
-                          0);
-                expectedz[(BIGINT_SIZE-1) - idx] = '1';
-        }
+    // Walking ones.
+    std::string expected("1");
+    std::string expectedz("1111111111111111111111111111111111111111111111111111111111111111");
+    for (int idx = 0; idx < (BIGINT_SIZE-1); idx += 1) {
+            int64_t input = 1ULL << idx;
+            ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
+                                input,
+                                expected),
+                      0);
+            expected = expected + "0";
+            expectedz[(BIGINT_SIZE-1) - idx] = '0';
+            ASSERT_EQ(testUnary(FUNC_VOLT_BIN,
+                                ~input,
+                                expectedz),
+                      0);
+            expectedz[(BIGINT_SIZE-1) - idx] = '1';
+    }
 }
 
 TEST_F(FunctionTest, HexTest) {
         ASSERT_EQ(testUnary(FUNC_VOLT_HEX,
-                            0xffULL,
+                            0xffLL,
                             "FF"),
                   0);
         ASSERT_EQ(testUnary(FUNC_VOLT_HEX,
-                            0x0ULL,
+                            0x0LL,
                             "0"),
                   0);
-        ASSERT_EQ(testUnary(FUNC_VOLT_HEX, 0x8000000000000000LL,"", true),
+        ASSERT_EQ(testUnary(FUNC_VOLT_HEX, int64_t(0x8000000000000000),"", true),
                     0);
         // Walking ones.
         // Apparently it's unrecommended to reuse std::stringstream,
@@ -310,6 +350,22 @@ TEST_F(FunctionTest, BitNotTest) {
     }
 }
 
+TEST_F(FunctionTest, RepeatTooBig) {
+    bool sawexception = false;
+    try {
+        ASSERT_EQ(testBinary(FUNC_REPEAT, "amanaplanacanalpanama", int64_t(1), "amanaplanacanalpanama", false), 0);
+    } catch (voltdb::SQLException &ex) {
+        sawexception = true;
+    }
+    ASSERT_FALSE(sawexception);
+    sawexception = false;
+    try {
+        ASSERT_EQ(testBinary(FUNC_REPEAT, "amanaplanacanalpanama", 1000000, "", false), 1);
+    } catch (voltdb::SQLException &ex) {
+        sawexception = true;
+    }
+    ASSERT_TRUE(sawexception);
+}
 
 int main() {
      return TestSuite::globalInstance()->runAll();
