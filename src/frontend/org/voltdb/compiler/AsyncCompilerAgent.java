@@ -337,6 +337,16 @@ public class AsyncCompilerAgent {
         // when the batch has one statement.
         StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+
+        boolean hasUserInputParamsForAdHoc = false;
+        if (work.userParamSet != null && work.userParamSet.length > 0) {
+            if (work.sqlStatements.length != 1) {
+                return AsyncCompilerResult.makeErrorResult(work,
+                        "Multiple AdHoc queries with question marks in a procedure call are not supported");
+            }
+            hasUserInputParamsForAdHoc = true;
+        }
+
         for (final String sqlStatement : work.sqlStatements) {
             if (inferSP) {
                 partitioning = StatementPartitioning.inferPartitioning();
@@ -347,7 +357,8 @@ public class AsyncCompilerAgent {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
+                        hasUserInputParamsForAdHoc? work.userParamSet: null);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
