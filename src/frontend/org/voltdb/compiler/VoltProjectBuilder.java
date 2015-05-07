@@ -72,6 +72,8 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -272,6 +274,7 @@ public class VoltProjectBuilder {
 
     private List<String> m_diagnostics;
 
+    private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<HashMap<String, Object>>();
     private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<HashMap<String, Object>>();
 
     private Integer m_deadHostTimeout = null;
@@ -566,6 +569,20 @@ public class VoltProjectBuilder {
         m_ppdEnabled = true;
         m_snapshotPath = snapshotPath;
         m_ppdPrefix = ppdPrefix;
+    }
+
+    public void addImport(boolean enabled, String importBundle, Properties config) {
+        HashMap<String, Object> importConnector = new HashMap<String, Object>();
+        importConnector.put("ilEnabled", enabled);
+        importConnector.put("ilBundle", importBundle);
+
+        importConnector.put("ilConfig", config);
+
+        if ((importBundle != null) && !importBundle.trim().isEmpty()) {
+            importConnector.put("ilExportTarget", importBundle);
+        }
+
+        m_ilImportConnectors.add(importConnector);
     }
 
     public void addExport(boolean enabled, String exportTarget, Properties config) {
@@ -1062,6 +1079,32 @@ public class VoltProjectBuilder {
                 }
             }
             export.getConfiguration().add(exportConfig);
+        }
+
+        // <import>
+        ImportType importt = factory.createImportType();
+        deployment.setImport(importt);
+
+        for (HashMap<String,Object> importConnector : m_ilImportConnectors) {
+            ImportConfigurationType importConfig = factory.createImportConfigurationType();
+            importConfig.setEnabled((boolean)importConnector.get("ilEnabled"));
+            importConfig.setBundle((String )importConnector.get("ilBundle"));
+
+            Properties config = (Properties)importConnector.get("ilConfig");
+            if((config != null) && (config.size() > 0)) {
+                List<PropertyType> configProperties = importConfig.getProperty();
+
+                for( Object nameObj: config.keySet()) {
+                    String name = String.class.cast(nameObj);
+
+                    PropertyType prop = factory.createPropertyType();
+                    prop.setName(name);
+                    prop.setValue(config.getProperty(name));
+
+                    configProperties.add(prop);
+                }
+            }
+            importt.getConfiguration().add(importConfig);
         }
 
         if (m_drProducerClusterId != null || (m_drMasterHost != null && !m_drMasterHost.isEmpty())) {
