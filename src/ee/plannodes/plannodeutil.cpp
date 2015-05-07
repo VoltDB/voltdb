@@ -63,6 +63,7 @@
 #include "plannodes/receivenode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
+#include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
 
@@ -107,6 +108,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_MATERIALIZEDSCAN):
             ret = new voltdb::MaterializedScanPlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // TupleScanPlanNode
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_TUPLESCAN):
+            ret = new voltdb::TupleScanPlanNode();
             break;
         // ------------------------------------------------------------------
         // NestLoop

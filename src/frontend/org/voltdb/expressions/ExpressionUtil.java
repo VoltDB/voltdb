@@ -22,11 +22,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -243,9 +245,7 @@ public abstract class ExpressionUtil {
         if (input == null)
         {
             return tves;
-        }
-        if (input instanceof TupleValueExpression)
-        {
+        } else if (input instanceof TupleValueExpression) {
             tves.add((TupleValueExpression) input);
             return tves;
         }
@@ -259,6 +259,18 @@ public abstract class ExpressionUtil {
             }
         }
         return tves;
+    }
+
+    /**
+     * A convenience wrapper around AbstractExpression.findAllExpressionsOfClass
+     * Recursively walk an expression and return a list of all the expressions
+     * of a given type it contains.
+     */
+    public static List<AbstractExpression> findAllExpressionsOfClass(AbstractExpression input, Class< ? extends AbstractExpression> aeClass) {
+        if (input == null) {
+            return new ArrayList<AbstractExpression>();
+        }
+        return input.findAllSubexpressionsOfClass(aeClass);
     }
 
     /**
@@ -358,6 +370,48 @@ public abstract class ExpressionUtil {
         }
     }
 
+    /**
+     *  Given two equal length lists of the expressions build a combined equivalence expression
+     *  (le1, le2,..., leN) (re1, re2,..., reN) =>
+     *  (le1=re1) AND (le2=re2) AND .... AND (leN=reN)
+     *
+     * @param leftExprs
+     * @param rightExprs
+     * @return AbstractExpression
+     */
+    public static AbstractExpression buildEquavalenceExpression(Collection<AbstractExpression> leftExprs, Collection<AbstractExpression> rightExprs) {
+        assert(leftExprs.size() == rightExprs.size());
+        Iterator<AbstractExpression> leftIt = leftExprs.iterator();
+        Iterator<AbstractExpression> rightIt = rightExprs.iterator();
+        AbstractExpression result = null;
+        while (leftIt.hasNext() && rightIt.hasNext()) {
+            AbstractExpression leftExpr = leftIt.next();
+            AbstractExpression rightExpr = rightIt.next();
+            AbstractExpression eqaulityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL, leftExpr, rightExpr);
+            if (result == null) {
+                result = eqaulityExpr;
+            } else {
+                result = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, result, eqaulityExpr);
+            }
+        }
+        return result;
+    }
+
+    /**
+     *  Return true/false whether an expression contains any aggregate expression
+     *
+     * @param expr
+     * @return true is expression contains an aggregate subexpression
+     */
+    public static boolean containsAggregateExpression(AbstractExpression expr) {
+        return expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_AVG) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_COUNT) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_COUNT_STAR) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_MAX) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_MIN) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_SUM);
+    }
+
     private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {
         assert(expr != null);
         List<TupleValueExpression> tves = getTupleValueExpressions(expr);
@@ -371,5 +425,53 @@ public abstract class ExpressionUtil {
             }
         }
         return false;
+    }
+
+    /**
+     * Resolve the column indexes from all subqueries that are part of this expression
+     * @param expr
+     * @param db
+     */
+    public static void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
+        if (subqueryExpressions.isEmpty()) {
+            return;
+        }
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).resolveColumnIndexes();
+        }
+    }
+
+    /**
+     * Generate the output schemas for the subquery expression nodes
+     * @param expr
+     * @param db
+     */
+    public static void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
+        }
+    }
+
+    /**
+     * Add a ScalarValueExpression on top of the SubqueryExpression
+     * @param expr - subquery expression
+     * return ScalarValueExpression
+     */
+    public static AbstractExpression addScalarValueExpression(AbstractSubqueryExpression expr) {
+        AbstractExpression scalarExpr = new ScalarValueExpression();
+        scalarExpr.setLeft(expr);
+        scalarExpr.setValueType(expr.getValueType());
+        scalarExpr.setValueSize(expr.getValueSize());
+        return scalarExpr;
     }
 }
