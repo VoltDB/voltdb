@@ -77,7 +77,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         m_tableList.clear();
         assert(stmtNode.children.size() > 1);
         AbstractParsedStmt childStmt = null;
-        boolean first = true;
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 childStmt = new ParsedSelectStmt(m_paramValues, m_db);
@@ -94,10 +93,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
             childStmt.m_paramsById.putAll(m_paramsById);
             childStmt.parseTablesAndParams(childSQL);
-            if (first) {
-                first = false;
-                promoteUnionParametersFromChild(childStmt);
-            }
+            promoteUnionParametersFromChild(childStmt);
             m_children.add(childStmt);
             // Add statement's tables to the consolidated list
             m_tableList.addAll(childStmt.m_tableList);

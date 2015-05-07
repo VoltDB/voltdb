@@ -139,13 +139,17 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(0, pred.getRight().getArgs().size());
     }
 
+    /**
+     * ENG-8203: Index usage for scalar value expression is disabled.
+     * All the where clause are used as post predicate in the index scan, other than search key or end key.
+     */
     public void testWhereIndexScalar() {
         {
             AbstractPlanNode pn = compile("select r5.c from r5 where r5.a = (select r1.a from r1 where r1.a = ?);");
             pn = pn.getChild(0);
             assertTrue(pn instanceof IndexScanPlanNode);
-            AbstractExpression pred = ((IndexScanPlanNode) pn).getEndExpression();
-            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            assertNull(((IndexScanPlanNode) pn).getEndExpression());
+            AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
             assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
         }
         {
@@ -153,8 +157,8 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             pn = pn.getChild(0);
             assertTrue(pn instanceof IndexScanPlanNode);
             List<AbstractExpression> exprs = ((IndexScanPlanNode) pn).getSearchKeyExpressions();
-            assertEquals(1, exprs.size());
-            assertEquals(ExpressionType.VALUE_SCALAR, exprs.get(0).getExpressionType());
+            assertEquals(0, exprs.size());
+            assertNotNull(((IndexScanPlanNode) pn).getPredicate());
         }
         {
             AbstractPlanNode pn = compile("select r5.c from r5 where r5.a IN (select r1.a from r1);");

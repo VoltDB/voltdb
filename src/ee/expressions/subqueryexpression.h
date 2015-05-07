@@ -20,12 +20,19 @@
 
 #include "expressions/abstractexpression.h"
 
-#include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include <vector>
 
 namespace voltdb {
 
+/**
+ * An expression that produces a temp table from a subquery.
+ * Note that this expression type's eval method is a little
+ * different from the others: eval will return a subquery id,
+ * which can then be retrieved from the executor context
+ * by invoking its getSubqueryOutputTable method.
+ */
 class SubqueryExpression : public AbstractExpression {
     public:
     SubqueryExpression(ExpressionType subqueryType,
@@ -53,7 +60,7 @@ class SubqueryExpression : public AbstractExpression {
     std::vector<int> m_otherParamIdxs;
 
     // The list of the corresponding TVE for each parameter index
-    boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
+    boost::scoped_ptr<const std::vector<AbstractExpression*> > m_tveParams;
 };
 
 }

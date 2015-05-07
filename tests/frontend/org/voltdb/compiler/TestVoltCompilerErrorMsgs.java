@@ -39,7 +39,10 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
-            "sval varchar(255) not null" +
+            "sval varchar(255) not null," +
+            "tinyval tinyint," +
+            "floatval float," +
+            "decval decimal" +
             ");" +
             "create table indexed_blah (" +
             "ival bigint default 0 not null, " +
@@ -48,7 +51,10 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
             ");" +
             "create table partitioned_blah (" +
             "ival bigint default 0 not null, " +
-            "sval varchar(255) not null" +
+            "sval varchar(255) not null," +
+            "tinyval tinyint," +
+            "floatval float," +
+            "decval decimal" +
             ");" +
             "partition table partitioned_blah on column sval;" +
             "";
@@ -209,29 +215,73 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
 
     public void testHexLiterals() throws Exception {
 
-        // x-quoted literals with hexadecimal digits currently not
-        // allowed to represent integers.
-
+        // 0 digits is not valid to specify a number.
         ddlErrorTest("invalid format for a constant bigint value",
                 "create procedure insHex as insert into blah (ival) values (x'');");
 
-        // This *would* work if we accepted hex literals as ints,
-        // but we don't.
-        ddlErrorTest("invalid format for a constant bigint value",
-                "create procedure insHex as insert into blah (ival) values (x'FF');");
-
-        // This *would* work if we accepted hex literals as ints,
-        // but we don't.  This would be a decimal 128.
-        ddlErrorTest("invalid format for a constant bigint value",
-                "create procedure insHex as insert into blah (ival) values (x'80');");
-
-        // The HSQL parser complains about an odd number of digits,
-        // so the error message is different here.
+        // The HSQL parser complains about an odd number of digits.
         ddlErrorTest("malformed binary string",
                 "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef0');");
 
+        // Too many digits for a BIGINT.
         ddlErrorTest("invalid format for a constant bigint value",
                 "create procedure insHex as insert into blah (ival) values (x'0123456789abcdef01');");
 
+        // Check that we get range checks right when inserting into a field narrower
+        // than BIGINT.
+
+        ddlErrorTest("Constant value overflows/underflows TINYINT type.",
+                "create procedure insHex as insert into blah (tinyval) values (x'FF');");
+
+        ddlErrorTest("Constant value overflows/underflows TINYINT type.",
+                "create procedure insHex as insert into blah (tinyval) values (x'80');");
+
+        // This is -128, the null value.
+        ddlErrorTest("Constant value overflows/underflows TINYINT type.",
+                "create procedure insHex as insert into blah (tinyval) values (x'FfffFfffFfffFf80');");
+
+        // This is -129.
+        ddlErrorTest("Constant value overflows/underflows TINYINT type.",
+                "create procedure insHex as insert into blah (tinyval) values (x'FfffFfffFfffFf7f');");
+
+        // Hex constants not allowed to initialize DECIMAL or FLOAT.
+
+        ddlErrorTest("invalid format for a constant float value",
+                "create procedure insHex as insert into blah (floatval) values (x'80');");
+
+        ddlErrorTest("invalid format for a constant decimal value",
+                "create procedure insHex as insert into blah (decval) values (x'80');");
+
+        // In arithmetic or logical expressions, we catch malformed (for BIGINT) x-literals
+        // in HSQL.
+
+        ddlErrorTest("malformed numeric constant",
+                "create procedure selHex as select 30 + X'' from blah;");
+
+        // (too many hex digits)
+        ddlErrorTest("malformed numeric constant",
+                "create procedure selHex as select tinyval from blah where X'0000000000000000FF' < tinyval;");
+    }
+
+    public void testHexLiteralDefaultValues() throws Exception {
+        ddlErrorTest("malformed numeric constant",
+                "create table t (bi bigint default X'');");
+
+        ddlErrorTest("malformed numeric constant",
+                "create table t (bi bigint default X'FFFF0000FFFF0000FF');");
+
+        ddlErrorTest("numeric value out of range",
+                "create table t (ti tinyint default X'80');");
+
+        ddlErrorTest("numeric value out of range",
+                "create table t (ti tinyint default X'FF');");
+
+        // This does not fail, but it seems like it should fail with an
+        // out of range error.  -128 is reserved for the TINYINT null value
+        // This is ENG-8148.
+        ddlNonErrorTest("create table t (ti tinyint default -X'80');");
+
+        ddlErrorTest("numeric value out of range",
+                "create table t (ti tinyint default -X'81');");
     }
 }

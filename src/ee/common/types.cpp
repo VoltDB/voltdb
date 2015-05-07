@@ -682,7 +682,7 @@ ExpressionType stringToExpression(string str )
     return EXPRESSION_TYPE_INVALID;
 }
 
-string quantifiernToString(QuantifierType type)
+string quantifierToString(QuantifierType type)
 {
     switch (type) {
     case QUANTIFIER_TYPE_NONE: {
@@ -698,7 +698,7 @@ string quantifiernToString(QuantifierType type)
     return "INVALID";
 }
 
-QuantifierType stringToQunatifier(string str )
+QuantifierType stringToQuantifier(string str )
 {
     if (str == "ANY") {
         return QUANTIFIER_TYPE_ANY;

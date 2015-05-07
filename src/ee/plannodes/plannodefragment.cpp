@@ -46,6 +46,9 @@
 #include <stdexcept>
 #include <sstream>
 #include <memory>
+
+#include <boost/foreach.hpp>
+
 #include "common/FatalException.hpp"
 #include "plannodefragment.h"
 #include "catalog/catalog.h"
@@ -89,10 +92,9 @@ void PlanNodeFragment::constructTree(AbstractPlanNode* node)
 
 PlanNodeFragment::~PlanNodeFragment()
 {
-    for (PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin(); mapIt != m_stmtExecutionListMap.end();) {
-        std::vector<AbstractPlanNode*>* execList = mapIt->second;
-        m_stmtExecutionListMap.erase(mapIt++);
-        delete execList;
+    typedef  std::map<int, std::vector<AbstractPlanNode*>* >::value_type MapEntry;
+    BOOST_FOREACH(MapEntry& entry, m_stmtExecutionListMap) {
+        delete entry.second;
     }
 
     std::map<CatalogId, AbstractPlanNode*>::iterator it = m_idToNodeMap.begin();

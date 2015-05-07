@@ -139,6 +139,14 @@ public class VoltProjectBuilder {
         public final String name;
         public String password;
         private final String roles[];
+        public boolean plaintext = true;
+
+        public UserInfo (final String name, final String password, final String roles[], final boolean plaintext){
+            this.name = name;
+            this.password = password;
+            this.roles = roles;
+            this.plaintext = plaintext;
+        }
 
         public UserInfo (final String name, final String password, final String roles[]){
             this.name = name;
@@ -997,6 +1005,7 @@ public class VoltProjectBuilder {
                 users.getUser().add(user);
                 user.setName(info.name);
                 user.setPassword(info.password);
+                user.setPlaintext(info.plaintext);
 
                 // build up user/roles.
                 if (info.roles.length > 0) {

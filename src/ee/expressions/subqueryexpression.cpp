@@ -51,8 +51,11 @@ SubqueryExpression::SubqueryExpression(
 SubqueryExpression::~SubqueryExpression()
 {
     if (m_tveParams.get() != NULL) {
+        // When we support C++11, we should store unique_ptrs
+        // in this vector so cleanup happens automatically.
         size_t i = m_tveParams->size();
         while (i--) {
+
             delete (*m_tveParams)[i];
         }
     }
@@ -87,6 +90,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
                 }
                 paramsChanged = true;
             }
+            // Update the value stored in the executor context's parameter container:
             prevParam = param.copyNValue();
         }
     }

@@ -194,8 +194,10 @@ class TableAndIndexTest : public Test {
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
+                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 districtTable->addIndex(index);
+                districtTableReplica->addIndex(replicaIndex);
             }
 
             districtTempTable = dynamic_cast<TempTable*>(
@@ -230,8 +232,10 @@ class TableAndIndexTest : public Test {
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
+                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 customerTable->addIndex(index);
+                customerTableReplica->addIndex(replicaIndex);
             }
 
             customerTempTable =  dynamic_cast<TempTable*>(

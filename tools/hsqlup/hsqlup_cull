@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    echo Source directory does not exist: $1
+    exit 1
+fi
+if [ -e "$2" ]; then
+    echo First,
+    echo rm $2
+    echo " then retry."
+    exit 2
+fi
+
+# An open-ended "cp -r" followed by rm for the exclude list is a little crude, but it works.
+
+cp -r $1 $2
+
+# There are a number of other modules that could be added to this exclude list,
+# especially unused commandline utils, even before upgrading from the hsql 1.9.0 beta version.
+find $2 -type d -name .svn | xargs rm -rf
+find $2 -type f -name "ClientConnection*.java" | xargs rm -f
+rm -rf $2/test
+rm -rf $2/server
+rm -rf $2/cmdline
+rm -rf $2/sample
+rm -rf $2/util/preprocessor
+rm -rf $2/lib/tar/rb
