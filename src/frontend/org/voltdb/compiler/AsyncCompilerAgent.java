@@ -34,7 +34,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
-import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
@@ -316,6 +315,11 @@ public class AsyncCompilerAgent {
         work.completionHandler.onCompletion(result);
     }
 
+    public static final String AdHocErrorResponseMessage =
+            "The @AdHoc stored procedure when called with more than one parameter "
+                    + "must be passed a single parameterized SQL statement as its first parameter. "
+                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
+
     AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
@@ -338,13 +342,10 @@ public class AsyncCompilerAgent {
         StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
 
-        boolean hasUserInputParamsForAdHoc = false;
         if (work.userParamSet != null && work.userParamSet.length > 0) {
             if (work.sqlStatements.length != 1) {
-                return AsyncCompilerResult.makeErrorResult(work,
-                        "Multiple AdHoc queries with question marks in a procedure call are not supported");
+                return AsyncCompilerResult.makeErrorResult(work, AdHocErrorResponseMessage);
             }
-            hasUserInputParamsForAdHoc = true;
         }
 
         for (final String sqlStatement : work.sqlStatements) {
@@ -357,8 +358,7 @@ public class AsyncCompilerAgent {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
-                        hasUserInputParamsForAdHoc? work.userParamSet: null);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning, work.userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
@@ -375,27 +375,6 @@ public class AsyncCompilerAgent {
         String errorSummary = null;
         if (!errorMsgs.isEmpty()) {
             errorSummary = StringUtils.join(errorMsgs, "\n");
-        }
-
-        // check the parameters count
-        if (work.explainMode == ExplainMode.NONE && work.userParamSet != null) {
-            int totalQuestionMarkParameters = 0;
-            for (AdHocPlannedStatement result: stmts) {
-                totalQuestionMarkParameters += result.getQuestionMarkParameterCount();
-            }
-            if (work.sqlStatements.length > 1 && totalQuestionMarkParameters > 0) {
-                return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("The @AdHoc stored procedure when called with more than one parameter "
-                                + "must be passed a single parameterized SQL statement as its first parameter. "
-                                + "Pass each parameterized SQL statement to a separate callProcedure invocation."));
-            }
-
-            if (totalQuestionMarkParameters != work.userParamSet.length) {
-                return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("Incorrect number of parameters passed: expected %d, passed %d",
-                                totalQuestionMarkParameters, work.userParamSet.length));
-            }
-
         }
 
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,

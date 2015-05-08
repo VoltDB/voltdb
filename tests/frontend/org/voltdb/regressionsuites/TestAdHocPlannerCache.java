@@ -30,6 +30,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestAdHocPlannerCache extends RegressionSuite {
@@ -37,12 +38,15 @@ public class TestAdHocPlannerCache extends RegressionSuite {
     private static final int CACHE_MISS2 = 1;
     private static final int CACHE_HIT1 = 2;
     private static final int CACHE_HIT2 = 3;
+    private static final int QUERY_EXCEPTION = 4;
 
     private long m_cache1_level = 0;
     private long m_cache2_level = 0;
     private long m_cache1_hits = 0;
     private long m_cache2_hits = 0;
     private long m_cache_misses = 0;
+
+    private static String pattern = "Incorrect number of parameters passed: expected %d, passed %d";
 
     private void resetStatistics() {
         m_cache1_level = 0;
@@ -86,6 +90,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
                 ++m_cache1_hits;
             } else if (cacheType == CACHE_HIT2) {
                 ++m_cache2_hits;
+            } else if (cacheType == QUERY_EXCEPTION) {
+                // Has not gone through the planner cache code
             } else {
                 fail("Wrong input cache type");
             }
@@ -209,7 +215,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
         Client client = getClient();
         String sql;
-        String errorMsg = "~abcdefg~";
+        String errorMsg;
 
         client.callProcedure("R1.insert", 1, "foo1", 0, 1.1);
         client.callProcedure("R1.insert", 2, "foo2", 0, 2.2);
@@ -218,7 +224,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         //
         // Multiple AdHoc queries with question marks per procedure call
         //
-        errorMsg = "Multiple AdHoc queries with question marks in a procedure call are not supported";
+        errorMsg = AsyncCompilerAgent.AdHocErrorResponseMessage;
+
         sql = "SELECT ID FROM R1 B WHERE num = 0 and B.ID > ? order by ID;";
         try {
             client.callProcedure("@AdHoc", sql + sql, 0, 0);
@@ -226,6 +233,16 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
+        checkPlannerCache(client, QUERY_EXCEPTION);
+
+        // fewer parameters
+        try {
+            client.callProcedure("@AdHoc", sql + sql, 0);
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(errorMsg));
+        }
+        checkPlannerCache(client, QUERY_EXCEPTION);
 
         try {
             client.callProcedure("@AdHoc", "select * from r1;" + sql, 0, 0);
@@ -233,6 +250,12 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
+        checkPlannerCache(client, QUERY_EXCEPTION);
+
+
+        // by pass the pre-planner check
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql+sql);
+        checkPlannerCache(client, CACHE_MISS1);
 
         // positive tests
         sql = "SELECT ID FROM R1 B order by ID;";
@@ -244,27 +267,34 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         //
         // Pass in incorrect number of parameters
         //
-        try {
-            client.callProcedure("@AdHoc", sql, 1);
-            fail();
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 0, passed 1"));
-        }
+        verifyAdHocFails(client, String.format(pattern, 0, 1), sql, 1);
+        checkPlannerCache(client, CACHE_MISS1);
 
         sql = "SELECT ID FROM R1 B WHERE num = 0 and B.ID > ? order by ID;";
-        try {
-            client.callProcedure("@AdHoc", sql, 1, 500);
-            fail();
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Incorrect number of parameters passed: expected 1, passed 2"));
-        }
+        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 1, 500);
+        checkPlannerCache(client, CACHE_MISS1);
 
-        try {
-            client.callProcedure("@AdHoc", sql);
-            fail();
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Number of arguments provided was 0 where 1 was expected"));
-        }
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        VoltTable vt;
+
+        // rename table with "TB" to run it as a new query to the system
+        sql = "SELECT ID FROM R1 TB WHERE TB.ID > ? order by ID;";
+        vt = client.callProcedure("@AdHoc", sql, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_MISS2);
+
+
+        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 1, 500);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        // no parameters passed in for multiple adhoc queries
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql + sql);
+        checkPlannerCache(client, CACHE_MISS1);
     }
 
     public void testAdHocBadParameters() throws IOException, ProcCallException {
@@ -274,6 +304,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         Client client = getClient();
         String sql;
         VoltTable vt;
+        String errorMsg;
 
         client.callProcedure("R1.insert", 1, "foo1", 0, 1.1);
         client.callProcedure("R1.insert", 2, "foo2", 0, 2.2);
@@ -304,13 +335,13 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         checkPlannerCache(client, CACHE_HIT2);
 
         sql = "SELECT ID FROM R1 B WHERE B.ID > ? order by ID;";
-        try {
-            vt = client.callProcedure("@AdHoc", sql, 1.8).getResults()[0];
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (1.8) of type: "
-                    + "java.lang.Double is not a match or is out of range for the target parameter type: long"));
-        }
+        errorMsg = "java.lang.Double is not a match or is out of range for the target parameter type: long";
+        verifyAdHocFails(client, errorMsg, sql, 1.8);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        // verify the error message is from "tryToMakeCompatible"
+        verifyAdHocFails(client, "tryToMakeCompatible", sql, 1.8);
+        checkPlannerCache(client, CACHE_MISS1);
 
         // change the where clause to get the new query pattern
 
@@ -329,6 +360,102 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 B WHERE B.NUM > 0.9 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS1);
+    }
+
+    public void testAdvancedBadParameters() throws IOException, ProcCallException {
+        System.out.println("testAdvancedBadParameters...");
+        resetStatistics();
+
+        Client client = getClient();
+        String sql;
+        VoltTable vt;
+
+        client.callProcedure("R1.insert", 1, "foo1", 0, 1.1);
+        client.callProcedure("R1.insert", 2, "foo2", 0, 2.2);
+        client.callProcedure("R1.insert", 3, "foo3", 1, 3.3);
+
+        // UNION
+        // parameters in both
+        sql = "SELECT ID FROM R1 B WHERE B.ID > ? UNION SELECT ID FROM R1 C WHERE C.ID > ?;";
+        vt = client.callProcedure("@AdHoc", sql, 0, 0).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        checkPlannerCache(client, CACHE_MISS1);
+
+        verifyAdHocFails(client, String.format(pattern, 2, 1), sql, 0);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        vt = client.callProcedure("@AdHoc", sql, 1, 2).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_HIT2);
+
+        verifyAdHocFails(client, String.format(pattern, 2, 3), sql, 0, 1, 2);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        // parameters on right
+        sql = "SELECT ID FROM R1 B WHERE NUM = 0 UNION SELECT ID FROM R1 C WHERE C.ID < ?;";
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 0, 0);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_MISS1);
+
+        vt = client.callProcedure("@AdHoc", sql, 3).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_HIT2);
+
+        // parameters on left
+        sql = "SELECT ID FROM R1 B WHERE NUM > ? UNION SELECT ID FROM R1 C WHERE C.ID > 1;";
+        vt = client.callProcedure("@AdHoc", sql, 0).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        checkPlannerCache(client, CACHE_MISS1);
+
+        vt = client.callProcedure("@AdHoc", sql, -1).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        checkPlannerCache(client, CACHE_HIT2);
+
+        verifyAdHocFails(client, String.format(pattern, 1, 2), sql, 0, 0);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        verifyAdHocFails(client, String.format(pattern, 1, 0), sql);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        //
+        // Subquery should not make a difference here, but add some tests to make sure at least
+        //
+
+        // IN subquery
+        sql = "SELECT ID FROM R1 B WHERE B.ID > ? and ID IN (SELECT ID FROM R1 where id > ?) order by ID;";
+        vt = client.callProcedure("@AdHoc", sql, 1, 2).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS1);
+
+        vt = client.callProcedure("@AdHoc", sql, 0, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        checkPlannerCache(client, CACHE_HIT2);
+
+        verifyAdHocFails(client, String.format(pattern, 2, 1), sql, 0);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        // scalar subquery
+        sql = "SELECT (select max(r1.id) from r1 where r1.id > B.id and num = ?) AS maxID FROM R1 B WHERE B.ID > ?;";
+
+        vt = client.callProcedure("@AdHoc", sql, 1, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3, Long.MIN_VALUE});
+        checkPlannerCache(client, CACHE_MISS1);
+
+        vt = client.callProcedure("@AdHoc", sql, 0, 0).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2, Long.MIN_VALUE, Long.MIN_VALUE});
+        checkPlannerCache(client, CACHE_HIT2);
+
+        verifyAdHocFails(client, String.format(pattern, 2, 1), sql, 0);
+        checkPlannerCache(client, CACHE_MISS1);
+
+        verifyAdHocFails(client, String.format(pattern, 2, 0), sql);
         checkPlannerCache(client, CACHE_MISS1);
     }
 
