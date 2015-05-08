@@ -451,7 +451,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
             sql = "select dept from " + tb +
                     " group by dept " +
                     " having max(wage) in (select wage from R1) order by dept desc";
-            /* enable for debug */ vt = client.callProcedure("@Explain", sql).getResults()[0];
+            //* enable for debug */ vt = client.callProcedure("@Explain", sql).getResults()[0];
             //* enable for debug */ System.out.println(vt);
             //TODO: Whatever @Explain is testung here should be covered in a planner test instead.
             assertFalse(vt.toString().toLowerCase().contains("subquery: null"));

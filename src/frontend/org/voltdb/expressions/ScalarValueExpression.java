@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -43,6 +44,11 @@ public class ScalarValueExpression extends AbstractValueExpression {
     public String explain(String impliedTableName) {
         assert(m_left != null);
         return m_left.explain(impliedTableName);
+    }
+
+    public StmtSubqueryScan getSubqueryScan() {
+        SelectSubqueryExpression subqExpr = (SelectSubqueryExpression)m_left;
+        return subqExpr.getSubqueryScan();
     }
 
 }

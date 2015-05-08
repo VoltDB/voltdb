@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.Stack;
 
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -461,17 +462,71 @@ public abstract class ExpressionUtil {
             ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
         }
     }
+    /**
+     * Traverse this expression tree.  Where we find a SelectSubqueryExpression, wrap it
+     * in a ScalarValueExpression if its parent is not one of:
+     * - comparison (=, !=, <, etc)
+     * - operator exists
+     * @param expr   - the expression that may contain subqueries that need to be wrapped
+     * @return the expression with subqueries wrapped where needed
+     */
+    public static AbstractExpression wrapScalarSubqueries(AbstractExpression expr) {
+        return wrapScalarSubqueriesHelper(null, expr);
+    }
 
     /**
      * Add a ScalarValueExpression on top of the SubqueryExpression
      * @param expr - subquery expression
-     * return ScalarValueExpression
+     * @return ScalarValueExpression
      */
-    public static AbstractExpression addScalarValueExpression(AbstractSubqueryExpression expr) {
+    private static AbstractExpression addScalarValueExpression(SelectSubqueryExpression expr) {
+        if (expr.getSubqueryScan().getOutputSchema().size() != 1) {
+            throw new PlanningErrorException("Scalar subquery can have only one output column");
+        }
+
+        expr.changeToScalarExprType();
+
         AbstractExpression scalarExpr = new ScalarValueExpression();
         scalarExpr.setLeft(expr);
         scalarExpr.setValueType(expr.getValueType());
         scalarExpr.setValueSize(expr.getValueSize());
         return scalarExpr;
+    }
+
+    private static boolean isScalarSubqueryContext(AbstractExpression parentExpr) {
+        if (parentExpr == null) {
+            // No context: we are a top-level expression.  E.g, an item on the
+            // select list.  In this case, assume the expression must be scalar.
+            return true;
+        }
+
+        // Exists and comparison operators can handle non-scalar subqueries.
+        if (parentExpr.getExpressionType() == ExpressionType.OPERATOR_EXISTS
+                || parentExpr instanceof ComparisonExpression) {
+            return false;
+        }
+
+        // By default, assume that the subquery must produce a single value.
+        return true;
+    }
+
+    private static AbstractExpression wrapScalarSubqueriesHelper(AbstractExpression parentExpr, AbstractExpression expr) {
+
+        // Bottom-up recursion.  Proceed to the children first.
+        AbstractExpression leftChild = expr.getLeft();
+        if (leftChild != null) {
+            expr.setLeft(wrapScalarSubqueriesHelper(expr, leftChild));
+        }
+
+        AbstractExpression rightChild = expr.getRight();
+        if (rightChild != null) {
+            expr.setRight(wrapScalarSubqueriesHelper(expr, rightChild));
+        }
+
+        if (expr instanceof SelectSubqueryExpression
+                && isScalarSubqueryContext(parentExpr)) {
+            expr = addScalarValueExpression((SelectSubqueryExpression)expr);
+        }
+        return expr;
     }
 }

@@ -284,6 +284,12 @@ public abstract class AbstractParsedStmt {
     // -- the function is now also called by DDLCompiler with no AbstractParsedStmt in sight --
     // so, the methods COULD be relocated to class AbstractExpression or ExpressionUtil.
     public AbstractExpression parseExpressionTree(VoltXMLElement root) {
+        AbstractExpression expr = parseExpressionTreeHelper(root);
+        expr = ExpressionUtil.wrapScalarSubqueries(expr);
+        return expr;
+    }
+
+    private AbstractExpression parseExpressionTreeHelper(VoltXMLElement root) {
         String elementName = root.name.toLowerCase();
         AbstractExpression retval = null;
 
@@ -333,7 +339,7 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(argNode);
+            AbstractExpression argExpr = parseExpressionTreeHelper(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
@@ -458,7 +464,7 @@ public abstract class AbstractParsedStmt {
        // Parse individual columnref expressions from the IN output schema
        // Short-circuit for COL IN (LIST) and COL IN (SELECT COL FROM ..)
        if (exprNode.children.size() == 1) {
-           return parseExpressionTree(exprNode.children.get(0));
+           return parseExpressionTreeHelper(exprNode.children.get(0));
        } else {
            // (COL1, COL2) IN (SELECT C1, C2 FROM...)
            return parseRowExpression(exprNode.children);
@@ -474,7 +480,7 @@ public abstract class AbstractParsedStmt {
       // Parse individual columnref expressions from the IN output schema
       List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
       for (VoltXMLElement exprNode : exprNodes) {
-          AbstractExpression expr = this.parseExpressionTree(exprNode);
+          AbstractExpression expr = this.parseExpressionTreeHelper(exprNode);
           exprs.add(expr);
       }
       return new RowSubqueryExpression(exprs);
@@ -580,7 +586,7 @@ public abstract class AbstractParsedStmt {
 
         // recursively parse the left subtree (could be another operator or
         // a constant/tuple/param value operand).
-        AbstractExpression leftExpr = parseExpressionTree(leftExprNode);
+        AbstractExpression leftExpr = parseExpressionTreeHelper(leftExprNode);
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
         expr.setLeft(leftExpr);
 
@@ -594,7 +600,7 @@ public abstract class AbstractParsedStmt {
             assert(rightExprNode != null);
 
             // recursively parse the right subtree
-            AbstractExpression rightExpr = parseExpressionTree(rightExprNode);
+            AbstractExpression rightExpr = parseExpressionTreeHelper(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
         } else {
@@ -820,7 +826,7 @@ public abstract class AbstractParsedStmt {
 
         // recursively parse the child subtree -- could (in theory) be an operator or
         // a constant, column, or param value operand or null in the specific case of "COUNT(*)".
-        AbstractExpression childExpr = parseExpressionTree(childExprNode);
+        AbstractExpression childExpr = parseExpressionTreeHelper(childExprNode);
         if (childExpr == null) {
             assert(exprType == ExpressionType.AGGREGATE_COUNT);
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
@@ -868,7 +874,7 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(argNode);
+            AbstractExpression argExpr = parseExpressionTreeHelper(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
