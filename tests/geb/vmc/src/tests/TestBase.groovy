@@ -57,6 +57,10 @@ class TestBase extends GebReportingSpec {
     static final int MAX_SECS_WAIT_FOR_PAGE = 60
     static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
 
+	static int numberOfTrials 	= 20
+	static int waitTime 		= 30
+	boolean testStatus 			= false
+	
     static Boolean doesDBMonitorPageOpenFirst = null
     @Shared boolean firstDebugMessage = true
 
@@ -269,13 +273,6 @@ class TestBase extends GebReportingSpec {
     }
 
     def cleanupSpec() {
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            when: 'Open VMC page'
-            ensureOnVoltDBManagementCenterPage()
-            then: 'to be on VMC page'
-            at VoltDBManagementCenterPage
-        }
-
-        page.loginIfNeeded()
+        
     }
 }
