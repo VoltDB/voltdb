@@ -1405,6 +1405,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
       verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
   }
 
+  public void testSubqueriesWithArithmetic() throws Exception {
+      Client client = getClient();
+
+      client.callProcedure("R1.insert", 1, 300,  1 , "2013-06-18 02:00:00.123457");
+
+      validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r1", new long[] {300});
+      validateTableOfScalarLongs(client, "select (select max(wage) from r1) + 0 from r1", new long[] {300});
+  }
+
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;
