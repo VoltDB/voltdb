@@ -561,16 +561,10 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
                 nameString = "?";
             }
 
-            char aliasBuffer[256];
-            if (obj.hasNonNullKey("ALIAS")) {
-                std::string aliasString = obj.valueForKey("ALIAS").asStr();
-                snprintf(aliasBuffer, sizeof(aliasBuffer), " aliased to '%s'", aliasString.c_str());
-            }
-
             char fn_message[1024];
             snprintf(fn_message, sizeof(fn_message),
-                     "SQL function '%s'%s with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
-                     nameString.c_str(), aliasBuffer, functionId, (int)args->size());
+                     "SQL function '%s' with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
+                     nameString.c_str(), functionId, (int)args->size());
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
         }
     }

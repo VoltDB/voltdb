@@ -2161,42 +2161,14 @@ public class FunctionSQL extends Expression {
         exp.attributes.put("name", name);
         exp.attributes.put("valuetype", dataType.getNameString());
         if (parameterArg != -1) {
-            exp.attributes.put("parameter", String.valueOf(parameterArg));
+            exp.attributes.put("result_type_parameter_index", String.valueOf(parameterArg));
         }
         int volt_funcType = funcType;
 
-        String volt_alias = null;
+        String implied_argument = null;
         int keywordConstant = 0;
 
         switch (funcType) {
-        case FUNC_TRIM_CHAR :
-            volt_alias = null;
-            keywordConstant = ((Integer) nodes[0].valueData).intValue();
-            switch (keywordConstant) {
-
-                case Tokens.BOTH :
-                    volt_alias = "trim(both";
-                    break;
-
-                case Tokens.LEADING :
-                    volt_alias = "trim(leading";
-                    break;
-
-                case Tokens.TRAILING :
-                    volt_alias = "trim(trailing";
-                    break;
-
-                default :
-                    throw Error.runtimeError(ErrorCode.U_S0500,
-                                             "FunctionSQL");
-            }
-            assert(volt_alias != null);
-            exp.attributes.put("function_id", String.valueOf(keywordConstant + SQL_TRIM_VOLT_FUNC_OFFSET));
-            exp.attributes.put("volt_alias", volt_alias);
-            // Having accounted for the first argument, remove it from the child expression list.
-            exp.children.remove(0);
-            return exp;
-
         case FUNC_SUBSTRING_CHAR :
             // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
             if (nodes.length == 2 || nodes[2] == null) {
@@ -2205,151 +2177,182 @@ public class FunctionSQL extends Expression {
             exp.attributes.put("function_id", String.valueOf(volt_funcType));
             return exp;
 
+            // A little tweaking is needed in some other cases because VoltDB
+        	// wants to define separate functions for each leading keyword
+        	// argument, eliminating the hard-coded node[0] value.
+
+        case FUNC_TRIM_CHAR :
+            implied_argument = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            switch (keywordConstant) {
+
+                case Tokens.BOTH :
+                    implied_argument = "BOTH";
+                    break;
+
+                case Tokens.LEADING :
+                    implied_argument = "LEADING";
+                    break;
+
+                case Tokens.TRAILING :
+                    implied_argument = "TRAILING";
+                    break;
+
+                default :
+                    throw Error.runtimeError(ErrorCode.U_S0500,
+                                             "FunctionSQL");
+            }
+            assert(implied_argument != null);
+            exp.attributes.put("function_id", String.valueOf(keywordConstant + SQL_TRIM_VOLT_FUNC_OFFSET));
+            exp.attributes.put("implied_argument", implied_argument);
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+
         case FUNC_EXTRACT :
-            // A little tweaking is needed here because VoltDB wants to define separate functions for each extract "field" (hard-coded node[0] value).
-            volt_alias = null;
+            implied_argument = null;
             keywordConstant = ((Integer) nodes[0].valueData).intValue();
             switch (keywordConstant) {
             case Tokens.DAY_NAME :
             // case DTIType.DAY_NAME :
-                volt_alias = "extract(day_name";
+                implied_argument = "DAY_NAME";
                 break;
             case Tokens.MONTH_NAME :
             // case DTIType.MONTH_NAME :
-                volt_alias = "extract(month_name";
+                implied_argument = "MONTH_NAME";
                 break;
             case Tokens.QUARTER :
             // case DTIType.QUARTER :
-                volt_alias = "extract(quarter";
+                implied_argument = "QUARTER";
                 break;
             case Tokens.DAY_OF_YEAR :
             // case DTIType.DAY_OF_YEAR :
-                volt_alias = "extract(day_of_year";
+                implied_argument = "DAY_OF_YEAR";
                 break;
             case Tokens.WEEKDAY :
-                volt_alias = "extract(weekday";
+                implied_argument = "WEEKDAY";
                 break;
             case Tokens.DAY_OF_WEEK :
             // case DTIType.DAY_OF_WEEK :
-                volt_alias = "extract(day_of_week";
+                implied_argument = "DAY_OF_WEEK";
                 break;
             case Tokens.WEEK:
                 keywordConstant = Tokens.WEEK_OF_YEAR;
             case Tokens.WEEK_OF_YEAR :
             // case DTIType.WEEK_OF_YEAR :
-                volt_alias = "extract(week_of_year";
+                implied_argument = "WEEK_OF_YEAR";
                 break;
             case Types.SQL_INTERVAL_YEAR :
-                volt_alias = "extract(interval_year";
+                implied_argument = "INTERVAL_YEAR";
                 break;
             case Types.SQL_INTERVAL_MONTH :
-                volt_alias = "extract(interval_month";
+                implied_argument = "SQL_INTERVAL_MONTH";
                 break;
             case Types.SQL_INTERVAL_DAY :
-                volt_alias = "extract(interval_day";
+                implied_argument = "SQL_INTERVAL_DAY";
                 break;
             case Types.SQL_INTERVAL_HOUR :
-                volt_alias = "extract(interval_hour";
+                implied_argument = "SQL_INTERVAL_HOUR";
                 break;
             case Types.SQL_INTERVAL_MINUTE :
-                volt_alias = "extract(interval_minute";
+                implied_argument = "SQL_INTERVAL_MINUTE";
                 break;
             case Types.SQL_INTERVAL_SECOND :
-                volt_alias = "extract(interval_second";
+                implied_argument = "SQL_INTERVAL_SECOND";
                 break;
             case Tokens.YEAR :
-                volt_alias = "extract(year";
+                implied_argument = "YEAR";
                 break;
             case Tokens.MONTH :
-                volt_alias = "extract(month";
+                implied_argument = "MONTH";
                 break;
             case Tokens.DAY_OF_MONTH :
             // case DTIType.DAY_OF_MONTH :
                 keywordConstant = Tokens.DAY;
             case Tokens.DAY :
-                volt_alias = "extract(day";
+                implied_argument = "DAY";
                 break;
             case Tokens.HOUR :
-                volt_alias = "extract(hour";
+                implied_argument = "HOUR";
                 break;
             case Tokens.MINUTE :
-                volt_alias = "extract(minute";
+                implied_argument = "MINUTE";
                 break;
             case Tokens.SECOND :
-                volt_alias = "extract(second";
+                implied_argument = "SECOND";
                 break;
             case Tokens.SECONDS_MIDNIGHT :
             // case DTIType.SECONDS_MIDNIGHT :
-                volt_alias = "extract(seconds_midnight";
+                implied_argument = "SECONDS_MIDNIGHT";
                 break;
             case Tokens.TIMEZONE_HOUR :
             // case DTIType.TIMEZONE_HOUR :
-                volt_alias = "extract(timezone_hour";
+                implied_argument = "TIMEZONE_HOUR";
                 break;
             case Tokens.TIMEZONE_MINUTE :
             // case DTIType.TIMEZONE_MINUTE :
-                volt_alias = "extract(timezone_minute";
+                implied_argument = "TIMEZONE_MINUTE";
                 break;
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
-            assert(volt_alias != null);
+            assert(implied_argument != null);
             exp.attributes.put("function_id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
-            exp.attributes.put("volt_alias", volt_alias);
+            exp.attributes.put("implied_argument", implied_argument);
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
             return exp;
 
         case FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH :
-            volt_alias = null;
+            implied_argument = null;
             keywordConstant = ((Integer) nodes[0].valueData).intValue();
             int since_epoch_func = -1;
             switch (keywordConstant) {
             case Tokens.SECOND :
-                volt_alias = "since_epoch_second";
+                implied_argument = "SECOND";
                 since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_SECOND;
                 break;
             case Tokens.MILLIS :
             case Tokens.MILLISECOND:
-                volt_alias = "since_epoch_millisecond";
+                implied_argument = "MILLISECOND";
                 since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MILLISECOND;
                 break;
             case Tokens.MICROS :
             case Tokens.MICROSECOND :
-                volt_alias = "since_epoch_microsecond";
+                implied_argument = "MICROSECOND";
                 since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MICROSECOND;
                 break;
             default:
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
-            assert(volt_alias != null);
+            assert(implied_argument != null);
             assert(-1 != since_epoch_func);
             exp.attributes.put("function_id", String.valueOf(since_epoch_func));
-            exp.attributes.put("volt_alias", volt_alias);
+            exp.attributes.put("implied_argument", implied_argument);
 
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
             return exp;
 
         case FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP :
-            volt_alias = null;
+            implied_argument = null;
             keywordConstant = ((Integer) nodes[0].valueData).intValue();
             int to_timestamp_func = -1;
             switch (keywordConstant) {
             case Tokens.SECOND :
-                volt_alias = "to_timestamp(second";
+                implied_argument = "SECOND";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND;
                 break;
             case Tokens.MILLIS :
             case Tokens.MILLISECOND :
-                volt_alias = "to_timestamp(millisecond";
+                implied_argument = "MILLISECOND";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
                 break;
             case Tokens.MICROS :
             case Tokens.MICROSECOND :
-                volt_alias = "to_timestamp(microsecond";
+                implied_argument = "MICROSECOND";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
                 break;
             default:
@@ -2358,63 +2361,63 @@ public class FunctionSQL extends Expression {
 
             assert(-1 != to_timestamp_func);
             exp.attributes.put("function_id", String.valueOf(to_timestamp_func));
-            exp.attributes.put("volt_alias", volt_alias);
+            exp.attributes.put("implied_argument", implied_argument);
 
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
             return exp;
 
         case FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP :
-            volt_alias = null;
+            implied_argument = null;
             keywordConstant = ((Integer) nodes[0].valueData).intValue();
             int truncate_func = -1;
             switch (keywordConstant) {
             case Tokens.YEAR :
-                volt_alias = "truncate(year";
+                implied_argument = "YEAR";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_YEAR;
                 break;
             case Tokens.QUARTER :
-                volt_alias = "truncate(quarter";
+                implied_argument = "QUARTER";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_QUARTER;
                 break;
             case Tokens.MONTH :
-                volt_alias = "truncate(month";
+                implied_argument = "MONTH";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MONTH;
                 break;
             case Tokens.DAY :
-                volt_alias = "truncate(day";
+                implied_argument = "DAY";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_DAY;
                 break;
             case Tokens.HOUR :
-                volt_alias = "truncate(hour";
+                implied_argument = "HOUR";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_HOUR;
                 break;
             case Tokens.MINUTE :
-                volt_alias = "truncate(minute";
+                implied_argument = "MINUTE";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MINUTE;
                 break;
             case Tokens.SECOND :
-                volt_alias = "truncate(second";
+                implied_argument = "SECOND";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_SECOND;
                 break;
             case Tokens.MILLIS:
             case Tokens.MILLISECOND :
-                volt_alias = "truncate(millisecond";
+                implied_argument = "MILLISECOND";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MILLISECOND;
                 break;
             case Tokens.MICROS:
             case Tokens.MICROSECOND :
-                volt_alias = "truncate(microseconcd";
+                implied_argument = "MICROSECOND";
                 truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MICROSECOND;
                 break;
             default:
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
-            assert(volt_alias != null);
+            assert(implied_argument != null);
             assert(-1 != truncate_func);
             exp.attributes.put("function_id", String.valueOf(truncate_func));
-            exp.attributes.put("volt_alias", volt_alias);
+            exp.attributes.put("implied_argument", implied_argument);
 
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
