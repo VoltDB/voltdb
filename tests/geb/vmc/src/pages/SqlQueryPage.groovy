@@ -23,6 +23,7 @@
 
 package vmcTest.pages
 
+import geb.error.RequiredPageContentNotPresent
 import geb.navigator.Navigator
 import geb.waiting.WaitTimeoutException
 import org.openqa.selenium.support.ui.Select
@@ -210,9 +211,13 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def List<String> getUserStoredProcedures() {
         def storedProcs = []
         showStoredProcedures()
-        userStoredProcs.each {
-            scrollIntoView(it);
-            storedProcs.add(it.text())
+        try {
+            userStoredProcs.each {
+                scrollIntoView(it)
+                storedProcs.add(it.text())
+            }
+        } catch (RequiredPageContentNotPresent e) {
+            // do nothing: empty list will be returned
         }
         return storedProcs
     }
