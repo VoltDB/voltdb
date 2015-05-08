@@ -225,6 +225,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * get tablename that is created and deleted
      */
+
     def String getTablename() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
         String line;
@@ -243,6 +244,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * click SQL query to go to SQL query
      */
+
     def boolean gotoSqlQuery() {
         header.tabSQLQuery.click()
     }
@@ -250,6 +252,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
     /*
      * click schema tab to go to Schema tab
      */
+
     def boolean gotoSchemaSubTab() {
         schemaSubLink.click()
     }
