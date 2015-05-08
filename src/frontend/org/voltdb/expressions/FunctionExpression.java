@@ -54,7 +54,7 @@ public class FunctionExpression extends AbstractExpression {
         m_functionId = id;
     }
 
-	public boolean hasFunctionId(int functionId) { return m_functionId == functionId; }
+    public boolean hasFunctionId(int functionId) { return m_functionId == functionId; }
 
     public void setResultTypeParameterIndex(int resultTypeParameterIndex) {
         m_resultTypeParameterIndex = resultTypeParameterIndex;
@@ -126,7 +126,7 @@ public class FunctionExpression extends AbstractExpression {
         if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
             if (m_resultTypeParameterIndex < 0 || m_resultTypeParameterIndex >= m_args.size()) {
                 throw new Exception("ERROR: The function parameter argument index '" +
-                		m_resultTypeParameterIndex + "' for '" + this + "' is out of bounds");
+                        m_resultTypeParameterIndex + "' for '" + this + "' is out of bounds");
             }
         }
 
@@ -171,7 +171,7 @@ public class FunctionExpression extends AbstractExpression {
             stringer.key(Members.IMPLIED_ARGUMENT.name()).value(m_impliedArgument);
         }
         if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
-        	stringer.key(Members.RESULT_TYPE_PARAM_IDX.name()).value(m_resultTypeParameterIndex);
+            stringer.key(Members.RESULT_TYPE_PARAM_IDX.name()).value(m_resultTypeParameterIndex);
         }
     }
 
@@ -181,14 +181,14 @@ public class FunctionExpression extends AbstractExpression {
         m_name = obj.getString(Members.NAME.name());
         assert(m_name != null);
         m_functionId = obj.getInt(Members.FUNCTION_ID.name());
-    	m_impliedArgument = null;
+        m_impliedArgument = null;
         if (obj.has(Members.IMPLIED_ARGUMENT.name())) {
-        	m_impliedArgument = obj.getString(Members.IMPLIED_ARGUMENT.name());
+            m_impliedArgument = obj.getString(Members.IMPLIED_ARGUMENT.name());
         }
         if (obj.has(Members.RESULT_TYPE_PARAM_IDX.name())) {
-        	m_resultTypeParameterIndex = obj.getInt(Members.RESULT_TYPE_PARAM_IDX.name());
+            m_resultTypeParameterIndex = obj.getInt(Members.RESULT_TYPE_PARAM_IDX.name());
         } else {
-        	m_resultTypeParameterIndex = NOT_PARAMETERIZED;
+            m_resultTypeParameterIndex = NOT_PARAMETERIZED;
         }
     }
 
