@@ -64,14 +64,13 @@ public class PlannerTestCase extends TestCase {
         try {
             m_aide.compile(sql, paramCount,
                     m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
-            fail();
+            fail("Expected planner failure, but found success.");
         }
         catch (Exception ex) {
             String result = ex.toString();
             for (String pattern : patterns) {
                 if ( ! result.contains(pattern)) {
-                    System.err.println("Did not find pattern '" + pattern + "' in error string '" + result + "'");
-                    fail();
+                    fail("Did not find pattern '" + pattern + "' in error string '" + result + "'");
                 }
             }
         }

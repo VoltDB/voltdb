@@ -28,6 +28,7 @@ package vmcTest.pages
  * tab) of the VoltDB Management Center (page), which is the VoltDB web UI
  * (replacing the old Catalog Report).
  */
+
 class SchemaPageProceduresAndSqlTab extends SchemaPage {
     static content = {
 	
