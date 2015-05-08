@@ -2747,6 +2747,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             hostLog.info("Different but compatible software versions on the master " +
                                          "and the replica. Master version is {" + (new String(data, "UTF-8")).split("-")[1] +
                                          "}. Replica version is {" + buildString.split("-")[1] + "}.");
+                            retval.set(null);
                         } catch (UnsupportedEncodingException e) {
                             retval.setException(new AssertionError(e));
                         }
