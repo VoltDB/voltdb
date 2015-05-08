@@ -1366,6 +1366,45 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
     }
 
+    public void testRepeatedQueriesDifferentData() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
+        client.callProcedure("R1.insert", 3,  15,  2 , "2013-08-18 02:00:00.123457");
+
+        client.callProcedure("R2.insert", 1,  5,  1 , "2013-08-18 02:00:00.123457");
+
+        validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r2;",
+                new long[] {15});
+
+        client.callProcedure("@AdHoc", "update r1 set wage = 35 where id = 2");
+
+        // Make sure that the second query reflects the current data.
+        validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r2;",
+                new long[] {35});
+    }
+
+  public void testSubqueryWithExceptions() throws Exception
+  {
+      Client client = getClient();
+      client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
+      client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
+      client.callProcedure("R1.insert", 3,  15,  2 , "2013-08-18 02:00:00.123457");
+      client.callProcedure("R1.insert", 4,  0,  2 , "2013-08-18 02:00:00.123457");
+
+      // A divide by zero execption in the top-level query!
+      // Debug assertions in the EE will make this test fail
+      // if we don't to clean up temp tables for both inner and outer queries.
+      String expectedMsg = isHSQL() ? "division by zero" : "Attempted to divide 30 by 0";
+      verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
+      verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
+
+      // As above, but this time the execption occurs in the inner query.
+      verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
+      verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
+  }
+
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;

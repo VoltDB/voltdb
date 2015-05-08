@@ -113,7 +113,7 @@ class ExecutorContext {
     void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
-        m_subqueryContextMap.clear();
+        assert(m_subqueryContextMap.empty());
     }
 
     UndoQuantum *getCurrentUndoQuantum() {
@@ -191,13 +191,15 @@ class ExecutorContext {
         return &(m_subqueryContextMap.find(subqueryId)->second);
     }
 
-    Table* executeExecutors(int subqueryId) const;
+    Table* executeExecutors(int subqueryId);
     Table* executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                            int subqueryId) const;
+                            int subqueryId);
 
     Table* getSubqueryOutputTable(int subqueryId) const;
 
-    void cleanupExecutors(int subqueryId) const;
+    void cleanupAllExecutors();
+
+    void cleanupExecutorsForSubquery(int subqueryId) const;
 
     DRTupleStream* drStream() {
         return m_drStream;
@@ -219,6 +221,8 @@ class ExecutorContext {
     void setDrStreamForTest(DRTupleStream *drStream) {
         m_drStream = drStream;
     }
+
+    bool allOutputTempTablesAreEmpty() const;
 
   private:
     Topend *m_topEnd;
