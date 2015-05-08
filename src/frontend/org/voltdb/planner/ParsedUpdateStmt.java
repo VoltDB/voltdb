@@ -80,7 +80,9 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
         for (AbstractExpression expr : columns.values()) {
-            exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            if (expr != null) {
+                exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            }
         }
 
         return exprs;
