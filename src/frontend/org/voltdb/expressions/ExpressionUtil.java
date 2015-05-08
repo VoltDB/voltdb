@@ -493,7 +493,7 @@ public abstract class ExpressionUtil {
         return scalarExpr;
     }
 
-    private static boolean isScalarSubqueryContext(AbstractExpression parentExpr) {
+    private static boolean subqueryRequiresScalarValueExpressionFromContext(AbstractExpression parentExpr) {
         if (parentExpr == null) {
             // No context: we are a top-level expression.  E.g, an item on the
             // select list.  In this case, assume the expression must be scalar.
@@ -503,6 +503,11 @@ public abstract class ExpressionUtil {
         // Exists and comparison operators can handle non-scalar subqueries.
         if (parentExpr.getExpressionType() == ExpressionType.OPERATOR_EXISTS
                 || parentExpr instanceof ComparisonExpression) {
+            return false;
+        }
+
+        // There is already a ScalarValueExpression above the subquery.
+        if (parentExpr instanceof ScalarValueExpression) {
             return false;
         }
 
@@ -524,7 +529,7 @@ public abstract class ExpressionUtil {
         }
 
         if (expr instanceof SelectSubqueryExpression
-                && isScalarSubqueryContext(parentExpr)) {
+                && subqueryRequiresScalarValueExpressionFromContext(parentExpr)) {
             expr = addScalarValueExpression((SelectSubqueryExpression)expr);
         }
         return expr;
