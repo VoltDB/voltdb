@@ -1808,7 +1808,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 String parts[] = sb.toString().split(" ", 2);
                 if (parts.length == 2) {
                     parts[0] = parts[0].trim();
-                    parts[1] = parts[1].trim();
+                    parts[1] = parts[0] + "_" + parts[1].trim();
                     return parts;
                 }
             }
@@ -2744,9 +2744,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         retval.set(null);
                     } else {
                         try {
-                            hostLog.info("Different but compatible software versions on the master " +
-                                         "and the replica. Master version is {" + (new String(data, "UTF-8")).split("-")[1] +
-                                         "}. Replica version is {" + buildString.split("-")[1] + "}.");
+                            hostLog.info("Different but compatible software versions on the cluster " +
+                                         "and the rejoining node. Cluster version is {" + (new String(data, "UTF-8")).split("_")[0] +
+                                         "}. Rejoining node version is {" + m_defaultVersionString + "}.");
                             retval.set(null);
                         } catch (UnsupportedEncodingException e) {
                             retval.setException(new AssertionError(e));
