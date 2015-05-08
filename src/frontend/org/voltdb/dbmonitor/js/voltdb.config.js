@@ -1,4 +1,4 @@
-
+﻿
 (function (window) {
 
     var iVoltDBConfig = (function () {
@@ -19,3 +19,4 @@
     window.VoltDBConfig = VoltDBConfig = new iVoltDBConfig();
 
 })(window);
+    
