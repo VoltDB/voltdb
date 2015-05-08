@@ -1752,8 +1752,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         try {
             InputStream buildstringStream =
                 ClassLoader.getSystemResourceAsStream("buildstring.txt");
-            if (buildstringStream == null) {
-                throw new RuntimeException("Unreadable or missing buildstring.txt file.");
+            if (buildstringStream != null) {
+                byte b;
+                while ((b = (byte) buildstringStream.read()) != -1) {
+                    sb.append((char)b);
+                }
+                String parts[] = sb.toString().split(" ", 2);
+                if (parts.length == 2) {
+                    parts[0] = parts[0].trim();
+                    parts[1] = parts[0] + "_" + parts[1].trim();
+                    return parts;
+                }
             }
             while ((b = (byte) buildstringStream.read()) != -1) {
                 sb.append((char)b);
@@ -2595,9 +2604,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         retval.set(null);
                     } else {
                         try {
-                            VoltDB.crashGlobalVoltDB("Local build string \"" + buildString +
-                                    "\" does not match cluster build string \"" +
-                                    new String(data, "UTF-8")  + "\"", false, null);
+                            hostLog.info("Different but compatible software versions on the cluster " +
+                                         "and the rejoining node. Cluster version is {" + (new String(data, "UTF-8")).split("_")[0] +
+                                         "}. Rejoining node version is {" + m_defaultVersionString + "}.");
+                            retval.set(null);
                         } catch (UnsupportedEncodingException e) {
                             retval.setException(new AssertionError(e));
                         }
