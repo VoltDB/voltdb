@@ -46,6 +46,13 @@ SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionTy
                translateVoltEEExceptionTypeToString(exceptionType), message.c_str());
 }
 
+SerializableEEException::SerializableEEException(std::string message) :
+    m_exceptionType(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION), m_message(message)
+{
+    VOLT_DEBUG("Created SerializableEEException: default type, %s",
+               message.c_str());
+}
+
 void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
     const std::size_t lengthPosition = output->reserveBytes(sizeof(int32_t));
     output->writeByte(static_cast<int8_t>(m_exceptionType));

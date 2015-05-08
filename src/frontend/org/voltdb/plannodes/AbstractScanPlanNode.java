@@ -30,6 +30,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -316,8 +317,17 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             }
         }
 
+        // Generate the output schema for subqueries
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
+
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
+            // generate its subquery output schema
+            aggNode.generateOutputSchema(db);
+
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = true;
         }
@@ -379,6 +389,11 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_outputSchema = m_outputSchema.clone();
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
+        // Resolve subquery expression indexes
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
 
@@ -430,8 +445,20 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected String explainPredicate(String prefix) {
         if (m_predicate != null) {
-            return prefix + m_predicate.explain(m_targetTableName);
+            return prefix + m_predicate.explain(getTableNameForExplain());
         }
         return "";
     }
+
+    protected String getTableNameForExplain() {
+        return (m_targetTableAlias != null) ? m_targetTableAlias : m_targetTableName;
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_predicate, aeClass));
+        return collected;
+    }
+
 }

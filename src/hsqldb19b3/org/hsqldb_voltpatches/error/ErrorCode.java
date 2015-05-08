@@ -640,6 +640,11 @@ public interface ErrorCode {
     // HSQLDB - SQL/JRT
     int X_46511 = 6021;                            // declared parameter types do not match method signature
 
+    // A VoltDB extension to implement subquery syntax limitations
+    int X_47000 = 7000;                                   // invalid WHERE expression
+    int X_47001 = 7001;                                   // subquery WHERE expression with parent aggregates
+
+    // End of VoltDB extension
     // Unknown Error: Catch-All - xxxx
     int X_99000 = 6500;                            // Unknown Error: Catch-All
     int X_99099 = 6501;                            // Error converting vendor code to SQL state code

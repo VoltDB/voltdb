@@ -183,6 +183,9 @@ namespace voltdb {
 
     private:
         rapidjson::Document m_document;
+        // For safety, undefine expensive copy and assignment.
+        PlannerDomRoot(const PlannerDomRoot& other);
+        PlannerDomRoot& operator=(const PlannerDomRoot& other);
     };
 }
 
