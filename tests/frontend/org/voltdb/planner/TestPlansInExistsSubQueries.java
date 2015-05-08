@@ -680,7 +680,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             verifyAggregateSubquery(((SeqScanPlanNode)pn.getChild(0)).getPredicate(), 2, 1, false);
         }
         {
-            // Subquery subquery-wit-having with group by => subquery-with-having with group by
+            // Subquery subquery-with-having with group by => subquery-with-having with group by
             AbstractPlanNode pn = compile("select a from r1 where exists " +
                     " (select a, max(c) from r2 group by a having max(c) > 2 order by max(c))");
             assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
