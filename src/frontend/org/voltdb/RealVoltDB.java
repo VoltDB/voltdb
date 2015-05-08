@@ -1798,7 +1798,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         String buildInfo[] = extractBuildInfo();
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
-        consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
+        consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString.split("_", 2)[1], editionTag));
     }
 
     /**
