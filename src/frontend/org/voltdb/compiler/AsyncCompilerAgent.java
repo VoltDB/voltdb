@@ -34,6 +34,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
@@ -358,7 +359,8 @@ public class AsyncCompilerAgent {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning, work.userParamSet);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
+                        work.explainMode != ExplainMode.NONE, work.userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {

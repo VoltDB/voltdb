@@ -105,7 +105,7 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, null);
+        return planSql(sqlIn, infer, false, null);
     }
 
     /**
@@ -138,13 +138,14 @@ public class PlannerTool {
     }
 
     synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            final Object[] userParams) {
+            boolean isExplainMode, final Object[] userParams) {
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
         }
         boolean hasUserQuestionMark = false;
+        boolean wrongNumberParameters = false;
         try {
             if ((sqlIn == null) || (sqlIn.length() == 0)) {
                 throw new RuntimeException("Can't plan empty or null SQL.");
@@ -196,13 +197,17 @@ public class PlannerTool {
                 // check user input question marks with input parameters
                 int inputParamsLengh = userParams == null ? 0: userParams.length;
                 if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
-                    throw new PlanningErrorException(String.format(
-                            "Incorrect number of parameters passed: expected %d, passed %d",
-                            planner.getAdhocUserParamsCount(), inputParamsLengh));
+                    wrongNumberParameters = true;
+                    if (!isExplainMode) {
+                        throw new PlanningErrorException(String.format(
+                                "Incorrect number of parameters passed: expected %d, passed %d",
+                                planner.getAdhocUserParamsCount(), inputParamsLengh));
+                    }
                 }
                 hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
 
-                if (partitioning.isInferred()) {
+                // do not put wrong parameter explain query into cache
+                if (!wrongNumberParameters && partitioning.isInferred()) {
                     // if cacheable, check the cache for a matching pre-parameterized plan
                     // if plan found, build the full plan using the parameter data in the
                     // QueryPlanner.
@@ -263,7 +268,8 @@ public class PlannerTool {
             CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
-            if (partitioning.isInferred()) {
+            // do not put wrong parameter explain query into cache
+            if (!wrongNumberParameters && partitioning.isInferred()) {
 
                 // Note either the parameter index (per force to a user-provided parameter) or
                 // the actual constant value of the partitioning key inferred from the plan.
