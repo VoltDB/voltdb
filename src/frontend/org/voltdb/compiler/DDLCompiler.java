@@ -1947,13 +1947,6 @@ public class DDLCompiler {
         // TODO(xin): It seems that indexes have already been set up well, the next whole block is redundant.
         // Remove them?
         if (catalog_index != null) {
-            // if the constraint name contains index type hints, exercise them (giant hack)
-            String constraintNameNoCase = name.toLowerCase();
-            if (constraintNameNoCase.contains("tree"))
-                catalog_index.setType(IndexType.BALANCED_TREE.getValue());
-            if (constraintNameNoCase.contains("hash"))
-                catalog_index.setType(IndexType.HASH_TABLE.getValue());
-
             catalog_const.setIndex(catalog_index);
             catalog_index.setUnique(true);
 

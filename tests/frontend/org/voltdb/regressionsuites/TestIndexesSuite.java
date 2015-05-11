@@ -24,9 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.TreeSet;
 
 import org.voltdb.BackendTarget;
@@ -1135,43 +1133,6 @@ public class TestIndexesSuite extends RegressionSuite {
         results = client.callProcedure("@AdHoc", "delete from R1IX").getResults();
     }
 
-    public void testHashInColumn() throws IOException, ProcCallException, InterruptedException {
-        Client client = getClient();
-        ClientResponse cr;
-        // These should all pass.
-        List<String> passing
-            = Arrays.asList(
-                            // If we name the column with a hash name, but we don't
-                            // explicitly name the constraint, we use the tree hash.
-                            "create table block ( goodhashname varchar(256) not null, primary key ( goodhashname ) );",
-                            // If we name the column with both a tree and hash name,
-                            // the tree name wins.  This doesn't actually test anything,
-                            // I suppose.
-                            "create table block ( goodtreehashname varchar(256) not null, primary key (goodtreehashname));",
-                            // If we name the constraint with both a tree and hash name, and the
-                            // field is not hashable, the tree name wins.
-                            "create table block ( goodvanilla varchar(256) not null, constraint goodtree_hash_constraint primary key ( goodvanilla ) );");
-        List<String> failing
-            = Arrays.asList(
-                            // If we name the constraint with a hash name,
-                            // but the column type is not hashable, it is an
-                            // error.
-                            "create table block ( badhashname varchar(256) not null, constraint badhashconstraint primary key ( badhashname ) );",
-                            // The name of the column is not a driver here.
-                            "create table block ( badzotzname varchar(256) not null, constraint badhashconstraint primary key ( badzotzname ) );");
-        for (String cmd : passing) {
-            // See if we can actually create the table.
-            cr = client.callProcedure("@AdHoc", cmd);
-            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-            // Cause, why not?
-            cr = client.callProcedure("@AdHoc", "drop table block;");
-            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        }
-        for (String cmd : failing) {
-            verifyProcFails(client, "Index [A-Z_]* in table [A-Z_]* uses a non-hashable column [A-Z_]*", "@AdHoc", cmd);
-        }
-    }
-
     public void testKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
 
@@ -1251,7 +1212,7 @@ public class TestIndexesSuite extends RegressionSuite {
         //        "'this here is a longish string to force a permanent object allocation'" +
         //        ")" +
         //        " and NUM IN (111,222,333,444,555)");
-        project.setUseDDLSchema(true);
+
         boolean success;
 
         //* CONFIG #1: HSQL -- keep this enabled by default with //
