@@ -441,6 +441,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
                 m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
             }
+            if (m_config.m_buildStringOverrideForTest != null) {
+                m_buildString = m_config.m_buildStringOverrideForTest;
+            }
 
             buildClusterMesh(isRejoin || m_joining);
 

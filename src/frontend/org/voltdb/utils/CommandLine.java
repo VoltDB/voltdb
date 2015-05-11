@@ -89,6 +89,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_vemTag = m_vemTag;
         cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
+        cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -631,6 +632,10 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("versionoverride");
             cmdline.add(m_versionStringOverrideForTest);
             cmdline.add(m_versionCompatibilityRegexOverrideForTest);
+            if (m_buildStringOverrideForTest != null) {
+                cmdline.add("buildstringoverride");
+                cmdline.add(m_buildStringOverrideForTest);
+            }
         }
 
         if (m_tag != null) {
