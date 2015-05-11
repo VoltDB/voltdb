@@ -195,20 +195,19 @@ using namespace functionexpression;
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
     AbstractExpression* ret = 0;
-    if (!arguments) {
+    assert(arguments);
+    size_t nArgs = arguments->size();
+    if (nArgs == 0) {
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
             break;
         default:
-            break;
+            return NULL;
         }
-        return ret;
+        delete arguments;
     }
-
-    size_t nArgs = arguments->size();
-    assert(nArgs != 0);
-    if (nArgs == 1) {
+    else if (nArgs == 1) {
         switch(functionId) {
         case FUNC_ABS:
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
@@ -423,7 +422,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             return NULL;
         }
     }
-    // May return null, leaving it to the caller (with more context) to generate an exception.
+    // This function may have explicitly returned null, earlier, leaving it to the caller
+    // (with more context?) to generate an exception.
+    // But having fallen through to this point indicates that
+    // a FunctionExpression was constructed.
+    assert(ret);
     return ret;
 }
 
