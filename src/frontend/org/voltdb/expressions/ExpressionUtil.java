@@ -474,25 +474,39 @@ public abstract class ExpressionUtil {
         return wrapScalarSubqueriesHelper(null, expr);
     }
 
-    /**
-     * Add a ScalarValueExpression on top of the SubqueryExpression
-     * @param expr - subquery expression
-     * @return ScalarValueExpression
-     */
-    private static AbstractExpression addScalarValueExpression(SelectSubqueryExpression expr) {
-        if (expr.getSubqueryScan().getOutputSchema().size() != 1) {
-            throw new PlanningErrorException("Scalar subquery can have only one output column");
+    private static AbstractExpression wrapScalarSubqueriesHelper(AbstractExpression parentExpr, AbstractExpression expr) {
+
+        // Bottom-up recursion.  Proceed to the children first.
+        AbstractExpression leftChild = expr.getLeft();
+        if (leftChild != null) {
+            AbstractExpression newLeft = wrapScalarSubqueriesHelper(expr, leftChild);
+            if (newLeft != leftChild) {
+                expr.setLeft(newLeft);
+            }
         }
 
-        expr.changeToScalarExprType();
+        AbstractExpression rightChild = expr.getRight();
+        if (rightChild != null) {
+            AbstractExpression newRight = wrapScalarSubqueriesHelper(expr, rightChild);
+            if (newRight != rightChild) {
+                expr.setRight(newRight);
+            }
+        }
 
-        AbstractExpression scalarExpr = new ScalarValueExpression();
-        scalarExpr.setLeft(expr);
-        scalarExpr.setValueType(expr.getValueType());
-        scalarExpr.setValueSize(expr.getValueSize());
-        return scalarExpr;
+        if (expr instanceof SelectSubqueryExpression
+                && subqueryRequiresScalarValueExpressionFromContext(parentExpr)) {
+            expr = addScalarValueExpression((SelectSubqueryExpression)expr);
+        }
+        return expr;
     }
 
+    /**
+     * Return true if we must insert a ScalarValueExpression between a subquery
+     * and its parent expression.
+     * @param parentExpr  the parent expression of a subquery
+     * @return true if the parent expression is not a comparison, EXISTS operator, or
+     *   a scalar value expression
+     */
     private static boolean subqueryRequiresScalarValueExpressionFromContext(AbstractExpression parentExpr) {
         if (parentExpr == null) {
             // No context: we are a top-level expression.  E.g, an item on the
@@ -515,23 +529,22 @@ public abstract class ExpressionUtil {
         return true;
     }
 
-    private static AbstractExpression wrapScalarSubqueriesHelper(AbstractExpression parentExpr, AbstractExpression expr) {
-
-        // Bottom-up recursion.  Proceed to the children first.
-        AbstractExpression leftChild = expr.getLeft();
-        if (leftChild != null) {
-            expr.setLeft(wrapScalarSubqueriesHelper(expr, leftChild));
+    /**
+     * Add a ScalarValueExpression on top of the SubqueryExpression
+     * @param expr - subquery expression
+     * @return ScalarValueExpression
+     */
+    private static AbstractExpression addScalarValueExpression(SelectSubqueryExpression expr) {
+        if (expr.getSubqueryScan().getOutputSchema().size() != 1) {
+            throw new PlanningErrorException("Scalar subquery can have only one output column");
         }
 
-        AbstractExpression rightChild = expr.getRight();
-        if (rightChild != null) {
-            expr.setRight(wrapScalarSubqueriesHelper(expr, rightChild));
-        }
+        expr.changeToScalarExprType();
 
-        if (expr instanceof SelectSubqueryExpression
-                && subqueryRequiresScalarValueExpressionFromContext(parentExpr)) {
-            expr = addScalarValueExpression((SelectSubqueryExpression)expr);
-        }
-        return expr;
+        AbstractExpression scalarExpr = new ScalarValueExpression();
+        scalarExpr.setLeft(expr);
+        scalarExpr.setValueType(expr.getValueType());
+        scalarExpr.setValueSize(expr.getValueSize());
+        return scalarExpr;
     }
 }

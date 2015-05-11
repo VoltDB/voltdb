@@ -1410,8 +1410,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
       client.callProcedure("R1.insert", 1, 300,  1 , "2013-06-18 02:00:00.123457");
 
+      // These test cases exercise the fix for ENG-8226, in which a missing ScalarValueExpression
+      // caused the result of a subquery to be seen as the subquery ID, rather than the contents
+      // of subquery's result table.
+
       validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r1", new long[] {300});
       validateTableOfScalarLongs(client, "select (select max(wage) from r1) + 0 from r1", new long[] {300});
+
+      validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) from r1)", new long[] {300});
+      validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) - 30 from r1) + 30", new long[] {300});
   }
 
     static public junit.framework.Test suite()

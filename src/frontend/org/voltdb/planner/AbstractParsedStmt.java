@@ -285,6 +285,10 @@ public abstract class AbstractParsedStmt {
     // so, the methods COULD be relocated to class AbstractExpression or ExpressionUtil.
     public AbstractExpression parseExpressionTree(VoltXMLElement root) {
         AbstractExpression expr = parseExpressionTreeHelper(root);
+
+        // If there were any subquery expressions appearing in a scalar context,
+        // we must wrap them in ScalarValueExpressions to avoid wrong answers.
+        // See ENG-8226.
         expr = ExpressionUtil.wrapScalarSubqueries(expr);
         return expr;
     }

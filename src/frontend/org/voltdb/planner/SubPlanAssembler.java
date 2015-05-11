@@ -1418,7 +1418,7 @@ public abstract class SubPlanAssembler {
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
-        // iteration after So initially settle for starting at "greater than a prefix key".
+        // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);

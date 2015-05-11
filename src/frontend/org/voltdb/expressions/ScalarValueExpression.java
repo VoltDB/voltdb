@@ -46,6 +46,11 @@ public class ScalarValueExpression extends AbstractValueExpression {
         return m_left.explain(impliedTableName);
     }
 
+    /**
+     * Currently ScalarValueExpressions can only have a subquery as children.  Return
+     * the StmtSubqueryScan object for our child.
+     * @return StmtSubqueryScan object for subquery
+     */
     public StmtSubqueryScan getSubqueryScan() {
         SelectSubqueryExpression subqExpr = (SelectSubqueryExpression)m_left;
         return subqExpr.getSubqueryScan();
