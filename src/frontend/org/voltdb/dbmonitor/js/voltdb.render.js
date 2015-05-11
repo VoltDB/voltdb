@@ -173,7 +173,8 @@ function alertNodeClicked(obj) {
                     $("#overlay").show();
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
-                    var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
+                    //var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
+                    var passwordVal = $("#password").val() != '' ? CryptoJS.SHA256($("#password").val()).toString(CryptoJS.enc.Hex) : $("#password").val();
                     responseObtained = false;
 
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
