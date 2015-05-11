@@ -48,7 +48,8 @@
                 authz = "Hashed " + user + ":" + isHashedPassword;
             } else if (user != null && password != null) {
                 var up = user + ":" + password;
-                authz = "Basic " + $().crypt({method: "b64enc", source: up});
+                //authz = "Basic " + $().crypt({ method: "b64enc", source: up });
+                authz = "Basic " + CryptoJS.SHA256({ method: "b64enc", source: up });
             }
             return authz;
         }

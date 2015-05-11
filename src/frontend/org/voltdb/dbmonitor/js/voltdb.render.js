@@ -32,7 +32,7 @@ function alertNodeClicked(obj) {
             AlertThreshold: $.cookie("alert-threshold"),
             username: $.cookie("username"),
             password: $.cookie("password")
-            
+
         };
 
         var win = window.open(newUrl + '?data=' + JSON.stringify(data), '_parent');
@@ -499,7 +499,7 @@ function alertNodeClicked(obj) {
                 onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData);
             });
         };
-        
+
         this.GetTableInformationClientPort = function () {
             VoltDBService.GetTableInformationClientPort(function (connection) {
                 var tablesData = {};
@@ -2067,7 +2067,7 @@ function alertNodeClicked(obj) {
 
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
-           
+
             var colIndex = {};
             var colIndex2 = {};
             var counter = 0;
@@ -3312,4 +3312,3 @@ $(window).resize(function () {
     }
 
 });
-
