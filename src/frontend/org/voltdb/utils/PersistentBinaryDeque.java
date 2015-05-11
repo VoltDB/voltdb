@@ -358,7 +358,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
         }
 
-        if (segment == null || retcont == null) {
+        if (retcont == null) {
             return null;
         }
 
