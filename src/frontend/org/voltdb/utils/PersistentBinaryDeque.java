@@ -418,7 +418,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
         if (segment.hasMoreEntries()) return false;
         for (PBDSegment s : m_segments) {
-            if (segment.hasMoreEntries()) return false;
+            if (s.hasMoreEntries()) return false;
         }
         return true;
     }
