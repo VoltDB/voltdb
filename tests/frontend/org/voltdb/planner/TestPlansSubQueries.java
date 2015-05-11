@@ -53,8 +53,26 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestPlansSubQueries extends PlannerTestCase {
 
-    public void testUnsupportedSyntax() {
+    public void testSelectOnlyGuard() {
+        // Can only have expression subqueries in SELECT statements
+
+        failToCompile("INSERT INTO R1 (A, C, D) VALUES ((SELECT MAX(A) FROM R1), 32, 32)",
+                "Subquery expressions are only supported in SELECT statements");
+
+        failToCompile("INSERT INTO R1 (A, C, D) SELECT (SELECT MAX(A) FROM R1), 32, 32 FROM R1",
+                "Subquery expressions are only supported in SELECT statements");
+
+        failToCompile("UPDATE R1 SET A = (SELECT MAX(A) FROM R1)",
+                "Subquery expressions are only supported in SELECT statements");
+
+        failToCompile("UPDATE R1 SET A = 37 WHERE A = (SELECT MAX(A) FROM R1)",
+                "Subquery expressions are only supported in SELECT statements");
+
         failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)",
+                "Subquery expressions are only supported in SELECT statements");
+
+        failToCompile("SELECT * FROM R1 WHERE A IN (32, 33) "
+                + "UNION SELECT * FROM R1 WHERE A = (SELECT MAX(A) FROM R1)",
                 "Subquery expressions are only supported in SELECT statements");
     }
 
@@ -1440,7 +1458,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
     }
 
-    private String joinErrorMsg = "Join of multiple partitioned tables has insufficient join criteria.";
+    private final String joinErrorMsg = "Join of multiple partitioned tables has insufficient join criteria.";
     public void testUnsupportedCases() {
         // (1)
         // sub-selected table must have an alias
