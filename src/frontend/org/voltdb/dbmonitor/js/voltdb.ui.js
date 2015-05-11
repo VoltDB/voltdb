@@ -1158,7 +1158,7 @@ var loadPage = function (serverName, portid) {
                 }
 
             }
-
+            var leftScroll = $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft();
             if ($.fn.dataTable.isDataTable('#tblDrMAster')) {
                 $("#tblDrMAster").DataTable().destroy();
             }
@@ -1202,11 +1202,14 @@ var loadPage = function (serverName, portid) {
             });
 
 
+
             // $("#tblDrMAster").wrap("<div class='tblScroll drScroll'>");
             //var org_html = $("#tblDrMAster")[0].outerHTML;
             ////console.log(org_html);
             //var new_html = "<div class='tblScroll drScroll'>" + org_html + "</div>";
             //$("#tblDrMAster_wrapper").find("table").replaceWith(new_html);
+
+            $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft(leftScroll);
 
             $("#tblMAster_wrapper").find(".paginationDefault").remove();
 
@@ -1249,7 +1252,7 @@ var loadPage = function (serverName, portid) {
 
             }
 
-
+            var leftScroll = $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft();
             if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
                 $("#tblDrReplica").DataTable().destroy();
             }
@@ -1286,6 +1289,7 @@ var loadPage = function (serverName, portid) {
                 ]
             });
 
+            $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft(leftScroll);
             $("#tblReplica_wrapper").find(".paginationDefault").remove();
 
             //  Customizing DataTables to make it as existing pagination
