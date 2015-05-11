@@ -223,4 +223,21 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         assert(m_tableList.size() == 1);
         return CatalogUtil.getLimitPartitionRowsDeleteStmt(m_tableList.get(0)) != null;
     }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+
+        for (AbstractExpression expr : m_columns.values()) {
+            if (expr != null) {
+                exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+
+        if (m_subquery != null) {
+            exprs.addAll(m_subquery.getSubqueryStmt().findAllSubexpressionsOfClass(aeClass));
+        }
+
+        return exprs;
+    }
 }
