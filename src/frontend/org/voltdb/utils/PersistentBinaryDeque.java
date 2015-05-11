@@ -173,6 +173,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 }
                             }
                             m_numObjects += qs.getNumEntries();
+                            qs.close();
                             segments.put( index, qs);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
@@ -225,6 +226,18 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
+    /**
+     * Close the tail segment if it's not being read from currently, then offer the new segment.
+     * @throws IOException
+     */
+    private void closeTailAndOffer(PBDSegment newSegment) throws IOException {
+        final PBDSegment last = m_segments.peekLast();
+        if (last != null && !last.isBeingPolled()) {
+            last.close();
+        }
+        m_segments.offer(newSegment);
+    }
+
     @Override
     public synchronized void offer(BBContainer object) throws IOException {
         offer(object, true);
@@ -250,7 +263,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             Long nextIndex = tail.m_index + 1;
             tail = new PBDSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
             tail.open(true);
-            m_segments.offer(tail);
+            closeTailAndOffer(tail);
             final boolean success = tail.offer(object, compress);
             if (!success) {
                 throw new IOException("Failed to offer object in PBD");
@@ -313,6 +326,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 incrementNumObjects();
             }
 
+            // Don't close the last one, it'll be used for writes
+            if (!m_segments.isEmpty()) {
+                writeSegment.close();
+            }
+
             m_segments.push(writeSegment);
         }
         assertions();
@@ -326,19 +344,21 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         BBContainer retcont = null;
-        PBDSegment segment = m_segments.peek();
-        if (segment.hasMoreEntries()) {
-            retcont = segment.poll(ocf);
-        } else {
-            for (PBDSegment s : m_segments) {
-                if (s.hasMoreEntries()) {
-                    segment = s;
-                    retcont = segment.poll(ocf);
-                    break;
-                }
+        PBDSegment segment = null;
+
+        for (PBDSegment s : m_segments) {
+            if (s.isClosed()) {
+                s.open(false);
+            }
+
+            if (s.hasMoreEntries()) {
+                segment = s;
+                retcont = segment.poll(ocf);
+                break;
             }
         }
-        if (retcont == null) {
+
+        if (segment == null || retcont == null) {
             return null;
         }
 
@@ -389,7 +409,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
             throw new IOException("Closed");
         }
         for (PBDSegment segment : m_segments) {
-            segment.sync();
+            if (!segment.isClosed()) {
+                segment.sync();
+            }
         }
     }
 
@@ -412,13 +434,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
             throw new IOException("Closed");
         }
 
-        PBDSegment segment = m_segments.peek();
-        if (segment == null) {
-            return true;
-        }
-        if (segment.hasMoreEntries()) return false;
         for (PBDSegment s : m_segments) {
-            if (s.hasMoreEntries()) return false;
+            final boolean wasClosed = s.isClosed();
+            try {
+                if (wasClosed) s.open(false);
+                if (s.hasMoreEntries()) return false;
+            } finally {
+                if (wasClosed) {
+                    s.close();
+                }
+            }
         }
         return true;
     }
@@ -429,11 +454,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * although incredibly unlikely
      */
     @Override
-    public long sizeInBytes() {
+    public long sizeInBytes() throws IOException {
         assertions();
         long size = 0;
         for (PBDSegment segment : m_segments) {
+            final boolean wasClosed = segment.isClosed();
+            if (wasClosed) segment.open(false);
             size += segment.sizeInBytes();
+            if (wasClosed) {
+                segment.close();
+            }
         }
         return size;
     }
@@ -647,10 +677,18 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (!assertionsOn || m_closed) return;
         int numObjects = 0;
         for (PBDSegment segment : m_segments) {
+            final boolean wasClosed = segment.isClosed();
             try {
                 numObjects += segment.getNumEntries() - segment.m_objectReadIndex;
             } catch (Exception e) {
                 Throwables.propagate(e);
+            }
+            if (wasClosed) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
         assert(numObjects == m_numObjects);
