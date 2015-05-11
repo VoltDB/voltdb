@@ -1235,7 +1235,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private void failOverConnection(Integer partitionId, Long initiatorHSId, Connection c) {
         ClientInterfaceHandleManager cihm = m_cihm.get(c.connectionId());
-        if (cihm == null) return;
+        if (cihm == null) {
+            return;
+        }
 
         List<Iv2InFlight> transactions =
                 cihm.removeHandlesForPartitionAndInitiator( partitionId, initiatorHSId);
@@ -1732,7 +1734,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (instance.getMode() == OperationMode.PAUSED && !handler.isAdmin())
         {
             return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Server is currently unavailable; try again later",
+                    new VoltTable[0], "Server is paused and is currently unavailable - please try again later.",
                     task.clientHandle);
         }
 
@@ -1903,7 +1905,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else if (task.procName.equals("@SnapshotRestore")) {
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
-                if (retval != null) return retval;
+                if (retval != null) {
+                    return retval;
+                }
             }
 
             // If you're going to copy and paste something, CnP the pattern
@@ -1988,7 +1992,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 response.flattenToBuffer(buf).flip();
 
                 ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
-                if (cihm == null) return;
+                if (cihm == null) {
+                    return;
+                }
                 cihm.connection.writeStream().enqueue(buf);
             }
         });
@@ -2001,7 +2007,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         String err = null;
         final ClientInterfaceHandleManager cihm = m_cihm.get(c.connectionId());
         //Not sure if it can actually be null, not really important if it is
-        if (cihm == null) return null;
+        if (cihm == null) {
+            return null;
+        }
         for (int ii = 0; ii < params.length; ii++) {
             final Object param = params[ii];
             if (param == null) {
@@ -2045,10 +2053,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         VoltType voltType = null;
         String typeStr = ((String)params[0]).trim().toUpperCase();
-        if (typeStr.equals("INTEGER")) voltType = VoltType.INTEGER;
-        else if (typeStr.equals("STRING") || typeStr.equals("VARCHAR")) voltType = VoltType.STRING;
-        else if (typeStr.equals("VARBINARY")) voltType = VoltType.VARBINARY;
-        else {
+        if (typeStr.equals("INTEGER")) {
+            voltType = VoltType.INTEGER;
+        } else if (typeStr.equals("STRING") || typeStr.equals("VARCHAR")) {
+            voltType = VoltType.STRING;
+        } else if (typeStr.equals("VARBINARY")) {
+            voltType = VoltType.VARBINARY;
+        } else {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
@@ -2484,7 +2495,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         oldValue.flip();
                     }
 
-                    if (buf.equals(oldValue)) return;
+                    if (buf.equals(oldValue)) {
+                        return;
+                    }
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
