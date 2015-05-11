@@ -298,7 +298,7 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
-    public void testOfferThanPoll() throws Exception {
+    public void testOfferThenPoll() throws Exception {
         System.out.println("Running testOfferThanPoll");
         assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
@@ -311,6 +311,62 @@ public class TestPersistentBinaryDeque {
         //Now make sure the current write file is stolen and a new write file created
         BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         retval.discard();
+    }
+
+    @Test
+    public void testCloseOldSegments() throws Exception {
+        System.out.println("Running testOfferMoreThanPoll");
+        assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+
+        final int total = 100;
+
+        //Make sure several files with the appropriate data is created
+        for (int i = 0; i < total; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        File files[] = TEST_DIR.listFiles();
+        assertEquals( 3, files.length);
+        for (int i = 0; i < 3; i++) {
+            assertEquals("pbd_nonce." + i + ".pbd", files[i].getName());
+        }
+
+        //Now make sure the current write file is stolen and a new write file created
+        for (int i = 0; i < total; i++) {
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            retval.discard();
+        }
+    }
+
+    @Test
+    public void testDontCloseReadSegment() throws Exception {
+        System.out.println("Running testOfferPollOfferMoreThanPoll");
+        assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+
+        final int total = 100;
+
+        //Make sure a single file with the appropriate data is created
+        for (int i = 0; i < 5; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        assertEquals(1, TEST_DIR.listFiles().length);
+
+        // Read one buffer from the segment so that it's considered being polled from.
+        m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+
+        for (int i = 5; i < total; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        File files[] = TEST_DIR.listFiles();
+        assertEquals( 3, files.length);
+        for (int i = 0; i < 3; i++) {
+            assertEquals("pbd_nonce." + i + ".pbd", files[i].getName());
+        }
+
+        //Now make sure the current write file is stolen and a new write file created
+        for (int i = 1; i < total; i++) {
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            retval.discard();
+        }
     }
 
     @Test
