@@ -169,6 +169,12 @@
                           "template": "advanced-inexists.sql",
                           "normalizer": "normalizer.py"},
 
+# To test advanced scalar subqueries
+    "advanced-scalar-subquery": {"schema": "schema.py",
+                                 "ddl": "DDL.sql",
+                                 "template": "advanced-scalar-subquery.sql",
+                                 "normalizer": "normalizer.py"},
+
 # ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
     "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
                                  "ddl": "matview-DDL.sql",
