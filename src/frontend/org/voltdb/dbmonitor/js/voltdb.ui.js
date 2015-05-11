@@ -1,4 +1,5 @@
-﻿var ispopupRevoked = false;
+﻿
+var ispopupRevoked = false;
 var table = '';
 
 $(document).ready(function () {

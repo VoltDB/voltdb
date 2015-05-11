@@ -23,6 +23,8 @@
 
 package vmcTest.tests
 
+import geb.waiting.WaitTimeoutException
+
 import vmcTest.pages.SqlQueryPage
 import vmcTest.pages.VoltDBManagementCenterPage.ColumnHeaderCase
 
@@ -43,7 +45,23 @@ class SqlQueriesTestBase extends TestBase {
 
     def ensureOnSqlQueryPage() {
         ensureOnVoltDBManagementCenterPage()
-        page.openSqlQueryPage()
+        try {
+            debugPrint 'Attempting to open SqlQueryPage, at: ' + sdf.format(new Date())
+            page.openSqlQueryPage()
+            debugPrint 'Succeeded:  opened SqlQueryPage, at: ' + sdf.format(new Date())
+        } catch (WaitTimeoutException e) {
+            // If a WaitTimeoutException is encountered, make a second attempt
+            String message = '\nCaught a WaitTimeoutException attempting to open SqlQueryPage ' +
+                             '[in SqlQueriesTestBase.ensureOnSqlQueryPage()]'
+            System.err.println message + ':'
+            e.printStackTrace()
+            println message + '; see Standard error for details.'
+            println 'Will refresh page and try again...    (' + sdf.format(new Date()) + ')'
+            driver.navigate().refresh()
+            ensureOnVoltDBManagementCenterPage()
+            page.openSqlQueryPage()
+            println '... second open attempt succeeded, at: ' + sdf.format(new Date())
+        }
     }
     
     /**
