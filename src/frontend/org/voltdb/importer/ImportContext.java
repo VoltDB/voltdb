@@ -63,6 +63,12 @@ public interface ImportContext {
     public List<Object> decodeParameters(Format format, String data);
 
     /**
+     * Returns max time in nanoseconds a call to callProcedure waits in backpressure.
+     * @return
+     */
+    public long getBackpressureTimeout();
+
+    /**
      * This is the real handler dont need to call or extend anything
      * @param handler
      */

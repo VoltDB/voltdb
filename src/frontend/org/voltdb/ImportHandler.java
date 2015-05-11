@@ -157,11 +157,16 @@ public class ImportHandler {
         }
         int counter = 1;
         int maxSleepNano = 100000;
+        long start = System.nanoTime();
         while (m_adapter.getPendingCount() > MAX_PENDING_TRANSACTIONS) {
             try {
                 int nanos = 500 * counter++;
                 Thread.sleep(0, nanos > maxSleepNano ? maxSleepNano : nanos);
                 if (m_stopped) {
+                    return false;
+                }
+                //We have reached max timeout.
+                if (System.nanoTime() - start > ic.getBackpressureTimeout()) {
                     return false;
                 }
             } catch (InterruptedException ex) { }

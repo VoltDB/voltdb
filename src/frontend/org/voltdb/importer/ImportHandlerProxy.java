@@ -20,6 +20,7 @@ package org.voltdb.importer;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -130,5 +131,10 @@ public class ImportHandlerProxy implements ImportContext {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+    }
+
+    @Override
+    public long getBackpressureTimeout() {
+        return TimeUnit.MINUTES.toNanos(2);
     }
 }
