@@ -745,7 +745,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@Explain",
                     "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
                     "    ( LOCK_TIME IS NULL OR " +
-                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );");
+                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
+                    10, 5000);
             //* enable for debug */ System.out.println(cr.getResults()[0]);
         } catch (Exception ex) {
             fail();
