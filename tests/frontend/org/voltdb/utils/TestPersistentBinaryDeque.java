@@ -33,8 +33,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeSet;
 
+import com.google_voltpatches.common.collect.Sets;
+import junit.framework.Assert;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -330,9 +333,15 @@ public class TestPersistentBinaryDeque {
         }
         File files[] = TEST_DIR.listFiles();
         assertEquals( 3, files.length);
-        for (int i = 0; i < 3; i++) {
-            assertEquals("pbd_nonce." + i + ".pbd", files[i].getName());
+        Set<String> actualFiles = Sets.newHashSet();
+        for (File f : files) {
+            actualFiles.add(f.getName());
         }
+        Set<String> expectedFiles = Sets.newHashSet();
+        for (int i = 0; i < 3; i++) {
+            expectedFiles.add("pbd_nonce." + i + ".pbd");
+        }
+        Assert.assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
         for (int i = 0; i < total; i++) {
@@ -362,9 +371,15 @@ public class TestPersistentBinaryDeque {
         }
         File files[] = TEST_DIR.listFiles();
         assertEquals( 3, files.length);
-        for (int i = 0; i < 3; i++) {
-            assertEquals("pbd_nonce." + i + ".pbd", files[i].getName());
+        Set<String> actualFiles = Sets.newHashSet();
+        for (File f : files) {
+            actualFiles.add(f.getName());
         }
+        Set<String> expectedFiles = Sets.newHashSet();
+        for (int i = 0; i < 3; i++) {
+            expectedFiles.add("pbd_nonce." + i + ".pbd");
+        }
+        Assert.assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
         for (int i = 1; i < total; i++) {
