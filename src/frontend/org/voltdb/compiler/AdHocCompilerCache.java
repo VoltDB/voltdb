@@ -210,17 +210,23 @@ public class AdHocCompilerCache implements Serializable {
      * Note that one goal here is to reduce the number of times two
      * separate plan instances with the same value are input for the
      * same SQL literal.
+     *
+     * L1 cache (literal cache) cache SQL queries without user provided parameters.
+     * L2 cache (core cache) cache parameterized queries: including user parameters and auto extracted parameters.
+     *
      * @param sql               original query text
      * @param parsedToken       massaged query text, possibly with literals purged
      * @param planIn
      * @param extractedLiterals the basis values for any "bound parameter" restrictions to plan re-use
+     * @param hasUserQuestionMarkParameters is user provided parameterized query
+     * @param hasAutoParameterizedException is the auto parameterized query has parameter exception
      */
     public synchronized void put(String sql,
                                  String parsedToken,
                                  AdHocPlannedStatement planIn,
                                  String[] extractedLiterals,
-                                 boolean hasUserQuestionMark,
-                                 boolean wasBadParameterized)
+                                 boolean hasUserQuestionMarkParameters,
+                                 boolean hasAutoParameterizedException)
     {
         assert(sql != null);
         assert(parsedToken != null);
@@ -228,11 +234,15 @@ public class AdHocCompilerCache implements Serializable {
         AdHocPlannedStatement plan = planIn;
         assert(new String(plan.sql, Constants.UTF8ENCODING).equals(sql));
 
+        // hasUserQuestionMarkParameters and hasAutoParameterizedException can not be true at the same time
+        // it means that a query can not be both user parameterized query and auto parameterized query.
+        assert(hasUserQuestionMarkParameters && hasAutoParameterizedException);
+
         // uncomment this to get some raw stdout cache performance stats every 5s
         //startPeriodicStatsPrinting();
 
         // deal with L2 cache
-        if (! wasBadParameterized) {
+        if (! hasAutoParameterizedException) {
             BoundPlan matched = null;
             BoundPlan unmatched = new BoundPlan(planIn.core, planIn.parameterBindings(extractedLiterals));
             // deal with the parameterized plan cache first
@@ -271,7 +281,7 @@ public class AdHocCompilerCache implements Serializable {
         }
 
         // then deal with the L1 cache
-        if (! hasUserQuestionMark) {
+        if (! hasUserQuestionMarkParameters) {
             AdHocPlannedStatement cachedPlan = m_literalCache.get(sql);
             if (cachedPlan == null) {
                 m_literalCache.put(sql, plan);

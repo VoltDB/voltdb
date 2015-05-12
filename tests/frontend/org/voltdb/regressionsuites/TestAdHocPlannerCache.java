@@ -35,15 +35,17 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestAdHocPlannerCache extends RegressionSuite {
+    // 1 means cache level 1, the literal sql string cache
+    // 2 means cache level 2, the parameterized sql cache (auto parameters and user parameters)
     private static final int CACHE_MISS1 = 0;
     private static final int CACHE_MISS2 = 1;
-    private static final int CACHE_MISS2_MISS1 = 2;
+    private static final int CACHE_MISS2_ADD1 = 2;
     private static final int CACHE_HIT1 = 3;
     private static final int CACHE_HIT2 = 4;
-    private static final int CACHE_HIT2_HIT1 = 5;
+    private static final int CACHE_HIT2_ADD1 = 5;
 
     private static final int CACHE_PARAMS_EXCEPTION = 6;
-    private static final int CACHE_SKIPED = -1;
+    private static final int CACHE_SKIPPED = -1;
 
     private long m_cache1_level = 0;
     private long m_cache2_level = 0;
@@ -99,7 +101,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
             } else if (cacheType == CACHE_MISS2) {
                 ++m_cache2_level;
                 ++m_cache_misses;
-            } else if (cacheType == CACHE_MISS2_MISS1) {
+            } else if (cacheType == CACHE_MISS2_ADD1) {
                 ++m_cache1_level;
                 ++m_cache2_level;
                 ++m_cache_misses;
@@ -107,12 +109,12 @@ public class TestAdHocPlannerCache extends RegressionSuite {
                 ++m_cache1_hits;
             } else if (cacheType == CACHE_HIT2) {
                 ++m_cache2_hits;
-            } else if (cacheType == CACHE_HIT2_HIT1) {
+            } else if (cacheType == CACHE_HIT2_ADD1) {
                 ++m_cache1_level;
                 ++m_cache2_hits;
             } else if (cacheType == CACHE_PARAMS_EXCEPTION) {
                 ++m_cache_misses;
-            } else if (cacheType == CACHE_SKIPED) {
+            } else if (cacheType == CACHE_SKIPPED) {
                 // Has not gone through the planner cache code
             } else {
                 fail("Wrong input cache type");
@@ -157,7 +159,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 sub1 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
-        checkPlannerCache(client, CACHE_MISS2_MISS1);
+        checkPlannerCache(client, CACHE_MISS2_ADD1);
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
@@ -171,7 +173,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 sub1_C order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{1, 2, 3});
-        checkPlannerCache(client, CACHE_MISS2_MISS1);
+        checkPlannerCache(client, CACHE_MISS2_ADD1);
 
 
         //
@@ -180,7 +182,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 sub1 WHERE ID > 1 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS2_MISS1);
+        checkPlannerCache(client, CACHE_MISS2_ADD1);
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2, 3});
@@ -189,7 +191,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 sub1 WHERE ID > 2 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
-        checkPlannerCache(client, CACHE_HIT2_HIT1);
+        checkPlannerCache(client, CACHE_HIT2_ADD1);
 
 
         //
@@ -260,7 +262,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
-        checkPlannerCache(client, CACHE_SKIPED, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
 
         // fewer parameters
         try {
@@ -269,7 +271,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
-        checkPlannerCache(client, CACHE_SKIPED, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
 
         try {
             client.callProcedure("@AdHoc", "select * from r1 sub2;" + sql, 0, 0);
@@ -277,12 +279,12 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(errorMsg));
         }
-        checkPlannerCache(client, CACHE_SKIPED, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
 
 
         // by pass the pre-planner check
         verifyAdHocFails(client, String.format(pattern, 1, 0), sql+sql);
-        checkPlannerCache(client, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
         // positive tests
         // multiple statements are not partition inferred, sent to every partitions.
@@ -291,7 +293,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         VoltTable[] vts = client.callProcedure("@AdHoc", sql + sql).getResults();
         validateTableOfScalarLongs(vts[0], new long[]{1, 2, 3});
         validateTableOfScalarLongs(vts[1], new long[]{1, 2, 3});
-        checkPlannerCache(client, CACHE_SKIPED, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED, CACHE_SKIPPED);
 
         //
         // Pass in incorrect number of parameters
@@ -323,7 +325,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
 
         // no parameters passed in for multiple adhoc queries
         verifyAdHocFails(client, String.format(pattern, 1, 0), sql + sql);
-        checkPlannerCache(client, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
     }
 
     public void subtest3AdHocBadParameters(Client client) throws IOException, ProcCallException {
@@ -345,7 +347,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 sub3 WHERE ID > 1 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2, 3});
-        checkPlannerCache(client, CACHE_MISS2_MISS1);
+        checkPlannerCache(client, CACHE_MISS2_ADD1);
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{2, 3});
@@ -354,7 +356,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 sub3 WHERE ID > 2 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
-        checkPlannerCache(client, CACHE_HIT2_HIT1);
+        checkPlannerCache(client, CACHE_HIT2_ADD1);
 
         sql = "SELECT ID FROM R1 sub3 WHERE ID > ? order by ID;";
         String errorMsg = "java.lang.Double is not a match or is out of range for the target parameter type: long";
@@ -375,7 +377,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         sql = "SELECT ID FROM R1 sub3 WHERE NUM > 0 order by ID;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
-        checkPlannerCache(client, CACHE_MISS2_MISS1);
+        checkPlannerCache(client, CACHE_MISS2_ADD1);
 
         // try the float value second, it has bad parameterization
         sql = "SELECT ID FROM R1 sub3 WHERE NUM > 0.8 order by ID;";
@@ -521,17 +523,17 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         //
         // Procedure does not go through AdHoc queries code
         vt = client.callProcedure("@ExplainProc", "proc1").getResults()[0];
-        checkPlannerCache(client, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("proc1", 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{0, 1});
-        checkPlannerCache(client, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ExplainProc", "proc1", 1).getResults()[0];
-        checkPlannerCache(client, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ExplainProc", "proc1", 1, 3).getResults()[0];
-        checkPlannerCache(client, CACHE_SKIPED);
+        checkPlannerCache(client, CACHE_SKIPPED);
     }
 
     //
