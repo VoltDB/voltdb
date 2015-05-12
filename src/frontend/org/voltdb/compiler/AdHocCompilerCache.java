@@ -236,7 +236,7 @@ public class AdHocCompilerCache implements Serializable {
 
         // hasUserQuestionMarkParameters and hasAutoParameterizedException can not be true at the same time
         // it means that a query can not be both user parameterized query and auto parameterized query.
-        assert(hasUserQuestionMarkParameters && hasAutoParameterizedException);
+        assert(!hasUserQuestionMarkParameters || !hasAutoParameterizedException);
 
         // uncomment this to get some raw stdout cache performance stats every 5s
         //startPeriodicStatsPrinting();

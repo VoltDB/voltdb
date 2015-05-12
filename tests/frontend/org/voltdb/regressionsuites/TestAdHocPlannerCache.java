@@ -146,6 +146,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
          subtest4AdvancedBadParameters(client);
 
          subtest5ExplainPlans(client);
+
+         subtest6ExpressionIndex(client);
     }
 
     public void subtest1AdHocPlannerCache(Client client) throws IOException, ProcCallException {
@@ -536,6 +538,73 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         checkPlannerCache(client, CACHE_SKIPPED);
     }
 
+    public void subtest6ExpressionIndex(Client client) throws IOException, ProcCallException {
+        System.out.println("subtest6ExpressionIndex...");
+
+        String sql;
+        VoltTable vt;
+
+        //
+        // With user question mark parameters
+        //
+        sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-1) = 1 AND ID >= ? ORDER BY ID;";
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("ABSIDX"));
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        vt = client.callProcedure("@AdHoc", sql, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2});
+        checkPlannerCache(client, CACHE_MISS2);
+
+        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{2});
+        checkPlannerCache(client, CACHE_HIT2);
+
+
+        // change the index constants
+        sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-0) = 1 AND ID >= ? ORDER BY ID;";
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertFalse(vt.toString().contains("ABSIDX"));
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        vt = client.callProcedure("@AdHoc", sql, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS2);
+
+        vt = client.callProcedure("@AdHoc", sql, 4).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+        checkPlannerCache(client, CACHE_HIT2);
+
+
+        // use user parameter with the constant in the expression index
+        // not able to use the index scan here
+        sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-?) = 1 AND ID >= ? ORDER BY ID;";
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertFalse(vt.toString().contains("ABSIDX"));
+        checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
+
+        vt = client.callProcedure("@AdHoc", sql, 0, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{3});
+        checkPlannerCache(client, CACHE_MISS2);
+
+        vt = client.callProcedure("@AdHoc", sql, 1, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2});
+        checkPlannerCache(client, CACHE_HIT2);
+
+
+        //
+        // no user parameters
+        //
+        sql = "SELECT ID FROM R1 sub6 WHERE ABS(NUM-1) = 1 AND ID >= 1 ORDER BY ID;";
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("ABSIDX"));
+        checkPlannerCache(client, CACHE_MISS2_ADD1);
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{1, 2});
+        checkPlannerCache(client, CACHE_HIT1);
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -560,8 +629,11 @@ public class TestAdHocPlannerCache extends RegressionSuite {
                 + "RATIO FLOAT, "
                 + "PRIMARY KEY (desc)); "
 
-                + "create procedure proc1 AS select num as number from R1 where id > ? order by num;"
+             // ENG-8243 shows that expression index has a bug not being able to be created.
+//                + "CREATE INDEX EXPRIDX ON R1 (POWER(num,2));"
+                + "CREATE INDEX absIdx ON R1 (ABS(num-1));"
 
+                + "create procedure proc1 AS select num as number from R1 where id > ? order by num;"
                 + ""
                 ;
 
