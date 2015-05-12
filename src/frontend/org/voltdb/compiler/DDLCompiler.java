@@ -1944,10 +1944,10 @@ public class DDLCompiler {
 
         Index catalog_index = indexMap.get(indexName);
 
-        // TODO(xin): It seems that indexes have already been set up well, the next whole block is redundant.
-        // Remove them?
+        // Attach the index to the catalog constraint (catalog_const).
         if (catalog_index != null) {
             catalog_const.setIndex(catalog_index);
+            // This may be redundant.
             catalog_index.setUnique(true);
 
             boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));

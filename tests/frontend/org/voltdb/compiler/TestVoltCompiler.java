@@ -2065,42 +2065,49 @@ public class TestVoltCompiler extends TestCase {
     {
         List<Pair<String, IndexType>> passing
             = Arrays.asList(
-               // If we don't explicitly name the primary key constraint,
-               // we always get a tree index.  This is independent of the name
-               // of the index column or columns.
-               Pair.of("create table t ( goodhashname varchar(256) not null, primary key ( goodhashname ) );",
-                       IndexType.BALANCED_TREE),
-               Pair.of("create table t ( goodhashname integer not null, primary key ( goodhashname ) );",
-                       IndexType.BALANCED_TREE),
-               Pair.of("create table t ( goodtreename varchar(256) not null, primary key ( goodtreename ) );",
-                       IndexType.BALANCED_TREE),
-               Pair.of("create table t ( goodtreename integer not null, primary key ( goodtreename ) );",
-                       IndexType.BALANCED_TREE),
-               Pair.of("create table t ( goodtreehashname varchar(256) not null, primary key (goodtreehashname));",
-                       IndexType.BALANCED_TREE),
-               Pair.of("create table t ( goodtreehashname integer not null, primary key (goodtreehashname));",
-                       IndexType.BALANCED_TREE),
-               // If we explicitly name the constraint with a tree name
-               // we always get a tree index.  This is true even if the
-               // colum type is hashable.
-               Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
-                       IndexType.BALANCED_TREE),
-               Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
-                       IndexType.BALANCED_TREE),
-               // If we explicitly name the constraint with a name
-               // which is both a hash name and a tree name, we always get a tree
-               // index.  This is true even if the column type is hashable.
-               Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
-                       IndexType.BALANCED_TREE),
-               Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
-                       IndexType.BALANCED_TREE),
+                            // If we don't explicitly name the primary key constraint,
+                            // we always get a tree index.  This is independent of the name
+                            // of the index column or columns.
+                            Pair.of("create table t ( goodhashname varchar(256) not null, primary key ( goodhashname ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodhashname integer not null, primary key ( goodhashname ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreename varchar(256) not null, primary key ( goodtreename ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreename integer not null, primary key ( goodtreename ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            // If we explicitly name the constraint with a tree name
+                            // we always get a tree index.  This is true even if the
+                            // column type is hashable.
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            // If we explicitly name the constraint with a name
+                            // which is both a hash name and a tree name, we always get a tree
+                            // index.  This is true even if the column type is hashable.
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
 
-               // The only way to get a hash index is to explicitly name the constraint
-               // with a hash name and to make the column type or types be hashable.
-               Pair.of("create table t ( goodtreehashname integer not null, constraint good_hash primary key (goodtreehashname));",
-                       IndexType.HASH_TABLE),
-               Pair.of("create table t ( goodvanilla integer not null, constraint good_hash_constraint primary key ( goodvanilla ) );",
-                       IndexType.HASH_TABLE)
+                            // The only way to get a hash index is to explicitly name the constraint
+                            // with a hash name and to make the column type or types be hashable.
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_hash primary key (goodtreehashname));",
+                                    IndexType.HASH_TABLE),
+                            Pair.of("create table t ( goodvanilla integer not null, constraint good_hash_constraint primary key ( goodvanilla ) );",
+                                    IndexType.HASH_TABLE),
+                            // Test to see if created indices are still hashed
+                            // when they are expected, and not hashed when they
+                            // are not expected.
+                            Pair.of("create table t ( goodvanilla integer not null ); create unique index myhash on t ( goodvanilla );",
+                                    IndexType.HASH_TABLE),
+                            Pair.of("create table t ( goodhash integer not null primary key );",
+                                    IndexType.BALANCED_TREE)
         );
         String[] failing
             = {
