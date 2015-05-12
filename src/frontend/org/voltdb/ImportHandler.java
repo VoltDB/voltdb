@@ -141,7 +141,7 @@ public class ImportHandler {
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
         // Check for admin mode restrictions before proceeding any further
         if (VoltDB.instance().getMode() == OperationMode.PAUSED || m_stopped) {
-            m_logger.warn("Can not invoke procedure from streaming interface when server is paused or updating catalog.");
+            m_logger.warn("Server is paused and is currently unavailable - please try again later.");
             m_failedCount.incrementAndGet();
             return false;
         }
