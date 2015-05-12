@@ -5,8 +5,7 @@
         <jsonapi enabled="true" />
     </httpd>
     <import>
-        <configuration bundle="file:__PATH_MARKER__/socketstream.jar" enabled="true">
-            <property name="impl">org.voltdb.osgi.socketstream.SocketStreamImporter</property>
+        <configuration module="file:__PATH_MARKER__/socketstream.jar" type="custom" enabled="true">
             <property name="port">7001</property>
             <property name="procedure">importTable.insert</property>
             <!-- ignore this property if you decode your own values and pass to procedure. -->

@@ -748,7 +748,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration bundle=\"///\" >"
+                + "        <configuration type=\"custom\" module=\"///\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -760,7 +760,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration bundle=\"file:/tmp/foobar.jar\" >"
+                + "        <configuration type=\"custom\" module=\"file:/tmp/foobar.jar\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -774,12 +774,12 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration bundle=\"file:/" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:/" + catjar.toString() + "\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration bundle=\"file:/" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:/" + catjar.toString() + "\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -791,12 +791,12 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration bundle=\"file:" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString() + "\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration bundle=\"file:" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString() + "\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -808,7 +808,19 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration bundle=\"file:" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString() + "\" >"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+        final String goodImport2 =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"custom\" module=\"org.voltdb.importer.ImportHandlerProxy\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -831,7 +843,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
-        assertTrue("compilation should have failed", msg.contains("Error validating deployment configuration: Invalid bundle URL specified."));
+        assertTrue("compilation should have failed", msg.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
 
         //import with bad bundlename
         final File tmpBad2 = VoltProjectBuilder.writeStringToTempFile(withBadImport2);
@@ -842,7 +854,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat2 = compiler2.compileCatalogFromDDL(x2);
 
         String msg2 = CatalogUtil.compileDeployment(cat2, bad_deployment2, false);
-        assertTrue("compilation should have failed", msg2.contains("Error validating deployment configuration: Invalid bundle URL specified."));
+        assertTrue("compilation should have failed", msg2.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
 
         //import with bad url for bundlename
         final File tmpBad3 = VoltProjectBuilder.writeStringToTempFile(withBadImport3);
@@ -853,7 +865,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat3 = compiler3.compileCatalogFromDDL(x3);
 
         String msg3 = CatalogUtil.compileDeployment(cat3, bad_deployment3, false);
-        assertTrue("compilation should have failed", msg3.contains("Error validating deployment configuration: Invalid bundle URL specified."));
+        assertTrue("compilation should have failed", msg3.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
 
         //import with dup bundlename
         final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withBadImport4);
@@ -864,7 +876,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat4 = compiler4.compileCatalogFromDDL(x4);
 
         String msg4 = CatalogUtil.compileDeployment(cat4, bad_deployment4, false);
-        assertTrue("compilation should have failed", msg4.contains("Error validating deployment configuration: Multiple connectors can not be assigned to single import bundle"));
+        assertTrue("compilation should have failed", msg4.contains("Error validating deployment configuration: Multiple connectors can not be assigned to single import module"));
 
         //import good bundle not necessary loadable by felix.
         final File good1 = VoltProjectBuilder.writeStringToTempFile(goodImport1);
@@ -876,6 +888,16 @@ public class TestCatalogUtil extends TestCase {
 
         String msg5 = CatalogUtil.compileDeployment(cat5, good_deployment1, false);
         assertNull(msg5);
+
+        final File good2 = VoltProjectBuilder.writeStringToTempFile(goodImport2);
+        DeploymentType good_deployment2 = CatalogUtil.getDeployment(new FileInputStream(good2));
+
+        VoltCompiler good_compiler2 = new VoltCompiler();
+        String x6[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat6 = good_compiler2.compileCatalogFromDDL(x6);
+
+        String msg6 = CatalogUtil.compileDeployment(cat6, good_deployment2, false);
+        assertNull(msg6);
 
         System.out.println("Import deployment tests done.");
     }

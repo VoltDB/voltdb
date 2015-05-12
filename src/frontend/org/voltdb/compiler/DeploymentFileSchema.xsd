@@ -303,7 +303,9 @@
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="bundle" type="xs:string" />
+    <xs:attribute name="module" type="xs:string" />
+    <xs:attribute name="type" type="ServerImportEnum" use="required" />
+    <xs:attribute name="format" type="ServerImportFormatEnum" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
@@ -330,6 +332,20 @@
       <xs:enumeration value="kafka"/>
       <xs:enumeration value="http"/>
       <xs:enumeration value="rabbitmq"/>
+      <xs:enumeration value="custom"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ServerImportEnum">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="kafka"/>
+      <xs:enumeration value="custom"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ServerImportFormatEnum">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="csv"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

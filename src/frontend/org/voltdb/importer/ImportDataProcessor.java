@@ -29,7 +29,7 @@ import org.voltdb.CatalogContext;
  */
 public interface ImportDataProcessor  {
 
-    public static final String IMPORT_BUNDLE = "__IMPORT_BUNDLE__";
+    public static final String IMPORT_MODULE = "__IMPORT_MODULE__";
     public static final String IMPORTER_CLASS = "impl";
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";
     /**

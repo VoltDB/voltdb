@@ -1098,21 +1098,42 @@ public abstract class CatalogUtil {
     }
 
     private static Properties checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
-        String importBundleUrl = importConfiguration.getBundle();
+        String importBundleUrl = importConfiguration.getModule();
+
         if (!importConfiguration.isEnabled()) {
             return null;
         }
+        switch(importConfiguration.getType()) {
+            case KAFKA: importBundleUrl = "org.voltdb.importclient.KafkaImportClient"; break;
+            //Validate that we can load the class.
+            case CUSTOM:
+                break;
+            default:
+                throw new DeploymentCheckException("Import Configuration type must be specified.");
+        }
 
         Properties processorProperties = new Properties();
+        String modulePrefix = "osgi|";
         try {
             URL u = new URL(importBundleUrl);
             //Make sure we can load stream
             u.openStream();
         } catch (Exception ex) {
-            throw new DeploymentCheckException("Invalid bundle URL specified.");
+            //Not a URL try as a class
+            try {
+                CatalogUtil.class.getClassLoader().loadClass(importBundleUrl);
+                modulePrefix = "class|";
+            }
+            catch (ClassNotFoundException ex2) {
+                String msg =
+                        "Import failed to configure, failed to load module by URL or classname provided" +
+                        " import module: " + importBundleUrl;
+                hostLog.error(msg);
+                throw new DeploymentCheckException(msg);
+            }
         }
         if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
-            processorProperties.setProperty(ImportDataProcessor.IMPORT_BUNDLE, importBundleUrl);
+            processorProperties.setProperty(ImportDataProcessor.IMPORT_MODULE, modulePrefix + importBundleUrl);
         }
 
         List<PropertyType> configProperties = importConfiguration.getProperty();
@@ -1245,11 +1266,11 @@ public abstract class CatalogUtil {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getBundle())) {
-                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
-                        importConfiguration.getBundle() + ".");
+            if (streamList.contains(importConfiguration.getModule())) {
+                throw new RuntimeException("Multiple connectors can not be assigned to single import module: " +
+                        importConfiguration.getModule()+ ".");
             } else {
-                streamList.add(importConfiguration.getBundle());
+                streamList.add(importConfiguration.getModule());
             }
 
             checkImportProcessorConfiguration(importConfiguration);
@@ -1267,15 +1288,15 @@ public abstract class CatalogUtil {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getBundle())) {
+            if (streamList.contains(importConfiguration.getModule())) {
                 throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
-                        importConfiguration.getBundle() + ".");
+                        importConfiguration.getModule()+ ".");
             } else {
-                streamList.add(importConfiguration.getBundle());
+                streamList.add(importConfiguration.getModule());
             }
 
             Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
-            processorConfig.put(importConfiguration.getBundle(), processorProperties);
+            processorConfig.put(importConfiguration.getModule(), processorProperties);
         }
         return processorConfig;
     }

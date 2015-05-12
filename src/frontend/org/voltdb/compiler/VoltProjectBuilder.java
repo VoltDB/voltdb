@@ -74,6 +74,8 @@ import org.voltdb.utils.NotImplementedException;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
+import org.voltdb.compiler.deploymentfile.ServerImportFormatEnum;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -571,15 +573,23 @@ public class VoltProjectBuilder {
         m_ppdPrefix = ppdPrefix;
     }
 
-    public void addImport(boolean enabled, String importBundle, Properties config) {
+    public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
         HashMap<String, Object> importConnector = new HashMap<String, Object>();
         importConnector.put("ilEnabled", enabled);
-        importConnector.put("ilBundle", importBundle);
+        importConnector.put("ilModule", importBundle);
 
         importConnector.put("ilConfig", config);
 
-        if ((importBundle != null) && !importBundle.trim().isEmpty()) {
-            importConnector.put("ilExportTarget", importBundle);
+        if ((importType != null) && !importType.trim().isEmpty()) {
+            importConnector.put("ilImportType", importType);
+        } else {
+            importConnector.put("ilImportType", "custom");
+        }
+
+        if ((importFormat != null) && !importFormat.trim().isEmpty()) {
+            importConnector.put("ilImportFormat", importFormat);
+        } else {
+            importConnector.put("ilImportFormat", "custom");
         }
 
         m_ilImportConnectors.add(importConnector);
@@ -1088,7 +1098,11 @@ public class VoltProjectBuilder {
         for (HashMap<String,Object> importConnector : m_ilImportConnectors) {
             ImportConfigurationType importConfig = factory.createImportConfigurationType();
             importConfig.setEnabled((boolean)importConnector.get("ilEnabled"));
-            importConfig.setBundle((String )importConnector.get("ilBundle"));
+            ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
+            importConfig.setType(importType);
+            ServerImportFormatEnum importFormatType = ServerImportFormatEnum.fromValue(((String)importConnector.get("ilImportFormat")).toLowerCase());
+            importConfig.setFormat(importFormatType);
+            importConfig.setModule((String )importConnector.get("ilModule"));
 
             Properties config = (Properties)importConnector.get("ilConfig");
             if((config != null) && (config.size() > 0)) {
