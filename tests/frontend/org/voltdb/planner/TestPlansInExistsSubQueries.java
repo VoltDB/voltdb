@@ -30,10 +30,12 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -581,6 +583,25 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             AbstractExpression aggrExpr = aggNode.getPostPredicate();
             assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
         }
+        {
+            // parent correlated TVE in the aggregate expression.
+            AbstractPlanNode pn = compile("select max(c) from r1 group by a " +
+                    " having count(*) = (select c from r2 where r2.c = r1.a)");
+
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof  ProjectionPlanNode);
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof SeqScanPlanNode);
+            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+            assertNotNull(aggNode);
+            assertNotNull(aggNode instanceof HashAggregatePlanNode);
+            assertEquals(3, aggNode.getOutputSchema().size()); // group by key, max, count
+
+            AbstractExpression aggrExpr = aggNode.getPostPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, aggrExpr.getExpressionType());
+            assertTrue(aggrExpr.getLeft() instanceof TupleValueExpression);
+            assertTrue(aggrExpr.getRight() instanceof SelectSubqueryExpression);
+        }
     }
 
     public void testSendReceiveInSubquery() {
@@ -599,12 +620,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             failToCompile("select a from r1 group by a " +
                     " having exists (select c from r2 where r2.c = max(r1.a))",
                     "subquery with WHERE expression with aggregates on parent columns are not supported");
-        }
-        {
-            // parent correlated TVE in the aggregate expression. NulPointerExpression
-            failToCompile("select max(c) from r1 group by a " +
-                    " having count(*) = (select c from r2 where r2.c = r1.a)",
-                    "");
         }
     }
 
