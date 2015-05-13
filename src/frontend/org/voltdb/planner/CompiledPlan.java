@@ -297,13 +297,6 @@ public class CompiledPlan {
         return m_extractedParamValues;
     }
 
-    public int getQuestionMarkParameterCount() {
-        if (parameters == null) {
-            return 0;
-        }
-        return parameters.length - m_generatedParameterCount;
-    }
-
     public boolean isReadOnly() {
         return m_readOnly;
     }
@@ -320,6 +313,7 @@ public class CompiledPlan {
         return m_partitioning;
     }
 
+    @Override
     public String toString() {
         if (rootPlanGraph != null) {
             return "CompiledPlan: \n" + rootPlanGraph.toExplainPlanString();
