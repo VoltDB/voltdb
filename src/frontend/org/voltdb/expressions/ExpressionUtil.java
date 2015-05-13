@@ -493,6 +493,18 @@ public abstract class ExpressionUtil {
             }
         }
 
+        // Let's not forget the args, which may also contain subqueries.
+        List<AbstractExpression> args = expr.getArgs();
+        if (args != null) {
+            for (int i = 0; i < args.size(); ++i) {
+                AbstractExpression arg = args.get(i);
+                AbstractExpression newArg = wrapScalarSubqueriesHelper(expr, arg);
+                if (newArg != arg) {
+                    expr.setArgAtIndex(i, newArg);
+                }
+            }
+        }
+
         if (expr instanceof SelectSubqueryExpression
                 && subqueryRequiresScalarValueExpressionFromContext(parentExpr)) {
             expr = addScalarValueExpression((SelectSubqueryExpression)expr);

@@ -233,6 +233,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
+     * Update the argument at specified index
+     * @param index   the index of the item to replace
+     * @param arg     the new argument to insert into the list
+     */
+    public void setArgAtIndex(int index, AbstractExpression arg) {
+        m_args.set(index, arg);
+    }
+
+    /**
      * @return The type of this expression's value.
      */
     public VoltType getValueType() {
