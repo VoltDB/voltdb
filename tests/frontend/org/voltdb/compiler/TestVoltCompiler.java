@@ -23,12 +23,14 @@
 
 package org.voltdb.compiler;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,7 @@ import java.util.regex.Pattern;
 import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
@@ -3885,6 +3888,52 @@ public class TestVoltCompiler extends TestCase {
                     compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
         assertTrue("Compile with dotted proc name did not have the expected error message",
                    isFeedbackPresent("Invalid procedure name", compiler.m_errors));
+    }
+
+    /**
+     * Test to see if scalar subqueries are either allowed where we
+     * expect them to be or else cause compilation errors where we
+     * don't expect them to be.
+     *
+     * @throws Exception
+     */
+    public void testScalarSubqueriesExpectedFailures() throws Exception {
+        List<Pair<String, String>> testList = Arrays.asList(
+                // This should not fail.
+                Pair.of("select WAGE from t where ID = 2;",
+                        "Unexpected compilation failure"),
+                // Scalar subquery not allowed in limit.
+                Pair.of("select WAGE from t where ID = 1 limit (select DEPT from r1 where ID = 2);\n",
+                        "Expected compilation failure: subquery in limit."),
+                // Scalar subquery not allowed in offset.
+                Pair.of("select WAGE from t where ID = 1 limit 1 offset (select DEPT from r1 where ID = 2);\n",
+                        "Expected compilation failure: subquery in offset"),
+                // Scalar subquery not allowed in order by
+                Pair.of("select WAGE from t where ID = 1 order by (select DEPT from r1 where ID = 2);\n",
+                        "Expected compilation failure: subquery in order by"),
+                // Scalar subquery not allowed in partial indices.
+                Pair.of("create index tidx on t ( id ) where exists ( select id = 1 from t) ;\n",
+                        "Expected compilation failure: scalar subquery in partial index."),
+                Pair.of("create index tidx on t ( id ) where ( select id > 1 from t) ;\n",
+                        "Expected compilation failure: scalar subquery in partial index."),
+                // Scalar subquery not allowed in indices.
+                Pair.of("create index tidx on t ( select WAGE from t where id = 1 );\n",
+                        "Expected compilation failure: scalar subquery in index.")
+        );
+
+        for (Pair<String, String> pair : testList) {
+            String ddl = "create table t ( ID integer, WAGE integer, DEPT integer );\n";
+            String dql = pair.getLeft();
+            String msg = pair.getRight();
+            if (dql.startsWith("select")) {
+                dql = "create procedure ALPHA as " + dql;
+            }
+            final File ddlFile = VoltProjectBuilder.writeStringToTempFile(ddl + dql);
+
+            final VoltCompiler compiler = new VoltCompiler();
+            assertEquals(msg, msg.startsWith("Unexpected"),
+                         compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
+        }
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
