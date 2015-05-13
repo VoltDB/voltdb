@@ -410,7 +410,7 @@ public class SQLCommand
         // complete formatted String result rather than the multiple lists.
         // This would save churn on startup and on DDL update.
         Tables tables = getTables();
-        printTables("User     Tables", tables.tables);
+        printTables("User Tables", tables.tables);
         printTables("User Views", tables.views);
         printTables("User Export Streams", tables.exports);
         System.out.println();

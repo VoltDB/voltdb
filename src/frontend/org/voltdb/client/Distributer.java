@@ -65,7 +65,6 @@ import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -166,7 +165,9 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                return;
+            }
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -204,11 +205,8 @@ class Distributer {
                 return;
             }
 
-            //Slow path, god knows why it didn't succeed, could be a bug. Don't firehose attempts.
+            //Slow path, god knows why it didn't succeed, server could be paused and in admin mode. Don't firehose attempts.
             if (response.getStatus() != ClientResponse.SUCCESS && !m_ex.isShutdown()) {
-                System.err.println("Error response received subscribing to topology updates.\n " +
-                                   "Performance may be reduced on topology updates. Error was \"" +
-                                    response.getStatusString() + "\"");
                 //Retry on the off chance that it will work the Nth time, or work at a different node
                 m_ex.schedule(new Runnable() {
                     @Override
@@ -239,7 +237,9 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                return;
+            }
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -421,7 +421,9 @@ class Distributer {
             //Check for disconnect
             if (!m_isConnected) {
                 //Check if the disconnect or expiration already handled the callback
-                if (m_callbacks.remove(handle) == null) return;
+                if (m_callbacks.remove(handle) == null) {
+                    return;
+                }
                 final ClientResponse r = new ClientResponseImpl(
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
                         "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
@@ -474,7 +476,9 @@ class Distributer {
             final CallbackBookeeping cb = m_callbacks.remove(handle);
 
             //It was handled during the race
-            if (cb == null) return;
+            if (cb == null) {
+                return;
+            }
 
             final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
 
@@ -704,7 +708,9 @@ class Distributer {
                 for (Pair<Integer, NodeConnection[]> entry : entriesToRewrite) {
                     m_partitionReplicas.remove(entry.getFirst());
                     NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
-                    if (survivors.length == 0) break;
+                    if (survivors.length == 0) {
+                        break;
+                    }
                     int zz = 0;
                     for (int ii = 0; ii < entry.getSecond().length; ii++) {
                         if (entry.getSecond()[ii] != this) {
@@ -752,7 +758,9 @@ class Distributer {
                 ") was lost before a response was received");
             for (Map.Entry<Long, CallbackBookeeping> e : m_callbacks.entrySet()) {
                 //Check for race with other threads
-                if (m_callbacks.remove(e.getKey()) == null) continue;
+                if (m_callbacks.remove(e.getKey()) == null) {
+                    continue;
+                }
                 final CallbackBookeeping callBk = e.getValue();
                 try {
                     callBk.callback.clientCallback(r);
@@ -828,9 +836,13 @@ class Distributer {
              * more prompt. Spinning sucks!
              */
             if (more) {
-                if (Thread.interrupted()) throw new InterruptedException();
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
                 LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
-                if (Thread.interrupted()) throw new InterruptedException();
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
                 if (sleep < 5000) {
                     sleep += 500;
                 }
@@ -1210,7 +1222,9 @@ class Distributer {
 
         for (NodeConnection conn : m_connections) {
             Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
-            if (perConnIOStats == null) continue;
+            if (perConnIOStats == null) {
+                continue;
+            }
 
             long read = perConnIOStats.getSecond()[0];
             long write = perConnIOStats.getSecond()[2];
