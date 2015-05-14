@@ -316,6 +316,11 @@ public class AsyncCompilerAgent {
         work.completionHandler.onCompletion(result);
     }
 
+    public static final String AdHocErrorResponseMessage =
+            "The @AdHoc stored procedure when called with more than one parameter "
+                    + "must be passed a single parameterized SQL statement as its first parameter. "
+                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
+
     AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
@@ -337,6 +342,13 @@ public class AsyncCompilerAgent {
         // when the batch has one statement.
         StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+
+        if (work.userParamSet != null && work.userParamSet.length > 0) {
+            if (work.sqlStatements.length != 1) {
+                return AsyncCompilerResult.makeErrorResult(work, AdHocErrorResponseMessage);
+            }
+        }
+
         for (final String sqlStatement : work.sqlStatements) {
             if (inferSP) {
                 partitioning = StatementPartitioning.inferPartitioning();
@@ -347,7 +359,8 @@ public class AsyncCompilerAgent {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
+                        work.explainMode != ExplainMode.NONE, work.userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
@@ -364,27 +377,6 @@ public class AsyncCompilerAgent {
         String errorSummary = null;
         if (!errorMsgs.isEmpty()) {
             errorSummary = StringUtils.join(errorMsgs, "\n");
-        }
-
-        // check the parameters count
-        if (work.explainMode == ExplainMode.NONE && work.userParamSet != null) {
-            int totalQuestionMarkParameters = 0;
-            for (AdHocPlannedStatement result: stmts) {
-                totalQuestionMarkParameters += result.getQuestionMarkParameterCount();
-            }
-            if (work.sqlStatements.length > 1 && totalQuestionMarkParameters > 0) {
-                return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("The @AdHoc stored procedure when called with more than one parameter "
-                                + "must be passed a single parameterized SQL statement as its first parameter. "
-                                + "Pass each parameterized SQL statement to a separate callProcedure invocation."));
-            }
-
-            if (totalQuestionMarkParameters != work.userParamSet.length) {
-                return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("Incorrect number of parameters passed: expected %d, passed %d",
-                                totalQuestionMarkParameters, work.userParamSet.length));
-            }
-
         }
 
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,

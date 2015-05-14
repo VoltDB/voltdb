@@ -12,7 +12,7 @@
         };
 
         this.GetPortId = function () {
-            return window.location.port;
+            return window.location.port || 8080;
         };
     });
 
