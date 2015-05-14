@@ -747,13 +747,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
                     "subquery with WHERE expression with aggregates on parent columns are not supported");
         }
         {
-            // parent correlated TVE in the aggregate expression. NulPointerExpression
-            failToCompile("select max(c) from r1 group by a " +
-                    " having count(*) = (select c from r2 where r2.c = r1.a)",
-                    "");
-        }
-        {
-            // join on EXISTS(FALSE) is not supported
             failToCompile("select * from r1 join r2 on exists " +
                     " (select a from r2 where a > 1) ",
                     "Join with filters that do not depend on joined tables is not supported in VoltDB");
