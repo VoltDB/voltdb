@@ -1747,8 +1747,8 @@ var loadPage = function (serverName, portid) {
         refreshGraphAndData(VoltDbUI.getCookie("graph-view"), VoltDbUI.CurrentTab);
     }, 5000);
 
-
     //refreshGraphAndDataInLoop(getRefreshTime(), VoltDbUI.getCookie("graph-view"));
+
     configureUserPreferences();
     adjustGraphSpacing();
     saveThreshold();
@@ -1963,6 +1963,7 @@ var showHideGraph = function (userpreferences) {
 function ChangeGraphLabelColor() {
     if (VoltDbUI.getCookie("user-preferences") != undefined) {
         var userPreferences = $.parseJSON(VoltDbUI.getCookie("user-preferences"));
+
         if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["DrReplicationRate"] != false) {
             $('#showHideGraphBlock').css('color', '#000000');
             $("#GraphBlock").removeClass("graphOpacity");
@@ -2167,3 +2168,4 @@ function getParameterByName(name) {
     else
         return decodeURIComponent(results[1].replace(/\+/g, " "));
 }
+

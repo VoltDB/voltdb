@@ -32,7 +32,6 @@ function alertNodeClicked(obj) {
             AlertThreshold: VoltDbUI.getCookie("alert-threshold"),
             username: VoltDbUI.getCookie("username"),
             password: VoltDbUI.getCookie("password")
-
         };
 
         var win = window.open(newUrl + '?data=' + JSON.stringify(data), '_parent');
@@ -3315,3 +3314,4 @@ $(window).resize(function () {
     }
 
 });
+
