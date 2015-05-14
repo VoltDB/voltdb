@@ -27,11 +27,11 @@ function alertNodeClicked(obj) {
 
         var data = {
             CurrentServer: clickedServer,
-            GraphView: $.cookie("graph-view"),
-            DisplayPreferences: $.cookie("user-preferences"),
-            AlertThreshold: $.cookie("alert-threshold"),
-            username: $.cookie("username"),
-            password: $.cookie("password")
+            GraphView: VoltDbUI.getCookie("graph-view"),
+            DisplayPreferences: VoltDbUI.getCookie("user-preferences"),
+            AlertThreshold: VoltDbUI.getCookie("alert-threshold"),
+            username: VoltDbUI.getCookie("username"),
+            password: VoltDbUI.getCookie("password")
 
         };
 
@@ -198,7 +198,7 @@ function alertNodeClicked(obj) {
                                 $("#password").val("");
                             }, 300);
                             $("#logOut").css('display', 'block');
-                            $('#logOut').prop('title', $.cookie("username"));
+                            $('#logOut').prop('title', VoltDbUI.getCookie("username"));
                         } else {
 
                             //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
@@ -236,8 +236,8 @@ function alertNodeClicked(obj) {
                 return true;
             });
 
-            var username = ($.cookie("username") != undefined) ? $.cookie("username") : "";
-            var password = (username != "" && $.cookie("password") != undefined) ? $.cookie("password") : "";
+            var username = (VoltDbUI.getCookie("username") != undefined) ? VoltDbUI.getCookie("username") : "";
+            var password = (username != "" && VoltDbUI.getCookie("password") != undefined) ? VoltDbUI.getCookie("password") : "";
 
             $("#serUnavailablePopup").popup({
                 open: function (event, ui, ele) {
@@ -574,7 +574,7 @@ function alertNodeClicked(obj) {
             var alertHtml = "";
 
             jQuery.each(systemMemory, function (id, val) {
-                var threshold = $.cookie("alert-threshold") != undefined ? $.cookie("alert-threshold") : 70;
+                var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
                 if (val["MEMORYUSAGE"] * 1 >= threshold) {
                     alertHtml += '<li class="active"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick=\"alertNodeClicked(this);\" href=\"#\">' + val['HOSTNAME'] + '</a> <span class=\"memory-status alert\">' + val['MEMORYUSAGE'] + '%</span></li>';
                     alertCount++;
@@ -589,7 +589,6 @@ function alertNodeClicked(obj) {
         };
 
         var configureRequestedHost = function (hostName) {
-
             $.each(systemOverview, function (id, val) {
                 if (val["IPADDRESS"] == hostName) {
                     gCurrentServer = val["HOSTNAME"];
@@ -1150,7 +1149,7 @@ function alertNodeClicked(obj) {
 
         this.mapNodeInformationByStatus = function (callback) {
             var counter = 0;
-            var memoryThreshold = $.cookie("alert-threshold") != '' ? $.cookie("alert-threshold") : -1;
+            var memoryThreshold = VoltDbUI.getCookie("alert-threshold") != '' ? VoltDbUI.getCookie("alert-threshold") : -1;
             var htmlMarkups = { "ServerInformation": [] };
             var htmlMarkup;
             var currentServerHtml = "";
