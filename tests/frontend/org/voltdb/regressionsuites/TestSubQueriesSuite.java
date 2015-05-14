@@ -1264,15 +1264,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] { {5} });
 
         // Having correlated -- parent TVE in the aggregated child expression
-        try {
-            vt = client.callProcedure("@AdHoc",
-                    "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
-                    "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
-            fail("Not support: Having correlated");
-        } catch (ProcCallException ex) {
-            String errMsg = "java.lang.NullPointerException";
-            assertTrue(ex.getMessage().contains(errMsg));
-        }
+        vt = client.callProcedure("@AdHoc",
+                "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{5});
+
+        vt = client.callProcedure("@AdHoc",
+                "select DEPT, max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {2,5} });
 
         try {
             vt = client.callProcedure("@AdHoc",
