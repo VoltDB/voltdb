@@ -20,6 +20,7 @@ package org.voltdb.importer;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 
@@ -137,4 +138,29 @@ public class ImportHandlerProxy implements ImportContext {
     public long getBackpressureTimeout() {
         return TimeUnit.MINUTES.toNanos(2);
     }
+
+    @Override
+    public boolean isRunEveryWhere() {
+        return true;
+    }
+
+    @Override
+    public Set<String> getAllResponsibleResources() {
+        return null;
+    }
+
+    @Override
+    public void setAllocatedResources(Set<String> allocated) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    /**
+     * Default to take in all data and run transactions regardless of partitioning.
+     * @return
+     */
+    @Override
+    public boolean isPartitionedData() {
+        return false;
+    }
+
 }

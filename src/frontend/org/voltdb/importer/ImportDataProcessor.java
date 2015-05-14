@@ -20,6 +20,7 @@ package org.voltdb.importer;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.voltcore.messaging.HostMessenger;
 
 import org.voltdb.CatalogContext;
 
@@ -36,8 +37,9 @@ public interface ImportDataProcessor  {
      * Inform the processor that initialization is complete; commence work.
      * @param context
      * @param partitions list of partitions we are responsible for.
+     * @param messenger to get handle to zookeeper
      */
-    public void readyForData(CatalogContext context, List<Integer> partitions);
+    public void readyForData(CatalogContext context, List<Integer> partitions, HostMessenger messenger);
 
     /**
      * The system is terminating. Cleanup and exit the processor.

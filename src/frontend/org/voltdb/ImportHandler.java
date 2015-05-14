@@ -208,7 +208,7 @@ public class ImportHandler {
                 return false;
             }
             //TODO: this should be property or should this be silently handled?
-            if (!m_partitions.contains(partition)) {
+            if (ic.isPartitionedData() && !m_partitions.contains(partition)) {
                 //Not our partition dont do anything.
                 m_unpartitionedCount.incrementAndGet();
                 tcont.discard();

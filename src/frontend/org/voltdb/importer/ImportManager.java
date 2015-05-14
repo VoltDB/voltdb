@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CatalogUtil;
@@ -46,6 +47,7 @@ public class ImportManager {
 
     /** Obtain the global ImportManager via its instance() method */
     private static ImportManager m_self;
+    private final HostMessenger m_messenger;
 
     /**
      * Get the global instance of the ImportManager.
@@ -59,7 +61,8 @@ public class ImportManager {
         m_self = self;
     }
 
-    protected ImportManager() {
+    protected ImportManager(HostMessenger messenger) {
+        m_messenger = messenger;
     }
 
     /**
@@ -67,8 +70,8 @@ public class ImportManager {
      * @param catalogContext
      * @param partitions
      */
-    public static synchronized void initialize(CatalogContext catalogContext, List<Integer> partitions) {
-        ImportManager em = new ImportManager();
+    public static synchronized void initialize(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) {
+        ImportManager em = new ImportManager(messenger);
 
         m_self = em;
         em.create(catalogContext, partitions);
@@ -112,21 +115,21 @@ public class ImportManager {
         m_processor.set(null);
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions) {
+    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) {
         //Shutdown and recreate.
         m_self.shutdown();
         assert(m_processor.get() == null);
         m_self.create(catalogContext, partitions);
-        m_self.readyForData(catalogContext, partitions);
+        m_self.readyForData(catalogContext, partitions, messenger);
     }
 
-    public synchronized void readyForData(CatalogContext catalogContext, List<Integer> partitions) {
+    public synchronized void readyForData(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) {
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
             return;
         }
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-        m_processor.get().readyForData(catalogContext, partitions);
+        m_processor.get().readyForData(catalogContext, partitions, messenger);
     }
 
 
