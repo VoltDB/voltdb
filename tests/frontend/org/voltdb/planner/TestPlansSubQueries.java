@@ -2170,8 +2170,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     // This test fails to compile, and causes an NPE in the planner (I think).
-    // The ticket number, obviously, is 8263.
-    public void testENG8263() throws Exception {
+    // The ticket number, obviously, is 8280.
+    public void testENG8280() throws Exception {
         // failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;","mumble");
     }
 
