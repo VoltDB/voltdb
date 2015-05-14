@@ -79,6 +79,9 @@ public:
     /** Send committed data to the top end. */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
 
+    /** Amount of header size to allocate at the beginning of a StreamBlock */
+    virtual size_t headerSize() const { return MAGIC_HEADER_SPACE_FOR_JAVA; }
+
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
 

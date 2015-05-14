@@ -27,7 +27,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 import org.voltdb.utils.PersistentBinaryDeque;
+import org.voltdb.utils.PersistentBinaryDeque.ByteBufferTruncatorResponse;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -271,7 +273,7 @@ public class StreamBlockQueue {
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
         @Override
-        public ByteBuffer parse(BBContainer bbc) {
+        public TruncatorResponse parse(BBContainer bbc) {
             ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
@@ -292,13 +294,13 @@ public class StreamBlockQueue {
                         //If the truncation point was the first row in the block, the entire block is to be discard
                         //We know it is the first row if the position before the row is after the uso (8 bytes)
                         if (b.position() == 8) {
-                            return ByteBuffer.allocate(0);
+                            return PersistentBinaryDeque.fullTruncateResponse();
                         } else {
                             //Return everything in the block before the truncation point.
                             //Indicate this is the end of the interesting data.
                             b.limit(b.position());
                             b.position(0);
-                            return b;
+                            return new ByteBufferTruncatorResponse(b);
                         }
                     } else {
                         //Not the row we are looking to truncate at. Skip past it keeping in mind

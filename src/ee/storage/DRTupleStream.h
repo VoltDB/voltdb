@@ -28,7 +28,9 @@
 namespace voltdb {
 class StreamBlock;
 
-const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
+const int MAGIC_TRANSACTION_PADDING_MP = 65;
+const int MAGIC_TRANSACTION_PADDING_SP = MAGIC_TRANSACTION_PADDING_MP + 4;
+const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
@@ -83,6 +85,8 @@ public:
 
     std::pair<int64_t, int64_t> getLastCommittedSequenceNumberAndUniqueId() { return std::pair<int64_t, int64_t>(m_committedSequenceNumber, m_committedUniqueId); }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
+
+    virtual size_t headerSize() const { return MAGIC_HEADER_SPACE_FOR_JAVA + (m_partitionId == 16383 ? MAGIC_TRANSACTION_PADDING_MP : MAGIC_TRANSACTION_PADDING_SP); }
 
     bool m_enabled;
 
