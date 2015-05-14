@@ -1587,25 +1587,35 @@ public class Expression {
         // A SIMPLE_COLUMN ExpressionColumn can be treated as a normal "COLUMN" ExpressionColumn.
         // That case gets explicitly enabled here by fudging the opType from SIMPLE_COLUMN to COLUMN.
         if (exprOp == OpTypes.SIMPLE_COLUMN) {
-            // find the substitue from displayCols list
-            for (int ii=startKey+1; ii < displayCols.size(); ++ii)
-            {
-                Expression otherCol = displayCols.get(ii);
-                // This mechanism of finding the expression that a SIMPLE_COLUMN
-                // is referring to is inherently fragile---columnIndex is an
-                // offset into different things depending on context!
-                if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
-                         (otherCol.columnIndex == this.columnIndex)  &&
-                         !(otherCol instanceof ExpressionColumn))
-                {
-                    ignoredDisplayColIndexes.add(ii);
-                    // serialize the column this simple column stands-in for.
-                    // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
-                    // quit seeking simple_column's replacement.
-                    return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
+            if (displayCols == null) {
+                if (this instanceof ExpressionColumn == false) {
+                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                            "VoltDB does not support this complex query currently.");
                 }
+                // convert the SIMPLE_COLUMN into a COLUMN
+                opType = OpTypes.COLUMN;
+                exprOp = OpTypes.COLUMN;
+            } else {
+                // find the substitue from displayCols list
+                for (int ii=startKey+1; ii < displayCols.size(); ++ii)
+                {
+                    Expression otherCol = displayCols.get(ii);
+                    // This mechanism of finding the expression that a SIMPLE_COLUMN
+                    // is referring to is inherently fragile---columnIndex is an
+                    // offset into different things depending on context!
+                    if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
+                             (otherCol.columnIndex == this.columnIndex)  &&
+                             !(otherCol instanceof ExpressionColumn))
+                    {
+                        ignoredDisplayColIndexes.add(ii);
+                        // serialize the column this simple column stands-in for.
+                        // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
+                        // quit seeking simple_column's replacement.
+                        return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
+                    }
+                }
+                assert(false);
             }
-            assert(false);
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct

@@ -451,7 +451,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
             sql = "select dept from " + tb +
                     " group by dept " +
                     " having max(wage) in (select wage from R1) order by dept desc";
-            /* enable for debug */ vt = client.callProcedure("@Explain", sql).getResults()[0];
+            //* enable for debug */ vt = client.callProcedure("@Explain", sql).getResults()[0];
             //* enable for debug */ System.out.println(vt);
             //TODO: Whatever @Explain is testung here should be covered in a planner test instead.
             assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
@@ -1264,15 +1264,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] { {5} });
 
         // Having correlated -- parent TVE in the aggregated child expression
-        try {
-            vt = client.callProcedure("@AdHoc",
-                    "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
-                    "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
-            fail("Not support: Having correlated");
-        } catch (ProcCallException ex) {
-            String errMsg = "java.lang.NullPointerException";
-            assertTrue(ex.getMessage().contains(errMsg));
-        }
+        vt = client.callProcedure("@AdHoc",
+                "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{5});
+
+        vt = client.callProcedure("@AdHoc",
+                "select DEPT, max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {2,5} });
 
         try {
             vt = client.callProcedure("@AdHoc",
@@ -1403,6 +1403,33 @@ public class TestSubQueriesSuite extends RegressionSuite {
       // As above, but this time the execption occurs in the inner query.
       verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
       verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
+  }
+
+  public void testSubqueriesWithArithmetic() throws Exception {
+      Client client = getClient();
+
+      client.callProcedure("R1.insert", 1, 300,  1 , "2013-06-18 02:00:00.123457");
+      client.callProcedure("R1.insert", 2, 200,  1 , "2013-06-18 02:00:00.123457");
+
+      // These test cases exercise the fix for ENG-8226, in which a missing ScalarValueExpression
+      // caused the result of a subquery to be seen as the subquery ID, rather than the contents
+      // of subquery's result table.
+
+      validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r1",
+              new long[] {300, 300});
+      validateTableOfScalarLongs(client, "select (select max(wage) from r1) + 0 as subq from r1",
+              new long[] {300, 300});
+
+      validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) from r1)", new long[] {300});
+      validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) - 30 from r1) + 30", new long[] {300});
+
+      // The IN operator takes a VectorExpression on its RHS, which uses the "args" field.
+      // Make sure that we can handle subqueries in there too.
+      validateTableOfScalarLongs(client,
+              "select wage from r1 "
+              + "where wage in (7, 8, (select max(wage) from r1), 9, 10, 200) "
+              + "order by wage",
+              new long[] {200, 300});
   }
 
     static public junit.framework.Test suite()
