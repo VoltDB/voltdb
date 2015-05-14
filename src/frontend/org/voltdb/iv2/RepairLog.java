@@ -164,10 +164,10 @@ public class RepairLog
                 m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
                 if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
                     StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
-                    // params[3] is the end sequence number from the original cluster
+                    // params[2] is the end sequence number from the original cluster
                     Object[] params = spi.getParams().toArray();
-                    m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[3]).longValue());
-                    m_maxSeenSpBinaryLogUniqueId = Math.max(m_maxSeenSpBinaryLogUniqueId, ((Number)params[4]).longValue());
+                    m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[2]).longValue());
+                    m_maxSeenSpBinaryLogUniqueId = Math.max(m_maxSeenSpBinaryLogUniqueId, ((Number)params[3]).longValue());
                 }
             }
         } else if (msg instanceof FragmentTaskMessage) {
@@ -186,8 +186,8 @@ public class RepairLog
                     StoredProcedureInvocation spi = initiateTask.getStoredProcedureInvocation();
                     // params[3] is the end sequence number id from the original cluster
                     Object[] params = spi.getParams().toArray();
-                    m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[3]).longValue());
-                    m_maxSeenMpBinaryLogUniqueId = Math.max(m_maxSeenMpBinaryLogUniqueId, ((Number)params[4]).longValue());
+                    m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[2]).longValue());
+                    m_maxSeenMpBinaryLogUniqueId = Math.max(m_maxSeenMpBinaryLogUniqueId, ((Number)params[3]).longValue());
                 }
             }
         }

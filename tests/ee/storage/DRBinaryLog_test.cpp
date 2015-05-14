@@ -230,10 +230,11 @@ public:
             boost::shared_array<char> data = m_topend.data[i - 1];
             m_topend.data.pop_back();
 
-            *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
+            size_t startPos = sb->headerSize() - 4;
+            *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sink.apply(&data[4], tables, &m_pool, NULL);
+            m_sink.apply(&data[startPos], tables, &m_pool, NULL);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
