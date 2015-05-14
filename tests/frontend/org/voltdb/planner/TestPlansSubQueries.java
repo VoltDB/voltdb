@@ -2166,6 +2166,13 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // Scalar subquery not allowed in order by
         failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C );",
                       "ORDER BY parsed with strange child node type: tablesubquery");
+
+    }
+
+    // This test fails to compile, and causes an NPE in the planner (I think).
+    // The ticket number, obviously, is 8263.
+    public void testENG8263() throws Exception {
+        // failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;","mumble");
     }
 
     @Override
