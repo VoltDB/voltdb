@@ -1409,7 +1409,6 @@ public abstract class SubPlanAssembler {
 
                 // DEAD CODE with the guards on index: ENG-8203
                 assert(false);
-                expr2 = ExpressionUtil.addScalarValueExpression((AbstractSubqueryExpression)expr2);
             }
             scanNode.addSearchKeyExpression(expr2);
         }
