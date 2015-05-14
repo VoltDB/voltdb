@@ -111,6 +111,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     Table* output_table = node->getOutputTable();
     assert(output_table);
 
+    // Short-circuit an empty scan
+    if (node->isEmptyScan()) {
+        VOLT_DEBUG ("Empty Seq Scan :\n %s", m_outputTable->debug().c_str());
+        return true;
+    }
+
     Table* input_table = (node->isSubQuery()) ?
             node->getChildren()[0]->getOutputTable():
             node->getTargetTable();

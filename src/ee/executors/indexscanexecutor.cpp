@@ -162,6 +162,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert(m_node);
     assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
 
+    // Short-circuit an empty scan
+    if (m_node->isEmptyScan()) {
+        VOLT_DEBUG ("Empty Index Scan :\n %s", m_outputTable->debug().c_str());
+        return true;
+    }
+
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());

@@ -431,6 +431,9 @@ constantValueFactory(PlannerDomValue obj,
     case VALUE_TYPE_DECIMAL:
         newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
         break;
+    case VALUE_TYPE_BOOLEAN:
+        newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
+        break;
     default:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "constantValueFactory: Unrecognized value"

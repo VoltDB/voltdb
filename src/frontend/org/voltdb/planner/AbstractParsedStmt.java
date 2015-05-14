@@ -655,7 +655,7 @@ public abstract class AbstractParsedStmt {
             }
         }
         if (ExpressionType.OPERATOR_EXISTS == expr.getExpressionType()) {
-            optimizeExistsExpression(expr);
+            expr = optimizeExistsExpression(expr);
         }
         return expr;
     }
@@ -696,15 +696,17 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Optimize EXISTS expression:
-     *  1. Replace the display columns with a single dummy column "1"
-     *  2. Drop DISTINCT expression
-     *  3. Add LIMIT 1
-     *  4. Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
+     * Simplify the EXISTS expression:
+     *  1. EXISTS ( table-agg-without-having-groupby) => TRUE
+     *  2. Replace the display columns with a single dummy column "1" and GROUP BY expressions
+     *  3. Drop DISTINCT expression
+     *  4. Add LIMIT 1
+     *  5. Remove ORDER BY expressions if HAVING expression is not present
      *
      * @param existsExpr
+     * @return optimized exists expression
      */
-    private void optimizeExistsExpression(AbstractExpression existsExpr) {
+    private AbstractExpression optimizeExistsExpression(AbstractExpression existsExpr) {
         assert(ExpressionType.OPERATOR_EXISTS == existsExpr.getExpressionType());
         assert(existsExpr.getLeft() != null);
 
@@ -713,9 +715,10 @@ public abstract class AbstractParsedStmt {
             AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
             if (subquery instanceof ParsedSelectStmt) {
                 ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
-                selectSubquery.simplifyExistsSubqueryStmt();
+                return selectSubquery.simplifyExistsSubqueryStmt(existsExpr);
             }
         }
+        return existsExpr;
     }
 
     /**
@@ -1170,6 +1173,11 @@ public abstract class AbstractParsedStmt {
             condExpr = parseExpressionTree(childNode.children.get(0));
             assert(condExpr != null);
             ExpressionUtil.finalizeValueTypes(condExpr);
+            condExpr = ExpressionUtil.evaluateExpression(condExpr);
+            // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
+            if (ConstantValueExpression.isBooleanTrue(condExpr)) {
+                condExpr = null;
+            }
         }
         return condExpr;
     }
