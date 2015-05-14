@@ -1048,7 +1048,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(vt, new long[][] {  {1,3,6}, {2, 2, 5} });
         }
 
-        // ENG-8263
+        // ENG-8263: group by scalar value expression
         vt = client.callProcedure("@AdHoc", "select R1.DEPT, count(*) FROM R1 "
                 + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage = R1.wage) order by dept;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {  {1,3}, {2, 2} });
