@@ -9,6 +9,9 @@ create procedure p as
     select * from t where d between ? and ?;
 Command succeeded.
 
+create table t2 ( c integer, d varchar(4), e varchar(4) );
+Command succeeded.
+
 exec T.insert 1,'a';
 (Returned 1 rows in #.##s)
 
@@ -88,22 +91,40 @@ EXECUTE T.insert 71 ,
 exec    T.insert 81,  'x''';
 (Returned 1 rows in #.##s)
 
-exec    T.insert 81,  '''y';
+exec    T.insert 82,  '''y';
 (Returned 1 rows in #.##s)
 
-exec    T.insert 81,  '''z''';
+exec    T.insert 83,  '''z''';
 (Returned 1 rows in #.##s)
 
-exec    T.insert 81,  ''' ''';
+exec    T.insert 84,  ''' ''';
 (Returned 1 rows in #.##s)
 
-exec    T.insert 81,  '" "';
+exec    T.insert 85,  '" "';
 (Returned 1 rows in #.##s)
 
-exec    T.insert 81,  ''' "';
+exec    T.insert 86,  ''' "';
 (Returned 1 rows in #.##s)
 
-exec    T.insert 81,  ''' "';
+exec    T.insert 87,  ''' "';
+(Returned 1 rows in #.##s)
+
+exec    T2.insert 88,  ''' '  ' ''';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 91,  '( )';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 92,  ')';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 93,  '"(';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 94,  '''()';
+(Returned 1 rows in #.##s)
+
+exec    T2.insert 95,  '('  ')';
 (Returned 1 rows in #.##s)
 
 exec p 'abc'    'abd';
@@ -162,12 +183,30 @@ C   D
  62 ; ,  
  63 ;,   
  71 ;,   
- 81 'y   
- 81 'z'  
+ 82 'y   
+ 83 'z'  
+ 91 ( )  
+ 92 )    
+ 94 '()  
 
-(Returned 25 rows in #.##s)
+(Returned 28 rows in #.##s)
 
-select * from t;
+exec p '((' '))';
+C   D 
+--- --
+ 92 ) 
+
+(Returned 1 rows in #.##s)
+
+exec p ( );
+C   D   
+--- ----
+ 91 ( ) 
+ 92 )   
+
+(Returned 2 rows in #.##s)
+
+select * from t order by c;
 C   D    
 --- -----
   1 a    
@@ -196,14 +235,29 @@ C   D
  63 ;,   
  71 ;,   
  81 x'   
- 81 'y   
- 81 'z'  
- 81 ' '  
- 81 " "  
- 81 ' "  
- 81 ' "  
+ 82 'y   
+ 83 'z'  
+ 84 ' '  
+ 85 " "  
+ 86 ' "  
+ 87 ' "  
+ 91 ( )  
+ 92 )    
+ 93 "(   
+ 94 '()  
 
-(Returned 32 rows in #.##s)
+(Returned 36 rows in #.##s)
+
+select * from t2 order by c;
+C   D   E  
+--- --- ---
+ 88 '    ' 
+ 95 (   )  
+
+(Returned 2 rows in #.##s)
+
+drop table t2;
+Command succeeded.
 
 drop procedure p;
 Command succeeded.

@@ -1,4 +1,4 @@
-
+﻿
 (function(window) {
 
     var IMonitorGraphUI = (function () {
@@ -14,6 +14,8 @@
         var latMinCount = 0;
         var partitionSecCount = 0;
         var partitionMinCount = 0;
+        var drSecCount = 0;
+        var drMinCount = 0;
         var totalEmptyData = 121;
         var totalEmptyDataForMinutes = 121;
         var totalEmptyDataForDays = 360;
@@ -22,14 +24,14 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var physicalMemory = -1;
+        var drReplicationChart;        var physicalMemory = -1;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
         this.ChartLatency = nv.models.lineChart();
         this.ChartTransactions = nv.models.lineChart();
         this.ChartPartitionIdleTime = nv.models.lineChart().useInteractiveGuideline(true);
-        var dataMapperSec = {};
+        this.ChartDrReplicationRate = nv.models.lineChart();        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
 
@@ -151,7 +153,7 @@
             }
             return dataPartition;
         };
-
+        
         var emptyData = getEmptyData();
         var emptyDataForMinutes = getEmptyDataForMinutes();
         var emptyDataForDays = getEmptyDataForDays();
@@ -203,6 +205,13 @@
             "values": getEmptyDataOptimized(),
             "color": "rgb(27, 135, 200)"
         }];
+        
+        var dataDrReplicationRate = [{
+            "key": "Replication Rate",
+            "values": getEmptyDataOptimized(),
+            "color": "rgb(27, 135, 200)"
+        }];
+
         var dataPartitionIdleTime = [];
 
         var dataParitionDetails = [];
@@ -361,7 +370,8 @@
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 80 });
-            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 1]);
+            MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
+            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
 
             MonitorGraphUI.ChartPartitionIdleTime.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Partition Idle Time </h3>'
@@ -376,6 +386,39 @@
             nv.utils.windowResize(MonitorGraphUI.ChartPartitionIdleTime.update);
             
             return MonitorGraphUI.ChartPartitionIdleTime;
+        });
+
+        nv.addGraph(function () {
+            MonitorGraphUI.ChartDrReplicationRate.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format('%X')(new Date(d));
+                });
+
+            MonitorGraphUI.ChartDrReplicationRate.xAxis.rotateLabels(-20);
+
+            MonitorGraphUI.ChartDrReplicationRate.yAxis
+                .tickFormat(d3.format(',.2f'));
+
+            MonitorGraphUI.ChartDrReplicationRate.yAxis
+                .axisLabel('(KBps)')
+                .axisLabelDistance(10);
+
+            MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
+            MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
+
+            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
+                return '<h3> Replication Rate </h3>'
+                    + '<p>' + e + ' KBps at ' + y + '</p>';
+            });
+
+            d3.select('#visualizationDrReplicationRate')
+                .datum(dataDrReplicationRate)
+                .transition().duration(500)
+                .call(MonitorGraphUI.ChartDrReplicationRate);
+
+            nv.utils.windowResize(MonitorGraphUI.ChartDrReplicationRate.update);
+
+            return MonitorGraphUI.ChartDrReplicationRate;
         });
 
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
@@ -505,13 +548,13 @@
             return getEmptyDataForPartition();
         };
 
-        this.AddGraph = function (view, cpuChartObj, ramChartObj, clusterChartObj, transactinoChartObj, partitionChartObj) {
+        this.AddGraph = function (view, cpuChartObj, ramChartObj, clusterChartObj, transactinoChartObj, partitionChartObj, drReplicationCharObj) {
             cpuChart = cpuChartObj;
             ramChart = ramChartObj;
             latencyChart = clusterChartObj;
             transactionChart = transactinoChartObj;
             partitionChart = partitionChartObj;
-            currentView = view;
+            drReplicationChart = drReplicationCharObj;            currentView = view;
             MonitorGraphUI.Monitors = {                
                 'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
@@ -534,7 +577,7 @@
                 'partitionDataMin': getEmptyDataForPartitionForMinutes(),
                 'partitionDataDay': getEmptyDataForPartitionForDay(),
                 'partitionFirstData': true,
-                'lastTimedTransactionCount': -1,
+                'drReplicationData': getEmptyDataOptimized(),                'drReplicationDataMin': getEmptyDataForMinutesOptimized(),                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                'drFirstData': true,                'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
             
@@ -543,6 +586,7 @@
             dataLatency[0]["values"] = getEmptyDataForView(view);
             dataTransactions[0]["values"] = getEmptyDataForView(view);
             dataPartitionIdleTime = getEmptyDataForPartitionView(view);
+            dataDrReplicationRate[0]["values"] = getEmptyDataForView(view);
             changeAxisTimeFormat(view);
         };
 
@@ -554,19 +598,21 @@
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataDay;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataDay;
                 dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionDataDay;
+                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationDataDay;
             } else if (view == 'Minutes') {
                 dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataMin;
                 dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataMin;
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataMin;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataMin;
                 dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionDataMin;
+                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationDataMin;
             } else {
                 dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuData;
                 dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsData;
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memData;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latData;
                 dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionData;
-            }
+                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationData;            }
 
             nv.utils.windowResize(MonitorGraphUI.ChartCpu.update);
             changeAxisTimeFormat(view);
@@ -588,6 +634,8 @@
             
             if (partitionChart.is(":visible"))
                 MonitorGraphUI.ChartPartitionIdleTime.update();
+            
+            if (drReplicationChart.is(":visible"))                MonitorGraphUI.ChartDrReplicationRate.update();
         };
 
         var changeAxisTimeFormat = function (view) {
@@ -612,6 +660,10 @@
                     return d3.time.format(dateFormat)(new Date(d));
                 });
             MonitorGraphUI.ChartPartitionIdleTime.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartDrReplicationRate.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
@@ -722,6 +774,9 @@
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
             
+            if ($.isEmptyObject(memDetails) || memDetails[currentServer].PHYSICALMEMORY == null || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].RSS == null || memDetails[currentServer].TIMESTAMP == null || memDetails[currentServer].TIMESTAMP == undefined)
+                return;
+
             if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
                 physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
                 
@@ -779,6 +834,9 @@
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
 
+            if ($.isEmptyObject(transacDetail) || transacDetail["CurrentTimedTransactionCount"] == null || transacDetail["TimeStamp"] == null || transacDetail["TimeStamp"] == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["currentTimerTick"] == null || transacDetail["currentTimerTick"] == undefined)
+                return;
+
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
@@ -833,6 +891,9 @@
             var cpuDetail = cpuDetails;
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
+
+            if ($.isEmptyObject(cpuDetail) || cpuDetail[currentServer].PERCENT_USED == null || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == null || cpuDetail[currentServer].TIMESTAMP == undefined)
+                return;
 
             if (percentageUsage < 0)
                 percentageUsage = 0;
@@ -892,6 +953,10 @@
             var partitionDataDay = monitor.partitionDataDay;
             var partitionDetail = partitionDetails;
             var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
+
+            if ($.isEmptyObject(partitionDetail) || partitionDetail["partitionDetail"]["timeStamp"] == null || partitionDetail["partitionDetail"]["timeStamp"] == undefined)
+                return;
+
             $.each(partitionDetail["partitionDetail"], function (datatype, datavalue) {
                 $.each(datavalue, function (partitionKey, partitionValue) {
                     var keyValue = partitionKey;
@@ -949,6 +1014,54 @@
             
             partitionSecCount++;
             partitionMinCount++;
+        };
+        
+        this.RefreshDrReplicationGraph = function (drDetails, currentServer, graphView, currentTab) {
+            var monitor = MonitorGraphUI.Monitors;
+            var drData = monitor.drReplicationData;
+            var drDataMin = monitor.drReplicationDataMin;
+            var drDataDay = monitor.drReplicationDataDay;
+            var drDetail = drDetails;
+            var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
+            var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
+
+            if ($.isEmptyObject(drDetail) || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == null || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == null || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
+                return;
+
+            if (drSecCount >= 6 || monitor.drFirstData) {
+                drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
+                drSecCount = 0;
+            }
+            if (drMinCount >= 60 || monitor.drFirstData) {
+                drDataDay = sliceFirstData(drDataDay, dataView.Days);
+                drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
+                drMinCount = 0;
+            }
+            drData = sliceFirstData(drData, dataView.Seconds);
+            drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
+            MonitorGraphUI.Monitors.drReplicationData = drData;
+            monitor.drFirstData = false;
+
+            if (graphView == 'Minutes')
+                dataDrReplicationRate[0]["values"] = drDataMin;
+            else if (graphView == 'Days')
+                dataDrReplicationRate[0]["values"] = drDataDay;
+            else {
+                dataDrReplicationRate[0]["values"] = drData;
+
+            }
+
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
+                d3.select('#visualizationDrReplicationRate')
+                    .datum(dataDrReplicationRate)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartDrReplicationRate);
+            }
+            drSecCount++;
+            drMinCount++;
         };
 
     });

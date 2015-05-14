@@ -15,6 +15,7 @@ import org.openqa.selenium.JavascriptExecutor
  */
 
 class Overview extends Module {
+	
     static content = {
         title				{ $("h1", text:"Overview") }
         sitePerHost			{ $(class:"configLabel", text:"Sites Per Host") }
@@ -76,6 +77,31 @@ class Overview extends Module {
         autoSnapshotsPopupOk		{ $(id:"btnSaveSnapshot", text:"Ok") }
         autoSnapshotsPopupCancel	{ $("html body div.popup_cont div.popup div.popup_content div.overlay-btns a#btnPopupAutoSnapshotCancel.btn.btn-gray") }
 
+		// SECURITY EXPANSION
+		
+		securityExpanded			{ $(class:"labelCollapsed labelExpanded", text:"security") }
+        securityUsername			{ $("th", text:"Username") }
+		securityRole				{ $("th", text:"Role") }
+		securityAdd					{ $("#addNewUserLink1") }
+
+		securityUserList			{ $("#UsersList") }
+		
+		errorUsernameMessage		{ $("#errorUser") }
+		errorPasswordMessage		{ $("#errorPassword") }
+		
+		userPopupUsernameField		{ $("#txtUser") }
+		userPopupPasswordField		{ $("#txtPassword") }
+		userPopupSelectRole			{ $("#selectRole") }
+		userPopupSave				{ $("#btnSaveUser") }
+		userPopupCancel				{ $("#btnCancelUser") }
+		userPopupDelete				{ $("#deleteSecUser") }
+		
+		editUser					{ $(class:"edit", onclick:onClickValue) }
+		editUserNext				{ $(class:"edit", onclick:onClickValueNext) }
+		saveDelete					{ $("#userSaveDelete") }
+		userPopupConfirmYes			{ $("#btnSaveSecUser") }
+		userPopupConfirmNo			{ $("btnCancelSaveSecUser") }
+		
         // HTTP ACCESS EXPANSION
 
         jsonApi			{ $(class:"configLabel", text:"JSON API") }
@@ -137,6 +163,336 @@ class Overview extends Module {
         // error message
         errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
         errorQuery				{ $("#errorQueryTimeout") }
+    }
+    
+    int waitTime = 30
+    int five = 5
+    int count = 0
+    String onClickValue = getName()
+    String onClickValueNext = getNameNext()
+    
+    def String getName() {
+    	return "addUser(1,'" + getUsernameOneForSecurity() + "','" + getRoleOneForSecurity() + "');"
+    }
+
+	def String getNameNext() {
+    	return "addUser(1,'" + getUsernameTwoForSecurity() + "','" + getRoleTwoForSecurity() + "');"
+    }
+    
+    // Get usernameone for security
+    def String getUsernameOneForSecurity() {
+    	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
+    	 
+    	String username
+
+        while((username = br.readLine()) != "#usernameOne") {}
+
+        username = br.readLine()
+
+        return username
+    }
+
+	// Get usernametwo for security
+    def String getUsernameTwoForSecurity() {
+    	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
+    	 
+    	String username
+    	 
+    	while((username = br.readLine()) != ("#usernameTwo")) {}
+
+        username = br.readLine()
+
+        return username
+    }
+    
+    // Get passwordone for security
+    def String getPasswordOneForSecurity() {
+    	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
+    	 
+    	String password
+
+        while((password = br.readLine()) != "#passwordOne") {}
+
+        password = br.readLine()
+
+        return password
+    }
+
+	// Get passwordtwo for security
+    def String getPasswordTwoForSecurity() {
+    	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
+    	 
+    	String password
+    	 
+    	while((password = br.readLine()) != ("#passwordTwo")) {}
+
+        password = br.readLine()
+
+        return password
+    }
+    
+    // Get roleone for security
+    def String getRoleOneForSecurity() {
+    	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
+    	 
+    	String role
+    	 
+    	while((role = br.readLine()) != ("#roleOne")) {}
+
+        role = br.readLine()
+
+        return role
+    }
+    
+    // Get roletwo for security
+    def String getRoleTwoForSecurity() {
+    	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
+    	 
+    	String role
+    	 
+    	while((role = br.readLine()) != ("#roleTwo")) {}
+
+        role = br.readLine()
+
+        return role
+    }
+    
+    /**
+     * Click security to expand, if already it is not expanded
+     */
+     def boolean expandSecurity() {	
+     	if (checkIfSecurityIsExpanded() == false)
+     		security.click()
+     	
+     }
+     
+     
+     /**
+     * Click security to collapse, if already it is expanded
+     */
+     def boolean collapseSecurity() {	
+     	if (checkIfSecurityIsExpanded() == true)
+     		security.click()
+     }
+     
+     /**
+     * Check if security is expanded or not
+     */
+     def boolean checkIfSecurityIsExpanded() {
+     	try {
+		 	securityExpanded.isDisplayed()
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(org.openqa.selenium.StaleElementReferenceException e) {
+     		return true
+     	}
+     }
+     
+     /**
+     * Click and open security Add popup
+     */
+     def boolean openSecurityAdd() {
+     	try {
+		 	waitFor(waitTime) { securityAdd.isDisplayed() }
+		 	securityAdd.click()
+		 	checkSecurityAddOpen()
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		return false
+     	}
+     }
+     
+     /**
+     * Check if Security Add is open or not
+     */
+     def boolean checkSecurityAddOpen() {
+     	try {
+		 	waitFor(waitTime) {
+		 		userPopupUsernameField.isDisplayed()
+				userPopupPasswordField.isDisplayed()
+				userPopupSave.isDisplayed()
+		 	}
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		return false
+     	}
+     }
+     
+     /**
+     * Enter the username, password, and role save it
+     */
+     def boolean enterUserCredentials(String username, String password, String role) {
+     	try {
+			checkSecurityAddOpen()
+		 	waitFor(waitTime) {
+		 		userPopupUsernameField.value(username)
+				userPopupPasswordField.value(password)
+				userPopupSelectRole.value(role)
+		 	}
+		 	userPopupSave.click()
+		 	
+		 	waitFor(waitTime) {
+				saveDelete.text().equals("save")
+				userPopupConfirmYes.isDisplayed()
+			}
+			
+			count = 0
+			while(count < five) {
+				count++
+				try {
+					waitFor(waitTime) { 
+						userPopupConfirmYes.click()
+					}
+				} catch(geb.error.RequiredPageContentNotPresent e) {
+					break
+				} catch(org.openqa.selenium.ElementNotVisibleException e) {
+					break
+				} catch(geb.waiting.WaitTimeoutException e) {
+					break
+				}
+			}
+			
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		return false
+     	}
+    }
+     
+     
+    /**
+    * Returns the list of all the users in Security
+    */
+    def String getListOfUsers() {
+    	String list = ""
+    	try {
+    		//expandSecurity()
+     		
+     		waitFor(waitTime) { securityUserList.isDisplayed() }
+     		
+     		list = securityUserList.text()
+     		return list
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		println("Error when getting list of users")
+     		return ""
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		println("Error when getting list of users")
+     		return ""
+     	}
+    }
+     
+     
+    def boolean checkListForUsers(String username) {
+    	
+    	try {
+    		String list = getListOfUsers()
+    		if(list.contains(username)) {
+    			println("The user " + username + " was created" )
+    			return true
+    		}
+    		else {
+    			return false
+    		}
+    	} catch(geb.error.RequiredPageContentNotPresent e) {
+    		println("Error when getting list of users")
+     		return false
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		println("Error when getting list of users")
+     		return false
+     	}
+    }
+     
+     
+    /**
+    * Check if Security Edit is open or not
+    */
+    def boolean checkSecurityEditOpen() {
+    	try {
+		 	waitFor(waitTime) {
+		 		userPopupUsernameField.isDisplayed()
+				userPopupPasswordField.isDisplayed()
+				userPopupSave.isDisplayed()
+		 	}
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		return false
+     	}
+    }
+     
+     
+    def boolean openEditUser() {
+    	try {
+		 	waitFor(waitTime) { editUser.isDisplayed() }
+		 	editUser.click()
+		 	checkSecurityAddOpen()
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		return false
+    	}
+    }
+     
+    def boolean openEditUserNext() {
+		try {
+		 	waitFor(waitTime) { editUserNext.isDisplayed() }
+		 	editUserNext.click()
+		 	checkSecurityAddOpen()
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		return false
+    	}
+    }
+     
+    def boolean cancelPopup() {
+    	try {
+	     	waitFor(waitTime) { userPopupCancel.click() }
+    	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		println("Cancel button isn't present")
+     		return true
+     	}
+    }
+    
+    def boolean deleteUserSecurityPopup() {
+    	try {
+	     	waitFor(waitTime) { userPopupDelete.click() }
+	     	
+	     	waitFor(waitTime) {
+				saveDelete.text().equals("delete")
+				userPopupConfirmYes.isDisplayed()
+			}
+			
+			count = 0
+			while(count < five) {
+				count++
+				try {
+					waitFor(waitTime) { 
+						page.overview.userPopupConfirmYes.click()
+					}
+				} catch(geb.error.RequiredPageContentNotPresent e) {
+					break
+				} catch(org.openqa.selenium.ElementNotVisibleException e) {
+					break
+				} catch(geb.waiting.WaitTimeoutException e) {
+					break
+				}
+			}	
+    	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		println("Delete button isn't present")
+     		return true
+     	} catch(geb.waiting.WaitTimeoutException e) {
+     		return false
+    	}
     }
 }
 

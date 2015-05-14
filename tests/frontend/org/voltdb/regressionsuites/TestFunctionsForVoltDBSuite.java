@@ -745,7 +745,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@Explain",
                     "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
                     "    ( LOCK_TIME IS NULL OR " +
-                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );");
+                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
+                    10, 5000);
             //* enable for debug */ System.out.println(cr.getResults()[0]);
         } catch (Exception ex) {
             fail();
@@ -1794,6 +1795,46 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
             result = client.callProcedure("@AdHoc", String.format("select hex(%d) from R3 where big = %d", val, val)).getResults()[0];
             validateTableColumnOfScalarVarchar(result, new String[]{hexString});
+        }
+    }
+
+    public void testBin() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test BIN function tests");
+
+        Client client = getClient();
+        VoltTable result = null;
+
+        // test null: Long.MIN_VALUE is our null value
+        client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)", 500, Long.MIN_VALUE);
+        result = client.callProcedure("@AdHoc", "select bin(big) from R3 where id = 500").getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{null});
+
+        // normal tests
+        long[] binInterestingValues = new long[] {
+            Long.MIN_VALUE + 1,
+            Long.MIN_VALUE + 1000,
+            -1,
+            0,
+            1,
+            1000,
+            Long.MAX_VALUE - 1,
+            Long.MAX_VALUE
+        };
+
+        int i = 0;
+        for (long val : binInterestingValues) {
+            client.callProcedure("@AdHoc", "insert into R3(id, big) values (?, ?)", i, val);
+            ++i;
+        }
+
+        for (long val : binInterestingValues) {
+            result = client.callProcedure("@AdHoc",
+                    "select bin(big) from R3 where big = " + val).getResults()[0];
+            String binString = Long.toBinaryString(val);
+            validateTableColumnOfScalarVarchar(result, new String[]{binString});
+
+            result = client.callProcedure("@AdHoc", String.format("select bin(%d) from R3 where big = %d", val, val)).getResults()[0];
+            validateTableColumnOfScalarVarchar(result, new String[]{binString});
         }
     }
 

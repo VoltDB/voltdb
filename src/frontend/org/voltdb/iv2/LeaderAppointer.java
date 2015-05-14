@@ -412,7 +412,7 @@ public class LeaderAppointer implements Promotable
                 final int initialPartitionCount = getInitialPartitionCount();
                 for (int i = 0; i < initialPartitionCount; i++) {
                     LeaderElector.createRootIfNotExist(m_zk,
-                            LeaderElector.electionDirForPartition(i));
+                            LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, i));
                     watchPartition(i, m_es, true);
                 }
             } catch (IllegalAccessException e) {
@@ -462,7 +462,7 @@ public class LeaderAppointer implements Promotable
                 }
 
                 int partId = master.getKey();
-                String dir = LeaderElector.electionDirForPartition(partId);
+                String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partId);
                 m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
                 Pair<BabySitter, List<String>> sitterstuff =
                         BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
@@ -500,7 +500,7 @@ public class LeaderAppointer implements Promotable
     void watchPartition(int pid, ExecutorService es, boolean shouldBlock)
         throws InterruptedException, ExecutionException
     {
-        String dir = LeaderElector.electionDirForPartition(pid);
+        String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, pid);
         m_callbacks.put(pid, new PartitionCallback(pid));
         BabySitter babySitter;
 

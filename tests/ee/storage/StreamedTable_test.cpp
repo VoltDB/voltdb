@@ -56,8 +56,10 @@ public:
         m_topend = new DummyTopend();
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
-
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, NULL, "", 0, NULL, NULL);
+        NValueArray* noParams = NULL;
+        VoltDBEngine* noEngine = NULL;
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool,
+                                        noParams, noEngine, "", 0, NULL, NULL);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;

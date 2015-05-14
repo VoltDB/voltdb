@@ -2435,6 +2435,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("foofoofoo", result.getString(1));
+        if (!isHSQL()) {
+            verifyProcFails(client,
+                            "VOLTDB ERROR: SQL ERROR\\s*REPEAT function call would create a string of size \\d+ which is larger than the maximum size \\d+",
+                            "REPEAT", 10000000, 1);
+        }
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
@@ -3298,7 +3303,11 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     private static String longToHexLiteral(long val) {
-        return "x'" + Long.toHexString(val) + "'";
+        String hexDigits = Long.toHexString(val);
+        if (hexDigits.length() % 2 == 1) {
+            hexDigits = "0" + hexDigits;
+        }
+        return "x'" + hexDigits + "'";
     }
 
     private void validateBitwiseAndOrXor(VoltTable vt, long bignum, long in) {
@@ -3319,9 +3328,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateBitwiseAndOrXor(vt, bignum, in);
 
         // Try again using x'...' syntax
-        // Doesn't work yet, just verify it fails.
         String hexIn = longToHexLiteral(in);
-        verifyProcFails(client, "Unable to convert string", "BITWISE_AND_OR_XOR", hexIn, hexIn, hexIn, pk);
+        vt = client.callProcedure("BITWISE_AND_OR_XOR", hexIn, hexIn, hexIn, pk).getResults()[0];
+        validateBitwiseAndOrXor(vt, bignum, in);
     }
 
     public void testBitwiseFunction_AND_OR_XOR() throws IOException, ProcCallException {

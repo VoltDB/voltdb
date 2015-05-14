@@ -29,16 +29,18 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.hsqldb_voltpatches.index.Index;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
@@ -53,7 +55,6 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
@@ -1898,12 +1899,44 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerTwoIdenticalIndexes()
     {
-        final String s =
-                "create table t(id integer not null, num integer not null);\n" +
-                "create index idx_t_idnum1 on t(id,num);\n" +
-                "create index idx_t_idnum2 on t(id,num);";
+        String s;
+        VoltCompiler c;
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id,num);\n" +
+            "create index idx_t_idnum2 on t(id,num);";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
 
-        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        // non-unique partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id) where num > 3;\n" +
+            "create index idx_t_idnum2 on t(id) where num > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        // unique partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create unique index idx_t_idnum1 on t(id) where num > 3;\n" +
+            "create unique index idx_t_idnum2 on t(id) where num > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        // non-unique expression partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id) where abs(num) > 3;\n" +
+            "create index idx_t_idnum2 on t(id) where abs(num) > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        // unique expression partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create unique index idx_t_idnum1 on t(id) where abs(num) > 3;\n" +
+            "create unique index idx_t_idnum2 on t(id) where abs(num) > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
         assertTrue(c.hasErrorsOrWarnings());
     }
@@ -2026,6 +2059,84 @@ public class TestVoltCompiler extends TestCase {
                 "where since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm) > 60 " +
                 "group by tm;";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
+    }
+
+    public void testColumnNameIndexHash()
+    {
+        List<Pair<String, IndexType>> passing
+            = Arrays.asList(
+                            // If we don't explicitly name the primary key constraint,
+                            // we always get a tree index.  This is independent of the name
+                            // of the index column or columns.
+                            Pair.of("create table t ( goodhashname varchar(256) not null, primary key ( goodhashname ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodhashname integer not null, primary key ( goodhashname ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreename varchar(256) not null, primary key ( goodtreename ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreename integer not null, primary key ( goodtreename ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            // If we explicitly name the constraint with a tree name
+                            // we always get a tree index.  This is true even if the
+                            // column type is hashable.
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            // If we explicitly name the constraint with a name
+                            // which is both a hash name and a tree name, we always get a tree
+                            // index.  This is true even if the column type is hashable.
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+
+                            // The only way to get a hash index is to explicitly name the constraint
+                            // with a hash name and to make the column type or types be hashable.
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_hash primary key (goodtreehashname));",
+                                    IndexType.HASH_TABLE),
+                            Pair.of("create table t ( goodvanilla integer not null, constraint good_hash_constraint primary key ( goodvanilla ) );",
+                                    IndexType.HASH_TABLE),
+                            // Test to see if created indices are still hashed
+                            // when they are expected, and not hashed when they
+                            // are not expected.
+                            Pair.of("create table t ( goodvanilla integer not null ); create unique index myhash on t ( goodvanilla );",
+                                    IndexType.HASH_TABLE),
+                            Pair.of("create table t ( goodhash integer not null primary key );",
+                                    IndexType.BALANCED_TREE)
+        );
+        String[] failing
+            = {
+                // If we name the constraint with a hash name,
+                // but the column type is not hashable, it is an
+                // error.
+                "create table t ( badhashname varchar(256) not null, constraint badhashconstraint primary key ( badhashname ) );",
+                // The name of the column is not important.
+                "create table t ( badzotzname varchar(256) not null, constraint badhashconstraint primary key ( badzotzname ) );",
+                // If any of the columns are non-hashable, the index is
+                // not hashable.
+                "create table t ( fld1 integer, fld2 varchar(256), constraint badhashconstraint primary key ( fld1, fld2 ) );"
+        };
+        for (Pair<String, IndexType> cmdPair : passing) {
+            // See if we can actually create the table.
+            VoltCompiler c = compileForDDLTest(getPathForSchema(cmdPair.getLeft()), true);
+            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+            assertEquals(1, d.getTables().getIgnoreCase("t").getIndexes().size());
+            org.voltdb.catalog.Index idx = d.getTables().getIgnoreCase("t").getIndexes().iterator().next();
+            String msg = String.format("CMD: %s\nExpected %s, got %s",
+                                       cmdPair.getLeft(),
+                                       cmdPair.getRight(),
+                                       IndexType.get(idx.getType()));
+            assertEquals(msg, cmdPair.getRight().getValue(),
+                         idx.getType());
+        }
+        for (String cmd : failing) {
+            compileForDDLTest(getPathForSchema(cmd), false);
+        }
     }
 
     private static final String msgP = "does not include the partitioning column";
@@ -2270,6 +2381,11 @@ public class TestVoltCompiler extends TestCase {
                 "as select num, count(*) from (select num from t) subt group by num; \n";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
 
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total) " +
+                "as select num, count(*) from t where id in (select id from t) group by num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
@@ -2504,6 +2620,11 @@ public class TestVoltCompiler extends TestCase {
                     // We seem to add a semicolon somewhere.  I guess that's okay.
                     stmt = stmt.substring(0, stmt.length() - 1);
                 }
+
+                // Remove spaces from both strings so we compare whitespace insensitively
+                // Capturing the DELETE statement in HSQL does not preserve whitespace.
+                expectedStmt = stmt.replace(" ", "");
+                stmt = stmt.replace(" ", "");
 
                 assertEquals("Did not find the LIMIT DELETE statement that we expected",
                         expectedStmt, stmt);
@@ -3677,12 +3798,7 @@ public class TestVoltCompiler extends TestCase {
         ddl =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
-        // @TODO: Remove TRY/CATCH once subqueries are supported
-        try {
-            checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
-        } catch (PlanningErrorException e) {
-            assertTrue(e.getMessage().contains("Unsupported subquery syntax within an expression."));
-        }
+        checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
 }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {

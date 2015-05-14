@@ -167,9 +167,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.2EA2";
+    static final String m_defaultVersionString = "5.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.2EA2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -440,6 +440,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
             if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
                 m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
+            }
+            if (m_config.m_buildStringOverrideForTest != null) {
+                m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
             buildClusterMesh(isRejoin || m_joining);
@@ -765,16 +768,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             int.class,
                             String.class,
                             ClientInterface.class,
-                            byte.class,
-                            boolean.class,
-                            String.class);
+                            byte.class);
                     m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
                             m_messenger.getHostId(),
                             drProducerHost,
                             m_clientInterface,
-                            drConsumerClusterId,
-                            usingCommandLog,
-                            clSnapshotPath);
+                            drConsumerClusterId);
                     m_globalServiceElector.registerService(m_consumerDRGateway);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
@@ -1808,7 +1807,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 String parts[] = sb.toString().split(" ", 2);
                 if (parts.length == 2) {
                     parts[0] = parts[0].trim();
-                    parts[1] = parts[1].trim();
+                    parts[1] = parts[0] + "_" + parts[1].trim();
                     return parts;
                 }
             }
@@ -1837,7 +1836,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         String buildInfo[] = extractBuildInfo(hostLog);
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
-        consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
+        String buildString = m_buildString;
+        if (m_buildString.contains("_"))
+            buildString = m_buildString.split("_", 2)[1];
+        consoleLog.info(String.format("Build: %s %s %s", m_versionString, buildString, editionTag));
     }
 
     void logSystemSettingFromCatalogContext() {
@@ -2744,9 +2746,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         retval.set(null);
                     } else {
                         try {
-                            VoltDB.crashGlobalVoltDB("Local build string \"" + buildString +
-                                    "\" does not match cluster build string \"" +
-                                    new String(data, "UTF-8")  + "\"", false, null);
+                            hostLog.info("Different but compatible software versions on the cluster " +
+                                         "and the rejoining node. Cluster version is {" + (new String(data, "UTF-8")).split("_")[0] +
+                                         "}. Rejoining node version is {" + m_defaultVersionString + "}.");
+                            retval.set(null);
                         } catch (UnsupportedEncodingException e) {
                             retval.setException(new AssertionError(e));
                         }

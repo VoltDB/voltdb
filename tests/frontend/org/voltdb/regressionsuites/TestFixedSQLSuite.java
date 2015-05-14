@@ -1164,7 +1164,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("invalid format for a constant"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 3, passed 0"));
         }
         // test that missing parameters don't work (ENG-1000)
         try {
@@ -1172,7 +1172,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("Number of arguments provided was 0 where 4 was expected"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 4, passed 0"));
         }
         //VoltTable results = client.callProcedure("@AdHoc", "select * from P1;").getResults()[0];
         //System.out.println(results.toJSONString());
@@ -2178,6 +2178,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable vt;
         vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
+
+        String sql1 = sql.replace("SELECT ID", "SELECT COUNT(ID)");
+        assertTrue(sql1.contains("SELECT COUNT(ID) FROM"));
+        vt = client.callProcedure("@AdHoc", sql1, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+
+        String sql2 = sql.replace("SELECT ID", "SELECT COUNT(*)");
+        assertTrue(sql2.contains("SELECT COUNT(*) FROM"));
+        vt = client.callProcedure("@AdHoc", sql2, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
     }
 
     public void testENG8120() throws Exception {
@@ -2251,7 +2261,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             if (tb != "R4") {
                 vt = client.callProcedure("@Explain", sql, null).getResults()[0];
                 assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
-                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4\""));
+                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4"));
             }
             nullIndexSearchKeyChecker(client, sql);
 
