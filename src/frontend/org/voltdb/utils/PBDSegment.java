@@ -28,6 +28,7 @@ import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DBBPool.MBBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 import org.xerial.snappy.Snappy;
 
@@ -237,6 +238,31 @@ class PBDSegment {
         }
 
         return true;
+    }
+
+    int offer(DeferredSerialization ds) throws IOException {
+        if (m_closed) throw new IOException("closed");
+        final ByteBuffer mbuf = m_buf.b();
+        if (mbuf.remaining() < ds.getSerializedSize() + m_objectHeaderBytes) return -1;
+
+        m_syncedSinceLastEdit = false;
+        return writeDeferredSerialization(mbuf, ds);
+    }
+
+    static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException {
+        int written = 0;
+        try {
+            final int objSizePosition = mbuf.position();
+            mbuf.position(mbuf.position() + m_objectHeaderBytes);
+            final int objStartPosition = mbuf.position();
+            ds.serialize(mbuf);
+            written = mbuf.position() - objStartPosition;
+            mbuf.putInt(objSizePosition, written);
+            mbuf.putInt(objSizePosition + 4, 0);
+        } finally {
+            ds.cancel();
+        }
+        return written;
     }
 
     BBContainer poll(OutputContainerFactory factory) throws IOException {

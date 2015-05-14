@@ -57,8 +57,8 @@ public:
     }
 
     int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity- MAGIC_HEADER_SPACE_FOR_JAVA)) +
-                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_signature);
+        return (m_pendingBlocks.size() * (m_defaultCapacity - headerSize())) +
+                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }
 
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);

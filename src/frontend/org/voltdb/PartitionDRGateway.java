@@ -124,7 +124,6 @@ public class PartitionDRGateway {
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
     }
-    public void tick(long txnId) {}
 
     private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
         @Override
