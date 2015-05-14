@@ -670,8 +670,10 @@ function alertNodeClicked(obj) {
                 //Command Logging
                 if (data.commandlog != null) {
                     adminConfigValues['commandLogEnabled'] = data.commandlog.enabled;
-                    adminConfigValues['commandLogFrequencyTime'] = data.commandlog.frequency.time;
-                    adminConfigValues['commandLogFrequencyTransactions'] = data.commandlog.frequency.transactions;
+                    if (data.commandlog.frequency != null) {
+                        adminConfigValues['commandLogFrequencyTime'] = data.commandlog.frequency.time;
+                        adminConfigValues['commandLogFrequencyTransactions'] = data.commandlog.frequency.transactions;
+                    }
                     adminConfigValues['logSegmentSize'] = data.commandlog.logsize;
                 }
 
@@ -692,8 +694,11 @@ function alertNodeClicked(obj) {
                 }
 
                 if (data.systemsettings != null) {
-                    adminConfigValues['tempTablesMaxSize'] = data.systemsettings.temptables.maxsize;
-                    adminConfigValues['snapshotPriority'] = data.systemsettings.snapshot.priority;
+                    if (data.systemsettings.temptables != null)
+                        adminConfigValues['tempTablesMaxSize'] = data.systemsettings.temptables.maxsize;
+                    
+                    if (data.systemsettings.snapshot != null)
+                        adminConfigValues['snapshotPriority'] = data.systemsettings.snapshot.priority;
                 }
 
                 //Directory
