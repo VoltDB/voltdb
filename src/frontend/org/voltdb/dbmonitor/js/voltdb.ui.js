@@ -729,6 +729,7 @@ var loadPage = function (serverName, portid) {
                                     //$(".replicaWrapper").css('top', '0');
                                     //show master table
                                     refreshDrMasterSection();
+                                     $("#drSection").addClass("drHeightIndividual");
                                 } else {
                                     //$(".replicaWrapper").css('top', '0');
                                     $("#drMasterSection").hide();
@@ -740,18 +741,18 @@ var loadPage = function (serverName, portid) {
                                         $("#ChartDrReplicationRate").show();
                                     }
                                     refreshDrReplicaSection(graphView, currentTab);
-                                    $("#drSection").removeClass("drHeightBoth");
-                                    $("#drSection").removeClass("drHeightIndividual");
+                                     $("#drSection").removeClass("drHeightBoth");
+                                     $("#drSection").removeClass("drHeightIndividual");
                                     //to show DR Mode and DR tables
                                     if (VoltDbUI.drMasterEnabled) {
-                                        $("#drSection").addClass("drHeightBoth");
+                                          $("#drSection").addClass("drHeightBoth");
                                         $("#dbDrMode").text("Both");
                                         $('#drMasterSection').css('display', 'block');
-                                        $(".replicaWrapper").css('top', '-27px');
+                                        // $(".replicaWrapper").css('top', '-27px');
                                     } else {
                                         $("#dbDrMode").text("Replica");
-                                        $(".replicaWrapper").css('top', '0px');
-                                        $("#drSection").addClass("drHeightIndividual");
+                                        //$(".replicaWrapper").css('top', '0px');
+                                         $("#drSection").addClass("drHeightIndividual");
                                         $('#drMasterSection').css('display', 'none');
                                     }
                                     $('#drReplicaSection').css('display', 'block');
@@ -1171,13 +1172,12 @@ var loadPage = function (serverName, portid) {
                 "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
                 "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                 "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
-            $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
+            $("#drMasterSection").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
 
             table = $("#tblDrMAster").DataTable({
                 stateSave: true,
                 pageLength: 5,
                 "sPaginationType": "extStyleLF",
-                "bAutoWidth": false,
                 "language": {
                     "zeroRecords": "No data to be displayed"
                 },
@@ -1191,7 +1191,7 @@ var loadPage = function (serverName, portid) {
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
 
-                "sDom": 'p<"tblScroll drScroll"t>',
+                "sDom": '<"tabs-filter-wrapper"<"drTitle icon-master">f<"pagination drPaginationSection"p><"clear">><"tblScroll"t>',
                 "aoColumns": [
                     null,
                     { "bSearchable": false },
@@ -1203,16 +1203,13 @@ var loadPage = function (serverName, portid) {
             });
 
 
-
-            // $("#tblDrMAster").wrap("<div class='tblScroll drScroll'>");
-            //var org_html = $("#tblDrMAster")[0].outerHTML;
-            ////console.log(org_html);
-            //var new_html = "<div class='tblScroll drScroll'>" + org_html + "</div>";
-            //$("#tblDrMAster_wrapper").find("table").replaceWith(new_html);
-
+            $("#tblDrMAster_filter").removeClass("dataTables_filter");
+            $("#tblDrMAster_wrapper").find(".drTitle").html("Master");
+            $("#tblDrMAster_filter").find("input").addClass('search-box');
+            $("#tblDrMAster_filter").find("input").attr('type', 'text');
+            $("#tblDrMAster_filter").find("input").attr('placeholder', 'Search Partition ID');
+            $("#tblDrMAster_filter").find("input").after("<a id='searchDrMasterData' href='javascript:void(0)' class='icon-search drIcon' title=''>search</a>");
             $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft(leftScroll);
-
-            $("#tblMAster_wrapper").find(".paginationDefault").remove();
 
 
             //Customizing DataTables to make it as existing pagination
@@ -1226,10 +1223,6 @@ var loadPage = function (serverName, portid) {
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
         });
-
-        $('#filterPartitionId').on('keyup', function () {
-            table.search(this.value).draw();
-        });
     };
     var replicaTable = '';
     var refreshDrReplicaSection = function (graphView, currentTab) {
@@ -1242,7 +1235,6 @@ var loadPage = function (serverName, portid) {
             var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
 
             var htmlcontent = "";
-            // if (!$.isEmptyObject(response)) {
             for (var key in response) {
                 htmlcontent = htmlcontent + "<tr>";
                 htmlcontent = htmlcontent + "<td>" + response[key].HOST_ID + "</td>" +
@@ -1266,12 +1258,10 @@ var loadPage = function (serverName, portid) {
                 stateSave: true,
                 pageLength: 5,
                 "sPaginationType": "extStyleLF",
-                "bAutoWidth": false,
                 "language": {
                     "zeroRecords": "No data to be displayed"
                 },
                 "fnDrawCallback": function () {
-
                     if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
                         $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
                     } else {
@@ -1281,17 +1271,24 @@ var loadPage = function (serverName, portid) {
 
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
                 },
-                "sDom": 'p<"tblScroll drScroll"t>',
+                "sDom": '<"tabs-filter-wrapper"<"drTitle icon-replica">f<"pagination drPaginationSection"p><"clear">><"tblScroll"t>',
                 "aoColumns": [
                     null,
                     { "bSearchable": false },
                     { "bSearchable": false },
                     { "bSearchable": false }
                 ]
-            });
+            }
+            );
+            $("#tblDrReplica_filter").removeClass("dataTables_filter");
 
+            $("#tblDrReplica_filter").find("input").addClass('search-box');
+            $("#tblDrReplica_filter").find("input").attr('type', 'text');
+            $("#tblDrReplica_filter").find("input").attr('placeholder', 'Search Host ID');
+            $("#tblDrReplica_filter").find("input").after("<a id='searchDrMasterData' href='javascript:void(0)' class='icon-search drIcon' title=''>search</a>");
+
+            $("#tblDrReplica_wrapper").find(".drTitle").html("Replica");
             $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft(leftScroll);
-            $("#tblReplica_wrapper").find(".paginationDefault").remove();
 
             //  Customizing DataTables to make it as existing pagination
             $(".paginate_disabled_previous").html("Prev");
@@ -1304,12 +1301,6 @@ var loadPage = function (serverName, portid) {
             $(".paginate_disabled_next").attr("title", "Next Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
-
-            //  }
-        });
-
-        $('#filterHostID').on('keyup', function () {
-            replicaTable.search(this.value).draw();
         });
     };
 

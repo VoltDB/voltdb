@@ -3069,7 +3069,7 @@
          *  @memberof DataTable#oApi
          */
         function _fnInitialise(settings) {
-            
+
             var i, iLen, iAjaxStart = settings.iInitDisplayStart;
             var columns = settings.aoColumns, column;
             var features = settings.oFeatures;
@@ -11047,7 +11047,7 @@
                  *      } );
                  *    } );
                  */
-                "sSearch": "Search:",
+                "sSearch": "",
 
 
                 /**
