@@ -1447,29 +1447,63 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         VoltTable vt;
 
-//        // EXISTS(table-agg-without-having-groupby) => EXISTS(TRUE)
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where exists( select max(ID) from R2)").getResults()[0];
-//        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
-//
-//        // EXISTS(SELECT...LIMIT 0) => EXISTS(FALSE)
+        // EXISTS(table-agg-without-having-groupby) => EXISTS(TRUE)
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select max(ID) from R2)").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
+
+        // EXISTS(SELECT...LIMIT 0) => EXISTS(FALSE)
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select max(id) from R2 limit 0)").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { });
+        }
+
+        // count(*) limit 0
 //        vt = client.callProcedure("@AdHoc",
 //                "select R1.ID FROM R1 where exists( select count(*) from R2 limit 0)").getResults()[0];
 //        validateTableOfLongs(vt, new long[][] { });
-//
-//        // EXISTS(SELECT...LIMIT ?) => EXISTS(TRUE/FALSE)
+
+        // EXISTS(SELECT...LIMIT ?) => EXISTS(TRUE/FALSE)
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select count(id) from R2 limit ?)", 0).getResults()[0];
+            validateTableOfLongs(vt, new long[][] { });
+        }
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select count(*) from R2 limit ?)", 1).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1}, {2}, {3} });
+
+        // EXISTS(able-agg-without-having-groupby OFFSET 1) => EXISTS(FALSE)
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select max(ID) from R2 offset 1)").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  });
+
+        // count(*) offset 1
 //        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where exists( select count(*) from R2 limit ?)", 0).getResults()[0];
-//        validateTableOfLongs(vt, new long[][] { });
-//
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where exists( select count(*) from R2 limit ?)", 1).getResults()[0];
-//        validateTableOfLongs(vt, new long[][] {  {1}, {2}, {3} });
-//
-//        // EXISTS(able-agg-without-having-groupby OFFSET 1) => EXISTS(FALSE)
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where exists( select max(ID) from R2 offset 1)").getResults()[0];
+//                "select R1.ID FROM R1 where exists( select count(*) from R2 offset 1)").getResults()[0];
 //        validateTableOfLongs(vt, new long[][] {  });
+
+        // join on EXISTS(FALSE)
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID FROM R1 T1 join R1 T2 on exists(select max(ID) from R2 offset 1) and T1.ID = 1").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { });
+
+        // join on EXISTS(TRUE)
+        vt = client.callProcedure("@AdHoc",
+                "select T1.ID FROM R1 T1 join R1 T2 on exists(select max(ID) from R2) or T1.ID = 25").getResults()[0];
+        assertEquals(9, vt.getRowCount());
+
+        // having TRUE
+        vt = client.callProcedure("@AdHoc",
+                "select max(ID), WAGE  FROM R1 group by WAGE having exists(select max(ID) from R2) or max(ID) = 25 order by max(ID) asc").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {3} });
+
+        // having FALSE
+        vt = client.callProcedure("@AdHoc",
+                "select max(ID), WAGE  FROM R1 group by WAGE having exists(select max(ID) from R2 offset 1) and max(ID) > 0 order by max(ID) asc").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { });
 
         client.callProcedure("R2.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
         client.callProcedure("R2.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");

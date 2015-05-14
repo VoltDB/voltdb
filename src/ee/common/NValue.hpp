@@ -2194,6 +2194,12 @@ private:
         return retval;
     }
 
+    static NValue getBooleanValue(bool value) {
+        NValue retval(VALUE_TYPE_BOOLEAN);
+        retval.getBoolean() = value;
+        return retval;
+    }
+
     static NValue getDecimalValueFromString(const std::string &value) {
         NValue retval(VALUE_TYPE_DECIMAL);
         retval.createDecimalFromString(value);
@@ -2394,6 +2400,8 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(char*);
       case VALUE_TYPE_DECIMAL:
         return sizeof(TTInt);
+      case VALUE_TYPE_BOOLEAN:
+        return sizeof(bool);
       default:
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",

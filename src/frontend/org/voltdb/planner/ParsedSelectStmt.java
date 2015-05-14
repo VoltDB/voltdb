@@ -822,6 +822,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(m_having);
+        m_having = ExpressionUtil.evaluateExpression(m_having);
+        // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
+        if (ConstantValueExpression.isBooleanTrue(m_having)) {
+            m_having = null;
+        }
+
         if (m_aggregationList.size() >= 1) {
             m_hasAggregateExpression = true;
         }
@@ -1086,13 +1092,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 m_limit == 0;
         if (canReplaceWithCVE) {
             if ( m_limit == 0) {
-                return ConstantValueExpression.makeExpression(VoltType.BIGINT, "0");
+                return ConstantValueExpression.getFalse();
             }
             for(ParsedColInfo displayColumn : m_displayColumns) {
                 assert(displayColumn.expression != null);
                 if (displayColumn.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    String value = (m_offset > 0) ? "0" : "1";
-                    return ConstantValueExpression.makeExpression(VoltType.BIGINT, value);
+                    if (m_offset == 0) {
+                        return ConstantValueExpression.getTrue();
+                    } else {
+                        return ConstantValueExpression.getFalse();
+                    }
                 }
             }
         }

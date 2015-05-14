@@ -564,6 +564,9 @@ public class ParameterSet implements JSONString {
                     }
                     break;
                 }
+                case BOOLEAN:
+                    value = in.get();
+                    break;
                 default:
                     throw new RuntimeException("ParameterSet doesn't support type " + nextType);
             }

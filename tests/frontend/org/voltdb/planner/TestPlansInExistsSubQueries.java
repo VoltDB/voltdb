@@ -33,6 +33,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -449,28 +450,56 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     }
 
     public void testInHaving() {
-        AbstractPlanNode pn = compile("select a from r1 " +
-                " group by a having max(c) in (select c from r2 )");
+        {
+            AbstractPlanNode pn = compile("select a from r1 " +
+                    " group by a having max(c) in (select c from r2 )");
 
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof SeqScanPlanNode);
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-        assertNotNull(aggNode);
-        NodeSchema ns = aggNode.getOutputSchema();
-        assertEquals(2, ns.size());
-        SchemaColumn aggColumn = ns.getColumns().get(1);
-        assertEquals("$$_MAX_$$_1", aggColumn.getColumnAlias());
-        AbstractExpression having = aggNode.getPostPredicate();
-        assertEquals(ExpressionType.OPERATOR_EXISTS, having.getExpressionType());
-        AbstractExpression se = having.getLeft();
-        assertEquals(1, se.getArgs().size());
-        assertTrue(se.getArgs().get(0) instanceof TupleValueExpression);
-        TupleValueExpression argTve = (TupleValueExpression) se.getArgs().get(0);
-        assertEquals(1, argTve.getColumnIndex());
-        assertEquals("$$_MAX_$$_1", argTve.getColumnAlias());
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof ProjectionPlanNode);
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof SeqScanPlanNode);
+            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+            assertNotNull(aggNode);
+            NodeSchema ns = aggNode.getOutputSchema();
+            assertEquals(2, ns.size());
+            SchemaColumn aggColumn = ns.getColumns().get(1);
+            assertEquals("$$_MAX_$$_1", aggColumn.getColumnAlias());
+            AbstractExpression having = aggNode.getPostPredicate();
+            assertEquals(ExpressionType.OPERATOR_EXISTS, having.getExpressionType());
+            AbstractExpression se = having.getLeft();
+            assertEquals(1, se.getArgs().size());
+            assertTrue(se.getArgs().get(0) instanceof TupleValueExpression);
+            TupleValueExpression argTve = (TupleValueExpression) se.getArgs().get(0);
+            assertEquals(1, argTve.getColumnIndex());
+            assertEquals("$$_MAX_$$_1", argTve.getColumnAlias());
+        }
+        {
+            // HAVING expression evaluates to TRUE and dropped
+            AbstractPlanNode pn = compile("select a from r1 " +
+                    " group by a having exists (select max(a) from r2) or max(c) > 0");
 
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof ProjectionPlanNode);
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof SeqScanPlanNode);
+            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+            assertNotNull(aggNode);
+            assertEquals(true, aggNode.getPostPredicate() == null);
+        }
+        {
+            // HAVING expression evaluates to FASLE and retained
+            AbstractPlanNode pn = compile("select a from r1 " +
+                    " group by a having exists (select max(a) from r2 limit 0) and max(c) > 0");
+
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof ProjectionPlanNode);
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof SeqScanPlanNode);
+            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+            assertNotNull(aggNode);
+            AbstractExpression having = aggNode.getPostPredicate();
+            assertEquals(true, ConstantValueExpression.isBooleanFalse(having));
+        }
     }
 
     public void testHavingInSubquery() {
@@ -618,28 +647,44 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             AbstractPlanNode pn = compile("select a from r1 where exists " +
                 " (select a, c  from r2 limit 0) ");
             assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
-            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "0");
+            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), false);
         }
         {
             // LIMIT is 0 EXISTS => FALSE
             AbstractPlanNode pn = compile("select a from r1 where exists " +
                 " (select count(*)  from r2 limit 0) ");
             assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
-            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "0");
+            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), false);
+        }
+        {
+            //EXISTS => TRUE, join predicate is TRUE or EXPR = > TRUE and dropped
+            AbstractPlanNode pn = compile("select a from r1 join r2 on (exists " +
+                " (select max(a)  from r2) or r2.a > 0)");
+            assertEquals(true, pn.getChild(0).getChild(0) instanceof AbstractJoinPlanNode);
+            AbstractJoinPlanNode jpn = (AbstractJoinPlanNode) pn.getChild(0).getChild(0);
+            assertEquals(true, jpn.getWherePredicate() == null);
+        }
+        {
+            //EXISTS => FALSE, join predicate is retained
+            AbstractPlanNode pn = compile("select a from r1 join r2 on exists " +
+                " (select max(a)  from r2 offset 1) ");
+            assertEquals(true, pn.getChild(0).getChild(0) instanceof NestLoopPlanNode);
+            NestLoopPlanNode jpn = (NestLoopPlanNode) pn.getChild(0).getChild(0);
+            verifyCVEPredicate(jpn.getJoinPredicate(), false);
         }
         {
             // table-agg-without-having-groupby OFFSET > 0 => FALSE
             AbstractPlanNode pn = compile("select a from r1 where exists " +
                 " (select count(*)  from r2 offset 1) ");
             assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
-            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "0");
+            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), false);
         }
         {
             // table-agg-without-having-groupby  => TRUE
             AbstractPlanNode pn = compile("select a from r1 where exists " +
                 " (select max(a)  from r2) ");
             assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
-            verifyCVEPredicate(((SeqScanPlanNode) pn.getChild(0)).getPredicate(), "1");
+            assertEquals(true, ((SeqScanPlanNode) pn.getChild(0)).getPredicate() == null);
         }
         {
             // table-agg-without-having-groupby by limit is a parameter => EXISTS
@@ -701,6 +746,18 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
                     " having exists (select c from r2 where r2.c = max(r1.a))",
                     "subquery with WHERE expression with aggregates on parent columns are not supported");
         }
+        {
+            // parent correlated TVE in the aggregate expression. NulPointerExpression
+            failToCompile("select max(c) from r1 group by a " +
+                    " having count(*) = (select c from r2 where r2.c = r1.a)",
+                    "");
+        }
+        {
+            // join on EXISTS(FALSE) is not supported
+            failToCompile("select * from r1 join r2 on exists " +
+                    " (select a from r2 where a > 1) ",
+                    "Join with filters that do not depend on joined tables is not supported in VoltDB");
+        }
     }
 
     // Disabled for now
@@ -729,10 +786,11 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     //      assertEquals(ExpressionType.SUBQUERY, e.getExpressionType());
     //    }
 
-    private void verifyCVEPredicate(AbstractExpression p, String value) {
+    private void verifyCVEPredicate(AbstractExpression p, boolean value) {
         assertEquals(true, p != null);
         assertEquals(ExpressionType.VALUE_CONSTANT, p.getExpressionType());
-        assertEquals(value, ((ConstantValueExpression) p).getValue());
+        assertEquals(VoltType.BOOLEAN, p.getValueType());
+        assertEquals(Boolean.toString(value), ((ConstantValueExpression) p).getValue());
 
     }
 

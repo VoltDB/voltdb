@@ -1173,6 +1173,11 @@ public abstract class AbstractParsedStmt {
             condExpr = parseExpressionTree(childNode.children.get(0));
             assert(condExpr != null);
             ExpressionUtil.finalizeValueTypes(condExpr);
+            condExpr = ExpressionUtil.evaluateExpression(condExpr);
+            // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
+            if (ConstantValueExpression.isBooleanTrue(condExpr)) {
+                condExpr = null;
+            }
         }
         return condExpr;
     }
