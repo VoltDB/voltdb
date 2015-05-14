@@ -41,6 +41,7 @@ import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.hsqldb_voltpatches.HsqlException;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
@@ -3622,9 +3623,14 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
+        final String simpleSchema = "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
+                                         "partition table books on column cash;";
+        return checkDDLAgainstGivenSchema(errorRegex, simpleSchema, ddl);
+    }
+
+    private Database checkDDLAgainstGivenSchema(String errorRegex, String givenSchema, String... ddl) throws Exception {
         String schemaDDL =
-            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
-            "partition table books on column cash;" +
+            givenSchema +
             StringUtils.join(ddl, " ");
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schemaDDL.toString());
@@ -3642,18 +3648,30 @@ public class TestVoltCompiler extends TestCase {
         String projectPath = projectFile.getPath();
 
         VoltCompiler compiler = new VoltCompiler();
-
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        String error = (success || compiler.m_errors.size() == 0
+        boolean success;
+        String error;
+        try {
+            success = compiler.compileWithProjectXML(projectPath, testout_jar);
+            error = (success || compiler.m_errors.size() == 0
                 ? ""
                 : compiler.m_errors.get(compiler.m_errors.size()-1).message);
+        } catch (HsqlException hex) {
+            success = false;
+            error = hex.getMessage();
+        }
         if (errorRegex == null) {
-            assertTrue(String.format("Expected success\nDDL: %s\n%s", ddl, error), success);
+            assertTrue(String.format("Expected success\nDDL: %s\n%s",
+                                     StringUtils.join(ddl, " "),
+                                     error),
+                       success);
             Catalog cat = compiler.getCatalog();
             return cat.getClusters().get("cluster").getDatabases().get("database");
         }
         else {
-            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s", errorRegex, ddl), success);
+            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s",
+                                      errorRegex,
+                                      StringUtils.join(ddl, " ")),
+                        success);
             assertFalse("Expected at least one error message.", error.isEmpty());
             Matcher m = Pattern.compile(errorRegex).matcher(error);
             assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
@@ -3968,6 +3986,16 @@ public class TestVoltCompiler extends TestCase {
                    isFeedbackPresent("Invalid procedure name", compiler.m_errors));
     }
 
+
+    /*
+     * Test some ddl with a schema tailored for illegal scalar subqueries.
+     */
+    private Database checkDDLAgainstScalarSubquerySchema(String errorRegex, String... ddl) throws Exception {
+        String scalarSubquerySchema = "create table books (cash integer default 23 NOT NULL, title varchar(10) default NULL, PRIMARY KEY(cash)); " +
+                                         "partition table books on column cash;";
+        return checkDDLAgainstGivenSchema(errorRegex, scalarSubquerySchema, ddl);
+    }
+
     /**
      * Test to see if scalar subqueries are either allowed where we
      * expect them to be or else cause compilation errors where we
@@ -3976,42 +4004,24 @@ public class TestVoltCompiler extends TestCase {
      * @throws Exception
      */
     public void testScalarSubqueriesExpectedFailures() throws Exception {
-        List<Pair<String, String>> testList = Arrays.asList(
-                // This should not fail.
-                Pair.of("select WAGE from t where ID = 2;",
-                        "Unexpected compilation failure"),
-                // Scalar subquery not allowed in limit.
-                Pair.of("select WAGE from t where ID = 1 limit (select DEPT from r1 where ID = 2);\n",
-                        "Expected compilation failure: subquery in limit."),
-                // Scalar subquery not allowed in offset.
-                Pair.of("select WAGE from t where ID = 1 limit 1 offset (select DEPT from r1 where ID = 2);\n",
-                        "Expected compilation failure: subquery in offset"),
-                // Scalar subquery not allowed in order by
-                Pair.of("select WAGE from t where ID = 1 order by (select DEPT from r1 where ID = 2);\n",
-                        "Expected compilation failure: subquery in order by"),
-                // Scalar subquery not allowed in partial indices.
-                Pair.of("create index tidx on t ( id ) where exists ( select id = 1 from t) ;\n",
-                        "Expected compilation failure: scalar subquery in partial index."),
-                Pair.of("create index tidx on t ( id ) where ( select id > 1 from t) ;\n",
-                        "Expected compilation failure: scalar subquery in partial index."),
-                // Scalar subquery not allowed in indices.
-                Pair.of("create index tidx on t ( select WAGE from t where id = 1 );\n",
-                        "Expected compilation failure: scalar subquery in index.")
-        );
-
-        for (Pair<String, String> pair : testList) {
-            String ddl = "create table t ( ID integer, WAGE integer, DEPT integer );\n";
-            String dql = pair.getLeft();
-            String msg = pair.getRight();
-            if (dql.startsWith("select")) {
-                dql = "create procedure ALPHA as " + dql;
-            }
-            final File ddlFile = VoltProjectBuilder.writeStringToTempFile(ddl + dql);
-
-            final VoltCompiler compiler = new VoltCompiler();
-            assertEquals(msg, msg.startsWith("Unexpected"),
-                         compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
-        }
+        // Scalar subquery not allowed in partial indices.
+        checkDDLAgainstScalarSubquerySchema(null, "create table mumble ( ID integer ); \n");
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx on books ( title ) where exists ( select title from books as child where books.cash = child.cash ) ;\n");
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx on books ( title ) where 7 < ( select cash from books as child where books.title = child.title ) ;\n");
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx on books ( title ) where 'ossians ride' < ( select title from books as child where books.cash = child.cash ) ;\n");
+        // Scalar subquery not allowed in indices.
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
+                                    "create index bidx on books ( select title from books as child where child.cash = child.cash );");
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
+                                    "create index bidx on books ( select cash from books as child where child.title < parent.title );");
+        // Scalar subquery not allowed in materialize views.
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+                                    "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+                                    "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
