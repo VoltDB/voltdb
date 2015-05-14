@@ -270,35 +270,41 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         m_inBytes = inBytes;
     }
 
-    private static final String INDENT = "  | ";
-    private void toStringHelper(String linePrefix, StringBuilder sb) {
-        sb.append(linePrefix + this.getClass().getSimpleName() + "[" + getExpressionType().toString() + "]"
-                + " : " + m_valueType.toSQLString() + "\n");
-
-        if (getLeft() != null) {
-            sb.append(linePrefix + "Left:\n");
-            getLeft().toStringHelper(linePrefix + INDENT, sb);
-        }
-
-        if (getRight() != null) {
-            sb.append(linePrefix + "Right:\n");
-            getRight().toStringHelper(linePrefix + INDENT, sb);
-        }
-
-        List<AbstractExpression> args = getArgs();
-        if (args != null) {
-            sb.append(linePrefix + "Args:\n");
-            for (AbstractExpression arg : args) {
-                arg.toStringHelper(linePrefix + INDENT, sb);
-            }
-        }
-    }
-
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         toStringHelper("", sb);
         return sb.toString();
+    }
+
+    private static final String INDENT = "  | ";
+
+    private void toStringHelper(String linePrefix, StringBuilder sb) {
+        String header = this.getClass().getSimpleName() + "[" + getExpressionType().toString() + "] : ";
+        if (m_valueType != null) {
+            header += m_valueType.toSQLString();
+        }
+        else {
+            header += "[null type]";
+        }
+        sb.append(linePrefix + header + "\n");
+
+        if (m_left != null) {
+            sb.append(linePrefix + "Left:\n");
+            m_left.toStringHelper(linePrefix + INDENT, sb);
+        }
+
+        if (m_right != null) {
+            sb.append(linePrefix + "Right:\n");
+            m_right.toStringHelper(linePrefix + INDENT, sb);
+        }
+
+        if (m_args != null) {
+            sb.append(linePrefix + "Args:\n");
+            for (AbstractExpression arg : m_args) {
+                arg.toStringHelper(linePrefix + INDENT, sb);
+            }
+        }
     }
 
     @Override
