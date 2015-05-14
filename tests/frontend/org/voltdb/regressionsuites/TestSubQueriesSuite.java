@@ -1034,6 +1034,20 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "select R1.DEPT, (SELECT ID FROM R2 where R2.ID = 1) FROM R1 where R1.DEPT = 2;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1} });
 
+        // with group by correlated
+        // Hsqldb back end bug: ENG-8273
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.DEPT, count(*), (SELECT max(dept) FROM R2 where R2.wage = R1.wage) FROM R1 "
+                    + " GROUP BY dept, wage order by dept, wage;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {  {1,1,1}, {1,1,1}, {1,1,1}, {2, 1, 2}, {2,1,2} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.DEPT, count(*), (SELECT sum(dept) FROM R2 where R2.wage > r1.dept * 10) FROM R1 "
+                    + " GROUP BY dept order by dept;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {  {1,3,6}, {2, 2, 5} });
+        }
+
         try {
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
@@ -1412,11 +1426,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                        "ID INTEGER DEFAULT 0 NOT NULL, " +
-                        "WAGE INTEGER, " +
-                        "DEPT INTEGER, " +
-                        "TM TIMESTAMP DEFAULT NULL, " +
-                        "PRIMARY KEY (ID) );" +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );" +
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +

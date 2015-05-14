@@ -98,3 +98,25 @@ COUNT(*) heat
 FROM pgr
 GROUP BY s, hotspot_hm;
 
+
+--- ENG-8264
+create table stores (
+    type_id integer,
+    zipcode integer,
+    franchise_id integer,
+    number integer
+);
+
+create table store_types (
+    category varchar(50),
+    name varchar(50),
+    type_id integer
+);
+
+CREATE PROCEDURE FRANCHISES_BY_NAMED_CATEGORY AS
+    select franchise_id,
+           count(*) as stores_in_category,
+           (select category from store_types where type_id = stores.type_id) as store_category
+    from stores
+    group by franchise_id,
+    type_id;
