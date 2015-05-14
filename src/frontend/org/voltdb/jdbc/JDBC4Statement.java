@@ -42,7 +42,7 @@ public class JDBC4Statement implements java.sql.Statement
 {
 
     //Timeout for statement. This is used for execute* methods. batch add dont have timeout.
-    private int m_timeout = 0;
+    private int m_timeout = Integer.MAX_VALUE;
     static class VoltSQL
     {
         public static final byte TYPE_SELECT = 1;
