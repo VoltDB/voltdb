@@ -46,7 +46,7 @@ public:
     /** Set the total number of bytes used (for rejoin/recover) */
     void setBytesUsed(size_t count) {
         assert(m_uso == 0);
-        StreamBlock *sb = new StreamBlock(new char[1], 0, count);
+        StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
         ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
                                 m_generation, m_partitionId, m_signature, sb, false, false);
         delete sb;

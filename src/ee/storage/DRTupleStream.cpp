@@ -422,8 +422,9 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
-    const int32_t adjustedLength = stream.m_currBlock->rawLength() - headerSize();
-    ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize(), adjustedLength);
+    size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_TRANSACTION_PADDING_SP;
+    const int32_t adjustedLength = stream.m_currBlock->rawLength() - headerSize;
+    ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
 
 }

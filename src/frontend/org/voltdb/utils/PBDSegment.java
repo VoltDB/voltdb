@@ -246,7 +246,9 @@ class PBDSegment {
         if (mbuf.remaining() < ds.getSerializedSize() + m_objectHeaderBytes) return -1;
 
         m_syncedSinceLastEdit = false;
-        return writeDeferredSerialization(mbuf, ds);
+        int written = writeDeferredSerialization(mbuf, ds);
+        incrementNumEntries(written);
+        return written;
     }
 
     static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException {

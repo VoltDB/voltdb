@@ -37,8 +37,8 @@ namespace voltdb
     class StreamBlock {
     public:
         StreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso)
-            : m_data(data + headerSize), m_headerSize(headerSize),
-              m_capacity(capacity - headerSize), m_offset(0),
+            : m_data(data + headerSize), m_capacity(capacity - headerSize),
+              m_headerSize(headerSize), m_offset(0),
               m_uso(uso),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
@@ -53,8 +53,8 @@ namespace voltdb
         }
 
         StreamBlock(StreamBlock *other)
-            : m_data(other->m_data), m_headerSize(other->m_headerSize),
-              m_capacity(other->m_capacity), m_offset(other->m_offset),
+            : m_data(other->m_data), m_capacity(other->m_capacity),
+              m_headerSize(other->m_headerSize), m_offset(other->m_offset),
               m_uso(other->m_uso),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),

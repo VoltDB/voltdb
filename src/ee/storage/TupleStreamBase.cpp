@@ -289,7 +289,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
-    m_currBlock = new StreamBlock(buffer, blockSize, uso);
+    m_currBlock = new StreamBlock(buffer, headerSize(), blockSize, uso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
