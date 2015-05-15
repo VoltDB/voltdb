@@ -826,6 +826,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_purpose = FOR_DETERMINISM;
     }
 
+    public boolean isForDeterminismOnly() {
+        return m_purpose == FOR_DETERMINISM;
+    }
+
     public void setForGroupingOnly() {
         m_purpose = FOR_GROUPING;
     }
