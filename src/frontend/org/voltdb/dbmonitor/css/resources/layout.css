@@ -40,12 +40,6 @@ h1 {
     font: 16px Arial, Helvetica, sans-serif;
 }
 
-
-#tblDrReplica_filter, #tblDrMAster_filter {
-    float: left;
-    width: 40%;
-}
-
 .btn {
     background-color: #aa1f2f;
     cursor: pointer;
@@ -800,8 +794,6 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
         font-size: 12px;
     }
 
-    .tabs-filter-wrapper .drPaginationSection { padding:2px 0 12px 0;}
-
         .tabs-filter-wrapper .pagination a {
             background: #aa1f2f;
             padding: 5px 10px;
@@ -832,7 +824,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover {
     padding: 15px 15px 15px 28px;
     font-size: 13px;
     font-weight: bold;
-    width: 192px;
+    width: 194px;
 }
 
 .icon-procedures {
@@ -3100,7 +3092,7 @@ a.restoreBtn {
 }
 
 .replicaWrapper {
-    /*position: relative;*/
+    position: relative;
     /*top: -27px;*/
 }
 
@@ -3196,7 +3188,7 @@ tr.drSubSection td {
 
 .paging_extStyleLF {
     width: 165px !important;
-    /*margin-bottom: 10px;*/
+    margin-bottom: 10px;
 }
 
 .navigationLabel {
@@ -3238,7 +3230,7 @@ tr.drSubSection td {
     padding: 15px 15px 15px 28px;
     font-size: 13px;
     font-weight: bold;
-    width: 194px;
+    width: 197px;
 }
 
 .drIcon {
@@ -3265,7 +3257,6 @@ tr.drSubSection td {
 .drHeightIndividual {
     min-height: 200px;
 }
-.drMasterContainer { margin-bottom: 20px;}
 
 /****DR Ends*******/
 
@@ -3535,11 +3526,6 @@ a:hover.changePsd {
         width: auto;
     }
 
-    #tblDrReplica_filter, #tblDrMAster_filter {
-        float: left;
-        width: auto;
-    }
-
     .tabs-filter-wrapper .pagination {
         clear: left;
         float: left;
@@ -3689,7 +3675,7 @@ a:hover.changePsd {
     }
 
     .replicaWrapper {
-        /*top: 20px !important;*/
+        top: 20px !important;
     }
 
     .drHeightBoth {

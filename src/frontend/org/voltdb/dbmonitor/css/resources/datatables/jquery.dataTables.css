@@ -8,8 +8,8 @@ table.dataTable {
     border-collapse: separate;
     border-spacing: 0;
     border-left: 1px solid #CCCCCC;
-    /*position: relative;
-    top: -48px;*/
+    position: relative;
+    top: -48px;
     /*
    * Header and footer styles
    */
@@ -400,11 +400,11 @@ table.dataTable {
     .dataTables_wrapper .dataTables_paginate {
         float: right;
         text-align: right;
-        /*padding-top: 0.25em;*/
-        /*border-bottom: 1px solid #dbdbdb;*/
-        /*padding-bottom: 10px;*/
-        /*position: relative;
-        top: -50px;*/
+        padding-top: 0.25em;
+        border-bottom: 1px solid #dbdbdb;
+        padding-bottom: 10px;
+        position: relative;
+        top: -50px;
     }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button {
