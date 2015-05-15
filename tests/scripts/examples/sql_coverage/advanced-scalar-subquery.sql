@@ -9,38 +9,59 @@ INSERT INTO @dmltable VALUES (@insertvals)
 {_optionaloffset |= "OFFSET 2"}
 {_optionallimitoffset |= ""}
 {_optionallimitoffset |= "LIMIT 4 _optionaloffset"}
+
 {_optionalorderbyidlimitoffset |= ""}
 {_optionalorderbyidlimitoffset |= "LIMIT 1000"}
 {_optionalorderbyidlimitoffset |= "ORDER BY @idcol _sortorder _optionallimitoffset"}
+{_optionalorderbyidlimitoffset |= "GROUP BY @idcol"}
+{_optionalorderbyidlimitoffset |= "GROUP BY @idcol HAVING @agg(@idcol)                     _cmp 12"}
+{_optionalorderbyidlimitoffset |= "GROUP BY @idcol HAVING @agg(__[#agg])                   _cmp 12"}
+{_optionalorderbyidlimitoffset |= "GROUP BY @idcol HAVING @agg(_variable[@comparabletype]) _cmp 12"}
+{_optionalorderbyidlimitoffset |= "GROUP BY @idcol HAVING @agg(_variable[string])          _cmp 'Z'"}
+
 {_optionalorderby1limitoffset |= ""}
 {_optionalorderby1limitoffset |= "LIMIT 1000"}
 {_optionalorderby1limitoffset |= "ORDER BY 1 _sortorder _optionallimitoffset"}
+--- GROUP BY 1 does not work
+--{_optionalorderby1limitoffset |= "GROUP BY 1"}
+--{_optionalorderby1limitoffset |= "GROUP BY 1 HAVING @agg(__[#agg])                   _cmp 12"}
+--{_optionalorderby1limitoffset |= "GROUP BY 1 HAVING @agg(_variable[@comparabletype]) _cmp 12"}
+--{_optionalorderby1limitoffset |= "GROUP BY 1 HAVING @agg(_variable[string])          _cmp 'Z'"}
+
 {_optionalorderbyvarlimitoffset |= ""}
 {_optionalorderbyvarlimitoffset |= "LIMIT 1000"}
 {_optionalorderbyvarlimitoffset |= "ORDER BY __[#ord] _sortorder _optionallimitoffset"}
+{_optionalorderbyvarlimitoffset |= "GROUP BY __[#ord]"}
+{_optionalorderbyvarlimitoffset |= "GROUP BY __[#ord] HAVING @agg(__[#ord])                   _cmp 12"}
+{_optionalorderbyvarlimitoffset |= "GROUP BY __[#ord] HAVING @agg(_variable[@comparabletype]) _cmp 12"}
+{_optionalorderbyvarlimitoffset |= "GROUP BY __[#ord] HAVING @agg(_variable[string])          _cmp 'Z'"}
 
 --- TODO: delete these, once ENG-8234 is fixed, so these are no longer needed to avoid mismatches:
 {_tempoptionalorderbylimitoffset |= ""}
 {_tempoptionalorderbylimitoffset |= "LIMIT 1000"}
 {_tempoptionalorderbylimitoffset |= "ORDER BY __[#ord]     _optionallimitoffset"}
 {_tempoptionalorderbylimitoffset |= "ORDER BY __[#ord] ASC _optionallimitoffset"}
+{_tempoptionalorderbylimitoffset |= "GROUP BY __[#ord]"}
+{_tempoptionalorderbylimitoffset |= "GROUP BY __[#ord] HAVING @agg(__[#ord])                   _cmp 12"}
+{_tempoptionalorderbylimitoffset |= "GROUP BY __[#ord] HAVING @agg(_variable[@comparabletype]) _cmp 12"}
+{_tempoptionalorderbylimitoffset |= "GROUP BY __[#ord] HAVING @agg(_variable[string])          _cmp 'Z'"}
 
 -- TEMP, for debugging, just so I can quickly see what data was generated:
 --SELECT * FROM @fromtables ORDER BY @idcol
 
 --- Test Scalar Subquery Advanced cases
 
---- Queries with scalar subqueries in the SELECT clause (with optional ORDER BY, LIMIT or OFFSET clauses)
-SELECT @idcol, (SELECT @agg(_variable) FROM @fromtables                                                                          ) FROM @fromtables    A1 _optionalorderbyidlimitoffset
+--- Queries with scalar subqueries in the SELECT clause (with optional ORDER BY, LIMIT, OFFSET, GROUP BY or HAVING clauses)
+SELECT @idcol, (SELECT @agg(_variable[#agg]) FROM @fromtables                                                                    ) FROM @fromtables    A1 _optionalorderbyidlimitoffset
 SELECT @idcol, (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE A2.__[#agg]                   _cmp                   __[#agg]) FROM @fromtables AS A2 _optionalorderbyidlimitoffset
-SELECT @idcol, (SELECT @agg(_variable)       FROM @fromtables WHERE A3._variable[@comparabletype] _cmp _variable[@comparabletype]) FROM @fromtables AS A3 _optionalorderbyidlimitoffset
+SELECT @idcol, (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE A3._variable[@comparabletype] _cmp _variable[@comparabletype]) FROM @fromtables AS A3 _optionalorderbyidlimitoffset
 
---- Queries with scalar subqueries in the FROM clause (with optional ORDER BY, LIMIT or OFFSET clauses)
-SELECT * FROM (SELECT @agg(_variable)       FROM @fromtables                                                                 )    A4 _optionalorderby1limitoffset
+--- Queries with scalar subqueries in the FROM clause (with optional ORDER BY, LIMIT, OFFSET, GROUP BY or HAVING clauses)
+SELECT * FROM (SELECT @agg(_variable[#agg]) FROM @fromtables                                                                 )    A4 _optionalorderby1limitoffset
 SELECT * FROM (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE __[#agg]                   _cmp                   __[#agg]) AS A5 _optionalorderby1limitoffset
-SELECT * FROM (SELECT @agg(_variable)       FROM @fromtables WHERE _variable[@comparabletype] _cmp _variable[@comparabletype]) AS A6 _optionalorderby1limitoffset
+SELECT * FROM (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _cmp _variable[@comparabletype]) AS A6 _optionalorderby1limitoffset
 
---- Queries with scalar subqueries in the WHERE clause (with optional ORDER BY, LIMIT or OFFSET clauses)
+--- Queries with scalar subqueries in the WHERE clause (with optional ORDER BY, LIMIT, OFFSET, GROUP BY or HAVING clauses)
 SELECT _variable[#ord]         FROM @fromtables A7  WHERE __[#ord] _cmp (SELECT @agg(       __[#ord]) FROM @fromtables                                      ) _optionalorderbyvarlimitoffset
 SELECT _variable[#ord numeric] FROM @fromtables A8  WHERE __[#ord] _cmp (SELECT @agg(_variable[#agg]) FROM @fromtables                                      ) _optionalorderbyvarlimitoffset
 SELECT _variable[#ord]         FROM @fromtables A9  WHERE __[#ord] _cmp (SELECT @agg(       __[#ord]) FROM @fromtables WHERE        __[#ord] =   A9.__[#ord]) _optionalorderbyvarlimitoffset
@@ -66,3 +87,8 @@ SELECT (SELECT @agg(_variable)       FROM @fromtables WHERE _variable[@comparabl
 --- Queries with scalar subqueries in the LIMIT or OFFSET clause (these should, and do, return errors)
 SELECT _variable AS C0 FROM @fromtables A21 ORDER BY C0 _sortorder LIMIT (SELECT @agg(_variable) FROM @fromtables) _optionaloffset
 SELECT _variable AS C0 FROM @fromtables A22 ORDER BY C0 _sortorder LIMIT 3 OFFSET (SELECT @agg(_variable) FROM @fromtables)
+
+
+--- Queries with scalar subqueries in the GROUP BY clause (these  ???)
+-- TBD!
+
