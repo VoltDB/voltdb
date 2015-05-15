@@ -23,7 +23,6 @@
 
 package org.voltdb.compiler;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -3658,6 +3657,9 @@ public class TestVoltCompiler extends TestCase {
         } catch (HsqlException hex) {
             success = false;
             error = hex.getMessage();
+        } catch (PlanningErrorException plex) {
+            success = false;
+            error = plex.getMessage();
         }
         if (errorRegex == null) {
             assertTrue(String.format("Expected success\nDDL: %s\n%s",
@@ -4014,16 +4016,35 @@ public class TestVoltCompiler extends TestCase {
                                     "create index bidx on books ( title ) where 'ossians ride' < ( select title from books as child where books.cash = child.cash ) ;\n");
         // Scalar subquery not allowed in indices.
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
-                                    "create index bidx on books ( select title from books as child where child.cash = child.cash );");
-        checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
-                                    "create index bidx on books ( select cash from books as child where child.title < parent.title );");
+                                    "create index bidx on books ( select title from books as child where child.cash = books.cash );");
+        checkDDLAgainstScalarSubquerySchema("Index BIDX1 with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
+        checkDDLAgainstScalarSubquerySchema("Index BIDX2 with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );");
         // Scalar subquery not allowed in materialize views.
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
                                     "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+                                    "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
     }
 
+    public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
+                                    "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.CASH\" in statement starting on lineno: 1",
+                                    "create view tview as select cash, count(*), max(( select cash from books as child where books.cash = child.cash )) from books group by cash;\n");
+    }
+
+    public void test8290UnboundIdentifiersNotCaughtEarlyEnough() throws Exception {
+        // The name parent is not defined here.  This is an
+        // HSQL bug somehow.
+        checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
+                                    "create index bidx1 on books ( ( select title from books as child where child.cash = parent.cash ) ) ;");
+        checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
+                                    "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
+    }
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;
         for (String string : diagnostics) {
