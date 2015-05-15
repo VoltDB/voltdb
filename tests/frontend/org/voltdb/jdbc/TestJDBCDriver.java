@@ -616,10 +616,20 @@ public class TestJDBCDriver {
     //Test to check Query Timeout
     @Test
     public void testQueryTimeout() throws SQLException {
-        //Use no timeout so default timeout of 2 min and thus no exception should be thrown.
+        //this should not timeout at all proc will wait for 3 min before returning.
         PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
-        stmt.setLong(1, 6000);
+        stmt.setLong(1, 180*1000);
         boolean exceptionCalled = false;
+        try {
+            stmt.execute();
+        } catch (SQLException ex) {
+            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
+            exceptionCalled = true;
+        }
+        assertFalse(exceptionCalled);
+
+        stmt.setLong(1, 60000);
+        exceptionCalled = false;
         try {
             stmt.execute();
         } catch (SQLException ex) {
@@ -630,7 +640,7 @@ public class TestJDBCDriver {
 
         //Now make it timeout
         stmt.setQueryTimeout(1);
-        stmt.setLong(1, 6000);
+        stmt.setLong(1, 7000);
         try {
             stmt.execute();
         } catch (SQLException ex) {
@@ -641,7 +651,7 @@ public class TestJDBCDriver {
 
         //redo statement with long timeout should not timeout
         stmt.setQueryTimeout(30);
-        stmt.setLong(1, 6000);
+        stmt.setLong(1, 7000);
         exceptionCalled = false;
         try {
             stmt.execute();
