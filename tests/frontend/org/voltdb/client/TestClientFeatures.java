@@ -190,6 +190,17 @@ public class TestClientFeatures extends TestCase {
 
         client.callProcedure("ArbitraryDurationProc", 3000);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        //Make sure that timeout is not 2 min when config sets 0 as procedurecall timeout.
+        client.callProcedure("ArbitraryDurationProc", 180*1000);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        Client client2 = ClientFactory.createClient();
+        client2.createConnection("localhost");
+        //Make sure that timeout is not 2 min when using default config.
+        client2.callProcedure("ArbitraryDurationProc", 180*1000);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
     }
 
     public void testQueryTimeout() throws NoConnectionsException, IOException, ProcCallException {
