@@ -739,18 +739,18 @@ var loadPage = function (serverName, portid) {
                                         $("#ChartDrReplicationRate").show();
                                     }
                                     refreshDrReplicaSection(graphView, currentTab);
-                                    $("#drSection").removeClass("drHeightBoth");
-                                    $("#drSection").removeClass("drHeightIndividual");
+                                    // $("#drSection").removeClass("drHeightBoth");
+                                    // $("#drSection").removeClass("drHeightIndividual");
                                     //to show DR Mode and DR tables
                                     if (VoltDbUI.drMasterEnabled) {
-                                        $("#drSection").addClass("drHeightBoth");
+                                        // $("#drSection").addClass("drHeightBoth");
                                         $("#dbDrMode").text("Both");
                                         $('#drMasterSection').css('display', 'block');
                                         $(".replicaWrapper").css('top', '-27px');
                                     } else {
                                         $("#dbDrMode").text("Replica");
                                         $(".replicaWrapper").css('top', '0px');
-                                        $("#drSection").addClass("drHeightIndividual");
+                                        //  $("#drSection").addClass("drHeightIndividual");
                                         $('#drMasterSection').css('display', 'none');
                                     }
                                     $('#drReplicaSection').css('display', 'block');
@@ -1188,6 +1188,22 @@ var loadPage = function (serverName, portid) {
                     }
 
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+
+                    var length = $("#tblDrMAster tr").length - 1;
+                    if (length >= 5) {
+                        $("#drMasterSection").css("min-height", "280px");
+                    } else if (length == 4) {
+                        $("#drMasterSection").css("min-height", "250px");
+                    }
+                    else if (length == 3) {
+                        $("#drMasterSection").css("min-height", "230px");
+                    }
+                    else if (length == 2) {
+                        $("#drMasterSection").css("min-height", "200px");
+                    }
+                    else if (length == 1 || length == 0) {
+                        $("#drMasterSection").css("min-height", "170px");
+                    }
                 },
 
                 "sDom": 'p<"tblScroll drScroll"t>',
@@ -1203,11 +1219,6 @@ var loadPage = function (serverName, portid) {
 
 
 
-            // $("#tblDrMAster").wrap("<div class='tblScroll drScroll'>");
-            //var org_html = $("#tblDrMAster")[0].outerHTML;
-            ////console.log(org_html);
-            //var new_html = "<div class='tblScroll drScroll'>" + org_html + "</div>";
-            //$("#tblDrMAster_wrapper").find("table").replaceWith(new_html);
 
             $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft(leftScroll);
 
@@ -1279,6 +1290,21 @@ var loadPage = function (serverName, portid) {
 
 
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                    var length = $("#tblDrReplica tr").length - 1;
+                    if (length >= 5) {
+                        $("#drReplicaSection").css("min-height", "280px");
+                    } else if (length == 4) {
+                        $("#drReplicaSection").css("min-height", "250px");
+                    }
+                    else if (length == 3) {
+                        $("#drReplicaSection").css("min-height", "230px");
+                    }
+                    else if (length == 2) {
+                        $("#drReplicaSection").css("min-height", "200px");
+                    }
+                    else if (length == 1 || length == 0) {
+                        $("#drReplicaSection").css("min-height", "170px");
+                    }
                 },
                 "sDom": 'p<"tblScroll drScroll"t>',
                 "aoColumns": [
@@ -1288,6 +1314,8 @@ var loadPage = function (serverName, portid) {
                     { "bSearchable": false }
                 ]
             });
+
+
 
             $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft(leftScroll);
             $("#tblReplica_wrapper").find(".paginationDefault").remove();
@@ -2065,8 +2093,8 @@ var adjustGraphSpacing = function () {
             SQLQueryRender.populateTablesAndViews();
         };
         this.hasPermissionToView = true;
-        
-        this.getCookie = function(name) {
+
+        this.getCookie = function (name) {
             return $.cookie(name + "_" + VoltDBConfig.GetPortId());
         },
 
