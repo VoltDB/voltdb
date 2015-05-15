@@ -743,6 +743,7 @@ public class JDBC4Statement implements java.sql.Statement
     }
 
     // Sets the number of seconds the driver will wait for a Statement object to execute to the given number of seconds.
+    // 0 is infinite in our case its Integer.MAX_VALUE
     @Override
     public void setQueryTimeout(int seconds) throws SQLException
     {
@@ -750,7 +751,11 @@ public class JDBC4Statement implements java.sql.Statement
         if (seconds < 0) {
             throw SQLError.get(SQLError.ILLEGAL_ARGUMENT, seconds);
         }
-        this.m_timeout = seconds;
+        if (seconds == 0) {
+            this.m_timeout = Integer.MAX_VALUE;
+        } else {
+            this.m_timeout = seconds;
+        }
     }
 
     // Returns true if this either implements the interface argument or is directly or indirectly a wrapper for an object that does.
