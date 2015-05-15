@@ -2033,7 +2033,6 @@ class AdminTest extends TestBase {
         header.help.click()
         then:
         waitFor(waitTime) {
-            header.popup.isDisplayed()
             header.popupTitle.isDisplayed()
             header.popupClose.isDisplayed()
             header.popupTitle.text().toLowerCase().equals("help".toLowerCase());
@@ -2619,7 +2618,7 @@ class AdminTest extends TestBase {
 
         when:
         while(true){
-            if(waitFor(10){page.networkInterfaces.serverSettingTitle.isDisplayed()} && page.networkInterfaces.serverSettingTitle.text() !=""){
+            if(waitFor(waitTime){page.networkInterfaces.serverSettingTitle.isDisplayed()} && page.networkInterfaces.serverSettingTitle.text() !=""){
                 println("Title displayed as:"+page.networkInterfaces.serverSettingTitle.text())
             }else println("Server setting title not displayed so not processing further")
             break;
