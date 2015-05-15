@@ -41,6 +41,7 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
@@ -656,25 +657,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         else if (child.name.equals("tablesubquery")) {
-            // Scalar subquery like 'select c, (select count(*) from t1), from t2;'
-            col.columnName = child.attributes.get("alias");
-            assert(colExpr instanceof SelectSubqueryExpression);
-            SelectSubqueryExpression scalarSubqueryExpr = (SelectSubqueryExpression) colExpr;
-            if (scalarSubqueryExpr.getSubqueryScan().getOutputSchema().size() != 1) {
-                throw new PlanningErrorException("Scalar subquery can have only one output column");
-            }
-            col.tableName = scalarSubqueryExpr.getSubqueryScan().getTableName();
-            col.tableAlias = scalarSubqueryExpr.getSubqueryScan().getTableAlias();
-            // Need to add a ScalarValueExpression on top of the subquery expression
-            // to be able to extract the subquery expression result
+            // Scalar subquery like 'select c, (select count(*) from t1) from t2;'
+            ScalarValueExpression sve = (ScalarValueExpression)colExpr;
 
-            scalarSubqueryExpr.changeToScalarExprType();
-            col.expression = ExpressionUtil.addScalarValueExpression(scalarSubqueryExpr);
+            col.columnName = child.attributes.get("alias");
+            col.tableName = sve.getSubqueryScan().getTableName();
+            col.tableAlias = sve.getSubqueryScan().getTableAlias();
+            col.expression = colExpr;
         }
         else
         {
             col.expression = colExpr;
-            // XXX hacky, assume all non-column refs come from a temp table
             // XXX hacky, assume all non-column refs come from a temp table
             col.tableName = "VOLT_TEMP_TABLE";
             col.tableAlias = "VOLT_TEMP_TABLE";
