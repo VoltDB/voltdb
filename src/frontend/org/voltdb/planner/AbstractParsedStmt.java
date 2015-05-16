@@ -861,18 +861,15 @@ public abstract class AbstractParsedStmt {
         }
         String value_type_name = exprNode.attributes.get("valuetype");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        String id = exprNode.attributes.get("function_id");
-        assert(id != null);
+        String function_id = exprNode.attributes.get("function_id");
+        assert(function_id != null);
         int idArg = 0;
         try {
-            idArg = Integer.parseInt(id);
+            idArg = Integer.parseInt(function_id);
         } catch (NumberFormatException nfe) {}
         assert(idArg > 0);
-        String parameter = exprNode.attributes.get("parameter");
-        String volt_alias = exprNode.attributes.get("volt_alias");
-        if (volt_alias == null) {
-            volt_alias = name; // volt shares the function name with HSQL
-        }
+        String result_type_parameter_index = exprNode.attributes.get("result_type_parameter_index");
+        String implied_argument = exprNode.attributes.get("implied_argument");
 
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
         for (VoltXMLElement argNode : exprNode.children) {
@@ -884,21 +881,21 @@ public abstract class AbstractParsedStmt {
         }
 
         FunctionExpression expr = new FunctionExpression();
-        expr.setAttributes(name, volt_alias, idArg);
+        expr.setAttributes(name, implied_argument, idArg);
         expr.setArgs(args);
         if (value_type != null) {
             expr.setValueType(value_type);
             expr.setValueSize(value_type.getMaxLengthInBytes());
         }
 
-        if (parameter != null) {
-            int parameter_idx = -1; // invalid argument index
+        if (result_type_parameter_index != null) {
+            int parameter_idx = -1;
             try {
-                parameter_idx = Integer.parseInt(parameter);
+                parameter_idx = Integer.parseInt(result_type_parameter_index);
             } catch (NumberFormatException nfe) {}
             assert(parameter_idx >= 0); // better be valid by now.
             assert(parameter_idx < args.size()); // must refer to a provided argument
-            expr.setParameterArg(parameter_idx);
+            expr.setResultTypeParameterIndex(parameter_idx);
             expr.negotiateInitialValueTypes();
         }
         return expr;
