@@ -44,7 +44,7 @@ class PBDSegment {
     public static final int FLAG_COMPRESSED = 1;
 
     //Avoid unecessary sync with this flag
-    private boolean m_syncedSinceLastEdit = true;
+    private boolean m_syncedSinceLastEdit;
     final File m_file;
     private RandomAccessFile m_ras;
     private FileChannel m_fc;
@@ -53,12 +53,12 @@ class PBDSegment {
 
     //If this is the first time polling a segment, madvise the entire thing
     //into memory
-    private boolean m_haveMAdvised = false;
+    private boolean m_haveMAdvised;
 
     //Index of the next object to read, not an offset into the file
     //The offset is maintained by the ByteBuffer. Used to determine if there is another object
-    int m_objectReadIndex = 0;
-    private int m_bytesRead = 0;
+    int m_objectReadIndex;
+    private int m_bytesRead;
 
     //ID of this segment
     final Long m_index;
@@ -69,22 +69,31 @@ class PBDSegment {
     static final int COUNT_OFFSET = 0;
     static final int SIZE_OFFSET = 4;
 
-    private boolean m_closed = false;
+    private boolean m_closed = true;
 
     //How many entries that have been polled have from this file have been discarded.
     //Convenient to let PBQ maintain the counter here
-    int m_discardCount = 0;
+    int m_discardCount;
 
     public PBDSegment(Long index, File file ) {
         m_index = index;
         m_file = file;
+        reset();
         if (LOG.isDebugEnabled()) {
             LOG.debug("Creating Segment: " + file.getName() + " At Index: " + m_index);
         }
     }
 
+    private void reset() {
+        m_syncedSinceLastEdit = true;
+        m_haveMAdvised = false;
+        m_objectReadIndex = 0;
+        m_bytesRead = 0;
+        m_discardCount = 0;
+    }
+
     int getNumEntries() throws IOException {
-        if (m_fc == null) {
+        if (m_closed) {
             open(false);
         }
         if (m_fc.size() > m_segmentHeaderBytes) {
@@ -93,6 +102,10 @@ class PBDSegment {
         } else {
             return 0;
         }
+    }
+
+    public boolean isBeingPolled() {
+        return m_objectReadIndex != 0;
     }
 
     private void initNumEntries() throws IOException {
@@ -111,13 +124,15 @@ class PBDSegment {
     }
 
     void open(boolean forWrite) throws IOException {
+        if (!m_closed) {
+            throw new IOException("Segment is already opened");
+        }
+
         if (!m_file.exists()) {
             m_syncedSinceLastEdit = false;
         }
-        if (m_ras != null) {
-            throw new IOException(m_file + " was already opened");
-        }
-        m_ras = new RandomAccessFile( m_file, "rw");
+        assert(m_ras == null);
+        m_ras = new RandomAccessFile(m_file, "rw");
         m_fc = m_ras.getChannel();
 
         if (forWrite) {
@@ -135,6 +150,8 @@ class PBDSegment {
             m_buf.b().position((int) size);
             m_readBuf.position(SIZE_OFFSET + 4);
         }
+
+        m_closed = false;
     }
 
     public void closeAndDelete() throws IOException {
@@ -143,6 +160,10 @@ class PBDSegment {
             LOG.debug("Deleting segment at Index " + m_index + " File: " + m_file.getAbsolutePath());
         }
         m_file.delete();
+    }
+
+    public boolean isClosed() {
+        return m_closed;
     }
 
     public void close() throws IOException {
@@ -157,6 +178,7 @@ class PBDSegment {
             }
         } finally {
             m_closed = true;
+            reset();
         }
     }
 

@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.Stack;
 
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -461,13 +462,97 @@ public abstract class ExpressionUtil {
             ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
         }
     }
+    /**
+     * Traverse this expression tree.  Where we find a SelectSubqueryExpression, wrap it
+     * in a ScalarValueExpression if its parent is not one of:
+     * - comparison (=, !=, <, etc)
+     * - operator exists
+     * @param expr   - the expression that may contain subqueries that need to be wrapped
+     * @return the expression with subqueries wrapped where needed
+     */
+    public static AbstractExpression wrapScalarSubqueries(AbstractExpression expr) {
+        return wrapScalarSubqueriesHelper(null, expr);
+    }
+
+    private static AbstractExpression wrapScalarSubqueriesHelper(AbstractExpression parentExpr, AbstractExpression expr) {
+
+        // Bottom-up recursion.  Proceed to the children first.
+        AbstractExpression leftChild = expr.getLeft();
+        if (leftChild != null) {
+            AbstractExpression newLeft = wrapScalarSubqueriesHelper(expr, leftChild);
+            if (newLeft != leftChild) {
+                expr.setLeft(newLeft);
+            }
+        }
+
+        AbstractExpression rightChild = expr.getRight();
+        if (rightChild != null) {
+            AbstractExpression newRight = wrapScalarSubqueriesHelper(expr, rightChild);
+            if (newRight != rightChild) {
+                expr.setRight(newRight);
+            }
+        }
+
+        // Let's not forget the args, which may also contain subqueries.
+        List<AbstractExpression> args = expr.getArgs();
+        if (args != null) {
+            for (int i = 0; i < args.size(); ++i) {
+                AbstractExpression arg = args.get(i);
+                AbstractExpression newArg = wrapScalarSubqueriesHelper(expr, arg);
+                if (newArg != arg) {
+                    expr.setArgAtIndex(i, newArg);
+                }
+            }
+        }
+
+        if (expr instanceof SelectSubqueryExpression
+                && subqueryRequiresScalarValueExpressionFromContext(parentExpr)) {
+            expr = addScalarValueExpression((SelectSubqueryExpression)expr);
+        }
+        return expr;
+    }
+
+    /**
+     * Return true if we must insert a ScalarValueExpression between a subquery
+     * and its parent expression.
+     * @param parentExpr  the parent expression of a subquery
+     * @return true if the parent expression is not a comparison, EXISTS operator, or
+     *   a scalar value expression
+     */
+    private static boolean subqueryRequiresScalarValueExpressionFromContext(AbstractExpression parentExpr) {
+        if (parentExpr == null) {
+            // No context: we are a top-level expression.  E.g, an item on the
+            // select list.  In this case, assume the expression must be scalar.
+            return true;
+        }
+
+        // Exists and comparison operators can handle non-scalar subqueries.
+        if (parentExpr.getExpressionType() == ExpressionType.OPERATOR_EXISTS
+                || parentExpr instanceof ComparisonExpression) {
+            return false;
+        }
+
+        // There is already a ScalarValueExpression above the subquery.
+        if (parentExpr instanceof ScalarValueExpression) {
+            return false;
+        }
+
+        // By default, assume that the subquery must produce a single value.
+        return true;
+    }
 
     /**
      * Add a ScalarValueExpression on top of the SubqueryExpression
      * @param expr - subquery expression
-     * return ScalarValueExpression
+     * @return ScalarValueExpression
      */
-    public static AbstractExpression addScalarValueExpression(AbstractSubqueryExpression expr) {
+    private static AbstractExpression addScalarValueExpression(SelectSubqueryExpression expr) {
+        if (expr.getSubqueryScan().getOutputSchema().size() != 1) {
+            throw new PlanningErrorException("Scalar subquery can have only one output column");
+        }
+
+        expr.changeToScalarExprType();
+
         AbstractExpression scalarExpr = new ScalarValueExpression();
         scalarExpr.setLeft(expr);
         scalarExpr.setValueType(expr.getValueType());

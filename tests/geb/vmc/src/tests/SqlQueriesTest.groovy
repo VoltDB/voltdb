@@ -35,7 +35,7 @@ import vmcTest.pages.*
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
 
-class SqlQueriesTest extends TestBase {
+class SqlQueriesTest extends SqlQueriesTestBase {
 
     static final int DEFAULT_NUM_ROWS_TO_INSERT = 2
     static final boolean DEFAULT_INSERT_JSON = false
@@ -92,22 +92,8 @@ class SqlQueriesTest extends TestBase {
     }
 
     def setup() { // called before each test
-        // TestBase.setup gets called first (automatically)
-        int count = 0
+        // SqlQueriesTestBase.setup gets called first (automatically)
 
-        while(count<numberOfTrials) {
-            count ++
-            try{
-                when: 'click the SQL Query link (if needed)'
-                ensureOnSqlQueryPage()
-                then: 'should be on SQL Query page'
-                at SqlQueryPage
-                break
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-
-
-            }
-        }
         // Create tables from the 'genqa' app, needed for testing (e.g.
         // PARTITIONED_TABLE, REPLICATED_TABLE), if they don't already exist
         boolean createdNewTable = false;
@@ -805,7 +791,7 @@ class SqlQueriesTest extends TestBase {
 
 
 // for tables
-
+/*
     def "Check created table by refreshing in SQL QUERY tab and Schema tab"() {
 
         when: 'click the SQL Query link (if needed)'
@@ -976,7 +962,9 @@ class SqlQueriesTest extends TestBase {
         page.refreshquery.click()
         try {
             waitFor(15){page.checkview.isDisplayed()}
-            page.checkview.click()} catch (geb.error.RequiredPageContentNotPresent e) {println("element not found")}catch (geb.waiting.WaitTimeoutException e){println("waiting timeout")}
+            page.checkview.click()}
+        catch (geb.error.RequiredPageContentNotPresent e) {println("element not found")}
+        catch (geb.waiting.WaitTimeoutException e){println("waiting timeout")}
         println("views that is created has been displayed!!")
 
         // In Schema Page Schema Tab
@@ -1072,6 +1060,6 @@ class SqlQueriesTest extends TestBase {
         println("refresh button clicked and created views deleted in schema page of Size and worksheet tab")
 
     }
-
+*/
 
 }

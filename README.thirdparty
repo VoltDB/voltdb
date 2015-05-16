@@ -2491,4 +2491,10 @@ Site: http://datatables.net/
 License Name: MIT License 
 License Url: http://datatables.net/license/mit 
 ===============================================================================
+sha256.js
+CryptoJS v3.1.2
+code.google.com/p/crypto-js
+(c) 2009-2013 by Jeff Mott. All rights reserved.
+https://code.google.com/p/crypto-js/wiki/License
+===============================================================================
 
