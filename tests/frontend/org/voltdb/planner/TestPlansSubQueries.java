@@ -23,7 +23,9 @@
 
 package org.voltdb.planner;
 
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.expressions.AbstractExpression;
@@ -2169,10 +2171,113 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
     }
 
-    // This test fails to compile, and causes an NPE in the planner (I think).
-    // The ticket number, obviously, is 8280.
+    /**
+     * This test fails to compile, and causes an NPE in the planner (I think).
+     * The ticket number, obviously, is 8280.  It's commented out because
+     * it fails.
+     *
+     * @throws Exception
+     */
+
     public void testENG8280() throws Exception {
         // failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;","mumble");
+    }
+
+    /**
+     * Asserts that the plan doesn't use index scans.
+     * (Except to ensure determinism).
+     * Only looks at the plan for the outermost query.
+     * @param sqlText  SQL statement used to produce plan to check
+     */
+    private void assertPlanHasNoIndexScans(String sqlText) {
+        AbstractPlanNode rootNode = compile(sqlText);
+        Queue<AbstractPlanNode> nodes = new LinkedList<>();
+
+        nodes.add(rootNode);
+        while (! nodes.isEmpty()) {
+            AbstractPlanNode node = nodes.remove();
+            assertPlanNodeHasNoIndexScans(node);
+
+            nodes.addAll(node.getInlinePlanNodes().values());
+            int numChildren = node.getChildCount();
+            for (int i = 0; i < numChildren; ++i) {
+                nodes.add(node.getChild(i));
+            }
+        }
+    }
+
+    private void assertPlanNodeHasNoIndexScans(AbstractPlanNode node) {
+        if (node instanceof IndexScanPlanNode) {
+            IndexScanPlanNode indexScan = (IndexScanPlanNode)node;
+            assertTrue("Expected plan to use no indexes, but it contains an index scan plan node "
+                    + "used for something other than forcing a deterministic order",
+                    indexScan.isForDeterminismOnly());
+        }
+        else {
+            String className = node.getClass().getSimpleName();
+            assertFalse("Expected plan to use no indexes, but it contains an instance of " + className,
+                    className.toLowerCase().contains("index"));
+        }
+    }
+
+    public void testNoIndexWithSubqueryExpressionIn() {
+
+        // Table R4 has an index on column A.
+
+        // A subquery on the RHS of IN.
+        assertPlanHasNoIndexScans(
+                "select * from r4 "
+                + "where a in (select a from r1);");
+
+        // A correlated subquery on the RHS of IN.
+        assertPlanHasNoIndexScans(
+                "select * from r4 "
+                + "where a in (select a from r1 where r4.a = r1.a);");
+
+        // A correlated subquery where inner table also has an index
+        // Note: the inner query (which we are not checking) will have
+        // an index scan this case, which is okay.
+        assertPlanHasNoIndexScans(
+                "select * from r4 "
+                + "where a in (select a from r2 where r4.a = r2.a);");
+
+        // Table R5 has an index on (a, c)
+
+        // RowSubqueryExpression on the left
+        assertPlanHasNoIndexScans(
+                "select * from r5 "
+                + "where (a, c) in (select a, c from r1);");
+
+        // RowSubqueryExpression on the left, with correlation
+        assertPlanHasNoIndexScans(
+                "select * from r5 "
+                + "where (a, c) in (select a, c from r1 where (r1.a, r1.c) = (r5.a, r5.c));");
+    }
+
+    public void testNoIndexWithSubqueryExpressionRelational() {
+        String[] relationalOps = {"=", "!=", "<", "<=", ">", ">="};
+        String[] quantifiers = {"", "any", "all"};
+
+        String subqueryTemplates[] = {
+                "select * from r4 where a %s %s (select a from r2)",
+                "select * from r4 where a %s %s (select a from r2 where r2.a = r4.a)",
+
+                "select * from r5 where (a, c) %s %s (select a, c from r1)",
+                "select * from r5 where (a, c) %s %s (select a, c from r1 where (r1.a, r1.c) = (r5.a, r5.c))",
+
+                // This would use an expression index, if not for the subquery.
+                "select * from r5 where abs(a - c) %s %s (select abs(a - c) from r1)",
+                "select * from r5 where abs(a - c) %s %s (select abs(a - c) from r1 where (r1.a, r1.c) = (r5.a, r5.c))"
+        };
+
+        for (String op : relationalOps) {
+            for (String quantifier : quantifiers) {
+                for (String template : subqueryTemplates) {
+                    String query = String.format(template, op, quantifier);
+                    assertPlanHasNoIndexScans(query);
+                }
+            }
+        }
     }
 
     @Override
