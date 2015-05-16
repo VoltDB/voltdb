@@ -2150,6 +2150,39 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertNotNull(((IndexScanPlanNode) pn).getPredicate());
     }
 
+   /**
+     * Test to see if scalar subqueries are either allowed where we
+     * expect them to be or else cause compilation errors where we
+     * don't expect them to be.
+     *
+     * @throws Exception
+     */
+    public void testScalarSubqueriesExpectedFailures() throws Exception {
+
+        // Scalar subquery not allowed in limit.
+        failToCompile("select A from r1 where C = 1 limit (select D from t where C = 2);",
+                      "incompatible data type in operation: ; in LIMIT, OFFSET or FETCH");
+        // Scalar subquery not allowed in offset.
+        failToCompile("select A from r1 where C = 1 limit 1 offset (select D from r1 where C = 2);",
+                      "SQL Syntax error in \"select A from r1 where C = 1 limit 1 offset (select D from r1 where C = 2);\" unexpected token: (");
+        // Scalar subquery not allowed in order by
+        failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C );",
+                      "ORDER BY parsed with strange child node type: tablesubquery");
+
+    }
+
+    /**
+     * This test fails to compile, and causes an NPE in the planner (I think).
+     * The ticket number, obviously, is 8280.  It's commented out because
+     * it fails.
+     *
+     * @throws Exception
+     */
+
+    public void testENG8280() throws Exception {
+        // failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;","mumble");
+    }
+
     /**
      * Asserts that the plan doesn't use index scans.
      * (Except to ensure determinism).
