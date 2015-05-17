@@ -43,6 +43,9 @@ import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
 
+// A VoltDB extension to allow use of X'..' as numeric literals
+import java.math.BigInteger;
+// End VoltDB extension
 /**
  * Implementation of SQL standard function calls
  *
@@ -924,7 +927,7 @@ public class FunctionSQL extends Expression {
                 ... disabled 9 lines */
 
                 return ((CharacterType) dataType).substring(session, data[0],
-                		offset, length, (nodes.length > 2 && nodes[2] != null), false);
+                        offset, length, (nodes.length > 2 && nodes[2] != null), false);
                 // End of VoltDB extension
             }
             /*
@@ -2124,14 +2127,14 @@ public class FunctionSQL extends Expression {
                 volt_alias = "day_of_year";
                 break;
             case Tokens.WEEKDAY :
-            	volt_alias = "weekday";
-            	break;
+                volt_alias = "weekday";
+                break;
             case Tokens.DAY_OF_WEEK :
             // case DTIType.DAY_OF_WEEK :
                 volt_alias = "day_of_week";
                 break;
             case Tokens.WEEK:
-            	keywordConstant = Tokens.WEEK_OF_YEAR;
+                keywordConstant = Tokens.WEEK_OF_YEAR;
             case Tokens.WEEK_OF_YEAR :
             // case DTIType.WEEK_OF_YEAR :
                 volt_alias = "week_of_year";
@@ -2339,5 +2342,61 @@ public class FunctionSQL extends Expression {
     public static int voltGetCurrentTimestampId() {
         return FUNC_CURRENT_TIMESTAMP;
     }
+
+    protected void voltResolveToBigintTypesForBitwise() {
+        for (int i = 0; i < nodes.length; i++) {
+            voltResolveToBigintType(i);
+        }
+        dataType = Type.SQL_BIGINT;
+    }
+
+    protected void voltResolveToBigintType(int nodeIdx) {
+        Expression node = nodes[nodeIdx];
+
+        if (node.dataType == null) {
+            node.dataType = Type.SQL_BIGINT;
+            return;
+        }
+
+        if (node.dataType.typeCode == Types.SQL_BIGINT) {
+            return;
+        }
+
+        if (node.valueData == null) {
+            throw Error.error(ErrorCode.X_42561);
+        }
+
+        if (node.dataType.isIntegralType()) {
+            // Only constants are checked here for long type range limits
+            NumberType.checkValueIsInLongLimits(node.valueData);
+            node.dataType = Type.SQL_BIGINT;
+        }
+        else if (node.dataType.isBinaryType() && node.opType == OpTypes.VALUE) {
+            boolean success = ExpressionValue.voltMutateToBigintType(node, this, nodeIdx);
+            if (! success) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+        }
+        else {
+            throw Error.error(ErrorCode.X_42561);
+        }
+    }
+
+    protected void voltResolveToBigintCompatibleType(int i) {
+        if (nodes[i].dataType == null) {
+            nodes[i].dataType = Type.SQL_BIGINT;
+        }
+        else if (nodes[i].dataType.typeCode != Types.SQL_BIGINT) {
+            if (! nodes[i].dataType.isIntegralType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[i].valueData != null) {                       // is constants
+                // check constants in range
+                NumberType.checkValueIsInLongLimits(nodes[i].valueData);
+                nodes[i].dataType = Type.SQL_BIGINT;
+            }
+        }
+    }
+
     /**********************************************************************/
 }

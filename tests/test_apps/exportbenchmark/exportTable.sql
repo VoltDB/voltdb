@@ -1,35 +1,32 @@
+IMPORT CLASS exportbenchmark.procedures.SampleRecord;
+
 CREATE TABLE ALL_VALUES (
-    bigcol    BIGINT NOT NULL,
-    tinycol   TINYINT,
-    smallcol  SMALLINT,
-    intcol    INT,
-    floatcol  FLOAT,
-    strcol    VARCHAR(128),
-    tscol     TIMESTAMP,
-    bincol    VARBINARY(128)
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+, rowid_group               TINYINT       NOT NULL
+, type_null_tinyint         TINYINT
+, type_not_null_tinyint     TINYINT       NOT NULL
+, type_null_smallint        SMALLINT
+, type_not_null_smallint    SMALLINT      NOT NULL
+, type_null_integer         INTEGER
+, type_not_null_integer     INTEGER       NOT NULL
+, type_null_bigint          BIGINT
+, type_not_null_bigint      BIGINT        NOT NULL
+, type_null_timestamp       TIMESTAMP
+, type_not_null_timestamp   TIMESTAMP     NOT NULL
+, type_null_float           FLOAT
+, type_not_null_float       FLOAT         NOT NULL
+, type_null_decimal         DECIMAL
+, type_not_null_decimal     DECIMAL       NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
+, type_null_varchar128      VARCHAR(128)
+, type_not_null_varchar128  VARCHAR(128)  NOT NULL
+, type_null_varchar1024     VARCHAR(1024)
+, type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-CREATE TABLE ALL_VALUES_NONPARTITIONED (
-    bigcol    BIGINT NOT NULL,
-    tinycol   TINYINT,
-    smallcol  SMALLINT,
-    intcol    INT,
-    floatcol  FLOAT,
-    strcol    VARCHAR(128),
-    tscol     TIMESTAMP,
-    bincol    VARBINARY(128)
-);
+PARTITION TABLE ALL_VALUES ON COLUMN rowid;
 
 EXPORT TABLE ALL_VALUES;
-EXPORT TABLE ALL_VALUES_NONPARTITIONED;
 
-CREATE PROCEDURE ExportInsert AS
-   INSERT INTO ALL_VALUES
-     (bigcol,tinycol,smallcol,intcol,floatcol,strcol,tscol,bincol)
-     VALUES (?,?,?,?,?,?,?,?);
-CREATE PROCEDURE ExportInsert_NonPartitioned AS
-   INSERT INTO ALL_VALUES
-     (bigcol,tinycol,smallcol,intcol,floatcol,strcol,tscol,bincol)
-     VALUES (?,?,?,?,?,?,?,?);
-
-PARTITION TABLE ALL_VALUES ON COLUMN bigcol;
-PARTITION PROCEDURE ExportInsert ON TABLE ALL_VALUES COLUMN bigcol;
+CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport;

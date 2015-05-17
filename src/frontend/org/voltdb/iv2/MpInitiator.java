@@ -101,7 +101,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
     }
 
@@ -164,7 +164,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
-                    if (m_consumerDRGateway != null) {
+                    if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
                         m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId);
                     }
                 }

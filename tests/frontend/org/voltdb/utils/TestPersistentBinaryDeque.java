@@ -33,8 +33,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeSet;
 
+import com.google_voltpatches.common.collect.Sets;
+import junit.framework.Assert;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -127,14 +130,14 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
-    public void testEmptyTruncation() throws Exception {
+    public void testCloseEmptyShouldNotDelete() throws Exception {
         System.out.println("Running testEmptyTruncation");
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
         m_pbd.close();
 
         listing = getSortedDirectoryListing();
-        assertEquals(listing.size(), 0);
+        assertEquals(listing.size(), 1);
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
 
@@ -302,7 +305,7 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
-    public void testOfferThanPoll() throws Exception {
+    public void testOfferThenPoll() throws Exception {
         System.out.println("Running testOfferThanPoll");
         assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
@@ -315,6 +318,74 @@ public class TestPersistentBinaryDeque {
         //Now make sure the current write file is stolen and a new write file created
         BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         retval.discard();
+    }
+
+    @Test
+    public void testCloseOldSegments() throws Exception {
+        System.out.println("Running testOfferMoreThanPoll");
+        assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+
+        final int total = 100;
+
+        //Make sure several files with the appropriate data is created
+        for (int i = 0; i < total; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        File files[] = TEST_DIR.listFiles();
+        assertEquals( 3, files.length);
+        Set<String> actualFiles = Sets.newHashSet();
+        for (File f : files) {
+            actualFiles.add(f.getName());
+        }
+        Set<String> expectedFiles = Sets.newHashSet();
+        for (int i = 0; i < 3; i++) {
+            expectedFiles.add("pbd_nonce." + i + ".pbd");
+        }
+        Assert.assertEquals(expectedFiles, actualFiles);
+
+        //Now make sure the current write file is stolen and a new write file created
+        for (int i = 0; i < total; i++) {
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            retval.discard();
+        }
+    }
+
+    @Test
+    public void testDontCloseReadSegment() throws Exception {
+        System.out.println("Running testOfferPollOfferMoreThanPoll");
+        assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+
+        final int total = 100;
+
+        //Make sure a single file with the appropriate data is created
+        for (int i = 0; i < 5; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        assertEquals(1, TEST_DIR.listFiles().length);
+
+        // Read one buffer from the segment so that it's considered being polled from.
+        m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+
+        for (int i = 5; i < total; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        File files[] = TEST_DIR.listFiles();
+        assertEquals( 3, files.length);
+        Set<String> actualFiles = Sets.newHashSet();
+        for (File f : files) {
+            actualFiles.add(f.getName());
+        }
+        Set<String> expectedFiles = Sets.newHashSet();
+        for (int i = 0; i < 3; i++) {
+            expectedFiles.add("pbd_nonce." + i + ".pbd");
+        }
+        Assert.assertEquals(expectedFiles, actualFiles);
+
+        //Now make sure the current write file is stolen and a new write file created
+        for (int i = 1; i < total; i++) {
+            BBContainer retval = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            retval.discard();
+        }
     }
 
     @Test

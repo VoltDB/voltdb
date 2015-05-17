@@ -19,6 +19,7 @@
 #include <cstring>
 #include <cxxabi.h>   // for abi
 #include <cstdlib> // for malloc/free
+#include <sstream> // for std::ostringstream
 
 namespace voltdb {
 StackTrace::StackTrace() {
@@ -70,8 +71,19 @@ StackTrace::StackTrace() {
         ::free(function);
     }
 }
+
 StackTrace::~StackTrace() {
     ::free(m_traceSymbols);
+}
+
+std::string StackTrace::stringStackTrace()
+{
+    StackTrace st;
+    std::ostringstream stacked;
+    for (int ii=2; ii < st.m_traces.size(); ii++) {
+        stacked << st.m_traces[ii] << "\n";
+    }
+    return stacked.str();
 }
 
 } // namespace voltdb

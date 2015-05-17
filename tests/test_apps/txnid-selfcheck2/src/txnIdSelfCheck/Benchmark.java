@@ -530,7 +530,15 @@ public class Benchmark {
         connect();
 
         // get partition count
-        int partitionCount = getUniquePartitionCount();
+        int partitionCount = 0;
+        int trycount = 12;
+        while (trycount-- > 0) {
+            try {
+                partitionCount = getUniquePartitionCount();
+                break;
+            } catch (Exception e) { }
+            Thread.sleep(10000);
+        }
 
         // get stats
         try {

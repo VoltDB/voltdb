@@ -924,6 +924,10 @@ public abstract class StatementDMQL extends Statement {
                     queryExpr.getLeftQueryExpression(), parameters, session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
                     queryExpr.getRightQueryExpression(), parameters, session);
+            if (queryExpr.sortAndSlice.hasOrder() || queryExpr.sortAndSlice.hasLimit()) {
+                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                        queryExpr.operatorName() + " tuple set operator with ORDER BY or LIMIT/OFFSET is not supported.");
+            }
             /**
              * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
@@ -945,7 +949,7 @@ public abstract class StatementDMQL extends Statement {
             return unionExpr;
         } else {
             throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    queryExpr.operatorName() + "  tuple set operator is not supported.");
+                    queryExpr.operatorName() + " tuple set operator is not supported.");
         }
     }
 

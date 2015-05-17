@@ -70,6 +70,7 @@ class Plot:
         self.xmax = xmax
         self.xmin = xmin
         self.series = series
+        self.title = title
 
         self.fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
                          dpi=self.DPI)
@@ -77,6 +78,7 @@ class Plot:
         self.ax.set_title(title)
         plt.tick_params(axis='x', which='major', labelsize=16)
         plt.tick_params(axis='y', labelright=True, labelleft=False, labelsize=16)
+        plt.Locator.MAXTICKS=2000
         plt.grid(True)
         self.fig.autofmt_xdate()
         plt.ylabel(ylabel)
@@ -89,9 +91,19 @@ class Plot:
     def close(self):
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(x_formatter)
-        loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=1)
-        self.ax.xaxis.set_major_locator(loc)
-        self.ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(n=7))
+        xmin, xmax = plt.xlim()
+        if (self.xmax - self.xmin).days >= 365:
+            l = 13
+            loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=13)
+            minloc = None
+        else:
+            l = 7
+            loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=1)
+            minloc = matplotlib.ticker.AutoMinorLocator(n=l)
+        if loc:
+            self.ax.xaxis.set_major_locator(loc)
+        if minloc:
+            self.ax.xaxis.set_minor_locator(minloc)
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
@@ -100,7 +112,7 @@ class Plot:
             lloc = 2
         else:
             lloc = 3
-        plt.legend(prop={'size': 12}, loc=lloc)
+        plt.legend(prop={'size': 10}, loc=lloc)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')

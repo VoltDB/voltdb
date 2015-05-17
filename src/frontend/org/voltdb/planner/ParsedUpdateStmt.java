@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Column;
@@ -48,6 +49,9 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     void parse(VoltXMLElement stmtNode) {
         assert(m_tableList.size() == 1);
         Table table = m_tableList.get(0);
+        // Need to add the table to the cache. It may be required to resolve the
+        // correlated TVE in case of WHERE clause contains IN subquery
+        addTableToStmtCache(table, table.getTypeName());
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns")) {
@@ -69,5 +73,18 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         retval = retval.trim();
 
         return retval;
+    }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+
+        for (AbstractExpression expr : columns.values()) {
+            if (expr != null) {
+                exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+
+        return exprs;
     }
 }

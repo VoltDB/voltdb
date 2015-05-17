@@ -188,6 +188,9 @@ public class TestUnion extends PlannerTestCase {
         // At this point, coordinator designation is only supported for single-fragment plans.
         failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
 
+        // Multiple Set operations in a single statement with multiple partitioned tables
+        failToCompile("select F from T1 UNION select G from T6 INTERSECT select F from T1");
+
         // Column types must match.
         failToCompile("select A, DESC from T1 UNION select B from T2");
         failToCompile("select B from T2 EXCEPT select A, DESC from T1");
@@ -232,6 +235,14 @@ public class TestUnion extends PlannerTestCase {
         failToCompile("select DESC from T1 UNION select DESC from T1");
     }
 
+    public void testUnionOrderby() {
+        String errorMsg = "UNION tuple set operator with ORDER BY or LIMIT/OFFSET is not supported";
+
+        failToCompile("(select B from T2 UNION select B from T2) order by B", errorMsg);
+        failToCompile("(select B from T2 UNION select B from T2) limit 5", errorMsg);
+        failToCompile("(select B from T2 UNION select B from T2) order by B limit 5", errorMsg);
+    }
+
     public void testSubqueryUnionWithParamENG7783() {
         AbstractPlanNode pn = compile(
                 "SELECT B, ABS( B - ? ) AS distance FROM ( " +
@@ -249,6 +260,6 @@ public class TestUnion extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestUnion.class.getResource("testunion-ddl.sql"), "testunion", false);
+        setupSchema(TestUnion.class.getResource("testplans-union-ddl.sql"), "testunion", false);
     }
 }

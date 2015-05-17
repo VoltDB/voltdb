@@ -172,6 +172,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     TableTuple& tmptup = m_outputTable->tempTuple();
     tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
 
+    bool earlyReturnForSearchKeyOutOfRange = false;
     //
     // SEARCH KEY
     //
@@ -180,6 +181,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
             NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
+            if (candidateValue.isNull()) {
+                // when any part of the search key is NULL, the result is false when it compares to anything.
+                // do early return optimization, our index comparator may not handle null comparison correctly.
+                earlyReturnForSearchKeyOutOfRange = true;
+                break;
+            }
             try {
                 searchKey.setNValue(ctr, candidateValue);
             }
@@ -203,8 +210,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     assert (localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
 
                     if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                        m_outputTable->insertTuple(tmptup);
-                        return true;
+                        earlyReturnForSearchKeyOutOfRange = true;
+                        break;
                     } else if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         searchKeyUnderflow = true;
                         break;
@@ -214,13 +221,18 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 }
                 // if a EQ comparision is out of range, then return no tuples
                 else {
-                    m_outputTable->insertTuple(tmptup);
-                    return true;
+                    earlyReturnForSearchKeyOutOfRange = true;
+                    break;
                 }
                 break;
             }
         }
         VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
+
+        if (earlyReturnForSearchKeyOutOfRange) {
+            m_outputTable->insertTuple(tmptup);
+            return true;
+        }
     }
 
     if (m_numOfEndkeys != 0) {
@@ -231,6 +243,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("Initial (all null) end key: '%s'", endKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
             NValue endKeyValue = m_endKeyArray[ctr]->eval(NULL, NULL);
+            if (endKeyValue.isNull()) {
+                // when any part of the search key is NULL, the result is false when it compares to anything.
+                // do early return optimization, our index comparator may not handle null comparison correctly.
+                earlyReturnForSearchKeyOutOfRange = true;
+                break;
+            }
             try {
                 endKey.setNValue(ctr, endKeyValue);
             }
@@ -248,8 +266,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 if (ctr == (m_numOfEndkeys - 1)) {
                     assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                        m_outputTable->insertTuple(tmptup);
-                        return true;
+                        earlyReturnForSearchKeyOutOfRange = true;
+                        break;
                     } else if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                         endKeyOverflow = true;
                         const ValueType type = endKey.getSchema()->columnType(ctr);
@@ -264,13 +282,18 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 }
                 // if a EQ comparision is out of range, then return no tuples
                 else {
-                    m_outputTable->insertTuple(tmptup);
-                    return true;
+                    earlyReturnForSearchKeyOutOfRange = true;
+                    break;
                 }
                 break;
             }
         }
         VOLT_TRACE("End key after substitutions: '%s'", endKey.debugNoHeader().c_str());
+
+        if (earlyReturnForSearchKeyOutOfRange) {
+            m_outputTable->insertTuple(tmptup);
+            return true;
+        }
     }
 
     //

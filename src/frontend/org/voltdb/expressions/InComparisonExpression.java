@@ -32,10 +32,10 @@ public class InComparisonExpression extends ComparisonExpression {
     public void validate() throws Exception {
         super.validate();
         //
-        // We need at least one value defined
+        // Args list is not used by IN.
         //
-        if (m_args.isEmpty()) {
-            throw new Exception("ERROR: There were no values defined for '" + this + "'");
+        if (m_args != null) {
+            throw new Exception("ERROR: Args list was not null for '" + this + "'");
         }
         //
         // We always need both a left node and a right node

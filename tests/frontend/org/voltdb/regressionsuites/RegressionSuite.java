@@ -37,6 +37,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
@@ -45,7 +46,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.net.HostAndPort;
-import org.voltdb.client.ClientAuthHashScheme;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -363,14 +363,14 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
-    public void validateTableOfLongs(Client c, String sql, long[][] expected)
+    static public void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws Exception, IOException, ProcCallException {
         assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(vt, expected);
     }
 
-    public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
         int len = expected.length;
@@ -379,23 +379,23 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    public void validateTableOfScalarLongs(Client client, String sql, long[] expected) throws Exception {
+    static public void validateTableOfScalarLongs(Client client, String sql, long[] expected) throws Exception {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
     }
 
-    public void validateTableOfLongs(VoltTable vt, long[][] expected) {
+    static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals("Wrong number of rows in table.  ",
                         expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {
-            validateRowOfLongs(vt, expected[i]);
+            validateRowOfLongs("at row " + i + ", ", vt, expected[i]);
         }
     }
 
-    public void validateRowOfLongs(VoltTable vt, long [] expected) {
+    static public void validateRowOfLongs(String messagePrefix, VoltTable vt, long [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
@@ -422,14 +422,24 @@ public class RegressionSuite extends TestCase {
                     }
                 }
             }
+
+            String message = "at column " + i +", ";
+            if (messagePrefix != null) {
+                message = messagePrefix + message;
+            }
+
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
-                assertEquals("At index " + i + ", ", expected[i], actual);
+                assertEquals(message, expected[i], actual);
             } else {
                 VoltType type = vt.getColumnType(i);
-                assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
             }
         }
+    }
+
+    static public void validateRowOfLongs(VoltTable vt, long [] expected) {
+        validateRowOfLongs(null, vt, expected);
     }
 
     static public void validateTableColumnOfScalarVarchar(VoltTable vt, String[] expected) {
@@ -442,7 +452,13 @@ public class RegressionSuite extends TestCase {
         int len = expected.length;
         for (int i=0; i < len; i++) {
             assertTrue(vt.advanceRow());
-            assertEquals(expected[i], vt.getString(col));
+            if (expected[i] == null) {
+                String actual = vt.getString(col);
+                assertTrue(vt.wasNull());
+                assertEquals(null, actual);
+            } else {
+                assertEquals(expected[i], vt.getString(col));
+            }
         }
     }
 
@@ -474,6 +490,10 @@ public class RegressionSuite extends TestCase {
 
     static public void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {
         verifyProcFails(client, expectedPattern, "@AdHoc", stmt);
+    }
+
+    static public void verifyAdHocFails(Client client, String expectedPattern, Object... args) throws IOException {
+        verifyProcFails(client, expectedPattern, "@AdHoc", args);
     }
 
     static public void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
@@ -577,5 +597,17 @@ public class RegressionSuite extends TestCase {
             }
         }
         assertTrue(found);
+    }
+
+    static public void checkQueryPlan(Client client, String query, String...patterns) throws Exception {
+        VoltTable vt;
+        assert(patterns.length >= 1);
+
+        vt = client.callProcedure("@Explain", query).getResults()[0];
+        String vtStr = vt.toString();
+
+        for (String pattern : patterns) {
+            assertTrue(vtStr.contains(pattern));
+        }
     }
 }

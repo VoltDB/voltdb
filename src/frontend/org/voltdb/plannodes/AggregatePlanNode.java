@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -26,6 +27,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
@@ -183,6 +185,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
             assert(m_hasSignificantOutputSchema);
         }
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
     }
 
     @Override
@@ -258,6 +265,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
             tve.setColumnIndex(index);
         }
 
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
     }
 
     /**
@@ -405,7 +417,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
-            if (jobj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
+            if (tempObj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
                 m_aggregateExpressions.add(null);
             }
             else {
@@ -441,4 +453,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
         return aggNode;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_prePredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_postPredicate, aeClass));
+        for (AbstractExpression ae : m_aggregateExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        for (AbstractExpression ae : m_groupByExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
+    }
+
 }
