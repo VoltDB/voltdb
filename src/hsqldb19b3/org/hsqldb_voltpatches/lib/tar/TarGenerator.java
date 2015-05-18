@@ -193,6 +193,18 @@ public class TarGenerator {
         write(System.err);
     }
 
+    /// Short-term backward compatability with the one call from VoltDB/pro
+    /// allows a branch with hsqldb232 upgraded to continue to
+    /// build alongside VoltDB/pro master.
+    /// VoltDB/voltdb code should use a different overload.
+    /// TODO: Eliminate this method and bypass this call in VEMCore.java
+    /// when the hsqldb232 upgrade hits master.
+    public void write(boolean must_be_false, boolean always_false) {
+        assert(!must_be_false);
+        assert(!always_false);
+        write(null);
+    }
+
     public void write(java.io.PrintStream feedback) throws IOException, TarMalformatException {
 // End of VoltDB extension
         if (TarFileOutputStream.debug) {
