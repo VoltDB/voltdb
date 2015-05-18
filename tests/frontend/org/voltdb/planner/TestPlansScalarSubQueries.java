@@ -31,7 +31,6 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -240,22 +239,34 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
                 "row column count mismatch");
     }
 
+    /**
+     * Uncomment these tests when ENG-8306 is finished
+     */
     public void testHavingScalar() {
-        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
-        pn = pn.getChild(0).getChild(0);
-        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-        AbstractExpression aggExpr = aggNode.getPostPredicate();
-        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
+        failToCompile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);",
+                TestPlansInExistsSubQueries.HavingErrorMsg);
+
+//        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
+//        pn = pn.getChild(0).getChild(0);
+//        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+//        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+//        AbstractExpression aggExpr = aggNode.getPostPredicate();
+//        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
     }
 
+    /**
+     * Uncomment these tests when ENG-8306 is finished
+     */
     public void testHavingRow() {
-        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");
-        pn = pn.getChild(0).getChild(0);
-        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-        AbstractExpression aggExpr = aggNode.getPostPredicate();
-        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
+        failToCompile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);",
+                TestPlansInExistsSubQueries.HavingErrorMsg);
+
+//        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");
+//        pn = pn.getChild(0).getChild(0);
+//        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+//        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+//        AbstractExpression aggExpr = aggNode.getPostPredicate();
+//        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
     }
 
     public void testHavingRowMismatch() {
