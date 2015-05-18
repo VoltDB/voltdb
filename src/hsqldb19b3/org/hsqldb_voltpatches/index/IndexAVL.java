@@ -2172,6 +2172,12 @@ public class IndexAVL implements Index {
         index.attributes.put("unique", isUnique() ? "true" : "false");
 
         if (predicate != null) {
+            if (predicate.voltHasSubqueries()) {
+                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                        "Subquery expressions are not allowed in index or constraint definitions.");
+            }
+            // TODO: Expressions containing agg functions could also be disallowed, here.
+            // For now, that check is put off until the VoltDB DDL compiler.
             org.hsqldb_voltpatches.VoltXMLElement partialExpr = new org.hsqldb_voltpatches.VoltXMLElement("predicate");
             index.children.add(partialExpr);
             org.hsqldb_voltpatches.VoltXMLElement xml = predicate.voltGetExpressionXML(session, (Table) table);

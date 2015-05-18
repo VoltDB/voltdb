@@ -681,6 +681,13 @@ public class ParserDDL extends ParserRoutine {
         Table t = database.schemaManager.getUserTable(session, tableName,
             schema.name);
 
+        // The named "table" was actually a view -- not considered a
+        // valid target for alter table commands -- treat as "not found",
+        // as if views and tables are not using the same name space.
+        if (t.tableType == TableBase.VIEW_TABLE) {
+            throw Error.error(ErrorCode.X_42501, tableName);
+        }
+
         read();
 
         switch (token.tokenType) {

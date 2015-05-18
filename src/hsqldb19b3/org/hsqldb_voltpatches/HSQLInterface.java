@@ -75,7 +75,8 @@ public class HSQLInterface {
         private String message = null;
         private Integer lineNo = null;
 
-        HSQLParseException(String msg) {
+        // Declared "public" for visibility from sub-packages e.g. "index".
+        public HSQLParseException(String msg) {
             message = msg;
         }
 

@@ -56,7 +56,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -144,7 +143,8 @@ public class TestVoltCompiler extends TestCase {
     private boolean isFeedbackPresent(String expectedError,
             ArrayList<Feedback> fbs) {
         for (Feedback fb : fbs) {
-            if (fb.getStandardFeedbackLine().contains(expectedError)) {
+            String fbLine = fb.getStandardFeedbackLine();
+            if (fbLine.contains(expectedError)) {
                 return true;
             }
         }
@@ -3708,23 +3708,18 @@ public class TestVoltCompiler extends TestCase {
     public void testInvalidPartialIndex()
     {
         String ddl = null;
-        ddl =
-                "create table t(id integer not null, num integer not null);\n" +
+        ddl =   "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where max(id) > 4;\n";
-
         checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with aggregate expression(s) is not supported.");
 
-        ddl =
-                "create table t1(id integer not null, num integer not null);\n" +
+        ddl =   "create table t1(id integer not null, num integer not null);\n" +
                 "create table t2(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T1_IDNUM on t1(id) where t2.id > 4;\n";
-
         checkDDLErrorMessage(ddl, "Partial index \"IDX_T1_IDNUM\" with expression(s) involving other tables is not supported.");
 
-        ddl =
-                "create table t(id integer not null, num integer not null);\n" +
+        ddl =   "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
-        checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
+        checkDDLErrorMessage(ddl, "Subquery expressions are not allowed");
 }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {

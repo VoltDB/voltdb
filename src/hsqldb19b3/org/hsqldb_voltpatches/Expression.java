@@ -2784,6 +2784,19 @@ public class Expression implements Cloneable {
         }
         return result;
     }
+    
+    public boolean voltHasSubqueries() {
+        if (table != null) {
+            return true;
+        }
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null && nodes[i].voltHasSubqueries()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     // End of VoltDB extension
 }

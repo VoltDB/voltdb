@@ -2290,12 +2290,14 @@ public class DDLCompiler {
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
 
+        // This case was already disqualified in the HSQL frontend because it
+        // was causing an NPE.
+        assert(predicate.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).isEmpty());
+        // TODO: it would not be difficult to also disqualify the following
+        // case in the HSQL frontend, and assert here.
+        // See IndexAVL.java
         if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
             msg += "with aggregate expression(s) is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-        if (!predicate.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).isEmpty()) {
-            msg += "with subquery expression(s) is not supported.";
             throw m_compiler.new VoltCompilerException(msg);
         }
         return predicate;
