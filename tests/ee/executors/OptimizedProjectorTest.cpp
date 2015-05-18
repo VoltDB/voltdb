@@ -256,7 +256,7 @@ public:
                 bool b = expectedVal.op_equals(actualVal).isTrue();
                 if (!b) {
                     std::cout << "\nFields failed to compare as equal.  "
-                         << "Dst: " << dstIdx << "\n";
+                              << "Dst: " << dstIdx << "\n";
                     std::cout << "  " << srcTuple.debug("src") << "\n";
                     std::cout << "  " << dstTuple.debug("dst") << "\n\n";
                     return false;
@@ -275,11 +275,11 @@ public:
     }
 
     std::pair<bool, double> runSteps(const std::string &name,
-                                const std::vector<eetest::TypeAndSize>& dstTableTypes,
-                                Table& srcTbl,
-                                const OptimizedProjector& projector,
-                                const OptimizedProjector& baselineProjector,
-                                double baselineRate) {
+                                     const std::vector<eetest::TypeAndSize>& dstTableTypes,
+                                     Table& srcTbl,
+                                     const OptimizedProjector& projector,
+                                     const OptimizedProjector& baselineProjector,
+                                     double baselineRate) {
 
         boost::scoped_ptr<voltdb::Table> dstTable(createTableEz(eetest::TEMP, dstTableTypes));
         boost::timer t;
@@ -288,7 +288,7 @@ public:
         projectFields(&srcTbl, dstTable.get(), projector);
         double rowsPerSecond = static_cast<double>(NUM_ROWS) / t.elapsed();
         std::cout << "            Projected " << boost::format("%10.0f") % rowsPerSecond
-             << " rows per second.  (" << name << ")\n";
+                  << " rows per second.  (" << name << ")\n";
 
         // Make sure we get the same answer as normal evaluation.
         bool success = assertProjection(&srcTbl, dstTable.get(), baselineProjector);
@@ -488,7 +488,7 @@ void printUsageAndExit(const std::string& progName) {
 
     std::cerr << "Usage: " << progName << " [-r <num_rows>] [-c <num_cols>]\n";
     std::cerr << "  Note that <num_cols> must be equal to a power of two "
-         << "(for easy permuations).\n";
+              << "(for easy permuations).\n";
     exit(1);
 
 }
