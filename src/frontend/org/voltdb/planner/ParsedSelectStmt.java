@@ -42,7 +42,6 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
-import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -70,7 +69,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
+    // This list contains the core information for aggregation.
+    // It collects aggregate expression, group by expression from display columns,
+    // group by columns, having, order by columns.
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
+    // It represents the group by expression and replace TVE if it's complex group by.
     public Map<String, AbstractExpression> m_groupByExpressions = null;
 
     private ArrayList<ParsedColInfo> m_avgPushdownDisplayColumns = null;
@@ -1828,10 +1831,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_having != null) {
             exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
         }
-        if (m_groupByExpressions != null) {
-            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
-                exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
-            }
+        // m_groupByExpressions is replaced all complex expression with TVE already
+        for (ParsedColInfo groupbyCol: m_groupByColumns) {
+            AbstractExpression groupByExpr = groupbyCol.expression;
+            exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
+
         }
         for(ParsedColInfo col : m_displayColumns) {
             if (col.expression != null) {
@@ -1841,17 +1845,30 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return exprs;
     }
 
+    /**
+     * This functions tries to find all expression from the statement. For complex group by or complex aggregate,
+     * we have a special function ParsedSelectStmt::placeTVEsinColumns() to replace the expression with TVE for
+     * the convenience of projection node after group by node.
+     *
+     * So use the original expression from the XML of hsqldb, other than the processed information. See ENG-8263.
+     * m_having and m_projectSchema seem to have the same issue in ENG-8263.
+     */
     @Override
     public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+        // m_having may have the same problem: already replaced with TVE
         if (m_having != null) {
             exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
         }
-        if (m_groupByExpressions != null) {
-            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
-                exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
-            }
+
+        // For complex group by query, m_groupByExpressions has been replaced with TVE already
+        for (ParsedColInfo groupbyCol: m_groupByColumns) {
+            AbstractExpression groupByExpr = groupbyCol.expression;
+            exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
+
         }
+        // m_projectSchema may have the same problem:
+        // probably should use m_displayColumns instead
         if (m_projectSchema != null) {
             for(SchemaColumn col : m_projectSchema.getColumns()) {
                 if (col.getExpression() != null) {

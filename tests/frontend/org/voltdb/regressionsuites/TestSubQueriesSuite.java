@@ -1014,7 +1014,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     public void testSelectScalarSubSelects() throws Exception
     {
         Client client = getClient();
-        loadData(false);
+        loadData(true);
         VoltTable vt;
 
         vt = client.callProcedure("@AdHoc",
@@ -1027,12 +1027,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where R2.ID = R1.ID and R2.WAGE = 50) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {  {5l, 2l, 5l}, {4l, 2l, Long.MIN_VALUE} });
+        validateTableOfLongs(vt, new long[][] {  {7, 2, Long.MIN_VALUE}, {6, 2, Long.MIN_VALUE}, {5, 2, 5}, {4, 2, Long.MIN_VALUE} });
 
         // Seq scan
         vt = client.callProcedure("@AdHoc",
                 "select R1.DEPT, (SELECT ID FROM R2 where R2.ID = 1) FROM R1 where R1.DEPT = 2;").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1} });
+        validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1}, {2, 1}, {2, 1} });
 
         // with group by correlated
         // Hsqldb back end bug: ENG-8273
@@ -1040,13 +1040,27 @@ public class TestSubQueriesSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                     "select R1.DEPT, count(*), (SELECT max(dept) FROM R2 where R2.wage = R1.wage) FROM R1 "
                     + " GROUP BY dept, wage order by dept, wage;").getResults()[0];
-            validateTableOfLongs(vt, new long[][] {  {1,1,1}, {1,1,1}, {1,1,1}, {2, 1, 2}, {2,1,2} });
+            validateTableOfLongs(vt, new long[][] {  {1,1,2}, {1,1,1}, {1,1,1}, {2, 1, 2}, {2, 2, 2}, {2,1,2} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.DEPT, count(*), (SELECT sum(dept) FROM R2 where R2.wage > r1.dept * 10) FROM R1 "
                     + " GROUP BY dept order by dept;").getResults()[0];
-            validateTableOfLongs(vt, new long[][] {  {1,3,6}, {2, 2, 5} });
+            validateTableOfLongs(vt, new long[][] {  {1,3,8}, {2, 4, 7} });
         }
+
+        // ENG-8263: group by scalar value expression
+        String sql = "select R1.DEPT, count(*) as tag FROM R1 "
+                + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage = R1.wage) order by dept, tag;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1, 1}, {1, 2}, {2, 1}, {2, 3} });
+
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, count(*) as tag FROM R1 "
+                + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage > 15) order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1,3}, {2, 4} });
+
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, abs((SELECT count(dept) FROM R2 where R2.wage > R1.wage) / 2 - 3) as ct, count(*) as tag FROM R1 "
+                + "GROUP BY dept, ct order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1,2,1}, {1,1,2}, {2,1,1}, {2,3,3} });
 
         try {
             vt = client.callProcedure("@AdHoc",
