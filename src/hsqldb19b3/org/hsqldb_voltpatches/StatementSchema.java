@@ -1309,21 +1309,23 @@ public class StatementSchema extends Statement {
 
                     TableWorks tableWorks = new TableWorks(session, table);
 
-                    // A VoltDB extension to support indexed expressions and partial indexes
-                    Expression predicate = (Expression) arguments[6];
+                    // A VoltDB extension to support indexed expressions,
+                    // the assume unique attribute, and partial indexes
+                    org.hsqldb_voltpatches.index.Index addedIndex = 
+                    // End of VoltDB extension
+                    tableWorks.addIndex(indexColumns, name, unique);
+                    // A VoltDB extension to support assume unique attribute
                     @SuppressWarnings("unchecked")
                     java.util.List<Expression> indexExprs = (java.util.List<Expression>)arguments[4];
                     boolean assumeUnique = ((Boolean) arguments[5]).booleanValue();
+                    Expression predicate = (Expression) arguments[6];
+                    Expression[] exprArray = null;
                     if (indexExprs != null) {
-                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, predicate).setAssumeUnique(assumeUnique);
-                        break;
+                        exprArray = indexExprs.toArray(new Expression[indexExprs.size()]);
                     }
-                    org.hsqldb_voltpatches.index.Index addedIndex = 
-                    tableWorks.addIndex(indexColumns, name, unique, predicate);
-                    // End of VoltDB extension
-                    // tableWorks.addIndex(indexColumns, name, unique);
-                    // A VoltDB extension to support assume unique attribute
-                    addedIndex.setAssumeUnique(assumeUnique);
+                    addedIndex.withExpressions(exprArray)
+                    .withPredicate(predicate)
+                    .setAssumeUnique(assumeUnique);
                     // End of VoltDB extension
 
                     break;

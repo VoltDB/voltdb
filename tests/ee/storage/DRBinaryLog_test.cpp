@@ -54,7 +54,11 @@ static int64_t addPartitionId(int64_t value) {
 
 class DRBinaryLogTest : public Test {
 public:
-    DRBinaryLogTest() : m_undoToken(0), m_context(new ExecutorContext( 1, 1, NULL, &m_topend, &m_pool, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream)) {
+    DRBinaryLogTest()
+      : m_undoToken(0)
+      , m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
+            NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream))
+    {
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
@@ -94,6 +98,21 @@ public:
         // allocate a new buffer and wrap it
         m_drStream.configure(42);
         m_drReplicatedStream.configure(16383);
+
+        // create a table with different schema only on the master
+        std::vector<ValueType> singleColumnType;
+        std::vector<int32_t> singleColumnLength;
+        std::vector<bool> singleColumnAllowNull(1, false);
+        singleColumnType.push_back(VALUE_TYPE_TINYINT); singleColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        m_singleColumnSchema = TupleSchema::createTupleSchemaForTest(singleColumnType, singleColumnLength, singleColumnAllowNull);
+        string singleColumnNameArray[1] = { "NOTHING" };
+        const vector<string> singleColumnName(singleColumnNameArray, singleColumnNameArray + 1);
+
+        m_singleColumnTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_SINGLE_COLUMN_TABLE",
+                                                                                                          m_singleColumnSchema,
+                                                                                                          singleColumnName,
+                                                                                                          tableHandle + 1, false, 0));
+        m_singleColumnTable->setDR(true);
     }
 
     virtual ~DRBinaryLogTest() {
@@ -104,6 +123,7 @@ public:
         delete m_replicatedTable;
         delete m_tableReplica;
         delete m_replicatedTableReplica;
+        delete m_singleColumnTable;
     }
 
     void beginTxn(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
@@ -183,11 +203,14 @@ protected:
     TupleSchema* m_replicatedSchema;
     TupleSchema* m_schemaReplica;
     TupleSchema* m_replicatedSchemaReplica;
+    TupleSchema* m_singleColumnSchema;
 
     PersistentTable* m_table;
     PersistentTable* m_replicatedTable;
     PersistentTable* m_tableReplica;
     PersistentTable* m_replicatedTableReplica;
+    // This table does not exist on the replica
+    PersistentTable* m_singleColumnTable;
 
     UndoLog m_undoLog;
     int64_t m_undoToken;
@@ -439,6 +462,24 @@ TEST_F(DRBinaryLogTest, RollbackOnReplica) {
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
     tuple = m_tableReplica->lookupTupleByValues(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
+}
+
+TEST_F(DRBinaryLogTest, CantFindTable) {
+    beginTxn(99, 99, 98, 70);
+    TableTuple temp_tuple = m_singleColumnTable->tempTuple();
+    temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(1));
+    insertTuple(m_singleColumnTable, temp_tuple);
+    endTxn(true);
+
+    // try and fail to apply this on the replica because the table cannot be found.
+    // should not throw fatal exception.
+    try {
+        flushAndApply(99, false);
+    } catch (SerializableEEException &e) {
+        endTxn(false);
+    } catch (...) {
+        ASSERT_TRUE(false);
+    }
 }
 
 int main() {

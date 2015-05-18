@@ -1608,7 +1608,7 @@ public class Result {
         }
     }
 
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
     public boolean hasError() { return mode == ResultConstants.ERROR; }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

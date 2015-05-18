@@ -2155,7 +2155,7 @@ public class Expression implements Cloneable {
     public void setCollation(Collation collation) {
         this.collation = collation;
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     // VoltDB support for indexed expressions
     public void voltCollectAllColumnExpressions(ArrayList<ExpressionColumn> list) {
@@ -2240,7 +2240,7 @@ public class Expression implements Cloneable {
         // logicals - other predicates
         prototypes.put(OpTypes.LIKE,          (new VoltXMLElement("operation")).withValue("optype", "like"));
         prototypes.put(OpTypes.IN,            null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.EXISTS,        null); // not yet supported ExpressionLogical for subqueries
+        prototypes.put(OpTypes.EXISTS,        (new VoltXMLElement("operation")).withValue("optype", "exists"));
         prototypes.put(OpTypes.OVERLAPS,      null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.UNIQUE,        null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.NOT_DISTINCT,  null); // not yet supported ExpressionLogical
@@ -2355,6 +2355,13 @@ public class Expression implements Cloneable {
             exp.attributes.put("alias", realAlias);
         } else if ((alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
+        }
+
+        // Add expresion sub type
+        if (exprSubType == OpTypes.ANY_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "any");
+        } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "all");
         }
 
         for (Expression expr : nodes) {
@@ -2475,8 +2482,6 @@ public class Expression implements Cloneable {
             if (table == null || table.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
-            // @TODO: SubQuery doesn't have an information about the query parameters
-            // Or maybe there is a way?
             ExpressionColumn parameters[] = new ExpressionColumn[0];
             exp.children.add(StatementQuery.voltGetXMLExpression(table.queryExpression, parameters, session));
             return exp;
@@ -2779,5 +2784,19 @@ public class Expression implements Cloneable {
         }
         return result;
     }
-    /**********************************************************************/
+    
+    public boolean voltHasSubqueries() {
+        if (table != null) {
+            return true;
+        }
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null && nodes[i].voltHasSubqueries()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // End of VoltDB extension
 }

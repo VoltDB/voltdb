@@ -681,6 +681,13 @@ public class ParserDDL extends ParserRoutine {
         Table t = database.schemaManager.getUserTable(session, tableName,
             schema.name);
 
+        // The named "table" was actually a view -- not considered a
+        // valid target for alter table commands -- treat as "not found",
+        // as if views and tables are not using the same name space.
+        if (t.tableType == TableBase.VIEW_TABLE) {
+            throw Error.error(ErrorCode.X_42501, tableName);
+        }
+
         read();
 
         switch (token.tokenType) {
@@ -1414,26 +1421,17 @@ public class ParserDDL extends ParserRoutine {
                             c.getName().name, table.getSchemaName(),
                             table.getName(), SchemaObject.INDEX);
 
-                    // A VoltDB extension to support indexed expressions and the assume unique attribute
-                    Index index = null;
-                    if (c.voltIndexedExprs != null) {
-                        // Special case handling for VoltDB indexed expressions
-                        index = table.createAndAddExprIndexStructure(session, indexName,
-                            c.core.mainCols, c.voltIndexedExprs, true, true).setAssumeUnique(c.voltAssumeUnique);
-                    } else {
-                        index = table.createAndAddIndexStructure(session, indexName,
-                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.voltAssumeUnique);
-                    }
-                    /* disable 3 lines ...
                     Index index = table.createAndAddIndexStructure(session,
                         indexName, c.core.mainCols, null, null, true, true,
                         false);
-                    ... disabled 3 lines */
-                    // End of VoltDB extension
                     Constraint newconstraint = new Constraint(c.getName(),
                         table, index, SchemaObject.ConstraintTypes.UNIQUE);
-                    // A VoltDB extension to support the assume unique attribute
-                    newconstraint = newconstraint.voltSetAssumeUnique(c.voltAssumeUnique);
+                    // A VoltDB extension to support indexed expressions and the assume unique attribute
+                    index.withExpressions(c.voltIndexedExprs)
+                    .setAssumeUnique(c.voltAssumeUnique);
+
+                    newconstraint.voltWithExpressions(c.voltIndexedExprs)
+                    .voltSetAssumeUnique(c.voltAssumeUnique);
                     // End of VoltDB extension
 
                     table.addConstraint(newconstraint);
@@ -5498,7 +5496,8 @@ public class ParserDDL extends ParserRoutine {
         session.getGrantee().checkSchemaUpdateOrGrantRights(schema.name);
         session.checkDDLWrite();
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
+
     /**
      * Responsible for handling Volt limit constraints section of CREATE TABLE ...
      *
@@ -5519,7 +5518,9 @@ public class ParserDDL extends ParserRoutine {
             // LIMIT PARTITION ROWS 10 EXECUTE (DELETE FROM tbl WHERE b = 1)
             //
             readThis(Tokens.OPENBRACKET);
-            int position = getPosition();
+
+            startRecording();
+
             int numOpenBrackets = 1;
             while (numOpenBrackets > 0) {
                 switch(token.tokenType) {
@@ -5544,8 +5545,10 @@ public class ParserDDL extends ParserRoutine {
                 }
             }
 
+            Token[] stmtTokens = getRecordedStatement();
+
             // This captures the DELETE statement exactly, including embedded whitespace, etc.
-            c.voltRowLimitDeleteStmt = getLastPart(position);
+            c.voltRowLimitDeleteStmt = Token.getSQL(stmtTokens);
             readThis(Tokens.CLOSEBRACKET);
         }
     }
@@ -5645,5 +5648,5 @@ public class ParserDDL extends ParserRoutine {
                                    null, writeLockNames);
     }
 
-    /**********************************************************************/
+    // End of VoltDB extension
 }

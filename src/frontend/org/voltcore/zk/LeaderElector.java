@@ -34,7 +34,6 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
@@ -315,8 +314,8 @@ public class LeaderElector {
         }
     }
 
-    public static String electionDirForPartition(int partition) {
-        return ZKUtil.path(VoltZK.leaders_initiators, "partition_" + partition);
+    public static String electionDirForPartition(String path, int partition) {
+        return ZKUtil.path(path, "partition_" + partition);
     }
 
     public static int getPartitionFromElectionDir(String partitionDir) {

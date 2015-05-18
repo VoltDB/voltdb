@@ -847,7 +847,8 @@ public class ParserBase {
         return scanner.convertToNumber(s, type);
     }
 
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to make reserved words more consistent
+    // and SQL statements easier to debug
 
     /**
      * Method added by VoltDB to make reserved words more consistent in DDL.
@@ -871,5 +872,10 @@ public class ParserBase {
             throw unexpectedToken();
         }
     }
-    /**********************************************************************/
+
+    public String toString() {
+        return "A subclass of ParserBase parsing <<" + scanner.sqlString + ">>";
+    }
+
+    // End of VoltDB extension
 }

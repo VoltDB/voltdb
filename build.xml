@@ -243,11 +243,11 @@ PRIMARY ENTRY POINTS
 <target name="check"
     depends="licensecheck, default, voltdbipc"
     description="Run Java and C++ JNI testcases." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
     </condition>
 
-    <exec executable="ant" failonerror="true" timeout="9000000">
+    <exec executable="ant" failonerror="true" timeout="90000000">
         <arg value="eecheck" />
         <arg value="junit" />
         <arg value="sqlcmdtest" />
@@ -296,21 +296,17 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="check_sql"
-    depends="licensecheck, compile, voltdbipc"
+    depends="licensecheck, compile, voltdbipc, eecheck"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+    <condition property="timeoutLength" value="${timeoutLength}" else='9000000'>
         <isset property="timeoutLength"/>
     </condition>
 
     <exec executable="ant" failonerror="true" timeout="9000000">
-        <arg value="eecheck" />
         <arg value="junit_sql" />
-        <arg value="distcheck" />
-        <arg value="pythonfser" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
-        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 
@@ -481,11 +477,6 @@ DISTRIBUTION
             <include name="nativelibs/libvoltdb*" />
         </fileset>
     </copy>
-    <copy todir="${dist.dir}/voltdb" flatten="true" >
-        <fileset dir="." defaultexcludes="yes">
-            <include name="third_party/cpp/jnilib/libjzmq*" />
-        </fileset>
-    </copy>
 
     <!-- add the Project and Deployment file schemas to the dist -->
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
@@ -606,7 +597,6 @@ DISTRIBUTION
             <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
-            <exclude name="voltdb/libjzmq*"/>
         </fileset>
     </copy>
 
@@ -1045,13 +1035,6 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <!-- copy zmq to voltdb dir / would be nice to only copy the right one -->
-    <copy todir="voltdb" flatten="true" >
-        <fileset dir="." defaultexcludes="yes">
-            <include name="third_party/cpp/jnilib/libjzmq*" />
-        </fileset>
-    </copy>
-
     <!-- compile the individual source directories -->
     <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
@@ -1365,7 +1348,7 @@ TEST CASES
             showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
-            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
+            <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
             <jvmarg value="-server" />
             <jvmarg value="-Xcheck:jni" />
             <jvmarg value="-Xmx256m"/>

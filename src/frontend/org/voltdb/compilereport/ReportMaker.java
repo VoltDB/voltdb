@@ -253,6 +253,9 @@ public class ReportMaker {
         sb.append("<td>");
         if (table.getTuplelimit() != Integer.MAX_VALUE) {
             tag(sb, "info", String.valueOf(table.getTuplelimit()));
+            if (CatalogUtil.getLimitPartitionRowsDeleteStmt(table) != null) {
+                sb.append("<small>enforced by DELETE statement</small>");
+            }
         } else {
             tag(sb, null, "No-limit");
         }

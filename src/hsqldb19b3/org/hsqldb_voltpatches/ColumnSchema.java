@@ -411,7 +411,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
             }
         }
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -466,5 +466,5 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
 
         return column;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

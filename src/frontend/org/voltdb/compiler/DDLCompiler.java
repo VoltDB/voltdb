@@ -66,6 +66,7 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
@@ -2289,15 +2290,16 @@ public class DDLCompiler {
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
 
+        // This case was already disqualified in the HSQL frontend because it
+        // was causing an NPE.
+        assert(predicate.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).isEmpty());
+        // TODO: it would not be difficult to also disqualify the following
+        // case in the HSQL frontend, and assert here.
+        // See IndexAVL.java
         if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
             msg += "with aggregate expression(s) is not supported.";
             throw m_compiler.new VoltCompilerException(msg);
         }
-        // @TODO: un-comment once subqueries are supported
-//        if (!predicate.findAllSubexpressionsOfClass(SubqueryExpression.class).isEmpty()) {
-//            msg += "with subquery expression(s) is not supported.";
-//            throw m_compiler.new VoltCompilerException(msg);
-//        }
         return predicate;
     }
 

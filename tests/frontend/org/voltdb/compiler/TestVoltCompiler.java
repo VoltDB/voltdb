@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,12 +52,10 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -146,7 +143,8 @@ public class TestVoltCompiler extends TestCase {
     private boolean isFeedbackPresent(String expectedError,
             ArrayList<Feedback> fbs) {
         for (Feedback fb : fbs) {
-            if (fb.getStandardFeedbackLine().contains(expectedError)) {
+            String fbLine = fb.getStandardFeedbackLine();
+            if (fbLine.contains(expectedError)) {
                 return true;
             }
         }
@@ -1898,12 +1896,44 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerTwoIdenticalIndexes()
     {
-        final String s =
-                "create table t(id integer not null, num integer not null);\n" +
-                "create index idx_t_idnum1 on t(id,num);\n" +
-                "create index idx_t_idnum2 on t(id,num);";
+        String s;
+        VoltCompiler c;
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id,num);\n" +
+            "create index idx_t_idnum2 on t(id,num);";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
 
-        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        // non-unique partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id) where num > 3;\n" +
+            "create index idx_t_idnum2 on t(id) where num > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        // unique partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create unique index idx_t_idnum1 on t(id) where num > 3;\n" +
+            "create unique index idx_t_idnum2 on t(id) where num > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        // non-unique expression partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create index idx_t_idnum1 on t(id) where abs(num) > 3;\n" +
+            "create index idx_t_idnum2 on t(id) where abs(num) > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+
+        // unique expression partial index
+        s = "create table t(id integer not null, num integer not null);\n" +
+            "create unique index idx_t_idnum1 on t(id) where abs(num) > 3;\n" +
+            "create unique index idx_t_idnum2 on t(id) where abs(num) > 3;";
+        c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());
         assertTrue(c.hasErrorsOrWarnings());
     }
@@ -2277,6 +2307,11 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
         // not yet hsql232 */
 
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total) " +
+                "as select num, count(*) from t where id in (select id from t) group by num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
@@ -2511,6 +2546,11 @@ public class TestVoltCompiler extends TestCase {
                     // We seem to add a semicolon somewhere.  I guess that's okay.
                     stmt = stmt.substring(0, stmt.length() - 1);
                 }
+
+                // Remove spaces from both strings so we compare whitespace insensitively
+                // Capturing the DELETE statement in HSQL does not preserve whitespace.
+                expectedStmt = stmt.replace(" ", "");
+                stmt = stmt.replace(" ", "");
 
                 assertEquals("Did not find the LIMIT DELETE statement that we expected",
                         expectedStmt, stmt);
@@ -3668,28 +3708,18 @@ public class TestVoltCompiler extends TestCase {
     public void testInvalidPartialIndex()
     {
         String ddl = null;
-        ddl =
-                "create table t(id integer not null, num integer not null);\n" +
+        ddl =   "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where max(id) > 4;\n";
-
         checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with aggregate expression(s) is not supported.");
 
-        ddl =
-                "create table t1(id integer not null, num integer not null);\n" +
+        ddl =   "create table t1(id integer not null, num integer not null);\n" +
                 "create table t2(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T1_IDNUM on t1(id) where t2.id > 4;\n";
-
         checkDDLErrorMessage(ddl, "Partial index \"IDX_T1_IDNUM\" with expression(s) involving other tables is not supported.");
 
-        ddl =
-                "create table t(id integer not null, num integer not null);\n" +
+        ddl =   "create table t(id integer not null, num integer not null);\n" +
                 "create unique index IDX_T_IDNUM on t(id) where id in (select num from t);\n";
-        // @TODO: Remove TRY/CATCH once subqueries are supported
-        try {
-            checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
-        } catch (PlanningErrorException e) {
-            assertTrue(e.getMessage().contains("Unsupported subquery syntax within an expression."));
-        }
+        checkDDLErrorMessage(ddl, "Subquery expressions are not allowed");
 }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {

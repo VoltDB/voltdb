@@ -6886,7 +6886,7 @@ public class ParserDQL extends ParserBase {
             return set;
         }
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     /** This wraps either an Expression result of readSQLFunction or a throwable Exception discovered
      *  in the process of reading that Expression.
@@ -6927,5 +6927,5 @@ public class ParserDQL extends ParserBase {
             return m_good;
         }
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

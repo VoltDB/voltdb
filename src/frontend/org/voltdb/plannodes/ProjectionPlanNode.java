@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -25,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
@@ -81,6 +83,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
         resolveColumnIndexesUsingSchema(input_schema);
+
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
     }
 
     /**
@@ -148,6 +156,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         }
         m_outputSchema = new_schema;
         m_hasSignificantOutputSchema = true;
+
+        // Generate the output schema for subqueries
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
 
         return;
     }

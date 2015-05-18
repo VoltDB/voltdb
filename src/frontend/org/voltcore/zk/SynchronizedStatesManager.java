@@ -44,7 +44,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -1505,9 +1504,9 @@ public class SynchronizedStatesManager {
         protected String taskResultToString(ByteBuffer task, ByteBuffer taskResult) { return ""; }
     }
 
-    public SynchronizedStatesManager(ZooKeeper zk, String rootNode, String memberId)
+    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId)
             throws KeeperException, InterruptedException {
-        this(zk, rootNode, memberId, 1);
+        this(zk, rootPath, ssmNodeName, memberId, 1);
     }
 
     // Used only for Mocking StateMachineInstance
@@ -1520,13 +1519,13 @@ public class SynchronizedStatesManager {
         m_memberId = "MockMemberId";
     }
 
-    public SynchronizedStatesManager(ZooKeeper zk, String rootNode, String memberId, int registeredInstances)
+    public SynchronizedStatesManager(ZooKeeper zk, String rootPath, String ssmNodeName, String memberId, int registeredInstances)
             throws KeeperException, InterruptedException {
         m_zk = zk;
         // We will not add ourselves as members in ZooKeeper until all StateMachineInstances have registered
         m_registeredStateMachines = new StateMachineInstance[registeredInstances];
-        m_ssmRootNode = rootNode;
-        m_stateMachineRoot = ZKUtil.joinZKPath(VoltZK.syncStateMachine, rootNode);
+        m_ssmRootNode = ssmNodeName;
+        m_stateMachineRoot = ZKUtil.joinZKPath(rootPath, ssmNodeName);
         ByteBuffer numberOfInstances = ByteBuffer.allocate(4);
         numberOfInstances.putInt(registeredInstances);
         addIfMissing(m_stateMachineRoot, CreateMode.PERSISTENT, numberOfInstances.array());

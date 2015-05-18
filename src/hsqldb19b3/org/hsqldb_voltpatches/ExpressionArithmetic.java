@@ -269,6 +269,9 @@ public class ExpressionArithmetic extends Expression {
                     throw Error.error(ErrorCode.X_42567);
                 }
 
+                // A VoltDB extension to use X'..' as a numeric literal
+                voltConvertBinaryLiteralOperandsToBigint();
+                // End VoltDB extension
                 dataType = nodes[LEFT].dataType;
 
                 if (!dataType.isNumberType()) {
@@ -323,6 +326,9 @@ public class ExpressionArithmetic extends Expression {
             nodes[RIGHT].dataType = Type.SQL_INTEGER;
         }
 
+        // A VoltDB extension to use X'..' as a numeric literal
+        voltConvertBinaryLiteralOperandsToBigint();
+        // End VoltDB extension
         if (nodes[LEFT].isUnresolvedParam()) {
             if (nodes[RIGHT].dataType == null) {
                 throw Error.error(ErrorCode.X_42567);
@@ -658,4 +664,17 @@ public class ExpressionArithmetic extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
     }
+    // A VoltDB extension to use X'..' as a numeric value
+    private void voltConvertBinaryLiteralOperandsToBigint() {
+        // Strange that CONCAT is an arithmetic operator.
+        // You could imagine using it for VARBINARY, so
+        // definitely don't convert its operands to BIGINT!
+        assert(opType != OpTypes.CONCAT);
+
+        for (int i = 0; i < nodes.length; ++i) {
+            Expression e = nodes[i];
+            ExpressionValue.voltMutateToBigintType(e, this, i);
+        }
+    }
+    // End VoltDB extension
 }

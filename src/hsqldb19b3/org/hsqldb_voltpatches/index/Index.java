@@ -257,8 +257,9 @@ public interface Index extends SchemaObject {
             this.columnCount = columnCount;
         }
     }
-    /************************* Volt DB Extensions *************************/
-
+    // A VoltDB extension to support indexed expressions,
+    // the assumeunique attribute and partial indexes
+    
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -298,5 +299,5 @@ public interface Index extends SchemaObject {
      */
     Index withPredicate(org.hsqldb_voltpatches.Expression indexPredicate);
 
-    /**********************************************************************/
+    // End of VoltDB extension
 }

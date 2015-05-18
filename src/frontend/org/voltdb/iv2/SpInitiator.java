@@ -125,7 +125,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
     }
 
@@ -194,8 +194,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
-            // If we are a DR replica, inform that subsystem of its new responsibilities
-            if (m_consumerDRGateway != null) {
+            // If we are a DR replica, inform that subsystem of any remote data we've seen
+            if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
                 m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId);
             }
         } catch (Exception e) {

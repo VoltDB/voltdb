@@ -1265,7 +1265,8 @@ public class ParserDML extends ParserDQL {
         ExpressionColumn.checkColumnsResolved(unresolved);
         e.resolveTypes(session, null);
     }
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
+
     /**
      * This is a Volt extension to allow
      *   DELETE FROM tab ORDER BY c LIMIT 1
@@ -1297,5 +1298,5 @@ public class ParserDML extends ParserDQL {
     private void voltAppendDeleteSortAndSlice(StatementDML deleteStmt, SortAndSlice sas) {
         deleteStmt.setSortAndSlice(sas);
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

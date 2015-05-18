@@ -271,15 +271,15 @@ public abstract class Statement {
     }
 
     public void clearStructures(Session session) {}
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     /**
-     * VoltDB added method to get a non-catalog-dependent
+     * VoltDB added method to get an abstract parse tree
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @return VoltXMLElement, a free-form (schema-less) abstract parse tree.
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     VoltXMLElement voltGetStatementXML(Session session)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
@@ -287,5 +287,5 @@ public abstract class Statement {
         throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                 "this type of sql statement is not supported or is not not allowed in this context");
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

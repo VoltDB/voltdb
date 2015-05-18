@@ -286,17 +286,18 @@ public class View extends TableDerived {
         return td;
     }
 
-    /************************* Volt DB Extensions *************************/
+    // A VoltDB extension to export abstract parse trees
 
     /**
-     * VoltDB added method to get a non-catalog-dependent
+     * VoltDB added method to get an abstract parse tree
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
      * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @return VoltXMLElement, a free-form (schema-less) abstract parse tree.
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
-    VoltXMLElement voltGetTableXML(Session session) throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
+    VoltXMLElement voltGetTableXML(Session session)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = super.voltGetTableXML(session);
 
@@ -304,5 +305,5 @@ public class View extends TableDerived {
         table.attributes.put("query", statement);
         return table;
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

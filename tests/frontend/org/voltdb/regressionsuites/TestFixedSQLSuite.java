@@ -2174,6 +2174,112 @@ public class TestFixedSQLSuite extends RegressionSuite {
         runQueryGetDouble(client, sql, 1.9);
     }
 
+    private void nullIndexSearchKeyChecker(Client client, String sql) throws Exception {
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        String sql1 = sql.replace("SELECT ID", "SELECT COUNT(ID)");
+        assertTrue(sql1.contains("SELECT COUNT(ID) FROM"));
+        vt = client.callProcedure("@AdHoc", sql1, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+
+        String sql2 = sql.replace("SELECT ID", "SELECT COUNT(*)");
+        assertTrue(sql2.contains("SELECT COUNT(*) FROM"));
+        vt = client.callProcedure("@AdHoc", sql2, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+    }
+
+    public void testENG8120() throws Exception {
+        // hsqldb does not handle null
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        String[] tables = {"R1", "R3", "R4"};
+        for (String tb : tables)
+        {
+            sql = "insert into " + tb + "  (id, num) Values(?, ?);";
+            client.callProcedure("@AdHoc", sql, 1, null);
+            client.callProcedure("@AdHoc", sql, 2, null);
+            client.callProcedure("@AdHoc", sql, 3, 3);
+            client.callProcedure("@AdHoc", sql, 4, 4);
+
+            sql = "select count(*) from " + tb;
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{4});
+
+            // activate # of searchkey is 1
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // activate # of searchkey is 2
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num > ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // post predicate
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            // nest loop index join
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
+
+            if (tb != "R4") {
+                vt = client.callProcedure("@Explain", sql, null).getResults()[0];
+                assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
+                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4"));
+            }
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
+            nullIndexSearchKeyChecker(client, sql);
+
+            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
+            nullIndexSearchKeyChecker(client, sql);
+        }
+
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

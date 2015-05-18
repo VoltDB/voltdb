@@ -877,6 +877,12 @@ public final class NumberType extends Type {
             case Types.SQL_DECIMAL :
                 break;
 
+            // A VoltDB extension to use X'..' as default values for integers
+            case Types.SQL_VARBINARY:
+                a = ValuePool.getLong(((BinaryData)a).toLong());
+                break;
+
+            // End VoltDB extension
             case Types.SQL_BIT :
             case Types.SQL_BIT_VARYING :
                 if (otherType.precision == 1) {
@@ -1110,6 +1116,9 @@ public final class NumberType extends Type {
      * Converter from a numeric object to Long. Input is checked to be
      * within range represented by Long.
      */
+    // A VoltDB extension to support BIGINT bitwise functions
+    public
+    // End of VoltDB extensions
     static Long convertToLong(SessionInterface session, Object a) {
 
         if (a instanceof Integer) {
@@ -2115,9 +2124,4 @@ public final class NumberType extends Type {
         }
     }
 
-    /************************* Volt DB Extensions *************************/
-    public static void checkValueIsInLongLimits(SessionInterface session, Object a) {
-        convertToLong(session, a);
-    }
-    /**********************************************************************/
 }

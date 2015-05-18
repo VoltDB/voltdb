@@ -41,7 +41,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -51,6 +50,7 @@ public class TestStateMachine extends ZKTestBase {
         SMI1,
         SMI2
     };
+    private final String stateMachineManagerRoot = "/test/db/States";
 
     VoltLogger log = new VoltLogger("HOST");
     SynchronizedStatesManager[] m_stateMachineGroup1 = new SynchronizedStatesManager[NUM_AGREEMENT_SITES];
@@ -85,14 +85,14 @@ public class TestStateMachine extends ZKTestBase {
         try {
             // Create a SynchronizedStatesManager to manage a single BooleanStateMachine
             SynchronizedStatesManager ssm1 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
-                    "ssm1", siteString);
+                    stateMachineManagerRoot, "ssm1", siteString);
             m_stateMachineGroup1[Site] = ssm1;
             BooleanStateMachine bsm1 = new BooleanStateMachine(ssm1, "bool");
             m_booleanStateMachinesForGroup1[Site] = bsm1;
 
             // Create a SynchronizedStatesManager to manage both a BooleanStateMachine and ByteStateMachine
             SynchronizedStatesManager ssm2 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
-                    "ssm2", siteString, stateMachines.values().length);
+                    stateMachineManagerRoot, "ssm2", siteString, stateMachines.values().length);
             m_stateMachineGroup2[Site] = ssm2;
             BooleanStateMachine bsm2 = new BooleanStateMachine(ssm2, "bool");
             m_booleanStateMachinesForGroup2[Site] = bsm2;
@@ -121,8 +121,9 @@ public class TestStateMachine extends ZKTestBase {
     public void setUp() throws Exception {
         setUpZK(NUM_AGREEMENT_SITES);
         ZooKeeper zk = m_messengers.get(0).getZK();
-        ZKUtil.addIfMissing(zk, "/db", CreateMode.PERSISTENT, null);
-        ZKUtil.addIfMissing(zk, VoltZK.syncStateMachine, CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, "/test", CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, "/test/db", CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, stateMachineManagerRoot, CreateMode.PERSISTENT, null);
         for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
             addStateMachinesFor(ii);
         }

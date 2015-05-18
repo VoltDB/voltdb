@@ -34,7 +34,6 @@ package org.hsqldb_voltpatches;
 import org.hsqldb_voltpatches.error.Error;
 import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.types.Type;
-
 /**
  * Implementation of value access operations.
  *
@@ -114,4 +113,31 @@ public class ExpressionValue extends Expression {
     public Object getValue(Session session) {
         return valueData;
     }
+    // A VoltDB extension to allow X'..' as numeric literals
+    /**
+     * Given a ExpressionValue that is a VARBINARY constant,
+     * convert it to a BIGINT constant.  Returns true for a
+     * successful conversion and false otherwise.
+     *
+     * For more details on how the conversion is performed, see BinaryData.toLong().
+     *
+     * @param parent      Reference of parent expression
+     * @param childIndex  Index of this node in parent
+     * @return true for a successful conversion and false otherwise.
+     */
+    public static boolean voltMutateToBigintType(Expression maybeConstantNode, Expression parent, int childIndex) {
+        if (maybeConstantNode.opType == OpTypes.VALUE && maybeConstantNode.dataType.isBinaryType()) {
+            ExpressionValue exprVal = (ExpressionValue)maybeConstantNode;
+            if (exprVal.valueData == null) {
+                return false;
+            }
+
+            org.hsqldb_voltpatches.types.BinaryData data = (org.hsqldb_voltpatches.types.BinaryData)exprVal.valueData;
+            parent.nodes[childIndex] = new ExpressionValue(data.toLong(), Type.SQL_BIGINT);
+
+            return true;
+        }
+        return false;
+    }
+    // End VoltDB extension
 }

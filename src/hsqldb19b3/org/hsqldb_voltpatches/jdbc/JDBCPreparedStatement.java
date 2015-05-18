@@ -4733,8 +4733,9 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
 
     /** The session attribute of the connection */
     protected SessionInterface session;
-    /************************* Volt DB Extensions *************************/
-
+    // A VoltDB extension to disable the JDBC closeOnCompletion functionality
+    // TODO: this could be refactored from leaf classes into JDBCStatementBase,
+    // possibly within JDBCStatementBase.checkClose
     public void closeOnCompletion() throws SQLException {
         throw new SQLException();
     }
@@ -4742,5 +4743,5 @@ public class JDBCPreparedStatement extends JDBCStatementBase implements Prepared
     public boolean isCloseOnCompletion() throws SQLException {
         throw new SQLException();
     }
-    /**********************************************************************/
+    // End of VoltDB extension
 }

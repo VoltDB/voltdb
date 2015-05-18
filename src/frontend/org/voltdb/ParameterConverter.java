@@ -108,8 +108,16 @@ public class ParameterConverter {
     }
 
     private static final Pattern thousandSeparator = Pattern.compile("\\,");
+
     /**
      * Given a string, covert it to a primitive type or return null.
+     *
+     * If the string value is a VARBINARY constant of the form X'00ABCD', and the
+     * expected class is one of byte, short, int or long, then we interpret the
+     * string as specifying bits of a 64-bit signed integer (padded with zeroes if
+     * there are fewer than 16 digits).
+     * Corresponding code for handling hex literals appears in HSQL's ExpressionValue class
+     * and in voltdb.expressions.ConstantValueExpression.
      */
     private static Object convertStringToPrimitive(String value, final Class<?> expectedClz)
     throws VoltTypeException
@@ -117,34 +125,48 @@ public class ParameterConverter {
         value = value.trim();
         // detect CSV null
         if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
-        // remove commas and escape chars
-        value = thousandSeparator.matcher(value).replaceAll("");
+
+        // Remove commas.  Doing this seems kind of dubious since it lets strings like
+        //    ,,,3.1,4,,e,+,,16
+        // be parsed as a valid double value (for example).
+        String commaFreeValue = thousandSeparator.matcher(value).replaceAll("");
 
         try {
             if (expectedClz == long.class) {
-                // Could be a long value specified in hexadecimal as x'ffff'
-                String hexDigits = SQLParser.getDigitsFromHexLiteral(value);
-                if (hexDigits != null) {
-                    return SQLParser.hexDigitsToLong(hexDigits);
-                }
-                return Long.parseLong(value);
+                return Long.parseLong(commaFreeValue);
             }
             if (expectedClz == int.class) {
-                return Integer.parseInt(value);
+                return Integer.parseInt(commaFreeValue);
             }
             if (expectedClz == short.class) {
-                return Short.parseShort(value);
+                return Short.parseShort(commaFreeValue);
             }
             if (expectedClz == byte.class) {
-                return Byte.parseByte(value);
+                return Byte.parseByte(commaFreeValue);
             }
             if (expectedClz == double.class) {
-                return Double.parseDouble(value);
+                return Double.parseDouble(commaFreeValue);
             }
         }
         // ignore the exception and fail through below
-        catch (NumberFormatException nfe) {}
-        catch (SQLParser.Exception spe) {}
+        catch (NumberFormatException nfe) {
+
+            // If we failed to parse the string in decimal form it could still
+            // be a numeric value specified as X'....'
+            //
+            // Do this only after trying to parse a decimal literal, which is the
+            // most common case.
+            if (expectedClz != double.class) {
+                String hexDigits = SQLParser.getDigitsFromHexLiteral(value);
+                if (hexDigits != null) {
+                    try {
+                        return SQLParser.hexDigitsToLong(hexDigits);
+                    }
+                    catch (SQLParser.Exception spe) {
+                    }
+                }
+            }
+        }
 
         throw new VoltTypeException(
                 "tryToMakeCompatible: Unable to convert string "
@@ -278,16 +300,25 @@ public class ParameterConverter {
             if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(expectedClz);
         }
         else if (inputClz == String.class) {
-            if (((String) param).equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
+            String stringParam = (String)param;
+            if (stringParam.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
             else if (expectedClz == String.class) return param;
             // Hack allows hex-encoded strings to be passed into byte[] params
             else if (expectedClz == byte[].class) {
-                return Encoder.hexDecode((String) param);
+                // regular expressions can be expensive, so don't invoke SQLParser
+                // unless the param really looks like an x-quoted literal
+                if (stringParam.startsWith("X") || stringParam.startsWith("x")) {
+                    String hexDigits = SQLParser.getDigitsFromHexLiteral(stringParam);
+                    if (hexDigits != null) {
+                        stringParam = hexDigits;
+                    }
+                }
+                return Encoder.hexDecode(stringParam);
             }
             // We allow all values to be passed as strings for csv loading, json, etc...
             // This code handles primitive types. Complex types come later.
             if (expectedClz.isPrimitive()) {
-                return convertStringToPrimitive((String) param, expectedClz);
+                return convertStringToPrimitive(stringParam, expectedClz);
             }
         }
         else if (inputClz == byte[].class) {
