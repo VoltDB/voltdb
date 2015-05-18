@@ -100,7 +100,6 @@ SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _cmp3 (SELECT
 --SELECT _variable AS C0 FROM @fromtables A27 ORDER BY C0 _sortorder LIMIT (SELECT @agg(_variable) FROM @fromtables) _optionaloffset
 --SELECT _variable AS C0 FROM @fromtables A28 ORDER BY C0 _sortorder LIMIT 3 OFFSET (SELECT @agg(_variable) FROM @fromtables)
 
-
 --- Queries with scalar subqueries in the GROUP BY or HAVING clause (these work)
 SELECT (SELECT @agg(_variable[#agg])                 FROM @fromtables WHERE _variable[@comparabletype] _cmp1 A31._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A31 GROUP BY C0
 SELECT (SELECT @agg(_variable[#agg @comparabletype]) FROM @fromtables WHERE _variable[@comparabletype] _cmp2 A32._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A32 GROUP BY C0 HAVING @agg(__[#agg]) _cmp 12
@@ -108,3 +107,15 @@ SELECT (SELECT @agg(_variable[#agg] string)          FROM @fromtables WHERE _var
 --- These do not currently work (meanwhile, commented out to save execution time)
 --SELECT (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _cmp A34._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A34 GROUP BY C0 HAVING C1 _cmp 12
 --SELECT _variable[#grp] C0, @agg(_variable[#agg]) C1  FROM @fromtables A35 GROUP BY C0 HAVING (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _cmp A35._variable[@comparabletype]) _cmp 12
+SELECT _variable[#grp] C0, @agg(_variable[#agg]) C1 FROM @fromtables A36 GROUP BY C0 HAVING @agg(__[#agg]) _cmp (SELECT @agg(__[#agg]) FROM @fromtables WHERE __[#grp] _cmp A36.__[#grp])
+
+--- Queries with a simple UNION of one or more scalar subqueries (these work)
+SELECT @agg(_variable)         FROM @fromtables UNION SELECT -1  FROM @fromtables A41
+SELECT @agg(_variable[string]) FROM @fromtables UNION SELECT 'Z' FROM @fromtables A42
+SELECT -2  FROM @fromtables UNION SELECT @agg(_variable)         FROM @fromtables A43
+SELECT 'Z' FROM @fromtables UNION SELECT @agg(_variable[string]) FROM @fromtables A44
+SELECT @agg(_variable)         FROM @fromtables UNION SELECT @agg(_variable)         FROM @fromtables A45
+SELECT @agg(_variable[string]) FROM @fromtables UNION SELECT @agg(_variable[string]) FROM @fromtables A46
+
+--- Queries with scalar subqueries containing a UNION (these ??)
+-- TBD
