@@ -199,7 +199,8 @@ public class TarGenerator {
     /// VoltDB/voltdb code should use a different overload.
     /// TODO: Eliminate this method and bypass this call in VEMCore.java
     /// when the hsqldb232 upgrade hits master.
-    public void write(boolean must_be_false, boolean always_false) {
+    public void write(boolean must_be_false, boolean always_false)
+            throws IOException, TarMalformatException {
         assert(!must_be_false);
         assert(!always_false);
         write(null);
