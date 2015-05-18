@@ -29,6 +29,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,8 @@ import java.util.regex.Pattern;
 import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.hsqldb_voltpatches.HsqlException;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
@@ -2058,6 +2061,84 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
+    public void testColumnNameIndexHash()
+    {
+        List<Pair<String, IndexType>> passing
+            = Arrays.asList(
+                            // If we don't explicitly name the primary key constraint,
+                            // we always get a tree index.  This is independent of the name
+                            // of the index column or columns.
+                            Pair.of("create table t ( goodhashname varchar(256) not null, primary key ( goodhashname ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodhashname integer not null, primary key ( goodhashname ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreename varchar(256) not null, primary key ( goodtreename ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreename integer not null, primary key ( goodtreename ) );",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            // If we explicitly name the constraint with a tree name
+                            // we always get a tree index.  This is true even if the
+                            // column type is hashable.
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            // If we explicitly name the constraint with a name
+                            // which is both a hash name and a tree name, we always get a tree
+                            // index.  This is true even if the column type is hashable.
+                            Pair.of("create table t ( goodtreehashname varchar(256) not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_tree primary key (goodtreehashname));",
+                                    IndexType.BALANCED_TREE),
+
+                            // The only way to get a hash index is to explicitly name the constraint
+                            // with a hash name and to make the column type or types be hashable.
+                            Pair.of("create table t ( goodtreehashname integer not null, constraint good_hash primary key (goodtreehashname));",
+                                    IndexType.HASH_TABLE),
+                            Pair.of("create table t ( goodvanilla integer not null, constraint good_hash_constraint primary key ( goodvanilla ) );",
+                                    IndexType.HASH_TABLE),
+                            // Test to see if created indices are still hashed
+                            // when they are expected, and not hashed when they
+                            // are not expected.
+                            Pair.of("create table t ( goodvanilla integer not null ); create unique index myhash on t ( goodvanilla );",
+                                    IndexType.HASH_TABLE),
+                            Pair.of("create table t ( goodhash integer not null primary key );",
+                                    IndexType.BALANCED_TREE)
+        );
+        String[] failing
+            = {
+                // If we name the constraint with a hash name,
+                // but the column type is not hashable, it is an
+                // error.
+                "create table t ( badhashname varchar(256) not null, constraint badhashconstraint primary key ( badhashname ) );",
+                // The name of the column is not important.
+                "create table t ( badzotzname varchar(256) not null, constraint badhashconstraint primary key ( badzotzname ) );",
+                // If any of the columns are non-hashable, the index is
+                // not hashable.
+                "create table t ( fld1 integer, fld2 varchar(256), constraint badhashconstraint primary key ( fld1, fld2 ) );"
+        };
+        for (Pair<String, IndexType> cmdPair : passing) {
+            // See if we can actually create the table.
+            VoltCompiler c = compileForDDLTest(getPathForSchema(cmdPair.getLeft()), true);
+            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+            assertEquals(1, d.getTables().getIgnoreCase("t").getIndexes().size());
+            org.voltdb.catalog.Index idx = d.getTables().getIgnoreCase("t").getIndexes().iterator().next();
+            String msg = String.format("CMD: %s\nExpected %s, got %s",
+                                       cmdPair.getLeft(),
+                                       cmdPair.getRight(),
+                                       IndexType.get(idx.getType()));
+            assertEquals(msg, cmdPair.getRight().getValue(),
+                         idx.getType());
+        }
+        for (String cmd : failing) {
+            compileForDDLTest(getPathForSchema(cmd), false);
+        }
+    }
+
     private static final String msgP = "does not include the partitioning column";
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
@@ -3548,9 +3629,14 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
+        final String simpleSchema = "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
+                                         "partition table books on column cash;";
+        return checkDDLAgainstGivenSchema(errorRegex, simpleSchema, ddl);
+    }
+
+    private Database checkDDLAgainstGivenSchema(String errorRegex, String givenSchema, String... ddl) throws Exception {
         String schemaDDL =
-            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
-            "partition table books on column cash;" +
+            givenSchema +
             StringUtils.join(ddl, " ");
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schemaDDL.toString());
@@ -3568,18 +3654,33 @@ public class TestVoltCompiler extends TestCase {
         String projectPath = projectFile.getPath();
 
         VoltCompiler compiler = new VoltCompiler();
-
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        String error = (success || compiler.m_errors.size() == 0
+        boolean success;
+        String error;
+        try {
+            success = compiler.compileWithProjectXML(projectPath, testout_jar);
+            error = (success || compiler.m_errors.size() == 0
                 ? ""
                 : compiler.m_errors.get(compiler.m_errors.size()-1).message);
+        } catch (HsqlException hex) {
+            success = false;
+            error = hex.getMessage();
+        } catch (PlanningErrorException plex) {
+            success = false;
+            error = plex.getMessage();
+        }
         if (errorRegex == null) {
-            assertTrue(String.format("Expected success\nDDL: %s\n%s", ddl, error), success);
+            assertTrue(String.format("Expected success\nDDL: %s\n%s",
+                                     StringUtils.join(ddl, " "),
+                                     error),
+                       success);
             Catalog cat = compiler.getCatalog();
             return cat.getClusters().get("cluster").getDatabases().get("database");
         }
         else {
-            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s", errorRegex, ddl), success);
+            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s",
+                                      errorRegex,
+                                      StringUtils.join(ddl, " ")),
+                        success);
             assertFalse("Expected at least one error message.", error.isEmpty());
             Matcher m = Pattern.compile(errorRegex).matcher(error);
             assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
@@ -3889,6 +3990,63 @@ public class TestVoltCompiler extends TestCase {
                    isFeedbackPresent("Invalid procedure name", compiler.m_errors));
     }
 
+
+    /*
+     * Test some ddl with a schema tailored for illegal scalar subqueries.
+     */
+    private Database checkDDLAgainstScalarSubquerySchema(String errorRegex, String... ddl) throws Exception {
+        String scalarSubquerySchema = "create table books (cash integer default 23 NOT NULL, title varchar(10) default NULL, PRIMARY KEY(cash)); " +
+                                         "partition table books on column cash;";
+        return checkDDLAgainstGivenSchema(errorRegex, scalarSubquerySchema, ddl);
+    }
+
+    /**
+     * Test to see if scalar subqueries are either allowed where we
+     * expect them to be or else cause compilation errors where we
+     * don't expect them to be.
+     *
+     * @throws Exception
+     */
+    public void testScalarSubqueriesExpectedFailures() throws Exception {
+        // Scalar subquery not allowed in partial indices.
+        checkDDLAgainstScalarSubquerySchema(null, "create table mumble ( ID integer ); \n");
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx on books ( title ) where exists ( select title from books as child where books.cash = child.cash ) ;\n");
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx on books ( title ) where 7 < ( select cash from books as child where books.title = child.title ) ;\n");
+        checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx on books ( title ) where 'ossians ride' < ( select title from books as child where books.cash = child.cash ) ;\n");
+        // Scalar subquery not allowed in indices.
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"unexpected token: SELECT\" in statement starting on lineno: [0-9]*",
+                                    "create index bidx on books ( select title from books as child where child.cash = books.cash );");
+        checkDDLAgainstScalarSubquerySchema("Index BIDX1 with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx1 on books ( ( select title from books as child where child.cash = books.cash ) ) ;");
+        checkDDLAgainstScalarSubquerySchema("Index BIDX2 with subquery expression\\(s\\) is not supported.",
+                                    "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );");
+        // Scalar subquery not allowed in materialize views.
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+                                    "create view tview as select cash, count(*) from books where 7 < ( select cash from books as child where books.title = child.title ) group by cash;\n");
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+                                    "create view tview as select cash, count(*) from books where ( select cash from books as child where books.title = child.title ) < 100 group by cash;\n");
+        checkDDLAgainstScalarSubquerySchema("Materialized view \"TVIEW\" with subquery sources is not supported.",
+                                    "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
+    }
+
+    public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
+                                    "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.CASH\" in statement starting on lineno: 1",
+                                    "create view tview as select cash, count(*), max(( select cash from books as child where books.cash = child.cash )) from books group by cash;\n");
+    }
+
+    public void test8290UnboundIdentifiersNotCaughtEarlyEnough() throws Exception {
+        // The name parent is not defined here.  This is an
+        // HSQL bug somehow.
+        checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
+                                    "create index bidx1 on books ( ( select title from books as child where child.cash = parent.cash ) ) ;");
+        checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
+                                    "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
+    }
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;
         for (String string : diagnostics) {

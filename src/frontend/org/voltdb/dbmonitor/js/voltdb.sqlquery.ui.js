@@ -395,7 +395,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
             });
         },
         beforeClose: function () {
-            if ($.cookie(sqlChangePortName) != sqlPortForPausedDB.UseAdminPort) {
+            if (VoltDbUI.getCookie(sqlChangePortName) != sqlPortForPausedDB.UseAdminPort) {
                 saveSessionCookie(sqlChangePortName, sqlPortForPausedDB.UseNormalPort);
                 //Rerun the query
                 $("#runBTn").button().click();

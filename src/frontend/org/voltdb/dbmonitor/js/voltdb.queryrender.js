@@ -178,7 +178,7 @@ function QueryUI(queryString, userName) {
         var target = $('.queryResult');
         var format = $('#exportType').val();
 
-        var dataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
+        var dataSource = VoltDbUI.getCookie('connectionkey') == undefined ? '' : VoltDbUI.getCookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
             return;

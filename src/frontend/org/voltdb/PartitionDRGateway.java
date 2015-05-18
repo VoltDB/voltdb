@@ -42,7 +42,7 @@ public class PartitionDRGateway {
     private static final VoltLogger log = new VoltLogger("DR");
 
     public enum DRRecordType {
-        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE;
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX;
 
         public static final ImmutableMap<Integer, DRRecordType> conversion;
         static {
@@ -160,31 +160,28 @@ public class PartitionDRGateway {
                 int checksum = 0;
                 if (version != 0) log.trace("Remaining is " + buf.remaining());
 
-                switch (DRRecordType.valueOf(type)) {
-                case INSERT: {
+                DRRecordType recordType = DRRecordType.valueOf(type);
+                switch (recordType) {
+                case INSERT:
+                case DELETE:
+                case DELETE_BY_INDEX: {
                     //Insert
                     if (haveOpenTransaction.get() == -1) {
-                        log.error("Have insert but no open transaction");
+                        log.error("Have insert/delete but no open transaction");
                         break;
                     }
                     final long tableHandle = buf.getLong();
                     final int lengthPrefix = buf.getInt();
-                    buf.position(buf.position() + lengthPrefix);
-                    checksum = buf.getInt();
-                    log.trace("Version " + version + " type INSERT table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
-                    break;
-                }
-                case DELETE: {
-                    //Delete
-                    if (haveOpenTransaction.get() == -1) {
-                        log.error("Have insert but no open transaction");
-                        break;
+                    final int indexCrc;
+                    if (recordType == DRRecordType.DELETE_BY_INDEX) {
+                        indexCrc = buf.getInt();
+                    } else {
+                        indexCrc = 0;
                     }
-                    final long tableHandle = buf.getLong();
-                    final int lengthPrefix = buf.getInt();
                     buf.position(buf.position() + lengthPrefix);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type DELETE table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum);
+                    log.trace("Version " + version + " type " + recordType + "table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
+                              (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
                     break;
                 }
                 case BEGIN_TXN: {

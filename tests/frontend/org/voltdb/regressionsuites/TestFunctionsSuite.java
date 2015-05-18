@@ -2467,6 +2467,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("foofoofoo", result.getString(1));
+        if (!isHSQL()) {
+            verifyProcFails(client,
+                            "VOLTDB ERROR: SQL ERROR\\s*REPEAT function call would create a string of size \\d+ which is larger than the maximum size \\d+",
+                            "REPEAT", 10000000, 1);
+        }
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {

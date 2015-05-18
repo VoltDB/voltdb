@@ -28,11 +28,13 @@ import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -70,6 +72,25 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         List<Integer> params = subqueryExpr.getParameterIdxList();
         assertEquals(1, params.size());
         assertEquals(new Integer(0), params.get(0));
+    }
+
+    public void testSelectCorrelatedScalarWithGroupby() {
+        String sql = "select franchise_id, count(*) as stores_in_category_AdHoc, "
+                + " (select category from store_types where type_id = stores.type_id) as store_category "
+                + "from stores group by franchise_id, type_id;";
+
+        AbstractPlanNode pn = compile(sql);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        NodeSchema schema = pn.getOutputSchema();
+        assertEquals(3, schema.size());
+        SchemaColumn col = schema.getColumns().get(2);
+        assertTrue(col != null);
+        assertEquals("STORE_CATEGORY", col.getColumnName());
+        assert(col.getExpression() instanceof ScalarValueExpression);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
     }
 
     public void testSelectParameterScalar() {
@@ -299,7 +320,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
         //        AbstractPlanNode.enableVerboseExplainForDebugging();
         //        AbstractExpression.enableVerboseExplainForDebugging();
     }
