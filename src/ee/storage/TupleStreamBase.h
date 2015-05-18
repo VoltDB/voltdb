@@ -68,7 +68,7 @@ public:
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedSpHandle);
+                       int64_t lastComittedSpHandle, int32_t exportPushInterval);
 
     virtual void extendBufferChain(size_t minLength);
     void pushPendingBlocks();

@@ -836,6 +836,11 @@ public abstract class CatalogUtil {
             tt = new SystemSettingsType.Temptables();
             ss.setTemptables(tt);
         }
+        SystemSettingsType.ExportPushInterval ep = ss.getExportPushInterval();
+        if (ep == null) {
+            ep = new SystemSettingsType.ExportPushInterval();
+            ss.setExportPushInterval(ep);
+        }
     }
 
     /**
@@ -974,6 +979,7 @@ public abstract class CatalogUtil {
         syssettings.setElasticduration(deployment.getSystemsettings().getElastic().getDuration());
         syssettings.setElasticthroughput(deployment.getSystemsettings().getElastic().getThroughput());
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
+        syssettings.setExportpushinterval(deployment.getSystemsettings().getExportPushInterval().getInterval());
     }
 
     private static void validateDirectory(String type, File path) {

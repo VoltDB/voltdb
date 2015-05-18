@@ -1467,6 +1467,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
                     hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
                 }
+                if (sysType.getExportPushInterval() != null && sysType.getExportPushInterval().getInterval() > 0) {
+                    hostLog.info("Export push interval set to " + sysType.getExportPushInterval().getInterval() + " milliseconds");
+                }
             }
 
             // create a dummy catalog to load deployment info into

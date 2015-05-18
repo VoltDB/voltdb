@@ -115,6 +115,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t hostId,
                         std::string hostname,
                         int64_t tempTableMemoryLimit,
+                        int32_t exportPushInterval,
                         bool createDrReplicatedStream,
                         int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
@@ -386,6 +387,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return m_tempTableMemoryLimit;
         }
 
+        int64_t exportPushInterval() const {
+            return m_exportPushInterval;
+        }
+
         int64_t tempTableLogLimit() const {
             return (m_tempTableMemoryLimit * 3) / 4;
         }
@@ -463,6 +468,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         boost::scoped_ptr<TheHashinator> m_hashinator;
         size_t m_startOfResultBuffer;
         int64_t m_tempTableMemoryLimit;
+        int32_t m_exportPushInterval;
 
         /*
          * Catalog delegates hashed by path.

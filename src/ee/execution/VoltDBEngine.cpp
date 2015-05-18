@@ -379,6 +379,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t hostId,
                          std::string hostname,
                          int64_t tempTableMemoryLimit,
+                         int32_t exportPushInterval,
                          bool createDrReplicatedStream,
                          int32_t compactionThreshold)
 {
@@ -386,6 +387,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
+    m_exportPushInterval = exportPushInterval;
     m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()
@@ -1430,24 +1432,26 @@ typedef std::pair<std::string, Table*> TablePair;
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     m_executorContext->setupForTick(lastCommittedSpHandle);
+    int32_t interval = m_executorContext->getEngine()->exportPushInterval();
     BOOST_FOREACH (TablePair table, m_exportingTables) {
-        table.second->flushOldTuples(timeInMillis);
+        table.second->flushOldTuples(timeInMillis, interval);
     }
-    m_drStream->periodicFlush(timeInMillis, lastCommittedSpHandle);
+    m_drStream->periodicFlush(timeInMillis, lastCommittedSpHandle, interval);
     if (m_drReplicatedStream) {
-        m_drReplicatedStream->periodicFlush(timeInMillis, lastCommittedSpHandle);
+        m_drReplicatedStream->periodicFlush(timeInMillis, lastCommittedSpHandle, interval);
     }
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
+    int32_t interval = m_executorContext->getEngine()->exportPushInterval();
     BOOST_FOREACH (TablePair table, m_exportingTables) {
-        table.second->flushOldTuples(-1L);
+        table.second->flushOldTuples(-1L, interval);
     }
-    m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
+    m_drStream->periodicFlush(-1L, lastCommittedSpHandle, interval);
     if (m_drReplicatedStream) {
-        m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
+        m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle, interval);
     }
 }
 

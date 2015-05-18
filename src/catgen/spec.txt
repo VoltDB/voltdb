@@ -34,6 +34,7 @@ begin Systemsettings javaonly "Container for deployment systemsettings element"
   int elasticduration         "Maximum duration time for rebalancing"
   int elasticthroughput       "Target throughput in megabytes for elasticity"
   int querytimeout            "The maximum latency for a query batch before timing out"
+  int exportpushinterval      "Minimum time to wait before export push is performed"
 end
 
 begin Database                       "A set of schema, procedures and other metadata that together comprise an application"

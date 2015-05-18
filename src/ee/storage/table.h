@@ -314,7 +314,7 @@ class Table {
      * Flush tuple stream wrappers. A negative time instructs an
      * immediate flush.
      */
-    virtual void flushOldTuples(int64_t timeInMillis) {
+    virtual void flushOldTuples(int64_t timeInMillis, int32_t flushInterval) {
     }
     /**
      * Inform the tuple stream wrapper of the table's signature and the timestamp

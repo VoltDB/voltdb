@@ -264,6 +264,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint hostId,
     jbyteArray hostname,
     jlong tempTableMemory,
+    jint exportPushInterval,
     jboolean createDrReplicatedStream,
     jint compactionThreshold)
 {
@@ -290,6 +291,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    hostId,
                                    hostString,
                                    tempTableMemory,
+                                   exportPushInterval,
                                    createDrReplicatedStream,
                                    static_cast<int32_t>(compactionThreshold));
         if (success) {

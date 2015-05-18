@@ -595,6 +595,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 0,
                 "",
                 100,
+                4000,
                 new HashinatorConfig(HashinatorType.LEGACY,
                                      LegacyHashinator.getConfigureBytes(1),
                                      0,

@@ -596,6 +596,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
+            final int exportPushInterval,
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
@@ -625,6 +626,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_hostId,
                 m_hostname,
                 1024 * 1024 * tempTableMemory,
+                exportPushInterval,
                 hashinatorConfig,
                 createDrReplicatedStream);
     }
@@ -659,6 +661,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final long tempTableMemory,
+            final int exportPushInterval,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream)
     {

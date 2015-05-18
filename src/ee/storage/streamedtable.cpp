@@ -141,11 +141,11 @@ void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
                                   "May not update a streamed table.");
 }
 
-void StreamedTable::flushOldTuples(int64_t timeInMillis)
+void StreamedTable::flushOldTuples(int64_t timeInMillis, int32_t flushInterval)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedSpHandle);
+                                 m_executorContext->m_lastCommittedSpHandle, flushInterval);
     }
 }
 

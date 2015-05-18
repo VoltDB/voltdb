@@ -117,6 +117,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
+            final int exportPushInterval,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream)
     {
@@ -143,6 +144,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostId,
                     getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024,
+                    exportPushInterval,
                     createDrReplicatedStream,
                     EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);

@@ -92,6 +92,7 @@ import org.voltdb.utils.MinimumRatioMaintainer;
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google_voltpatches.common.base.Preconditions;
+import org.voltdb.catalog.Systemsettings;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -486,6 +487,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
         try {
+            CatalogMap<Systemsettings> ss = m_context.cluster.getDeployment().get("deployment").
+                            getSystemsettings();
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
                     new ExecutionEngineJNI(
@@ -494,8 +497,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_partitionId,
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
-                        m_context.cluster.getDeployment().get("deployment").
-                        getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        ss.get("systemsettings").getTemptablemaxsize(),
+                        ss.get("systemsettings").getExportpushinterval(),
                         hashinatorConfig,
                         m_mpDrGateway != null);
             }
@@ -508,8 +511,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_partitionId,
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
-                            m_context.cluster.getDeployment().get("deployment").
-                            getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                            ss.get("systemsettings").getTemptablemaxsize(),
+                            ss.get("systemsettings").getExportpushinterval(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,

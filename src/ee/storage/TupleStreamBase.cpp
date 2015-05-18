@@ -36,8 +36,6 @@
 using namespace std;
 using namespace voltdb;
 
-const int MAX_BUFFER_AGE = 4000;
-
 TupleStreamBase::TupleStreamBase()
     : m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
@@ -326,10 +324,10 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
  */
 void
 TupleStreamBase::periodicFlush(int64_t timeInMillis,
-                                  int64_t lastCommittedSpHandle)
+                                  int64_t lastCommittedSpHandle, int32_t exportPushInterval)
 {
     // negative timeInMillis instructs a mandatory flush
-    if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
+    if (timeInMillis < 0 || (timeInMillis - m_lastFlush > exportPushInterval)) {
         int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
         if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;

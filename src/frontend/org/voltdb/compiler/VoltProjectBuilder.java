@@ -279,6 +279,7 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
+    private Integer m_exportPushInterval = null;
 
     private boolean m_useDDLSchema = false;
 
@@ -990,6 +991,11 @@ public class VoltProjectBuilder {
             SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
             query.setTimeout(m_queryTimeout);
             systemSettingType.setQuery(query);
+        }
+        if (m_exportPushInterval != null) {
+            SystemSettingsType.ExportPushInterval ep = factory.createSystemSettingsTypeExportPushInterval();
+            ep.setInterval(m_exportPushInterval);
+            systemSettingType.setExportPushInterval(ep);
         }
 
         deployment.setSystemsettings(systemSettingType);
