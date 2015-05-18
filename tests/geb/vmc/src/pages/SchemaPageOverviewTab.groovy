@@ -43,7 +43,7 @@ class SchemaPageOverviewTab extends SchemaPage {
         clusterCompositionValue		{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(4) > td:nth-child(2)") }
         runningSinceValue			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(5) > td:nth-child(2)") }
 
-        catalogOverviewStatistics	{ $("h3", text:"Catalog Overview Statistics") }
+        schemaOverview          	{ $("#o > div:nth-child(2) > div.dataBlockHeading > h3") }
         compiledBy					{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
         compiledOn					{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
         tableCount					{ $("#o > div:nth-child(2) > div.dataBlockContent > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
@@ -71,8 +71,8 @@ class SchemaPageOverviewTab extends SchemaPage {
         systemOverview.isDisplayed()
     }
 
-    def boolean checkCatalogOverviewStatistics() {
-        catalogOverviewStatistics.isDisplayed()
+    def boolean checkSchemaOverview() {
+        schemaOverview.isDisplayed()
     }
 
     def boolean checkMode() {
