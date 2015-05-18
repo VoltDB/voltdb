@@ -1189,21 +1189,32 @@ var loadPage = function (serverName, portid) {
 
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
 
-                    var length = $("#tblDrMAster tr").length - 1;
-                    if (length >= 5) {
-                        $("#drMasterSection").css("min-height", "280px");
-                    } else if (length == 4) {
-                        $("#drMasterSection").css("min-height", "250px");
+                    if ((screen.width == 1600) && (screen.height == 900)) {
+                        var length = $("#tblDrMAster tr").length - 1;
+                        if (length >= 5) {
+                            $("#drMasterSection").css("min-height", "280px");
+                        } else if (length == 4) {
+                            $("#drMasterSection").css("min-height", "250px");
+                        } else if (length == 3) {
+                            $("#drMasterSection").css("min-height", "230px");
+                        } else if (length == 2) {
+                            $("#drMasterSection").css("min-height", "200px");
+                        } else if (length == 1 || length == 0) {
+                            $("#drMasterSection").css("min-height", "170px");
+                        }
                     }
-                    else if (length == 3) {
-                        $("#drMasterSection").css("min-height", "230px");
+
+                    else if ((screen.width == 360) && (screen.height == 640)) {
+                        $("#drMasterSection").css("min-height", "380px");
                     }
-                    else if (length == 2) {
-                        $("#drMasterSection").css("min-height", "200px");
+                    else if ((screen.width == 640) && (screen.height == 960)) {
+                        alert("iphone resolution mode");
+                        $("#drMasterSection").css("min-height", "380px");
                     }
-                    else if (length == 1 || length == 0) {
-                        $("#drMasterSection").css("min-height", "170px");
-                    }
+                    //else if ($(window).width() == '751') {
+                    //    $("#drMasterSection").css("min-height", "350px");
+                    //}
+                    //console.log(screen.width + "*" + screen.height);
                 },
 
                 "sDom": 'p<"tblScroll drScroll"t>',
