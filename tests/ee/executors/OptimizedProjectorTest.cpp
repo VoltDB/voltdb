@@ -52,14 +52,11 @@
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 
-using namespace voltdb;
-using namespace std;
-
 
 static int64_t NUM_ROWS = 10000;
 static int64_t NUM_COLS = 32;
 
-
+namespace voltdb {
 static const CatalogId DATABASE_ID = 100;
 
 // Declarations in this namespace should someday become
@@ -100,8 +97,8 @@ static ValueType toValueType(TypeAndSize tas) {
     return VALUE_TYPE_INVALID;
 }
 
-static vector<ValueType> toValueType(const vector<TypeAndSize> &tasVec) {
-    vector<ValueType> valTypes;
+static std::vector<ValueType> toValueType(const std::vector<TypeAndSize> &tasVec) {
+    std::vector<ValueType> valTypes;
     BOOST_FOREACH(TypeAndSize tas, tasVec) {
         valTypes.push_back(toValueType(tas));
     }
@@ -220,8 +217,6 @@ static void fillTable(Table* tbl, int64_t numRows) {
 
 } // end namespace eetest
 
-using namespace eetest;
-
 class OptimizedProjectorTest : public Test
 {
 public:
@@ -248,7 +243,7 @@ public:
         TableIterator dstIterator = dstTable->iteratorDeletingAsWeGo();
         while (srcIterator.next(srcTuple)) {
             if (! dstIterator.next(dstTuple)) {
-                cout << "Too few rows in dst table\n";
+                std::cout << "Too few rows in dst table\n";
                 return false;
             }
 
@@ -260,10 +255,10 @@ public:
 
                 bool b = expectedVal.op_equals(actualVal).isTrue();
                 if (!b) {
-                    cout << "\nFields failed to compare as equal.  "
+                    std::cout << "\nFields failed to compare as equal.  "
                          << "Dst: " << dstIdx << "\n";
-                    cout << "  " << srcTuple.debug("src") << "\n";
-                    cout << "  " << dstTuple.debug("dst") << "\n\n";
+                    std::cout << "  " << srcTuple.debug("src") << "\n";
+                    std::cout << "  " << dstTuple.debug("dst") << "\n\n";
                     return false;
                 }
 
@@ -272,27 +267,27 @@ public:
         }
 
         if (dstIterator.next(dstTuple)) {
-            cout << "Too many rows in dst table\n";
+            std::cout << "Too many rows in dst table\n";
             return false;
         }
 
         return true;
     }
 
-    pair<bool, double> runSteps(const std::string &name,
-                                const std::vector<TypeAndSize>& dstTableTypes,
+    std::pair<bool, double> runSteps(const std::string &name,
+                                const std::vector<eetest::TypeAndSize>& dstTableTypes,
                                 Table& srcTbl,
                                 const OptimizedProjector& projector,
                                 const OptimizedProjector& baselineProjector,
                                 double baselineRate) {
 
-        boost::scoped_ptr<voltdb::Table> dstTable(createTableEz(TEMP, dstTableTypes));
+        boost::scoped_ptr<voltdb::Table> dstTable(createTableEz(eetest::TEMP, dstTableTypes));
         boost::timer t;
 
         t.restart();
         projectFields(&srcTbl, dstTable.get(), projector);
         double rowsPerSecond = static_cast<double>(NUM_ROWS) / t.elapsed();
-        cout << "            Projected " << boost::format("%10.0f") % rowsPerSecond
+        std::cout << "            Projected " << boost::format("%10.0f") % rowsPerSecond
              << " rows per second.  (" << name << ")\n";
 
         // Make sure we get the same answer as normal evaluation.
@@ -300,10 +295,10 @@ public:
 
         if (baselineRate > 0.0) {
             double percentChange = (rowsPerSecond - baselineRate) / baselineRate * 100;
-            cout << "              Percent change: " << boost::format("%3.3f%%") % (percentChange) << "\n";
+            std::cout << "              Percent change: " << boost::format("%3.3f%%") % (percentChange) << "\n";
         }
 
-        return make_pair(success, rowsPerSecond);
+        return std::make_pair(success, rowsPerSecond);
     }
 
     template <typename T>
@@ -311,15 +306,15 @@ public:
         return static_cast<T>(log(static_cast<double>(n)) / log(2.0));
     }
 
-    void runProjectionTest(const std::vector<TypeAndSize>& tableTypes,
+    void runProjectionTest(const std::vector<eetest::TypeAndSize>& tableTypes,
                            const OptimizedProjector& baselineProjector) {
 
         TupleSchema* dstSchema = createSchemaEz(tableTypes);
 
-        boost::scoped_ptr<voltdb::Table> srcTable(createTableEz(PERSISTENT, tableTypes));
-        fillTable(srcTable.get(), NUM_ROWS);
+        boost::scoped_ptr<voltdb::Table> srcTable(createTableEz(eetest::PERSISTENT, tableTypes));
+        eetest::fillTable(srcTable.get(), NUM_ROWS);
 
-        cout << "\n";
+        std::cout << "\n";
         int numBits = static_cast<int>(log2(NUM_COLS));
         for (int i = 0; i <= numBits; ++i) {
 
@@ -365,7 +360,7 @@ public:
         }
 
         TupleSchema::freeTupleSchema(dstSchema);
-        cout << "            ";
+        std::cout << "            ";
     }
 };
 
@@ -381,48 +376,45 @@ std::vector<T*> toRawPtrVector(const std::vector<boost::shared_ptr<T> > &vec) {
 
 TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
 {
-    using namespace boost;
-
-    std::vector<TypeAndSize> bigIntColumns;
+    std::vector<eetest::TypeAndSize> bigIntColumns;
     for (int i = 0; i < NUM_COLS; ++i) {
-        bigIntColumns.push_back(BIGINT);
+        bigIntColumns.push_back(eetest::BIGINT);
     }
 
     // Describe a way to move fields from one tuple to another
-    std::vector<shared_ptr<TupleValueExpression> > exprs(NUM_COLS);
+    std::vector<boost::shared_ptr<TupleValueExpression> > exprs(NUM_COLS);
     for (int i = 0; i < NUM_COLS; ++i) {
-        exprs[i] = make_shared<TupleValueExpression>(0, i);
+        exprs[i] = boost::make_shared<TupleValueExpression>(0, i);
     }
 
     OptimizedProjector projector;
-    BOOST_FOREACH(const shared_ptr<TupleValueExpression> &e, exprs) {
+    BOOST_FOREACH(const boost::shared_ptr<TupleValueExpression> &e, exprs) {
         projector.insertStep(e.get(), e->getColumnId());
     }
 
-    cout << "\n\n          " << "BIGINT columns:\n";
+    std::cout << "\n\n          " << "BIGINT columns:\n";
     runProjectionTest(bigIntColumns, projector);
 
-    std::vector<TypeAndSize> varcharColumns;
+    std::vector<eetest::TypeAndSize> varcharColumns;
     for (int i = 0; i < NUM_COLS; ++i) {
-        varcharColumns.push_back(VARCHAR_INLINE);
+        varcharColumns.push_back(eetest::VARCHAR_INLINE);
     }
 
-    cout << "\n          " << "VARCHAR columns (inlined):\n";
+    std::cout << "\n          " << "VARCHAR columns (inlined):\n";
     runProjectionTest(varcharColumns, projector);
 
-    std::vector<TypeAndSize> outlinedVarcharColumns;
+    std::vector<eetest::TypeAndSize> outlinedVarcharColumns;
     for (int i = 0; i < NUM_COLS; ++i) {
-        outlinedVarcharColumns.push_back(VARCHAR_OUTLINE);
+        outlinedVarcharColumns.push_back(eetest::VARCHAR_OUTLINE);
     }
 
-    cout << "\n          " << "VARCHAR columns (outlined):\n";
+    std::cout << "\n          " << "VARCHAR columns (outlined):\n";
     runProjectionTest(outlinedVarcharColumns, projector);
 }
 
 TEST_F(OptimizedProjectorTest, ProjectNonTVE)
 {
-    using namespace boost;
-    std::vector<shared_ptr<AbstractExpression> > exprs(NUM_COLS);
+    std::vector<boost::shared_ptr<AbstractExpression> > exprs(NUM_COLS);
 
     // Create a expr vector for a projection like
     // (for NUM_COLS == 4)
@@ -433,16 +425,16 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
         if (i == NUM_COLS / 2) {
             TupleValueExpression* lhs = new TupleValueExpression(0, i - 1);
             TupleValueExpression* rhs = new TupleValueExpression(0, i);
-            shared_ptr<AbstractExpression> plus(new OperatorExpression<OpPlus>(EXPRESSION_TYPE_OPERATOR_PLUS, lhs, rhs));
+            boost::shared_ptr<AbstractExpression> plus(new OperatorExpression<OpPlus>(EXPRESSION_TYPE_OPERATOR_PLUS, lhs, rhs));
             exprs[i] = plus;
         }
         else {
-            shared_ptr<AbstractExpression> tve(new TupleValueExpression(0, i));
+            boost::shared_ptr<AbstractExpression> tve(new TupleValueExpression(0, i));
             exprs[i] = tve;
         }
     }
 
-    std::vector<TypeAndSize> types(NUM_COLS, BIGINT);
+    std::vector<eetest::TypeAndSize> types(NUM_COLS, eetest::BIGINT);
     TupleSchema* schema = createSchemaEz(types);
 
     OptimizedProjector projector(toRawPtrVector(exprs));
@@ -462,19 +454,18 @@ TEST_F(OptimizedProjectorTest, ProjectNonTVE)
 
 TEST_F(OptimizedProjectorTest, ProjectTypeMismatch)
 {
-    using namespace boost;
     // If destination table has different types than source, a TVE may
     // be an implicit cast.  We shouldn't create a memcpy step for
     // this case---it should be treated like a non-TVE.
 
-    std::vector<TypeAndSize> colTypes(NUM_COLS, INTEGER);
+    std::vector<eetest::TypeAndSize> colTypes(NUM_COLS, eetest::INTEGER);
     TupleSchema* srcSchema = createSchemaEz(colTypes);
-    colTypes[NUM_COLS / 2] = BIGINT;
+    colTypes[NUM_COLS / 2] = eetest::BIGINT;
     TupleSchema* dstSchema = createSchemaEz(colTypes);
 
-    std::vector<shared_ptr<AbstractExpression> > exprs(NUM_COLS);
+    std::vector<boost::shared_ptr<AbstractExpression> > exprs(NUM_COLS);
     for (int i = 0; i < NUM_COLS; ++i) {
-        shared_ptr<AbstractExpression> tve(new TupleValueExpression(0, i));
+        boost::shared_ptr<AbstractExpression> tve(new TupleValueExpression(0, i));
         exprs[i] = tve;
     }
 
@@ -490,10 +481,13 @@ TEST_F(OptimizedProjectorTest, ProjectTypeMismatch)
     TupleSchema::freeTupleSchema(srcSchema);
 }
 
+} // end namespace voltdb
+
+
 void printUsageAndExit(const std::string& progName) {
 
-    cerr << "Usage: " << progName << " [-r <num_rows>] [-c <num_cols>]\n";
-    cerr << "  Note that <num_cols> must be equal to a power of two "
+    std::cerr << "Usage: " << progName << " [-r <num_rows>] [-c <num_cols>]\n";
+    std::cerr << "  Note that <num_cols> must be equal to a power of two "
          << "(for easy permuations).\n";
     exit(1);
 
@@ -524,11 +518,21 @@ int main(int argc, char* argv[]) {
 
     assert (ExecutorContext::getExecutorContext() == NULL);
 
-    boost::scoped_ptr<Pool> testPool(new Pool());
-    UndoQuantum* wantNoQuantum = NULL;
-    Topend* topless = NULL;
-    boost::scoped_ptr<ExecutorContext> executorContext(new ExecutorContext(0, 0, wantNoQuantum, topless, testPool.get(),
-                                                                           NULL, "", 0, NULL, NULL));
+    boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());
+    voltdb::UndoQuantum* wantNoQuantum = NULL;
+    voltdb::Topend* topless = NULL;
+    boost::scoped_ptr<voltdb::ExecutorContext>
+        executorContext(new voltdb::ExecutorContext(0,              // siteId
+                                                    0,              // partitionId
+                                                    wantNoQuantum,  // undoQuantum
+                                                    topless,        // topend
+                                                    testPool.get(), // tempStringPool
+                                                    NULL,           // params
+                                                    NULL,           // engine
+                                                    "",             // hostname
+                                                    0,              // hostId
+                                                    NULL,           // drTupleStream
+                                                    NULL));         // drReplicatedStream
 
     return TestSuite::globalInstance()->runAll();
 }
