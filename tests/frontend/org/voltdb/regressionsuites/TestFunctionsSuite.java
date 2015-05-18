@@ -57,6 +57,29 @@ public class TestFunctionsSuite extends RegressionSuite {
     private static final String paddedToNonInlineLength =
         "will you still free me (will memcheck see me) when Im sixty-four";
 
+    
+
+
+    public void testMod() throws IOException, InterruptedException, ProcCallException {
+         System.out.println("STARTING testFoundHSQLBackendOutOfRange");
+         Client client = getClient();
+         ClientResponse cr = null;
+
+         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        
+         cr = client.callProcedure("@AdHoc", "select MOD(10,4) from P1");
+         VoltTable r = cr.getResults()[0];
+         long l=r.getLong(1);
+         assertEquals(l, 2);
+         
+         cr = client.callProcedure("@AdHoc", "select MOD(ID,4) from P1");
+         r = cr.getResults()[0];
+         l=r.getLong(1);
+         assertEquals(l, 2);
+     }
+
+
+    
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
     public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
         System.out.println("STARTING testFoundHSQLBackendOutOfRange");

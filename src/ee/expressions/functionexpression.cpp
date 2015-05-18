@@ -413,6 +413,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_FORMAT_CURRENCY:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
             break;
+        case FUNC_MOD:
+            ret = new GeneralFunctionExpression<FUNC_MOD>(*arguments);
+            break;
         default:
             return NULL;
         }
