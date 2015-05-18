@@ -4,7 +4,4 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <systemsettings>
-        <exportPushInterval interval="1000"/>
-    </systemsettings>
 </deployment>
