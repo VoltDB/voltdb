@@ -431,7 +431,13 @@ public abstract class AbstractParsedStmt {
         // Get tableScan where this TVE is originated from. In case of the
         // correlated queries it may not be THIS statement but its parent
         StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
-        assert(tableScan != null);
+        if (tableScan == null) {
+            // This never used to happen.  HSQL should make sure all the
+            // identifiers are defined.  But something has gone wrong.
+            // The query is "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );"
+            // from TestVoltCompler.testScalarSubqueriesExpectedFailures.
+            throw new PlanningErrorException("Object not found: " + tableAlias);
+        }
         tableScan.resolveTVE(expr);
 
         if (m_stmtId == tableScan.getStatementId()) {

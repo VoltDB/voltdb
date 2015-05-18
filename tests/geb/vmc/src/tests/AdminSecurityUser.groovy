@@ -260,11 +260,9 @@ class AdminSecurityUser extends TestBase {
 				break
 			} catch(geb.waiting.WaitTimeoutException e) {
 				println("Wait Timeout Exception Occurred: Retrying")
-				at AdminPage
 				testStatus = false
 			} catch(org.openqa.selenium.StaleElementReferenceException e) {
 				println("Stale Element Reference Exception Occurred: Retrying")
-				at AdminPage
 				testStatus = false
 			}
 		}

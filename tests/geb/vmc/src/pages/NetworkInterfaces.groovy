@@ -21,7 +21,7 @@ class NetworkInterfaces extends Module {
 
         portNameTitle			        { $("th", text:"Port Name") }
         clusterSettingTitle		        { $("th", text:"Cluster Settings") }
-        serverSettingTitle		        { $("th", text:"Server Settings") }
+        serverSettingTitle		        { $("#hServerSettings") }
         clientPortTitle			        { $("#clientport").previous() }
         adminPortTitle			        { $("#adminport").previous() }
         httpPortTitle 			        { $("#httpport").previous() }

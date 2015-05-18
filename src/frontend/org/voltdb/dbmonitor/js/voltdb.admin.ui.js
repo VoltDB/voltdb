@@ -1588,7 +1588,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td>Type </td>' +
                 '    <td>' +
-                '       <input id="txtType" name="txtType" type="text" size="38">' +
+                '       <input id="txtType" name="txtType" style="text-transform: uppercase" type="text" size="38">' +
                 '       <label id="errorType" for="txtType" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
@@ -1647,6 +1647,11 @@ function loadAdminPage() {
 
             $('#chkStream').on('ifChanged', function () {
                 $("#chkStreamValue").text(getOnOffText($('#chkStream').is(":checked")));
+            });
+
+            $('#txtType').focusout(function() {
+                // Uppercase-ize contents
+                this.value = this.value.toUpperCase();
             });
 
             var count = 0;
