@@ -77,14 +77,6 @@ class SchemaPageTestDatabase extends TestBase {
         then: 'run the query'
         page.runQuery()
 
-        if ( page.queryStatus.isDisplayed() ) {
-            println("Create query successful")
-        }
-        else {
-            println("Create query unsuccessful")
-            assert false
-        }
-
         when: 'go to Schema page'
         page.gotoSchema()
         then: 'at Schema page'
@@ -111,13 +103,6 @@ class SchemaPageTestDatabase extends TestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-        if ( page.queryStatus.isDisplayed() ) {
-            println("Delete query successful")
-        }
-        else {
-            println("Delete query unsuccessful")
-            assert false
-        }
 
         when: 'go to Schema page'
         page.gotoSchema()
@@ -166,14 +151,6 @@ class SchemaPageTestDatabase extends TestBase {
 		page.setQueryText(createQuery)
 		then: 'run the query'
 		page.runQuery()
-				
-		if ( page.queryStatus.isDisplayed() ) {
-			println("Create query successful")
-		}
-		else {
-			println("Create query unsuccessful")
-			assert false
-		}
 		
 		when: 'go to Schema page'
 		page.gotoSchema()
@@ -201,13 +178,6 @@ class SchemaPageTestDatabase extends TestBase {
 		page.setQueryText(deleteQuery)
 		then: 'run the query'
 		page.runQuery()
-		if ( page.queryStatus.isDisplayed() ) {
-			println("Delete query successful")
-		}
-		else {
-			println("Delete query unsuccessful")
-			assert false
-		}
 		
 		when: 'go to Schema page'
 		page.gotoSchema()
