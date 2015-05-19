@@ -387,7 +387,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return m_tempTableMemoryLimit;
         }
 
-        int64_t exportPushInterval() const {
+        int32_t exportPushInterval() const {
             return m_exportPushInterval;
         }
 
