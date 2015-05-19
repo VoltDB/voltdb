@@ -841,6 +841,20 @@ public abstract class AbstractParsedStmt {
             assert(exprType == ExpressionType.AGGREGATE_COUNT);
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
         }
+        else {
+            // For count(<column>), check if it's non-nullable column
+            // it also cannot have "distinct"
+            if(exprType == ExpressionType.AGGREGATE_COUNT &&
+                    childExpr.getExpressionType().equals(ExpressionType.VALUE_TUPLE) &&
+                    exprNode.attributes.get("distinct") == null) {
+                String tableName = childExprNode.attributes.get("table");
+                String columnName = childExprNode.attributes.get("column");
+                Table t = getTableFromDB(tableName);
+                if(! t.getColumns().get(columnName).getNullable()) {
+                    exprType = ExpressionType.AGGREGATE_COUNT_STAR;
+                }
+            }
+        }
 
         AggregateExpression expr = new AggregateExpression(exprType);
         expr.setLeft(childExpr);
