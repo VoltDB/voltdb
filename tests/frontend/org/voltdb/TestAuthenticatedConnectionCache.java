@@ -25,16 +25,18 @@ package org.voltdb;
 
 
 import junit.framework.TestCase;
+import org.voltcore.utils.Pair;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestAuthenticatedConnectionCache extends TestCase {
 
     ServerThread server;
-    Client client;
+    Pair<Client, ClientAuthHashScheme> client;
 
     public void testAuthenticatedConnectionCache() throws Exception {
         try {
@@ -69,29 +71,29 @@ public class TestAuthenticatedConnectionCache extends TestCase {
             AuthenticatedConnectionCache ccache = new AuthenticatedConnectionCache(10, "localhost", server.m_config.m_port, "localhost", server.m_config.m_adminPort);
             client = ccache.getClient(null, null, null, true);
 
-            assertEquals(client.hashCode(), ccache.getUnauthenticatedAdminClient().hashCode());
+            assertEquals(client.getFirst().hashCode(), ccache.getUnauthenticatedAdminClient().hashCode());
             client = ccache.getClient(null, null, null, false);
-            assertEquals(client.hashCode(), ccache.getUnauthenticatedClient().hashCode());
+            assertEquals(client.getFirst().hashCode(), ccache.getUnauthenticatedClient().hashCode());
 
             client = ccache.getClient("admin", "password", null, true);
             assertEquals(1, ccache.getSize());
-            Client client2 = ccache.getClient("admin", "password", null, true);
-            assertEquals(client2.hashCode(), client.hashCode());
+            Pair<Client, ClientAuthHashScheme> client2 = ccache.getClient("admin", "password", null, true);
+            assertEquals(client2.getFirst().hashCode(), client.getFirst().hashCode());
 
             client = ccache.getClient("admin", "password", null, false);
             assertEquals(2, ccache.getSize());
             client2 = ccache.getClient("admin", "password", null, false);
-            assertEquals(client2.hashCode(), client.hashCode());
+            assertEquals(client2.getFirst().hashCode(), client.getFirst().hashCode());
 
             client = ccache.getClient("user", "password", null, true);
             assertEquals(3, ccache.getSize());
             client2 = ccache.getClient("user", "password", null, true);
-            assertEquals(client2.hashCode(), client.hashCode());
+            assertEquals(client2.getFirst().hashCode(), client.getFirst().hashCode());
 
             client = ccache.getClient("user", "password", null, false);
             assertEquals(4, ccache.getSize());
             client2 = ccache.getClient("user", "password", null, false);
-            assertEquals(client2.hashCode(), client.hashCode());
+            assertEquals(client2.getFirst().hashCode(), client.getFirst().hashCode());
 
         } finally {
             if (server != null) {
@@ -100,7 +102,7 @@ public class TestAuthenticatedConnectionCache extends TestCase {
             }
             server = null;
             if (client != null) {
-                client.close();
+                client.getFirst().close();
             }
         }
     }
