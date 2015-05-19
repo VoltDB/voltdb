@@ -819,7 +819,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(m_having != null);
         if (! m_having.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
             throw new PlanningErrorException(
-                    "SQL HAVING with subquery expression is not supported currently.");
+                    "SQL HAVING with subquery expression is not allowed.");
         }
         if (isDistributed) {
             m_having = m_having.replaceAVG();
