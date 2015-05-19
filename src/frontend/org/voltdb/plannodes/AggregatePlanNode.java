@@ -107,10 +107,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
             return false;
         if (m_aggregateTypes.size() != 1)
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR) == false)
-            return false;
-
-        return true;
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR)) {
+            return true;
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT) &&
+                m_aggregateExpressions.get(0).getExpressionType().equals(ExpressionType.VALUE_PARAMETER)) {
+                return true;
+        }
+        return false;
     }
 
     // single min() without GROUP BY?
