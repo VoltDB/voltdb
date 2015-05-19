@@ -35,7 +35,7 @@ INSERT INTO @dmltable VALUES (@insertvals)
 {_temp0grouporderbyvarlimoffhaving |= "LIMIT 1000"}
 {_temp0grouporderbyvarlimoffhaving |= "GROUP BY __[#ord]"}
 {_temp0grouporderbyvarlimoffhaving |= "GROUP BY __[#ord] HAVING @agg(_variable[@comparabletype]) _cmp 12"}
-{_temp0grouporderbyvarlimoffhaving |= "GROUP BY __[#ord] HAVING @genericagg(_variable[string])   _cmp 'Z'"}
+{_temp0grouporderbyvarlimoffhaving |= "GROUP BY __[#ord] HAVING _genericagg(_variable[string])   _cmp 'Z'"}
 
 {_grouporderbyvarlimoffhaving |= "_temp0grouporderbyvarlimoffhaving"}
 {_grouporderbyvarlimoffhaving |= "ORDER BY __[#ord] _sortorder _optionallimitoffset"}
@@ -78,7 +78,7 @@ SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _cmp3 (SELECT
 --- Queries with scalar subqueries in the GROUP BY or HAVING clause (these work)
 SELECT (SELECT @agg(_variable[#agg])                 FROM @fromtables WHERE _variable[@comparabletype] _cmp1 A31._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A31 GROUP BY C0
 SELECT (SELECT @agg(_variable[#agg @comparabletype]) FROM @fromtables WHERE _variable[@comparabletype] _cmp2 A32._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A32 GROUP BY C0 HAVING @agg(__[#agg]) _cmp 12
-SELECT (SELECT @genericagg(_variable[#agg string])   FROM @fromtables WHERE _variable[@comparabletype] _cmp3 A33._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A33 GROUP BY C0 HAVING @agg(__[#agg]) _cmp 'Z'
+SELECT (SELECT _genericagg(_variable[#agg string])   FROM @fromtables WHERE _variable[@comparabletype] _cmp3 A33._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A33 GROUP BY C0 HAVING @agg(__[#agg]) _cmp 'Z'
 --- These do not currently work (meanwhile, commented out to save execution time)
 --SELECT (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _cmp A34._variable[@comparabletype]) C0, @agg(__[#agg]) C1 FROM @fromtables A34 GROUP BY C0 HAVING C1 _cmp 12
 --SELECT _variable[#grp] C0, @agg(_variable[#agg]) C1  FROM @fromtables A35 GROUP BY C0 HAVING (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _cmp A35._variable[@comparabletype]) _cmp 12
