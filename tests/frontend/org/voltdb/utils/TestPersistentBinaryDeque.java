@@ -36,8 +36,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.google_voltpatches.common.collect.Sets;
 import junit.framework.Assert;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -45,6 +45,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse;
+
+import com.google_voltpatches.common.collect.Sets;
 
 public class TestPersistentBinaryDeque {
 
@@ -118,8 +121,8 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             @Override
-            public ByteBuffer parse(BBContainer bbc) {
-                return ByteBuffer.allocate(0);
+            public TruncatorResponse parse(BBContainer bbc) {
+                return PersistentBinaryDeque.fullTruncateResponse();
             }
 
         });
@@ -147,7 +150,7 @@ public class TestPersistentBinaryDeque {
 
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             @Override
-            public ByteBuffer parse(BBContainer bbc) {
+            public TruncatorResponse parse(BBContainer bbc) {
                 fail();
                 return null;
             }
@@ -189,7 +192,7 @@ public class TestPersistentBinaryDeque {
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             private long m_objectsParsed = 0;
             @Override
-            public ByteBuffer parse(BBContainer bbc) {
+            public TruncatorResponse parse(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 if (b.getLong(0) != m_objectsParsed) {
                     System.out.println("asd");
@@ -198,7 +201,7 @@ public class TestPersistentBinaryDeque {
                 assertEquals(b.remaining(), 1024 * 1024 * 2 );
                 if (b.getLong(0) == 45) {
                     b.limit(b.remaining() / 2);
-                    return ByteBuffer.allocate(0);
+                    return PersistentBinaryDeque.fullTruncateResponse();
                 }
                 while (b.remaining() > 15) {
                     assertEquals(b.getLong(), m_objectsParsed);
@@ -257,13 +260,13 @@ public class TestPersistentBinaryDeque {
         m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             private long m_objectsParsed = 0;
             @Override
-            public ByteBuffer parse(BBContainer bbc) {
+            public TruncatorResponse parse(BBContainer bbc) {
                 ByteBuffer b = bbc.b();
                 assertEquals(b.getLong(0), m_objectsParsed);
                 assertEquals(b.remaining(), 1024 * 1024 * 2 );
                 if (b.getLong(0) == 45) {
                     b.limit(b.remaining() / 2);
-                    return b.slice();
+                    return new PersistentBinaryDeque.ByteBufferTruncatorResponse(b.slice());
                 }
                 while (b.remaining() > 15) {
                     assertEquals(b.getLong(), m_objectsParsed);
