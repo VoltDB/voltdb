@@ -145,7 +145,7 @@ TEST_F(StreamedTableTest, BaseCase) {
         m_table->insertTuple(*m_tuple);
     }
     // a negative flush implies "now". this helps valgrind heap block test
-    m_table->flushOldTuples(-1);
+    m_table->flushOldTuples(-1, 4000);
 
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and

@@ -1432,26 +1432,24 @@ typedef std::pair<std::string, Table*> TablePair;
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     m_executorContext->setupForTick(lastCommittedSpHandle);
-    int32_t interval = m_executorContext->getEngine()->exportPushInterval();
     BOOST_FOREACH (TablePair table, m_exportingTables) {
-        table.second->flushOldTuples(timeInMillis, interval);
+        table.second->flushOldTuples(timeInMillis, m_executorContext->getEngine()->exportPushInterval());
     }
-    m_drStream->periodicFlush(timeInMillis, lastCommittedSpHandle, interval);
+    m_drStream->periodicFlush(timeInMillis, lastCommittedSpHandle, m_executorContext->getEngine()->exportPushInterval());
     if (m_drReplicatedStream) {
-        m_drReplicatedStream->periodicFlush(timeInMillis, lastCommittedSpHandle, interval);
+        m_drReplicatedStream->periodicFlush(timeInMillis, lastCommittedSpHandle, m_executorContext->getEngine()->exportPushInterval());
     }
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
-    int32_t interval = m_executorContext->getEngine()->exportPushInterval();
     BOOST_FOREACH (TablePair table, m_exportingTables) {
-        table.second->flushOldTuples(-1L, interval);
+        table.second->flushOldTuples(-1L, m_executorContext->getEngine()->exportPushInterval());
     }
-    m_drStream->periodicFlush(-1L, lastCommittedSpHandle, interval);
+    m_drStream->periodicFlush(-1L, lastCommittedSpHandle, m_executorContext->getEngine()->exportPushInterval());
     if (m_drReplicatedStream) {
-        m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle, interval);
+        m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle, m_executorContext->getEngine()->exportPushInterval());
     }
 }
 

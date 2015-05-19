@@ -357,7 +357,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     //Flush to generate a buffer
     drStream.endTransaction();
-    drStream.periodicFlush(-1, addPartitionId(99));
+    drStream.periodicFlush(-1, addPartitionId(99), 4000);
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
@@ -404,7 +404,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     //Flush to generate the log buffer
     drStream.endTransaction();
-    drStream.periodicFlush(-1, addPartitionId(101));
+    drStream.periodicFlush(-1, addPartitionId(101), 4000);
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated block of log data
@@ -440,7 +440,7 @@ TEST_F(TableAndIndexTest, DrTest) {
 
     //Flush to generate the buffer
     drStream.endTransaction();
-    drStream.periodicFlush(-1, addPartitionId(102));
+    drStream.periodicFlush(-1, addPartitionId(102), 4000);
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
@@ -499,7 +499,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
 
     //Flush to generate a buffer
     drStream.endTransaction();
-    drStream.periodicFlush(-1, addPartitionId(99));
+    drStream.periodicFlush(-1, addPartitionId(99), 4000);
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
@@ -542,7 +542,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
 
     //Flush to generate the buffer
     drStream.endTransaction();
-    drStream.periodicFlush(-1, addPartitionId(101));
+    drStream.periodicFlush(-1, addPartitionId(101), 4000);
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data
@@ -616,7 +616,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
 
     //Flush to generate a buffer
     drStream.endTransaction();
-    drStream.periodicFlush(-1, addPartitionId(99));
+    drStream.periodicFlush(-1, addPartitionId(99), 4000);
     ASSERT_TRUE( topend.receivedDRBuffer );
 
     //Buidl the map expected by the binary log sink
@@ -659,7 +659,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
 
     //Flush to generate the buffer
     drStream.endTransaction();
-    drStream.periodicFlush(-1, addPartitionId(101));
+    drStream.periodicFlush(-1, addPartitionId(101), 4000);
     EXPECT_TRUE( topend.receivedDRBuffer );
 
     //Grab the generated blocks of data

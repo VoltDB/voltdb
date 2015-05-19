@@ -209,8 +209,8 @@ public:
     }
 
     bool flush(int64_t lastCommittedSpHandle) {
-        m_drStream.periodicFlush(-1, addPartitionId(lastCommittedSpHandle));
-        m_drReplicatedStream.periodicFlush(-1, addPartitionId(lastCommittedSpHandle));
+        m_drStream.periodicFlush(-1, addPartitionId(lastCommittedSpHandle), 4000);
+        m_drReplicatedStream.periodicFlush(-1, addPartitionId(lastCommittedSpHandle), 4000);
         return m_topend.receivedDRBuffer;
     }
 
