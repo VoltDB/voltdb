@@ -6,7 +6,6 @@ import geb.Page.*
 
 
 class AdminExport extends TestBase {
-
 	def "Check export Click and check its value"(){
 		
 		when: 'click the Admin link (if needed)'
@@ -16,17 +15,17 @@ class AdminExport extends TestBase {
 			at AdminPage
 				
 		when:
-		waitFor(5){page.exportbtn.isDisplayed()}
+		waitFor(waitTime){page.exportbtn.isDisplayed()}
 		page.exportbtn.click()
 		
 		then:
-		waitFor(10){page.noconfigtxt.isDisplayed()}
+		waitFor(waitTime){page.noconfigtxt.isDisplayed()}
 		if(page.noconfigtxt.text()=="No configuration available.")
 		{println("Currently, No configurations are available in export")}else 
 		{println("Early presence of Configuration settings detected!")}
 		page.exportbtn.click()
 	}
-	
+
 
 	def "Check export add configuration for empty values and validate errors" (){
 	
@@ -39,11 +38,11 @@ class AdminExport extends TestBase {
 		when:
 		at AdminPage
 		
-		waitFor(5){	page.exportbtn.isDisplayed()
+		waitFor(waitTime){	page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()}
 				page.addconfig.click()
 		then:
-		waitFor(10){	page.addconfigpopup.isDisplayed()
+		waitFor(waitTime){	page.addconfigpopup.isDisplayed()
 				page.addconfigtxt.isDisplayed()
 				page.streamtxt.isDisplayed()
 				page.typetxt.isDisplayed()
@@ -57,11 +56,11 @@ class AdminExport extends TestBase {
 		
 			else println("None of the title and label verified")
 
-		waitFor(10){	page.saveconfig.isDisplayed()
+		waitFor(waitTime){	page.saveconfig.isDisplayed()
 				page.cancelconfig.isDisplayed()}
 				page.saveconfig.click()
 		
-		waitFor(10){	page.reqfielderror.isDisplayed()}
+		waitFor(waitTime){	page.reqfielderror.isDisplayed()}
 				if(page.reqfielderror.text()=="This field is required"){
 				println("error message verified")}
 				page.cancelconfig.click()	
@@ -84,11 +83,11 @@ class AdminExport extends TestBase {
 		String nameValue   = page.getExportName()
 		String valueValue  = page.getValue()
 
-		waitFor(5){	page.exportbtn.isDisplayed()
+		waitFor(waitTime){	page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()}
 				page.addconfig.click()
 		then:
-		waitFor(10){	page.addconfigpopup.isDisplayed()
+		waitFor(waitTime){	page.addconfigpopup.isDisplayed()
 				page.addconfigtxt.isDisplayed()
 				if(page.streamtxt.isDisplayed())	{page.inputstream.value(streamValue)}
 				if(page.typetxt.isDisplayed())		{page.inputtype.value(typeValue)}
@@ -99,11 +98,11 @@ class AdminExport extends TestBase {
 			}
 				
 								
-		waitFor(10){	page.saveconfig.isDisplayed()
+		waitFor(waitTime){	page.saveconfig.isDisplayed()
 				page.cancelconfig.isDisplayed()}
 				page.saveconfig.click()
 
-		waitFor(10){	page.confirmpopupask.isDisplayed()
+		waitFor(waitTime){	page.confirmpopupask.isDisplayed()
 				page.confirmnobtn.isDisplayed()
 				page.confirmyesbtn.isDisplayed()				
 			}
@@ -124,7 +123,7 @@ class AdminExport extends TestBase {
 		try{		if(!page.exportbtn.isDisplayed() || !page.dbmonitorerrormsgpopup.isDisplayed()){page.confirmyesbtn.click()}
 				else println("confirm pop up for save Yes clicked")
 
-				if(waitFor(30){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
+				if(waitFor(waitTime){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
 				page.clickdbmonitorerrormsg.click()
 				println("Since due to late timing, dbMonitor error message displayed")}
 
@@ -132,7 +131,7 @@ class AdminExport extends TestBase {
 			{println("This occurs due to error message of dbmonitor")}
 			catch(geb.waiting.WaitTimeoutException e){println("Time exceed more than the given waiting time")}
 				
-				waitFor(30){page.exportbtn.isDisplayed()
+				waitFor(waitTime){page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()
 				page.ksafetyValue.isDisplayed()}
 				page.exportbtn.click()
@@ -143,7 +142,7 @@ class AdminExport extends TestBase {
 		try{		if(!page.exportbtn.isDisplayed() || !page.dbmonitorerrormsgpopup.isDisplayed()){page.confirmyesbtn.click()}
 				else println("confirm pop up for save Yes clicked")
 
-				if(waitFor(30){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
+				if(waitFor(waitTime){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
 				page.clickdbmonitorerrormsg.click()
 				println("Since due to late timing, dbMonitor error message displayed")}
 
@@ -152,14 +151,14 @@ class AdminExport extends TestBase {
 			catch(geb.waiting.WaitTimeoutException e){println("Time exceed more than the given waiting time")}
 				
 			
-				waitFor(15){page.belowexportbtn.isDisplayed()
+				waitFor(waitTime){page.belowexportbtn.isDisplayed()
 					    }
 					if(!page.belowexportbtn.isDisplayed()){page.exportbtn.click()}else
 				page.belowexportbtn.click()
 			
 					
 		try{
-		waitFor(30){	page.addconfig.isDisplayed()
+		waitFor(waitTime){	page.addconfig.isDisplayed()
 				if(page.onstatetxt.isDisplayed()){println("It is in ON STATE")}else println("It is in OFF STATE")				
 				page.belowexportnametxt.isDisplayed()
 				page.belowexportvaluetxt.isDisplayed()}
@@ -187,11 +186,11 @@ class AdminExport extends TestBase {
 		String nameValue   = page.getExportName()
 		String valueValue  = page.getValue()
 
-		waitFor(5){	page.exportbtn.isDisplayed()
+		waitFor(waitTime){	page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()}
 				page.addconfig.click()
 		then:
-		waitFor(10){	page.addconfigpopup.isDisplayed()
+		waitFor(waitTime){	page.addconfigpopup.isDisplayed()
 				page.addconfigtxt.isDisplayed()
 				if(page.streamtxt.isDisplayed())	{page.inputstream.value(streamValue)}
 				if(page.typetxt.isDisplayed())		{page.inputtype.value(typeValue)}
@@ -202,11 +201,11 @@ class AdminExport extends TestBase {
 			}
 				
 								
-		waitFor(10){	page.saveconfig.isDisplayed()
+		waitFor(waitTime){	page.saveconfig.isDisplayed()
 				page.cancelconfig.isDisplayed()}
 				page.saveconfig.click()
 
-		waitFor(10){	page.confirmpopupask.isDisplayed()
+		waitFor(waitTime){	page.confirmpopupask.isDisplayed()
 				page.confirmnobtn.isDisplayed()
 				page.confirmyesbtn.isDisplayed()				
 			}
@@ -221,7 +220,7 @@ class AdminExport extends TestBase {
 				}catch(geb.error.RequiredPageContentNotPresent e){}
 				
 		
-		waitFor(15){	page.samestreamnameerrorpopup.isDisplayed()
+		waitFor(waitTime){	page.samestreamnameerrorpopup.isDisplayed()
 				page.samestreamnameerrorOk.isDisplayed()}			
 				page.samestreamnameerrorOk.click()
 				println("same stream error name verified")
@@ -249,11 +248,11 @@ class AdminExport extends TestBase {
 		String nameValue   	= page.getExportName()
 		String valueValue  	= page.getValue()
 
-		waitFor(5){	page.exportbtn.isDisplayed()
+		waitFor(waitTime){	page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()}
 				page.addconfig.click()
 		then:
-		waitFor(10){	page.addconfigpopup.isDisplayed()
+		waitFor(waitTime){	page.addconfigpopup.isDisplayed()
 				page.addconfigtxt.isDisplayed()
 				if(page.streamtxt.isDisplayed())	{page.inputstream.value(streamValueScnd)}
 				if(page.typetxt.isDisplayed())		{page.inputtype.value(typeValue)}
@@ -263,11 +262,11 @@ class AdminExport extends TestBase {
 				page.deletetxt.isDisplayed()
 			}
 			try{	
-		waitFor(10){   	if(page.addconfigcheckonbox.value()=="on" && page.addconfigcheckonbox.isChecked()){page.checkboxtest.click()
+		waitFor(waitTime){   	if(page.addconfigcheckonbox.value()=="on" && page.addconfigcheckonbox.isChecked()){page.checkboxtest.click()
 
 				println("clicked")}}
 
-		waitFor(10){	if(page.checkboxofftxt.text()=="Off"){println("OFF state")}else 
+		waitFor(waitTime){	if(page.checkboxofftxt.text()=="Off"){println("OFF state")}else
 				page.checkboxtest.click()}
 			}catch (geb.error.RequiredPageContentNotPresent e)
 			{println("This occurs due to element not found")}
@@ -279,11 +278,11 @@ class AdminExport extends TestBase {
 		   		if(page.checkboxofftxt.text()=="Off"){println("OFF state")}else 
 				page.checkboxtest.click()
 
-		waitFor(10){	page.saveconfig.isDisplayed()
+		waitFor(waitTime){	page.saveconfig.isDisplayed()
 				page.cancelconfig.isDisplayed()}
 				page.saveconfig.click()
 
-		waitFor(10){	page.confirmpopupask.isDisplayed()
+		waitFor(waitTime){	page.confirmpopupask.isDisplayed()
 				page.confirmnobtn.isDisplayed()
 				page.confirmyesbtn.isDisplayed()				
 			}
@@ -301,7 +300,7 @@ class AdminExport extends TestBase {
 		try{		if(!page.exportbtn.isDisplayed() || !page.dbmonitorerrormsgpopup.isDisplayed()){page.confirmyesbtn.click()}
 				else println("confirm pop up for save Yes clicked")
 
-				if(waitFor(30){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
+				if(waitFor(waitTime){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
 				page.clickdbmonitorerrormsg.click()
 				println("Since due to late timing, dbMonitor error message displayed")}
 
@@ -309,7 +308,7 @@ class AdminExport extends TestBase {
 			{println("This occurs due to error message of dbmonitor")}
 			catch(geb.waiting.WaitTimeoutException e){println("Time exceed more than the given waiting time")}
 				
-				waitFor(30){page.exportbtn.isDisplayed()
+				waitFor(waitTime){page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()
 				page.ksafetyValue.isDisplayed()}
 				page.exportbtn.click()
@@ -320,7 +319,7 @@ class AdminExport extends TestBase {
 		try{		if(!page.exportbtn.isDisplayed() || !page.dbmonitorerrormsgpopup.isDisplayed()){page.confirmyesbtn.click()}
 				else println("confirm pop up for save Yes clicked")
 
-				if(waitFor(30){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
+				if(waitFor(waitTime){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
 				page.clickdbmonitorerrormsg.click()
 				println("Since due to late timing, dbMonitor error message displayed")}
 
@@ -329,14 +328,14 @@ class AdminExport extends TestBase {
 			catch(geb.waiting.WaitTimeoutException e){println("Time exceed more than the given waiting time")}
 				
 			
-				waitFor(15){page.belowexportbtn.isDisplayed()
+				waitFor(waitTime){page.belowexportbtn.isDisplayed()
 					    }
 					if(!page.belowexportbtn.isDisplayed()){page.exportbtn.click()}else
 				page.belowexportbtn.click()
 			
 					
 		try{
-		waitFor(30){	page.addconfig.isDisplayed()}
+		waitFor(waitTime){	page.addconfig.isDisplayed()}
 				if(page.offstatetxt.isDisplayed()){println("It is in OFF STATE")}else println("It is in ON STATE")						
 	}catch(geb.waiting.WaitTimeoutException e){println("Time exceed more than the given waiting time")
 	}catch (geb.error.RequiredPageContentNotPresent e){println("element content not found")}
@@ -362,13 +361,13 @@ class AdminExport extends TestBase {
 		String nameScnd	   = page.getExportNamescnd()
 		String valueScnd   = page.getExportValuescnd()
 
-		waitFor(5){	page.exportbtn.isDisplayed()
+		waitFor(waitTime){	page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()}
 				page.exportbtn.click()
 		then:
 		
 		try{		
-		waitFor(10){	page.exporteditbtn.isDisplayed()
+		waitFor(waitTime){	page.exporteditbtn.isDisplayed()
 				page.onstatetxt.isDisplayed()}
 				if(page.onstatetxt.text()=="On")	{page.exporteditbtn.click()}
 			}catch (geb.error.RequiredPageContentNotPresent e){println("element couldn't found")
@@ -378,20 +377,20 @@ class AdminExport extends TestBase {
 				if(page.inputnamefrst.isDisplayed() && page.inputvaluefrst.isDisplayed())
 				{page.addproperty.click()}
 		try {
-		waitFor(10){    if(!page.inputnamescnd.isDisplayed() && !page.inputvaluescnd.isDisplayed()){page.addproperty.click()}
+		waitFor(waitTime){    if(!page.inputnamescnd.isDisplayed() && !page.inputvaluescnd.isDisplayed()){page.addproperty.click()}
 				}
 			}catch (geb.error.RequiredPageContentNotPresent e){println("element couldn't found")
 			}catch(geb.waiting.WaitTimeoutException e){println("Took time due to condition mismatch")}	
-		waitFor(10){	if(page.inputnamescnd.isDisplayed()){page.inputnamescnd.value(nameScnd)}
+		waitFor(waitTime){	if(page.inputnamescnd.isDisplayed()){page.inputnamescnd.value(nameScnd)}
 				if(page.inputvaluescnd.isDisplayed()){page.inputvaluescnd.value(valueScnd)}
 			     }
 		
 							
-		waitFor(10){	page.saveconfig.isDisplayed()
+		waitFor(waitTime){	page.saveconfig.isDisplayed()
 				page.cancelconfig.isDisplayed()}
 				page.saveconfig.click()
 
-		waitFor(10){	page.confirmpopupask.isDisplayed()
+		waitFor(waitTime){	page.confirmpopupask.isDisplayed()
 				page.confirmnobtn.isDisplayed()
 				page.confirmyesbtn.isDisplayed()				
 			}
@@ -407,7 +406,7 @@ class AdminExport extends TestBase {
 				}catch(geb.error.RequiredPageContentNotPresent e){}
 				
 	
-		try{		if(waitFor(30){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
+		try{		if(waitFor(waitTime){page.dbmonitorerrormsgpopup.isDisplayed() && page.clickdbmonitorerrormsg.isDisplayed()}){
 				page.clickdbmonitorerrormsg.click()
 				println("Since due to late timing, dbMonitor error message displayed")}
 
@@ -415,18 +414,18 @@ class AdminExport extends TestBase {
 			{println("This occurs due to error message of dbmonitor")}
 			catch(geb.waiting.WaitTimeoutException e){println("Time exceed more than the given waiting time")}
 				
-				waitFor(30){page.exportbtn.isDisplayed()
+				waitFor(waitTime){page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()
 				page.ksafetyValue.isDisplayed()}
 				
-				waitFor(15){page.belowexportbtn.isDisplayed()
+				waitFor(waitTime){page.belowexportbtn.isDisplayed()
 					    }
 					if(!page.belowexportbtn.isDisplayed()){page.exportbtn.click()}else
 				page.belowexportbtn.click()
 			
 					
 		try{
-		waitFor(30){	page.addconfig.isDisplayed()
+		waitFor(waitTime){	page.addconfig.isDisplayed()
 				if(page.onstatetxt.isDisplayed() && page.onstatetxt.text()=="On"){println("It is in ON STATE")}else println("It is in OFF STATE")				
 				page.belowexportnametxt.isDisplayed()
 				page.belowexportvaluetxt.isDisplayed()}
@@ -446,17 +445,17 @@ class AdminExport extends TestBase {
 				else println("Value from the file did not matched")	
 
 			when:'edit button again clicked for delete property'	
-			waitFor(10){page.exporteditbtn.isDisplayed()
+			waitFor(waitTime){page.exporteditbtn.isDisplayed()
 				page.onstatetxt.isDisplayed()}
 				if(page.onstatetxt.text()=="On")	{page.exporteditbtn.click()}
-			waitFor(10){if(page.inputnamescnd.isDisplayed() && page.inputvaluescnd.isDisplayed()){page.deletescndproperty.click()}
+			waitFor(waitTime){if(page.inputnamescnd.isDisplayed() && page.inputvaluescnd.isDisplayed()){page.deletescndproperty.click()}
 				}			
 
-				waitFor(10){	page.saveconfig.isDisplayed()
+				waitFor(waitTime){	page.saveconfig.isDisplayed()
 				page.cancelconfig.isDisplayed()}
 				page.saveconfig.click()
 
-		waitFor(10){	page.confirmpopupask.isDisplayed()
+		waitFor(waitTime){	page.confirmpopupask.isDisplayed()
 				page.confirmnobtn.isDisplayed()
 				page.confirmyesbtn.isDisplayed()				
 			}
@@ -467,13 +466,13 @@ class AdminExport extends TestBase {
 			then:'check the updated results'
 				
 		try{
-				if(waitFor(15){!page.belowexportnametxt.isDisplayed()}){page.belowexportbtn.click()}
+				if(waitFor(waitTime){!page.belowexportnametxt.isDisplayed()}){page.belowexportbtn.click()}
 					    
 									
 			}catch(geb.waiting.WaitTimeoutException e){println("Took time for element to find.")}
 					
 		try{
-		waitFor(30){	page.addconfig.isDisplayed()
+		waitFor(waitTime){	page.addconfig.isDisplayed()
 				page.belowexportnametxt.isDisplayed()
 				page.belowexportvaluetxt.isDisplayed()}
 			}catch (geb.error.RequiredPageContentNotPresent e){println("element couldn't found")
@@ -490,34 +489,46 @@ class AdminExport extends TestBase {
 
 	
 	def "verify Delete Configuration for export setting in ON STATE"(){
-
-	when: 'click the Admin link (if needed)'
-			page.openAdminPage()
+		when: 'click the Admin link (if needed)'
+		page.openAdminPage()
 	
 		then: 'should be on Admin page'
-			at AdminPage				
+		at AdminPage
 		when:
 		at AdminPage
 
-		waitFor(5){	page.exportbtn.isDisplayed()
+		waitFor(waitTime){	page.exportbtn.isDisplayed()
 			   	page.addconfig.isDisplayed()}
 				page.exportbtn.click()
 		then:
 				
-		waitFor(10){	page.exporteditbtn.isDisplayed()}
-				
-				page.exporteditbtn.click()
-				
-	
-		waitFor(10){	page.deleteconfigurations.isDisplayed()}
-				page.deleteconfigurations.click()
-		waitFor(10){	page.deleteconfirmation.isDisplayed()
-				page.deleteYes.isDisplayed()
-				page.deleteNo.isDisplayed()}
-				if(page.deleteconfirmation.text().equals("Are you sure you want to delete?")){println("delete confirmation verified in ON STATE")}
-				page.deleteYes.click()	
-		waitFor(30){	page.noconfigtxt.isDisplayed()}
-				if(page.noconfigtxt.text()=="No configuration available."){println("No Configuration verified")}
+		waitFor(waitTime){	page.exporteditbtn.isDisplayed()}
+		page.exporteditbtn.click()
+
+		waitFor(waitTime){	page.deleteconfigurations.isDisplayed()}
+
+		int count = 0
+		while (count < numberOfTrials) {
+			count++
+			try {
+				waitFor(waitTime) {
+					page.deleteconfigurations.click()
+					page.deleteYes.isDisplayed()
+					page.deleteNo.isDisplayed()
+				}
+				break
+			}
+			catch(geb.waiting.WaitTimeoutException e) {
+				println("Retrying")
+			}
+		}
+
+		page.deleteYes.isDisplayed()
+		page.deleteNo.isDisplayed()
+		if(page.deleteconfirmation.text().equals("Are you sure you want to delete?")){println("delete confirmation verified in ON STATE")}
+		page.deleteYes.click()
+		waitFor(waitTime){	page.noconfigtxt.isDisplayed()}
+		if(page.noconfigtxt.text()=="No configuration available."){println("No Configuration verified")}
 	}
 
 
@@ -530,24 +541,36 @@ class AdminExport extends TestBase {
 			at AdminPage				
 		when:
 		at AdminPage
-
-		waitFor(5){	page.exportbtn.isDisplayed()
-			   	page.addconfig.isDisplayed()}
-				page.exportbtn.click()
+		waitFor(waitTime){
+			page.exportbtn.isDisplayed()
+			page.addconfig.isDisplayed()
+		}
+		page.exportbtn.click()
 		then:
-				
-		waitFor(10){	page.exporteditbtn.isDisplayed()}
-				
-				page.exporteditbtn.click()				
+		waitFor(waitTime){	page.exporteditbtn.isDisplayed()}
+		page.exporteditbtn.click()
 	
-		waitFor(10){	page.deleteconfigurations.isDisplayed()}
-				page.deleteconfigurations.click()
-		waitFor(10){	page.deleteconfirmation.isDisplayed()
-				page.deleteYes.isDisplayed()
-				page.deleteNo.isDisplayed()}
-				if(page.deleteconfirmation.text().equals("Are you sure you want to delete?")){println("delete confirmation verified in OFF STATE")}
-				page.deleteYes.click()	
-		waitFor(30){	page.noconfigtxt.isDisplayed()}
+		waitFor(waitTime){	page.deleteconfigurations.isDisplayed()}
+
+		int count = 0
+		while (count < numberOfTrials) {
+			count++
+			try {
+				waitFor(waitTime) {
+					page.deleteconfigurations.click()
+					page.deleteYes.isDisplayed()
+					page.deleteNo.isDisplayed()
+				}
+				break
+			}
+			catch(geb.waiting.WaitTimeoutException e) {
+				println("Retrying")
+			}
+		}
+
+		if(page.deleteconfirmation.text().equals("Are you sure you want to delete?")){println("delete confirmation verified in OFF STATE")}
+		page.deleteYes.click()
+		waitFor(waitTime){	page.noconfigtxt.isDisplayed()}
 				if(page.noconfigtxt.text()=="No configuration available."){println("No Configuration verified")}
 	}
 }
