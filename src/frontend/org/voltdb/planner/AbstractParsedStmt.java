@@ -842,16 +842,27 @@ public abstract class AbstractParsedStmt {
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
         }
         else {
-            // For count(<column>), check if it's non-nullable column
-            // it also cannot have "distinct"
-            if(exprType == ExpressionType.AGGREGATE_COUNT &&
-                    childExpr.getExpressionType().equals(ExpressionType.VALUE_TUPLE) &&
-                    exprNode.attributes.get("distinct") == null) {
-                String tableName = childExprNode.attributes.get("table");
-                String columnName = childExprNode.attributes.get("column");
-                Table t = getTableFromDB(tableName);
-                if(! t.getColumns().get(columnName).getNullable()) {
+            // For count(<constant>) and count(<non-nullable column>),
+            // it should be treated like count(*)
+            // See ENG-6131
+            if(exprType == ExpressionType.AGGREGATE_COUNT) {
+                // count(<constant>)
+                if(childExpr.getExpressionType().equals(ExpressionType.VALUE_CONSTANT) ||
+                        childExpr.getExpressionType().equals(ExpressionType.VALUE_PARAMETER)) {
                     exprType = ExpressionType.AGGREGATE_COUNT_STAR;
+                    childExpr = null;
+                }
+                // count(<non-nullable column>)
+                // count() cannot have distinct in it.
+                else if(childExpr.getExpressionType().equals(ExpressionType.VALUE_TUPLE) &&
+                        exprNode.attributes.get("distinct") == null) {
+                    String tableName = childExprNode.attributes.get("table");
+                    String columnName = childExprNode.attributes.get("column");
+                    Table t = getTableFromDB(tableName);
+                    if(! t.getColumns().get(columnName).getNullable()) {
+                        exprType = ExpressionType.AGGREGATE_COUNT_STAR;
+                        childExpr = null;
+                    }
                 }
             }
         }
@@ -860,7 +871,7 @@ public abstract class AbstractParsedStmt {
         expr.setLeft(childExpr);
 
         String node;
-        if ((node = exprNode.attributes.get("distinct")) != null && Boolean.parseBoolean(node)) {
+        if ((node = exprNode.attributes.get("distinct")) != null ) {
             expr.setDistinct();
         }
         return expr;
