@@ -570,6 +570,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
+        int32_t exportPushInterval;
         int32_t createDrReplicatedStream;
         int32_t hostnameLength;
         char data[0];
@@ -605,6 +606,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->hostId,
                                  hostname,
                                  cs->tempTableMemory,
+                                 cs->exportPushInterval,
                                  createDrReplicatedStream) == true) {
             return kErrorCode_Success;
         }
