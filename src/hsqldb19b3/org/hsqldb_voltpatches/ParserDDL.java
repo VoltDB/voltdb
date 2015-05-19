@@ -516,9 +516,23 @@ public class ParserDDL extends ParserRoutine {
                                         ? session.getSchemaName(null)
                                         : name.schema.name;
                     SchemaObject object =
+                    // A VoltDB extension to avoid exceptions in
+                    // the normal control flow.
+                    // findSchemaObject returns null when 
+                    // getSchemaObject would needlessly
+                    // throw into the catch block below.
+                    /* disable 3 lines ...
                         database.schemaManager.getSchemaObject(name.name,
                             schemaName, objectType);
 
+                    ... disabled 3 lines */
+                        database.schemaManager.findSchemaObject(name.name,
+                                schemaName, objectType);
+                    if (object == null) {
+                    	writeName = null;
+                    }
+                    else  // AS IN else if (cascade) {
+                    // End of VoltDB extension
                     if (cascade) {
                         writeName = database.getCatalogName();
                     } else {
