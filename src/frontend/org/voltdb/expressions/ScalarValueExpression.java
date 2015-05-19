@@ -41,6 +41,11 @@ public class ScalarValueExpression extends AbstractValueExpression {
     }
 
     @Override
+    public int hashCode() {
+        return m_left.hashCode();
+    }
+
+    @Override
     public String explain(String impliedTableName) {
         assert(m_left != null);
         return m_left.explain(impliedTableName);

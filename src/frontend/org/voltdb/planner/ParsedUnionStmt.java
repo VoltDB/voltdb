@@ -18,7 +18,9 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -164,8 +166,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     @Override
-    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         for (AbstractParsedStmt childStmt : m_children) {
             exprs.addAll(childStmt.findAllSubexpressionsOfClass(aeClass));
         }
