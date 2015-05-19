@@ -372,7 +372,7 @@ public class TestRepairLog
         final long endUniqueId = 42;
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@ApplyBinaryLogSP");
-        spi.setParams(0, new byte[]{0}, endUniqueId - 10, endUniqueId, endUniqueId);
+        spi.setParams(0, endUniqueId - 10, endUniqueId, endUniqueId, new byte[]{0});
         spi.setOriginalUniqueId(endUniqueId - 10);
         spi.setOriginalTxnId(endUniqueId -15);
 
