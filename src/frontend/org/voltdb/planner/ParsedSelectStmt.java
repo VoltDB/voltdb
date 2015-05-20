@@ -793,6 +793,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
+
+        // guards against subquery inside of order by clause
+        if (! order_exp.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+            throw new PlanningErrorException(
+                    "ORDER BY clause with subquery expression is not allowed.");
+        }
+
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
