@@ -34,7 +34,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -321,7 +320,7 @@ public class HTTPClientInterface {
                 MessageDigest md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(ClientAuthHashScheme.HASH_SHA256));
                 hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
-                return new AuthenticationResult(null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
+                return new AuthenticationResult(null, null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority
@@ -330,14 +329,14 @@ public class HTTPClientInterface {
         // Hashedassword must be a 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)
         if (hashedPassword != null) {
             if (hashedPassword.length() != 40 && hashedPassword.length() != 64) {
-                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
             try {
                 hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
             }
             catch (Exception e) {
-                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
         }
@@ -346,13 +345,15 @@ public class HTTPClientInterface {
 
         try {
             // get a connection to localhost from the pool
-            Client client = m_connections.get().getClient(username, password, hashedPasswordBytes, adminMode);
-            if (client != null) {
-                return new AuthenticationResult(client, adminMode, username, "");
+            AuthenticatedConnectionCache.ClientWithHashScheme clientWithScheme =
+                    m_connections.get().getClient(username, password, hashedPasswordBytes, adminMode);
+            if (clientWithScheme != null && clientWithScheme.m_client != null && clientWithScheme.m_scheme != null) {
+                return new AuthenticationResult(clientWithScheme.m_client, clientWithScheme.m_scheme,
+                        adminMode, username, "");
             }
-            return new AuthenticationResult(null, adminMode, username, "Failed to get client.");
+            return new AuthenticationResult(null, null, adminMode, username, "Failed to get client.");
         } catch (IOException ex) {
-            return new AuthenticationResult(null, adminMode, username, ex.getMessage());
+            return new AuthenticationResult(null, null, adminMode, username, ex.getMessage());
         }
     }
 
@@ -369,7 +370,7 @@ public class HTTPClientInterface {
     public void releaseClient(AuthenticationResult authResult, boolean force) {
         if (authResult != null && authResult.m_client != null) {
             assert(m_connections != null);
-            m_connections.get().releaseClient(authResult.m_client, force);
+            m_connections.get().releaseClient(authResult.m_client, authResult.m_scheme, force);
         }
     }
 
