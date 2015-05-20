@@ -37,7 +37,9 @@ public class ScalarValueExpression extends AbstractValueExpression {
     @Override
     public boolean equals(Object obj) {
         assert(m_left != null);
-        return m_left.equals(obj);
+        if (obj instanceof ScalarValueExpression == false) return false;
+        ScalarValueExpression expr = (ScalarValueExpression) obj;
+        return m_left.equals(expr.getLeft());
     }
 
     @Override
