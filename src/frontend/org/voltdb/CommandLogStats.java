@@ -7,25 +7,28 @@ import org.voltdb.VoltTable.ColumnInfo;
 
 public class CommandLogStats extends StatsSource {
 
-	private static final String OUTSTANDING_BYTES_NAME = "OUTSTANDING_BYTES";
-	private static final String OUTSTANDING_TXNS_NAME = "OUTSTANDING_TXNS";
-	
-	public CommandLogStats() {
+	private final CommandLog m_commandLog;
+
+	public enum StatName {
+		OUTSTANDING_BYTES,
+		OUTSTANDING_TXNS
+	};
+
+	public CommandLogStats(CommandLog commandLog) {
 		super(false);
+		m_commandLog = commandLog;
 	}
-	
+
 	@Override
 	protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
 		super.populateColumnSchema(columns);
-        columns.add(new VoltTable.ColumnInfo(OUTSTANDING_BYTES_NAME, VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo(OUTSTANDING_TXNS_NAME, VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo(StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo(StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT));
 	}
 
 	@Override
 	protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-		// TODO stub here
-		rowValues[columnNameToIndex.get(OUTSTANDING_BYTES_NAME)] = 0;
-		rowValues[columnNameToIndex.get(OUTSTANDING_TXNS_NAME)] = 0;
+		m_commandLog.populateCommandLogStats(columnNameToIndex, rowValues);
 		super.updateStatsRow(rowKey, rowValues);
 	}
 

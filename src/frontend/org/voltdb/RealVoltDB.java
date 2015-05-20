@@ -690,9 +690,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_cpuStats = new CpuStats();
             getStatsAgent().registerStatsSource(StatsSelector.CPU,
                     0, m_cpuStats);
-            
+
             // ENG-6321
-            m_commandLogStats = new CommandLogStats();
+            m_commandLogStats = new CommandLogStats(m_commandLog);
             getStatsAgent().registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
             /*
