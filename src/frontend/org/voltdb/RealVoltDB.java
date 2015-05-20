@@ -184,6 +184,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
+    private CommandLogStats m_commandLogStats = null;
     private StatsManager m_statsManager = null;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     // These are unused locally, but they need to be registered with the StatsAgent so they're
@@ -378,6 +379,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_partitionCountStats = null;
             m_ioStats = null;
             m_memoryStats = null;
+            m_commandLogStats = null;
             m_statsManager = null;
             m_restoreAgent = null;
             m_recoveryStartTime = System.currentTimeMillis();
@@ -688,6 +690,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_cpuStats = new CpuStats();
             getStatsAgent().registerStatsSource(StatsSelector.CPU,
                     0, m_cpuStats);
+            
+            // ENG-6321
+            m_commandLogStats = new CommandLogStats();
+            getStatsAgent().registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
