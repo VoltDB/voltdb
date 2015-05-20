@@ -70,6 +70,7 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.parser.HSQLLexer;
@@ -1647,6 +1648,11 @@ public class DDLCompiler {
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
 
+                    // The expr cannnot contain a scalar subquery.
+                    if (!expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+                        String msg = String.format("Index %s with subquery expression(s) is not supported.", name);
+                        throw this.m_compiler.new VoltCompilerException(msg);
+                    }
                     if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
                         String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
                         throw this.m_compiler.new VoltCompilerException(msg);
