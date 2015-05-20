@@ -32,11 +32,12 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.types.PlanNodeType;
 
-public class TestReplaceWithIndexCounter extends PlannerTestCase {
+// Revised for ENG-6131
+public class TestPlansCount extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
-        setupSchema(getClass().getResource("testplans-indexcounter-ddl.sql"),
-                    "testindexcounter", false);
+        setupSchema(getClass().getResource("testplans-count-ddl.sql"),
+                    "testcount", false);
     }
 
     @Override
@@ -51,6 +52,10 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1");
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
+
+        pn = compileToFragments("SELECT count(1) from T1");
+        p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
     }
     // This is treated as new TABLE COUNT plan for partitioned table
     public void testCountStar001() {
@@ -60,11 +65,23 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
+
+        pn = compileToFragments("SELECT count(1) from P1");
+        p = pn.get(0).getChild(0);
+        // AGGREGATE_SUM
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
     }
 
     public void testCountStar002() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT POINTS, count(*) from T1 Group by POINTS");
         AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+
+        pn = compileToFragments("SELECT POINTS, count(1) from T1 Group by POINTS");
+        p = pn.get(0).getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
@@ -77,11 +94,25 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(p instanceof TableCountPlanNode);
         p = p.getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
+
+        pn = compileToFragments("select count(1) from (SELECT count(*) from T1) Temp");
+        p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
     }
 
     public void testCountStar004() {
         List<AbstractPlanNode> pn = compileToFragments("select count(*) from (SELECT count(*) from P1) Temp");
         AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+
+        pn = compileToFragments("select count(1) from (SELECT count(1) from P1) Temp");
+        p = pn.get(0).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
         p = p.getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
@@ -96,6 +127,9 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar01() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 ORDER BY POINTS ASC");
         checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT count(1) from T1 ORDER BY POINTS ASC");
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar02() {
@@ -106,30 +140,48 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar04() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS = ?");
         checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS = ?");
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar05() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < ? ORDER BY ID DESC");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS < ? ORDER BY ID DESC");
         checkIndexCounter(pn, true);
     }
 
     public void testCountStar06() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS >= 3 AND AGE = ?");
         checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS >= 3 AND AGE = ?");
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar07() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?");
+        checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?");
         checkIndexCounter(pn, false);
     }
 
     public void testCountStar08() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME >'XIN' AND POINTS = ?");
         checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME >'XIN' AND POINTS = ?");
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar10() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN' AND POINTS > ?");
         checkIndexCounter(pn, true);
     }
 
@@ -137,40 +189,64 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar11() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < 4");
         checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS < 4");
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar12() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < ?");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS < ?");
         checkIndexCounter(pn, true);
     }
 
     public void testCountStar13() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS >= 3");
         checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS >= 3");
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar14() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS > 3 AND POINTS <= 6");
         checkIndexCounter(pn, true);
     }
 
     public void testCountStar15() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?");
         checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS > ? AND POINTS < ?");
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar16() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= ? AND POINTS <= ?");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN' AND POINTS >= ? AND POINTS <= ?");
         checkIndexCounter(pn, true);
     }
 
     public void testCountStar17() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?");
         checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN' AND POINTS < ?");
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar18() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN'");
+        checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN'");
         checkIndexCounter(pn, false);
     }
 
@@ -179,13 +255,26 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000");
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue((p instanceof IndexCountPlanNode) == false);
+
+        pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000");
+        p = pn.get(0).getChild(0);
+        assertTrue((p instanceof IndexCountPlanNode) == false);
     }
+
     // test with group by with Replicated table
     public void testCountStar20() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT AGE, count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < 1 Group by AGE");
         for ( AbstractPlanNode nd : pn)
             System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+
+        pn = compileToFragments("SELECT AGE, count(1) from T2 WHERE USERNAME ='XIN' AND POINTS < 1 Group by AGE");
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        p = pn.get(0).getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
                 p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
@@ -202,6 +291,16 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(p instanceof IndexScanPlanNode);
         assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
                 p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+
+        pn = compileToFragments("SELECT RATIO, count(1) from P1 WHERE NUM < 1 Group by RATIO");
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
     }
 
     // Test counting index feature with partitioned table
@@ -213,20 +312,37 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
         assertTrue(p instanceof IndexCountPlanNode);
+
+        pn = compileToFragments("SELECT count(1) from P1 WHERE NUM < ?");
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
     }
 
     public void testCountStar23() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC");
         checkIndexCounter(pn, true);
     }
 
     public void testCountStar24() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE ID = 1 AND USERNAME > 'JOHN' ");
         checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE ID = 1 AND USERNAME > 'JOHN' ");
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar25() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= ?");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN' AND POINTS >= ?");
         checkIndexCounter(pn, true);
     }
 
@@ -239,21 +355,38 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
         assertTrue(p instanceof IndexCountPlanNode);
+
+        pn = compileToFragments("SELECT count(1) from P1 WHERE NUM = 1 AND RATIO >= ?");
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
     }
 
     // should not replace
     public void testCountStar27() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T2 WHERE USERNAME >= 'XIN' AND POINTS = ?");
         checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT COUNT(1) FROM T2 WHERE USERNAME >= 'XIN' AND POINTS = ?");
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar28() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T1 WHERE AGE = 18 AND ID + POINTS > ?");
         checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT COUNT(1) FROM T1 WHERE AGE = 18 AND ID + POINTS > ?");
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar29() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T1 WHERE AGE / 2 = 10 AND ABS(AGE) > ?");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT COUNT(1) FROM T1 WHERE AGE / 2 = 10 AND ABS(AGE) > ?");
         checkIndexCounter(pn, true);
     }
 
@@ -261,11 +394,17 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar30() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T1 WHERE AGE / 2 <= ?");
         checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT COUNT(1) FROM T1 WHERE AGE / 2 <= ?");
+        checkIndexCounter(pn, false);
     }
 
     // Not padding maximum value case.
     public void testCountStar32() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T2 WHERE ID = 1 AND USERNAME > ?");
+        checkIndexCounter(pn, false);
+
+        pn = compileToFragments("SELECT COUNT(1) FROM T2 WHERE ID = 1 AND USERNAME > ?");
         checkIndexCounter(pn, false);
     }
 
@@ -273,9 +412,34 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar31() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
         checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
+        checkIndexCounter(pn, true);
     }
 
+    // Testing the count(<non-nullable column>) on a partitioned table.)
+    public void testCountColumn01() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(NUM) from P1 WHERE ID=1 AND NUM >= ?");
+        checkIndexCounter(pn, true);
+    }
 
+    // Testing the count( distinct <non-nullable column>) on a partitioned table.)
+    public void testCountColumn02() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct NUM) from P1 WHERE ID=1 AND NUM >= ?");
+        checkIndexCounter(pn, false);
+    }
+
+    // Testing the count(<nullable column>) on a partitioned table.)
+    public void testCountColumn03() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(RATIO) from P1 WHERE ID=1 AND RATIO >= ?");
+        checkIndexCounter(pn, false);
+    }
+
+    // Testing the count( distinct <nullable column>) on a partitioned table.)
+    public void testCountColumn04() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct RATIO) from P1 WHERE ID=1 AND RATIO >= ?");
+        checkIndexCounter(pn, false);
+    }
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *
@@ -295,6 +459,5 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
             assertTrue(p instanceof IndexCountPlanNode);
         else
             assertTrue((p instanceof IndexCountPlanNode) == false);
-
     }
 }
