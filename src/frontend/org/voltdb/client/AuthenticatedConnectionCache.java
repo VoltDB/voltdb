@@ -225,9 +225,7 @@ public class AuthenticatedConnectionCache {
                 conn = null;
                 throw ioe;
             }
-            synchronized (m_connections) {
-                m_connections.put(ckey, conn);
-            }
+            m_connections.put(ckey, conn);
             attemptToShrinkPoolIfNeeded();
         }
         return new ClientWithHashScheme(conn.client, scheme);
