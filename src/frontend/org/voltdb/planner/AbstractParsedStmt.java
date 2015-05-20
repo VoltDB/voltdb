@@ -1451,8 +1451,8 @@ public abstract class AbstractParsedStmt {
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
-    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        HashSet<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
             if (treeExpr != null) {
@@ -1475,7 +1475,7 @@ public abstract class AbstractParsedStmt {
             return true;
         }
         // Verify expression subqueries
-        List<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
+        Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
                 SelectSubqueryExpression.class);
         return !subqueryExprs.isEmpty();
     }

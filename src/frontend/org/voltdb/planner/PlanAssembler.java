@@ -395,7 +395,7 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
+        Set<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
                 SelectSubqueryExpression.class);
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
@@ -530,7 +530,7 @@ public class PlanAssembler {
      * @param subqueryExprs - list of subquery expressions
      * @return true if a best plan was generated for each subquery, false otherwise
      */
-    private boolean getBestCostPlanForExpressionSubQueries(List<AbstractExpression> subqueryExprs) {
+    private boolean getBestCostPlanForExpressionSubQueries(Set<AbstractExpression> subqueryExprs) {
         int nextPlanId = m_planSelector.m_planId;
 
         for (AbstractExpression expr : subqueryExprs) {
