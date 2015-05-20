@@ -423,7 +423,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
-    const int32_t adjustedLength = stream.m_currBlock->rawLength() - headerSize;
+    const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
 
