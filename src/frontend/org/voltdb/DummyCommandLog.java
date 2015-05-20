@@ -72,11 +72,11 @@ public class DummyCommandLog implements CommandLog {
         return;
     }
 
-	@Override
-	public void populateCommandLogStats(Map<String, Integer> columnNameToIndex,
-			Object[] rowValues) {
-		rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_BYTES.name())] = 123;
-		rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_TXNS.name())] = 321;
-	}
+    @Override
+    public void populateCommandLogStats(Map<String, Integer> columnNameToIndex,
+            Object[] rowValues) {
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_BYTES.name())] = 123;
+        rowValues[columnNameToIndex.get(CommandLogStats.StatName.OUTSTANDING_TXNS.name())] = 321;
+    }
 
 }
