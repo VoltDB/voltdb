@@ -4119,15 +4119,13 @@ public class ParserDQL extends ParserBase {
             exprList  = new HsqlArrayList();
 
             // A VoltDB extension to avoid using exceptions for flow control.
-            HsqlException e2 = readExpression(exprList, parseList, 0, parseList.length, false, false);
-            if (e2 != null) {
-                // Return or throw the original exception (e) thrown from the
-                // mismatch with the preferred standard argument syntax,
-                // rather than (e2) from the mismatch with the (not as
-                // standard) alternative syntax that also failed.
+            e = readExpression(exprList, parseList, 0, parseList.length, false, preferToThrow);
+            if (e != null) {
                 if ( ! preferToThrow ) {
                     return new ExpressionOrException(e);
                 }
+                // It's a little strange to be here -- should have thrown already.
+                // But better late than sorry.
                 throw e;
             }
             /* disable 1 line ...

@@ -2276,10 +2276,6 @@ private:
         *reinterpret_cast<void**>(retval.m_data) = address;
         return retval;
     }
-
-    /// Common code to implement variants of the TRIM SQL function: LEADING, TRAILING, or BOTH
-    static NValue trimWithOptions(const std::vector<NValue>& arguments, bool leading, bool trailing);
-
 };
 
 /**

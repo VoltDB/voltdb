@@ -1724,14 +1724,7 @@ public class FunctionCustom extends FunctionSQL {
                     .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
                     .append(nodes[1].getSQL()).append(')').toString();
             }
-            // A VoltDB extension to customize SQL function support
-            case FUNC_CHAR :
-            case FUNC_SPACE :
-                return new StringBuffer(name).append('(')                 //
-                    .append(nodes[0].getSQL()).append(')').toString();
-            case FUNC_REPEAT :
-            case FUNC_LEFT :
-            case FUNC_RIGHT :
+            // A VoltDB extension: Hsqldb uses Integer type by default,
             case FUNC_BITAND :
             case FUNC_BITOR :
             case FUNC_BITXOR: {
@@ -1739,18 +1732,8 @@ public class FunctionCustom extends FunctionSQL {
                         .append(nodes[0].getSQL()).append(Tokens.T_COMMA)     //
                         .append(nodes[1].getSQL()).append(')').toString();
             }
-            case FUNC_REPLACE : {
-                return new StringBuffer(name).append('(').append(
-                    nodes[0].getSQL()).append(Tokens.T_COMMA).append(
-                    nodes[1].getSQL()).append(Tokens.T_COMMA).append(
-                    nodes[2].getSQL()).append(')').toString();
-            }
             // End of VoltDB extension
             default :
-            // A VoltDB extension to customize SQL function support
-            // This delegation to super (usually?) fails with a runtime exception.
-            //*enable to debug */ System.out.println("DEBUGGING: super.getSQL FUNCTION " + name + " VALUE " + funcType);
-            // End of VoltDB extension
                 return super.getSQL();
         }
     }
