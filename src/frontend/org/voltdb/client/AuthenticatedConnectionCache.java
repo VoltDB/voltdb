@@ -61,6 +61,7 @@ public class AuthenticatedConnectionCache {
         String user;
         byte[] hashedPassword;
         int passHash;
+        ClientAuthHashScheme scheme;
     }
 
     /**
@@ -100,7 +101,17 @@ public class AuthenticatedConnectionCache {
         m_targetSize = targetSize;
     }
 
-    public synchronized Client getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
+    public class ClientWithHashScheme {
+        public final Client m_client;
+        public final ClientAuthHashScheme m_scheme;
+
+        public ClientWithHashScheme(Client client, ClientAuthHashScheme scheme) {
+            m_client = client;
+            m_scheme = scheme;
+        }
+    }
+
+    public synchronized ClientWithHashScheme getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
         String userNameWithAdminSuffix = null;
         if (userName != null && !userName.trim().isEmpty()) {
             if (userName.endsWith(ADMIN_SUFFIX)) {
@@ -151,7 +162,8 @@ public class AuthenticatedConnectionCache {
             assert(m_unauthClient != null);
             assert(m_adminUnauthClient != null);
 
-            return admin ? m_adminUnauthClient : m_unauthClient;
+            return new ClientWithHashScheme(admin ? m_adminUnauthClient : m_unauthClient,
+                    ClientAuthHashScheme.HASH_SHA256);
         }
 
         // AUTHENTICATED
@@ -160,7 +172,10 @@ public class AuthenticatedConnectionCache {
             passHash = Arrays.hashCode(hashedPassword);
         }
 
-        Connection conn = m_connections.get(admin ? userNameWithAdminSuffix : userName);
+        ClientAuthHashScheme scheme = (hashedPassword == null ?
+                ClientAuthHashScheme.HASH_SHA256 : ClientAuthHashScheme.getByUnencodedLength(hashedPassword.length));
+        String ckey = (admin ? userNameWithAdminSuffix : userName) + scheme;
+        Connection conn = m_connections.get(ckey);
         if (conn != null) {
             if (conn.passHash != passHash) {
                 throw new IOException("Incorrect authorization credentials.");
@@ -184,12 +199,11 @@ public class AuthenticatedConnectionCache {
             // a connection gets closed/disconnected.  If this happens,
             // we need to remove it from the m_conections cache.
             //detect hash scheme from length of hashed password if sent instead of password.
-            ClientAuthHashScheme scheme = (conn.hashedPassword == null ?
-                    ClientAuthHashScheme.HASH_SHA256 : ClientAuthHashScheme.getByUnencodedLength(hashedPassword.length));
             ClientConfig config = new ClientConfig(userName, password, true, new StatusListener(conn), scheme);
 
             conn.user = userName;
             conn.client = (ClientImpl) ClientFactory.createClient(config);
+            conn.scheme = scheme;
             try
             {
                 conn.client.createConnectionWithHashedCredentials(
@@ -211,10 +225,10 @@ public class AuthenticatedConnectionCache {
                 conn = null;
                 throw ioe;
             }
-            m_connections.put(admin ? userNameWithAdminSuffix : userName, conn);
+            m_connections.put(ckey, conn);
             attemptToShrinkPoolIfNeeded();
         }
-        return conn.client;
+        return new ClientWithHashScheme(conn.client, scheme);
     }
 
     private Predicate<InetSocketAddress> onAdminPort = new Predicate<InetSocketAddress>() {
@@ -230,7 +244,7 @@ public class AuthenticatedConnectionCache {
      * @param force this is sent true in case we just lost network and so the connection I thought this will not happen
      * in internally connected clients but have seen it in strange/unknown/unreproducible cases.
      */
-    public synchronized void releaseClient(Client client, boolean force) {
+    public synchronized void releaseClient(Client client, ClientAuthHashScheme scheme, boolean force) {
         ClientImpl ci = (ClientImpl) client;
         if (force) {
             if (client == this.m_unauthClient) {
@@ -252,8 +266,8 @@ public class AuthenticatedConnectionCache {
         if (FluentIterable.from(ci.getConnectedHostList()).allMatch(onAdminPort)) {
             userNameBuilder.append(ADMIN_SUFFIX);
         }
-
-        Connection conn = m_connections.get(userNameBuilder.toString());
+        String ckey = userNameBuilder.toString() + scheme;
+        Connection conn = m_connections.get(ckey);
         if (conn == null) {
             throw new RuntimeException("Released client not in pool.");
         }
