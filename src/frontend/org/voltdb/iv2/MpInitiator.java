@@ -68,6 +68,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
     @Override
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
@@ -86,7 +87,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
         m_consumerDRGateway = consumerDRGateway;
 
-        super.configureCommon(backend, catalogContext,
+        super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;

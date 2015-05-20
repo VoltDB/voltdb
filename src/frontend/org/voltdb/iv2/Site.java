@@ -64,7 +64,6 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -169,11 +168,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // initialize EEs in the right thread.
     private static class StartupConfig
     {
-        final Catalog m_serializableCatalog;
+        final String m_serializedCatalog;
         final long m_timestamp;
-        StartupConfig(final Catalog catalog, final long timestamp)
+        StartupConfig(final String catalog, final long timestamp)
         {
-            m_serializableCatalog = catalog;
+            m_serializedCatalog = catalog;
             m_timestamp = timestamp;
         }
     }
@@ -396,6 +395,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long siteId,
             BackendTarget backend,
             CatalogContext context,
+            String serializedCatalog,
             int partitionId,
             int numPartitions,
             StartAction startAction,
@@ -417,7 +417,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(context.catalog, context.m_uniqueId);
+        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_spHandleForSnapshotDigest = m_lastCommittedSpHandle;
         m_currentTxnId = Long.MIN_VALUE;
@@ -515,7 +515,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             hashinatorConfig,
                             m_mpDrGateway != null);
             }
-            eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializableCatalog.serialize());
+            eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializedCatalog);
             eeTemp.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getQuerytimeout());
         }
