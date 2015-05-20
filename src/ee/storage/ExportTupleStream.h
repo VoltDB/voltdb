@@ -57,7 +57,7 @@ public:
     }
 
     int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity - headerSize())) +
+        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
                 ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }
 

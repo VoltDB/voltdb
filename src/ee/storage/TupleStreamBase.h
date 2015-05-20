@@ -41,7 +41,7 @@ const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FO
 class TupleStreamBase {
 public:
 
-    TupleStreamBase();
+    TupleStreamBase(size_t extraHeaderSpace = 0);
 
     virtual ~TupleStreamBase() {
         cleanupManagedBuffers();
@@ -79,9 +79,6 @@ public:
     /** Send committed data to the top end. */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
 
-    /** Amount of header size to allocate at the beginning of a StreamBlock */
-    virtual size_t headerSize() const { return MAGIC_HEADER_SPACE_FOR_JAVA; }
-
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;
 
@@ -116,6 +113,8 @@ public:
     int64_t m_committedSequenceNumber;
 
     int64_t m_committedUniqueId;
+
+    size_t m_headerSpace;
 };
 
 }

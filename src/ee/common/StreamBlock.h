@@ -80,7 +80,7 @@ namespace voltdb
         }
 
         int32_t rawLength() const {
-            return static_cast<int32_t>(m_offset) + m_headerSize;
+            return static_cast<int32_t>(m_offset + m_headerSize);
         }
 
         /**
@@ -106,6 +106,10 @@ namespace voltdb
          */
         size_t remaining() const {
             return m_capacity - m_offset;
+        }
+
+        size_t headerSize() const {
+            return m_headerSize;
         }
 
         /**

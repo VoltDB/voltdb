@@ -526,22 +526,25 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     public static class DeferredSerializationTruncatorResponse extends TruncatorResponse {
-        private final DeferredSerialization m_ds;
-        private int m_truncatedObjectBytes = Integer.MIN_VALUE;
+        public static interface Callback {
+            public void bytesWritten(int bytes);
+        }
 
-        public DeferredSerializationTruncatorResponse(DeferredSerialization ds) {
+        private final DeferredSerialization m_ds;
+        private final Callback m_truncationCallback;
+
+        public DeferredSerializationTruncatorResponse(DeferredSerialization ds, Callback truncationCallback) {
             super(Status.PARTIAL_TRUNCATE);
             m_ds = ds;
+            m_truncationCallback = truncationCallback;
         }
 
         @Override
         public void writeTruncatedObject(ByteBuffer output) throws IOException {
-            m_truncatedObjectBytes = PBDSegment.writeDeferredSerialization(output, m_ds);
-        }
-
-        public int truncatedObjectBytes() {
-            assert m_truncatedObjectBytes >= 0;
-            return m_truncatedObjectBytes;
+            int bytesWritten = PBDSegment.writeDeferredSerialization(output, m_ds);
+            if (m_truncationCallback != null) {
+                m_truncationCallback.bytesWritten(bytesWritten);
+            }
         }
     }
 

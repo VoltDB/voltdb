@@ -268,7 +268,7 @@ public class TestRepairLog
         if (taskMsg != null && taskMsg.getStoredProcedureName().startsWith("@ApplyBinaryLog")) {
             ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
             long uid = uig.getNextUniqueId();
-            when(params.toArray()).thenReturn(new Object[] {null, null, 0l, 0l, uid});
+            when(params.toArray()).thenReturn(new Object[] {null, 0l, 0l, uid, null});
             return uid;
         }
 
