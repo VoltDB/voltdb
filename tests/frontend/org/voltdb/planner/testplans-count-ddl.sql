@@ -1,10 +1,12 @@
 CREATE TABLE T1 (
 	ID INTEGER NOT NULL,
 	POINTS INTEGER NOT NULL,
-	AGE TINYINT NOT NULL,
+	AGE TINYINT,
 	PRIMARY KEY (ID)
 );
 create index idx_1_tree on T1 (POINTS);
+create index idx_t1_id_age on T1 (ID, AGE);
+create index idx_t1_id_pts on T1 (ID, POINTS);
 create index idx1_t1_tree on T1 (AGE, (ID + POINTS));
 create index idx2_t1_tree on T1 (AGE/2, ABS(AGE));
 

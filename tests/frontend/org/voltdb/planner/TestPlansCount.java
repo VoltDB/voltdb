@@ -417,27 +417,51 @@ public class TestPlansCount extends PlannerTestCase {
         checkIndexCounter(pn, true);
     }
 
-    // Testing the count(<non-nullable column>) on a partitioned table.)
+    // Testing the count(<non-nullable column>) on a partitioned table.
     public void testCountColumn01() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(NUM) from P1 WHERE ID=1 AND NUM >= ?");
         checkIndexCounter(pn, true);
     }
 
-    // Testing the count( distinct <non-nullable column>) on a partitioned table.)
+    // Testing the count( distinct <non-nullable column>) on a partitioned table.
     public void testCountColumn02() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct NUM) from P1 WHERE ID=1 AND NUM >= ?");
         checkIndexCounter(pn, false);
     }
 
-    // Testing the count(<nullable column>) on a partitioned table.)
+    // Testing the count(<nullable column>) on a partitioned table.
     public void testCountColumn03() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(RATIO) from P1 WHERE ID=1 AND RATIO >= ?");
         checkIndexCounter(pn, false);
     }
 
-    // Testing the count( distinct <nullable column>) on a partitioned table.)
+    // Testing the count( distinct <nullable column>) on a partitioned table.
     public void testCountColumn04() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct RATIO) from P1 WHERE ID=1 AND RATIO >= ?");
+        checkIndexCounter(pn, false);
+    }
+
+    // Testing the count(<non-nullable column>) on a replicated table.
+    public void testCountColumn05() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(POINTS) from T1 WHERE ID=1 AND POINTS >= ?");
+        checkIndexCounter(pn, true);
+    }
+
+    // Testing the count( distinct <non-nullable column>) on a replicated table.
+    public void testCountColumn06() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct POINTS) from T1 WHERE ID=1 AND POINTS >= ?");
+        checkIndexCounter(pn, false);
+    }
+
+    // Testing the count(<nullable column>) on a replicated table.
+    public void testCountColumn07() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(AGE) from T1 WHERE ID=1 AND AGE >= ?");
+        checkIndexCounter(pn, false);
+    }
+
+    // Testing the count( distinct <nullable column>) on a replicated table.
+    public void testCountColumn08() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct AGE) from T1 WHERE ID=1 AND AGE >= ?");
         checkIndexCounter(pn, false);
     }
     /**
