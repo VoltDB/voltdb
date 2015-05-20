@@ -31,11 +31,9 @@ import org.eclipse.jetty.server.Request;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -347,9 +345,11 @@ public class HTTPClientInterface {
 
         try {
             // get a connection to localhost from the pool
-            Pair<Client, ClientAuthHashScheme> clientp = m_connections.get().getClient(username, password, hashedPasswordBytes, adminMode);
-            if (clientp != null && clientp.getFirst() != null) {
-                return new AuthenticationResult(clientp.getFirst(), clientp.getSecond(), adminMode, username, "");
+            AuthenticatedConnectionCache.ClientWithHashScheme clientWithScheme =
+                    m_connections.get().getClient(username, password, hashedPasswordBytes, adminMode);
+            if (clientWithScheme != null && clientWithScheme.m_client != null && clientWithScheme.m_scheme != null) {
+                return new AuthenticationResult(clientWithScheme.m_client, clientWithScheme.m_scheme,
+                        adminMode, username, "");
             }
             return new AuthenticationResult(null, null, adminMode, username, "Failed to get client.");
         } catch (IOException ex) {

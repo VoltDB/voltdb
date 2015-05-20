@@ -28,7 +28,6 @@ import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.FluentIterable;
-import org.voltcore.utils.Pair;
 
 /**
  * Maintain a set of the last N recently used credentials and
@@ -102,7 +101,17 @@ public class AuthenticatedConnectionCache {
         m_targetSize = targetSize;
     }
 
-    public synchronized Pair<Client,ClientAuthHashScheme> getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
+    public class ClientWithHashScheme {
+        public final Client m_client;
+        public final ClientAuthHashScheme m_scheme;
+
+        public ClientWithHashScheme(Client client, ClientAuthHashScheme scheme) {
+            m_client = client;
+            m_scheme = scheme;
+        }
+    }
+
+    public synchronized ClientWithHashScheme getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
         String userNameWithAdminSuffix = null;
         if (userName != null && !userName.trim().isEmpty()) {
             if (userName.endsWith(ADMIN_SUFFIX)) {
@@ -153,7 +162,8 @@ public class AuthenticatedConnectionCache {
             assert(m_unauthClient != null);
             assert(m_adminUnauthClient != null);
 
-            return new Pair(admin ? m_adminUnauthClient : m_unauthClient, ClientAuthHashScheme.HASH_SHA256);
+            return new ClientWithHashScheme(admin ? m_adminUnauthClient : m_unauthClient,
+                    ClientAuthHashScheme.HASH_SHA256);
         }
 
         // AUTHENTICATED
@@ -220,7 +230,7 @@ public class AuthenticatedConnectionCache {
             }
             attemptToShrinkPoolIfNeeded();
         }
-        return new Pair(conn.client, scheme);
+        return new ClientWithHashScheme(conn.client, scheme);
     }
 
     private Predicate<InetSocketAddress> onAdminPort = new Predicate<InetSocketAddress>() {
