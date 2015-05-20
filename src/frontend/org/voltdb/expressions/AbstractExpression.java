@@ -535,7 +535,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.key(Members.RIGHT.name()).value(m_right);
         }
 
-        if (m_args != null && m_args.size() > 0) {
+        if (m_args != null) {
             stringer.key(Members.ARGS.name()).array();
             for (AbstractExpression argument : m_args) {
                 assert (argument instanceof JSONString);

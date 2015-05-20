@@ -169,16 +169,6 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public int hashCode() {
-        // defer to the superclass, which factors in other attributes
-        int result = super.hashCode();
-        if (m_subquery != null) {
-            result += m_subquery.hashCode();
-        }
-        return result;
-    }
-
-    @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         // Output the correlated parameter ids that this subquery or its descendants

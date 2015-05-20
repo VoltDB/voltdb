@@ -133,9 +133,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     public int hashCode() {
         // defer to the superclass, which factors in other attributes
         int result = super.hashCode();
-        if (m_subqueryNode != null) {
-            result += m_subqueryNode.hashCode();
-        }
+        result += m_subqueryId;
         return result;
     }
 
