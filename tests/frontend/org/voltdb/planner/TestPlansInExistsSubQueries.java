@@ -31,13 +31,11 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -448,36 +446,39 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 //        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(sn);
 //        assertNotNull(aggNode.getPostPredicate());
     }
+    public static String HavingErrorMsg = "SQL HAVING with subquery expression is not allowed.";
 
     public void testInHaving() {
         {
-            AbstractPlanNode pn = compile("select a from r1 " +
-                    " group by a having max(c) in (select c from r2 )");
+            String sql = "select a from r1 group by a having max(c) in (select c from r2 )";
+            failToCompile(sql, HavingErrorMsg);
 
-            pn = pn.getChild(0);
-            assertTrue(pn instanceof ProjectionPlanNode);
-            pn = pn.getChild(0);
-            assertTrue(pn instanceof SeqScanPlanNode);
-            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-            assertNotNull(aggNode);
-            NodeSchema ns = aggNode.getOutputSchema();
-            assertEquals(2, ns.size());
-            SchemaColumn aggColumn = ns.getColumns().get(1);
-            assertEquals("$$_MAX_$$_1", aggColumn.getColumnAlias());
-            AbstractExpression having = aggNode.getPostPredicate();
-            assertEquals(ExpressionType.OPERATOR_EXISTS, having.getExpressionType());
-            AbstractExpression se = having.getLeft();
-            assertEquals(1, se.getArgs().size());
-            assertTrue(se.getArgs().get(0) instanceof TupleValueExpression);
-            TupleValueExpression argTve = (TupleValueExpression) se.getArgs().get(0);
-            assertEquals(1, argTve.getColumnIndex());
-            assertEquals("$$_MAX_$$_1", argTve.getColumnAlias());
+            // ENG-8306: Uncomment next block when HAVING with subquery is supported
+//            AbstractPlanNode pn = compile(sql);
+//            pn = pn.getChild(0);
+//            assertTrue(pn instanceof ProjectionPlanNode);
+//            pn = pn.getChild(0);
+//            assertTrue(pn instanceof SeqScanPlanNode);
+//            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+//            assertNotNull(aggNode);
+//            NodeSchema ns = aggNode.getOutputSchema();
+//            assertEquals(2, ns.size());
+//            SchemaColumn aggColumn = ns.getColumns().get(1);
+//            assertEquals("$$_MAX_$$_1", aggColumn.getColumnAlias());
+//            AbstractExpression having = aggNode.getPostPredicate();
+//            assertEquals(ExpressionType.OPERATOR_EXISTS, having.getExpressionType());
+//            AbstractExpression se = having.getLeft();
+//            assertEquals(1, se.getArgs().size());
+//            assertTrue(se.getArgs().get(0) instanceof TupleValueExpression);
+//            TupleValueExpression argTve = (TupleValueExpression) se.getArgs().get(0);
+//            assertEquals(1, argTve.getColumnIndex());
+//            assertEquals("$$_MAX_$$_1", argTve.getColumnAlias());
         }
         {
             // HAVING expression evaluates to TRUE and dropped
-            AbstractPlanNode pn = compile("select a from r1 " +
-                    " group by a having exists (select max(a) from r2) or max(c) > 0");
-
+            String sql = "select a from r1 " +
+                    " group by a having exists (select max(a) from r2) or max(c) > 0";
+            AbstractPlanNode pn = compile(sql);
             pn = pn.getChild(0);
             assertTrue(pn instanceof ProjectionPlanNode);
             pn = pn.getChild(0);
@@ -488,9 +489,9 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             // HAVING expression evaluates to FASLE and retained
-            AbstractPlanNode pn = compile("select a from r1 " +
-                    " group by a having exists (select max(a) from r2 limit 0) and max(c) > 0");
-
+            String sql = "select a from r1 " +
+                    " group by a having exists (select max(a) from r2 limit 0) and max(c) > 0";
+            AbstractPlanNode pn = compile(sql);
             pn = pn.getChild(0);
             assertTrue(pn instanceof ProjectionPlanNode);
             pn = pn.getChild(0);
@@ -621,23 +622,29 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
         }
         {
-            // parent correlated TVE in the aggregate expression.
-            AbstractPlanNode pn = compile("select max(c) from r1 group by a " +
-                    " having count(*) = (select c from r2 where r2.c = r1.a)");
+            failToCompile("select max(c) from r1 group by a " +
+                    " having count(*) = (select c from r2 where r2.c = r1.a)", HavingErrorMsg);
 
-            pn = pn.getChild(0);
-            assertTrue(pn instanceof  ProjectionPlanNode);
-            pn = pn.getChild(0);
-            assertTrue(pn instanceof SeqScanPlanNode);
-            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-            assertNotNull(aggNode);
-            assertNotNull(aggNode instanceof HashAggregatePlanNode);
-            assertEquals(3, aggNode.getOutputSchema().size()); // group by key, max, count
-
-            AbstractExpression aggrExpr = aggNode.getPostPredicate();
-            assertEquals(ExpressionType.COMPARE_EQUAL, aggrExpr.getExpressionType());
-            assertTrue(aggrExpr.getLeft() instanceof TupleValueExpression);
-            assertTrue(aggrExpr.getRight() instanceof SelectSubqueryExpression);
+            /**
+             * Uncomment these tests when ENG-8306 is finished
+             */
+//            // parent correlated TVE in the aggregate expression.
+//            AbstractPlanNode pn = compile("select max(c) from r1 group by a " +
+//                    " having count(*) = (select c from r2 where r2.c = r1.a)");
+//
+//            pn = pn.getChild(0);
+//            assertTrue(pn instanceof  ProjectionPlanNode);
+//            pn = pn.getChild(0);
+//            assertTrue(pn instanceof SeqScanPlanNode);
+//            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+//            assertNotNull(aggNode);
+//            assertNotNull(aggNode instanceof HashAggregatePlanNode);
+//            assertEquals(3, aggNode.getOutputSchema().size()); // group by key, max, count
+//
+//            AbstractExpression aggrExpr = aggNode.getPostPredicate();
+//            assertEquals(ExpressionType.COMPARE_EQUAL, aggrExpr.getExpressionType());
+//            assertTrue(aggrExpr.getLeft() instanceof TupleValueExpression);
+//            assertTrue(aggrExpr.getRight() instanceof SelectSubqueryExpression);
         }
     }
 

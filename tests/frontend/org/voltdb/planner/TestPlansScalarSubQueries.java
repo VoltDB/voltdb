@@ -28,11 +28,15 @@ import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ScalarValueExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -70,6 +74,65 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         List<Integer> params = subqueryExpr.getParameterIdxList();
         assertEquals(1, params.size());
         assertEquals(new Integer(0), params.get(0));
+    }
+
+    public void testSelectCorrelatedScalarWithGroupby() {
+        String sql = "select franchise_id, count(*) as stores_in_category_AdHoc, "
+                + " (select category from store_types where type_id = stores.type_id) as store_category "
+                + "from stores group by franchise_id, type_id;";
+
+        AbstractPlanNode pn = compile(sql);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        NodeSchema schema = pn.getOutputSchema();
+        assertEquals(3, schema.size());
+        SchemaColumn col = schema.getColumns().get(2);
+        assertTrue(col != null);
+        assertEquals("STORE_CATEGORY", col.getColumnName());
+        assertTrue(col.getExpression() instanceof ScalarValueExpression);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+    }
+
+    public void testSelectCorrelatedScalarInGroupbyClause() {
+        String sql = "select franchise_id, count(*) as stores_in_category_AdHoc "
+                + " from stores group by franchise_id, (select category from store_types where type_id = stores.type_id);";
+        AbstractPlanNode pn = compile(sql);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        NodeSchema schema = pn.getOutputSchema();
+        assertEquals(2, schema.size());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        HashAggregatePlanNode aggNode = (HashAggregatePlanNode) pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertEquals(2, aggNode.getGroupByExpressionsSize());
+        AbstractExpression tveExpr = aggNode.getGroupByExpressions().get(0);
+        assertTrue(tveExpr instanceof TupleValueExpression);
+        AbstractExpression gbExpr = aggNode.getGroupByExpressions().get(1);
+        assertTrue(gbExpr instanceof ScalarValueExpression);
+        assertTrue(gbExpr.getLeft() instanceof SelectSubqueryExpression);
+    }
+
+    // negative tests not to support subquery inside of aggregate function
+    public void testSelectScalarInAggregation() {
+        String sql, errorMsg = "SQL Aggregate with subquery expression is not allowed.";
+
+        // non-correlated
+        sql = "select franchise_id, sum((select count(category) from store_types where type_id = 3)) as stores_in_category_AdHoc "
+                + " from stores group by franchise_id;";
+        failToCompile(sql, errorMsg);
+
+        // expression with subquery
+        sql = "select franchise_id, sum(1 + (select count(category) from store_types where type_id = 3)) as stores_in_category_AdHoc "
+                + " from stores group by franchise_id;";
+        failToCompile(sql, errorMsg);
+
+        // correlated
+        sql = "select franchise_id, sum((select count(category) from store_types where type_id = stores.franchise_id)) as stores_in_category_AdHoc "
+                + " from stores group by franchise_id;";
+        failToCompile(sql, "user lacks privilege or object not found: STORES.FRANCHISE_ID");
     }
 
     public void testSelectParameterScalar() {
@@ -219,22 +282,34 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
                 "row column count mismatch");
     }
 
+    /**
+     * Uncomment these tests when ENG-8306 is finished
+     */
     public void testHavingScalar() {
-        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
-        pn = pn.getChild(0).getChild(0);
-        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-        AbstractExpression aggExpr = aggNode.getPostPredicate();
-        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
+        failToCompile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);",
+                TestPlansInExistsSubQueries.HavingErrorMsg);
+
+//        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
+//        pn = pn.getChild(0).getChild(0);
+//        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+//        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+//        AbstractExpression aggExpr = aggNode.getPostPredicate();
+//        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
     }
 
+    /**
+     * Uncomment these tests when ENG-8306 is finished
+     */
     public void testHavingRow() {
-        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");
-        pn = pn.getChild(0).getChild(0);
-        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
-        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-        AbstractExpression aggExpr = aggNode.getPostPredicate();
-        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
+        failToCompile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);",
+                TestPlansInExistsSubQueries.HavingErrorMsg);
+
+//        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");
+//        pn = pn.getChild(0).getChild(0);
+//        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+//        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+//        AbstractExpression aggExpr = aggNode.getPostPredicate();
+//        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
     }
 
     public void testHavingRowMismatch() {
@@ -299,7 +374,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
         //        AbstractPlanNode.enableVerboseExplainForDebugging();
         //        AbstractExpression.enableVerboseExplainForDebugging();
     }

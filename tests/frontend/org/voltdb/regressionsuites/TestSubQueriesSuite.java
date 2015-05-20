@@ -32,6 +32,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.planner.TestPlansInExistsSubQueries;
 
 public class TestSubQueriesSuite extends RegressionSuite {
     public TestSubQueriesSuite(String name) {
@@ -446,41 +447,40 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "group by dept;").getResults()[0];
             //* enable for debug */ System.out.println(vt);
             validateTableOfLongs(vt, new long[][] {{1,10}});
-
+            assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
 
             sql = "select dept from " + tb +
                     " group by dept " +
                     " having max(wage) in (select wage from R1) order by dept desc";
-            //* enable for debug */ vt = client.callProcedure("@Explain", sql).getResults()[0];
-            //* enable for debug */ System.out.println(vt);
-            //TODO: Whatever @Explain is testung here should be covered in a planner test instead.
-            assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
+            // Uncomment these tests when ENG-8306 is finished
+//            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+//            /* enable for debug */ System.out.println(vt);
+//            validateTableOfLongs(vt, new long[][] {{2} ,{1}});
+            verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            /* enable for debug */ System.out.println(vt);
-            validateTableOfLongs(vt, new long[][] {{2} ,{1}});
 
             sql = "select dept from " + tb + " group by dept " +
                     " having max(wage) + 1 - 1 in (select wage from R1) order by dept desc";
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            //* enable for debug */ System.out.println(vt.toString());
-            validateTableOfLongs(vt, new long[][] {{2}, {1} });
+            // Uncomment these tests when ENG-8306 is finished
+//            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+//            validateTableOfLongs(vt, new long[][] {{2}, {1} });
+            verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
             // subquery with having
-            vt = client.callProcedure("@AdHoc",
-                    "select id from " + tb + " TBA where exists " +
-                            " (select dept from R1 " +
-                            "  group by dept " +
-                            "  having max(wage) = TBA.wage or min(wage) = TBA.wage) order by id;").getResults()[0];
+            sql = "select id from " + tb + " TBA where exists " +
+                    " (select dept from R1 " +
+                    "  group by dept " +
+                    "  having max(wage) = TBA.wage or min(wage) = TBA.wage) order by id;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
 
             // subquery with having and grand parent parameter TVE
-            vt = client.callProcedure("@AdHoc",
-                    "select id from " + tb + " TBA where exists " +
-                            " (select 1 from R2 where exists " +
-                            "         (select dept from R1 " +
-                            "          group by dept " +
-                            "          having max(wage) = TBA.wage) ) order by id;").getResults()[0];
+            sql =  "select id from " + tb + " TBA where exists " +
+                    " (select 1 from R2 where exists " +
+                    "         (select dept from R1 " +
+                    "          group by dept " +
+                    "          having max(wage) = TBA.wage) ) order by id;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{3}, {5}});
 
             vt = client.callProcedure("@AdHoc",
@@ -1014,7 +1014,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     public void testSelectScalarSubSelects() throws Exception
     {
         Client client = getClient();
-        loadData(false);
+        loadData(true);
         VoltTable vt;
 
         vt = client.callProcedure("@AdHoc",
@@ -1027,13 +1027,74 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where R2.ID = R1.ID and R2.WAGE = 50) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {  {5l, 2l, 5l}, {4l, 2l, Long.MIN_VALUE} });
+        validateTableOfLongs(vt, new long[][] {  {7, 2, Long.MIN_VALUE}, {6, 2, Long.MIN_VALUE}, {5, 2, 5}, {4, 2, Long.MIN_VALUE} });
 
         // Seq scan
         vt = client.callProcedure("@AdHoc",
                 "select R1.DEPT, (SELECT ID FROM R2 where R2.ID = 1) FROM R1 where R1.DEPT = 2;").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1} });
+        validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1}, {2, 1}, {2, 1} });
 
+        // with group by correlated
+        // Hsqldb back end bug: ENG-8273
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.DEPT, count(*), (SELECT max(dept) FROM R2 where R2.wage = R1.wage) FROM R1 "
+                    + " GROUP BY dept, wage order by dept, wage;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {  {1,1,2}, {1,1,1}, {1,1,1}, {2, 1, 2}, {2, 2, 2}, {2,1,2} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.DEPT, count(*), (SELECT sum(dept) FROM R2 where R2.wage > r1.dept * 10) FROM R1 "
+                    + " GROUP BY dept order by dept;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {  {1,3,8}, {2, 4, 7} });
+        }
+
+        // ENG-8263: group by scalar value expression
+        String sql = "select R1.DEPT, count(*) as tag FROM R1 "
+                + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage = R1.wage) order by dept, tag;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1, 1}, {1, 2}, {2, 1}, {2, 3} });
+
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, count(*) as tag FROM R1 "
+                + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage > 15) order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1,3}, {2, 4} });
+
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, abs((SELECT count(dept) FROM R2 where R2.wage > R1.wage) / 2 - 3) as ct, count(*) as tag FROM R1 "
+                + "GROUP BY dept, ct order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1,2,1}, {1,1,2}, {2,1,1}, {2,3,3} });
+
+        // duplicates the subquery expression
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, count(*) as tag FROM R1 "
+                + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage > 15), "
+                + "(SELECT count(dept) FROM R2 where R2.wage > 15) order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1,3}, {2, 4} });
+
+        // changes a little bit on the subquery
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, count(*) as tag FROM R1 "
+                + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage > 15), "
+                + "(SELECT count(dept) FROM R2 where R2.wage > 14) order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1,3}, {2, 4} });
+
+        // expression with subuqery
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, count(*) as tag FROM R1 "
+                + "GROUP BY dept, (SELECT count(dept) FROM R2 where R2.wage > 15), "
+                + "(1 + (SELECT count(dept) FROM R2 where R2.wage > 14) ) order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  {1,3}, {2, 4} });
+
+        // duplicates the subquery expression
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, "
+                + "abs((SELECT count(dept) FROM R2 where R2.wage > R1.wage) / 2 - 3) as ct1, "
+                + "abs((SELECT count(dept) FROM R2 where R2.wage > R1.wage) / 2 - 3) as ct2, "
+                + "count(*) as tag FROM R1 "
+                + "GROUP BY dept, ct1 order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1,2,2,1}, {1,1,1,2}, {2,1,1,1}, {2,3,3,3} });
+
+        // expression with subuqery
+        vt = client.callProcedure("@AdHoc", "select R1.DEPT, "
+                + "abs((SELECT count(dept) FROM R2 where R2.wage > R1.wage) / 2 - 3) as ct1, "
+                + "(5 + abs((SELECT count(dept) FROM R2 where R2.wage > R1.wage) / 2 - 3)) as ct2, "
+                + "count(*) as tag FROM R1 "
+                + "GROUP BY dept, ct1 order by dept, tag;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1,2,7,1}, {1,1,6,2}, {2,1,6,1}, {2,3,8,3} });
         try {
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
@@ -1263,21 +1324,28 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] { {1, 4}, {1,5} });
 
         // Having
-        vt = client.callProcedure("@AdHoc",
-                "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
-                        "(select R2.ID from R2 where R2.ID = ?);", 2).getResults()[0];
-        validateTableOfLongs(vt, new long[][] { {5} });
+        String sql;
+        sql = "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                "(select R2.ID from R2 where R2.ID = ?);";
+     // Uncomment these tests when ENG-8306 is finished
+//        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
+//        validateTableOfLongs(vt, new long[][] { {5} });
+        verifyAdHocFails(client, TestPlansInExistsSubQueries.HavingErrorMsg, sql, 2);
 
         // Having correlated -- parent TVE in the aggregated child expression
-        vt = client.callProcedure("@AdHoc",
-                "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
-                "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{5});
+        sql = "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = "
+                + "(select R2.ID from R2 where R2.ID = R1.DEPT);";
+        // Uncomment these tests when ENG-8306 is finished
+//        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+//        validateTableOfScalarLongs(vt, new long[]{5});
+        verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
-        vt = client.callProcedure("@AdHoc",
-                "select DEPT, max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
-                "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
-        validateTableOfLongs(vt, new long[][] { {2,5} });
+        sql = "select DEPT, max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                "(select R2.ID from R2 where R2.ID = R1.DEPT);";
+        // Uncomment these tests when ENG-8306 is finished
+//        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+//        validateTableOfLongs(vt, new long[][] { {2,5} });
+        verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
         try {
             vt = client.callProcedure("@AdHoc",
@@ -1557,11 +1625,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                        "ID INTEGER DEFAULT 0 NOT NULL, " +
-                        "WAGE INTEGER, " +
-                        "DEPT INTEGER, " +
-                        "TM TIMESTAMP DEFAULT NULL, " +
-                        "PRIMARY KEY (ID) );" +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );" +
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
