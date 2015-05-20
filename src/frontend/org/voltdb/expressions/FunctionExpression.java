@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -25,83 +26,44 @@ import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
 public class FunctionExpression extends AbstractExpression {
-    private enum Members {
+    public enum Members {
         NAME,
-        IMPLIED_ARGUMENT,
+        ALIAS,
         FUNCTION_ID,
-        RESULT_TYPE_PARAM_IDX,
+        PARAMETER_ARG,
     }
 
     private final static int NOT_PARAMETERIZED = -1;
 
-    /// The name of the actual generic SQL function being invoked,
-    /// normally this is just the upper-case formatted version of the function
-    /// name that was used in the SQL statement.
-    /// It can be something different when the statement used a function name
-    /// that is just an alias or a specialization of another function.
-    /// For example:
-    /// Name used in SQL |  m_name
-    /// ABS              |   ABS
-    /// NOW              |   CURRENT_TIMESTAMP
-    /// DAY              |   EXTRACT
-    /// WEEK             |   EXTRACT
-    /// EXTRACT          |   EXTRACT
-    /// LTRIM            |   TRIM
-    /// TRIM             |   TRIM
     private String m_name;
-
-    /// An optional implied keyword argument, always upper case,
-    /// normally null -- except for functions that had an initial keyword
-    /// argumment which got optimized out of its argument list prior to export
-    /// from the HSQL front-end.
-    /// For example:
-    /// SQL invocation  |  m_impliedArgument
-    /// ABS             |  null
-    /// NOW             |  null
-    /// DAY             |  DAY -- because of aliasing to EXTRACT(DAY...
-    /// WEEK            |  WEEK -- because of aliasing to EXTRACT(WEEK...
-    /// EXTRACT(DAY...  |  DAY
-    /// EXTRACT(week... |  WEEK
-    /// LTRIM           |  LEADING
-    /// TRIM(LEADING... |  LEADING
-    private String m_impliedArgument;
-
-    /// The unique function (implementation) identifier for a named SQL
-    /// function, assigned from constants defined in various HSQL frontend
-    /// modules like Tokens.java, FunctionSQL.java, FunctionForVoltDB.java,
-    /// etc. AND identically defined in functionsexpression.h.
-    /// Aliases for the same function (implementation) will share an ID.
-    /// For example, NOW and CURRENT_TIMESTAMP share one.
-    /// Functions whose behavior is parameterized by a keyword argument will
-    /// have a different function for each possible value of that argument
-    /// For example, EXTRACT(DAY... and EXTRACT(WEEK... will have different IDs,
-    /// which they share, respectively, with their aliases DAY(... and WEEK(...
+    private String m_alias;
     private int m_functionId;
+    private int m_parameterArg = NOT_PARAMETERIZED;
 
-    /// Defaults to the out-of-range value NOT_PARAMETERIZED for normal functions
-    /// that have a fixed return type. For functions with a return type that depends
-    /// on the type of one of its parameters, this is the index of that parameter.
-    /// For example, 1 for the MOD function, 0 for ABS, etc.
-    private int m_resultTypeParameterIndex = NOT_PARAMETERIZED;
+    public int getParameterArg() {
+        return m_parameterArg;
+    }
 
-    /// This is used for both initial construction
-    /// and JSON deserialization.
     public FunctionExpression() {
+        //
+        // This is needed for serialization
+        //
         super();
         setExpressionType(ExpressionType.FUNCTION);
     }
 
-    public void setAttributes(String name, String impliedArgument, int id) {
-        assert(name != null);
+    public void setAttributes(String name, String volt_alias, int id) {
         m_name = name;
-        m_impliedArgument = impliedArgument;
+        m_alias = volt_alias;
         m_functionId = id;
     }
 
-    public boolean hasFunctionId(int functionId) { return m_functionId == functionId; }
+    public int getFunctionId() {
+        return m_functionId;
+    }
 
-    public void setResultTypeParameterIndex(int resultTypeParameterIndex) {
-        m_resultTypeParameterIndex = resultTypeParameterIndex;
+    public void setParameterArg(int parameterArg) {
+        m_parameterArg = parameterArg;
     }
 
     /** Negotiate the type(s) of the parameterized function's result and its parameter argument.
@@ -116,8 +78,8 @@ public class FunctionExpression extends AbstractExpression {
 
         // DO use the type chosen by HSQL for the parameterized function as a specific type hint
         // for numeric constant arguments that could either go decimal or float.
-        AbstractExpression typing_arg = m_args.get(m_resultTypeParameterIndex);
-        VoltType param_type = typing_arg.getValueType();
+        AbstractExpression param_arg = m_args.get(m_parameterArg);
+        VoltType param_type = param_arg.getValueType();
         VoltType value_type = getValueType();
         // The heuristic for which type to change is that any type (parameter type or return type) specified so far,
         // including NUMERIC is better than nothing. And that anything else is better than NUMERIC.
@@ -135,8 +97,8 @@ public class FunctionExpression extends AbstractExpression {
             } else if ((param_type == null) || (param_type == VoltType.NUMERIC)) {
                 // The only purpose of refining the parameter argument's type is to force a more specific
                 // refinement than NUMERIC as implied by HSQL, in case that might be more specific than
-                // what can be inferred later from the function call context.
-                typing_arg.refineValueType(value_type, value_type.getMaxLengthInBytes());
+                // what can be be inferred later from the function call context.
+                param_arg.refineValueType(value_type, value_type.getMaxLengthInBytes());
             }
         }
         if (value_type != null) {
@@ -167,10 +129,9 @@ public class FunctionExpression extends AbstractExpression {
         if (m_name == null) {
             throw new Exception("ERROR: The function name for '" + this + "' is NULL");
         }
-        if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
-            if (m_resultTypeParameterIndex < 0 || m_resultTypeParameterIndex >= m_args.size()) {
-                throw new Exception("ERROR: The function parameter argument index '" +
-                        m_resultTypeParameterIndex + "' for '" + this + "' is out of bounds");
+        if (m_parameterArg != NOT_PARAMETERIZED) {
+            if (m_parameterArg < 0 || ((m_args != null) && m_parameterArg >= m_args.size())) {
+                throw new Exception("ERROR: The function parameter argument index '" + m_parameterArg + "' for '" + this + "' is out of bounds");
             }
         }
 
@@ -180,9 +141,9 @@ public class FunctionExpression extends AbstractExpression {
     public Object clone() {
         FunctionExpression clone = (FunctionExpression)super.clone();
         clone.m_name = m_name;
-        clone.m_impliedArgument = m_impliedArgument;
+        clone.m_alias = m_alias;
         clone.m_functionId = m_functionId;
-        clone.m_resultTypeParameterIndex = m_resultTypeParameterIndex;
+        clone.m_parameterArg = m_parameterArg;
         return clone;
     }
 
@@ -193,52 +154,70 @@ public class FunctionExpression extends AbstractExpression {
         }
         FunctionExpression expr = (FunctionExpression) obj;
 
-        // Function id determines all other attributes
-        return m_functionId == expr.m_functionId;
+        assert(m_name != null);
+        if (m_name == null) {
+            // This is most unpossible. BUT...
+            // better to fail the equality test than to embarrass ourselves in production
+            // (when asserts are turned off) with an NPE on the next line.
+            return false;
+        }
+        if (m_name.equals(expr.m_name) == false) {
+            return false;
+        }
+        if (m_alias == null) {
+            if (expr.m_alias != null) {
+                return false;
+            }
+        } else {
+            if (m_alias.equals(expr.m_alias) == false) {
+                return false;
+            }
+        }
+        if (m_functionId != expr.m_functionId) {
+            return false;
+        }
+        if (m_parameterArg != expr.m_parameterArg) {
+            return false;
+        }
+        return true;
     }
 
     @Override
     public int hashCode() {
         // based on implementation of equals
-        int result = m_functionId;
-        // defer to the superclass, which factors in arguments and other attributes
+        int result = 0;
+        result += m_name.hashCode();
+        if (m_alias != null) {
+            result += m_alias.hashCode();
+        }
+        result += m_functionId;
+        // defer to the superclass, which factors in other attributes
         return result += super.hashCode();
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        assert(m_name != null);
         stringer.key(Members.NAME.name()).value(m_name);
+        if (m_alias != null) {
+            stringer.key(Members.ALIAS.name()).value(m_alias);
+        }
         stringer.key(Members.FUNCTION_ID.name()).value(m_functionId);
-        if (m_impliedArgument != null) {
-            stringer.key(Members.IMPLIED_ARGUMENT.name()).value(m_impliedArgument);
-        }
-        if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
-            stringer.key(Members.RESULT_TYPE_PARAM_IDX.name()).value(m_resultTypeParameterIndex);
-        }
+        stringer.key(Members.PARAMETER_ARG.name()).value(m_parameterArg);
     }
 
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException
     {
         m_name = obj.getString(Members.NAME.name());
-        assert(m_name != null);
+        m_alias = obj.getString(Members.ALIAS.name());
         m_functionId = obj.getInt(Members.FUNCTION_ID.name());
-        m_impliedArgument = null;
-        if (obj.has(Members.IMPLIED_ARGUMENT.name())) {
-            m_impliedArgument = obj.getString(Members.IMPLIED_ARGUMENT.name());
-        }
-        if (obj.has(Members.RESULT_TYPE_PARAM_IDX.name())) {
-            m_resultTypeParameterIndex = obj.getInt(Members.RESULT_TYPE_PARAM_IDX.name());
-        } else {
-            m_resultTypeParameterIndex = NOT_PARAMETERIZED;
-        }
+        m_parameterArg = obj.getInt(Members.PARAMETER_ARG.name());
     }
 
     @Override
     public void refineOperandType(VoltType columnType) {
-        if (m_resultTypeParameterIndex == NOT_PARAMETERIZED) {
+        if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.
             return;
@@ -248,7 +227,7 @@ public class FunctionExpression extends AbstractExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
-        AbstractExpression arg = m_args.get(m_resultTypeParameterIndex);
+        AbstractExpression arg = m_args.get(m_parameterArg);
         VoltType valueType = arg.getValueType();
         if (valueType != null && valueType != VoltType.NUMERIC) {
             return;
@@ -260,7 +239,7 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public void refineValueType(VoltType neededType, int neededSize) {
-        if (m_resultTypeParameterIndex == NOT_PARAMETERIZED) {
+        if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.
             return;
@@ -270,7 +249,7 @@ public class FunctionExpression extends AbstractExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
-        AbstractExpression arg = m_args.get(m_resultTypeParameterIndex);
+        AbstractExpression arg = m_args.get(m_parameterArg);
         VoltType valueType = arg.getValueType();
         if (valueType != null && valueType != VoltType.NUMERIC) {
             return;
@@ -286,13 +265,13 @@ public class FunctionExpression extends AbstractExpression {
     public void finalizeValueTypes()
     {
         finalizeChildValueTypes();
-        if (m_resultTypeParameterIndex == NOT_PARAMETERIZED) {
+        if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.
             return;
         }
         // A parameterized function should reflect the final value of its parameter argument's type.
-        AbstractExpression arg = m_args.get(m_resultTypeParameterIndex);
+        AbstractExpression arg = m_args.get(m_parameterArg);
         m_valueType = arg.getValueType();
         m_valueSize = m_valueType.getMaxLengthInBytes();
     }
@@ -301,7 +280,7 @@ public class FunctionExpression extends AbstractExpression {
     @Override
     public void resolveForTable(Table table) {
         resolveChildrenForTable(table);
-        if (m_resultTypeParameterIndex == NOT_PARAMETERIZED) {
+        if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.
             return;
@@ -312,44 +291,14 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        assert(m_name != null);
         String result = m_name;
-
-        if ( ! m_args.isEmpty()) {
-            String connector = "(";
-
-            // The purpose of m_impliedArgument is to allow functions with
-            // different leading keyword arguments to be implemented as different
-            // functions in VoltDB but to be "unified" back to their
-            // original/generic form when explained to the user or
-            // re-generated as SQL syntax for round trips back to the parser.
-            // For example, SQL function invocations like
-            //   "trim(leading 'X' from field)" and
-            //   "trim(trailing 'X' from field)"
-            // get invoked as separate volt functions.
-            // They are modeled internally as something more like
-            // "trim_leading('X', field)" and "trim_trailing('X', field)".
-            // Note: it's actually m_functionId, not m_impliedParameter that
-            // drives that distinction.
-
-            // We slightly extended the supported SQL grammar to allow consistent
-            // use of comma separators in the place of keyword separators,
-            // even in non-traditional cases like
-            //   "trim(leading, 'X', field)"
-            // as a normalized equivalent of
-            //   "trim(leading 'X' from field)".
-
-            // SQL functions that use this mechanism include variants of
-            // "extract", "since_epoch", "to_timestamp", "trim" and "truncate"
-            // and their various aliases.
-            // It is assumed that there is at least 1 explicit argument following
-            // the implied argument (so m_args will not be empty for these cases).
-            if (m_impliedArgument != null) {
-                result += connector + m_impliedArgument;
-                connector = ", ";
-            }
-
-            // Append each normal argument.
+        String connector = "(";
+        // This is temporary and will be replaced once the Unit Attribute is in the XML
+        if (FunctionForVoltDB.isUnitFunction(m_functionId)) {
+            result += connector + m_alias.substring(m_name.length()+1);
+            connector = ", ";
+        }
+        if (m_args != null) {
             for (AbstractExpression arg : m_args) {
                 result += connector + arg.explain(impliedTableName);
                 connector = ", ";

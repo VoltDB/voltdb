@@ -336,10 +336,9 @@ static inline std::string trim_function(std::string source, const std::string ma
     return source;
 }
 
-
-/** implement the 2-argument SQL TRIM functions */
-inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool leading, bool trailing) {
-    assert(arguments.size() == 2);
+/** implement the 3-argument SQL TRIM function */
+template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 3);
 
     for (int i = 0; i < arguments.size(); i++) {
         const NValue& arg = arguments[i];
@@ -348,8 +347,11 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
         }
     }
 
+    const NValue& opt = arguments[0];
+    int32_t optArg = static_cast<int32_t>(opt.castAsBigIntAndGetValue());
+
     char* ptr;
-    const NValue& trimChar = arguments[0];
+    const NValue& trimChar = arguments[1];
     if (trimChar.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -359,7 +361,7 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
 
     std::string trimArg = std::string(ptr, length);
 
-    const NValue& strVal = arguments[1];
+    const NValue& strVal = arguments[2];
     if (strVal.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -370,28 +372,29 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
 
     // SQL03 standard only allows 1 character trim character.
     // In order to be compatible with other popular databases like MySQL,
-    // our implementation also allows multiple characters, but rejects 0 characters.
+    // our implementation also allows multiple characters, but rejects 0 character.
     if (length == 0) {
         throw SQLException( SQLException::data_exception_numeric_value_out_of_range,
                 "data exception -- trim error, invalid length argument 0");
     }
 
-    std::string result = trim_function(inputStr, trimArg, leading, trailing);
+    std::string result = "";
+    switch (optArg) {
+    case SQL_TRIM_BOTH:
+        result = trim_function(inputStr, trimArg, true, true);
+        break;
+    case SQL_TRIM_LEADING:
+        result = trim_function(inputStr, trimArg, true, false);
+        break;
+    case SQL_TRIM_TRAILING:
+        result = trim_function(inputStr, trimArg, false, true);
+        break;
+    default:
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported SQL TRIM exception");
+    }
+
     return getTempStringValue(result.c_str(), result.length());
 }
-
-template<> inline NValue NValue::call<FUNC_TRIM_BOTH_CHAR>(const std::vector<NValue>& arguments) {
-    return trimWithOptions(arguments, true, true);
-}
-
-template<> inline NValue NValue::call<FUNC_TRIM_LEADING_CHAR>(const std::vector<NValue>& arguments) {
-    return trimWithOptions(arguments, true, false);
-}
-
-template<> inline NValue NValue::call<FUNC_TRIM_TRAILING_CHAR>(const std::vector<NValue>& arguments) {
-    return trimWithOptions(arguments, false, true);
-}
-
 
 /** implement the 3-argument SQL REPLACE function */
 template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& arguments) {

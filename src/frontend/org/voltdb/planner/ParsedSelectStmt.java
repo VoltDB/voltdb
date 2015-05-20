@@ -42,6 +42,7 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -816,6 +817,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(havingNode.children.size() == 1);
         m_having = parseExpressionTree(havingNode.children.get(0));
         assert(m_having != null);
+        if (! m_having.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+            throw new PlanningErrorException(
+                    "SQL HAVING with subquery expression is not allowed.");
+        }
         if (isDistributed) {
             m_having = m_having.replaceAVG();
             updateAvgExpressions();
@@ -1827,11 +1832,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_having != null) {
             exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
         }
-        // m_groupByExpressions is replaced all complex expression with TVE already
-        for (ParsedColInfo groupbyCol: m_groupByColumns) {
-            AbstractExpression groupByExpr = groupbyCol.expression;
-            exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
-
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
+            }
         }
         for(ParsedColInfo col : m_displayColumns) {
             if (col.expression != null) {
@@ -1847,12 +1851,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_having != null) {
             exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
         }
-
-        // m_groupByExpressions is replaced all complex expression with TVE already
-        for (ParsedColInfo groupbyCol: m_groupByColumns) {
-            AbstractExpression groupByExpr = groupbyCol.expression;
-            exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
-
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
+            }
         }
         if (m_projectSchema != null) {
             for(SchemaColumn col : m_projectSchema.getColumns()) {

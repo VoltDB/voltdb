@@ -506,4 +506,30 @@ public class FunctionForVoltDB extends FunctionSQL {
         return sb.toString();
     }
 
+    // This function will be removed with a new attribute is added XML indicating Function Unit
+    public static boolean isUnitFunction(int functionType) {
+
+        switch (functionType) {
+            case FunctionId.FUNC_VOLT_SINCE_EPOCH_SECOND:
+            case FunctionId.FUNC_VOLT_SINCE_EPOCH_MILLISECOND:
+            case FunctionId.FUNC_VOLT_SINCE_EPOCH_MICROSECOND:
+            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND:
+            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND:
+            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND:
+            case FunctionId.FUNC_VOLT_TRUNCATE_YEAR:
+            case FunctionId.FUNC_VOLT_TRUNCATE_QUARTER:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MONTH:
+            case FunctionId.FUNC_VOLT_TRUNCATE_DAY:
+            case FunctionId.FUNC_VOLT_TRUNCATE_HOUR:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MINUTE:
+            case FunctionId.FUNC_VOLT_TRUNCATE_SECOND:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MILLISECOND:
+            case FunctionId.FUNC_VOLT_TRUNCATE_MICROSECOND:
+                return true;
+
+            default :
+                return false;
+        }
+    }
+
 }
