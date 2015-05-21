@@ -204,6 +204,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_drGateway = gateway;
     }
 
+    public void setMpDRGateway(final PartitionDRGateway mpGateway)
+    {
+        // intentionally blank placeholder
+    }
+
     @Override
     public void shutdown()
     {

@@ -114,6 +114,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         PartitionDRGateway mpPDRG = null;
         if (createMpDRGateway) {
             mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
+            ((SpScheduler) m_scheduler).setMpDRGateway(mpPDRG);
         }
 
         super.configureCommon(backend, catalogContext,

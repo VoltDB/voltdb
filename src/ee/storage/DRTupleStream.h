@@ -29,6 +29,7 @@ namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
+// Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 69;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
 

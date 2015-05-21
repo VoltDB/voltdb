@@ -510,18 +510,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         public ByteBufferTruncatorResponse(ByteBuffer retval) {
             super(Status.PARTIAL_TRUNCATE);
+            assert retval.remaining() > 0;
             m_retval = retval;
         }
 
         @Override
         public void writeTruncatedObject(ByteBuffer output) {
-            ByteBuffer copy = ByteBuffer.allocate(m_retval.remaining());
-            copy.put(m_retval);
-            copy.flip();
-
-            output.putInt(copy.remaining());
+            output.putInt(m_retval.remaining());
             output.putInt(0);
-            output.put(copy);
+            output.put(m_retval);
         }
     }
 
@@ -585,7 +582,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     for (int ii = 0; ii < numObjects; ii++) {
                         final int nextObjectLength = readBuffer.getInt();
                         final int nextObjectFlags = readBuffer.getInt();
-                        final boolean compressed = nextObjectFlags == PBDSegment.FLAG_COMPRESSED;
+                        final boolean compressed = (nextObjectFlags & PBDSegment.FLAG_COMPRESSED) != 0;
                         final int uncompressedLength = compressed ? (int)Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
                         objectsProcessed++;
                         //Copy the next object into a separate heap byte buffer

@@ -42,6 +42,7 @@ import org.xerial.snappy.Snappy;
 class PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
+    public static final int NO_FLAGS = 0;
     public static final int FLAG_COMPRESSED = 1;
 
     //Avoid unecessary sync with this flag
@@ -230,7 +231,7 @@ class PBDSegment {
             //Record the size of the compressed object and update buffer positions
             //and whether the object was compressed
             mbuf.putInt(objSizePosition, written);
-            mbuf.putInt(objSizePosition + 4, compress ? FLAG_COMPRESSED: 0);
+            mbuf.putInt(objSizePosition + 4, compress ? FLAG_COMPRESSED: NO_FLAGS);
             buf.position(buf.limit());
             incrementNumEntries(remaining);
         } finally {
@@ -260,7 +261,7 @@ class PBDSegment {
             ds.serialize(mbuf);
             written = mbuf.position() - objStartPosition;
             mbuf.putInt(objSizePosition, written);
-            mbuf.putInt(objSizePosition + 4, 0);
+            mbuf.putInt(objSizePosition + 4, NO_FLAGS);
         } finally {
             ds.cancel();
         }
@@ -294,7 +295,7 @@ class PBDSegment {
         final int nextFlags = m_readBuf.getInt();
 
         //Check for compression
-        final boolean compressed = nextFlags == FLAG_COMPRESSED;
+        final boolean compressed = (nextFlags & FLAG_COMPRESSED) != 0;
         //Determine the length of the object if uncompressed
         final int nextUncompressedLength = compressed ? (int)Snappy.uncompressedLength(mBufAddr + m_readBuf.position(), nextCompressedLength) : nextCompressedLength;
         m_bytesRead += nextUncompressedLength;
