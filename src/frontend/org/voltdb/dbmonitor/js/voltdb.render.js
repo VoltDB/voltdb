@@ -695,7 +695,7 @@ function alertNodeClicked(obj) {
                 if (data.systemsettings != null) {
                     if (data.systemsettings.temptables != null)
                         adminConfigValues['tempTablesMaxSize'] = data.systemsettings.temptables.maxsize;
-                    
+
                     if (data.systemsettings.snapshot != null)
                         adminConfigValues['snapshotPriority'] = data.systemsettings.snapshot.priority;
                 }
@@ -2103,8 +2103,8 @@ function alertNodeClicked(obj) {
                 replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 repData["HOST_ID"] = info[colIndex["HOST_ID"]];
                 repData["STATE"] = info[colIndex["STATE"]];
-                repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]];
-                repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]];
+                repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
+                repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
                 replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
 
             });
