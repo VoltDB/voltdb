@@ -845,7 +845,7 @@ public abstract class AbstractParsedStmt {
             // For count(<constant>) and count(<non-nullable column>),
             // it should be treated like count(*)
             // See ENG-6131
-            if(exprType == ExpressionType.AGGREGATE_COUNT) {
+            if(exprType == ExpressionType.AGGREGATE_COUNT && exprNode.attributes.get("distinct") == null) {
                 // count(<constant>)
                 if(childExpr.getExpressionType().equals(ExpressionType.VALUE_CONSTANT) ||
                         childExpr.getExpressionType().equals(ExpressionType.VALUE_PARAMETER)) {
@@ -854,8 +854,7 @@ public abstract class AbstractParsedStmt {
                 }
                 // count(<non-nullable column>)
                 // count() cannot have distinct in it.
-                else if(childExpr.getExpressionType().equals(ExpressionType.VALUE_TUPLE) &&
-                        exprNode.attributes.get("distinct") == null) {
+                else if(childExpr.getExpressionType().equals(ExpressionType.VALUE_TUPLE)) {
                     String tableName = childExprNode.attributes.get("table");
                     String columnName = childExprNode.attributes.get("column");
                     Table t = getTableFromDB(tableName);

@@ -254,11 +254,11 @@ public class TestPlansCount extends PlannerTestCase {
     public void testCountStar19() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000");
         AbstractPlanNode p = pn.get(0).getChild(0);
-        assertTrue((p instanceof IndexCountPlanNode) == false);
+        assertFalse(p instanceof IndexCountPlanNode);
 
-        pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000");
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000");
         p = pn.get(0).getChild(0);
-        assertTrue((p instanceof IndexCountPlanNode) == false);
+        assertFalse(p instanceof IndexCountPlanNode);
     }
 
     // test with group by with Replicated table
@@ -464,24 +464,30 @@ public class TestPlansCount extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct AGE) from T1 WHERE ID=1 AND AGE >= ?");
         checkIndexCounter(pn, false);
     }
+
+    // Testing COUNT( DISTINCT <constant> )
+    public void testCountDistinctConstant() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct 1) from P1 WHERE ID=1 AND RATIO >= ?");
+        checkIndexCounter(pn, false);
+    }
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *
      * @param pn
      *            The generated plan
-     * @param isReplaceable
+     * @param optimizedCount
      *            Whether or not the original plan is replaced with CountingIndexPlanNode
      */
-    private void checkIndexCounter(List<AbstractPlanNode> pn, boolean isReplaceable) {
+    private void checkIndexCounter(List<AbstractPlanNode> pn, boolean optimizedCount) {
         assertTrue(pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {
             System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         }
         AbstractPlanNode p = pn.get(0).getChild(0);
-        if (isReplaceable)
+        if (optimizedCount)
             assertTrue(p instanceof IndexCountPlanNode);
         else
-            assertTrue((p instanceof IndexCountPlanNode) == false);
+            assertFalse(p instanceof IndexCountPlanNode);
     }
 }
