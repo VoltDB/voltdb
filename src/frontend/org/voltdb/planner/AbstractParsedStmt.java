@@ -850,7 +850,6 @@ public abstract class AbstractParsedStmt {
                 if(childExpr.getExpressionType().equals(ExpressionType.VALUE_CONSTANT) ||
                         childExpr.getExpressionType().equals(ExpressionType.VALUE_PARAMETER)) {
                     exprType = ExpressionType.AGGREGATE_COUNT_STAR;
-                    childExpr = null;
                 }
                 // count(<non-nullable column>)
                 // count() cannot have distinct in it.
@@ -860,7 +859,6 @@ public abstract class AbstractParsedStmt {
                     Table t = getTableFromDB(tableName);
                     if(! t.getColumns().get(columnName).getNullable()) {
                         exprType = ExpressionType.AGGREGATE_COUNT_STAR;
-                        childExpr = null;
                     }
                 }
             }

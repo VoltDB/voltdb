@@ -2104,6 +2104,13 @@ public class DDLCompiler {
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
                 ParsedColInfo col = stmt.m_displayColumns.get(i);
                 AbstractExpression aggExpr = col.expression.getLeft();
+                // If it's COUNT(*) optimized from COUNT(1) or COUNT(column)
+                // Set it back to COUNT because materialized view does not support it.
+                // See ENG-6131
+                if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR &&
+                        aggExpr != null) {
+                    col.expression.setExpressionType(ExpressionType.AGGREGATE_COUNT);
+                }
                 if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                     hasAggregationExprs = true;
                 }
@@ -2366,9 +2373,11 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        // It is legal to have repeated COUNT(*).
         for (i++; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
