@@ -108,7 +108,7 @@ public interface BinaryDeque {
         public TruncatorResponse(Status status) {
             this.status = status;
         }
-        public void writeTruncatedObject(ByteBuffer output) throws IOException {
+        public int writeTruncatedObject(ByteBuffer output) throws IOException {
             throw new UnsupportedOperationException("Must implement this for partial object truncation");
         }
     }
