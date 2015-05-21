@@ -1618,7 +1618,7 @@ public class DDLCompiler {
         List<AbstractExpression> functionsList = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
         for (AbstractExpression funcExpr: functionsList) {
             assert(funcExpr instanceof FunctionExpression);
-            if (((FunctionExpression)funcExpr).getFunctionId() == functionId) {
+            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
                 return true;
             }
         }
