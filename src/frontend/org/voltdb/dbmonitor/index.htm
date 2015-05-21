@@ -310,7 +310,6 @@
                                         </a>
                                     </li>
                                 </ul>
-
                                 <div class="clear"></div>
                             </div>
                             <div class="clear"></div>
@@ -324,7 +323,6 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
-
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
@@ -347,7 +345,6 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div id="drReplicaSection" class="replicaWrapper" style="display:block">
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
@@ -356,7 +353,6 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
-
                                     <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate">
                                         <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
                                         <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
@@ -379,7 +375,6 @@
                             </div>
                         </div>
 
-
                     </div>
                 </div>
             </div>
@@ -401,7 +396,6 @@
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
-
                         </div>
                         <div class="clear"></div>
                     </div>
@@ -747,16 +741,12 @@
                                         <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
                                         <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
-                                    <!--<tr class="child-row-8 subLabelRow" id="Tr1">
-                                        <td class="configLabel">Source </td>
-                                        <td align="right" class="">
-                                            <div id="loadingDrSource" class="loading-small" style="display: none;"></div>
-                                            <span id="drSourceSpan">serverBz</span>
-                                            <input id="txtDrSource" name="txtDrSource" class="exitableTxtDr" value="serverBz" type="text" style="display: none" />
-                                        </td>
-                                        <td>&nbsp;</td>
-                                        <td>&nbsp;</td>
-                                    </tr>-->
+                                    <tr>
+                                        <td class="configLabel">Replicated Tables <span id="replicaSource" style="font-weight:normal"></span></td>
+                                        <td align="right"><a href="javascript:void(0);" id="lstReplicatedTbl" class="replicatedIcon" style="display: block;" title="List Replicated Tables">&nbsp;</a></td>
+                                        <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
+                                        <td><a href="#replicatedTablePopup" id="lstReplicatedTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
+                                    </tr>
                                 </table>
                             </div>
                         </div>
@@ -1163,7 +1153,6 @@
             </div>
         </div>
     </div>
-
     <!--help popup ends-->
     <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
@@ -1557,6 +1546,18 @@
             </div>
         </div>
     </div>
+
+    <div id="replicatedTablePopup" style="display:none">
+        <div class="overlay-title icon-alert">Replicated Tables</div>
+        <div class="overlay-content resizeCon">
+            <div class="repliWrapper">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblReplicated">
+                    <tbody id="replicatedTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
+    </div>
     <!--Add Configuration Popup-->
     <!-- Query error because of Paused Database Popup-->
     <div style="display: none"><a href="#queryDatabasePausedErrorPopup" id="queryDatabasePausedErrorPopupLink">Query Error</a></div>
@@ -1580,7 +1581,7 @@
         </div>
     </div>
     <!-- Query error because of Paused Database Popup-->
-    <a href="#addUserPopup" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
+    <a href="#" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
     <div id="addUserPopup" style="display: none">
         <div id="addUserInnerPopup" data-isupdate="" data-username="" data-role="">
             <div class="overlay-title icon-alert">
