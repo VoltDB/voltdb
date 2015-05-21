@@ -457,7 +457,7 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         callWithExpectedCount(client, 1, "ENG_6131", 123, 2);
     }
-    
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
