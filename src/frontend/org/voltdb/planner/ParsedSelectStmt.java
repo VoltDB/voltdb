@@ -70,7 +70,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
+    // This list contains the core information for aggregation.
+    // It collects aggregate expression, group by expression from display columns,
+    // group by columns, having, order by columns.
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
+    // It represents the group by expression and replace TVE if it's complex group by.
     public Map<String, AbstractExpression> m_groupByExpressions = null;
 
     private ArrayList<ParsedColInfo> m_avgPushdownDisplayColumns = null;
@@ -473,6 +477,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     private void insertAggExpressionsToAggResultColumns (List<AbstractExpression> aggColumns, ParsedColInfo cookedCol) {
         for (AbstractExpression expr: aggColumns) {
+            assert(expr instanceof AggregateExpression);
+            if (! expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+                throw new PlanningErrorException(
+                        "SQL Aggregate with subquery expression is not allowed.");
+            }
+
             ParsedColInfo col = new ParsedColInfo();
             col.expression = (AbstractExpression) expr.clone();
             assert(col.expression instanceof AggregateExpression);
@@ -783,6 +793,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
+
+        // guards against subquery inside of order by clause
+        if (! order_exp.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+            throw new PlanningErrorException(
+                    "ORDER BY clause with subquery expression is not allowed.");
+        }
+
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
@@ -1845,9 +1862,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return exprs;
     }
 
+    /**
+     * This functions tries to find all expression from the statement. For complex group by or complex aggregate,
+     * we have a special function ParsedSelectStmt::placeTVEsinColumns() to replace the expression with TVE for
+     * the convenience of projection node after group by node.
+     *
+     * So use the original expression from the XML of hsqldb, other than the processed information. See ENG-8263.
+     * m_having and m_projectSchema seem to have the same issue in ENG-8263.
+     */
     @Override
-    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
         if (m_having != null) {
             exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
         }
@@ -1861,6 +1886,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 if (col.getExpression() != null) {
                     exprs.addAll(col.getExpression().findAllSubexpressionsOfClass(aeClass));
                 }
+            }
+        }
+
+        // m_having, m_groupByExpressions, m_projectSchema may contain the aggregation or group by expression that have
+        // been replaced with TVEs already. So check out the repository of the original expression in m_aggResultColumns.
+        for (ParsedColInfo col: m_aggResultColumns) {
+            if (col.expression != null) {
+                exprs.addAll(col.expression.findAllSubexpressionsOfClass(aeClass));
             }
         }
         return exprs;
