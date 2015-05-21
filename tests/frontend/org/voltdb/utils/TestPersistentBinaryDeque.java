@@ -174,8 +174,8 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
-    public void testTruncatorWithEmptyBufferReturn() throws Exception {
-        System.out.println("Running testTruncatorWithEmptyBufferReturn");
+    public void testTruncatorWithFullTruncateReturn() throws Exception {
+        System.out.println("Running testTruncatorWithFullTruncateReturn");
         assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
         for (int ii = 0; ii < 150; ii++) {
@@ -220,6 +220,8 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
+        long actualSizeInBytes = 0;
+        long reportedSizeInBytes = m_pbd.sizeInBytes();
         long blocksFound = 0;
         BBContainer cont = null;
         while ((cont = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
@@ -229,6 +231,7 @@ public class TestPersistentBinaryDeque {
                     blocksFound++;//white lie, so we expect the right block contents
                 }
                 assertEquals(buffer.remaining(), 1024 * 1024 * 2);
+                actualSizeInBytes += buffer.remaining();
                 while (buffer.remaining() > 15) {
                     assertEquals(buffer.getLong(), blocksFound);
                     buffer.getLong();
@@ -239,6 +242,7 @@ public class TestPersistentBinaryDeque {
             }
         }
         assertEquals(blocksFound, 96);
+        assertEquals(actualSizeInBytes, reportedSizeInBytes);
     }
 
     @Test
@@ -285,6 +289,8 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
+        long actualSizeInBytes = 0;
+        long reportedSizeInBytes = m_pbd.sizeInBytes();
         long blocksFound = 0;
         BBContainer cont = null;
         while ((cont = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY)) != null) {
@@ -295,6 +301,7 @@ public class TestPersistentBinaryDeque {
                 } else {
                     assertEquals(buffer.remaining(), 1024 * 1024 * 2);
                 }
+                actualSizeInBytes += buffer.remaining();
                 while (buffer.remaining() > 15) {
                     assertEquals(buffer.getLong(), blocksFound);
                     buffer.getLong();
@@ -305,6 +312,7 @@ public class TestPersistentBinaryDeque {
             }
         }
         assertEquals(blocksFound, 96);
+        assertEquals(actualSizeInBytes, reportedSizeInBytes);
     }
 
     @Test
