@@ -439,6 +439,25 @@ public class TestIndexCountSuite extends RegressionSuite {
         callAdHocFilterWithExpectedCount(client,"TU5", "ID = 2 AND POINTS > 0.5", 0);
     }
 
+    public void testENG6131CountDistinctConstant() throws Exception {
+        Client client = getClient();
+        client.callProcedure("TU3.insert", 1, 1, 123);
+        client.callProcedure("TU3.insert", 2, 2, 123);
+        client.callProcedure("TU3.insert", 3, 3, 123);
+        client.callProcedure("TU3.insert", 4, 6, 123);
+        client.callProcedure("TU3.insert", 5, 8, 123);
+        client.callProcedure("TU3.insert", 6, 1, 456);
+        client.callProcedure("TU3.insert", 7, 2, 456);
+        client.callProcedure("TU3.insert", 8, 3, 456);
+        client.callProcedure("TU3.insert", 9, 6, 456);
+        client.callProcedure("TU3.insert", 10, 8, 456);
+
+        client.callProcedure("TU3.insert", 11, null, 123);
+        client.callProcedure("TU3.insert", 12, null, 456);
+
+        callWithExpectedCount(client, 1, "ENG_6131", 123, 2);
+    }
+    
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -481,6 +500,8 @@ public class TestIndexCountSuite extends RegressionSuite {
         project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?");
         project.addStmtProcedure("TM2_GET_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?");
         project.addStmtProcedure("TM2_GET_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
+
+        project.addStmtProcedure("ENG_6131", "SELECT COUNT(DISTINCT 1) FROM TU3 WHERE TEL = ? AND POINTS > ? ");
         boolean success;
 
         /////////////////////////////////////////////////////////////
