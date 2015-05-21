@@ -504,7 +504,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 try {
                     //Get the number of objects and then iterator over them
                     int numObjects = readBuffer.getInt();
-                    int size = readBuffer.getInt();
+                    readBuffer.position(PBDSegment.SIZE_OFFSET + 4);
+                    int sizeInBytes = 0;
+
                     int objectsProcessed = 0;
                     m_usageSpecificLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
                     for (int ii = 0; ii < numObjects; ii++) {
@@ -539,6 +541,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             ByteBuffer retval = truncator.parse(nextObject);
                             if (retval == null) {
                                 //Nothing to do, leave the object alone and move to the next
+                                sizeInBytes += uncompressedLength;
                                 continue;
                             } else {
                                 //If the returned bytebuffer is empty, remove the object and truncate the file
@@ -554,8 +557,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                     } else {
                                         addToNumObjects(-(numObjects - (objectsProcessed - 1)));
                                         //Don't forget to update the number of entries in the file
-                                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
-                                        numObjectsBuffer.putInt(0, ii);
+                                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(8);
+                                        numObjectsBuffer.putInt(ii);
+                                        numObjectsBuffer.putInt(sizeInBytes);
+                                        numObjectsBuffer.flip();
                                         fc.position(0);
                                         while (numObjectsBuffer.hasRemaining()) {
                                             fc.write(numObjectsBuffer);
@@ -570,11 +575,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                     copy.put(retval);
                                     copy.flip();
                                     readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
-                                    readBuffer.putInt(copy.remaining());
+
+                                    int truncatedSizeInBytes = copy.remaining();
+                                    sizeInBytes += truncatedSizeInBytes;
+                                    readBuffer.putInt(truncatedSizeInBytes);
                                     readBuffer.putInt(0);
                                     readBuffer.put(copy);
 
-                                    readBuffer.putInt(0, ii + 1);
+                                    readBuffer.putInt(PBDSegment.COUNT_OFFSET, ii + 1);
+                                    readBuffer.putInt(PBDSegment.SIZE_OFFSET, sizeInBytes);
 
                                     /*
                                      * SHOULD REALLY make a copy of the original and then swap them with renaming
