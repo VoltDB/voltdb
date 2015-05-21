@@ -73,7 +73,7 @@ public interface ImportContext {
      * This is the real handler dont need to call or extend anything
      * @param handler
      */
-    public void setHandler(Object handler);
+    public void setHandler(Object handler) throws Exception;
 
     /**
      * Give a friendly name for the importer.

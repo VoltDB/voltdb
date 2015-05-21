@@ -1118,7 +1118,7 @@ public abstract class CatalogUtil {
             URL u = new URL(importBundleUrl);
             //Make sure we can load stream
             u.openStream();
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             //Not a URL try as a class
             try {
                 CatalogUtil.class.getClassLoader().loadClass(importBundleUrl);

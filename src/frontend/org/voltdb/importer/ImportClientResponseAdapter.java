@@ -52,12 +52,12 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     private class ImportCallback implements Callback {
 
         private DBBPool.BBContainer m_cont;
-        private Long m_id;
+        private long m_id;
         public ImportCallback(final DBBPool.BBContainer cont) {
             m_cont = cont;
         }
 
-        public void setId(Long id) {
+        public void setId(long id) {
             m_id = id;
         }
 
@@ -101,11 +101,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
      */
     public ImportClientResponseAdapter(long connectionId, String name) {
         m_connectionId = connectionId;
-    }
-
-    public void registerCallback(long handle, Callback c) {
-        m_handles.set(handle + 1);//just in case make them not match
-        m_callbacks.put(handle, c);
     }
 
     public long registerCallback(Callback c) {
@@ -168,10 +163,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     @Override
     public void enqueue(ByteBuffer[] b)
     {
-        if (b.length != 1) {
-            throw new RuntimeException("Can't use chained ByteBuffers to enqueue");
+        if (b.length == 1) {
+            enqueue(b[0]);
+        } else {
+            throw new UnsupportedOperationException("Buffer chains not supported in Import invocation adapter");
         }
-        enqueue(b[0]);
     }
 
     @Override

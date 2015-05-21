@@ -40,7 +40,7 @@ public class ImportManager {
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
 
     //Default to OSGI based processor there is also a native processor that will be easy to use for testing.
-    private final String m_loaderClass = System.getProperty("ImportProcessor", "org.voltdb.importer.processors.ImportProcessor");
+    private final String m_loaderClass = System.getProperty("ImportProcessor", "org.voltdb.importer.ImportProcessor");
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
     private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
@@ -98,8 +98,6 @@ public class ImportManager {
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
-        } catch (final ClassNotFoundException e) {
-            VoltDB.crashLocalVoltDB("Import is not supported in Community Edition.", true, e);
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating next import processor", true, e);
         }

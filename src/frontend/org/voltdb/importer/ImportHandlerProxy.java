@@ -78,7 +78,6 @@ public class ImportHandlerProxy implements ImportContext {
         try {
             return (List<Object> )m_decoder.invoke(m_handler, format, data);
         } catch (Exception ex) {
-            ex.printStackTrace();
             return null;
         }
     }
@@ -95,22 +94,17 @@ public class ImportHandlerProxy implements ImportContext {
         try {
             return (Boolean )m_invoker.invoke(m_handler, ic, proc, fieldList);
         } catch (Exception ex) {
-            ex.printStackTrace();
             return false;
         }
     }
 
     @Override
-    public void setHandler(Object handler) {
+    public void setHandler(Object handler) throws Exception {
         m_handler = handler;
-        try {
-            m_invoker = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);
-            m_info_log = m_handler.getClass().getMethod("info", String.class);
-            m_error_log = m_handler.getClass().getMethod("error", String.class);
-            m_decoder = m_handler.getClass().getMethod("decodeParameters", Format.class, String.class);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
+        m_invoker = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);
+        m_info_log = m_handler.getClass().getMethod("info", String.class);
+        m_error_log = m_handler.getClass().getMethod("error", String.class);
+        m_decoder = m_handler.getClass().getMethod("decodeParameters", Format.class, String.class);
     }
 
     @Override
@@ -120,7 +114,6 @@ public class ImportHandlerProxy implements ImportContext {
                 m_info_log.invoke(m_handler, message);
             }
         } catch (Exception ex) {
-            ex.printStackTrace();
         }
     }
     @Override
@@ -130,7 +123,6 @@ public class ImportHandlerProxy implements ImportContext {
                 m_error_log.invoke(m_handler, message);
             }
         } catch (Exception ex) {
-            ex.printStackTrace();
         }
     }
 
