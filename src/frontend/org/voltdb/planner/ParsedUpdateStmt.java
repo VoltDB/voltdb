@@ -18,7 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Column;
@@ -76,8 +76,8 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     }
 
     @Override
-    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
         for (AbstractExpression expr : columns.values()) {
             if (expr != null) {

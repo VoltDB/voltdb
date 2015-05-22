@@ -2169,6 +2169,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C );",
                       "ORDER BY parsed with strange child node type: tablesubquery");
 
+        // Scalar subquery with expression not allowed
+        failToCompile("select A from r1 as parent where C < 100 order by ( select max(D) from r1 where r1.C = parent.C ) * 2;",
+                "ORDER BY clause with subquery expression is not allowed.");
+
     }
 
     /**

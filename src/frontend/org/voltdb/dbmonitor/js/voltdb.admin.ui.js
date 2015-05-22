@@ -81,7 +81,8 @@ function loadAdminPage() {
         clusterReplicationPort: $('#clusterReplicationPort'),
         //ServerList Section
         adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody"),
-        serverSettingHeader: $('#hServerSettings')
+        serverSettingHeader: $('#hServerSettings'),
+        lstReplicatedTables: $('#lstReplicatedTblLink')
 
     };
 
@@ -196,7 +197,7 @@ function loadAdminPage() {
         iconDrReplicaOption: $("#drReplicaIcon"),
         txtDrReplica: $("#txtDrReplica"),
         labelReplicaSource: $("#replicaSource"),
-      };
+    };
 
     var adminValidationRules = {
         numericRules: {
@@ -1558,6 +1559,26 @@ function loadAdminPage() {
         adminDOMObjects.addConfigLink.trigger("click");
     });
 
+    $("#lstReplicatedTbl").on("click", function () {
+        adminDOMObjects.lstReplicatedTables.trigger("click");
+    });
+
+    $("#lstReplicatedTblLink").popup({
+        open: function (event, ui, ele) {
+            var content = '';
+            for (var i = 0; i <= voltDbRenderer.replicatedTablesArray.length - 1; i++) {
+                content = content + "<tr><td>" + voltDbRenderer.replicatedTablesArray[i] + "</td></tr>";
+            }
+            $("#replicatedTableBody").html(content);
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $(".closeBtn").on("click", function () {
+                //Close the popup
+                popup.close();
+            });
+        }
+    });
     var editId = -1;
     $("#addConfigPopupLink").popup({
         open: function (event, ui, ele) {
@@ -2946,3 +2967,10 @@ var formatDisplayName = function (displayName) {
     displayName = displayName.toLowerCase();
     return displayName.charAt(0).toUpperCase() + displayName.slice(1);
 };
+
+
+
+
+
+
+

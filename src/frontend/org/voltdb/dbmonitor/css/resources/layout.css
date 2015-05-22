@@ -2021,7 +2021,7 @@ ul.helpSchemaList {
 .arrow,
 .labelCollapsed,
 .labelExpanded,
-a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd {
+a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd, .replicatedIcon {
     background-image: url(images/admin-icons.png);
 }
 
@@ -3046,7 +3046,15 @@ a.restoreBtn {
 }
 
 .plusAdd {
-    background-position: -418px -61px;
+    background-position: -411px -61px;
+    width: 31px;
+    height: 17px;
+    display: inline-block;
+    position: relative;
+    top: 8px;
+}
+.replicatedIcon {
+    background-position: -438px -61px;
     width: 31px;
     height: 17px;
     display: inline-block;
@@ -3074,6 +3082,8 @@ a.restoreBtn {
 }
 
 /****Export details Ends*******/
+table.tblReplicated { border: 1px solid #CCCCCC;}
+.repliWrapper { height: 150px;overflow: auto;}
 
 /****DR *******/
 .drWrapper {
