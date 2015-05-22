@@ -1143,9 +1143,10 @@ function alertNodeClicked(obj) {
                     schemaCatalogTableTypes[tableName] = {};
                     schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
                     schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                    if (entry[remarksIndex] != null)
+                    if (entry[remarksIndex] != null) {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
-                    else {
+                        schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
+                    } else {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
                     }
                 }
@@ -1639,11 +1640,11 @@ function alertNodeClicked(obj) {
                 if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
 
                 voltDbRenderer.replicatedTablesArray = [];
+
                 $.each(lTableData, function (id, val) {
-                    if (val['TABLE_TYPE'] == "REPLICATED") {
+                    if (val['drEnabled'] == "true") {
                         voltDbRenderer.replicatedTablesArray.push(val['TABLE_NAME']);
                     }
-                    //console.log(JSON.stringify(replicatedTablesArray));
                     if (lTableData)
                         if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
                             if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
@@ -2914,7 +2915,8 @@ function alertNodeClicked(obj) {
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
                                 "AVG_ROWS": getAverage(tupleCountPartitions),
                                 "TUPLE_COUNT": schemaCatalogTableTypes[key].REMARKS == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
-                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS
+                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS,
+                                "drEnabled": schemaCatalogTableTypes[key].drEnabled
                             };
 
                         });
