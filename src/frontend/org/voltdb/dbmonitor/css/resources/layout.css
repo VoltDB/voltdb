@@ -2842,6 +2842,7 @@ a.restoreBtn {
     border-radius: 0;
     border: none;
 }
+.configCustom { padding: 0 0 0 5px;}
 
 /****Export details*******/
 .btnEd {
@@ -3886,9 +3887,10 @@ a:hover.changePsd {
         width: 80%;
     }
 
-    .configWrapper {
+   /* .configWrapper {
         width: 380px;
-    }
+    }*/
+    .popup_cont {width: 380px;}
 }
 
 @media (width: 768px) {
