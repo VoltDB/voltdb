@@ -256,7 +256,7 @@ public class TestPlansCount extends PlannerTestCase {
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue((p instanceof IndexCountPlanNode) == false);
 
-        pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000");
+        pn = compileToFragments("SELECT count(1) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000");
         p = pn.get(0).getChild(0);
         assertTrue((p instanceof IndexCountPlanNode) == false);
     }
