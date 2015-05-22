@@ -491,5 +491,6 @@ public class TestPlansCount extends PlannerTestCase {
             assertTrue(p instanceof IndexCountPlanNode);
         else
             assertTrue((p instanceof IndexCountPlanNode) == false);
+
     }
 }
