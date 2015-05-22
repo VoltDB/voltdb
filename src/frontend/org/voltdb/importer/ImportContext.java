@@ -17,7 +17,6 @@
 
 package org.voltdb.importer;
 
-import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
@@ -28,9 +27,6 @@ import java.util.Set;
 
 public interface ImportContext {
 
-    public enum Format {
-        CSV
-    }
     /**
      * This is called to configure properties. Just save or configure anything you want here.
      * The readyForData() will be called to actually start processing the data.
@@ -54,14 +50,6 @@ public interface ImportContext {
      * @return true if successfully accepted the work.
      */
     public boolean callProcedure(ImportContext ic, String procName, Object... fieldList);
-
-    /**
-     * Convert passed string to params for procedure based on format.
-     * @param format
-     * @param data
-     * @return array ob objects to pass to callProcedure.
-     */
-    public List<Object> decodeParameters(Format format, String data);
 
     /**
      * Returns max time in nanoseconds a call to callProcedure waits in backpressure.

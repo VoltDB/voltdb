@@ -34,7 +34,6 @@ import org.voltdb.importer.ImportContext;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.util.ArrayList;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.importer.ImportContext.Format;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -118,24 +117,6 @@ public class ImportHandler {
 
     private BBContainer getBuffer(int sz) {
         return DBBPool.allocateDirect(sz);
-    }
-
-    /**
-     * Handle decoding of params passed in data based on format specified.
-     * @param format currently CSV supported
-     * @param data data to decode.
-     * @return list of objects to be passed to the callProcedure.
-     * @throws IOException
-     */
-    public static List<Object> decodeParameters(Format format, String data) throws IOException {
-        switch (format) {
-            case CSV:
-                return m_csvParser.parseLineList(data);
-            default:
-                List<Object> list = new ArrayList<Object>();
-                list.add(data);
-                return list;
-        }
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {

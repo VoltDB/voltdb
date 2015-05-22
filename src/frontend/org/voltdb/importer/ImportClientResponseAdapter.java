@@ -148,8 +148,7 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
             b.position(4);
             resp.initFromBuffer(b);
 
-            Callback callback = null;
-            callback = m_callbacks.remove(resp.getClientHandle());
+            Callback callback = m_callbacks.remove(resp.getClientHandle());
             if (callback != null) {
                 callback.handleResponse(resp);
             }

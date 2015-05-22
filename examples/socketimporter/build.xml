@@ -47,8 +47,13 @@
     <target name="jar" depends="compile">
         <mkdir dir="${jar.dir}"/>
         <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
+            <zipgroupfileset dir="${basedir}/../../voltdb">
+                <filename name="voltdb-**.jar" />
+                <include name="**/*.class" />
+                <include name="org/voltdb/importclient/SocketStreamImporter.class"/>
+            </zipgroupfileset>
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.osgi.socketstream.SocketStreamImporter" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.SocketStreamImporter" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="SocketStream OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="SocketStreamImporter" />

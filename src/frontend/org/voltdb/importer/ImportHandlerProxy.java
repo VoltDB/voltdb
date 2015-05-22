@@ -18,7 +18,6 @@
 package org.voltdb.importer;
 
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -35,7 +34,6 @@ public class ImportHandlerProxy implements ImportContext {
     private Method m_invoker;
     private Method m_info_log;
     private Method m_error_log;
-    private Method m_decoder;
 
     /**
      * These must be implemented in tghe bundle even if you are not using any properties.
@@ -69,20 +67,6 @@ public class ImportHandlerProxy implements ImportContext {
     }
 
     /**
-     * Convert passed string to params for procedure based on format.
-     * @param format
-     * @param data
-     * @return array ob objects to pass to callProcedure.
-     */
-    public List<Object> decodeParameters(Format format, String data) {
-        try {
-            return (List<Object> )m_decoder.invoke(m_handler, format, data);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    /**
      * This calls real handler using reflection.
      * @param ic
      * @param proc
@@ -104,7 +88,6 @@ public class ImportHandlerProxy implements ImportContext {
         m_invoker = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);
         m_info_log = m_handler.getClass().getMethod("info", String.class);
         m_error_log = m_handler.getClass().getMethod("error", String.class);
-        m_decoder = m_handler.getClass().getMethod("decodeParameters", Format.class, String.class);
     }
 
     @Override
