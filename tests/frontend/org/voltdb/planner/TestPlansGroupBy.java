@@ -60,7 +60,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkSimpleTableInlineAgg("SELECT SUM(A1) from T1");
         checkSimpleTableInlineAgg("SELECT MIN(A1) from T1");
         checkSimpleTableInlineAgg("SELECT MAX(A1) from T1");
-        checkSimpleTableInlineAgg("SELECT COUNT(A1) from T1");
+        // This test case will be tested in ENG-6131
+//        checkSimpleTableInlineAgg("SELECT COUNT(A1) from T1");
 
         checkSimpleTableInlineAgg("SELECT SUM(A1), COUNT(A1) from T1");
 
