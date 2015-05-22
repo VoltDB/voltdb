@@ -126,6 +126,8 @@ public class PartitionDRGateway {
         cont.discard();
     }
 
+    public void uniqueIdDurable(long uniqueId) {}
+
     private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
         @Override
         protected AtomicLong initialValue() {

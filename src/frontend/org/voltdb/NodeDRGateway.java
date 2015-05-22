@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import java.io.IOException;
 import java.util.Map;
 
 public interface NodeDRGateway {
@@ -36,15 +35,6 @@ public interface NodeDRGateway {
      * @return true if bindPorts has been called.
      */
     public abstract boolean isStarted();
-
-    /**
-     * Called by an EE to make the buffer server is aware it's going to be
-     * handling buffers from a specific partition.
-     * Call this at startup before sending buffers.
-     * @param partitionId id of the initializing partition.
-     * @throws IOException
-     */
-    public abstract void initForSite(int partitionId) throws IOException;
 
     /**
      * @param ib This is really the invocation buffer

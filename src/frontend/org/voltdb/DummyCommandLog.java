@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -49,7 +50,7 @@ public class DummyCommandLog implements CommandLog {
             long spHandle,
             int[] involvedPartitions,
             DurabilityListener l,
-            Object handle) {
+            TransactionTask handle) {
         return Futures.immediateFuture(null);
     }
 
@@ -70,5 +71,14 @@ public class DummyCommandLog implements CommandLog {
     {
         // Don't perform truncation snapshot if Command Logging is disabled
         return;
+    }
+
+    @Override
+    public boolean isSynchronous() {
+        return false;
+    }
+
+    @Override
+    public void registerDurabilityListener(DurabilityListener durabilityListener) {
     }
 }
