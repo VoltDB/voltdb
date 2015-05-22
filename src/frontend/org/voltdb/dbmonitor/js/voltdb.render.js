@@ -1645,6 +1645,7 @@ function alertNodeClicked(obj) {
                     if (val['drEnabled'] == "true") {
                         voltDbRenderer.replicatedTablesArray.push(val['TABLE_NAME']);
                     }
+
                     if (lTableData)
                         if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
                             if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
