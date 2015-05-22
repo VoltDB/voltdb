@@ -16,10 +16,10 @@
  */
 package org.voltdb;
 
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -68,7 +68,7 @@ public interface CommandLog {
             long spHandle,
             int[] involvedPartitions,
             DurabilityListener listener,
-            Object durabilityHandle);
+            TransactionTask durabilityHandle);
 
     public abstract void shutdown() throws InterruptedException;
 
@@ -79,7 +79,11 @@ public interface CommandLog {
             int partitionId, long spHandle);
 
     public interface DurabilityListener {
-        public void onDurability(ArrayList<Object> durableThings);
+        public void createFirstCompletionCheck(boolean isSyncLogging, boolean haveMpGateway);
+        public void onDurability();
+        public void addTransaction(TransactionTask pendingTask);
+        public int getNumberOfTasks();
+        public void startNewTaskList(int nextMaxRowCnt);
     }
 
     /**
@@ -98,4 +102,14 @@ public interface CommandLog {
      * Implementation should populate the stats based on column name to index mapping
      */
     public void populateCommandLogStats(Map<String, Integer> columnNameToIndex, Object[] rowValues);
+
+    /**
+     * Does this logger do synchronous logging
+     */
+    public abstract boolean isSynchronous();
+
+    /**
+     * Assign DurabilityListener from each SpScheduler to commmand log
+     */
+    public abstract void registerDurabilityListener(DurabilityListener durabilityListener);
 }

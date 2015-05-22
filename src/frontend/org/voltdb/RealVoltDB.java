@@ -2631,7 +2631,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private void prepareReplication() {
         try {
             if (m_producerDRGateway != null) {
-                m_producerDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled(),
+                m_producerDRGateway.initialize(m_catalogContext.cluster.getDrproducerenabled(),
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
                         VoltDB.getDefaultReplicationInterface());
             }
