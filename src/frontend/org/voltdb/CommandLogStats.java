@@ -44,9 +44,9 @@ public class CommandLogStats extends StatsSource {
         super.populateColumnSchema(columns);
         columns.add(new VoltTable.ColumnInfo(StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo(StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo(StatName.LOANED_SEGMENT_COUNT.name(), VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo(StatName.SEGMENT_COUNT.name(), VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo(StatName.FSYNC_INTERVAL.name(), VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo(StatName.LOANED_SEGMENT_COUNT.name(), VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo(StatName.SEGMENT_COUNT.name(), VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo(StatName.FSYNC_INTERVAL.name(), VoltType.INTEGER));
     }
 
     @Override

@@ -38,6 +38,7 @@ import org.HdrHistogram_voltpatches.Histogram;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.BackendTarget;
+import org.voltdb.CommandLogStats;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -57,6 +58,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     private final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
     private final static boolean hasLocalServer = false;
     private static StringBuilder m_recentAnalysis = null;
+    private final static int FSYNC_INTERVAL_GOLD = 30;
+    private final static double FSYNC_TOLERENCE_PERCENT = 0.05;
 
     private static final Class<?>[] PROCEDURES =
     {
@@ -177,6 +180,72 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Remove the MPI in case it's in there
         partsSeen.remove(MpInitiator.MP_INIT_PID);
         assertEquals(PARTITIONS, partsSeen.size());
+    }
+
+    public void testCommandLogStats() throws Exception {
+        System.out.println("\n\nTESTING COMMANDLOG STATS\n\n\n");
+
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema = new ColumnInfo[8];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT);
+        expectedSchema[4] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT);
+        expectedSchema[5] = new ColumnInfo(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name(), VoltType.INTEGER);
+        expectedSchema[6] = new ColumnInfo(CommandLogStats.StatName.SEGMENT_COUNT.name(), VoltType.INTEGER);
+        expectedSchema[7] = new ColumnInfo(CommandLogStats.StatName.FSYNC_INTERVAL.name(), VoltType.INTEGER);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        VoltTable[] results = null;
+
+        // Test the schema
+        Thread.sleep(1000);
+        results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
+        System.out.println("Node commandlog statistics table: " + results[0].toString());
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+        results[0].advanceRow();
+        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+
+        // Enough for community version
+        /*
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+        */
+        System.out.println(MiscUtils.isPro());
+
+        // Inject some transactions
+        for (int i = 0; i < 3; i++) {
+            long start = System.currentTimeMillis();
+            for (int j = 0; j < 100; j++) {
+                results = client.callProcedure("NEW_ORDER.insert", i * 100 + j).getResults();
+            }
+            long end = System.currentTimeMillis();
+            System.out.println("Insertion took " + (end - start) + " ms");
+            if (end - start < FSYNC_INTERVAL_GOLD) {
+                System.out.println("Insertion took " + (end - start) + " ms, sleeping..");
+                Thread.sleep(FSYNC_INTERVAL_GOLD - (end - start));
+            }
+
+            // Issue commandlog stats query
+            results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
+            System.out.println("commandlog statistics: " + results[0].toString());
+            results[0].advanceRow();
+
+            // Test fsync interval
+            int actualFsyncInterval = (int) results[0].getLong(CommandLogStats.StatName.FSYNC_INTERVAL.name());
+            int fsyncNoise = Math.abs(actualFsyncInterval - FSYNC_INTERVAL_GOLD);
+
+            System.out.println("Actual fsync interval is " + actualFsyncInterval + "ms, specified interval is " + FSYNC_INTERVAL_GOLD + "ms");
+            String message = "Abnormal fsync interval: " + actualFsyncInterval + "ms (specified interval is "
+                    + FSYNC_INTERVAL_GOLD + "ms)";
+            assertTrue(message, fsyncNoise < FSYNC_TOLERENCE_PERCENT * FSYNC_INTERVAL_GOLD);
+        }
+
+        // TODO Test segment counts & outstanding counts
     }
 
     public void testInvalidCalls() throws Exception {
@@ -1202,6 +1271,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
+
+        project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
+        System.getProperties().put("LOG_SEGMENT_SIZE", "1");
 
         /*
          * Create a cluster configuration.
