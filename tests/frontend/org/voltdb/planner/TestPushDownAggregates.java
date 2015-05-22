@@ -30,6 +30,7 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -383,7 +384,13 @@ public class TestPushDownAggregates extends PlannerTestCase {
         if (isAggInlined) {
             assertTrue(p instanceof AbstractScanPlanNode);
             assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
-                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null ||
+                    // If it's table count, it won't have inline plan node.
+                    // See ENG-6131
+                    p instanceof TableCountPlanNode);
+            if(p instanceof TableCountPlanNode) {
+                return;
+            }
 
             if (p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
                 p  = p.getInlinePlanNode(PlanNodeType.AGGREGATE);
