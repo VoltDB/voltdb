@@ -453,17 +453,17 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     " group by dept " +
                     " having max(wage) in (select wage from R1) order by dept desc";
             // Uncomment these tests when ENG-8306 is finished
-//            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-//            /* enable for debug */ System.out.println(vt);
-//            validateTableOfLongs(vt, new long[][] {{2} ,{1}});
+            //            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            //            /* enable for debug */ System.out.println(vt);
+            //            validateTableOfLongs(vt, new long[][] {{2} ,{1}});
             verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
 
             sql = "select dept from " + tb + " group by dept " +
                     " having max(wage) + 1 - 1 in (select wage from R1) order by dept desc";
             // Uncomment these tests when ENG-8306 is finished
-//            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-//            validateTableOfLongs(vt, new long[][] {{2}, {1} });
+            //            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            //            validateTableOfLongs(vt, new long[][] {{2}, {1} });
             verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
             // subquery with having
@@ -578,8 +578,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // Outer result is NULL. The expression is NULL
         if (!isHSQL()) {
             vt = client.callProcedure("@AdHoc",
-                "select ID from R1 where ((WAGE, DEPT) = " +
-                "( select WAGE, DEPT from R2 where ID = 102)) is NULL;").getResults()[0];
+                    "select ID from R1 where ((WAGE, DEPT) = " +
+                    "( select WAGE, DEPT from R2 where ID = 102)) is NULL;").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{101}});
         }
 
@@ -703,8 +703,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // HSQL gets it wrong
         if (!isHSQL()) {
             vt = client.callProcedure("@AdHoc",
-                "select ID from R1 where R1.WAGE NOT IN " +
-                "(select WAGE from R2 where ID < 104 order by WAGE desc limit 1 offset 1);").getResults()[0];
+                    "select ID from R1 where R1.WAGE NOT IN " +
+                    "(select WAGE from R2 where ID < 104 order by WAGE desc limit 1 offset 1);").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{100}});
         }
 
@@ -901,7 +901,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
             // I think HSQL gets this one wrong evaluating the =ALL to NULL instead of FALSE.
             // PostgreSQL agrees with us
             vt = client.callProcedure("@AdHoc",
-                "select ID from R1 where not (WAGE = ALL ( select WAGE from R2));").getResults()[0];
+                    "select ID from R1 where not (WAGE = ALL ( select WAGE from R2));").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{100}});
         }
     }
@@ -951,8 +951,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
             // I think HSQL gets this one wrong evaluating the =ALL to FALSE instead of NULL.
             // PostgreSQL agrees with us
             vt = client.callProcedure("@AdHoc",
-                "select ID from R2 where ID = 200 and ((ID,WAGE) =ALL " +
-                "( select ID, WAGE from R1)) is  null ;").getResults()[0];
+                    "select ID from R2 where ID = 200 and ((ID,WAGE) =ALL " +
+                    "( select ID, WAGE from R1)) is  null ;").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{200}});
         }
     }
@@ -1039,12 +1039,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
         if (!isHSQL()) {
             vt = client.callProcedure("@AdHoc",
                     "select R1.DEPT, count(*), (SELECT max(dept) FROM R2 where R2.wage = R1.wage) FROM R1 "
-                    + " GROUP BY dept, wage order by dept, wage;").getResults()[0];
+                            + " GROUP BY dept, wage order by dept, wage;").getResults()[0];
             validateTableOfLongs(vt, new long[][] {  {1,1,2}, {1,1,1}, {1,1,1}, {2, 1, 2}, {2, 2, 2}, {2,1,2} });
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.DEPT, count(*), (SELECT sum(dept) FROM R2 where R2.wage > r1.dept * 10) FROM R1 "
-                    + " GROUP BY dept order by dept;").getResults()[0];
+                            + " GROUP BY dept order by dept;").getResults()[0];
             validateTableOfLongs(vt, new long[][] {  {1,3,8}, {2, 4, 7} });
         }
 
@@ -1327,24 +1327,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
         String sql;
         sql = "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
                 "(select R2.ID from R2 where R2.ID = ?);";
-     // Uncomment these tests when ENG-8306 is finished
-//        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
-//        validateTableOfLongs(vt, new long[][] { {5} });
+        // Uncomment these tests when ENG-8306 is finished
+        //        vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
+        //        validateTableOfLongs(vt, new long[][] { {5} });
         verifyAdHocFails(client, TestPlansInExistsSubQueries.HavingErrorMsg, sql, 2);
 
         // Having correlated -- parent TVE in the aggregated child expression
         sql = "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = "
                 + "(select R2.ID from R2 where R2.ID = R1.DEPT);";
         // Uncomment these tests when ENG-8306 is finished
-//        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-//        validateTableOfScalarLongs(vt, new long[]{5});
+        //        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        //        validateTableOfScalarLongs(vt, new long[]{5});
         verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
         sql = "select DEPT, max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
                 "(select R2.ID from R2 where R2.ID = R1.DEPT);";
         // Uncomment these tests when ENG-8306 is finished
-//        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-//        validateTableOfLongs(vt, new long[][] { {2,5} });
+        //        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        //        validateTableOfLongs(vt, new long[][] { {2,5} });
         verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
         try {
@@ -1458,52 +1458,52 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 new long[] {35});
     }
 
-  public void testSubqueryWithExceptions() throws Exception
-  {
-      Client client = getClient();
-      client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
-      client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
-      client.callProcedure("R1.insert", 3,  15,  2 , "2013-08-18 02:00:00.123457");
-      client.callProcedure("R1.insert", 4,  0,  2 , "2013-08-18 02:00:00.123457");
+    public void testSubqueryWithExceptions() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
+        client.callProcedure("R1.insert", 3,  15,  2 , "2013-08-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 4,  0,  2 , "2013-08-18 02:00:00.123457");
 
-      // A divide by zero execption in the top-level query!
-      // Debug assertions in the EE will make this test fail
-      // if we don't to clean up temp tables for both inner and outer queries.
-      String expectedMsg = isHSQL() ? "division by zero" : "Attempted to divide 30 by 0";
-      verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
-      verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
+        // A divide by zero execption in the top-level query!
+        // Debug assertions in the EE will make this test fail
+        // if we don't to clean up temp tables for both inner and outer queries.
+        String expectedMsg = isHSQL() ? "division by zero" : "Attempted to divide 30 by 0";
+        verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
+        verifyStmtFails(client, "select (select max(30 / wage) from r1 where wage != 0) from r1 where id = 30 / wage;", expectedMsg);
 
-      // As above, but this time the execption occurs in the inner query.
-      verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
-      verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
-  }
+        // As above, but this time the execption occurs in the inner query.
+        verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
+        verifyStmtFails(client, "select (select max(30 / wage) from r1) from r1;", expectedMsg);
+    }
 
-  public void testSubqueriesWithArithmetic() throws Exception {
-      Client client = getClient();
+    public void testSubqueriesWithArithmetic() throws Exception {
+        Client client = getClient();
 
-      client.callProcedure("R1.insert", 1, 300,  1 , "2013-06-18 02:00:00.123457");
-      client.callProcedure("R1.insert", 2, 200,  1 , "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 1, 300,  1 , "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2, 200,  1 , "2013-06-18 02:00:00.123457");
 
-      // These test cases exercise the fix for ENG-8226, in which a missing ScalarValueExpression
-      // caused the result of a subquery to be seen as the subquery ID, rather than the contents
-      // of subquery's result table.
+        // These test cases exercise the fix for ENG-8226, in which a missing ScalarValueExpression
+        // caused the result of a subquery to be seen as the subquery ID, rather than the contents
+        // of subquery's result table.
 
-      validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r1",
-              new long[] {300, 300});
-      validateTableOfScalarLongs(client, "select (select max(wage) from r1) + 0 as subq from r1",
-              new long[] {300, 300});
+        validateTableOfScalarLongs(client, "select (select max(wage) from r1) from r1",
+                new long[] {300, 300});
+        validateTableOfScalarLongs(client, "select (select max(wage) from r1) + 0 as subq from r1",
+                new long[] {300, 300});
 
-      validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) from r1)", new long[] {300});
-      validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) - 30 from r1) + 30", new long[] {300});
+        validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) from r1)", new long[] {300});
+        validateTableOfScalarLongs(client, "select wage from r1 where wage = (select max(wage) - 30 from r1) + 30", new long[] {300});
 
-      // The IN operator takes a VectorExpression on its RHS, which uses the "args" field.
-      // Make sure that we can handle subqueries in there too.
-      validateTableOfScalarLongs(client,
-              "select wage from r1 "
-              + "where wage in (7, 8, (select max(wage) from r1), 9, 10, 200) "
-              + "order by wage",
-              new long[] {200, 300});
-  }
+        // The IN operator takes a VectorExpression on its RHS, which uses the "args" field.
+        // Make sure that we can handle subqueries in there too.
+        validateTableOfScalarLongs(client,
+                "select wage from r1 "
+                        + "where wage in (7, 8, (select max(wage) from r1), 9, 10, 200) "
+                        + "order by wage",
+                        new long[] {200, 300});
+    }
 
     public void testExistsSimplification() throws NoConnectionsException, IOException, ProcCallException
     {
@@ -1517,41 +1517,39 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // EXISTS(table-agg-without-having-groupby) => EXISTS(TRUE)
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select max(ID) from R2)").getResults()[0];
+                "select R1.ID FROM R1 where exists( select max(ID) from R2 order by ID;)").getResults()[0];
         validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
 
         // EXISTS(SELECT...LIMIT 0) => EXISTS(FALSE)
         if (!isHSQL()) {
             vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select max(id) from R2 limit 0)").getResults()[0];
+                    "select R1.ID FROM R1 where exists( select max(id) from R2 limit 0)").getResults()[0];
             validateTableOfLongs(vt, new long[][] { });
-        }
 
-        // count(*) limit 0
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where exists( select count(*) from R2 limit 0)").getResults()[0];
-//        validateTableOfLongs(vt, new long[][] { });
-
-        // EXISTS(SELECT...LIMIT ?) => EXISTS(TRUE/FALSE)
-        if (!isHSQL()) {
+            // count(*) limit 0
             vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select count(id) from R2 limit ?)", 0).getResults()[0];
+                    "select R1.ID FROM R1 where exists( select count(*) from R2 limit 0)").getResults()[0];
+            validateTableOfLongs(vt, new long[][] { });
+
+            // EXISTS(SELECT...LIMIT ?) => EXISTS(TRUE/FALSE)
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where exists( select count(id) from R2 limit ?)", 0).getResults()[0];
             validateTableOfLongs(vt, new long[][] { });
         }
 
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select count(*) from R2 limit ?)", 1).getResults()[0];
+                "select R1.ID FROM R1 where exists( select count(*) from R2 limit ?) order by id;", 1).getResults()[0];
         validateTableOfLongs(vt, new long[][] {  {1}, {2}, {3} });
 
         // EXISTS(able-agg-without-having-groupby OFFSET 1) => EXISTS(FALSE)
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select max(ID) from R2 offset 1)").getResults()[0];
+                "select R1.ID FROM R1 where exists( select max(ID) from R2 offset 1;)").getResults()[0];
         validateTableOfLongs(vt, new long[][] {  });
 
         // count(*) offset 1
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where exists( select count(*) from R2 offset 1)").getResults()[0];
-//        validateTableOfLongs(vt, new long[][] {  });
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select count(*) from R2 offset 1)").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  });
 
         // join on EXISTS(FALSE)
         vt = client.callProcedure("@AdHoc",
@@ -1577,44 +1575,45 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("R2.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
         client.callProcedure("R2.insert", 3,  10,  2 , "2013-08-18 02:00:00.123457");
 
-      // EXISTS(SELECT ... OFFSET ?)
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID FROM R1 where exists( select ID from R2 offset ?)", 4).getResults()[0];
-      validateTableOfLongs(vt, new long[][] {  });
+        // EXISTS(SELECT ... OFFSET ?)
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select ID from R2 offset ?)", 4).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  });
 
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID FROM R1 where exists( select ID from R2 offset ?)", 1).getResults()[0];
-      validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where exists( select ID from R2 offset ?) order by id;", 1).getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
 
-      // Subquery subquery-without-having with group by and no limit => select .. from r2 limit 1
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID from R1 where exists (select WAGE from R2 group by WAGE )").getResults()[0];
-      validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
+        // Subquery subquery-without-having with group by and no limit => select .. from r2 limit 1
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 where exists (select WAGE from R2 group by WAGE ) order by id;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
 
-      // Subquery subquery-without-having with group by and offset => select .. from r2 group by offset
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID from R1 where exists (select WAGE from R2 group by WAGE offset 2)").getResults()[0];
-      validateTableOfLongs(vt, new long[][] {  });
+        // Subquery subquery-without-having with group by and offset => select .. from r2 group by offset
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 where exists (select WAGE from R2 group by WAGE offset 2)").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {  });
 
-      // Subquery subquery-without-having with group by => select .. from r2 limit 1
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID)").getResults()[0];
-      validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
+        // Subquery subquery-without-having with group by => select .. from r2 limit 1
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID) order by id;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
 
-      // Subquery subquery-with-having with group by => select .. from r2 group by having limit 1
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID having MAX(WAGE) > 20)").getResults()[0];
-      validateTableOfLongs(vt, new long[][] { });
+        // Subquery subquery-with-having with group by => select .. from r2 group by having limit 1
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID having MAX(WAGE) > 20)").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { });
 
-      // Subquery subquery-with-having with group by => select .. from r2 group by having limit 1
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID having MAX(WAGE) > 9)").getResults()[0];
-      validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
+        // Subquery subquery-with-having with group by => select .. from r2 group by having limit 1
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID having MAX(WAGE) > 9) "
+                + "order by id;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
 
-      // Subquery subquery-with-having with group by offset => select .. from r2 group by having limit 1 offset
-      vt = client.callProcedure("@AdHoc",
-              "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID having MAX(WAGE) > 9 offset 2)").getResults()[0];
-      validateTableOfLongs(vt, new long[][] { });
+        // Subquery subquery-with-having with group by offset => select .. from r2 group by having limit 1 offset
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID from R1 where exists (select ID, MAX(WAGE) from R2 group by ID having MAX(WAGE) > 9 offset 2)").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { });
 
     }
 
@@ -1625,11 +1624,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER, " +
-                "DEPT INTEGER, " +
-                "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                        "ID INTEGER DEFAULT 0 NOT NULL, " +
+                        "WAGE INTEGER, " +
+                        "DEPT INTEGER, " +
+                        "TM TIMESTAMP DEFAULT NULL, " +
+                        "PRIMARY KEY (ID) );" +
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +

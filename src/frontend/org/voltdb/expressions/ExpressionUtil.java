@@ -627,6 +627,8 @@ public abstract class ExpressionUtil {
                 leftExpr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, l, r);
                 return evaluateExpression(leftExpr);
             }
+            // NOT (expr1 AND expr2) => (NOT expr1) || (NOT expr2)
+            // The above case is probably not interesting to do for short circuit purpose
         }
         return expr;
     }

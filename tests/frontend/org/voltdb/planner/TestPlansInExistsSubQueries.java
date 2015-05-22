@@ -430,21 +430,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         assertTrue(sn instanceof SeqScanPlanNode);
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(sn);
         assertNotNull(aggNode.getPostPredicate());
-
-//        //* enable to debug */ System.out.println(sn.toExplainPlanString());
-//////        assertTrue(sn instanceof ProjectionPlanNode);
-//////        sn = sn.getChild(0);
-//////TODO: This ORDER BY serves no purpose?
-//        assertTrue(sn instanceof SeqScanPlanNode);
-//        assertNotNull(sn.getInlinePlanNode(PlanNodeType.AGGREGATE));
-//        sn = sn.getChild(0);
-//////TODO: This PROJECTION (not even inline) serves no purpose?
-//        assertTrue(sn instanceof ProjectionPlanNode);
-//        sn = sn.getChild(0);
-//        assertTrue(sn instanceof SeqScanPlanNode);
-//
-//        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(sn);
-//        assertNotNull(aggNode.getPostPredicate());
     }
     public static String HavingErrorMsg = "SQL HAVING with subquery expression is not allowed.";
 

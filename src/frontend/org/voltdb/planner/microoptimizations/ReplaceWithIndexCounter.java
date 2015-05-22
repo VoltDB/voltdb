@@ -28,9 +28,11 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.PlanNodeType;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
@@ -93,6 +95,12 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
                     return plan;
                 }
             }
+
+            if (hasInlineLimit(aggplan)) {
+                // table count EE executor does not handle inline limit stuff
+                return plan;
+            }
+
             return new TableCountPlanNode((AbstractScanPlanNode)child, aggplan);
         }
 
@@ -119,6 +127,11 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             // This can only happen when a confused query like
             // "select count(*) from table order by index_key;"
             // meets a naive planner that doesn't just cull the no-op ORDER BY. Who, us?
+
+            if (hasInlineLimit(aggplan)) {
+                return plan;
+            }
+
             return new TableCountPlanNode(isp, aggplan);
         }
 
@@ -140,5 +153,19 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             return plan;
         }
         return countingPlan;
+    }
+
+    public static boolean hasInlineLimit (AbstractPlanNode node) {
+        AbstractPlanNode inlineNode = node.getInlinePlanNode(PlanNodeType.LIMIT);
+        if (inlineNode != null) {
+            assert(inlineNode instanceof LimitPlanNode);
+
+            // Table count with limit greater than 0 will not make a difference.
+            // The better way is to check m_limit and return true ONLY for m_limit == 0.
+            // However, the parameterized plan make is more complicated.
+            // Be conservative about the silly query without wrong answers now.
+            return true;
+        }
+        return false;
     }
 }
