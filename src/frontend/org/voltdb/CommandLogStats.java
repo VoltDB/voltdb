@@ -28,7 +28,10 @@ public class CommandLogStats extends StatsSource {
 
     public enum StatName {
         OUTSTANDING_BYTES,
-        OUTSTANDING_TXNS
+        OUTSTANDING_TXNS,
+        LOANED_SEGMENT_NUM,
+        SEGMENT_NUM,
+        FSYNC_INTERVAL
     };
 
     public CommandLogStats(CommandLog commandLog) {
@@ -41,6 +44,9 @@ public class CommandLogStats extends StatsSource {
         super.populateColumnSchema(columns);
         columns.add(new VoltTable.ColumnInfo(StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo(StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo(StatName.LOANED_SEGMENT_NUM.name(), VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo(StatName.SEGMENT_NUM.name(), VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo(StatName.FSYNC_INTERVAL.name(), VoltType.BIGINT));
     }
 
     @Override
