@@ -59,7 +59,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     private final static boolean hasLocalServer = false;
     private static StringBuilder m_recentAnalysis = null;
     private final static int FSYNC_INTERVAL_GOLD = 30;
-    private final static double FSYNC_TOLERENCE_PERCENT = 0.05;
+    private final static int FSYNC_TOLERENCE = 20;
 
     private static final Class<?>[] PROCEDURES =
     {
@@ -220,8 +220,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Inject some transactions
         for (int i = 0; i < 3; i++) {
             long start = System.currentTimeMillis();
-            for (int j = 0; j < 100; j++) {
-                results = client.callProcedure("NEW_ORDER.insert", i * 100 + j).getResults();
+            for (int j = 0; j < 16000; j++) {
+                client.callProcedure("NEW_ORDER.insert", (i * 16000 + j) % 32768);
             }
             long end = System.currentTimeMillis();
             System.out.println("Insertion took " + (end - start) + " ms");
@@ -233,19 +233,34 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             // Issue commandlog stats query
             results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
             System.out.println("commandlog statistics: " + results[0].toString());
-            results[0].advanceRow();
 
-            // Test fsync interval
-            int actualFsyncInterval = (int) results[0].getLong(CommandLogStats.StatName.FSYNC_INTERVAL.name());
-            int fsyncNoise = Math.abs(actualFsyncInterval - FSYNC_INTERVAL_GOLD);
+            // check every row
+            while (results[0].advanceRow()) {
+                // Test fsync interval
+                int actualFsyncInterval = (int) results[0].getLong(CommandLogStats.StatName.FSYNC_INTERVAL.name());
+                int fsyncNoise = Math.abs(actualFsyncInterval - FSYNC_INTERVAL_GOLD);
 
-            System.out.println("Actual fsync interval is " + actualFsyncInterval + "ms, specified interval is " + FSYNC_INTERVAL_GOLD + "ms");
-            String message = "Abnormal fsync interval: " + actualFsyncInterval + "ms (specified interval is "
-                    + FSYNC_INTERVAL_GOLD + "ms)";
-            assertTrue(message, fsyncNoise < FSYNC_TOLERENCE_PERCENT * FSYNC_INTERVAL_GOLD);
+                System.out.println("Actual fsync interval is " + actualFsyncInterval + "ms, specified interval is " + FSYNC_INTERVAL_GOLD + "ms");
+                String message = "Abnormal fsync interval: " + actualFsyncInterval + "ms (specified interval is "
+                        + FSYNC_INTERVAL_GOLD + "ms)";
+                assertTrue(message, fsyncNoise < FSYNC_TOLERENCE);
+
+                if (i == 4) {
+                    int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name());
+                    int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
+                    message = "haha";
+                    assertTrue(message, (actualSegmentCount == 2) && (actualLoanedSegmentCount <= actualSegmentCount));
+                }
+            }
         }
 
-        // TODO Test segment counts & outstanding counts
+        /*
+        System.out.println("Sleeping, waiting for truncation snapshot to complete");
+        Thread.sleep(50000);
+        results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
+        System.out.println("commandlog statistics: " + results[0].toString());
+        */
+
     }
 
     public void testInvalidCalls() throws Exception {
@@ -1272,8 +1287,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
 
+        //asynchronous logging
         project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
-        System.getProperties().put("LOG_SEGMENT_SIZE", "1");
 
         /*
          * Create a cluster configuration.
@@ -1285,9 +1300,25 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
                 BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
+        ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
+        ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+
+        // synchronous logging
+        /*
+        project.configureLogging(null, null, true, true, FSYNC_INTERVAL_GOLD, null, null);
+        config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
+                TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
+                BackendTarget.NATIVE_EE_JNI);
+        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
+        ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
+        ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+        */
 
         return builder;
     }
