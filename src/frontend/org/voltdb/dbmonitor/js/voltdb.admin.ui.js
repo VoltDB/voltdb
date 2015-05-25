@@ -1580,6 +1580,19 @@ function loadAdminPage() {
         }
     });
     var editId = -1;
+    
+    function setConnectorClassValidation() {
+        var settings = $('#formAddConfiguration').validate().settings;
+        if ($('#txtType').val() == "CUSTOM") {
+            $("#TdExportConnectorClass").append('<label id="errorExportConnectorClass" for="txtExportConnectorClass" class="error" style="display: none;"></label>');
+            settings.rules.txtExportConnectorClass = adminValidationRules.streamNameRules;
+            settings.messages.txtExportConnectorClass = adminValidationRules.streamNameMessages;
+        } else {
+            delete settings.rules.txtExportConnectorClass;
+            $("#errorExportConnectorClass").remove();
+        }
+    };
+
     $("#addConfigPopupLink").popup({
         open: function (event, ui, ele) {
             editId = adminDOMObjects.addConfigLink.data("id");
@@ -1609,21 +1622,14 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td>Type </td>' +
                 '    <td>' +
-                '       <select id="txtType" name="txtType" disabled="disabled"> ' +
+                '       <select id="txtType" name="txtType"> ' +
                 '           <option>FILE </option> ' +
+                '           <option>JDBC </option> ' +
                 '           <option>KAFKA</option> ' +
+                '           <option>HTTP</option> ' +
                 '           <option>RABBITMQ</option> ' +
-                '           <option>WEBHDFS</option> ' +
-                '       </select><span class="configCustom"><input type="checkbox" checked="true" id="chkCustom" class="chkCustom"/></span> Use Custom Type' +
-                '    </td>' +
-                '    <td>&nbsp;</td>' +
-                '    <td>&nbsp;</td>' +
-                '</tr>' +
-                '<tr id="TrCustomType">' +
-                '    <td></td>' +
-                '    <td width="15%" id="TdCustomType">' +
-                '       <input id="txtCustomType" name="txtCustomType" style="text-transform: uppercase" type="text" size="38" >' +
-                '       <label id="errorCustomType" for="txtCustomType" class="error" style="display: none;"></label>' +
+                '           <option>CUSTOM</option> ' +
+                '       </select>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
                 '    <td>&nbsp;</td>' +
@@ -1632,7 +1638,7 @@ function loadAdminPage() {
                 '    <td>Export Connector Class</td>' +
                 '    <td width="15%" id="TdExportConnectorClass">' +
                 '       <input id="txtExportConnectorClass" name="txtExportConnectorClass" type="text" size="38">' +
-                '       <label id="errorExportConnectorClass" for="txtExportConnectorClass" class="error" style="display: none;"></label>' +
+                //'       <label id="errorExportConnectorClass" for="txtExportConnectorClass" class="error" style="display: none;"></label>' +
                 '    </td>' +
                 '    <td>&nbsp;</td>' +
                 '    <td>&nbsp;</td>' +
@@ -1692,28 +1698,11 @@ function loadAdminPage() {
                 $("#chkStreamValue").text(getOnOffText($('#chkStream').is(":checked")));
             });
             
-            $("#chkCustom").iCheck({                
-                checkboxClass: 'icheckbox_square-aero customCheckbox',
-                increaseArea: '20%'
+            
+            $('#txtType').change(function () {
+                setConnectorClassValidation();
             });
 
-            $('#chkCustom').on('ifChanged', function() {
-                var settings = $('#formAddConfiguration').validate().settings;
-                if ($('#chkCustom').is(":checked")) {
-                    $("#TrCustomType").show();
-                    $("#txtType").attr('disabled', 'disabled');
-                    $("#txtCustomType").removeAttr('disabled');
-                    $("#TdExportConnectorClass").append('<label id="errorExportConnectorClass" for="txtExportConnectorClass" class="error" style="display: none;"></label>');
-                    settings.rules.txtExportConnectorClass = adminValidationRules.streamNameRules;
-                    settings.messages.txtExportConnectorClass = adminValidationRules.streamNameMessages;
-                } else {
-                    $("#TrCustomType").hide();
-                    $("#txtCustomType").attr('disabled', 'disabled');
-                    $("#txtType").removeAttr('disabled');
-                    delete settings.rules.txtExportConnectorClass;
-                    $("#errorExportConnectorClass").remove();
-                }
-            });
 
             $('#txtCustomType').focusout(function () {
                 // Uppercase-ize contents
@@ -1755,24 +1744,11 @@ function loadAdminPage() {
             });
         },
         afterOpen: function () {
-
             //For editing an existing configuration
             if (editId != "-1") {
                 var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 var config = existingAdminConfig.export.configuration[editId * 1];
-                if (isInSelectOption(config.type)) {
-                    $("#txtType").val(config.type);
-                    $("#TrCustomType").hide();//css("display", "inline-block");
-                    $("#txtCustomType").attr('disabled', 'disabled');
-                    $("#txtType").removeAttr('disabled');
-                    $("#chkCustom").iCheck('uncheck');
-                } else {
-                    $("#txtCustomType").val(config.type);
-                    $("#TrCustomType").show();//css("display", "inline-block");
-                    $("#txtType").attr('disabled', 'disabled');
-                    $("#txtCustomType").removeAttr('disabled');
-                    $("#chkCustom").iCheck('check');
-                }
+                $("#txtType").val(config.type);
                 $("#txtStream").val(config.stream);
                 
                 $("#chkStream").iCheck(config.enabled ? 'check' : 'uncheck');
@@ -1792,7 +1768,7 @@ function loadAdminPage() {
                     $("#txtValue" + i).val(properties[i].value);
                 }
             }
-
+            setConnectorClassValidation();
             var popup = $(this)[0];
             $("#btnAddConfigSave").unbind("click");
             $("#btnAddConfigSave").on("click", function (e) {
@@ -1855,11 +1831,7 @@ function loadAdminPage() {
                         });
                     }
                     newConfig["stream"] = $("#txtStream").val();
-                    if ($('#chkCustom').is(":checked")) {
-                        newConfig["type"] = $("#txtCustomType").val();
-                    } else {
-                        newConfig["type"] = $("#txtType").val();
-                    }
+                    newConfig["type"] = $("#txtType").val().trim();
                     newConfig["enabled"] = $("#chkStream").is(':checked'); 
                     newConfig["exportconnectorclass"] = $("#txtExportConnectorClass").val();
 
@@ -1946,11 +1918,6 @@ function loadAdminPage() {
             });
         }
     });
-
-    function isInSelectOption(value) {
-        //return $(selector + " option[value=" + value + "]").length > 0;
-        return $("#txtType").find('option:contains('+value+')').length > 0;
-    }
 
     var editUserState = -1;
     var orguser = '';
