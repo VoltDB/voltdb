@@ -3061,6 +3061,9 @@ a.restoreBtn {
     position: relative;
     top: 8px;
 }
+a.drTblBtn { background: #4E8DB5;margin:3px 4px 3px 0; color: #ffffff;text-align: center;width: 110px;}
+a.drTblBtn:hover {background: #AA1F2F;}
+
 
 .loadExport {
     position: relative;
