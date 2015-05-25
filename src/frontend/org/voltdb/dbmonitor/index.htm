@@ -742,10 +742,11 @@
                                         <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
                                     </tr>
                                     <tr>
-                                        <td class="configLabel">Replicated Tables <span id="replicaSource" style="font-weight:normal"></span></td>
-                                        <td align="right"><a href="javascript:void(0);" id="lstReplicatedTbl" class="replicatedIcon" style="display: block;" title="List Replicated Tables">&nbsp;</a></td>
+                                        <td class="configLabel">DR Tables <span id="replicaSource" style="font-weight:normal"></span></td>
+                                        
                                         <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
                                         <td><a href="#replicatedTablePopup" id="lstReplicatedTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
+                                        <td align="right"><a href="javascript:void(0);" id="lstReplicatedTbl" class="drTblBtn" style="display: block;" title="List Replicated Tables">List of DR Tables</a></td>
                                     </tr>
                                 </table>
                             </div>
@@ -1548,7 +1549,7 @@
     </div>
 
     <div id="replicatedTablePopup" style="display:none">
-        <div class="overlay-title icon-alert">Replicated Tables</div>
+        <div class="overlay-title icon-alert">DR Tables</div>
         <div class="overlay-content resizeCon">
             <div class="repliWrapper">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblReplicated">
