@@ -41,7 +41,7 @@ using namespace std;
 using namespace voltdb;
 
 DRTupleStream::DRTupleStream()
-    : TupleStreamBase(),
+    : TupleStreamBase(MAGIC_DR_TRANSACTION_PADDING),
       m_enabled(true),
       m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
       m_opened(false)
@@ -351,7 +351,7 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
-        if (partialTxnLength + minLength >= (m_defaultCapacity - MAGIC_HEADER_SPACE_FOR_JAVA)) {
+        if (partialTxnLength + minLength >= (m_defaultCapacity - m_headerSpace)) {
             switch (sb->type()) {
                 case voltdb::NORMAL_STREAM_BLOCK:
                 {
@@ -422,8 +422,9 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
-    const int32_t adjustedLength = stream.m_currBlock->rawLength() - MAGIC_HEADER_SPACE_FOR_JAVA;
-    ::memcpy(outBytes, stream.m_currBlock->rawPtr() + MAGIC_HEADER_SPACE_FOR_JAVA, adjustedLength);
+    size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
+    const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
+    ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
 
 }
