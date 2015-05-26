@@ -1150,7 +1150,7 @@ var loadPage = function (serverName, portid) {
                     htmlcontent = htmlcontent + "<tr>";
                     htmlcontent = htmlcontent + "<td>" + key + "</td>" +
                         "<td>" + VoltDbUI.drStatus + "</td>" +
-                        "<td>" + response[key][i].TOTALBYTES / 1024 / 1024 + "</td >" +
+                        "<td>" + (response[key][i].TOTALBYTES / 1024 / 1024).toFixed(3) + "</td >" +
                         "<td>" + replicaLatencyMs + "</td >" +
                         "<td>" + replicaLatencyTrans + "</td >";
                     htmlcontent = htmlcontent + "</tr>";
