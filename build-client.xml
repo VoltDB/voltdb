@@ -91,6 +91,7 @@
                   org/json_voltpatches/**/*.java
                   org/voltdb/importer/ImportContext.java
                   org/voltdb/importer/ImportHandlerProxy.java
+                  org/voltdb/importer/Invocation.java
                   jsr166y/**/*.java
                   io/netty_voltpatches/NinjaKeySet.java
                   "
@@ -148,6 +149,7 @@
                   org/voltdb/VoltTypeException.java
                   org/voltdb/importer/ImportContext.java
                   org/voltdb/importer/ImportHandlerProxy.java
+                  org/voltdb/importer/Invocation.java
                   "
 />
 

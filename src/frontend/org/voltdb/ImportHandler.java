@@ -17,10 +17,8 @@
 
 package org.voltdb;
 
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
@@ -32,7 +30,6 @@ import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.importer.ImportClientResponseAdapter;
 import org.voltdb.importer.ImportContext;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import java.util.ArrayList;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
@@ -48,8 +45,6 @@ public class ImportHandler {
     private final CatalogContext m_catalogContext;
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
-    private final AtomicLong m_unpartitionedCount = new AtomicLong();
-    private final List<Integer> m_partitions;
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
     private boolean m_stopped = false;
@@ -57,12 +52,10 @@ public class ImportHandler {
     private static final ImportClientResponseAdapter m_adapter = new ImportClientResponseAdapter(ClientInterface.IMPORTER_CID, "Importer");
 
     private static final long MAX_PENDING_TRANSACTIONS = Integer.getInteger("IMPORTER_MAX_PENDING_TRANSACTION", 5000);
-    private static final CSVParser m_csvParser = new CSVParser();
 
     // The real handler gets created for each importer.
-    public ImportHandler(ImportContext importContext, CatalogContext catContext, List<Integer> partitions) {
+    public ImportHandler(ImportContext importContext, CatalogContext catContext) {
         m_catalogContext = catContext;
-        m_partitions = partitions;
 
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
@@ -110,13 +103,9 @@ public class ImportHandler {
         }
     }
 
-    //TODO
-    public void hadBackPressure() {
-        //Handle back pressure....how to count bytes here?
-    }
-
+    //Allocate and pool similar row sizes will reuse the buffers.
     private BBContainer getBuffer(int sz) {
-        return DBBPool.allocateDirect(sz);
+        return DBBPool.allocateDirectAndPool(sz);
     }
 
     public boolean callProcedure(ImportContext ic, String proc, Object... fieldList) {
@@ -179,19 +168,11 @@ public class ImportHandler {
 
         int partition = -1;
         if (catProc.getSinglepartition()) {
-            // break out the Hashinator and calculate the appropriate partition
             try {
                 partition = getPartitionForProcedure(ppi.index, ppi.type, task);
             } catch (Exception e) {
                 m_logger.error("Can not invoke SP procedure from streaming interface partition not found.");
                 m_failedCount.incrementAndGet();
-                tcont.discard();
-                return false;
-            }
-            //TODO: this should be property or should this be silently handled?
-            if (ic.isPartitionedData() && !m_partitions.contains(partition)) {
-                //Not our partition dont do anything.
-                m_unpartitionedCount.incrementAndGet();
                 tcont.discard();
                 return false;
             }

@@ -83,6 +83,16 @@ public class ImportHandlerProxy implements ImportContext {
     }
 
     @Override
+    public boolean callProcedure(ImportContext ic, Invocation invocation) {
+        try {
+            Object params[] = invocation.getParams();
+            return (Boolean )m_invoker.invoke(m_handler, ic, invocation.getProcedure(), params);
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    @Override
     public void setHandler(Object handler) throws Exception {
         m_handler = handler;
         m_invoker = m_handler.getClass().getMethod("callProcedure", ImportContext.class, String.class, Object[].class);

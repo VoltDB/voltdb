@@ -39,9 +39,6 @@ public class ImportManager {
      */
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
 
-    //Default to OSGI based processor there is also a native processor that will be easy to use for testing.
-    private final String m_loaderClass = System.getProperty("ImportProcessor", "org.voltdb.importer.ImportProcessor");
-
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
     private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
 
@@ -57,10 +54,6 @@ public class ImportManager {
         return m_self;
     }
 
-    public static void setInstanceForTest(ImportManager self) {
-        m_self = self;
-    }
-
     protected ImportManager(HostMessenger messenger) {
         m_messenger = messenger;
     }
@@ -74,7 +67,7 @@ public class ImportManager {
         ImportManager em = new ImportManager(messenger);
 
         m_self = em;
-        em.create(catalogContext, partitions);
+        em.create(catalogContext);
     }
 
     /**
@@ -82,30 +75,26 @@ public class ImportManager {
      * @param catalogContext
      * @param partitions
      */
-    private synchronized void create(CatalogContext catalogContext, List<Integer> partitions) {
+    private synchronized void create(CatalogContext catalogContext) {
         try {
             if (catalogContext.getDeployment().getImport() == null) {
+                importLog.info("No importers specified skipping Streaming Import initialization.");
                 return;
             }
-            if (!org.voltdb.utils.MiscUtils.isPro()) {
-                importLog.info("Importer specified in deployment. Import is not supported in Community Edition.");
-                return;
-            }
-            importLog.info("Creating import connector " + m_loaderClass);
-            ImportDataProcessor newProcessor = null;
-            final Class<?> loaderClass = Class.forName(m_loaderClass);
-            newProcessor = (ImportDataProcessor)loaderClass.newInstance();
+            ImportDataProcessor newProcessor = new ImportProcessor();
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
+            importLog.info("Import Processor is configured.");
         } catch (final Exception e) {
-            VoltDB.crashLocalVoltDB("Error creating next import processor", true, e);
+            VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
     }
 
     public synchronized void shutdown() {
         //If no processor set we dont have any import configuration
         if (m_processor.get() == null) {
+            importLog.info("ImportDataProcessor is not set nothing to shutdown.");
             return;
         }
         m_processor.get().shutdown();
@@ -113,21 +102,22 @@ public class ImportManager {
         m_processor.set(null);
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) {
+    public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
         //Shutdown and recreate.
         m_self.shutdown();
         assert(m_processor.get() == null);
-        m_self.create(catalogContext, partitions);
-        m_self.readyForData(catalogContext, partitions, messenger);
+        m_self.create(catalogContext);
+        m_self.readyForData(catalogContext, messenger);
     }
 
-    public synchronized void readyForData(CatalogContext catalogContext, List<Integer> partitions, HostMessenger messenger) {
+    public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
+            importLog.error("ImportDataProcessor is not set failed to call readyForData");
             return;
         }
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-        m_processor.get().readyForData(catalogContext, partitions, messenger);
+        m_processor.get().readyForData(catalogContext, messenger);
     }
 
 

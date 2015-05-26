@@ -1115,9 +1115,9 @@ public abstract class CatalogUtil {
         Properties processorProperties = new Properties();
         String modulePrefix = "osgi|";
         try {
-            URL u = new URL(importBundleUrl);
             //Make sure we can load stream
-            u.openStream();
+            InputStream is = (new URL(importBundleUrl)).openStream();
+            is.close();
         } catch (IOException ex) {
             //Not a URL try as a class
             try {

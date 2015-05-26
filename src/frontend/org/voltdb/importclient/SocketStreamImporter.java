@@ -23,10 +23,10 @@ import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.ImportHandlerProxy;
 
 /**
@@ -120,8 +120,8 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                         String line = in.readLine();
                         //You should convert your data to params here.
                         if (line == null) break;
-                        List<Object> args = new ArrayList<Object>();
-                        if (!callProcedure(m_importHandlerProxy, m_procedure, args.toArray())) {
+                        CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                        if (!callProcedure(m_importHandlerProxy, invocation)) {
                             System.out.println("Inserted failed: " + line);
                         }
                     }

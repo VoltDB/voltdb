@@ -25,7 +25,6 @@ import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import java.util.List;
 import java.util.ServiceLoader;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.osgi.framework.Bundle;
@@ -56,6 +55,7 @@ public class ImportProcessor implements ImportDataProcessor {
         m_frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
     }
 
+    //This abstracts OSGi based and class based importers.
     public class BundleWrapper {
         public final Bundle m_bundle;
         public final Framework m_framework;
@@ -91,14 +91,11 @@ public class ImportProcessor implements ImportDataProcessor {
                 }
             } catch (Exception ex) {
                 m_logger.error("Failed to stop the import bundles.", ex);
-                ex.printStackTrace();
-                Throwables.propagate(ex);
             }
         }
     }
 
     public void addProcessorConfig(Properties properties) {
-        //This is for builtin ones
         String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
         String moduleAttrs[] = module.split("\\|");
         String bundleJar = moduleAttrs[1];
@@ -127,6 +124,7 @@ public class ImportProcessor implements ImportDataProcessor {
                 //Save bundle and properties
                 wrapper = new BundleWrapper(bundle, framework, importHandlerProxy, properties);
             } else {
+                //Class based importer.
                 Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
                 if (reference == null) {
                     m_logger.error("Failed to initialize importer from: " + bundleJar);
@@ -135,7 +133,7 @@ public class ImportProcessor implements ImportDataProcessor {
 
                 Object o = reference.newInstance();
                 importHandlerProxy = (ImportHandlerProxy )o;
-                //Save bundle and properties
+                //Save bundle and properties - no bundle and framework.
                  wrapper = new BundleWrapper(null, null, importHandlerProxy, properties);
             }
             importHandlerProxy.configure(properties);
@@ -152,22 +150,21 @@ public class ImportProcessor implements ImportDataProcessor {
         }
     }
 
-    private void registerImporterMetaData(CatalogContext catContext, List<Integer> partitions, HostMessenger messenger) {
+    private void registerImporterMetaData(CatalogContext catContext, HostMessenger messenger) {
         ZooKeeper zk = messenger.getZK();
         //TODO: Do resource allocation.
     }
 
     @Override
-    public void readyForData(CatalogContext catContext, List<Integer> partitions, HostMessenger messenger) {
+    public void readyForData(CatalogContext catContext, HostMessenger messenger) {
         //Register and launch watchers. - See if UAC path needs this. TODO.
-        registerImporterMetaData(catContext, partitions, messenger);
+        registerImporterMetaData(catContext, messenger);
 
         //Clean any pending and invoked stuff.
         synchronized (this) {
             for (BundleWrapper bw : m_bundles.values()) {
                 try {
-
-                    ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext, partitions);
+                    ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, catContext);
                     //Set the internal handler
                     bw.setHandler(importHandler);
                     importHandler.readyForData();
@@ -189,9 +186,8 @@ public class ImportProcessor implements ImportDataProcessor {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
                         bw.stop();
-                    } catch (Exception t) {
-                        t.printStackTrace();
-                        Throwables.propagate(t);
+                    } catch (Exception ex) {
+                        m_logger.error("Failed to stop the import handler: " + bw.m_handlerProxy.getName(), ex);
                     }
                 }
                 m_bundles.clear();

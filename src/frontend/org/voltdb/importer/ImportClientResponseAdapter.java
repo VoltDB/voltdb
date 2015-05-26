@@ -116,12 +116,6 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public boolean hadBackPressure() {
-        //TODO: Notify of backpressure for the ImportHandler
-        return true;
-    }
-
-    @Override
     public void fastEnqueue(DeferredSerialization ds) {
         enqueue(ds);
     }
@@ -171,6 +165,11 @@ public class ImportClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public int calculatePendingWriteDelta(long now) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean hadBackPressure() {
         throw new UnsupportedOperationException();
     }
 
