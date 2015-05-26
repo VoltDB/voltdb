@@ -382,15 +382,14 @@ public class TestPushDownAggregates extends PlannerTestCase {
         }
 
         if (isAggInlined) {
-            assertTrue(p instanceof AbstractScanPlanNode);
-            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
-                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null ||
-                    // If it's table count, it won't have inline plan node.
-                    // See ENG-6131
-                    p instanceof TableCountPlanNode);
+            // If it's table count, it won't have inline plan node.
+            // See ENG-6131
             if(p instanceof TableCountPlanNode) {
                 return;
             }
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
 
             if (p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null) {
                 p  = p.getInlinePlanNode(PlanNodeType.AGGREGATE);

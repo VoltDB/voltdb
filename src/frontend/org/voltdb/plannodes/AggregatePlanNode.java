@@ -106,23 +106,29 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     public boolean isTableCountStar() {
-        if (m_groupByExpressions.isEmpty() == false)
+        if (m_groupByExpressions.isEmpty() == false) {
             return false;
-        if (m_aggregateTypes.size() != 1)
+        }
+        if (m_aggregateTypes.size() != 1) {
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR) == false)
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR) == false) {
             return false;
+        }
 
         return true;
     }
 
     public boolean isTableNonDistinctCount() {
-        if (m_groupByExpressions.isEmpty() == false)
+        if (m_groupByExpressions.isEmpty() == false) {
             return false;
-        if (m_aggregateTypes.size() != 1)
+        }
+        if (m_aggregateTypes.size() != 1) {
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT) == false)
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT) == false) {
             return false;
+        }
         // Does it have a distinct keyword?
         if (m_aggregateDistinct.get(0) == 1) {
             return false;
@@ -151,10 +157,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // Normally it has to be a ScanPlanNode.
         // If the query is a join query then the child will be something like nested loop.
         assert (m_children.size() == 1);
-        if(! (m_children.get(0) instanceof AbstractScanPlanNode) ) {
+        if (! (m_children.get(0) instanceof AbstractScanPlanNode) ) {
             return false;
         }
         AbstractScanPlanNode asp = (AbstractScanPlanNode)m_children.get(0);
+        if ( ! (asp.getTableScan() instanceof StmtTargetTableScan)) {
+            return false;
+        }
         StmtTargetTableScan sttscan = (StmtTargetTableScan)asp.getTableScan();
         Table tbl = sttscan.getTargetTable();
         TupleValueExpression tve = (TupleValueExpression)m_aggregateExpressions.get(0);
@@ -170,12 +179,15 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // single min() without GROUP BY?
     public boolean isTableMin() {
         // do not support GROUP BY for now
-        if (m_groupByExpressions.isEmpty() == false)
+        if (m_groupByExpressions.isEmpty() == false) {
             return false;
-        if (m_aggregateTypes.size() != 1)
+        }
+        if (m_aggregateTypes.size() != 1) {
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN) == false)
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN) == false) {
             return false;
+        }
 
         return true;
     }
@@ -183,12 +195,15 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // single max() without GROUP BY?
     public boolean isTableMax() {
         // do not support GROUP BY for now
-        if (m_groupByExpressions.isEmpty() == false)
+        if (m_groupByExpressions.isEmpty() == false) {
             return false;
-        if (m_aggregateTypes.size() != 1)
+        }
+        if (m_aggregateTypes.size() != 1) {
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX) == false)
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX) == false) {
             return false;
+        }
 
         return true;
     }

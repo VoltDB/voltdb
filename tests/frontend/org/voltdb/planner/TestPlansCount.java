@@ -472,6 +472,11 @@ public class TestPlansCount extends PlannerTestCase {
         p = pn.get(1).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
     }
+
+    public void testCountSubquery() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(distinct RATIO) from (SELECT * FROM P1) a");
+        checkIndexCounter(pn, false);
+    }
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *
