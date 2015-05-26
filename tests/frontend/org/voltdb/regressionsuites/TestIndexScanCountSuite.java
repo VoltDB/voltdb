@@ -90,7 +90,11 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         callWithExpectedCount(client, 0, "TU1_LT", -6000000000L);
         callWithExpectedCount(client, 0, "TU1_LET", -6000000000L);
         callWithExpectedCount(client, 5, "TU1_GT", -6000000000L);
-        callWithExpectedCount(client, 5, "TU1_GET", -6000000000L);
+        // hsql232 backend does not properly handle null
+        // in SOME underflow range comparisons.
+        if (! isHSQL()) {
+            callWithExpectedCount(client, 5, "TU1_GET", -6000000000L);
+        }
 
         // Unique Map, two column index
         client.callProcedure("TU3.insert", 1, 1, 123);

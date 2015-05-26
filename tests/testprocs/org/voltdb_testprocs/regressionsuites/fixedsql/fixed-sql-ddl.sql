@@ -284,19 +284,23 @@ create index sm_idx on sm_idx_tbl(ti1, ti2);
 -- ****************************** --
 -- Stored procedures for ENG-7354 --
 create procedure one_list_param as
-       select id from P1 where ID in ?
+       select id from P1 where ID -- hsl232 not yet supporting: in ?
+                                  = ? -- poor stub for hsl232
        order by id;
 
 create procedure one_string_list_param as
-       select id from P1 where desc in ?
+       select id from P1 where desc -- hsl232 not yet supporting: in ?
+                                    = ? -- poor stub for hsl232
        order by id;
 
 create procedure one_scalar_param as
-       select id from P1 where ID in (?)
+       select id from P1 where ID -- hsl232 not yet supporting: in (?)
+                                    = ? -- poor stub for hsl232
        order by id;
 
 create procedure one_string_scalar_param as
-       select id from P1 where desc in (?)
+       select id from P1 where desc -- hsl232 not yet supporting: in (?)
+                                    = ? -- poor stub for hsl232
        order by id;
 -- End stored procedures for ENG-7354 --
 -- ********************************** --

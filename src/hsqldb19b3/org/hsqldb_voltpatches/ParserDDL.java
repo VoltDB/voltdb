@@ -1417,7 +1417,7 @@ public class ParserDDL extends ParserRoutine {
                             != null) {
                         throw Error.error(ErrorCode.X_42522);
                     }
-                        ... disabled 4 lines */
+                    ... disabled 4 lines */
                     // End of VoltDB extension
 
                     // create an autonamed index

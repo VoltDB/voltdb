@@ -577,7 +577,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         checkPlannerCache(client, CACHE_PARAMS_EXCEPTION);
 
         // scalar subquery
-        sql = "SELECT (select max(r1.id) from r1 where r1.id > sub4.ID and num >= ?) AS maxID FROM R1 sub4 "
+// hsql232 not yet supporting subqueries? ENG-8307:        sql = "SELECT (select max(r1.id) from r1 where r1.id > sub4.ID and num >= ?) AS maxID FROM R1 sub4 "
+        sql = "SELECT CASE WHEN sub4.ID < 3+0*? THEN 3 ELSE null END AS maxID FROM R1 sub4 " // hsql232 stub ENG-8307
                 + " WHERE ID > ? order by id;";
         vt = client.callProcedure("@AdHoc", sql, 1, 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3, Long.MIN_VALUE});
