@@ -1825,9 +1825,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
             getMoreResults();
         }
     }
-
     // A VoltDB extension to disable the JDBC closeOnCompletion functionality
-
     public void closeOnCompletion() throws SQLException {
         throw new SQLException();
     }

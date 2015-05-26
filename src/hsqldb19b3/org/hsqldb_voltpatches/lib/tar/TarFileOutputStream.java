@@ -380,7 +380,6 @@ public class TarFileOutputStream {
         ... disabled 1 line */
         // End of VoltDB extension
     }
-
     // A VoltDB extension to support explicit tar outputstream pre-configuration
     public TarFileOutputStream(GZIPOutputStream outputStream) throws IOException {
         blocksPerRecord = TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD;

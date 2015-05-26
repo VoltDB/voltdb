@@ -34,6 +34,7 @@ package org.hsqldb_voltpatches;
 import org.hsqldb_voltpatches.error.Error;
 import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.types.Type;
+
 /**
  * Implementation of value access operations.
  *
@@ -139,5 +140,5 @@ public class ExpressionValue extends Expression {
         }
         return false;
     }
-    // End VoltDB extension
+    // End of VoltDB extension
 }

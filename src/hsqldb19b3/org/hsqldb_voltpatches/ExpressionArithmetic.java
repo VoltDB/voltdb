@@ -271,7 +271,7 @@ public class ExpressionArithmetic extends Expression {
 
                 // A VoltDB extension to use X'..' as a numeric literal
                 voltConvertBinaryLiteralOperandsToBigint();
-                // End VoltDB extension
+                // End of VoltDB extension
                 dataType = nodes[LEFT].dataType;
 
                 if (!dataType.isNumberType()) {
@@ -328,7 +328,7 @@ public class ExpressionArithmetic extends Expression {
 
         // A VoltDB extension to use X'..' as a numeric literal
         voltConvertBinaryLiteralOperandsToBigint();
-        // End VoltDB extension
+        // End of VoltDB extension
         if (nodes[LEFT].isUnresolvedParam()) {
             if (nodes[RIGHT].dataType == null) {
                 throw Error.error(ErrorCode.X_42567);
@@ -676,5 +676,5 @@ public class ExpressionArithmetic extends Expression {
             ExpressionValue.voltMutateToBigintType(e, this, i);
         }
     }
-    // End VoltDB extension
+    // End of VoltDB extension
 }

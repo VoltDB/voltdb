@@ -155,10 +155,14 @@ implements PersistentStoreCollection {
                             table);
                 }
 
-                ////if (table.getTableType() == TableBase.INFO_SCHEMA_TABLE) {
-                ////    session.database.dbInfo.setStore(session, (Table) table,
-                ////                                     store);
-                ////}
+                // A VoltDB extension eliminate a dependency
+                /* disable 4 lines ...
+                if (table.getTableType() == TableBase.INFO_SCHEMA_TABLE) {
+                    session.database.dbInfo.setStore(session, (Table) table,
+                                                     store);
+                }
+                ... disabled 4 lines */
+                // End of VoltDB extension
 
                 return store;
 

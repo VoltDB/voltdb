@@ -95,14 +95,14 @@ public class DatabaseManager {
      */
     public static Vector getDatabaseURIs() {
 
-        Vector   v  = new Vector();
+        Vector v = new Vector();
 
         synchronized (databaseIDMap) {
             // A VoltDB extension to work around ENG-6044
             java.util.Iterator<Database> it = databaseIDMap.values().iterator();
             /* disable 1 line ...
             Iterator it = databaseIDMap.values().iterator();
-            ... disabled 1 line */
+               ... disabled 1 line */
             // End of VoltDB extension
 
             while (it.hasNext()) {
@@ -363,10 +363,7 @@ public class DatabaseManager {
             String path) {
 
         // A VoltDB extension to work around ENG-6044
-        assert (type == DatabaseURL.S_MEM);
-        java.util.HashMap<String, Database> databaseMap = memDatabaseMap;
-        String key = path;
-        /* disabled 13 lines ...
+        /* disable 13 lines ...
         Object  key = path;
         HashMap databaseMap;
 
@@ -381,6 +378,9 @@ public class DatabaseManager {
             throw (Error.runtimeError(ErrorCode.U_S0500, "DatabaseManager"));
         }
            ... disabled 13 lines */
+        assert (type == DatabaseURL.S_MEM);
+        java.util.HashMap<String, Database> databaseMap = memDatabaseMap;
+        String key = path;
         // End of VoltDB extension
 
         return (Database) databaseMap.get(key);

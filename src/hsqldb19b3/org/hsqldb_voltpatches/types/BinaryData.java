@@ -34,7 +34,6 @@ package org.hsqldb_voltpatches.types;
 import java.io.DataInput;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.error.Error;
@@ -355,5 +354,5 @@ public class BinaryData implements BlobData {
         java.math.BigInteger bi = new java.math.BigInteger(dataWithLeadingZeros);
         return bi.longValue();
     }
-    // End VoltDB extension
+    // End of VoltDB extension
 }

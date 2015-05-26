@@ -2807,7 +2807,11 @@ public class ParserDQL extends ParserBase {
 
         e = readColumnOrFunctionExpression();
 
-        if (e != null && e.isAggregate()) { // temp hack for hsql232 may not be worth it
+        // A VoltDB extension to avoid NPE for hsql232
+        // (not needed if this problem was fixed upstream?)
+        if (e != null)
+        // End of VoltDB extension
+        if (e.isAggregate()) {
             readFilterClause(e);
         }
 
@@ -5258,7 +5262,7 @@ public class ParserDQL extends ParserBase {
                     // avoid abusing the exception handling mechanism.
                     // It's not really clear why readSQLFunction exceptions just get
                     // thrown through here but get post-processed in the similar call
-                    // above for FunctionForVoltDB and FunctionCustom
+                    // above for FunctionForVoltDB and FunctionCustom.
                     // End of VoltDB extension
                     Expression e = readSQLFunction(function);
 

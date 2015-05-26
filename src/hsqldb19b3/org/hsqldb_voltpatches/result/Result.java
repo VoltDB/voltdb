@@ -1607,7 +1607,6 @@ public class Result {
                 throw Error.runtimeError(ErrorCode.U_S0500, "Result");
         }
     }
-
     // A VoltDB extension to export abstract parse trees
     public boolean hasError() { return mode == ResultConstants.ERROR; }
     // End of VoltDB extension

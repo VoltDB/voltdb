@@ -681,13 +681,14 @@ public class ParserDDL extends ParserRoutine {
         Table t = database.schemaManager.getUserTable(session, tableName,
             schema.name);
 
+        // A VoltDB extension to guard against alter table operations performed on views.
         // The named "table" was actually a view -- not considered a
         // valid target for alter table commands -- treat as "not found",
         // as if views and tables are not using the same name space.
         if (t.tableType == TableBase.VIEW_TABLE) {
             throw Error.error(ErrorCode.X_42501, tableName);
         }
-
+        // End of VoltDB extension
         read();
 
         switch (token.tokenType) {
@@ -1409,12 +1410,15 @@ public class ParserDDL extends ParserRoutine {
                             throw Error.error(ErrorCode.X_42522);
                         }
                     }
-                    else
-                    // End of VoltDB extension
+                    // TODO: enable a weaker form of this guard. The current form was
+                    // causing problems with some innocent-looking primary key definitions.
+                    /* disable 4 lines ...
                     if (table.getUniqueConstraintForColumns(c.core.mainCols)
                             != null) {
-////FIXME? causing problems with PK on hsql232                        throw Error.error(ErrorCode.X_42522);
+                        throw Error.error(ErrorCode.X_42522);
                     }
+                        ... disabled 4 lines */
+                    // End of VoltDB extension
 
                     // create an autonamed index
                     indexName = session.database.nameManager.newAutoName("IDX",
@@ -4214,6 +4218,7 @@ public class ParserDDL extends ParserRoutine {
         Expression defaultExpr = null;
         boolean isNullable = true;
         // End of VoltDB extension
+
         if (token.tokenType == Tokens.IDENTITY) {
             read();
 
@@ -4226,6 +4231,7 @@ public class ParserDDL extends ParserRoutine {
             }
         } else {
             type = readTypeDefinition(true, true);
+
             switch (token.tokenType) {
 
                 case Tokens.IDENTITY : {

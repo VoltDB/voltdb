@@ -590,12 +590,12 @@ public final class NumberType extends Type {
         switch (operation) {
 
             // A VoltDB extension to be more sql compliant
-            // drop this special case handling of ADD
-            /* disable 2 lines ...
+            // drop this special case handling of ADD, DIVIDE
+            /* disable 3 lines ...
             case OpTypes.ADD :
             case OpTypes.DIVIDE :
                 break;
-            ... disabled 2 lines */
+            ... disabled 3 lines */
             // End of VoltDB extension
 
             case OpTypes.MULTIPLY :
@@ -882,7 +882,7 @@ public final class NumberType extends Type {
                 a = ValuePool.getLong(((BinaryData)a).toLong());
                 break;
 
-            // End VoltDB extension
+            // End of VoltDB extension
             case Types.SQL_BIT :
             case Types.SQL_BIT_VARYING :
                 if (otherType.precision == 1) {
@@ -1118,7 +1118,7 @@ public final class NumberType extends Type {
      */
     // A VoltDB extension to support BIGINT bitwise functions
     public
-    // End of VoltDB extensions
+    // End of VoltDB extension
     static Long convertToLong(SessionInterface session, Object a) {
 
         if (a instanceof Integer) {
@@ -2110,7 +2110,7 @@ public final class NumberType extends Type {
 
             case Types.SQL_REAL :
             case Types.SQL_DOUBLE :
-            // A VoltDB extension to ?support FLOAT as alis to DOUBLE?
+            // A VoltDB extension to ?support FLOAT as alias to DOUBLE?
             case Types.SQL_FLOAT :
             // End of VoltDB extension
                 return SQL_DOUBLE;
@@ -2123,5 +2123,4 @@ public final class NumberType extends Type {
                 throw Error.runtimeError(ErrorCode.U_S0500, "NumberType");
         }
     }
-
 }

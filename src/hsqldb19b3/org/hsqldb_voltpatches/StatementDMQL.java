@@ -927,9 +927,10 @@ public abstract class StatementDMQL extends Statement {
             }
             QuerySpecification select = (QuerySpecification) queryExpr;
             return voltGetXMLSpecification(select, parameters, session);
-        } else if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
-                   exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
-                   exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
+        }
+        if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
+                exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
+                exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
             VoltXMLElement unionExpr = new VoltXMLElement("union");
             unionExpr.attributes.put("uniontype", queryExpr.operatorName());
 
@@ -1003,7 +1004,7 @@ public abstract class StatementDMQL extends Statement {
             Expression limitExpr = limitCondition.getRightNode();
             if (limitExpr != null) {
                 VoltXMLElement limit = new VoltXMLElement("limit");
-                if (limitExpr.isUnresolvedParam()) {
+                if (limitExpr.isDynamicParam()) {
                     limit.attributes.put("limit_paramid", limitExpr.voltGetUniqueId(session));
                 }
                 else {
