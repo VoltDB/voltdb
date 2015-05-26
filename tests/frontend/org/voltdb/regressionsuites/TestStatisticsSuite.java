@@ -1051,9 +1051,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("Test SNAPSHOTSTATUS table: " + results[0].toString());
         validateSchema(results[0], expectedTable);
         // One row per table per node
-        validateRowSeenAtAllHosts(results[0], "TABLE", "WAREHOUSE", true);
-        validateRowSeenAtAllHosts(results[0], "TABLE", "NEW_ORDER", true);
-        validateRowSeenAtAllHosts(results[0], "TABLE", "ITEM", true);
+        validateRowSeenAtAllHosts(results[0], "TABLE", "WAREHOUSE", false);
+        validateRowSeenAtAllHosts(results[0], "TABLE", "NEW_ORDER", false);
+        validateRowSeenAtAllHosts(results[0], "TABLE", "ITEM", false);
     }
 
     public void testManagementStats() throws Exception {
@@ -1195,7 +1195,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         }
 
         // Inject some transactions
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 2; i++) {
             long start = System.currentTimeMillis();
             for (int j = 0; j < 16000; j++) {
                 client.callProcedure("NEW_ORDER.insert", (i * 16000 + j) % 32768);
@@ -1222,10 +1222,10 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                         + FSYNC_INTERVAL_GOLD + "ms)";
                 assertTrue(message, fsyncNoise < FSYNC_TOLERENCE);
 
-                if (i == 2) {
+                if (i == 1) {
                     int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name());
                     int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
-                    message = "haha";
+                    message = "Unexpected segment count: should be 2";
                     assertTrue(message, (actualSegmentCount == 2) && (actualLoanedSegmentCount <= actualSegmentCount));
                 }
             }
@@ -1284,7 +1284,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         project.addProcedures(PROCEDURES);
 
         //asynchronous logging
-        project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
+        if (MiscUtils.isPro()) {
+            project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
+        }
 
         /*
          * Create a cluster configuration.
@@ -1296,8 +1298,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
                 BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-        ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
-        ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+
+        if (MiscUtils.isPro()) {
+            ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
+            ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+        }
+
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
