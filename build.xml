@@ -237,7 +237,7 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="compile, ee, voltdb.jar, voltdbclient.jar"
+    depends="compile, ee, voltdb.jar, voltdbclient.jar, socketstream.jar"
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
@@ -879,6 +879,11 @@ JAR BUILDING
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
     <ant antfile="build-client.xml" target="voltdbclient.jar" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
+</target>
+<target name="socketstream.jar" depends="compile, buildinfo">
+    <ant antfile="build-socketstream.xml" target="socketstream.jar" inheritAll="false">
         <property name="build" value="${build}"/>
     </ant>
 </target>

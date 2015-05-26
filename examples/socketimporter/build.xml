@@ -16,7 +16,6 @@
         <delete dir="${log.dir}"/>
         <delete dir="${voltdbroot.dir}"/>
         <delete dir="${basedir}/felix-cache"/>
-        <delete file="${jar.dir}/${ant.project.name}.jar"/>
         <delete file="${jar.dir}/${ant.project.name}-client.jar"/>
         <delete file="${basedir}/deployment.xml"/>
         <delete file="${basedir}/catalog-report.html"/>
@@ -37,32 +36,13 @@
             <classpath refid="build-classpath"/>
         </javac>
     </target>
-    <target name="compile">
-        <mkdir dir="${classes.dir}"/>
-        <javac target="1.7" source="1.7" debug="on" srcdir="${src.dir}" destdir="${classes.dir}" >
-            <classpath refid="build-classpath"/>
-        </javac>
-    </target>
 
-    <target name="jar" depends="compile">
-        <mkdir dir="${jar.dir}"/>
-        <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="../../obj/release/prod/">
-            <include name="org/voltdb/importclient/SocketStreamImporter.class"/>
-            <include name="org/voltdb/importclient/SocketStreamImporter$ClientConnectionHandler.class"/>
-            <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.SocketStreamImporter" />
-                <attribute name="Bundle-ManifestVersion" value="2" />
-                <attribute name="Bundle-Name" value="SocketStream OSGi Bundle" />
-                <attribute name="Bundle-SymbolicName" value="SocketStreamImporter" />
-                <attribute name="Bundle-Version" value="1.0.0" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer" />
-            </manifest>
-        </jar>
+    <target name="deployment">
         <copy file="${basedir}/deployment.xml.template" tofile="${basedir}/deployment.xml"/>
-        <replace file="${basedir}/deployment.xml" token="__PATH_MARKER__" value="${basedir}"/>
+        <replace file="${basedir}/deployment.xml" token="__PATH_MARKER__" value="${basedir}/../../bundles"/>
     </target>
 
-    <target name="client" depends="client-compile,jar">
+    <target name="client" depends="client-compile, deployment">
         <mkdir dir="${jar.dir}"/>
         <jar destfile="${jar.dir}/${ant.project.name}-client.jar" basedir="${clientclasses.dir}">
         </jar>
