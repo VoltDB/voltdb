@@ -1190,12 +1190,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
 
         // Enough for community version
-        /*
         if (!MiscUtils.isPro()) {
             return;
         }
-        */
-        System.out.println(MiscUtils.isPro());
 
         // Inject some transactions
         for (int i = 0; i < 3; i++) {
@@ -1240,7 +1237,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
         System.out.println("commandlog statistics: " + results[0].toString());
         */
-
     }
 
     //
@@ -1301,7 +1297,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
-        //((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+        ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
