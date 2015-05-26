@@ -25,8 +25,11 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -129,6 +132,73 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 }
                 m_recentAnalysis.append(rowStatus +
                         " at host " + thisHostId + " for " + columnName + " " + colValFromRow + "\n");
+            }
+        }
+        return hostsSeen.size();
+    }
+
+    // validation functions supporting multiple columns
+    private boolean checkRowForMultipleTargets(VoltTable result, Map<String, String> columnTargets) {
+        for (Entry<String, String> entry : columnTargets.entrySet()) {
+            if (!result.getString(entry.getKey()).equals(entry.getValue())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void validateRowSeenAtAllHosts(VoltTable result, Map<String, String> columnTargets,
+            boolean enforceUnique)
+    {
+        int hostCount = countHostsProvidingRows(result, columnTargets, enforceUnique);
+        assertEquals(claimRecentAnalysis(), HOSTS, hostCount);
+    }
+
+    private int countHostsProvidingRows(VoltTable result, Map<String, String> columnTargets,
+            boolean enforceUnique)
+    {
+        result.resetRowPosition();
+        Set<Long> hostsSeen = new HashSet<Long>();
+        while (result.advanceRow()) {
+            if (checkRowForMultipleTargets(result, columnTargets)) {
+                Long thisHostId = result.getLong("HOST_ID");
+                if (enforceUnique) {
+                    StringBuilder message = new StringBuilder();
+                    message.append("HOST_ID: " + thisHostId + " seen twice in table looking for ");
+                    for (Entry<String, String> entry : columnTargets.entrySet()) {
+                        message.append(entry.getValue() + " in column " + entry.getKey() + ";");
+                    }
+                    assertFalse(message.toString(), hostsSeen.contains(thisHostId));
+                }
+                hostsSeen.add(thisHostId);
+            }
+        }
+
+        //* Enable this to force a failure with diagnostics */ hostsSeen.add(123456789L);
+
+        // Before possibly failing an assert, prepare to report details of the non-conforming result.
+        m_recentAnalysis = null;
+        if (HOSTS != hostsSeen.size()) {
+            m_recentAnalysis = new StringBuilder();
+            m_recentAnalysis.append("Failure follows from these results:\n");
+            Set<Long> seenAgain = new HashSet<Long>();
+            result.resetRowPosition();
+            while (result.advanceRow()) {
+                Long thisHostId = result.getLong("HOST_ID");
+                String rowStatus = "Found a non-match";
+                if (checkRowForMultipleTargets(result, columnTargets)) {
+                    if (seenAgain.add(thisHostId)) {
+                        rowStatus = "Added a match";
+                    } else {
+                        rowStatus = "Duplicated a match";
+                    }
+                }
+                m_recentAnalysis.append(rowStatus +
+                        " at host " + thisHostId + " for ");
+                for (String key : columnTargets.keySet()) {
+                    m_recentAnalysis.append(key + " " + result.getString(key) + ";");
+                }
+                m_recentAnalysis.append("\n");
             }
         }
         return hostsSeen.size();
@@ -632,8 +702,18 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         // expect NEW_ORDER.insert, GoSleep
         // see TestStatsProcProfile.java for tests of the aggregation itself.
-        assertEquals("Validate site filtering for PROCEDUREPROFILE",
-                3, results[0].getRowCount());
+        List<String> possibleProcs = new ArrayList<String>();
+        possibleProcs.add("org.voltdb_testprocs.regressionsuites.malicious.GoSleep");
+        possibleProcs.add("NEW_ORDER.insert");
+        if (MiscUtils.isPro()) {
+            possibleProcs.add("org.voltdb.sysprocs.SnapshotSave");
+        }
+
+        while (results[0].advanceRow()) {
+            assertTrue("Unexpected stored procedure executed: " +
+                        results[0].getString("PROCEDURE"),
+                        possibleProcs.contains(results[0].getString("PROCEDURE")));
+        }
     }
 
     public void testIOStatistics() throws Exception {
@@ -1051,9 +1131,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("Test SNAPSHOTSTATUS table: " + results[0].toString());
         validateSchema(results[0], expectedTable);
         // One row per table per node
-        validateRowSeenAtAllHosts(results[0], "TABLE", "WAREHOUSE", false);
-        validateRowSeenAtAllHosts(results[0], "TABLE", "NEW_ORDER", false);
-        validateRowSeenAtAllHosts(results[0], "TABLE", "ITEM", false);
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("NONCE", "testnonce");
+        columnTargets.put("TABLE", "WAREHOUSE");
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
+        columnTargets.put("TABLE", "NEW_ORDER");
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
+        columnTargets.put("TABLE", "ITEM");
+        validateRowSeenAtAllHosts(results[0], columnTargets, true);
     }
 
     public void testManagementStats() throws Exception {
@@ -1307,20 +1392,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
-        // synchronous logging
-        /*
-        project.configureLogging(null, null, true, true, FSYNC_INTERVAL_GOLD, null, null);
-        config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
-                TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
-                BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-        ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
-        ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-        */
 
         return builder;
     }
