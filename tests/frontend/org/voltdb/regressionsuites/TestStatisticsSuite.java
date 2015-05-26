@@ -182,87 +182,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(PARTITIONS, partsSeen.size());
     }
 
-    public void testCommandLogStats() throws Exception {
-        System.out.println("\n\nTESTING COMMANDLOG STATS\n\n\n");
-
-        Client client  = getFullyConnectedClient();
-
-        ColumnInfo[] expectedSchema = new ColumnInfo[8];
-        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT);
-        expectedSchema[4] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT);
-        expectedSchema[5] = new ColumnInfo(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name(), VoltType.INTEGER);
-        expectedSchema[6] = new ColumnInfo(CommandLogStats.StatName.SEGMENT_COUNT.name(), VoltType.INTEGER);
-        expectedSchema[7] = new ColumnInfo(CommandLogStats.StatName.FSYNC_INTERVAL.name(), VoltType.INTEGER);
-        VoltTable expectedTable = new VoltTable(expectedSchema);
-
-        VoltTable[] results = null;
-
-        // Test the schema
-        Thread.sleep(1000);
-        results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
-        System.out.println("Node commandlog statistics table: " + results[0].toString());
-        assertEquals(1, results.length);
-        validateSchema(results[0], expectedTable);
-        results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
-
-        // Enough for community version
-        /*
-        if (!MiscUtils.isPro()) {
-            return;
-        }
-        */
-        System.out.println(MiscUtils.isPro());
-
-        // Inject some transactions
-        for (int i = 0; i < 3; i++) {
-            long start = System.currentTimeMillis();
-            for (int j = 0; j < 16000; j++) {
-                client.callProcedure("NEW_ORDER.insert", (i * 16000 + j) % 32768);
-            }
-            long end = System.currentTimeMillis();
-            System.out.println("Insertion took " + (end - start) + " ms");
-            if (end - start < FSYNC_INTERVAL_GOLD) {
-                System.out.println("Insertion took " + (end - start) + " ms, sleeping..");
-                Thread.sleep(FSYNC_INTERVAL_GOLD - (end - start));
-            }
-
-            // Issue commandlog stats query
-            results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
-            System.out.println("commandlog statistics: " + results[0].toString());
-
-            // check every row
-            while (results[0].advanceRow()) {
-                // Test fsync interval
-                int actualFsyncInterval = (int) results[0].getLong(CommandLogStats.StatName.FSYNC_INTERVAL.name());
-                int fsyncNoise = Math.abs(actualFsyncInterval - FSYNC_INTERVAL_GOLD);
-
-                System.out.println("Actual fsync interval is " + actualFsyncInterval + "ms, specified interval is " + FSYNC_INTERVAL_GOLD + "ms");
-                String message = "Abnormal fsync interval: " + actualFsyncInterval + "ms (specified interval is "
-                        + FSYNC_INTERVAL_GOLD + "ms)";
-                assertTrue(message, fsyncNoise < FSYNC_TOLERENCE);
-
-                if (i == 4) {
-                    int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name());
-                    int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
-                    message = "haha";
-                    assertTrue(message, (actualSegmentCount == 2) && (actualLoanedSegmentCount <= actualSegmentCount));
-                }
-            }
-        }
-
-        /*
-        System.out.println("Sleeping, waiting for truncation snapshot to complete");
-        Thread.sleep(50000);
-        results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
-        System.out.println("commandlog statistics: " + results[0].toString());
-        */
-
-    }
-
     public void testInvalidCalls() throws Exception {
         System.out.println("\n\nTESTING INVALID CALLS\n\n\n");
         Client client = getFullyConnectedClient();
@@ -714,7 +633,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // expect NEW_ORDER.insert, GoSleep
         // see TestStatsProcProfile.java for tests of the aggregation itself.
         assertEquals("Validate site filtering for PROCEDUREPROFILE",
-                2, results[0].getRowCount());
+                3, results[0].getRowCount());
     }
 
     public void testIOStatistics() throws Exception {
@@ -1243,6 +1162,87 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         checker.check(bps.getOverallStats());
     }
 
+    public void testCommandLogStats() throws Exception {
+        System.out.println("\n\nTESTING COMMANDLOG STATS\n\n\n");
+
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema = new ColumnInfo[8];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_BYTES.name(), VoltType.BIGINT);
+        expectedSchema[4] = new ColumnInfo(CommandLogStats.StatName.OUTSTANDING_TXNS.name(), VoltType.BIGINT);
+        expectedSchema[5] = new ColumnInfo(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name(), VoltType.INTEGER);
+        expectedSchema[6] = new ColumnInfo(CommandLogStats.StatName.SEGMENT_COUNT.name(), VoltType.INTEGER);
+        expectedSchema[7] = new ColumnInfo(CommandLogStats.StatName.FSYNC_INTERVAL.name(), VoltType.INTEGER);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        VoltTable[] results = null;
+
+        // Test the schema
+        Thread.sleep(1000);
+        results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
+        System.out.println("Node commandlog statistics table: " + results[0].toString());
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+        results[0].advanceRow();
+        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+
+        // Enough for community version
+        /*
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+        */
+        System.out.println(MiscUtils.isPro());
+
+        // Inject some transactions
+        for (int i = 0; i < 3; i++) {
+            long start = System.currentTimeMillis();
+            for (int j = 0; j < 16000; j++) {
+                client.callProcedure("NEW_ORDER.insert", (i * 16000 + j) % 32768);
+            }
+            long end = System.currentTimeMillis();
+            System.out.println("Insertion took " + (end - start) + " ms");
+            if (end - start < FSYNC_INTERVAL_GOLD) {
+                System.out.println("Insertion took " + (end - start) + " ms, sleeping..");
+                Thread.sleep(FSYNC_INTERVAL_GOLD - (end - start));
+            }
+
+            // Issue commandlog stats query
+            results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
+            System.out.println("commandlog statistics: " + results[0].toString());
+
+            // check every row
+            while (results[0].advanceRow()) {
+                // Test fsync interval
+                int actualFsyncInterval = (int) results[0].getLong(CommandLogStats.StatName.FSYNC_INTERVAL.name());
+                int fsyncNoise = Math.abs(actualFsyncInterval - FSYNC_INTERVAL_GOLD);
+
+                System.out.println("Actual fsync interval is " + actualFsyncInterval + "ms, specified interval is " + FSYNC_INTERVAL_GOLD + "ms");
+                String message = "Abnormal fsync interval: " + actualFsyncInterval + "ms (specified interval is "
+                        + FSYNC_INTERVAL_GOLD + "ms)";
+                assertTrue(message, fsyncNoise < FSYNC_TOLERENCE);
+
+                if (i == 2) {
+                    int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name());
+                    int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
+                    message = "haha";
+                    assertTrue(message, (actualSegmentCount == 2) && (actualLoanedSegmentCount <= actualSegmentCount));
+                }
+            }
+        }
+
+        /*
+        System.out.println("Sleeping, waiting for truncation snapshot to complete");
+        Thread.sleep(50000);
+        results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
+        System.out.println("commandlog statistics: " + results[0].toString());
+        */
+
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
@@ -1301,7 +1301,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
-        ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+        //((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
