@@ -579,9 +579,12 @@ public class Expression {
     boolean isComposedOf(OrderedHashSet expressions,
                          OrderedIntHashSet excludeSet) {
 
-        if (opType == OpTypes.VALUE) {
+        // BEGIN Cherry-picked code change from hsqldb-2.3.2
+        if (opType == OpTypes.VALUE || opType == OpTypes.DYNAMIC_PARAM
+                || opType == OpTypes.PARAMETER || opType == OpTypes.VARIABLE) {
             return true;
         }
+        // END Cherry-picked code change from hsqldb-2.3.2
 
         if (excludeSet.contains(opType)) {
             return true;
@@ -1507,7 +1510,7 @@ public class Expression {
         // logicals - other predicates
         prototypes.put(OpTypes.LIKE,          (new VoltXMLElement("operation")).withValue("optype", "like"));
         prototypes.put(OpTypes.IN,            null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.EXISTS,        null); // not yet supported ExpressionLogical for subqueries
+        prototypes.put(OpTypes.EXISTS,        (new VoltXMLElement("operation")).withValue("optype", "exists"));
         prototypes.put(OpTypes.OVERLAPS,      null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.UNIQUE,        null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.NOT_DISTINCT,  null); // not yet supported ExpressionLogical
@@ -1584,25 +1587,35 @@ public class Expression {
         // A SIMPLE_COLUMN ExpressionColumn can be treated as a normal "COLUMN" ExpressionColumn.
         // That case gets explicitly enabled here by fudging the opType from SIMPLE_COLUMN to COLUMN.
         if (exprOp == OpTypes.SIMPLE_COLUMN) {
-            // find the substitue from displayCols list
-            for (int ii=startKey+1; ii < displayCols.size(); ++ii)
-            {
-                Expression otherCol = displayCols.get(ii);
-                // This mechanism of finding the expression that a SIMPLE_COLUMN
-                // is referring to is inherently fragile---columnIndex is an
-                // offset into different things depending on context!
-                if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
-                         (otherCol.columnIndex == this.columnIndex)  &&
-                         !(otherCol instanceof ExpressionColumn))
-                {
-                    ignoredDisplayColIndexes.add(ii);
-                    // serialize the column this simple column stands-in for.
-                    // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
-                    // quit seeking simple_column's replacement.
-                    return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
+            if (displayCols == null) {
+                if (this instanceof ExpressionColumn == false) {
+                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                            "VoltDB does not support this complex query currently.");
                 }
+                // convert the SIMPLE_COLUMN into a COLUMN
+                opType = OpTypes.COLUMN;
+                exprOp = OpTypes.COLUMN;
+            } else {
+                // find the substitue from displayCols list
+                for (int ii=startKey+1; ii < displayCols.size(); ++ii)
+                {
+                    Expression otherCol = displayCols.get(ii);
+                    // This mechanism of finding the expression that a SIMPLE_COLUMN
+                    // is referring to is inherently fragile---columnIndex is an
+                    // offset into different things depending on context!
+                    if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
+                             (otherCol.columnIndex == this.columnIndex)  &&
+                             !(otherCol instanceof ExpressionColumn))
+                    {
+                        ignoredDisplayColIndexes.add(ii);
+                        // serialize the column this simple column stands-in for.
+                        // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
+                        // quit seeking simple_column's replacement.
+                        return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
+                    }
+                }
+                assert(false);
             }
-            assert(false);
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
@@ -1622,6 +1635,13 @@ public class Expression {
             exp.attributes.put("alias", realAlias);
         } else if ((alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
+        }
+
+        // Add expresion sub type
+        if (exprSubType == OpTypes.ANY_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "any");
+        } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
+            exp.attributes.put("opsubtype", "all");
         }
 
         for (Expression expr : nodes) {
@@ -1736,8 +1756,6 @@ public class Expression {
             if (subQuery == null || subQuery.queryExpression == null) {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
-            // @TODO: SubQuery doesn't have an information about the query parameters
-            // Or maybe there is a way?
             ExpressionColumn parameters[] = new ExpressionColumn[0];
             exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
             return exp;

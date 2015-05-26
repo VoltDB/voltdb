@@ -35,6 +35,7 @@
 #include "storage/DRTupleStream.h"
 #include "common/Topend.h"
 #include "common/executorcontext.hpp"
+#include "indexes/tableindexfactory.h"
 #include "boost/smart_ptr.hpp"
 
 using namespace std;
@@ -45,15 +46,24 @@ const int COLUMN_COUNT = 5;
 // size without incestuously using code we're trying to test.  I've
 // pre-computed this magic size for an Exported tuple of 5 integer
 // columns, which includes:
-// 1 Export header column * sizeof(int8_t) = 1
-// 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
-// sizeof(int32_t) for row header = 4
-// 5 * sizeof(int32_t) for tuple data = 40
-// total: 67
+// 1 version byte
+// 1 type byte
+// 8 table signature bytes
+// 4 row length bytes
+// 1 (5 columns rounds to 8, /8 = 1) null mask byte
+// 5 * sizeof(int32_t) = 20 data bytes
+// 4 checksum bytes
+// total: 39
 const int MAGIC_TUPLE_SIZE = 39;
 const int MAGIC_TRANSACTION_SIZE = 36;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
-// 1k buffer
+// More magic: assume we've indexed on precisely one of those integer
+// columns. Then our magic size should reduce the 5 * sizeof(int32_t) to:
+// 4 index checksum bytes
+// 1 * sizeof(int32_t) = 4 data bytes
+// new total: 27
+const int MAGIC_OPTIMIZED_TUPLE_SIZE = 27;
+const int MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_OPTIMIZED_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 const int BUFFER_SIZE = 950;
 // roughly 22.5k
 const int LARGE_BUFFER_SIZE = 21375;
@@ -64,8 +74,11 @@ static int64_t addPartitionId(int64_t value) {
 
 class DRTupleStreamTest : public Test {
 public:
-    DRTupleStreamTest() : m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, "localhost", 2, &m_wrapper, NULL)) {
+    DRTupleStreamTest()
+      : m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
+                                      (NValueArray*)NULL, (VoltDBEngine*)NULL,
+                                      "localhost", 2, &m_wrapper, NULL))
+    {
         m_wrapper.m_enabled = true;
         srand(0);
         // set up the schema used to fill the new buffer
@@ -86,8 +99,8 @@ public:
         m_wrapper.configure(42);
 
         // excercise a smaller buffer capacity
-        m_wrapper.setDefaultCapacity(BUFFER_SIZE + 8);
-        m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + 8);
+        m_wrapper.setDefaultCapacity(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
+        m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
@@ -100,7 +113,7 @@ public:
         m_tuple->move(m_tupleMemory);
     }
 
-    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle)
+    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT, TableIndex* index = NULL, uint32_t indexCrc = 0)
     {
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
@@ -111,7 +124,7 @@ public:
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
-                               currentSpHandle, currentSpHandle, *m_tuple, DR_RECORD_INSERT);
+                               currentSpHandle, currentSpHandle, *m_tuple, type, index, indexCrc);
     }
 
     virtual ~DRTupleStreamTest() {
@@ -232,6 +245,46 @@ TEST_F(DRTupleStreamTest, BasicOps)
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
+    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+}
+
+
+TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
+    vector<int> columnIndices(1, 0);
+    TableIndexScheme scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
+                                               columnIndices, TableIndex::simplyIndexColumns(),
+                                               true, true, m_schema);
+    TableIndex *index = TableIndexFactory::getInstance(scheme);
+    uint32_t indexCrc = 42;
+    for (int i = 1; i < 10; i++)
+    {
+        // first, send some delete records with an index
+        appendTuple(i-1, i, DR_RECORD_DELETE, index, indexCrc);
+        m_wrapper.endTransaction();
+    }
+    m_wrapper.periodicFlush(-1, addPartitionId(9));
+    delete index;
+
+    for (int i = 10; i < 20; i++)
+    {
+        // then send some delete records without an index
+        appendTuple(i-1, i, DR_RECORD_DELETE);
+        m_wrapper.endTransaction();
+    }
+    m_wrapper.periodicFlush(-1, addPartitionId(19));
+
+    // get the first buffer flushed
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), (MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE * 9));
+
+    // now get the second
+    ASSERT_FALSE(m_topend.blocks.empty());
+    results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), (MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
 }
 

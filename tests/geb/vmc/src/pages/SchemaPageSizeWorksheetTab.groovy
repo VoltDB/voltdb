@@ -28,6 +28,7 @@ package vmcTest.pages
  * of the VoltDB Management Center (page), which is the VoltDB web UI (replacing
  * the old Catalog Report).
  */
+
 class SchemaPageSizeWorksheetTab extends SchemaPage {
     static content = {
         name		{ $(class:"tablesorter-header-inner", text:"Name") }
@@ -62,8 +63,11 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         searchName			{ $("#sizetable > thead > tr.tablesorter-filter-row > td:nth-child(1) > input") }
         documentationLink 	{ $("#iconDoc") }
         generatedbytxt		{$("#catalogContainer > div.documentation > span")}
+        refreshtableworksheet   { $("#MenuCatalog > div > button", text:"Refresh")}
 
     }
+
+
     static at = {
         sizeTab.displayed
         sizeTab.attr('class') == 'active'

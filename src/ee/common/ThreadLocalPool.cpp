@@ -21,12 +21,12 @@
 #include <iostream>
 #include "common/SQLException.h"
 
+namespace voltdb {
 // This needs to be >= the VoltType.MAX_VALUE_LENGTH defined in java, currently 1048576.
 // The rationale for making it any larger would be to allow calculating wider "temp" values
 // for use in situations where they are not being stored as column values.
-static const int POOLED_MAX_VALUE_LENGTH = 1048576;
+const int ThreadLocalPool::POOLED_MAX_VALUE_LENGTH = 1048576;
 
-namespace voltdb {
 /**
  * Thread local key for storing thread specific memory pools
  */

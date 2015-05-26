@@ -137,6 +137,13 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
     }
 
     const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
+    if ((count * valueUTF8Length) > ThreadLocalPool::POOLED_MAX_VALUE_LENGTH) {
+        char msg[1024];
+        snprintf(msg, sizeof(msg), "REPEAT function call would create a string of size %d which is larger than the maximum size %d",
+                 count * valueUTF8Length, ThreadLocalPool::POOLED_MAX_VALUE_LENGTH);
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                           msg);
+    }
     char *repeatChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
 
     std::string repeatStr;
@@ -329,9 +336,10 @@ static inline std::string trim_function(std::string source, const std::string ma
     return source;
 }
 
-/** implement the 3-argument SQL TRIM function */
-template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 3);
+
+/** implement the 2-argument SQL TRIM functions */
+inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool leading, bool trailing) {
+    assert(arguments.size() == 2);
 
     for (int i = 0; i < arguments.size(); i++) {
         const NValue& arg = arguments[i];
@@ -340,11 +348,8 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
         }
     }
 
-    const NValue& opt = arguments[0];
-    int32_t optArg = static_cast<int32_t>(opt.castAsBigIntAndGetValue());
-
     char* ptr;
-    const NValue& trimChar = arguments[1];
+    const NValue& trimChar = arguments[0];
     if (trimChar.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -354,7 +359,7 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
 
     std::string trimArg = std::string(ptr, length);
 
-    const NValue& strVal = arguments[2];
+    const NValue& strVal = arguments[1];
     if (strVal.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
@@ -365,29 +370,28 @@ template<> inline NValue NValue::call<FUNC_TRIM_CHAR>(const std::vector<NValue>&
 
     // SQL03 standard only allows 1 character trim character.
     // In order to be compatible with other popular databases like MySQL,
-    // our implementation also allows multiple characters, but rejects 0 character.
+    // our implementation also allows multiple characters, but rejects 0 characters.
     if (length == 0) {
         throw SQLException( SQLException::data_exception_numeric_value_out_of_range,
                 "data exception -- trim error, invalid length argument 0");
     }
 
-    std::string result = "";
-    switch (optArg) {
-    case SQL_TRIM_BOTH:
-        result = trim_function(inputStr, trimArg, true, true);
-        break;
-    case SQL_TRIM_LEADING:
-        result = trim_function(inputStr, trimArg, true, false);
-        break;
-    case SQL_TRIM_TRAILING:
-        result = trim_function(inputStr, trimArg, false, true);
-        break;
-    default:
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported SQL TRIM exception");
-    }
-
+    std::string result = trim_function(inputStr, trimArg, leading, trailing);
     return getTempStringValue(result.c_str(), result.length());
 }
+
+template<> inline NValue NValue::call<FUNC_TRIM_BOTH_CHAR>(const std::vector<NValue>& arguments) {
+    return trimWithOptions(arguments, true, true);
+}
+
+template<> inline NValue NValue::call<FUNC_TRIM_LEADING_CHAR>(const std::vector<NValue>& arguments) {
+    return trimWithOptions(arguments, true, false);
+}
+
+template<> inline NValue NValue::call<FUNC_TRIM_TRAILING_CHAR>(const std::vector<NValue>& arguments) {
+    return trimWithOptions(arguments, false, true);
+}
+
 
 /** implement the 3-argument SQL REPLACE function */
 template<> inline NValue NValue::call<FUNC_REPLACE>(const std::vector<NValue>& arguments) {

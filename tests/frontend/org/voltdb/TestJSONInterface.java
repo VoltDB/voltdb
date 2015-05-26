@@ -226,6 +226,11 @@ public class TestJSONInterface extends TestCase {
                 byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
                 String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
                 conn.setRequestProperty("Authorization", "Hashed " + h);
+            } else if (scheme.equalsIgnoreCase("hashed256")) {
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
+                String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
+                conn.setRequestProperty("Authorization", "Hashed " + h);
             } else if (scheme.equalsIgnoreCase("basic")) {
                 conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
             }
@@ -266,11 +271,16 @@ public class TestJSONInterface extends TestCase {
 
         StringBuilder decodedString = new StringBuilder();
         String line;
-        while ((line = in.readLine()) != null) {
-            decodedString.append(line);
+        try {
+            while ((line = in.readLine()) != null) {
+                decodedString.append(line);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        } finally {
+            in.close();
+            in = null;
         }
-        in.close();
-        in = null;
         // get result code
         int responseCode = conn.getResponseCode();
 
@@ -795,7 +805,9 @@ public class TestJSONInterface extends TestCase {
             // Call @AdHoc with many parameters (more than 2)
             pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            assertTrue(responseJSON.contains("Incorrect number of parameters passed: expected 0, passed 2"));
+            System.err.println(responseJSON);
+            assertTrue(responseJSON.contains("Too many actual arguments were passed for the parameters in the sql "
+                    + "statement(s): (2 vs. 0)"));
 
         } finally {
             if (server != null) {
@@ -1473,6 +1485,7 @@ public class TestJSONInterface extends TestCase {
             UserInfo users[] = new UserInfo[] {
                     new UserInfo("user1", "admin", new String[] {"user"}),
                     new UserInfo("user2", "admin", new String[] {"administrator"}),
+                    new UserInfo("user3", "admin", new String[] {"administrator"}), //user3 used for both hash testing.
             };
             builder.addUsers(users);
 
@@ -1488,8 +1501,18 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
+            //Get deployment with diff hashed password
+            //20E3AAE7FC23385295505A6B703FD1FBA66760D5 FD19534FBF9B75DF7CD046DE3EAF93DB77367CA7C1CC017FFA6CED2F14D32E7D
+            //D033E22AE348AEB5660FC2140AEC35850C4DA997 8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918
+            //sha-256
+            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918", null, null, null, 200, "application/json");
+            assertTrue(dep.contains("cluster"));
+            //sha-1
+            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=D033E22AE348AEB5660FC2140AEC35850C4DA997", null, null, null, 200, "application/json");
+            assertTrue(dep.contains("cluster"));
+
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
             dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
@@ -1563,6 +1586,14 @@ public class TestJSONInterface extends TestCase {
             dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed256", 200, "text/xml");
+            assertTrue(dep.contains("<deployment>"));
+            assertTrue(dep.contains("</deployment>"));
+            //Test back with sha1
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
+            assertTrue(dep.contains("<deployment>"));
+            assertTrue(dep.contains("</deployment>"));
+
         } finally {
             if (server != null) {
                 server.shutdown();

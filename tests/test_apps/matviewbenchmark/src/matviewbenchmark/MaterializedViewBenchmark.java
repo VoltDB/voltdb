@@ -121,20 +121,6 @@ public class MaterializedViewBenchmark {
     }
 
     /**
-     * Class to use for returning values from the diffWriter method to the
-     * runBenchmark method.
-     */
-    public static class DiffRetVals {
-        double throughput;
-        double execute;
-
-        public DiffRetVals(double tp, double ex) {
-            throughput = tp;
-            execute = ex;
-        }
-    }
-
-    /**
      * The constructor method for the MaterializedViewBenchmark class.
      * @param config MatViewConfig object containing the configuration options.
      */
@@ -240,38 +226,6 @@ public class MaterializedViewBenchmark {
     }
 
     /**
-     * Writes the diff values to the csv file.
-     * @param savedThroughput Throughput class variable.
-     *        newThroughput   New throughput value.
-     *        savedExecute    Execute class variable.
-     *        newExecute      New Execute value.
-     *        name            Title to use for the row in the csv file.
-     *        stats           ClientStats class.
-     *        fw              FileWriter object with the csv file.
-     * @throws Exception if anything unexpected happens.
-     * @return Returns DiffRetVals class containing the throughput/execute values to update
-     *         the MaterializedViewBenchmark class variables with.
-     */
-    public DiffRetVals diffWriter(double savedThroughput, double newThroughput, double savedExecute,
-                                  double newExecute, String name, ClientStats stats, FileWriter fw) throws Exception {
-        if (savedThroughput > 0) {
-            savedThroughput = (((newThroughput - savedThroughput) /
-                                  newThroughput) * 100);
-            savedExecute = (((savedExecute - newExecute) /
-                               newExecute) * 100);
-            fw.append(String.format("%s,%d,-1,0,0,0,%.2f,%.2f,0,0,0,0,0,0\n",
-                                    name,
-                                    stats.getStartTimestamp(),
-                                    savedThroughput,
-                                    savedExecute));
-        } else {
-            savedThroughput = newThroughput;
-            savedExecute = newExecute;
-        }
-        return new DiffRetVals(savedThroughput, savedExecute);
-    }
-
-    /**
      * Prints the results and statistics about performance.
      * @param procedure The name of the stored procedure that was tested.
      * @throws Exception if anything unexpected happens.
@@ -338,30 +292,6 @@ public class MaterializedViewBenchmark {
                                 stats.getStartTimestamp(),
                                 stats.getTxnThroughput(),
                                 execTimeInMicroSec));
-
-        // Expecting the custom insert/delete procedure names ex. ids_insert
-        String[] procArray = procedure.split("_");
-        if (procArray[procArray.length-1].equals("insert")) {
-            DiffRetVals ret = diffWriter(insertThroughput, (double)stats.getTxnThroughput(), insertExecute,
-                                         execTimeInMicroSec, "Insert Diff", stats, fw);
-            insertThroughput = ret.throughput;
-            insertExecute = ret.execute;
-        } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("group")) {
-            DiffRetVals ret = diffWriter(updateGroupThroughput, (double)stats.getTxnThroughput(), updateGroupExecute,
-                                         execTimeInMicroSec, "Update Grp Diff", stats, fw);
-            updateGroupThroughput = ret.throughput;
-            updateGroupExecute = ret.execute;
-        } else if (procArray[procArray.length-1].equals("update") && procArray[1].equals("value")) {
-            DiffRetVals ret = diffWriter(updateValueThroughput, (double)stats.getTxnThroughput(), updateValueExecute,
-                                         execTimeInMicroSec, "Update Sum Diff", stats, fw);
-            updateValueThroughput = ret.throughput;
-            updateValueExecute = ret.execute;
-        } else {
-            DiffRetVals ret = diffWriter(deleteThroughput, (double)stats.getTxnThroughput(), deleteExecute,
-                                         execTimeInMicroSec, "Delete Diff", stats, fw);
-            deleteThroughput = ret.throughput;
-            deleteExecute = ret.execute;
-        }
     }
 
     /**

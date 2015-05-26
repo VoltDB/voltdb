@@ -248,8 +248,9 @@ public class TestClientInterface {
     {
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
         proc.setProcName(name);
-        if (origTxnId != null)
+        if (origTxnId != null) {
             proc.setOriginalTxnId(origTxnId);
+        }
         proc.setParams(params);
         ByteBuffer buf = ByteBuffer.allocate(proc.getSerializedSize());
         proc.flattenToBuffer(buf);
@@ -552,6 +553,7 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
+        assert(resp.getStatusString().startsWith("Server is paused"));
         when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
     }
 
