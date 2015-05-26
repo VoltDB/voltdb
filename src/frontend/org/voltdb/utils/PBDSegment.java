@@ -28,6 +28,7 @@ import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DBBPool.MBBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 import org.xerial.snappy.Snappy;
 
@@ -41,6 +42,7 @@ import org.xerial.snappy.Snappy;
 class PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
+    public static final int NO_FLAGS = 0;
     public static final int FLAG_COMPRESSED = 1;
 
     //Avoid unecessary sync with this flag
@@ -229,7 +231,7 @@ class PBDSegment {
             //Record the size of the compressed object and update buffer positions
             //and whether the object was compressed
             mbuf.putInt(objSizePosition, written);
-            mbuf.putInt(objSizePosition + 4, compress ? FLAG_COMPRESSED: 0);
+            mbuf.putInt(objSizePosition + 4, compress ? FLAG_COMPRESSED: NO_FLAGS);
             buf.position(buf.limit());
             incrementNumEntries(remaining);
         } finally {
@@ -237,6 +239,33 @@ class PBDSegment {
         }
 
         return true;
+    }
+
+    int offer(DeferredSerialization ds) throws IOException {
+        if (m_closed) throw new IOException("closed");
+        final ByteBuffer mbuf = m_buf.b();
+        if (mbuf.remaining() < ds.getSerializedSize() + m_objectHeaderBytes) return -1;
+
+        m_syncedSinceLastEdit = false;
+        int written = writeDeferredSerialization(mbuf, ds);
+        incrementNumEntries(written);
+        return written;
+    }
+
+    static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException {
+        int written = 0;
+        try {
+            final int objSizePosition = mbuf.position();
+            mbuf.position(mbuf.position() + m_objectHeaderBytes);
+            final int objStartPosition = mbuf.position();
+            ds.serialize(mbuf);
+            written = mbuf.position() - objStartPosition;
+            mbuf.putInt(objSizePosition, written);
+            mbuf.putInt(objSizePosition + 4, NO_FLAGS);
+        } finally {
+            ds.cancel();
+        }
+        return written;
     }
 
     BBContainer poll(OutputContainerFactory factory) throws IOException {
@@ -266,7 +295,7 @@ class PBDSegment {
         final int nextFlags = m_readBuf.getInt();
 
         //Check for compression
-        final boolean compressed = nextFlags == FLAG_COMPRESSED;
+        final boolean compressed = (nextFlags & FLAG_COMPRESSED) != 0;
         //Determine the length of the object if uncompressed
         final int nextUncompressedLength = compressed ? (int)Snappy.uncompressedLength(mBufAddr + m_readBuf.position(), nextCompressedLength) : nextCompressedLength;
         m_bytesRead += nextUncompressedLength;

@@ -99,8 +99,8 @@ public:
         m_wrapper.configure(42);
 
         // excercise a smaller buffer capacity
-        m_wrapper.setDefaultCapacity(BUFFER_SIZE + 8);
-        m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + 8);
+        m_wrapper.setDefaultCapacity(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
+        m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
