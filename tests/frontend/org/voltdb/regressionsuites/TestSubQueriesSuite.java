@@ -1517,7 +1517,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // EXISTS(table-agg-without-having-groupby) => EXISTS(TRUE)
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select max(ID) from R2 order by ID;)").getResults()[0];
+                "select R1.ID FROM R1 where exists( select max(ID) from R2 ) order by ID;").getResults()[0];
         validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
 
         // EXISTS(SELECT...LIMIT 0) => EXISTS(FALSE)
@@ -1543,12 +1543,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // EXISTS(able-agg-without-having-groupby OFFSET 1) => EXISTS(FALSE)
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select max(ID) from R2 offset 1;)").getResults()[0];
+                "select R1.ID FROM R1 where exists( select max(ID) from R2 offset 1);").getResults()[0];
         validateTableOfLongs(vt, new long[][] {  });
 
         // count(*) offset 1
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID FROM R1 where exists( select count(*) from R2 offset 1)").getResults()[0];
+                "select R1.ID FROM R1 where exists( select count(*) from R2 offset 1);").getResults()[0];
         validateTableOfLongs(vt, new long[][] {  });
 
         // join on EXISTS(FALSE)

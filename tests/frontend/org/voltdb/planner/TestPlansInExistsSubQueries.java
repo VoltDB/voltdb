@@ -723,7 +723,14 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertEquals(true, pn.getChild(0) instanceof SeqScanPlanNode);
             verifyAggregateSubquery(((SeqScanPlanNode)pn.getChild(0)).getPredicate(), 2, 1, true);
         }
-   }
+    }
+
+    public void testConstantExpressionInWhereClause() {
+        failToCompile("select * from r1 where 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
+
+        failToCompile("select a from r1 where exists " +
+                " (select max(c) from r2) and 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
+    }
 
     // HSQL failed to parse  these statement
     public void testHSQLFailed() {
