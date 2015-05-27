@@ -61,8 +61,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     private final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
     private final static boolean hasLocalServer = false;
     private static StringBuilder m_recentAnalysis = null;
-    private final static int FSYNC_INTERVAL_GOLD = 30;
-    private final static int FSYNC_TOLERENCE = 20;
+    private final static int FSYNC_INTERVAL_GOLD = 50;
+    private final static int FSYNC_TOLERENCE = 30;
 
     private static final Class<?>[] PROCEDURES =
     {
