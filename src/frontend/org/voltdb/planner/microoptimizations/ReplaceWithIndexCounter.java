@@ -66,7 +66,10 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             return plan;
         assert(plan.getChildCount() == 1);
         AggregatePlanNode aggplan = (AggregatePlanNode)plan;
-        if (aggplan.isTableCountStar() == false) {
+        // ENG-6131 fixed here.
+        if (! (aggplan.isTableCountStar() ||
+                aggplan.isTableNonDistinctCountConstant() ||
+                aggplan.isTableCountNonDistinctNullableColumn() )) {
             return plan;
         }
 
