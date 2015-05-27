@@ -62,3 +62,4 @@ doc/tutorials/auction/csvloader_*.csv
 /src/frontend/org/voltcore/utils/DBBPool.java
 /src/frontend/org/voltcore/utils/.flagfile
 /tests/sqlcmd/scripts/**/*.outdiffs
+out
