@@ -31,7 +31,7 @@
     <classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
     <classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
     <classpathentry kind="lib" path="lib/jna.jar"/>
-    <classpathentry kind="lib" path="lib/protobuf-java-2.4.1.jar"/>
+    <classpathentry kind="lib" path="lib/protobuf-java-2.5.0.jar"/>
     <classpathentry kind="lib" path="lib/snappy-java-1.1.0.1.jar"/>
     <classpathentry kind="lib" path="lib/jsch-0.1.51.jar"/>
     <classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
