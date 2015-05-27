@@ -985,7 +985,7 @@ public abstract class StatementDMQL extends Statement {
             // read offset. it may be a parameter token.
             VoltXMLElement offset = new VoltXMLElement("offset");
             Expression offsetExpr = limitCondition.getLeftNode();
-            if (offsetExpr.isUnresolvedParam()) {
+            if (offsetExpr.isDynamicParam()) {
                 offset.attributes.put("offset_paramid", offsetExpr.voltGetUniqueId(session));
             }
             else {
