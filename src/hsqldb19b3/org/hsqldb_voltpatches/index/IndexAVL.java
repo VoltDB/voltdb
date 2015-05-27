@@ -2033,7 +2033,6 @@ public class IndexAVL implements Index {
             return nextnode.getPos();
         }
     }
-
     // A VoltDB extension to support indexed expressions,
     // the assumeunique attribute and partial indexes
     

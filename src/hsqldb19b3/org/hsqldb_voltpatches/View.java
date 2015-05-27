@@ -285,7 +285,6 @@ public class View extends TableDerived {
 
         return td;
     }
-
     // A VoltDB extension to export abstract parse trees
 
     /**

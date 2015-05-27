@@ -775,12 +775,16 @@ public class SchemaManager {
                 t      = findUserTable(session, name, schema);
             }
 
-            ////if (t == null) {
-            ////    if (SqlInvariants.INFORMATION_SCHEMA.equals(schema)
-            ////            && database.dbInfo != null) {
-            ////        t = database.dbInfo.getSystemTable(session, name);
-            ////    }
-            ////}
+            // A VoltDB extension eliminate a dependency
+            /* disable 6 lines ...
+            if (t == null) {
+                if (SqlInvariants.INFORMATION_SCHEMA.equals(schema)
+                        && database.dbInfo != null) {
+                    t = database.dbInfo.getSystemTable(session, name);
+                }
+            }
+               ... disabled 4 lines */
+            // End of VoltDB extension
 
             if (t == null) {
                 throw Error.error(ErrorCode.X_42501, name);

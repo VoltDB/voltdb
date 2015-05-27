@@ -62,11 +62,9 @@ import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.types.ArrayType;
-import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Collation;
 import org.hsqldb_voltpatches.types.NullType;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.Types;
 
@@ -2201,7 +2199,7 @@ public class Expression implements Cloneable {
         prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
         prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery"));
         prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
-        prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table")); // not yet supported subquery feature, but needed for "in"
+        prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table"));
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
         prototypes.put(OpTypes.SQL_FUNCTION,  new VoltXMLElement("function"));
         prototypes.put(OpTypes.ROUTINE_FUNCTION, null); // not used
@@ -2549,8 +2547,6 @@ public class Expression implements Cloneable {
     {
         String opAsString;
         switch (exprOp) {
-        //case OpTypes.COALESCE:
-        //    opAsString = "the COALESCE operator. Consider using DECODE."; break; //MAY require ExpressionColumn state
 
         case OpTypes.VARIABLE:
             opAsString = "HSQL session variables"; break; // Some kind of HSQL session parameter? --paul
@@ -2562,10 +2558,6 @@ public class Expression implements Cloneable {
 
         case OpTypes.SCALAR_SUBQUERY:
         case OpTypes.ROW_SUBQUERY:
-        case OpTypes.TABLE_SUBQUERY:
-        case OpTypes.ROW:
-        case OpTypes.TABLE:
-        case OpTypes.EXISTS:
             throw new HSQLParseException("Unsupported subquery syntax within an expression. Consider using a join or multiple statements instead");
 
         case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break;
@@ -2581,7 +2573,6 @@ public class Expression implements Cloneable {
 
         case OpTypes.OVERLAPS:
         case OpTypes.UNIQUE:
-        case OpTypes.NOT_DISTINCT:
             opAsString = "sequences or subqueries"; break; // not yet supported ExpressionLogical
 
         case OpTypes.MATCH_SIMPLE:

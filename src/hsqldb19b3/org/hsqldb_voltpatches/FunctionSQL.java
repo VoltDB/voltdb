@@ -50,7 +50,7 @@ import org.hsqldb_voltpatches.types.Types;
 
 // A VoltDB extension to allow use of X'..' as numeric literals
 import java.math.BigInteger;
-// End VoltDB extension
+// End of VoltDB extension
 /**
  * Implementation of SQL standard function calls
  *
@@ -1644,22 +1644,30 @@ public class FunctionSQL extends Expression {
                 }
 
                 if (nodes[1].dataType == null) {
+                    // A VoltDB extension to provide better typing for position parameters
+                    /* disable 1 line ...
                     nodes[1].dataType = Type.SQL_NUMERIC;
+                    ... disabled 1 line */
+                    nodes[1].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                    // End of VoltDB extension
                 }
 
                 if (!nodes[1].dataType.isNumberType()) {
                     throw Error.error(ErrorCode.X_42563);
                 }
 
-                // A VoltDB extension to make the third parameter optional
+                // A VoltDB extension to make the third parameter optional and integer-typed
                 /* disable 1 line ...
                 if (nodes[2] != null) {
-                ... disabled 1 line */
-                if (nodes.length > 2 && nodes[2] != null) {
-                // End of VoltDB extension
                     if (nodes[2].dataType == null) {
                         nodes[2].dataType = Type.SQL_NUMERIC;
                     }
+                ... disabled 1 line */
+                if (nodes.length > 2 && nodes[2] != null) {
+                    if (nodes[2].dataType == null) {
+                        nodes[2].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                    }
+                // End of VoltDB extension
 
                     if (!nodes[2].dataType.isNumberType()) {
                         throw Error.error(ErrorCode.X_42563);
@@ -1847,7 +1855,12 @@ public class FunctionSQL extends Expression {
                 // End of VoltDB extension
 
                 if (nodes[2].dataType == null) {
+                    // A VoltDB extension to provide better typing for position parameters
+                    /* disable 1 line ...
                     nodes[2].dataType = Type.SQL_NUMERIC;
+                    ... disabled 1 line */
+                    nodes[2].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                    // End of VoltDB extension
                 }
 
                 if (!nodes[2].dataType.isNumberType()) {
@@ -1859,7 +1872,12 @@ public class FunctionSQL extends Expression {
 
                 if (nodes[3] != null) {
                     if (nodes[3].dataType == null) {
+                        // A VoltDB extension to provide better typing for position parameters
+                        /* disable 1 line ...
                         nodes[3].dataType = Type.SQL_NUMERIC;
+                        ... disabled 1 line */
+                        nodes[3].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
+                        // End of VoltDB extension
                     }
 
                     if (!nodes[3].dataType.isNumberType()) {
@@ -2306,7 +2324,6 @@ public class FunctionSQL extends Expression {
     public boolean isValueFunction() {
         return isSQLValueFunction;
     }
-
     // A VoltDB extension to customize the SQL function set support
 
     // FunctionCustom adds a few values to the range of FUNC_ constants above that should probaby be

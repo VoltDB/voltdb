@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches.types;
 
+import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;

@@ -266,11 +266,11 @@ public class Database {
                 logger.checkpoint(false);
             }
 
-            ////lobManager.open();
             // A VoltDB extension to eliminate a module dependency
-            /* disable 1 line
+            /* disable 2 lines
+            lobManager.open();
             dbInfo.setWithContent(true);
-             */
+            ... disabled 2 lines */
             // End of VoltDB extension
 
             checkpointRunner = new CheckpointRunner();
@@ -321,6 +321,7 @@ public class Database {
         /* disable 1 line
         dbInfo           = null;
         ... disabled 1 line */
+        // End of VoltDB extension
         checkpointRunner = null;
         timeoutRunner    = null;
     }

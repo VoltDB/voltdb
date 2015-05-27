@@ -46,9 +46,6 @@ import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
-// BEGIN Cherry-picked code change from hsqldb-2.3.2
-import org.hsqldb_voltpatches.lib.Iterator;
-// END Cherry-picked code change from hsqldb-2.3.2
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
@@ -1085,13 +1082,13 @@ public class QuerySpecification extends QueryExpression {
                 // two error messages for two different unsupported cases.
                 if ( ! isTopLevel) {
                     OrderedHashSet columnSet = new OrderedHashSet();
-                    Iterator aggIt = tempSet.iterator();
+                    org.hsqldb_voltpatches.lib.Iterator aggIt = tempSet.iterator();
                     while (aggIt.hasNext()) {
                         Expression nextAggr = (Expression) aggIt.next();
                         nextAggr.collectAllExpressions(columnSet,
                                 Expression.columnExpressionSet, Expression.emptyExpressionSet);
                     }
-                    Iterator columnIt = columnSet.iterator();
+                    org.hsqldb_voltpatches.lib.Iterator columnIt = columnSet.iterator();
                     while (columnIt.hasNext()) {
                         Expression nextColumn = (Expression) columnIt.next();
                         assert(nextColumn instanceof ExpressionColumn);

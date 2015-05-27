@@ -846,7 +846,6 @@ public class ParserBase {
     public Number convertToNumber(String s, NumberType type) {
         return scanner.convertToNumber(s, type);
     }
-
     // A VoltDB extension to make reserved words more consistent
     // and SQL statements easier to debug
 

@@ -403,7 +403,6 @@ public class DatabaseURL {
 
         return props;
     }
-
     // A VoltDB extension to disable the server package dependency
     // -- these values probably don't even matter.
 
