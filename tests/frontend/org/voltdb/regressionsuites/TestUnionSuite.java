@@ -571,7 +571,7 @@ public class TestUnionSuite extends RegressionSuite {
         project.addStmtProcedure("UnionBCD",
                 "((SELECT I FROM B WHERE PKEY = ?) UNION " +
                 "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(''||?))) UNION " +
-                "        SELECT I FROM D WHERE PKEY = ? and I = 4");
+                "        SELECT I FROM D WHERE PKEY = ?");
 
         // local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

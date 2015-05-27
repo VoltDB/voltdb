@@ -1131,6 +1131,7 @@ public abstract class StatementDMQL extends Statement {
 
         java.util.ArrayList<Expression> orderByCols = new java.util.ArrayList<Expression>();
         java.util.ArrayList<Expression> groupByCols = new java.util.ArrayList<Expression>();
+        select.displayCols.clear();
         java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>> aliases =
                 new java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>>();
 
