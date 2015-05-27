@@ -94,7 +94,6 @@ public class ImportManager {
     public synchronized void shutdown() {
         //If no processor set we dont have any import configuration
         if (m_processor.get() == null) {
-            importLog.info("ImportDataProcessor is not set nothing to shutdown.");
             return;
         }
         m_processor.get().shutdown();
@@ -113,7 +112,6 @@ public class ImportManager {
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
-            importLog.error("ImportDataProcessor is not set failed to call readyForData");
             return;
         }
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
