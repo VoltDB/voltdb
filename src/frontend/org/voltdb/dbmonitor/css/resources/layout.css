@@ -365,8 +365,7 @@ ul.topRightList {
 }
 
     ul.topRightList li {
-        margin: 0 0 0 5px;
-        padding: 20px 0 0 0;
+      padding: 20px 0 0 5px;
         float: left;
         line-height: 12px;
     }
@@ -1619,7 +1618,7 @@ div.popup {
 }
 
 ul.topRightList li.responsiveMenuPlaceHolder {
-    border-left: 1px solid #ccc;
+    /*border-left: 1px solid #ccc;*/
     height: 45px;
     width: 45px;
     display: none;

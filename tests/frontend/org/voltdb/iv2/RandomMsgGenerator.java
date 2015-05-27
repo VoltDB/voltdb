@@ -63,7 +63,7 @@ public class RandomMsgGenerator
     {
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         ParameterSet ps = mock(ParameterSet.class);
-        when(ps.toArray()).thenReturn(new Object[] {null, null, 0l, 0l, Long.MIN_VALUE});
+        when(ps.toArray()).thenReturn(new Object[] {null, 0l, 0l, Long.MIN_VALUE, null});
         when(spi.getParams()).thenReturn(ps);
         Iv2InitiateTaskMessage msg =
             new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, !isMp, spi,

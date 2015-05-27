@@ -82,6 +82,8 @@
                         </li>
                         <li class="line" id="userLine"></li>
                         <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
+                         <li class="line" id="Li1"></li>
+                        <li class="help"><a href="#About" id="ShowAbout">About</a></li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
                     </ul>
                 </div>
@@ -1155,6 +1157,50 @@
         </div>
     </div>
     <!--help popup ends-->
+    
+    <!--About popup-->
+    <div id="About" style="display: none">
+        <div class="overlay-title helpIcon ">System Overview</div>
+        <div class="clear"></div>
+        <div class="overlay-contentHelp">
+            <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
+            <div class="dataBlock">
+                    <div class="dataBlockContent systemOver" style="padding:0;">
+                        <table class="table table-condensed">
+                            <tbody>
+                                <tr>
+                                    <td>Mode</td>
+                                    <td id="mode"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>VoltDB Version</td>
+                                    <td id="voltdbVersion"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Buildstring</td>
+                                    <td id="buildString"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Cluster Composition</td>
+                                    <td id="clusterComposition"></td>
+                                    <td></td>
+                                </tr>
+                                <tr><td>Running Since</td>
+                                    <td id="runningSince"></td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p></p>
+                    </div>
+                </div>
+        </div>
+    </div>
+    <!--help popup ends-->
+
     <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
         <div class="overlay-title icon-alert">Shutdown: Confirmation</div>
@@ -1582,7 +1628,7 @@
         </div>
     </div>
     <!-- Query error because of Paused Database Popup-->
-    <a href="#" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
+    <a href="#addUserPopup" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
     <div id="addUserPopup" style="display: none">
         <div id="addUserInnerPopup" data-isupdate="" data-username="" data-role="">
             <div class="overlay-title icon-alert">

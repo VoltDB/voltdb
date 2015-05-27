@@ -671,6 +671,37 @@ var loadPage = function (serverName, portid) {
             } else
                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
         });
+        
+        //Get System Overview information
+        voltDbRenderer.GetHostAndSiteCount(function (countDetails) {
+            var siteCount = 0;
+            var hostCount = countDetails.DETAILS.HOSTCOUNT;
+            for (var item in countDetails.DETAILS.SITECOUNT) {
+                if (item == getCurrentServer())
+                    siteCount = countDetails.DETAILS.SITECOUNT[item];
+            }
+            if(siteCount>0)
+                siteCount--;
+            var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
+            if (clusterDetails != undefined && clusterDetails != null) {
+                if (clusterDetails.MODE != undefined && clusterDetails.VERSION != undefined && clusterDetails.BUILDSTRING != undefined && clusterDetails.UPTIME != undefined) {
+                    $("#mode").html(clusterDetails.MODE);
+                    $("#voltdbVersion").html(clusterDetails.VERSION);
+                    $("#buildString").html(clusterDetails.BUILDSTRING);
+                    $("#clusterComposition").html(hostCount + " hosts with " + (hostCount * siteCount) + " sites (" + siteCount + " per host)");
+                    $("#runningSince").html(getRunningTimeInfo(parseInt(clusterDetails.STARTTIME), clusterDetails.UPTIME));
+                }
+            }
+        });
+
+       var getRunningTimeInfo = function (startTime, upTime) {
+           var strTime = new Date(startTime).toUTCString();
+           var upTime1 = upTime.split(' ');
+           var upTimeHrMin = upTime1[2].split(':');
+           var runningSince = strTime + " (" + parseInt(upTime1[0]) + "d " + parseInt(upTimeHrMin[0]) + "h " + parseInt(upTimeHrMin[1]) + "m)";
+           return runningSince;
+        };
+        //
     };
 
     var refreshGraphAndData = function (graphView, currentTab) {
@@ -694,7 +725,7 @@ var loadPage = function (serverName, portid) {
             if (getCurrentServer() != undefined)
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
-
+        
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
@@ -1790,6 +1821,7 @@ var loadPage = function (serverName, portid) {
     saveThreshold();
 
     $('#showMyHelp').popup();
+    $('#ShowAbout').popup();
     $("#conPopup").popup({
         closeDialog: function () {
             VoltDbUI.isConnectionChecked = false;
