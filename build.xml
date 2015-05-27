@@ -727,6 +727,9 @@ CLEANING
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf bundles/*.jar'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf voltdb/*.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
