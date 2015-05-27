@@ -127,6 +127,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         public void setLimit(long number) {
             m_limit = number;
         }
+
+        public long getLimit() {
+            return m_limit;
+        }
+
+        public long getOffset() {
+            return m_offset;
+        }
+
+        public long getLimitParameterId () {
+            return m_limitParameterId;
+        }
     }
     LimitOffset m_limitOffset = new LimitOffset();
 
@@ -876,6 +888,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(m_having);
+        m_having = ExpressionUtil.evaluateExpression(m_having);
+        // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
+        if (ConstantValueExpression.isBooleanTrue(m_having)) {
+            m_having = null;
+        }
+
         if (m_aggregationList.size() >= 1) {
             m_hasAggregateExpression = true;
         }
@@ -1124,83 +1142,94 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
-     * Simplify the select statement from the EXISTS expression:
-     *  1. Replace the display columns with a single dummy column "1"
-     *  2. Drop DISTINCT expression
-     *  3. Add LIMIT 1
-     *  4. @TODO Remove ORDER BY, GROUP BY expressions
-     *           if HAVING and OFFSET expression is not present
+     * Simplify the EXISTS expression:
+     *  1. EXISTS ( table-agg-without-having-groupby) => TRUE
+     *  2. Replace the display columns with a single dummy column "1" and GROUP BY expressions
+     *  3. Drop DISTINCT expression
+     *  4. Add LIMIT 1
+     *  5. Remove ORDER BY expressions if HAVING expression is not present
      *
      * @param selectStmt
      * @return existsExpr
      */
-    protected void simplifyExistsSubqueryStmt() {
-        // Collect having, group by column names
-        Set<String> havingColumnNamesSet = new HashSet<String>();
-        Set<String> groupByColumnNamesSet = new HashSet<String>();
-        if (m_having != null) {
-            List<TupleValueExpression> havingTves = ExpressionUtil.getTupleValueExpressions(m_having);
-            for (TupleValueExpression tve : havingTves) {
-                havingColumnNamesSet.add(tve.getColumnAlias());
+    protected AbstractExpression simplifyExistsSubqueryStmt(AbstractExpression originalExistExpr) {
+        // Verify the edge case of EXISTS ( table-agg-without-having-groupby) for which
+        // the correct handling is to optimize out the exists clause entirely as trivially true or
+        // false if limit = 0 or offset > 0
+        // Can't optimize away the entire expression with limit and/or offset parameters
+        boolean canReplaceWithCVE = (m_having == null && m_groupByColumns.isEmpty() && !hasLimitOrOffsetParameters()) ||
+                m_limitOffset.getLimit() == 0;
+        if (canReplaceWithCVE) {
+            if ( m_limitOffset.getLimit() == 0) {
+                return ConstantValueExpression.getFalse();
             }
-        }
-        for (ParsedColInfo colInfo: m_groupByColumns) {
-            groupByColumnNamesSet.add(colInfo.alias);
-        }
-
-        ArrayList<ParsedColInfo> aggrExpressions = new ArrayList<ParsedColInfo>();
-        aggrExpressions.addAll(m_aggResultColumns);
-        m_aggResultColumns = aggrExpressions;
-
-        // Replace the display schema with the single dummy column
-        m_displayColumns.clear();
-        ParsedColInfo col = new ParsedColInfo();
-        ConstantValueExpression colExpr = new ConstantValueExpression();
-        colExpr.setValueType(VoltType.NUMERIC);
-        colExpr.setValue("1");
-        col.expression = colExpr;
-        ExpressionUtil.finalizeValueTypes(col.expression);
-
-        col.tableName = "VOLT_TEMP_TABLE";
-        col.tableAlias = "VOLT_TEMP_TABLE";
-        col.columnName = "$$_EXISTS_$$";
-        col.alias = "$$_EXISTS_$$";
-        col.index = 0;
-        m_projectSchema = null;
-        m_displayColumns.add(col);
-        placeTVEsinColumns();
-
-        // If HAVING clause is missing we can drop GROUP BY and ORDER BY
-        if (m_having == null) {
-            m_aggResultColumns.clear();
-            m_orderColumns.clear();
-            m_groupByColumns.clear();
-        } else {
-            // Iterate over the aggregate columns and delete all columns that are not
-            // part of the HAVING or GROUP BY expressions (used to be in the original display schema
-            Iterator<ParsedColInfo> aggColumnIt = m_aggResultColumns.iterator();
-            while (aggColumnIt.hasNext()) {
-                ParsedColInfo aggrColumn = aggColumnIt.next();
-                boolean canDropColumn = !havingColumnNamesSet.contains(aggrColumn.alias) &&
-                        !groupByColumnNamesSet.contains(aggrColumn.alias);
-                if (canDropColumn) {
-                    aggColumnIt.remove();
+            for(ParsedColInfo displayColumn : m_displayColumns) {
+                assert(displayColumn.expression != null);
+                if (displayColumn.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    if (m_limitOffset.getOffset() == 0) {
+                        return ConstantValueExpression.getTrue();
+                    } else {
+                        return ConstantValueExpression.getFalse();
+                    }
                 }
             }
         }
+
+        // Remove ORDER BY columns
+        m_orderColumns.clear();
+
+        // Can drop GROUP BY expressions if there are no HAVING/OFFEST expressions
+        if (m_having == null && !hasOffset()) {
+            m_groupByColumns.clear();
+            m_groupByExpressions.clear();
+        }
+
+        // Remove  all non-aggregate display columns if GROUP BY is empty
+        if (m_groupByColumns.isEmpty()) {
+            Iterator<ParsedColInfo >iter = m_displayColumns.iterator();
+            while(iter.hasNext()) {
+                ParsedColInfo col = iter.next();
+                if (!col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    iter.remove();
+                }
+            }
+        }
+
+        // If  m_displayColumns is empty from the previous step
+        // add a single dummy column
+        if (m_displayColumns.isEmpty()) {
+            ParsedColInfo col = new ParsedColInfo();
+            col.expression = ConstantValueExpression.makeExpression(VoltType.NUMERIC, "1");
+            ExpressionUtil.finalizeValueTypes(col.expression);
+
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.columnName = "$$_EXISTS_$$";
+            col.alias = "$$_EXISTS_$$";
+            col.index = 0;
+            m_projectSchema = null;
+            m_displayColumns.add(col);
+        }
+
         if (m_aggResultColumns.isEmpty()) {
             m_hasAggregateExpression = false;
             m_hasAverage = false;
         }
+
+        placeTVEsinColumns();
         needComplexAggregation();
 
         // Drop DISTINCT expression
         m_distinct = false;
 
-        // Add LIMIT 1
-        m_limitOffset.setLimit(1);
+        // Set LIMIT 1
+        if (m_limitOffset.getLimitParameterId() == -1) {
+            m_limitOffset.setLimit(1);
+        }
 
         prepareLimitPlanNode(this, m_limitOffset);
+
+        return originalExistExpr;
     }
 
     public boolean hasJoinOrder() {

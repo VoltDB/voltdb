@@ -194,6 +194,15 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         temp_tuple = m_outputTable->tempTuple();
     }
 
+    // Short-circuit an empty scan
+    if (m_node->isEmptyScan()) {
+        VOLT_DEBUG ("Empty Index Scan :\n %s", m_outputTable->debug().c_str());
+        if (m_aggExec != NULL) {
+            m_aggExec->p_execute_finish();
+        }
+        return true;
+    }
+
     //
     // SEARCH KEY
     //

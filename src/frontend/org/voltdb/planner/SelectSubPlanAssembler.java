@@ -191,7 +191,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // Analyze join and filter conditions
             joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
             // a query that is a little too quirky or complicated.
-            assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
+            if (!m_parsedStmt.m_noTableSelectionList.isEmpty()) {
+                throw new PlanningErrorException("Join with filters that do not depend on joined tables is not supported in VoltDB");
+            }
 
             if ( ! m_partitioning.wasSpecifiedAsSingle()) {
                 // Now that analyzeJoinExpressions has done its job of properly categorizing

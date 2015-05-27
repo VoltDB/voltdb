@@ -21,11 +21,14 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.JoinType;
 
 public class BranchNode extends JoinNode {
@@ -164,6 +167,17 @@ public class BranchNode extends JoinNode {
         // In case of multi-table joins certain expressions could be pushed down to the children
         // to improve join performance.
         pushDownExpressions(noneList);
+
+        Iterator<AbstractExpression> iter = noneList.iterator();
+        while (iter.hasNext()) {
+            AbstractExpression noneExpr = iter.next();
+            // Allow CVE(TRUE/FALSE)
+            if (VoltType.BOOLEAN == noneExpr.getValueType()) {
+                m_whereInnerOuterList.add(noneExpr);
+                iter.remove();
+            }
+        }
+
     }
 
     /**
