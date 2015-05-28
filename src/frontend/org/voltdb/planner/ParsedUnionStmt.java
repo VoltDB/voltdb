@@ -31,6 +31,7 @@ import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.LimitOffset;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -210,6 +211,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
+
+        if (order_exp instanceof TupleValueExpression == false && order_exp instanceof ConstantValueExpression == false ) {
+            throw new PlanningErrorException(m_unionType.toString() + " with ORDER BY expression is not allowed.");
+        }
+
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column

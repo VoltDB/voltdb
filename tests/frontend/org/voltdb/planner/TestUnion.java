@@ -338,7 +338,26 @@ public class TestUnion extends PlannerTestCase {
     public void testInvalidOrderBy() {
         String errorMsg = "invalid ORDER BY expression";
         failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by C+1", errorMsg);
-        failToCompile("(select C from T3 UNION select B from T2) order by B");
+        failToCompile("(select C from T3 UNION select B from T2) order by B", errorMsg);
+        failToCompile("select C from T3 UNION select A from T1 order by A UNION select B from T2", errorMsg);
+
+        // order by in the union has to be at the last part
+        failToCompile("select C from T3 UNION select A from T1 order by C UNION select B from T2", "unexpected token: UNION");
+
+        failToCompile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by abs(C)", errorMsg);
+
+        failToCompile("select C from T3 UNION select B from T2 order by C+1", errorMsg);
+
+        // order by expression
+        // voltdb has exception for type match on the output columns. expression that may change its type
+        errorMsg = "UNION with ORDER BY expression is not allowed";
+        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by 1", errorMsg);
+
+
+        // expression that does not change its type
+        failToCompile("select abs(C), C as C2 from T3 UNION select B,B from T2 order by 1", errorMsg);
+        failToCompile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by tag", errorMsg);
+
     }
 
     public void testMultiUnionOrderby() {
@@ -414,14 +433,39 @@ public class TestUnion extends PlannerTestCase {
   }
 
     public void testUnionOrderByLimit() {
-        AbstractPlanNode pn = compile(
-                "select C from T3 UNION select B from T2 order by C limit 3 offset 2");
-        String[] columnNames = {"C"};
-        pn = pn.getChild(0);
-        checkOrderByNode(pn, columnNames);
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
-        checkLimitNode(pn, 3, 2);
+        // order by column name
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 UNION select B from T2 order by C limit 3 offset 2");
+            String[] columnNames = {"C"};
+            pn = pn.getChild(0);
+            checkOrderByNode(pn, columnNames);
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+            checkLimitNode(pn, 3, 2);
+        }
+        // order by alias
+        {
+            AbstractPlanNode pn = compile(
+                    "select C as TAG from T3 UNION select B from T2 order by TAG limit 3 offset 2");
+            String[] columnNames = {"TAG"};
+            pn = pn.getChild(0);
+            checkOrderByNode(pn, columnNames);
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+            checkLimitNode(pn, 3, 2);
+        }
+        // order by number
+        {
+            AbstractPlanNode pn = compile(
+                    "select C as TAG from T3 UNION select B from T2 order by 1 limit 3 offset 2");
+            String[] columnNames = {"TAG"};
+            pn = pn.getChild(0);
+            checkOrderByNode(pn, columnNames);
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+            checkLimitNode(pn, 3, 2);
+        }
     }
 
     public void testUnionOrderByLimitParams() {
