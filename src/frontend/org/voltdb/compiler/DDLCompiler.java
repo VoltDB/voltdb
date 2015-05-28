@@ -2082,19 +2082,23 @@ public class DDLCompiler {
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
-            Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
-            pkIndex.setType(IndexType.BALANCED_TREE.getValue());
-            pkIndex.setUnique(true);
-            // add the group by columns from the src table
-            // assume index 1 throuh #grpByCols + 1 are the cols
-            for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
-                c.setColumn(destColumnArray.get(i));
-                c.setIndex(i);
+            // After ENG-7872 is fixed if there is no group by column then we will not create any
+            // index or constraint in order to avoid error and crash.
+            if (stmt.m_groupByColumns.size() != 0) {
+                Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
+                pkIndex.setType(IndexType.BALANCED_TREE.getValue());
+                pkIndex.setUnique(true);
+                // add the group by columns from the src table
+                // assume index 1 throuh #grpByCols + 1 are the cols
+                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                    ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
+                    c.setColumn(destColumnArray.get(i));
+                    c.setIndex(i);
+                }
+                Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
+                pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
+                pkConstraint.setIndex(pkIndex);
             }
-            Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
-            pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
-            pkConstraint.setIndex(pkIndex);
 
             // prepare info for aggregation columns.
             List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
