@@ -392,6 +392,59 @@ ul.topRightList {
             color: #222222;
         }
 
+
+        /*help drop down*/
+        .menuHome ul {
+	font-size: 14px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display:block;
+}
+.menuHome ul li {
+	display: block;
+	position: relative;
+    padding: 0;
+    background: #FFFFFF;
+}
+.menuHome ul li ul {
+	display: none;
+   
+}
+.menuHome ul li a {
+	display: block;
+	text-decoration: none;
+	color: #000000;
+	padding: 3px 2px 5px 15px;
+	
+
+	white-space: nowrap;
+}
+.menuHome ul li a:hover {
+	
+}
+.menuHome ul li:hover ul {
+	display: block;
+	position: absolute;
+}
+.menuHome ul li:hover li {
+	float: none;
+	font-size: 13px;
+}
+.menuHome ul li ul li { border-bottom:1px solid #CCCCCC;border-left:1px solid #CCCCCC;border-right:1px solid #CCCCCC;position: relative;
+  right: 50px;z-index: 1; width: 115px;}
+.menuHome ul li ul li:first-child{border-top:1px solid #CCCCCC;}
+.menuHome ul li ul li a {
+    padding:5px 10px;
+color:#000000;	
+}
+.menuHome ul li ul li a:hover {
+	background: #76BD1D;
+	color:#FFFFFF!important;
+}
+         /*help drop down End*/
+
+
 .overlay-contentHelp {
     padding: 20px;
     border-bottom: 1px solid #dbdbdb;
@@ -2020,7 +2073,7 @@ ul.helpSchemaList {
 .arrow,
 .labelCollapsed,
 .labelExpanded,
-a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd, .replicatedIcon {
+a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd, .replicatedIcon,{
     background-image: url(images/admin-icons.png);
 }
 
@@ -2408,6 +2461,11 @@ ul.adminClusterList li a.shutdown {
 }
 
 .hasSubLabel {
+}
+
+.helpDrop {float: right;cursor: pointer;
+   width: 16px;height: 16px; background:url("images/help-arrow.png") no-repeat;margin-top: 2px;
+   
 }
 
 .labelCollapsed {

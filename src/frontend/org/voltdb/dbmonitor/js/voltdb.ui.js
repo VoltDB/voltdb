@@ -260,6 +260,7 @@ $(document).ready(function () {
             $("#VDBSchHelp").hide();
             $("#VDBQHelp").show();
             $("#VDBAdmHelp").hide();
+            $("#showMyHelp").html("SQL Query Help");
 
             if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
                 shortcut.add("f6", function () {
@@ -274,7 +275,7 @@ $(document).ready(function () {
 
             //Refresh the charts if the current tab is "DB Monitor"
             if (VoltDbUI.CurrentTab == NavigationTabs.DBMonitor) {
-
+                $("#showMyHelp").html("DB Monitor Help");
                 $("#VDBMonHelp").show();
                 $("#VDBSchHelp").hide();
                 $("#VDBQHelp").hide();
@@ -283,14 +284,14 @@ $(document).ready(function () {
                 MonitorGraphUI.UpdateCharts();
             }
             else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
-
+                $("#showMyHelp").html("Schema Help");
                 $("#VDBMonHelp").hide();
                 $("#VDBSchHelp").show();
                 $("#VDBQHelp").hide();
                 $("#VDBAdmHelp").hide();
             }
             else if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
-
+                $("#showMyHelp").html("Admin Help");
                 $("#VDBMonHelp").hide();
                 $("#VDBSchHelp").hide();
                 $("#VDBQHelp").hide();
@@ -674,22 +675,19 @@ var loadPage = function (serverName, portid) {
         
         //Get System Overview information
         voltDbRenderer.GetHostAndSiteCount(function (countDetails) {
-            var siteCount = 0;
-            var hostCount = countDetails.DETAILS.HOSTCOUNT;
-            for (var item in countDetails.DETAILS.SITECOUNT) {
-                if (item == getCurrentServer())
-                    siteCount = countDetails.DETAILS.SITECOUNT[item];
-            }
-            if(siteCount>0)
-                siteCount--;
-            var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
-            if (clusterDetails != undefined && clusterDetails != null) {
-                if (clusterDetails.MODE != undefined && clusterDetails.VERSION != undefined && clusterDetails.BUILDSTRING != undefined && clusterDetails.UPTIME != undefined) {
-                    $("#mode").html(clusterDetails.MODE);
-                    $("#voltdbVersion").html(clusterDetails.VERSION);
-                    $("#buildString").html(clusterDetails.BUILDSTRING);
-                    $("#clusterComposition").html(hostCount + " hosts with " + (hostCount * siteCount) + " sites (" + siteCount + " per host)");
-                    $("#runningSince").html(getRunningTimeInfo(parseInt(clusterDetails.STARTTIME), clusterDetails.UPTIME));
+            if (countDetails != undefined) {
+                var siteCount = countDetails.DETAILS.SITECOUNT;
+                var hostCount = countDetails.DETAILS.HOSTCOUNT;
+
+                var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
+                if (clusterDetails != undefined && clusterDetails != null) {
+                    if (clusterDetails.MODE != undefined && clusterDetails.VERSION != undefined && clusterDetails.BUILDSTRING != undefined && clusterDetails.UPTIME != undefined) {
+                        $("#mode").html(clusterDetails.MODE);
+                        $("#voltdbVersion").html(clusterDetails.VERSION);
+                        $("#buildString").html(clusterDetails.BUILDSTRING);
+                        $("#clusterComposition").html(hostCount + " hosts with " + (hostCount * siteCount) + " sites (" + siteCount + " per host)");
+                        $("#runningSince").html(getRunningTimeInfo(parseInt(clusterDetails.STARTTIME), clusterDetails.UPTIME));
+                    }
                 }
             }
         });
