@@ -81,9 +81,21 @@
                             </a>
                         </li>
                         <li class="line" id="userLine"></li>
-                        <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
-                        <li class="line" id="Li1"></li>
-                        <li class="help"><a href="#About" id="ShowAbout">About</a></li>
+                        <li>
+                            <div class="menuHome">
+                            <ul class="menuHomeList">
+                                <li>
+                                    <a href="#" style="float:left">Help</a>
+                                    <div class="helpDrop"></div>
+                                    <div class="clear"></div>
+                                    <ul>
+                                        <li><a href="#help" id="showMyHelp">DB Monitor Help</a></li>
+                                        <li><a href="#About" id="ShowAbout">About</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                            </div>
+                        </li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
                     </ul>
                 </div>
@@ -1171,40 +1183,40 @@
     <div id="About" style="display: none">
         <div class="overlay-title helpIcon ">System Overview</div>
         <div class="clear"></div>
-        <div class="overlay-contentHelp">
+        <div class="overlay-contentAbout">
             <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
             <div class="dataBlock">
-                <div class="dataBlockContent systemOver" style="padding:0;">
-                    <table class="table table-condensed">
-                        <tbody>
-                            <tr>
-                                <td>Mode</td>
-                                <td id="mode"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>VoltDB Version</td>
-                                <td id="voltdbVersion"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>Buildstring</td>
-                                <td id="buildString"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>Cluster Composition</td>
-                                <td id="clusterComposition"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>Running Since</td>
-                                <td id="runningSince"></td>
-                                <td></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p></p>
+                    <div class="dataBlockContent systemOver" style="padding:0;">
+                        <table id="tblSystemOverview" class="table table-condensed">
+                            <tbody>
+                                <tr>
+                                    <td>Mode</td>
+                                    <td id="mode"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>VoltDB Version</td>
+                                    <td id="voltdbVersion"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Buildstring</td>
+                                    <td id="buildString"></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td>Cluster Composition</td>
+                                    <td id="clusterComposition"></td>
+                                    <td></td>
+                                </tr>
+                                <tr><td>Running Since</td>
+                                    <td id="runningSince"></td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p></p>
+                    </div>
                 </div>
             </div>
         </div>
