@@ -117,6 +117,7 @@ public abstract class BaseInitiator implements Initiator
 
     protected void configureCommon(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
@@ -147,6 +148,7 @@ public abstract class BaseInitiator implements Initiator
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
+                                       serializedCatalog,
                                        m_partitionId,
                                        numberOfPartitions,
                                        startAction,

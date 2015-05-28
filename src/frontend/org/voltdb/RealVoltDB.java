@@ -785,11 +785,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
              * Configure and start all the IV2 sites
              */
             try {
+                final String serializedCatalog = m_catalogContext.catalog.serialize();
                 boolean createMpDRGateway = true;
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(
                             getBackendTargetType(),
                             m_catalogContext,
+                            serializedCatalog,
                             m_catalogContext.getDeployment().getCluster().getKfactor(),
                             csp,
                             m_configuredNumberOfPartitions,

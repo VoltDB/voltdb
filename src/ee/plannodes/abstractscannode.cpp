@@ -71,7 +71,12 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
 
-    m_predicate.reset(loadExpressionFromJSONObject("PREDICATE", obj));
+    m_isEmptyScan = obj.hasNonNullKey("PREDICATE_FALSE");
+
+    // Set the predicate (if any) only if it's not a trivial FALSE expression
+    if (!m_isEmptyScan) {
+        m_predicate.reset(loadExpressionFromJSONObject("PREDICATE", obj));
+    }
 
     m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
 
