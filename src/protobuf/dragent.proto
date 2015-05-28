@@ -4,7 +4,7 @@ option java_outer_classname = "DRAgent";
 
 message UUID {
     required fixed64 instance = 1;
-    required fixed64 count = 2;
+    required fixed64 timestamp = 2;
 }
 
 message Ack {
