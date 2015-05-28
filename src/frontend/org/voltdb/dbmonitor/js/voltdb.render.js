@@ -488,6 +488,18 @@ function alertNodeClicked(obj) {
             });
         };
 
+        //
+        
+        //Get host and site count
+        this.GetHostAndSiteCount = function (onInformationLoaded) {
+            var countDetails = {};
+
+            VoltDBService.GetHostAndSiteCount(function (connection) {
+                getCountDetails(connection, countDetails, "GET_HOST_SITE_COUNT");
+                onInformationLoaded(countDetails);
+            });
+        };
+
         this.GetTableInformation = function (onInformationLoaded) {
             VoltDBService.GetTableInformation(function (connection) {
                 var tablesData = {};
@@ -1774,6 +1786,21 @@ function alertNodeClicked(obj) {
             });
             return serverAddress;
         };
+        
+        this.getClusterDetail = function (serverName) {
+            var clusterInfo = [];
+            $.each(systemOverview, function (key, val) {
+                if (val["HOSTNAME"] == serverName) {
+                    clusterInfo["VERSION"] = val["VERSION"];
+                    clusterInfo["MODE"] = val["CLUSTERSTATE"];
+                    clusterInfo["BUILDSTRING"] = val["BUILDSTRING"];
+                    clusterInfo["STARTTIME"] = val["STARTTIME"];
+                    clusterInfo["UPTIME"] = val["UPTIME"];
+                    return false;
+                }
+            });
+            return clusterInfo;
+        };
 
         this.sortTablesByColumns = function (isSearched) {
             var lConnection = VoltDBService.getTablesContextForSorting();
@@ -2073,9 +2100,6 @@ function alertNodeClicked(obj) {
         };
         //
 
-
-
-
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
             var colIndex = {};
@@ -2364,6 +2388,43 @@ function alertNodeClicked(obj) {
             });
 
             return portConfigValues;
+        };
+
+        var getCountDetails = function(connection, countDetails, processName) {
+            var colIndex = {};
+            var counter = 0;
+            var hostName = "";
+            var hostCount = 0;
+            var siteCount = [];
+            var suffix = "_" + processName;
+            if (connection.Metadata['@Statistics_STARVATION' + suffix] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_STARVATION' + suffix].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "SITE_ID")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_STARVATION' + suffix].data.forEach(function (info) {
+                if (hostName != info[colIndex["HOSTNAME"]]) {
+                    hostName = info[colIndex["HOSTNAME"]];
+                    hostCount++;
+                } 
+               
+                if (hostName != "") {
+                    if (siteCount[hostName] == undefined)
+                        siteCount[hostName] = 1;
+                    else
+                        siteCount[hostName]++;
+                }
+            });
+            if (!countDetails.hasOwnProperty("DETAILS")) {
+                countDetails["DETAILS"] = {};
+            }
+            countDetails["DETAILS"]["HOSTCOUNT"] = hostCount;
+            countDetails["DETAILS"]["SITECOUNT"] = siteCount;
         };
 
         var validateServerSpecificSettings = function (overviewValues) {
