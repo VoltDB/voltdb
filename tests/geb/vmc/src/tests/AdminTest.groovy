@@ -2416,18 +2416,21 @@ class AdminTest extends TestBase {
         at AdminPage
         page.serverbutton.isDisplayed()
         page.serverbutton.click()
-
+        then:
         if (waitFor(waitTime) { page.mainservername.isDisplayed() && page.servername.isDisplayed() }) {
 
-            println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", " "))
+            println("server name is displayed as: " + page.mainservername.text().replaceAll("Stop", "").replaceAll("Paused", ""))
             println("currently running server is : "+ page.servername.text())
         }
-
-
-        then:
-        if (waitFor(waitTime) { page.serverstopbtndisable.isDisplayed() }) {
-            println("server stop button  displayed for disable mode")
+        
+        try {
+            page.cluster.resumebutton.isDisplayed()
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            waitFor(waitTime) { 
+                page.serverstopbtndisable.isDisplayed() 
+            }
         }
+        
 
         //   enable below code FOR UAT TESTING
         //     if( waitFor(waitTime) { page.serverstopbtnenable.isDisplayed() }){
