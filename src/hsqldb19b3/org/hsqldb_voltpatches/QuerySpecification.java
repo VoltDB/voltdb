@@ -31,6 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -2006,6 +2009,9 @@ public class QuerySpecification extends QueryExpression {
 
     /************************* Volt DB Extensions *************************/
     Expression getHavingCondition() { return havingCondition; }
+
+    // Display columns expressions
+    List<Expression> displayCols = new ArrayList<Expression>();
 
     /**
      * Dumps the exprColumns list for this query specification.
