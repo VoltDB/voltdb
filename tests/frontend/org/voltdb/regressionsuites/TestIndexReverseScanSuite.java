@@ -101,7 +101,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
 
             // Overflow
             vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 6000000000000 order by a DESC").getResults()[0];
-            if (! isHSQL()) { // hsql232 does not properly handle overflow range comparison.
+            if (! isHSQL()) { // hsql232 ENG-8332 does not properly handle overflow range comparison.
                 validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
             }
 
@@ -132,7 +132,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
 
             // Overflow
             vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= 6000000000000 order by a DESC").getResults()[0];
-            if (! isHSQL()) { // hsql232 does not properly handle overflow range comparison.
+            if (! isHSQL()) { // hsql232 ENG-8332 does not properly handle overflow range comparison.
                 validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
             }
 
@@ -212,7 +212,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
             validateTableOfScalarLongs(vt, new long[] {4, 3, 2, 1});
 
             vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 AND a < 6000000000000 order by a DESC").getResults()[0];
-            if (! isHSQL()) { // hsql232 does not properly handle overflow range comparison.
+            if (! isHSQL()) { // hsql232 ENG-8332 does not properly handle overflow range comparison.
                 validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
             }
 
@@ -233,7 +233,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
             validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
 
             vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 AND a < 6000000000000 order by a DESC").getResults()[0];
-            if (! isHSQL()) { // hsql232 does not properly handle overflow range comparison.
+            if (! isHSQL()) { // hsql232 ENG-8332 does not properly handle overflow range comparison.
                 validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
             }
 
@@ -254,7 +254,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
             validateTableOfScalarLongs(vt, new long[] {5, 4, 3});
 
             vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 AND a < 6000000000000 order by a DESC").getResults()[0];
-            if (! isHSQL()) { // hsql232 does not properly handle overflow range comparison.
+            if (! isHSQL()) { // hsql232 ENG-8332 does not properly handle overflow range comparison.
                 validateTableOfScalarLongs(vt, new long[] {5, 4, 3});
             }
 

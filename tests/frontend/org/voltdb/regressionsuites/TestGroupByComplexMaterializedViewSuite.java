@@ -1143,10 +1143,10 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                     + tb + " where V_G1 > 10 ;").getResults()[0];
             assertEquals(3, vt.asScalarLong());
 
-            // hsql232 no more nonsense: // Test it with extra meaningless order by.
-            // hsql232 no more nonsense: vt = client.callProcedure("@AdHoc", "Select count(*) from " +
-            // hsql232 no more nonsense:         tb + " where V_G1 > 10 ORDER BY V_CNT;").getResults()[0];
-            // hsql232 no more nonsense: assertEquals(3, vt.asScalarLong());
+            // hsql232 ENG-8311: // Test it with extra meaningless order by.
+            // hsql232 ENG-8311: vt = client.callProcedure("@AdHoc", "Select count(*) from " +
+            // hsql232 ENG-8311:         tb + " where V_G1 > 10 ORDER BY V_CNT;").getResults()[0];
+            // hsql232 ENG-8311: assertEquals(3, vt.asScalarLong());
 
             // Test AND
             vt = client.callProcedure("@AdHoc", "Select V_CNT from "
@@ -1156,11 +1156,11 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             // Test OR
             vt = client.callProcedure("@AdHoc", "Select V_CNT from "
                     + tb + " where V_G1 > 10 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
-            // hsql232 not yet: problem with "or" condition: validateTableOfLongs(vt, new long[][]{{1}, {2}, {3}, {4}});
+            // hsql232 ENG-8299: problem with "or" condition: validateTableOfLongs(vt, new long[][]{{1}, {2}, {3}, {4}});
 
             vt = client.callProcedure("@AdHoc", "Select V_CNT from "
                     + tb + " where V_G1 = 20 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
-            // hsql232 not yet: problem with "or" condition: validateTableOfLongs(vt, new long[][]{{2}, {3}, {4}});
+            // hsql232 ENG-8299: problem with "or" condition: validateTableOfLongs(vt, new long[][]{{2}, {3}, {4}});
 
             // Test no push down.
             vt = client.callProcedure("@AdHoc", "Select V_G1, V_CNT from "

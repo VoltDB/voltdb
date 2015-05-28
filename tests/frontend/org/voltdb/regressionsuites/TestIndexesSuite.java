@@ -52,7 +52,7 @@ public class TestIndexesSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class,
         CheckMultiMultiIntGTEFailure.class,
-        //hsql232 in lists. CompiledInLists.class
+        // hsql232 ENG-8325 in lists. CompiledInLists.class
         };
 
     // Index stuff to test:
@@ -353,7 +353,7 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals( ((Double)expected[4]).doubleValue(), vt.getDouble(4), 0.001);
     }
 
-    public void notestInList() // hsql232 runs notests yet with IN LISTs
+    public void notestInList() // hsql232 ENG-8325 runs notests yet with IN LISTs
             throws IOException, ProcCallException
     {
         String[] tables = {"P3", "R3"};
@@ -1178,7 +1178,7 @@ public class TestIndexesSuite extends RegressionSuite {
                                  "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
         project.addStmtProcedure("InsertR1IX", "insert into R1IX values (?, ?, ?, ?);");
 
-        /* hsql232 choking on IN LISTS
+        /* hsql232 ENG-8325 choking on IN LISTS
         project.addStmtProcedure("InlinedInListP3with5DESCs",
                                  "select * from P3 T where T.DESC IN (?, ?, ?, ?, ?)" +
                                  " and T.NUM IN (100, 200, 300, 400, 500)");
@@ -1209,7 +1209,7 @@ public class TestIndexesSuite extends RegressionSuite {
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
                                  " and T.NUM IN ?");
-        // hsql232 choking on IN LISTS */
+        // hsql232 */
 
         //project.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
         //        "update P3 set NUM = 0 where DESC IN ('a', 'b', 'c', 'g', " +

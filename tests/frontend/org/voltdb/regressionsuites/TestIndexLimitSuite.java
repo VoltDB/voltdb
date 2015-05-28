@@ -132,7 +132,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, 1, "COL_TU4_MIN_POINTS_WHERE", "jim", 0);
     }
 
-    public void notestExpressionIndex() throws Exception {
+    public void testExpressionIndex() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU1.insert", 1, 1);
@@ -156,7 +156,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, 5, "EXPR_TU2_MAX_LENGTH_UNAME", 1);
     }
 
-    public void notestSpecialCases() throws Exception {
+    public void testSpecialCases() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU1.insert", 1, 1);
@@ -222,13 +222,13 @@ public class TestIndexLimitSuite extends RegressionSuite {
         client.callProcedure("TU4.insert", 5, 5, "betty", 1);
 
         callWithExpectedResult(client, -3, "@AdHoc", "SELECT MIN(POINTS) FROM TU1");
-        // hsql232 prevents an Index-with-limit optimization from being applied,
+        // hsql232 ENG-8341 prevents an Index-with-limit optimization from being applied,
         // possibly by generating bogus IS NOT NULL filters which change nothing
         // but fail the optimization's applicability check
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU1");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU1");
 
         callWithExpectedResult(client, "thea", "@AdHoc", "SELECT MAX(UNAME) FROM TU2");
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MAX(UNAME) FROM TU2");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MAX(UNAME) FROM TU2");
 
         callWithExpectedResult(client, 3, "@AdHoc", "SELECT MAX(POINTS) FROM TU3 WHERE TEL = 3");
         expectPlanWithoutLimit(client, "SELECT MAX(POINTS) FROM TU3 WHERE TEL = 3");
@@ -267,11 +267,11 @@ public class TestIndexLimitSuite extends RegressionSuite {
         expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU1 WHERE POINTS >= 2");
 
         callWithExpectedResult(client, -3, "@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1");
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1");
 
 
         callWithExpectedResult(client, -3, "@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2");
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2");
 
         callWithExpectedResult(client, 2, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS > 0");
         expectPlanWithLimit(client, "SELECT MAX(POINTS) FROM TU1 WHERE POINTS > 0");
@@ -282,22 +282,22 @@ public class TestIndexLimitSuite extends RegressionSuite {
         // NEW: optimizable after adding reverse scan
         // MAX() with upper bound is not optimized
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
 
         // NEW: optimizable after adding reverse scan
         // MAX() with upper bound is not optimized
         callWithExpectedResult(client, 2, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
 
         callWithExpectedResult(client, -1, "@AdHoc", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5");
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5");
 
         // MAX() with filters on cols / exprs other than aggExpr is not optimized
         callWithExpectedResult(client, 3, "@AdHoc", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = 'thea' AND POINTS > 1");
         expectPlanWithoutLimit(client, "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = 'thea' AND POINTS > 1");
 
         callWithExpectedResult(client, -1, "@AdHoc", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < 5 AND UNAME = 'jim'");
-        // hsql232 not yet: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < 5 AND UNAME = 'jim'");
+        // hsql232 ENG-8341: expectPlanWithLimit(client, "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < 5 AND UNAME = 'jim'");
 
         // MAX() with filters on cols / exprs other than aggExpr is not optimized
         callWithExpectedResult(client, 3, "@AdHoc", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS > 1 AND UNAME = 'thea'");
@@ -317,7 +317,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
         // the optimizable query will use not-optimized plan but should still execute correctly
         expectPlanWithoutLimit(client, "SELECT MIN(POINTS + 200) FROM TU3");
         callWithExpectedResult(client, 201, "@AdHoc", "SELECT MIN(POINTS + 200) FROM TU3");
-        // hsql232 not yet: expectPlanWithoutLimit(client, "SELECT MIN(POINTS + 100) FROM TU3");
+        // hsql232 ENG-8341: expectPlanWithoutLimit(client, "SELECT MIN(POINTS + 100) FROM TU3");
         callWithExpectedResult(client, 101, "@AdHoc", "SELECT MIN(POINTS + 100) FROM TU3");
 
         callWithExpectedResult(client, 9, "@AdHoc", "SELECT MIN(POINTS + 10) FROM TU2 WHERE UNAME = 'jim' AND POINTS + 10 > 5");
@@ -329,7 +329,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
 
         // do not optimize using hash index
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(ID) FROM T1;");
-        // hsql232 not yet: expectPlanWithoutLimit(client, "SELECT MIN(ID) FROM T1");
+        // hsql232 ENG-8341: expectPlanWithoutLimit(client, "SELECT MIN(ID) FROM T1");
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(POINTS) FROM T1 WHERE ID = 1;");
         expectPlanWithoutLimit(client, "SELECT MIN(POINTS) FROM T1 WHERE ID = 1");
 
@@ -340,7 +340,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
 
     }
 
-    public void notestENG6176_MIN_NULL() throws Exception {
+    public void testENG6176_MIN_NULL() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TMIN.insert", 1, 1,    1);

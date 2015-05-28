@@ -100,10 +100,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (6, 'WCfDDvZBPoqhanfGN', 1414568, 1.14383710279231887164e-01, NULL)");
-        // hsql232 has regressed the fix for this: cr = client.callProcedure("@AdHoc", "select (5.25 + NUM) from P1");
-        // hsql232 has regressed the fix for this: assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        // hsql232 has regressed the fix for this: cr = client.callProcedure("@AdHoc", "SELECT FLOOR(NUM + 5.25) NUMSUM FROM P1 ORDER BY NUMSUM");
-        // hsql232 has regressed the fix for this: assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // hsql232 ENG-8330 regressed the fix for this: cr = client.callProcedure("@AdHoc", "select (5.25 + NUM) from P1");
+        // hsql232 ENG-8330 regressed the fix for this: assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // hsql232 ENG-8330 regressed the fix for this: cr = client.callProcedure("@AdHoc", "SELECT FLOOR(NUM + 5.25) NUMSUM FROM P1 ORDER BY NUMSUM");
+        // hsql232 ENG-8330 regressed the fix for this: assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // This test case requires HSQL to be taught to do (truncating) integer division of integers as VoltDB does.
         // While not strictly required by the SQL standard, integer division is at least technically compliant,
         // where HSQL's use of floating point division is not.
@@ -139,7 +139,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // TODO: For that reason, it might make sense to break them out into
         // their own suite to make their specific issues easier to isolate.
 
-        /* not yet hsql232 -- getting GC and hang?
+        /* not yet hsql232 -- getting GC and hang? NEEDS TICKET?
         cr = client.callProcedure("@AdHoc",
                 "select ID from P1 " +
                 "where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 " +
@@ -731,7 +731,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( DESC FROM 2) > 9");
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
-            /* not yet hsql232 -- missing parser type check -- and getting runtime type check error!
+            /* hsql232 NEED TICKET! -- missing parser type check -- and getting runtime type check error!
             //TODO: isolate this as a planner/TestFunctions test case.
             String msg = e.getMessage();
             assertTrue(msg.indexOf("incompatible data type") != -1);
@@ -809,7 +809,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // Test non-NULL defaults
         long t2FirstRow = vt.getTimestampAsLong(2);
-        // hsql232 not yet: default NOW is broken? assertFalse(vt.wasNull());
+        // hsql232 ENG-8351: default NOW is broken? assertFalse(vt.wasNull());
         long t3FirstRow = vt.getTimestampAsLong(3);
         assertFalse(vt.wasNull());
 
@@ -819,13 +819,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         // behind this runtime assert, leaving it to this runtime check
         // to show that repeated evals in the same transaction get the
         // same reasonable result.
-        // hsql232 not yet: default NOW is broken? assertEquals(t2FirstRow, t3FirstRow);
-        // hsql232 not yet: assertTrue("defaulted NOW value is late by about " +
-        // hsql232 not yet:         (t2FirstRow - after.getTime()*1000) + " micros",
-        // hsql232 not yet:         t2FirstRow <= after.getTime()*1000);
-        // hsql232 not yet: assertTrue("defaulted NOW value is early by about " +
-        // hsql232 not yet:         (before.getTime()*1000 - t2FirstRow) + " micros",
-        // hsql232 not yet:         before.getTime()*1000 <= t2FirstRow);
+        // hsql232 ENG-8351: default NOW is broken? assertEquals(t2FirstRow, t3FirstRow);
+        // hsql232 ENG-8351: assertTrue("defaulted NOW value is late by about " +
+        // hsql232 ENG-8351:         (t2FirstRow - after.getTime()*1000) + " micros",
+        // hsql232 ENG-8351:         t2FirstRow <= after.getTime()*1000);
+        // hsql232 ENG-8351: assertTrue("defaulted NOW value is early by about " +
+        // hsql232 ENG-8351:         (before.getTime()*1000 - t2FirstRow) + " micros",
+        // hsql232 ENG-8351:         before.getTime()*1000 <= t2FirstRow);
 
         // execute the same insert again, to assert that we get a newer timestamp
         // even if we are re-using the same plan (ENG-6755)
@@ -838,7 +838,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "SELECT C1, T1, T2, T3 FROM R_TIME WHERE ID = 2;").getResults()[0];
         assertTrue(vt.advanceRow());
         long t2SecondRow = vt.getTimestampAsLong(2);
-        // hsql232 not yet supporting default NOW: assertTrue(t2FirstRow < t2SecondRow);
+        // hsql232 ENG-8351 supporting default NOW: assertTrue(t2FirstRow < t2SecondRow);
 
         before = new Date();
         vt = client.callProcedure("@AdHoc", "SELECT NOW, CURRENT_TIMESTAMP FROM R_TIME;").getResults()[0];
@@ -1613,7 +1613,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestFromVarCharCasts();
         subtestToVarCharCasts();
         subtestNumericCasts();
-        // hsql232 problem? subtestCeiling();
+        // hsql232 problem? NEED TICKET! subtestCeiling();
         subtestExp();
         subtestFloor();
         subtestPowerx7();
@@ -2845,7 +2845,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
                     "WHEN num >=5 THEN 'I am null'  ELSE num END FROM R1 ORDER BY 1;";
             vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
-            // hsql232 having no incompatibility problem with this: fail();
+            // hsql232 NEED TICKET! having no incompatibility problem with this: fail();
         } catch (Exception ex) {
             assertNotNull(ex);
             assertTrue(ex.getMessage().contains("incompatible data types in combination"));
@@ -3194,7 +3194,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // TODO: Is the exception throwed by coalesce? Or by decode?
         try {
             doTestThreeColCoalesce(cl, "S1", "I2", "V3", "100");
-            // hsql232 having no incompatibility problem with this: fail();
+            // hsql232 NEED TICKET! having no incompatibility problem with this: fail();
         } catch (ProcCallException pcex){
             assertTrue(pcex.getMessage().contains("incompatible data types"));
         }

@@ -968,7 +968,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         //* enable for debugging */ System.out.println(results[0].toFormattedString());
 
-        if ( ! isHSQL()) { // HSQL backend gives wrong answer
+        if ( ! isHSQL()) { // HSQL backend gives wrong answer ENG-8340
             for (int i = 0; results[0].advanceRow(); i++) {
                 assertEquals(i, results[0].getLong(0));
                 //* enable for debugging */ System.out.println("i:" + i + " " + results[0].getLong(0));
@@ -1875,7 +1875,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // Note: the following tests for IN with parameters should at some point
     // be moved into their own suite along with existing tests for IN
     // that now live in TestIndexesSuite.  This is ENG-7607.
-    /* hsql232 not yet supporting IN LISTS
+    /* hsql232 not yet supporting IN LISTS ENG-8325
     public void testInWithIntParams() throws Exception {
 
         // HSQL does not support WHERE f IN ?

@@ -568,7 +568,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         // Same numeric tests, using ad-hoc queries
         testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][-1][-1]') IS NOT NULL ORDER BY ID");
-/* hsql232 not yet supported -- our IN LIST rewrite rules appear to be broken, so we're getting OpTypes.VALUELIST == 26 related errors.
+/* hsql232 ENG-8325 -- our IN LIST rewrite rules appear to be broken, so we're getting OpTypes.VALUELIST == 26 related errors.
         testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'numeric') IN ('1.2', '1.20') ORDER BY ID");
         testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'inner.second.third.numeric') IN ('2.3', '2.30') ORDER BY ID");
         testProcWithValidJSON(TABLE_ROWS123, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][2]') IN ('4.5', '4.50') ORDER BY ID");
@@ -1788,7 +1788,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
                 ";\n" +
                 "CREATE PROCEDURE NumericFieldProc AS\n" +
-/* hsql232 not yet supported -- our IN LIST rewrite rules appear to be broken, so we're getting OpTypes.VALUELIST == 26 related errors.
+/* hsql232 ENG-8325 -- our IN LIST rewrite rules appear to be broken, so we're getting OpTypes.VALUELIST == 26 related errors.
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IN (?, ?) ORDER BY ID\n" +
 */
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) BETWEEN ? AND ? ORDER BY ID\n" + //hsql232 stub

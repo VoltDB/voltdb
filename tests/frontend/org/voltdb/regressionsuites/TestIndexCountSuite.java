@@ -87,7 +87,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         callWithExpectedCount(client, 0, "TU1_LT", -6000000000L);
         callWithExpectedCount(client, 0, "TU1_LET", -6000000000L);
         callWithExpectedCount(client, 5, "TU1_GT", -6000000000L);
-        if ( ! isHSQL()) { // hsql232 includes null in the  >= underflowed case.
+        if ( ! isHSQL()) { // hsql232 ENG-8333 includes null in the  >= underflowed case.
             callWithExpectedCount(client, 5, "TU1_GET", -6000000000L);
         }
         // Unique Map, two column index
