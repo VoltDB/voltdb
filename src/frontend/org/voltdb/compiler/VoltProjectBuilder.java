@@ -586,12 +586,6 @@ public class VoltProjectBuilder {
             importConnector.put("ilImportType", "custom");
         }
 
-        if ((importFormat != null) && !importFormat.trim().isEmpty()) {
-            importConnector.put("ilImportFormat", importFormat);
-        } else {
-            importConnector.put("ilImportFormat", "custom");
-        }
-
         m_ilImportConnectors.add(importConnector);
     }
 
@@ -1100,8 +1094,6 @@ public class VoltProjectBuilder {
             importConfig.setEnabled((boolean)importConnector.get("ilEnabled"));
             ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
             importConfig.setType(importType);
-            ServerImportFormatEnum importFormatType = ServerImportFormatEnum.fromValue(((String)importConnector.get("ilImportFormat")).toLowerCase());
-            importConfig.setFormat(importFormatType);
             importConfig.setModule((String )importConnector.get("ilModule"));
 
             Properties config = (Properties)importConnector.get("ilConfig");
