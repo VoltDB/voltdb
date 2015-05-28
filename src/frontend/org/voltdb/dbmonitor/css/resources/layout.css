@@ -460,6 +460,14 @@ color:#000000;
         padding: 0 0 10px;
     }
 
+.overlay-contentAbout {
+    padding: 5px 10px;
+    border-bottom: 1px solid #dbdbdb;
+    margin-bottom: 15px;
+    min-width: 200px;
+    max-width: 600px;
+    overflow: auto;
+}
 .line {
     border-right: 1px solid #AAAAAA;
     font-size: 27px;
@@ -1266,6 +1274,11 @@ ul.catalogNav {
     padding: 8px 0 8px 20px;
     font-size: 13px;
 }
+
+#tblSystemOverview tr:first-child td {
+    border-top: none;
+}
+
 
 .sysOverviewContent {
 }
