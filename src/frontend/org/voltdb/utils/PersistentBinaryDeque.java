@@ -163,7 +163,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             return false;
                         }
                         Long index = Long.valueOf(seqNum);
-                        PBDSegment qs = new PBDSegment( index, pathname );
+                        PBDSegment qs = newSegment( index, pathname );
                         try {
                             qs.open(false);
                             m_initializedFromExistingFiles = true;
@@ -220,12 +220,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
         } catch (NoSuchElementException e) {}
 
         PBDSegment writeSegment =
-            new PBDSegment(
+            newSegment(
                     writeSegmentIndex,
                     new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
         m_segments.offer(writeSegment);
         writeSegment.open(true);
         assertions();
+    }
+
+    private PBDSegment newSegment(long segmentId, File file) {
+        // TODO
+        return new PBDMMapSegment(segmentId, file);
     }
 
     /**
@@ -290,12 +295,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     private PBDSegment addSegment(PBDSegment tail) throws IOException {
         //Check to see if the tail is completely consumed so we can close and delete it
-        if (!tail.hasMoreEntries() && tail.m_discardCount == tail.getNumEntries()) {
+        if (!tail.hasMoreEntries() && tail.isEmpty()) {
             m_segments.pollLast();
             tail.closeAndDelete();
         }
-        Long nextIndex = tail.m_index + 1;
-        tail = new PBDSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
+        Long nextIndex = tail.segmentId() + 1;
+        tail = newSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
         tail.open(true);
         closeTailAndOffer(tail);
         return tail;
@@ -313,17 +318,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         //Take the objects that were provided and separate them into deques of objects
         //that will fit in a single write segment
-        int available = PBDSegment.m_chunkSize - 4;
+        int available = PBDSegment.CHUNK_SIZE - 4;
         for (BBContainer object : objects) {
-            int needed = PBDSegment.m_objectHeaderBytes + object.b().remaining();
+            int needed = PBDSegment.OBJECT_HEADER_BYTES + object.b().remaining();
 
             if (available - needed < 0) {
-                if (needed > PBDSegment.m_chunkSize - 4) {
-                    throw new IOException("Maximum object size is " + (PBDSegment.m_chunkSize - 4));
+                if (needed > PBDSegment.CHUNK_SIZE - 4) {
+                    throw new IOException("Maximum object size is " + (PBDSegment.CHUNK_SIZE - 4));
                 }
                 segments.offer( currentSegment );
                 currentSegment = new ArrayDeque<BBContainer>();
-                available = PBDSegment.m_chunkSize - 4;
+                available = PBDSegment.CHUNK_SIZE - 4;
             }
             available -= needed;
             currentSegment.add(object);
@@ -337,13 +342,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //before the write segment if there are no finished segments
         Long nextIndex = 0L;
         if (m_segments.size() > 0) {
-            nextIndex = m_segments.peek().m_index - 1;
+            nextIndex = m_segments.peek().segmentId() - 1;
         }
 
         while (segments.peek() != null) {
             ArrayDeque<BBContainer> currentSegmentContents = segments.poll();
             PBDSegment writeSegment =
-                new PBDSegment(
+                newSegment(
                         nextIndex,
                         new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
             writeSegment.open(true);
@@ -398,17 +403,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
         return new BBContainer(retcont.b()) {
-            private boolean m_discarded = false;
             @Override
             public void discard() {
                 checkDoubleFree();
-                if (m_discarded) {
-                    LOG.error("PBD Container discarded more than once");
-                    return;
-                }
-                m_discarded = true;
                 retcont.discard();
-                segment.m_discardCount++;
                 assert(m_closed || m_segments.contains(segment));
 
                 //Don't do anything else if we are closed
@@ -418,7 +416,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                 //Segment is potentially ready for deletion
                 try {
-                    if (segment.m_discardCount == segment.getNumEntries()) {
+                    if (segment.isEmpty()) {
                         if (segment != m_segments.peekLast()) {
                             m_segments.remove(segment);
                             segment.closeAndDelete();
@@ -540,7 +538,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         @Override
         public int writeTruncatedObject(ByteBuffer output) throws IOException {
-            int bytesWritten = PBDSegment.writeDeferredSerialization(output, m_ds);
+            int bytesWritten = PBDUtils.writeDeferredSerialization(output, m_ds);
             if (m_truncationCallback != null) {
                 m_truncationCallback.bytesWritten(bytesWritten);
             }
@@ -568,9 +566,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         BBContainer decompressionBuffer = DBBPool.allocateDirect(1024 * 512);
         try {
             for (PBDSegment segment : m_segments) {
-                long segmentIndex = segment.m_index;
+                long segmentIndex = segment.segmentId();
 
-                File segmentFile = segment.m_file;
+                File segmentFile = segment.file();
                 RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
                 FileChannel fc = ras.getChannel();
                 MBBContainer readBufferC = DBBPool.wrapMBB(fc.map(MapMode.READ_WRITE, 0, fc.size()));
@@ -640,13 +638,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                         while (numObjectsBuffer.hasRemaining()) {
                                             fc.write(numObjectsBuffer);
                                         }
-                                        fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
+                                        fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.OBJECT_HEADER_BYTES));
                                     }
                                 } else {
                                     assert retval.status == Status.PARTIAL_TRUNCATE;
                                     addToNumObjects(-(numObjects - objectsProcessed));
                                     //Partial object truncation
-                                    readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
+                                    readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.OBJECT_HEADER_BYTES));
                                     sizeInBytes += retval.writeTruncatedObject(readBuffer);
                                     readBuffer.putInt(PBDSegment.COUNT_OFFSET, ii + 1);
                                     readBuffer.putInt(PBDSegment.SIZE_OFFSET, sizeInBytes);
@@ -692,7 +690,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         Iterator<PBDSegment> iterator = m_segments.descendingIterator();
         while (iterator.hasNext()) {
             PBDSegment segment = iterator.next();
-            if (segment.m_index <= lastSegmentIndex) {
+            if (segment.segmentId() <= lastSegmentIndex) {
                 break;
             }
             addToNumObjects(-segment.getNumEntries());
@@ -705,10 +703,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
          */
         //Find the first and last segment for polling and writing (after)
         Long newSegmentIndex = 0L;
-        if (m_segments.peekLast() != null) newSegmentIndex = m_segments.peekLast().m_index + 1;
+        if (m_segments.peekLast() != null) newSegmentIndex = m_segments.peekLast().segmentId() + 1;
 
         PBDSegment newSegment =
-            new PBDSegment(
+            newSegment(
                     newSegmentIndex,
                     new VoltFile(m_path, m_nonce + "." + newSegmentIndex + ".pbd"));
         newSegment.open(true);
@@ -753,7 +751,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (PBDSegment segment : m_segments) {
             final boolean wasClosed = segment.isClosed();
             try {
-                numObjects += segment.getNumEntries() - segment.m_objectReadIndex;
+                numObjects += segment.getNumEntries() - segment.readIndex();
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
