@@ -62,7 +62,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     private final static boolean hasLocalServer = false;
     private static StringBuilder m_recentAnalysis = null;
     private final static int FSYNC_INTERVAL_GOLD = 50;
-    private final static int FSYNC_TOLERENCE = 30;
 
     private static final Class<?>[] PROCEDURES =
     {
@@ -1130,9 +1129,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(1, results.length);
         System.out.println("Test SNAPSHOTSTATUS table: " + results[0].toString());
         validateSchema(results[0], expectedTable);
-        // One row per table per node
+        // One row per table per node, test existence of manually added snapshot
         Map<String, String> columnTargets = new HashMap<String, String>();
-        columnTargets.put("NONCE", "testnonce");
+        columnTargets.put("NONCE", TESTNONCE);
         columnTargets.put("TABLE", "WAREHOUSE");
         validateRowSeenAtAllHosts(results[0], columnTargets, true);
         columnTargets.put("TABLE", "NEW_ORDER");
@@ -1265,7 +1264,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         VoltTable[] results = null;
 
-        // Test the schema
+        // Test table schema
         Thread.sleep(1000);
         results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
         System.out.println("Node commandlog statistics table: " + results[0].toString());
@@ -1296,32 +1295,21 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
             System.out.println("commandlog statistics: " + results[0].toString());
 
-            // check every row
+            // Check every row
             while (results[0].advanceRow()) {
-                // Test fsync interval
+                // Print fsync interval
                 int actualFsyncInterval = (int) results[0].getLong(CommandLogStats.StatName.FSYNC_INTERVAL.name());
-                int fsyncNoise = Math.abs(actualFsyncInterval - FSYNC_INTERVAL_GOLD);
-
                 System.out.println("Actual fsync interval is " + actualFsyncInterval + "ms, specified interval is " + FSYNC_INTERVAL_GOLD + "ms");
-                String message = "Abnormal fsync interval: " + actualFsyncInterval + "ms (specified interval is "
-                        + FSYNC_INTERVAL_GOLD + "ms)";
-                assertTrue(message, fsyncNoise < FSYNC_TOLERENCE);
 
+                // Test segment counts
                 if (i == 1) {
                     int actualLoanedSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.LOANED_SEGMENT_COUNT.name());
                     int actualSegmentCount = (int) results[0].getLong(CommandLogStats.StatName.SEGMENT_COUNT.name());
-                    message = "Unexpected segment count: should be 2";
+                    String message = "Unexpected segment count: should be 2";
                     assertTrue(message, (actualSegmentCount == 2) && (actualLoanedSegmentCount <= actualSegmentCount));
                 }
             }
         }
-
-        /*
-        System.out.println("Sleeping, waiting for truncation snapshot to complete");
-        Thread.sleep(50000);
-        results = client.callProcedure("@Statistics", "COMMANDLOG", 0).getResults();
-        System.out.println("commandlog statistics: " + results[0].toString());
-        */
     }
 
     //
@@ -1368,7 +1356,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
 
-        //asynchronous logging
+        // Enable asynchronous logging for test of commandlog test
         if (MiscUtils.isPro()) {
             project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
         }
