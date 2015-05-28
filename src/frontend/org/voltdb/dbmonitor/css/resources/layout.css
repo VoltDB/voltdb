@@ -3060,7 +3060,7 @@ a.restoreBtn {
     position: relative;
     top: 8px;
 }
-a.drTblBtn { background: #4E8DB5;margin:3px 4px 3px 0; color: #ffffff;text-align: center;width: 110px;}
+a.drTblBtn { background: #4E8DB5;margin:3px 4px 3px 0; color: #ffffff;text-align: center;width: 110px;  line-height: 27px;}
 a.drTblBtn:hover {background: #AA1F2F;}
 
 
@@ -3084,7 +3084,7 @@ a.drTblBtn:hover {background: #AA1F2F;}
 }
 
 /****Export details Ends*******/
-table.tblReplicated { border: 1px solid #CCCCCC;}
+table.tblPopup { border: 1px solid #CCCCCC;}
 .repliWrapper { height: 150px;overflow: auto;}
 
 /****DR *******/
