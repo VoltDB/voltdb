@@ -2014,7 +2014,6 @@ public class RangeVariable {
             Expression indexConds = Expression.voltCombineWithAnd(indexCond);
             Expression indexEndConds = Expression.voltCombineWithAnd(indexEndCond);
             return Expression.voltCombineWithAnd(indexEndCondition,
-                                                 excludeConditions,
                                                  nonIndexCondition,
                                                  terminalCondition,
                                                  indexConds,

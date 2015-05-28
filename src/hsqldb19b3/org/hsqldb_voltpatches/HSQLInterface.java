@@ -29,6 +29,7 @@ import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class is built to create a single in-memory database
@@ -43,8 +44,8 @@ import org.hsqldb_voltpatches.result.Result;
  * </ul>
  */
 public class HSQLInterface {
-
     static public String XML_SCHEMA_NAME = "databaseschema";
+    static final private VoltLogger m_logger = new VoltLogger("HSQLCOMPILER");
     /**
      * Naming conventions for unnamed indexes and constraints
      */
@@ -335,7 +336,7 @@ public class HSQLInterface {
         if (cs == null) {
             throw new HSQLParseException(errorMessage);
         }
-        
+
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
         if (result.hasError()) {
@@ -343,7 +344,12 @@ public class HSQLInterface {
         }
 
         VoltXMLElement xml = cs.voltGetStatementXML(sessionProxy);
-
+        if (m_logger.isDebugEnabled()) {
+            // Don't make any strings we don't need to.
+            m_logger.debug("SQL: " + sql);
+            m_logger.debug("HSQLDB: " + cs.describe(sessionProxy));
+            m_logger.debug("VoltDB: " + xml.toString());
+        }
         // this releases some small memory hsql uses that builds up over time if not
         // cleared
         // if it's not called for every call of getXMLCompiledStatement, that's ok;
@@ -361,7 +367,7 @@ public class HSQLInterface {
     /**
      * Recursively find all in-lists, subquery, row comparisons found in the XML and munge them into the
      * simpler thing we want to pass to the AbstractParsedStmt.
-     * @throws HSQLParseException 
+     * @throws HSQLParseException
      */
     private void fixupInStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
         if (doesExpressionReallyMeanIn(expr)) {
@@ -379,7 +385,7 @@ public class HSQLInterface {
      * Find in-expressions in fresh-off-the-hsql-boat Volt XML. Is this fake XML
      * representing an in-list in the weird table/row way that HSQL generates
      * in-list expressions. Used by {@link this#fixupInStatementExpressions(VoltXMLElement)}.
-     * @throws HSQLParseException 
+     * @throws HSQLParseException
      */
     private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) throws HSQLParseException {
         if (!expr.name.equals("operation")) {
