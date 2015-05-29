@@ -228,9 +228,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
+    private static final boolean USE_MMAP = Boolean.getBoolean("PBD_USE_MMAP");
     private PBDSegment newSegment(long segmentId, File file) {
-        // TODO
-        return new PBDMMapSegment(segmentId, file);
+        if (USE_MMAP) {
+            return new PBDMMapSegment(segmentId, file);
+        } else {
+            return new PBDRegularSegment(segmentId, file);
+        }
     }
 
     /**
@@ -258,9 +262,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         PBDSegment tail = m_segments.peekLast();
-        //If we are mostly empty, don't do compression, otherwise compress to reduce space and IO
-        final boolean compress = object.b().isDirect() && allowCompression &&
-                (m_segments.size() > 1 || tail.sizeInBytes() > 1024 * 512);
+        final boolean compress = object.b().isDirect() && allowCompression;
         if (!tail.offer(object, compress)) {
             tail = addSegment(tail);
             final boolean success = tail.offer(object, compress);
@@ -486,7 +488,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (PBDSegment segment : m_segments) {
             final boolean wasClosed = segment.isClosed();
             if (wasClosed) segment.open(false);
-            size += segment.sizeInBytes();
+            size += segment.uncompressedBytesToRead();
             if (wasClosed) {
                 segment.close();
             }
@@ -763,6 +765,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
             }
         }
-        assert(numObjects == m_numObjects);
+        assert numObjects == m_numObjects : numObjects + " != " + m_numObjects;
     }
 }

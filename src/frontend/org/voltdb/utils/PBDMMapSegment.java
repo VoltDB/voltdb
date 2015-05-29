@@ -363,7 +363,7 @@ class PBDMMapSegment implements PBDSegment {
      * although incredibly unlikely
      */
     @Override
-    public int sizeInBytes() {
+    public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("closed");
         return Math.max(0, m_buf.b().getInt(SIZE_OFFSET) - m_bytesRead);
     }
