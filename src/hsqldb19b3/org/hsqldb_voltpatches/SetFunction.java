@@ -121,7 +121,11 @@ public class SetFunction implements Serializable {
 
             case OpTypes.COUNT :
                 return;
-
+            // A VoltDB extension APPROC_COUNT_DISTINCT
+            case OpTypes.APPROX_COUNT_DISTINCT:
+                // Return "unexpected token" error
+                throw Error.error(ErrorCode.X_42581, Tokens.T_APPROX_COUNT_DISTINCT);
+            // End of VoltDB extension
             case OpTypes.AVG :
             case OpTypes.SUM : {
                 switch (dataType) {
@@ -242,6 +246,11 @@ public class SetFunction implements Serializable {
             return ValuePool.getInt(count);
         }
 
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        if (setType == OpTypes.APPROX_COUNT_DISTINCT) {
+            throw Error.error(ErrorCode.X_42581, Tokens.T_APPROX_COUNT_DISTINCT);
+        }
+        // End of VoltDB extension
         if (count == 0) {
             return null;
         }
@@ -374,6 +383,11 @@ public class SetFunction implements Serializable {
             return Type.SQL_INTEGER;
         }
 
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        if (setType == OpTypes.APPROX_COUNT_DISTINCT) {
+            return Type.SQL_DOUBLE;
+        }
+        // End of VoltDB extension
         // A VoltDB extension to handle aggfnc(*) syntax errors.
         // If the argument node does not have
         // a data type, it may be '*'.  If the

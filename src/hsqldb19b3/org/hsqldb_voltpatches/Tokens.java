@@ -100,6 +100,9 @@ public class Tokens {
     static final String        T_CORR             = "CORR";
     static final String        T_CORRESPONDING    = "CORRESPONDING";
     static final String        T_COUNT            = "COUNT";
+    // A VoltDB extension APPROX_COUNT_DISTINCT
+    static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT";
+    // End of VoltDB extension
     static final String        T_COVAR_POP        = "COVAR_POP";
     static final String        T_COVAR_SAMP       = "COVAR_SAMP";
     public static final String T_CREATE           = "CREATE";
@@ -862,6 +865,9 @@ public class Tokens {
     public static final int CORR                             = 49;
     public static final int CORRESPONDING                    = 50;
     public static final int COUNT                            = 51;
+    // A VoltDB extension APPROX_COUNT_DISTINCT
+    public static final int APPROX_COUNT_DISTINCT            = 1304;
+    // End of VoltDB extension
     public static final int COVAR_POP                        = 52;
     public static final int COVAR_SAMP                       = 53;
     public static final int CREATE                           = 54;
@@ -1652,6 +1658,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_CORR, CORR);
         reservedKeys.put(Tokens.T_CORRESPONDING, CORRESPONDING);
         reservedKeys.put(Tokens.T_COUNT, COUNT);
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_COVAR_POP, COVAR_POP);
         reservedKeys.put(Tokens.T_COVAR_SAMP, COVAR_SAMP);
         reservedKeys.put(Tokens.T_CREATE, CREATE);
@@ -2258,6 +2267,9 @@ public class Tokens {
             UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
             ASSUMEUNIQUE, // For VoltDB
+            // End of VoltDB extension
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            APPROX_COUNT_DISTINCT,
             // End of VoltDB extension
         };
 

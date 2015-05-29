@@ -57,10 +57,12 @@
 
 #include "boost/foreach.hpp"
 #include "boost/unordered_map.hpp"
+#include "hyperloglog/hyperloglog.hpp" // for APPROX_COUNT_DISTINCT
 
 #include <algorithm>
 #include <limits>
 #include <set>
+#include <sstream>
 #include <stdint.h>
 #include <utility>
 
@@ -340,6 +342,118 @@ private:
     Pool* m_memoryPool;
 };
 
+class ApproxCountDistinctAgg : public Agg {
+public:
+    ApproxCountDistinctAgg()
+        : m_hyperLogLog(registerBitWidth())
+    {
+    }
+
+    virtual void advance(const NValue& val)
+    {
+        if (val.isNull()) {
+            return;
+        }
+
+        ValueType vt = ValuePeeker::peekValueType(val);
+
+        char* elem = NULL;
+        uint32_t len = 0;
+
+        double doubleVal;
+        int64_t bigintVal;
+        TTInt decimalVal;
+
+        switch (vt) {
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+        case VALUE_TYPE_TIMESTAMP:
+        case VALUE_TYPE_BOOLEAN:
+            bigintVal = ValuePeeker::peekAsRawInt64(val);
+            elem = reinterpret_cast<char*>(&bigintVal);
+            len = sizeof(bigintVal);
+            break;
+
+        case VALUE_TYPE_DOUBLE:
+            doubleVal = ValuePeeker::peekDouble(val);
+            elem = reinterpret_cast<char*>(&doubleVal);
+            len = sizeof(doubleVal);
+            break;
+
+        case VALUE_TYPE_DECIMAL:
+            decimalVal = ValuePeeker::peekDecimal(val);
+            elem = reinterpret_cast<char*>(&decimalVal);
+            len = sizeof(decimalVal);
+            break;
+
+        default:
+            assert(false);
+        }
+
+        m_hyperLogLog.add(elem, len);
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        m_value = ValueFactory::getDoubleValue(m_hyperLogLog.estimate());
+        return m_value;
+    }
+
+protected:
+    hll::HyperLogLog& hyperLogLog() {
+        return m_hyperLogLog;
+    }
+
+    static uint8_t registerBitWidth() {
+        // Setting this value higher makes for a more accurate
+        // estimate (based on my experiments), but means that the
+        // hyperloglog sent to the coordinator will be larger.
+        //
+        // This value is called "b" in the hyperloglog code
+        // and papers.  Size of the hyperloglog will be
+        // 2^b + 1 bytes.
+        return 11;
+    }
+
+private:
+
+    hll::HyperLogLog m_hyperLogLog;
+};
+
+class ValsToHyperLogLogAgg : public ApproxCountDistinctAgg {
+public:
+    virtual NValue finalize(ValueType type)
+    {
+        assert (type == VALUE_TYPE_VARBINARY);
+        // serialize the hyperloglog as varbinary, to send to
+        // coordinator.
+        std::ostringstream oss;
+        hyperLogLog().dump(oss);
+        return ValueFactory::getTempBinaryValue(oss.str().c_str(),
+                                                static_cast<int32_t>(oss.str().length()));
+    }
+};
+
+class HyperLogLogsToCardAgg : public ApproxCountDistinctAgg {
+public:
+    virtual void advance(const NValue& val)
+    {
+        assert (ValuePeeker::peekValueType(val) == VALUE_TYPE_VARBINARY);
+        assert (!val.isNull());
+
+        int32_t len = ValuePeeker::peekObjectLength_withoutNull(val);
+        char* data = static_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(val));
+        assert (len > 0);
+        std::istringstream iss(std::string(data, static_cast<size_t>(len)));
+
+        hll::HyperLogLog distHll(registerBitWidth());
+        distHll.restore(iss);
+        hyperLogLog().merge(distHll);
+    }
+};
+
 /*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
@@ -368,6 +482,12 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
             return new (memoryPool) AvgAgg<Distinct>();
         }
         return new (memoryPool) AvgAgg<NotDistinct>();
+    case EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT:
+        return new (memoryPool) ApproxCountDistinctAgg();
+    case EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG:
+        return new (memoryPool) ValsToHyperLogLogAgg();
+    case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
+        return new (memoryPool) HyperLogLogsToCardAgg();
     default:
     {
         char message[128];

@@ -25,11 +25,13 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -84,6 +86,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.AGGREGATE;
+    }
+
+    public List<ExpressionType> getAggregateTypes() {
+        return m_aggregateTypes;
     }
 
     @Override
@@ -370,6 +376,21 @@ public class AggregatePlanNode extends AbstractPlanNode {
         } else {
             assert(aggInputExpr != null);
             m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
+        }
+    }
+
+    public void updateAggregate(
+            int index,
+            ExpressionType aggType) {
+        m_aggregateTypes.set(index, aggType);
+        assert(m_aggregateDistinct.get(index) == 0);
+
+        // update the node schema to the proper type here!
+        if (aggType == ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG) {
+            int outputSchemaIndex = m_aggregateOutputColumns.get(index);
+            SchemaColumn schemaCol = m_outputSchema.getColumns().get(outputSchemaIndex);
+            schemaCol.getExpression().setValueType(VoltType.VARBINARY);
+            schemaCol.getExpression().setValueSize(65537);
         }
     }
 
