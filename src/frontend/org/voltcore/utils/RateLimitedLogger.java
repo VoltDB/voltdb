@@ -80,6 +80,14 @@ public class RateLimitedLogger {
         }
     }
 
+    /**
+     * This variant delays the formatting of the string message until it is actually logged
+     * @param now
+     * @param level a {@link Level debug level}
+     * @param cause evidentiary exception
+     * @param stemformat a {@link String#format(String, Object...) string format}
+     * @param args format arguments
+     */
     public void log(long now, Level level, Throwable cause, String stemformat, Object...args) {
         if (now - m_lastLogTime > m_maxLogIntervalMillis) {
             synchronized (this) {
@@ -166,11 +174,7 @@ public class RateLimitedLogger {
         final RateLimitedLogger rll;
         try {
             rll = m_loggersCached.get(format, builder);
-            rll.log(String.format(format, parameters), now, level);
-        } catch (MissingFormatArgumentException ex) {
-            Throwables.propagate(Throwables.getRootCause(ex));
-        } catch (IllegalFormatConversionException ex) {
-            Throwables.propagate(Throwables.getRootCause(ex));
+            rll.log(now, level, null, format, parameters);
         } catch (ExecutionException ex) {
             Throwables.propagate(Throwables.getRootCause(ex));
         }
