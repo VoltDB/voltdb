@@ -29,9 +29,6 @@ package socketimporter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
@@ -95,13 +92,13 @@ public class AsyncBenchmark {
         int duration = 30;
 
         @Option(desc = "Warmup duration in seconds.")
-        int warmup = 10;
+        int warmup = 2;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for streaming data")
-        String servers = "localhost";
+        String servers = "volt3e,volt3f,volt3g";
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for database queries")
-        String dbservers = "localhost";
+        String dbservers = "volt3e,volt3f,volt3g";
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = false;
@@ -256,7 +253,7 @@ public class AsyncBenchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
-        long icnt = 0;
+        AtomicLong icnt = new AtomicLong(0);
         try {
             // Run the benchmark loop for the requested warmup time
             // The throughput may be throttled depending on client configuration
@@ -264,12 +261,13 @@ public class AsyncBenchmark {
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
             	long t = System.currentTimeMillis();
-            	Pair<Long,Long> p = new Pair<Long,Long>(Long.valueOf(icnt), Long.valueOf(t));
+            	long cnt = icnt.getAndIncrement();
+            	Pair<Long,Long> p = new Pair<Long,Long>(cnt, t);
                 queue.offer(p);
-                String s = String.valueOf(icnt) + "," + t + "\n";
+                String s = String.valueOf(cnt) + "," + t + "\n";
 
                 writeFully(s, hap, warmupEndTime);
-                icnt++;
+                //icnt++;
             }
 
             // print periodic statistics to the console
@@ -284,17 +282,18 @@ public class AsyncBenchmark {
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
             	long t = System.currentTimeMillis();
-            	Pair<Long,Long> p = new Pair<Long,Long>(Long.valueOf(icnt), Long.valueOf(t));
+            	long cnt = icnt.getAndIncrement();
+            	Pair<Long,Long> p = new Pair<Long,Long>(cnt, t);
                 queue.offer(p);
-                String s = String.valueOf(icnt) + "," + t + "\n";
+                String s = cnt + "," + t + "\n";
                 writeFully(s, hap, benchmarkEndTime);
-                icnt++;
+                //icnt++;
             }
             haplist.get(hap).flush();
         } finally {
             // cancel periodic stats printing
             timer.cancel();
-            finalInsertCount.addAndGet(icnt);
+            finalInsertCount.addAndGet(icnt.get());
             // print the summary results
             printResults();
         }
@@ -373,19 +372,16 @@ public class AsyncBenchmark {
         }
         System.out.println("Starting CheckData methods. Queue size: " + queue.size());
         checkDB.processQueue();
-
         cdl.await();
 
         System.out.println("...starting timed check looping... " + queue.size());
+        // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
         final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
-        DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-        //Date date = new Date();
+        System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis()) + " seconds.");
+
         while (queueEndTime > System.currentTimeMillis()) {
-        	if ((queueEndTime - System.currentTimeMillis()) % 15000 == 0) {
-        		Date date = new Date();
-        		System.out.println("...still looping... Queue length: " + queue.size());
-        		System.out.println(dateFormat.format(date));
-        		System.out.println(new Date());
+        	if ((queueEndTime - System.currentTimeMillis())/1000 % 15 == 0) {
+         		System.out.println("...still looping... Queue length: " + queue.size());
         	}
         	checkDB.processQueue();
         }
