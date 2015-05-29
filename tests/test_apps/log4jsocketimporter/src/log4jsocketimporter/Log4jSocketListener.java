@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package log4jsocketimporter;
+package log4jsocketimporter;  
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -140,21 +140,16 @@ public class Log4jSocketListener
                             new TimestampType(new Date(event.getTimeStamp())), event.getRenderedMessage(),
                             getThrowableRep(event));
                 }
-            } catch (ClassNotFoundException | IOException e) { // assume that
-                                                               // these are
-                                                               // unrecoverable
-                                                               // errors and
-                                                               // exit from
-                                                               // thread
+            } catch (ClassNotFoundException | IOException e) { // assume that these are unrecoverable
+                                                               // errors and exit from thread
                 System.err.println("Unexpected error reading from " + m_socket.getRemoteSocketAddress());
                 e.printStackTrace();
             }
         }
 
-        // Gets the throwable representation from LoggingEvent as a single
-        // string with newline chars between lines.
-        // Returns null if there is no throwable information in the logging
-        // event.
+        // Gets the throwable representation from LoggingEvent as a single string
+        // with newline chars between lines.
+        // Returns null if there is no throwable information in the logging event.
         private String getThrowableRep(LoggingEvent event)
         {
             if (event.getThrowableStrRep() == null) {
@@ -165,8 +160,7 @@ public class Log4jSocketListener
             for (String line : event.getThrowableStrRep()) {
                 sb.append(line + "\n");
             }
-            if (sb.length() > 0) { // remove the last newline and return the
-                                   // string
+            if (sb.length() > 0) { // remove the last newline and return the string
                 return sb.deleteCharAt(sb.length() - 1).toString();
             } else {
                 return null;

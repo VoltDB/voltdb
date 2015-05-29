@@ -27,11 +27,8 @@ CLASSPATH=$({ \
 
 
 VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="`pwd`/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
-HOST="localhost"
-SERVERS="localhost"
 
 # remove build artifacts
 function clean() {
