@@ -75,7 +75,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
-import org.voltdb.compiler.deploymentfile.ServerImportFormatEnum;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
