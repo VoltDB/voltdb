@@ -1104,8 +1104,6 @@ public abstract class CatalogUtil {
             return null;
         }
         switch(importConfiguration.getType()) {
-            case KAFKA: importBundleUrl = "org.voltdb.importclient.KafkaImportClient"; break;
-            //Validate that we can load the class.
             case CUSTOM:
                 break;
             default:

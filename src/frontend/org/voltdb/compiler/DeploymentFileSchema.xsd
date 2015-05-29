@@ -305,7 +305,6 @@
     </xs:sequence>
     <xs:attribute name="module" type="xs:string" />
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
-    <xs:attribute name="format" type="ServerImportFormatEnum" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
@@ -338,14 +337,6 @@
 
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
-      <xs:enumeration value="kafka"/>
-      <xs:enumeration value="custom"/>
-    </xs:restriction>
-  </xs:simpleType>
-
-  <xs:simpleType name="ServerImportFormatEnum">
-    <xs:restriction base="xs:token">
-      <xs:enumeration value="csv"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

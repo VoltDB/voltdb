@@ -29,6 +29,7 @@ package socketimporter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
@@ -89,16 +90,16 @@ public class AsyncBenchmark {
         long displayinterval = 2;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 30;
+        int duration = 10;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for streaming data")
-        String servers = "volt3e,volt3f,volt3g";
+        String servers = "localhost";
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for database queries")
-        String dbservers = "volt3e,volt3f,volt3g";
+        String dbservers = "localhost";
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = false;
@@ -254,6 +255,9 @@ public class AsyncBenchmark {
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
         AtomicLong icnt = new AtomicLong(0);
+        SecureRandom rnd = new SecureRandom();
+	    rnd.setSeed(Thread.currentThread().getId());
+	    //System.out.println(rnd.nextInt());
         try {
             // Run the benchmark loop for the requested warmup time
             // The throughput may be throttled depending on client configuration
@@ -261,13 +265,14 @@ public class AsyncBenchmark {
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
             	long t = System.currentTimeMillis();
-            	long cnt = icnt.getAndIncrement();
-            	Pair<Long,Long> p = new Pair<Long,Long>(cnt, t);
+
+            	long key = rnd.nextLong();
+            	Pair<Long,Long> p = new Pair<Long,Long>(key, t);
                 queue.offer(p);
-                String s = String.valueOf(cnt) + "," + t + "\n";
+                String s = key + "," + t + "\n";
 
                 writeFully(s, hap, warmupEndTime);
-                //icnt++;
+                icnt.getAndIncrement();
             }
 
             // print periodic statistics to the console
@@ -282,12 +287,12 @@ public class AsyncBenchmark {
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
             	long t = System.currentTimeMillis();
-            	long cnt = icnt.getAndIncrement();
-            	Pair<Long,Long> p = new Pair<Long,Long>(cnt, t);
+            	long key = rnd.nextLong();
+            	Pair<Long,Long> p = new Pair<Long,Long>(key, t);
                 queue.offer(p);
-                String s = cnt + "," + t + "\n";
+                String s = key + "," + t + "\n";
                 writeFully(s, hap, benchmarkEndTime);
-                //icnt++;
+                icnt.getAndIncrement();
             }
             haplist.get(hap).flush();
         } finally {
@@ -377,7 +382,7 @@ public class AsyncBenchmark {
         System.out.println("...starting timed check looping... " + queue.size());
         // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
         final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
-        System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis()) + " seconds.");
+        System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
 
         while (queueEndTime > System.currentTimeMillis()) {
         	if ((queueEndTime - System.currentTimeMillis())/1000 % 15 == 0) {

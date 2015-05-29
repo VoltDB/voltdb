@@ -43,6 +43,12 @@ public interface ImportContext {
     public void stop();
 
     /**
+     * Call this to see if you need to exit.
+     * @return
+     */
+    public boolean canContinue();
+
+    /**
      * Call this to get the ingested data passed to procedure.
      * @param ic Import Context invoking the procedure.
      * @param procName procedure to invoke.
@@ -68,6 +74,7 @@ public interface ImportContext {
     /**
      * This is the real handler dont need to call or extend anything
      * @param handler
+     * @throws java.lang.Exception
      */
     public void setHandler(Object handler) throws Exception;
 
@@ -90,6 +97,7 @@ public interface ImportContext {
      * list of resources it should handle. The implementation should honor and act on those resources. In case if node
      * failure a update notification will be sent to start acting on more resources.
      * @return list of resources identifier that will be persisted in Volt ZK for watching.
+     * TODO make sure to get correct naming.
      */
     public Set<String> getAllResponsibleResources();
 
@@ -97,14 +105,9 @@ public interface ImportContext {
      * This is called after importer system has allocated part of the responsible resources to the importer running on this node.
      * This may get invoked during node failuers which may distribute additional resources this importer is now responsible for.
      * @param allocated
+     * TODO make sure to get correct naming.
      */
     public void setAllocatedResources(Set<String> allocated);
-
-    /**
-     * Return true if you are handling partitioned data and any data that does not belong to partitions on this node should be dropped.
-     * @return
-     */
-    public boolean isPartitionedData();
 
     /**
      * log info message
