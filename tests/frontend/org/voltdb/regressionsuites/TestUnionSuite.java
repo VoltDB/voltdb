@@ -61,7 +61,7 @@ public class TestUnionSuite extends RegressionSuite {
                 .getResults()[0];
         assertEquals(4, result.getRowCount());
         // test with parameters
-        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;")
+        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B where PKEY = 2 UNION SELECT I FROM C WHERE I = 3;")
                 .getResults()[0];
         assertEquals(3, result.getRowCount());
         result = client.callProcedure("@Explain", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;").getResults()[0];
@@ -472,6 +472,88 @@ public class TestUnionSuite extends RegressionSuite {
         assertEquals(3, result.getRowCount());
         result = client.callProcedure("UnionBCD", 4, "ABC", 2).getResults()[0];
         assertEquals(1, result.getRowCount());
+    }
+
+    /**
+     * Three table Union ALL - A.PKEY, B.I and C.I
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testUnionOrderLimitOffset() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 0, 1); //In the final result set
+        client.callProcedure("InsertB", 1, 1); //In the final result set
+        client.callProcedure("InsertB", 2, 1); //In the final result set
+        client.callProcedure("InsertC", 1, 2); //In the final result set
+        client.callProcedure("InsertC", 2, 3); //In the final result set
+
+        // No limit, offset
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0;")
+                .getResults()[0];
+        assertEquals(5, result.getRowCount());
+
+        // Order by
+        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY PKEY DESC;")
+                .getResults()[0];
+        assertEquals(5, result.getRowCount());
+        assertEquals(3, result.fetchRow(0).getLong(0));
+        assertEquals(0, result.fetchRow(4).getLong(0));
+
+        if (!isHSQL()) { // HSQL does not handle limit with union
+            // limit 3, no offset
+            result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0) LIMIT 3;")
+                .getResults()[0];
+            assertEquals(3, result.getRowCount());
+
+            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C LIMIT ?;", 3)
+                .getResults()[0];
+            assertEquals(3, result.getRowCount());
+
+            // no limit, offset 3
+            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C ORDER BY PKEY OFFSET 3;")
+                .getResults()[0];
+            assertEquals(2, result.getRowCount());
+            assertEquals(2, result.fetchRow(0).getLong(0));
+            assertEquals(3, result.fetchRow(1).getLong(0));
+
+            // limit 2, offset 2
+            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 ORDER BY PKEY LIMIT 2 OFFSET 2;")
+                .getResults()[0];
+            assertEquals(2, result.getRowCount());
+            assertEquals(1, result.fetchRow(0).getLong(0));
+            assertEquals(2, result.fetchRow(1).getLong(0));
+
+            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C LIMIT ? OFFSET ?;", 2, 2)
+                    .getResults()[0];
+            assertEquals(2, result.getRowCount());
+
+            result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B LIMIT 1) UNION ALL SELECT I FROM C;")
+                    .getResults()[0];
+            assertEquals(3, result.getRowCount());
+
+            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL (SELECT I FROM B UNION ALL SELECT I FROM C LIMIT 1);")
+                    .getResults()[0];
+            assertEquals(2, result.getRowCount());
+
+            result = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A UNION ALL SELECT I FROM B ORDER BY PKEY) UNION ALL SELECT I FROM C;")
+                    .getResults()[0];
+            assertEquals(5, result.getRowCount());
+
+            result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL (SELECT I FROM B UNION ALL SELECT I FROM C ORDER BY I);")
+                    .getResults()[0];
+            assertEquals(5, result.getRowCount());
+}
+
+        // Make sure the query is parameterized
+        result = client.callProcedure("@Explain", "SELECT PKEY FROM A WHERE PKEY = 0 UNION ALL SELECT I FROM B WHERE I = 1 UNION ALL SELECT I FROM C WHERE PKEY > 0 LIMIT 2 OFFSET 2;")
+                .getResults()[0];
+        String explainPlan = result.toString();
+        assertTrue(explainPlan.contains("LIMIT with parameter"));
+        assertTrue(explainPlan.contains("uniquely match (PKEY = ?0)"));
+        assertTrue(explainPlan.contains("filter by (column#1 = ?1)"));
+        assertTrue(explainPlan.contains("range-scan covering from (PKEY > ?2)"));
+
     }
 
     static public junit.framework.Test suite() {
