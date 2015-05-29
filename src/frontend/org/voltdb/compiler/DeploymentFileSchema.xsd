@@ -314,7 +314,6 @@
       <xs:enumeration value="kafka"/>
       <xs:enumeration value="http"/>
       <xs:enumeration value="rabbitmq"/>
-      <xs:enumeration value="hive"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
