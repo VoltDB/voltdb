@@ -112,7 +112,7 @@ public class TestTableCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(10, table.getLong(0));
 
-     // Multi-map, two column index
+        // Multi-map, two column index
         client.callProcedure("TM2.insert", 1, 1, "xin");
         client.callProcedure("TM2.insert", 2, 2, "xin");
         client.callProcedure("TM2.insert", 3, 3, "xin");
@@ -145,6 +145,26 @@ public class TestTableCountSuite extends RegressionSuite {
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(20, table.getLong(0));
+    }
+
+    public void testTableCountsOnEmptyTable() throws Exception {
+        Client client = getClient();
+
+        checkEmptryTableAggHelper(client, "COUNT(*)", 0);
+
+        String[] aggFunctions = {"SUM(POINTS)", "AVG(POINTS)", "MIN(POINTS)", "MAX(POINTS)" };
+        final long nullVal = Long.MIN_VALUE;
+        for (String agg: aggFunctions) {
+            checkEmptryTableAggHelper(client, agg, nullVal);
+        }
+    }
+
+    private void checkEmptryTableAggHelper(Client client, String agg, long value) throws Exception {
+        validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{});
+        validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 1", new long[]{value});
+        validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{});
+        validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 2", new long[]{value});
+        validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1", new long[]{value});
     }
 
     /**

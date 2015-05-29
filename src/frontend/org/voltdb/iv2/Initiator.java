@@ -40,6 +40,7 @@ public interface Initiator
     /** Configure an Initiator and prepare it for work */
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,

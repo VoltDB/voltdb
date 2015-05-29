@@ -68,6 +68,8 @@ public:
 
     bool isSubQuery() const { return m_isSubQuery; }
 
+    bool isEmptyScan() const { return m_isEmptyScan; }
+
 protected:
     AbstractScanPlanNode() { }
 
@@ -87,6 +89,8 @@ protected:
     boost::scoped_ptr<AbstractExpression> m_predicate;
     // True if this scan represents a sub query
     bool m_isSubQuery;
+    // True if this scan has a predicate that always evaluates to FALSE
+    bool m_isEmptyScan;
 };
 
 } // namespace voltdb
