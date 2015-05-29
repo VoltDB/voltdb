@@ -66,6 +66,11 @@ public class ImportHandlerProxy implements ImportContext {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
+    @Override
+    public boolean canContinue() {
+        return true;
+    }
+
     /**
      * This calls real handler using reflection.
      * @param ic
@@ -137,15 +142,6 @@ public class ImportHandlerProxy implements ImportContext {
     @Override
     public void setAllocatedResources(Set<String> allocated) {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    /**
-     * Default to take in all data and run transactions regardless of partitioning.
-     * @return
-     */
-    @Override
-    public boolean isPartitionedData() {
-        return false;
     }
 
 }

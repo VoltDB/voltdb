@@ -31,6 +31,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -45,7 +46,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         PREDICATE,
         TARGET_TABLE_NAME,
         TARGET_TABLE_ALIAS,
-        SUBQUERY_INDICATOR;
+        SUBQUERY_INDICATOR,
+        PREDICATE_FALSE;
     }
 
     // Store the columns from the table as an internal NodeSchema
@@ -411,6 +413,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
 
         if (m_predicate != null) {
+            if (ConstantValueExpression.isBooleanFalse(m_predicate)) {
+                stringer.key(Members.PREDICATE_FALSE.name()).value("TRUE");
+            }
             stringer.key(Members.PREDICATE.name());
             stringer.value(m_predicate);
         }
