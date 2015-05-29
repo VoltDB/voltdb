@@ -57,6 +57,7 @@
 
 #include <vector>
 #include <cassert>
+#include <iostream>
 
 using namespace std;
 using namespace voltdb;
@@ -127,6 +128,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             targetTuple.move(targetAddress);
 
             // Delete from target table
+            std::cout << "delete tuple from Executor" << std::endl;
             if (!targetTable->deleteTuple(targetTuple, true)) {
                 VOLT_ERROR("Failed to delete tuple from table '%s'",
                            targetTable->name().c_str());

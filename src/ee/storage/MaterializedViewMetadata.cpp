@@ -35,6 +35,8 @@
 #include "storage/persistenttable.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
+#include <iostream>
+#include "common/executorcontext.hpp"
 
 namespace voltdb {
 
@@ -55,7 +57,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
-
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+        std::cout << "addMaterializedView" << std::endl;
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
     // So the minimal set of indexes that MIGHT need to be updated must include
@@ -80,6 +83,16 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
         TableIterator &iterator = srcTable->iterator();
         while (iterator.next(scannedTuple)) {
             processTupleInsert(scannedTuple, false);
+        }
+    }
+    else {
+        if (m_groupByColumnCount == 0) {
+            std::cout << "no group by column" << std::endl;
+            m_existingTuple.move(m_emptyTupleBackingStore);
+            memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+            NValue value = m_existingTuple.getNValue(0);
+            m_updatedTuple.setNValue(0, value);
+            m_target->insertPersistentTuple(m_updatedTuple, true);
         }
     }
     VOLT_TRACE("Finish initialization...");
@@ -486,6 +499,8 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
 
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
 {
+    if(ExecutorContext::getExecutorContext()->m_siteId == 0)
+        std::cout << "processTupleDelete" << std::endl;
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && !m_filterPredicate->eval(&oldTuple, NULL).isTrue())
         return;
@@ -501,10 +516,17 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
 
     // set up the first column, which is a count
+    if(ExecutorContext::getExecutorContext()->m_siteId == 0)
+        std::cout << "count star decrease" << std::endl;
     NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
 
     // check if we should remove the tuple
-    if (count.isZero()) {
+    // ENG-7872: If it's count(*), will not delete the tuple even it's 0.
+    if(ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        std::cout << "m_groupByColumnCount = " << m_groupByColumnCount << std::endl;
+        std::cout << "count.isZero() = " << count.isZero() << std::endl;
+    }
+    if (count.isZero() && m_groupByColumnCount != 0) {
         m_target->deleteTuple(m_existingTuple, fallible);
         return;
     }
