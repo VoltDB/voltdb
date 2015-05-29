@@ -1150,8 +1150,7 @@ var loadPage = function (serverName, portid) {
                     htmlcontent = htmlcontent + "<tr>";
                     htmlcontent = htmlcontent + "<td>" + key + "</td>" +
                         "<td>" + VoltDbUI.drStatus + "</td>" +
-                        "<td>" + response[key][i].TOTALBUFFERS + "</td >" +
-                        "<td>" + response[key][i].TOTALBYTES + "</td >" +
+                        "<td>" + (response[key][i].TOTALBYTES / 1024 / 1024).toFixed(3) + "</td >" +
                         "<td>" + replicaLatencyMs + "</td >" +
                         "<td>" + replicaLatencyTrans + "</td >";
                     htmlcontent = htmlcontent + "</tr>";
@@ -1166,8 +1165,7 @@ var loadPage = function (serverName, portid) {
             var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
                 "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
                 "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                "<th id='Th3' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Total Buffer</th>" +
-                "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Buffer on disk</th>" +
+                "<th id='Th4' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
                 "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                 "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
             $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
@@ -1189,27 +1187,37 @@ var loadPage = function (serverName, portid) {
 
                     $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
 
-                    var length = $("#tblDrMAster tr").length - 1;
-                    if (length >= 5) {
-                        $("#drMasterSection").css("min-height", "280px");
-                    } else if (length == 4) {
-                        $("#drMasterSection").css("min-height", "250px");
+                    if ((screen.width == 1600) && (screen.height == 900)) {
+                        var length = $("#tblDrMAster tr").length - 1;
+                        if (length >= 5) {
+                            $("#drMasterSection").css("min-height", "280px");
+                        } else if (length == 4) {
+                            $("#drMasterSection").css("min-height", "250px");
+                        } else if (length == 3) {
+                            $("#drMasterSection").css("min-height", "230px");
+                        } else if (length == 2) {
+                            $("#drMasterSection").css("min-height", "200px");
+                        } else if (length == 1 || length == 0) {
+                            $("#drMasterSection").css("min-height", "170px");
+                        }
                     }
-                    else if (length == 3) {
-                        $("#drMasterSection").css("min-height", "230px");
+
+                    else if ((screen.width == 360) && (screen.height == 640)) {
+                        $("#drMasterSection").css("min-height", "380px");
                     }
-                    else if (length == 2) {
-                        $("#drMasterSection").css("min-height", "200px");
+                    else if ((screen.width == 640) && (screen.height == 960)) {
+                        alert("iphone resolution mode");
+                        $("#drMasterSection").css("min-height", "380px");
                     }
-                    else if (length == 1 || length == 0) {
-                        $("#drMasterSection").css("min-height", "170px");
-                    }
+                    //else if ($(window).width() == '751') {
+                    //    $("#drMasterSection").css("min-height", "350px");
+                    //}
+                    //console.log(screen.width + "*" + screen.height);
                 },
 
                 "sDom": 'p<"tblScroll drScroll"t>',
                 "aoColumns": [
                     null,
-                    { "bSearchable": false },
                     { "bSearchable": false },
                     { "bSearchable": false },
                     { "bSearchable": false },
