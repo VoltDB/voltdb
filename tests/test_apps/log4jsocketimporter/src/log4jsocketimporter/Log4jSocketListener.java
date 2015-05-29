@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package log4jsocketimporter;  
+package log4jsocketimporter;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
