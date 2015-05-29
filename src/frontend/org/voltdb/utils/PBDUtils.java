@@ -19,8 +19,10 @@ package org.voltdb.utils;
 
 import org.voltcore.utils.DeferredSerialization;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 public class PBDUtils {
     public static int writeDeferredSerialization(ByteBuffer mbuf, DeferredSerialization ds) throws IOException
@@ -38,5 +40,26 @@ public class PBDUtils {
             ds.cancel();
         }
         return written;
+    }
+
+    public static void writeBuffer(FileChannel fc, ByteBuffer buf, int startPos) throws IOException
+    {
+        int pos = startPos;
+        while (buf.hasRemaining()) {
+            pos += fc.write(buf, pos);
+        }
+    }
+
+    public static void readBufferFully(FileChannel fc, ByteBuffer buf, int startPos) throws IOException
+    {
+        int pos = startPos;
+        while (buf.hasRemaining()) {
+            int read = fc.read(buf, pos);
+            if (read == -1) {
+                throw new EOFException();
+            }
+            pos += read;
+        }
+        buf.flip();
     }
 }
