@@ -29,9 +29,6 @@ package socketimporter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
@@ -39,6 +36,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.utils.Pair;
@@ -98,10 +96,10 @@ public class AsyncBenchmark {
         int warmup = 10;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for streaming data")
-        String servers = "localhost";
+        String servers = "volt3e,volt3f,volt3g";
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to for database queries")
-        String dbservers = "localhost";
+        String dbservers = "volt3e,volt3f,volt3g";
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = false;
@@ -264,10 +262,11 @@ public class AsyncBenchmark {
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
             	long t = System.currentTimeMillis();
-            	Pair<Long,Long> p = new Pair<Long,Long>(Long.valueOf(icnt), Long.valueOf(t));
+            	long rnd = ThreadLocalRandom.current().nextLong();
+            	Pair<Long,Long> p = new Pair<Long,Long>(rnd, t);
                 queue.offer(p);
-                String s = String.valueOf(icnt) + "," + t + "\n";
-
+                //String s = String.valueOf(icnt) + "," + t + "\n";
+                String s = rnd + "," + t + "\n";
                 writeFully(s, hap, warmupEndTime);
                 icnt++;
             }
@@ -284,10 +283,12 @@ public class AsyncBenchmark {
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
             	long t = System.currentTimeMillis();
-            	Pair<Long,Long> p = new Pair<Long,Long>(Long.valueOf(icnt), Long.valueOf(t));
+            	long rnd = ThreadLocalRandom.current().nextLong();
+            	Pair<Long,Long> p = new Pair<Long,Long>(rnd, t);
                 queue.offer(p);
-                String s = String.valueOf(icnt) + "," + t + "\n";
-                writeFully(s, hap, benchmarkEndTime);
+                //String s = String.valueOf(icnt) + "," + t + "\n";
+                String s = rnd + "," + t + "\n";
+                writeFully(s, hap, warmupEndTime);
                 icnt++;
             }
             haplist.get(hap).flush();
@@ -373,19 +374,16 @@ public class AsyncBenchmark {
         }
         System.out.println("Starting CheckData methods. Queue size: " + queue.size());
         checkDB.processQueue();
-
         cdl.await();
 
         System.out.println("...starting timed check looping... " + queue.size());
+        // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
         final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
-        DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-        //Date date = new Date();
+        System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis()) + " seconds.");
+
         while (queueEndTime > System.currentTimeMillis()) {
-        	if ((queueEndTime - System.currentTimeMillis()) % 15000 == 0) {
-        		Date date = new Date();
-        		System.out.println("...still looping... Queue length: " + queue.size());
-        		System.out.println(dateFormat.format(date));
-        		System.out.println(new Date());
+        	if ((queueEndTime - System.currentTimeMillis())/1000 % 15 == 0) {
+         		System.out.println("...still looping... Queue length: " + queue.size());
         	}
         	checkDB.processQueue();
         }
