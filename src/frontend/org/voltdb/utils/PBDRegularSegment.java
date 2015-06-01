@@ -333,6 +333,7 @@ public class PBDRegularSegment implements PBDSegment {
             final int length = m_tmpHeaderBuf.b().getInt();
             final int flags = m_tmpHeaderBuf.b().getInt();
             final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
+            final int uncompressedLen;
 
             if (length < 1) {
                 throw new IOException("Read an invalid length");
@@ -350,7 +351,7 @@ public class PBDRegularSegment implements PBDSegment {
                     }
                     compressedBuf.b().flip();
 
-                    final int uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
+                    uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
                     retcont = factory.getContainer(uncompressedLen);
                     retcont.b().limit(uncompressedLen);
                     CompressionService.decompressBuffer(compressedBuf.bDR(), retcont.b());
@@ -358,6 +359,7 @@ public class PBDRegularSegment implements PBDSegment {
                     compressedBuf.discard();
                 }
             } else {
+                uncompressedLen = length;
                 retcont = factory.getContainer(length);
                 retcont.b().limit(length);
                 while (retcont.b().hasRemaining()) {
@@ -369,7 +371,7 @@ public class PBDRegularSegment implements PBDSegment {
                 retcont.b().flip();
             }
 
-            m_bytesRead += length;
+            m_bytesRead += uncompressedLen;
 
             return new DBBPool.BBContainer(retcont.b()) {
                 private boolean m_discarded = false;
@@ -394,7 +396,7 @@ public class PBDRegularSegment implements PBDSegment {
     }
 
     @Override
-    public int sizeInBytes() {
+    public int uncompressedBytesToRead() {
         if (m_closed) throw new RuntimeException("Segment closed");
         return m_size - m_bytesRead - SEGMENT_HEADER_BYTES;
     }

@@ -488,7 +488,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (PBDSegment segment : m_segments) {
             final boolean wasClosed = segment.isClosed();
             if (wasClosed) segment.open(false);
-            size += segment.sizeInBytes();
+            size += segment.uncompressedBytesToRead();
             if (wasClosed) {
                 segment.close();
             }

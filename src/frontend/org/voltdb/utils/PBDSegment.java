@@ -70,5 +70,5 @@ public interface PBDSegment {
      * diverge from object count on crash or power failure
      * although incredibly unlikely
      */
-    int sizeInBytes();
+    int uncompressedBytesToRead();
 }
