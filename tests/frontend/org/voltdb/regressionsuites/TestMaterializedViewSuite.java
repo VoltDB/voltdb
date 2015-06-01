@@ -94,7 +94,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     private void assertAggNoGroupBy(VoltTable[] results, String... values) throws IOException, ProcCallException
     {
-            assertTrue(values != null);
+        assertTrue(values != null);
         assertTrue(results != null);
         assertEquals(1, results.length);
         VoltTable t = results[0];
@@ -791,7 +791,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     private void subtestENG7872MP() throws IOException, ProcCallException
     {
-            Client client = getClient();
+        Client client = getClient();
         truncateBeforeTest(client);
         VoltTable[] results = null;
 
