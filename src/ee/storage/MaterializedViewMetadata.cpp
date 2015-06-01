@@ -35,8 +35,6 @@
 #include "storage/persistenttable.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
-#include <iostream>
-#include "common/executorcontext.hpp"
 
 namespace voltdb {
 
@@ -57,6 +55,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
+
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
     // So the minimal set of indexes that MIGHT need to be updated must include
@@ -83,24 +82,30 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
             processTupleInsert(scannedTuple, false);
         }
     }
-    else {
-        if (m_groupByColumnCount == 0) {
-            m_existingTuple.move(m_emptyTupleBackingStore);
-            memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
-            m_updatedTuple.setNValue(0, ValueFactory::getBigIntValue(0)); // COUNT(*);
-            int aggOffset = (int)m_groupByColumnCount + 1;
-            NValue newValue;
-            for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-                if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
-                    newValue = ValueFactory::getBigIntValue(0);
-                }
-                else {
-                    newValue = ValueFactory::getNullValue();
-                }
-                m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+    /* If there is no group by column and the target table is still empty 
+     * even after catching up with pre-existing source tuples, we should initialize the 
+     * target table with one default row of data. 
+     * COUNT() functions should have value 0, other aggregation functions should have value NULL.
+     * See ENG-7872
+     */
+    if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
+        m_existingTuple.move(m_emptyTupleBackingStore);
+        // clear the tuple that will be built to insert or overwrite
+        memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+        // COUNT(*) column will be zero.
+        m_updatedTuple.setNValue(0, ValueFactory::getBigIntValue(0));
+        int aggOffset = (int)m_groupByColumnCount + 1;
+        NValue newValue;
+        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+                newValue = ValueFactory::getBigIntValue(0);
             }
-            m_target->insertPersistentTuple(m_updatedTuple, true);
+            else {
+                newValue = ValueFactory::getNullValue();
+            }
+            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
+        m_target->insertPersistentTuple(m_updatedTuple, true);
     }
     VOLT_TRACE("Finish initialization...");
 }
@@ -524,8 +529,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
 
     // check if we should remove the tuple
-    // ENG-7872: If it's count(*), will not delete the tuple even it's 0.
-    if (count.isZero() ) {
+    if (count.isZero()) {
         m_target->deleteTuple(m_existingTuple, fallible);
         return;
     }
