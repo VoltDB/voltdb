@@ -57,8 +57,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-        std::cout << "addMaterializedView" << std::endl;
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
     // So the minimal set of indexes that MIGHT need to be updated must include
@@ -87,11 +85,20 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     }
     else {
         if (m_groupByColumnCount == 0) {
-            std::cout << "no group by column" << std::endl;
             m_existingTuple.move(m_emptyTupleBackingStore);
             memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
-            NValue value = m_existingTuple.getNValue(0);
-            m_updatedTuple.setNValue(0, value);
+            m_updatedTuple.setNValue(0, ValueFactory::getBigIntValue(0)); // COUNT(*);
+            int aggOffset = (int)m_groupByColumnCount + 1;
+            NValue newValue;
+            for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+                if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+                    newValue = ValueFactory::getBigIntValue(0);
+                }
+                else {
+                    newValue = ValueFactory::getNullValue();
+                }
+                m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+            }
             m_target->insertPersistentTuple(m_updatedTuple, true);
         }
     }
@@ -499,8 +506,6 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
 
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
 {
-    if(ExecutorContext::getExecutorContext()->m_siteId == 0)
-        std::cout << "processTupleDelete" << std::endl;
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && !m_filterPredicate->eval(&oldTuple, NULL).isTrue())
         return;
@@ -516,17 +521,11 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
 
     // set up the first column, which is a count
-    if(ExecutorContext::getExecutorContext()->m_siteId == 0)
-        std::cout << "count star decrease" << std::endl;
     NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
 
     // check if we should remove the tuple
     // ENG-7872: If it's count(*), will not delete the tuple even it's 0.
-    if(ExecutorContext::getExecutorContext()->m_siteId == 0) {
-        std::cout << "m_groupByColumnCount = " << m_groupByColumnCount << std::endl;
-        std::cout << "count.isZero() = " << count.isZero() << std::endl;
-    }
-    if (count.isZero() && m_groupByColumnCount != 0) {
+    if (count.isZero() ) {
         m_target->deleteTuple(m_existingTuple, fallible);
         return;
     }
@@ -600,7 +599,7 @@ bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
     // For the case where is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view.
     // See ENG-7872
-    if (m_index == NULL) {
+    if (m_groupByColumnCount == 0) {
         TableIterator iterator = m_target->iteratorDeletingAsWeGo();
         iterator.next(m_existingTuple);
     }
