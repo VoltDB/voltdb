@@ -363,9 +363,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
-    public void setDRGateway(PartitionDRGateway gateway)
+    public long setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
+        return
     }
 
     public void setMpDRGateway(final PartitionDRGateway mpGateway)
