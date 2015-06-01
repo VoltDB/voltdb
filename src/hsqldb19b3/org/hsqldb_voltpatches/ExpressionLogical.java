@@ -634,9 +634,24 @@ public class ExpressionLogical extends Expression {
 
         if (nodes[LEFT].opType == OpTypes.ROW
                 || nodes[RIGHT].opType == OpTypes.ROW) {
+            // A VoltDB extension to allow row subqueries (C1, C2) = (SELECT C1, C2 FROM ...)
+            if (nodes[RIGHT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[RIGHT].subQuery != null);
+                if (nodes[LEFT].nodes.length != nodes[RIGHT].subQuery.getTable().columnCount) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[LEFT].subQuery != null);
+                if (nodes[LEFT].subQuery.getTable().columnCount != nodes[RIGHT].nodes.length) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            /* Disable 3 lines ...
             if (nodes[LEFT].opType != OpTypes.ROW
                     || nodes[RIGHT].opType != OpTypes.ROW
                     || nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            ... disabled 3 lines. */
+            // End of VoltDB extension
                 throw Error.error(ErrorCode.X_42564);
             }
 

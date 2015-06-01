@@ -64,7 +64,8 @@ public enum TxnId2Utils {;
                      ss.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*")
                     )) {
                     }
-                else if (ss.matches(".*Server is currently unavailable; try again later.*")) {
+                else if (ss.matches(".*Server is currently unavailable; try again later.*") ||
+                         ss.matches(".*Server is paused and is currently unavailable.*")) {
                     sleep = true;
                 }
                 else {

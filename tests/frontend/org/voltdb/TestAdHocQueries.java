@@ -39,6 +39,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
@@ -566,7 +567,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // expecting failure above
             fail();
         } catch(Exception ex) {
-            assertEquals(errorMsg, ex.getMessage());
+            assertTrue(ex.getMessage().contains(errorMsg));
         }
     }
 
@@ -601,13 +602,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
             //
             // test batch with extra parameter call
             //
-            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = 'a2';";
-            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1"});
-
+            String errorMsg = AsyncCompilerAgent.AdHocErrorResponseMessage;
             // test batch question mark parameter guards
-            String errorMsg = "The @AdHoc stored procedure when called with more than one parameter "
-                    + "must be passed a single parameterized SQL statement as its first parameter. "
-                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
+
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = 'a2';";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
+                fail();
+            } catch (Exception ex) {
+                assertEquals(errorMsg, ex.getMessage());
+            }
+
             adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = ?;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
@@ -709,11 +714,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                      WHERE STAFF.EMPNUM = WORKS.EMPNUM);";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on subquery");
+                fail("did not fail on subquery In/Exists");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+                assertTrue(pcex.getMessage().indexOf("Subquery expressions are only supported in SELECT statements") > 0);
             }
+
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
                     "           FROM STAFF \n" +
                     "           WHERE NOT EXISTS (SELECT * FROM WORKS \n" +
@@ -721,11 +727,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                ORDER BY EMPNUM;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on exists clause");
             }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+            catch (Exception ex) {
+                fail("did fail on exists clause");
             }
+
             adHocQuery = "   SELECT STAFF.EMPNAME \n" +
                     "          FROM STAFF \n" +
                     "          WHERE STAFF.EMPNUM IN \n" +
@@ -738,11 +744,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on subquery");
             }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+            catch (Exception ex) {
+                fail("did fail on subquery");
             }
+
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
                     "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +

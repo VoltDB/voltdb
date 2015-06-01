@@ -32,8 +32,8 @@ apply plugin: 'groovy'
 //apply from: "src/resources/Downloads.gradle"
 //apply from: "src/resources/GetPropertyValues.gradle"
 
-// The drivers to use
-ext.drivers = ["firefox", "chrome", "ie", "htmlunit", "phantomjs", "safari"]
+// The browser-drivers to use
+ext.drivers = ["firefox", "chrome", "phantomjs", "ie", "safari", "htmlunit"]
 
 repositories {
     mavenCentral()

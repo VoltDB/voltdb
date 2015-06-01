@@ -21,13 +21,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -72,7 +71,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
+        // Need to add the table to the cache. It may be required to resolve the
+        // correlated TVE in case of WHERE clause contains IN subquery
         Table table = getTableFromDB(tableName);
+        addTableToStmtCache(table, tableName);
 
         m_tableList.add(table);
 
@@ -134,7 +136,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                 int id = Integer.parseInt(timeValue.split(":")[1]);
 
                 FunctionExpression funcExpr = new FunctionExpression();
-                funcExpr.setAttributes(name, name , id);
+                funcExpr.setAttributes(name, null, id);
 
                 funcExpr.setValueType(VoltType.TIMESTAMP);
                 funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
@@ -179,19 +181,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         return expr;
     }
 
-    public boolean isInsertWithSubquery() {
-        if (m_subquery != null) {
-            return true;
-        }
-        return false;
-    }
+    public StmtSubqueryScan getSubqueryScan() { return m_subquery; }
 
     /**
      * Return the subqueries for this statement.  For INSERT statements,
      * there can be only one.
      */
     @Override
-    public List<StmtSubqueryScan> getSubqueries() {
+    public List<StmtSubqueryScan> getSubqueryScans() {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
         if (m_subquery != null) {
@@ -224,5 +221,22 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     public boolean targetTableHasLimitRowsTrigger() {
         assert(m_tableList.size() == 1);
         return CatalogUtil.getLimitPartitionRowsDeleteStmt(m_tableList.get(0)) != null;
+    }
+
+    @Override
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+
+        for (AbstractExpression expr : m_columns.values()) {
+            if (expr != null) {
+                exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+
+        if (m_subquery != null) {
+            exprs.addAll(m_subquery.getSubqueryStmt().findAllSubexpressionsOfClass(aeClass));
+        }
+
+        return exprs;
     }
 }

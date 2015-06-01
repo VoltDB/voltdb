@@ -578,7 +578,19 @@ public class TestFunctionsSuite extends RegressionSuite {
         r = cr.getResults()[0];
         assertEquals(5, r.asScalarLong());
 
+        // Test that commas work just like keyword separators
+        cr = client.callProcedure("ALT_WHERE_SUBSTRING2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+
         cr = client.callProcedure("WHERE_SUBSTRING3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+
+        // Test that commas work just like keyword separators
+        cr = client.callProcedure("ALT_WHERE_SUBSTRING3");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         assertEquals(5, r.asScalarLong());
@@ -783,8 +795,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr = null;
         VoltTable r = null;
-        long result;
-        int columnIndex = 0;
 
         // Giving up on hsql testing until timestamp precision behavior can be normalized.
         if ( ! isHSQL()) {
@@ -886,10 +896,26 @@ public class TestFunctionsSuite extends RegressionSuite {
 //        assertNull(r.getLong(8));
 
 
+        subtestExtract(client, "EXTRACT_TIMESTAMP");
+        // Test that commas work just like keyword separators
+        subtestExtract(client, "ALT_EXTRACT_TIMESTAMP");
+    }
+
+    void subtestExtract(Client client, String extractProc)
+            throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr = null;
+        VoltTable r = null;
+        long result;
+        int columnIndex = 0;
+        String extractFailed = extractProc + " got a wrong answer";
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
         // Normal test case 2001-9-9 01:46:40
         cr = client.callProcedure("P1.insert", 1, "X0", 10, 1.1, new Timestamp(1000000000789L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("EXTRACT_TIMESTAMP", 1);
+        cr = client.callProcedure(extractProc, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
@@ -897,43 +923,43 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         int EXPECTED_YEAR = 2001;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_YEAR, result);
+        assertEquals(extractFailed, EXPECTED_YEAR, result);
 
         int EXPECTED_MONTH = 9;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MONTH, result);
+        assertEquals(extractFailed, EXPECTED_MONTH, result);
 
         int EXPECTED_DAY = 9;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DAY, result);
+        assertEquals(extractFailed, EXPECTED_DAY, result);
 
         int EXPECTED_DOW = 1;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOW, result);
+        assertEquals(extractFailed, EXPECTED_DOW, result);
 
         int EXPECTED_DOM = EXPECTED_DAY;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOM, result);
+        assertEquals(extractFailed, EXPECTED_DOM, result);
 
         int EXPECTED_DOY = 252;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOY, result);
+        assertEquals(extractFailed, EXPECTED_DOY, result);
 
         int EXPECTED_QUARTER = 3;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_QUARTER, result);
+        assertEquals(extractFailed, EXPECTED_QUARTER, result);
 
         int EXPECTED_HOUR = 1;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_HOUR, result);
+        assertEquals(extractFailed, EXPECTED_HOUR, result);
 
         int EXPECTED_MINUTE = 46;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MINUTE, result);
+        assertEquals(extractFailed, EXPECTED_MINUTE, result);
 
         BigDecimal EXPECTED_SECONDS = new BigDecimal("40.789000000000");
         BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
-        assertEquals(EXPECTED_SECONDS, decimalResult);
+        assertEquals(extractFailed, EXPECTED_SECONDS, decimalResult);
 
         // ISO 8601 regards Sunday as the last day of a week
         int EXPECTED_WEEK = 36;
@@ -942,9 +968,9 @@ public class TestFunctionsSuite extends RegressionSuite {
             EXPECTED_WEEK = 37;
         }
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
 
         // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
         int EXPECTED_WEEKDAY = 6;
@@ -953,14 +979,14 @@ public class TestFunctionsSuite extends RegressionSuite {
             EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEKDAY, result);
+        assertEquals(extractFailed, EXPECTED_WEEKDAY, result);
 
         // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
         // Leap year!
         // http://disc.gsfc.nasa.gov/julian_calendar.shtml
         cr = client.callProcedure("P1.insert", 2, "X0", 10, 1.1, new Timestamp(-666430077123L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("EXTRACT_TIMESTAMP", 2);
+        cr = client.callProcedure(extractProc, 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
@@ -968,49 +994,49 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         EXPECTED_YEAR = 1948;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_YEAR, result);
+        assertEquals(extractFailed, EXPECTED_YEAR, result);
 
         EXPECTED_MONTH = 11;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MONTH, result);
+        assertEquals(extractFailed, EXPECTED_MONTH, result);
 
         EXPECTED_DAY = 18;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DAY, result);
+        assertEquals(extractFailed, EXPECTED_DAY, result);
 
         EXPECTED_DOW = 5;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOW, result);
+        assertEquals(extractFailed, EXPECTED_DOW, result);
 
         EXPECTED_DOM = EXPECTED_DAY;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOM, result);
+        assertEquals(extractFailed, EXPECTED_DOM, result);
 
         EXPECTED_DOY = 323;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOY, result);
+        assertEquals(extractFailed, EXPECTED_DOY, result);
 
         EXPECTED_QUARTER = 4;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_QUARTER, result);
+        assertEquals(extractFailed, EXPECTED_QUARTER, result);
 
         EXPECTED_HOUR = 16;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_HOUR, result);
+        assertEquals(extractFailed, EXPECTED_HOUR, result);
 
         EXPECTED_MINUTE = 32;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MINUTE, result);
+        assertEquals(extractFailed, EXPECTED_MINUTE, result);
 
         EXPECTED_SECONDS = new BigDecimal("2.877000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
-        assertEquals(EXPECTED_SECONDS, decimalResult);
+        assertEquals(extractFailed, EXPECTED_SECONDS, decimalResult);
 
         EXPECTED_WEEK = 47;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
 
         // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
         EXPECTED_WEEKDAY = 3;
@@ -1019,62 +1045,62 @@ public class TestFunctionsSuite extends RegressionSuite {
             EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEKDAY, result);
+        assertEquals(extractFailed, EXPECTED_WEEKDAY, result);
 
         // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
         cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("EXTRACT_TIMESTAMP", 3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(extractProc, 3);
+        assertEquals(extractFailed, ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
         columnIndex = 0;
 
         EXPECTED_YEAR = 1658;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_YEAR, result);
+        assertEquals(extractFailed, EXPECTED_YEAR, result);
 
         EXPECTED_MONTH = 7;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MONTH, result);
+        assertEquals(extractFailed, EXPECTED_MONTH, result);
 
         EXPECTED_DAY = 5;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DAY, result);
+        assertEquals(extractFailed, EXPECTED_DAY, result);
 
         EXPECTED_DOW = 6;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOW, result);
+        assertEquals(extractFailed, EXPECTED_DOW, result);
 
         EXPECTED_DOM = EXPECTED_DAY;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOM, result);
+        assertEquals(extractFailed, EXPECTED_DOM, result);
 
         EXPECTED_DOY = 186;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOY, result);
+        assertEquals(extractFailed, EXPECTED_DOY, result);
 
         EXPECTED_QUARTER = 3;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_QUARTER, result);
+        assertEquals(extractFailed, EXPECTED_QUARTER, result);
 
         EXPECTED_HOUR = 14;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_HOUR, result);
+        assertEquals(extractFailed, EXPECTED_HOUR, result);
 
         EXPECTED_MINUTE = 22;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MINUTE, result);
+        assertEquals(extractFailed, EXPECTED_MINUTE, result);
 
         EXPECTED_SECONDS = new BigDecimal("27.544000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
-        assertEquals(EXPECTED_SECONDS, decimalResult);
+        assertEquals(extractFailed, EXPECTED_SECONDS, decimalResult);
 
         EXPECTED_WEEK = 27;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
 
         // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
         EXPECTED_WEEKDAY = 4;
@@ -1083,7 +1109,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEKDAY, result);
+        assertEquals(extractFailed, EXPECTED_WEEKDAY, result);
 
         // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
         cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
@@ -1097,49 +1123,49 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         EXPECTED_YEAR = 1956;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_YEAR, result);
+        assertEquals(extractFailed, EXPECTED_YEAR, result);
 
         EXPECTED_MONTH = 7;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MONTH, result);
+        assertEquals(extractFailed, EXPECTED_MONTH, result);
 
         EXPECTED_DAY = 2;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DAY, result);
+        assertEquals(extractFailed, EXPECTED_DAY, result);
 
         EXPECTED_DOW = 2;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOW, result);
+        assertEquals(extractFailed, EXPECTED_DOW, result);
 
         EXPECTED_DOM = EXPECTED_DAY;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOM, result);
+        assertEquals(extractFailed, EXPECTED_DOM, result);
 
         EXPECTED_DOY = 184;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOY, result);
+        assertEquals(extractFailed, EXPECTED_DOY, result);
 
         EXPECTED_QUARTER = 3;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_QUARTER, result);
+        assertEquals(extractFailed, EXPECTED_QUARTER, result);
 
         EXPECTED_HOUR = 12;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_HOUR, result);
+        assertEquals(extractFailed, EXPECTED_HOUR, result);
 
         EXPECTED_MINUTE = 53;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MINUTE, result);
+        assertEquals(extractFailed, EXPECTED_MINUTE, result);
 
         EXPECTED_SECONDS = new BigDecimal("37.123000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
-        assertEquals(EXPECTED_SECONDS, decimalResult);
+        assertEquals(extractFailed, EXPECTED_SECONDS, decimalResult);
 
         EXPECTED_WEEK = 27;
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEK, result);
+        assertEquals(extractFailed, EXPECTED_WEEK, result);
 
         // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
         EXPECTED_WEEKDAY = 0;
@@ -1148,7 +1174,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             EXPECTED_WEEKDAY = EXPECTED_DOW;
         }
         result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_WEEKDAY, result);
+        assertEquals(extractFailed, EXPECTED_WEEKDAY, result);
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
@@ -2248,8 +2274,25 @@ public class TestFunctionsSuite extends RegressionSuite {
     public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Trim");
         Client client = getClient();
+
+        subtestTrimSpace(client, "TRIM_SPACE");
+        // Test that commas work just like keyword separators
+        subtestTrimSpace(client, "ALT_TRIM_SPACE");
+
+        subtestTrimAny(client, "TRIM_ANY");
+        // Test that commas work just like keyword separators
+        subtestTrimAny(client, "ALT_TRIM_ANY");
+    }
+
+    private void subtestTrimSpace(Client client, String trimProc)
+            throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
         VoltTable result;
+
+        String trimFailed = trimProc + " got a wrong answer";
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("P1.insert", 1, "  VoltDB   ", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2263,25 +2306,38 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("VoltDB   ", result.getString(1));
-        assertEquals("VoltDB   ", result.getString(2));
-        assertEquals("  VoltDB",  result.getString(3));
-        assertEquals("  VoltDB",  result.getString(4));
-        assertEquals("VoltDB",  result.getString(5));
-        assertEquals("VoltDB",  result.getString(6));
+        assertEquals(trimFailed, "VoltDB   ", result.getString(1));
+        assertEquals(trimFailed, "VoltDB   ", result.getString(2));
+        assertEquals(trimFailed, "  VoltDB",  result.getString(3));
+        assertEquals(trimFailed, "  VoltDB",  result.getString(4));
+        assertEquals(trimFailed, "VoltDB",  result.getString(5));
+        assertEquals(trimFailed, "VoltDB",  result.getString(6));
+    }
 
+    private void subtestTrimAny(Client client, String trimProc)
+            throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr;
+        VoltTable result;
 
-        cr = client.callProcedure("TRIM_ANY", " ", " ", " ", 1);
+        String trimFailed = trimProc + " got a wrong answer";
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("P1.insert", 1, "  VoltDB   ", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure(trimProc, " ", " ", " ", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("VoltDB   ", result.getString(1));
-        assertEquals("  VoltDB",  result.getString(2));
-        assertEquals("VoltDB",  result.getString(3));
+        assertEquals(trimFailed, "VoltDB   ", result.getString(1));
+        assertEquals(trimFailed, "  VoltDB",  result.getString(2));
+        assertEquals(trimFailed, "VoltDB",  result.getString(3));
 
         try {
-            cr = client.callProcedure("TRIM_ANY", "", "", "", 1);
+            cr = client.callProcedure(trimProc, "", "", "", 1);
             fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("data exception"));
@@ -2292,29 +2348,29 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("P1.insert", 2, "vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("TRIM_ANY", "v", "B", "B", 2);
+        cr = client.callProcedure(trimProc, "v", "B", "B", 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("VoltDBBB", result.getString(1));
-        assertEquals("vVoltD", result.getString(2));
-        assertEquals("vVoltD", result.getString(3));
+        assertEquals(trimFailed, "VoltDBBB", result.getString(1));
+        assertEquals(trimFailed, "vVoltD", result.getString(2));
+        assertEquals(trimFailed, "vVoltD", result.getString(3));
 
         // Multiple character trim, Hsql does not support
         if (!isHSQL()) {
-            cr = client.callProcedure("TRIM_ANY", "vV", "BB", "Vv", 2);
+            cr = client.callProcedure(trimProc, "vV", "BB", "Vv", 2);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            assertEquals("oltDBBB", result.getString(1));
-            assertEquals("vVoltDB", result.getString(2));
-            assertEquals("vVoltDBBB", result.getString(3));
+            assertEquals(trimFailed, "oltDBBB", result.getString(1));
+            assertEquals(trimFailed, "vVoltDB", result.getString(2));
+            assertEquals(trimFailed, "vVoltDBBB", result.getString(3));
         }
 
         // Test null trim character
-        cr = client.callProcedure("TRIM_ANY", null, null, null, 2);
+        cr = client.callProcedure(trimProc, null, null, null, 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -2328,34 +2384,34 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("P1.insert", 3, "贾vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("TRIM_ANY", "贾", "v", "贾", 3);
+        cr = client.callProcedure(trimProc, "贾", "v", "贾", 3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("vVoltDBBB", result.getString(1));
-        assertEquals("贾vVoltDBBB", result.getString(2));
-        assertEquals("vVoltDBBB", result.getString(3));
+        assertEquals(trimFailed, "vVoltDBBB", result.getString(1));
+        assertEquals(trimFailed, "贾vVoltDBBB", result.getString(2));
+        assertEquals(trimFailed, "vVoltDBBB", result.getString(3));
 
         if (!isHSQL()) {
             // Complete match
-            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB", "贾vVoltDBBB", "贾vVoltDBBB", 3);
+            cr = client.callProcedure(trimProc, "贾vVoltDBBB", "贾vVoltDBBB", "贾vVoltDBBB", 3);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            assertEquals("", result.getString(1));
-            assertEquals("", result.getString(2));
-            assertEquals("", result.getString(3));
+            assertEquals(trimFailed, "", result.getString(1));
+            assertEquals(trimFailed, "", result.getString(2));
+            assertEquals(trimFailed, "", result.getString(3));
 
-            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB_TEST", "贾vVoltDBBB贾vVoltDBBB", "贾vVoltDBBBT", 3);
+            cr = client.callProcedure(trimProc, "贾vVoltDBBB_TEST", "贾vVoltDBBB贾vVoltDBBB", "贾vVoltDBBBT", 3);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            assertEquals("贾vVoltDBBB", result.getString(1));
-            assertEquals("贾vVoltDBBB", result.getString(2));
-            assertEquals("贾vVoltDBBB", result.getString(3));
+            assertEquals(trimFailed, "贾vVoltDBBB", result.getString(1));
+            assertEquals(trimFailed, "贾vVoltDBBB", result.getString(2));
+            assertEquals(trimFailed, "贾vVoltDBBB", result.getString(3));
         }
 
         // Complicated test
@@ -2363,47 +2419,43 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // UTF-8 hex, 贾: 0xe8 0xb4 0xbe, 辴: 0xe8 0xbe 0xb4
-        cr = client.callProcedure("TRIM_ANY", "辴", "辴", "辴", 4);
+        cr = client.callProcedure(trimProc, "辴", "辴", "辴", 4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
-        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
-        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+        assertEquals(trimFailed, "贾贾vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals(trimFailed, "贾贾vVoltDBBB贾贾贾", result.getString(2));
+        assertEquals(trimFailed, "贾贾vVoltDBBB贾贾贾", result.getString(3));
 
-        cr = client.callProcedure("TRIM_ANY", "贾", "贾", "贾", 4);
+        cr = client.callProcedure(trimProc, "贾", "贾", "贾", 4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("vVoltDBBB贾贾贾", result.getString(1));
-        assertEquals("贾贾vVoltDBBB", result.getString(2));
-        assertEquals("vVoltDBBB", result.getString(3));
+        assertEquals(trimFailed, "vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals(trimFailed, "贾贾vVoltDBBB", result.getString(2));
+        assertEquals(trimFailed, "vVoltDBBB", result.getString(3));
 
         if (!isHSQL()) {
-            cr = client.callProcedure("TRIM_ANY", "贾辴", "贾辴", "贾辴", 4);
+            cr = client.callProcedure(trimProc, "贾辴", "贾辴", "贾辴", 4);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
-            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
-            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+            assertEquals(trimFailed, "贾贾vVoltDBBB贾贾贾", result.getString(1));
+            assertEquals(trimFailed, "贾贾vVoltDBBB贾贾贾", result.getString(2));
+            assertEquals(trimFailed, "贾贾vVoltDBBB贾贾贾", result.getString(3));
 
-            cr = client.callProcedure("TRIM_ANY", "贾贾vV", "贾贾", "B贾贾贾", 4);
+            cr = client.callProcedure(trimProc, "贾贾vV", "贾贾", "B贾贾贾", 4);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            assertEquals("oltDBBB贾贾贾", result.getString(1));
-            assertEquals("贾贾vVoltDBBB贾", result.getString(2));
-            assertEquals("贾贾vVoltDBB", result.getString(3));
+            assertEquals(trimFailed, "oltDBBB贾贾贾", result.getString(1));
+            assertEquals(trimFailed, "贾贾vVoltDBBB贾", result.getString(2));
+            assertEquals(trimFailed, "贾贾vVoltDBB", result.getString(3));
         }
-
-        cr = client.callProcedure("P1.insert", 5, "vVoltADBDB", 1, 1.0, new Timestamp(1000000000000L));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
     }
 
     public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2435,6 +2487,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("foofoofoo", result.getString(1));
+        if (!isHSQL()) {
+            verifyProcFails(client,
+                            "VOLTDB ERROR: SQL ERROR\\s*REPEAT function call would create a string of size \\d+ which is larger than the maximum size \\d+",
+                            "REPEAT", 10000000, 1);
+        }
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
@@ -2484,135 +2541,147 @@ public class TestFunctionsSuite extends RegressionSuite {
     public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Overlay");
         Client client = getClient();
+        subtestOverlay(client, "OVERLAY", "OVERLAY_FULL_LENGTH");
+        // Test that commas work just like keyword separators
+        subtestOverlay(client, "ALT_OVERLAY", "ALT_OVERLAY_FULL_LENGTH");
+    }
+
+    public void subtestOverlay(Client client, String overlayProc, String overlayFullLengthProc)
+            throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
         VoltTable result;
+        String overlayFailed = overlayProc + " got a wrong answer";
+        String overlayFullLengthFailed = overlayFullLengthProc + " got a wrong answer";
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        result = client.callProcedure("OVERLAY", "Jia", 4, 7, 1).getResults()[0];
+        result = client.callProcedure(overlayProc, "Jia", 4, 7, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("XinJia", result.getString(1));
+        assertEquals(overlayFailed, "XinJia", result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "Jia_", 4, 1, 1).getResults()[0];
+        result = client.callProcedure(overlayProc, "Jia_", 4, 1, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("XinJia_VoltDB", result.getString(1));
+        assertEquals(overlayFailed, "XinJia_VoltDB", result.getString(1));
 
         try {
-            result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
+            result = client.callProcedure(overlayProc, "Jia", 4.2, 7, 1).getResults()[0];
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("The provided value: (4.2) of type: java.lang.Double "
                     + "is not a match or is out of range for the target parameter type: long"));
         }
 
         // Test NULL results
-        result = client.callProcedure("OVERLAY", null, 4, 7, 1).getResults()[0];
+        result = client.callProcedure(overlayProc, null, 4, 7, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals(null, result.getString(1));
+        assertEquals(overlayFailed, null, result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "Jia", 4, null, 1).getResults()[0];
+        result = client.callProcedure(overlayProc, "Jia", 4, null, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals(null, result.getString(1));
+        assertEquals(overlayFailed, null, result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "Jia", null, 7, 1).getResults()[0];
+        result = client.callProcedure(overlayProc, "Jia", null, 7, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals(null, result.getString(1));
+        assertEquals(overlayFailed, null, result.getString(1));
 
-        result = client.callProcedure("OVERLAY_FULL_LENGTH", "Jia", 4, 1).getResults()[0];
+        result = client.callProcedure(overlayFullLengthProc, "Jia", 4, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("XinJialtDB", result.getString(1));
+        assertEquals(overlayFullLengthFailed, "XinJialtDB", result.getString(1));
 
-        result = client.callProcedure("OVERLAY_FULL_LENGTH", "J", 4, 1).getResults()[0];
+        result = client.callProcedure(overlayFullLengthProc, "J", 4, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("XinJVoltDB", result.getString(1));
+        assertEquals(overlayFullLengthFailed, "XinJVoltDB", result.getString(1));
 
 
         // Test UTF-8 OVERLAY
         cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        result = client.callProcedure("OVERLAY", "XinJia", 1, 2, 2).getResults()[0];
+        result = client.callProcedure(overlayProc, "XinJia", 1, 2, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("XinJia@VoltDB", result.getString(1));
+        assertEquals(overlayFailed, "XinJia@VoltDB", result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "XinJia", 8, 2, 2).getResults()[0];
+        result = client.callProcedure(overlayProc, "XinJia", 8, 2, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("贾鑫@VoltXinJia", result.getString(1));
+        assertEquals(overlayFailed, "贾鑫@VoltXinJia", result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "XinJia", 1, 9, 2).getResults()[0];
+        result = client.callProcedure(overlayProc, "XinJia", 1, 9, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("XinJia", result.getString(1));
+        assertEquals(overlayFailed, "XinJia", result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "XinJia", 2, 7, 2).getResults()[0];
+        result = client.callProcedure(overlayProc, "XinJia", 2, 7, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("贾XinJiaB", result.getString(1));
+        assertEquals(overlayFailed, "贾XinJiaB", result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "XinJia", 2, 8, 2).getResults()[0];
+        result = client.callProcedure(overlayProc, "XinJia", 2, 8, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("贾XinJia", result.getString(1));
+        assertEquals(overlayFailed, "贾XinJia", result.getString(1));
 
-        result = client.callProcedure("OVERLAY_FULL_LENGTH", "_", 3, 2).getResults()[0];
+        result = client.callProcedure(overlayFullLengthProc, "_", 3, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("贾鑫_VoltDB", result.getString(1));
+        assertEquals(overlayFullLengthFailed, "贾鑫_VoltDB", result.getString(1));
 
-        result = client.callProcedure("OVERLAY_FULL_LENGTH", " at ", 2, 2).getResults()[0];
+        result = client.callProcedure(overlayFullLengthProc, " at ", 2, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("贾 at ltDB", result.getString(1));
+        assertEquals(overlayFullLengthFailed, "贾 at ltDB", result.getString(1));
 
 
-        result = client.callProcedure("OVERLAY", "XinJia", 9, 1, 2).getResults()[0];
+        result = client.callProcedure(overlayProc, "XinJia", 9, 1, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+        assertEquals(overlayFailed, "贾鑫@VoltDXinJia", result.getString(1));
 
-        result = client.callProcedure("OVERLAY", "石宁", 9, 1, 2).getResults()[0];
+        result = client.callProcedure(overlayProc, "石宁", 9, 1, 2).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("贾鑫@VoltD石宁", result.getString(1));
+        assertEquals(overlayFailed, "贾鑫@VoltD石宁", result.getString(1));
 
         // Hsql has bugs on string(substring) index
         if (!isHSQL()) {
-            result = client.callProcedure("OVERLAY", "XinJia", 9, 2, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "XinJia", 9, 2, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+            assertEquals(overlayFailed, "贾鑫@VoltDXinJia", result.getString(1));
 
-            result = client.callProcedure("OVERLAY", "石宁", 9, 2, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "石宁", 9, 2, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("贾鑫@VoltD石宁", result.getString(1));
+            assertEquals(overlayFailed, "贾鑫@VoltD石宁", result.getString(1));
 
-            result = client.callProcedure("OVERLAY", "XinJia", 10, 2, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "XinJia", 10, 2, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+            assertEquals(overlayFailed, "贾鑫@VoltDBXinJia", result.getString(1));
 
-            result = client.callProcedure("OVERLAY", "石宁", 10, 2, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "石宁", 10, 2, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("贾鑫@VoltDB石宁", result.getString(1));
+            assertEquals(overlayFailed, "贾鑫@VoltDB石宁", result.getString(1));
 
             // various start argument tests
             // start from 0, not 1, but treat it at least 1
-            result = client.callProcedure("OVERLAY", "XinJia", 100, 2, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "XinJia", 100, 2, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+            assertEquals(overlayFailed, "贾鑫@VoltDBXinJia", result.getString(1));
 
             // various length argument
-            result = client.callProcedure("OVERLAY", "XinJia", 2, 0, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "XinJia", 2, 0, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("贾XinJia鑫@VoltDB", result.getString(1));
+            assertEquals(overlayFailed, "贾XinJia鑫@VoltDB", result.getString(1));
 
-            result = client.callProcedure("OVERLAY", "XinJia", 1, 10, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "XinJia", 1, 10, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("XinJia", result.getString(1));
+            assertEquals(overlayFailed, "XinJia", result.getString(1));
 
-            result = client.callProcedure("OVERLAY", "XinJia", 1, 100, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "XinJia", 1, 100, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("XinJia", result.getString(1));
+            assertEquals(overlayFailed, "XinJia", result.getString(1));
 
-            result = client.callProcedure("OVERLAY", "XinJia", 2, 100, 2).getResults()[0];
+            result = client.callProcedure(overlayProc, "XinJia", 2, 100, 2).getResults()[0];
             assertTrue(result.advanceRow());
-            assertEquals("贾XinJia", result.getString(1));
+            assertEquals(overlayFailed, "贾XinJia", result.getString(1));
 
 
             // Negative tests
             try {
-                result = client.callProcedure("OVERLAY", "XinJia", -10, 2, 2).getResults()[0];
+                result = client.callProcedure(overlayProc, "XinJia", -10, 2, 2).getResults()[0];
                 fail();
             } catch (Exception ex) {
                 assertTrue(ex.getMessage().contains(
@@ -2620,7 +2689,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
 
             try {
-                result = client.callProcedure("OVERLAY", "XinJia", 0, 2, 2).getResults()[0];
+                result = client.callProcedure(overlayProc, "XinJia", 0, 2, 2).getResults()[0];
                 fail();
             } catch (Exception ex) {
                 assertTrue(ex.getMessage().contains(
@@ -2628,7 +2697,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
 
             try {
-                result = client.callProcedure("OVERLAY", "XinJia", 1, -1, 2).getResults()[0];
+                result = client.callProcedure(overlayProc, "XinJia", 1, -1, 2).getResults()[0];
                 fail();
             } catch (Exception ex) {
                 assertTrue(ex.getMessage().contains(
@@ -3778,6 +3847,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST), EXTRACT(WEEK_OF_YEAR FROM PAST), " +
                 "EXTRACT(WEEK FROM PAST), EXTRACT(WEEKDAY FROM PAST) from P1 where ID = ?");
 
+        // Test that commas work just like keyword separators
+        project.addStmtProcedure("ALT_EXTRACT_TIMESTAMP", "select EXTRACT(YEAR, PAST), EXTRACT(MONTH, PAST), EXTRACT(DAY, PAST), " +
+                "EXTRACT(DAY_OF_WEEK, PAST), EXTRACT(DAY_OF_MONTH, PAST), EXTRACT(DAY_OF_YEAR, PAST), EXTRACT(QUARTER, PAST), " +
+                "EXTRACT(HOUR, PAST), EXTRACT(MINUTE, PAST), EXTRACT(SECOND, PAST), EXTRACT(WEEK_OF_YEAR, PAST), " +
+                "EXTRACT(WEEK, PAST), EXTRACT(WEEKDAY, PAST) from P1 where ID = ?");
+
 
         project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
                 "select PAST, CAST(DESC AS TIMESTAMP), DESC, CAST(PAST AS VARCHAR) from R2 " +
@@ -3811,11 +3886,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("ORDER_SUBSTRING", "select ID+15 from P1 order by SUBSTRING (DESC FROM 2)");
 
         project.addStmtProcedure("WHERE_SUBSTRING2",
-                                 "select count(*) from P1 " +
-                                 "where SUBSTRING (DESC FROM 2) > '12"+paddedToNonInlineLength+"'");
+                "select count(*) from P1 " +
+                "where SUBSTRING (DESC FROM 2) > '12"+paddedToNonInlineLength+"'");
+        // Test that commas work just like keyword separators
+        project.addStmtProcedure("ALT_WHERE_SUBSTRING2",
+                "select count(*) from P1 " +
+                "where SUBSTRING (DESC, 2) > '12"+paddedToNonInlineLength+"'");
+
         project.addStmtProcedure("WHERE_SUBSTRING3",
-                                 "select count(*) from P1 " +
-                                 "where not SUBSTRING (DESC FROM 2 FOR 1) > '13'");
+                "select count(*) from P1 " +
+                "where not SUBSTRING (DESC FROM 2 FOR 1) > '13'");
+        // Test that commas work just like keyword separators
+        project.addStmtProcedure("ALT_WHERE_SUBSTRING3",
+                "select count(*) from P1 " +
+                "where not SUBSTRING (DESC, 2, 1) > '13'");
 
         // Test GROUP BY by support
         project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
@@ -3833,13 +3917,23 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("TRIM_SPACE", "select id, LTRIM(DESC), TRIM(LEADING ' ' FROM DESC), " +
                 "RTRIM(DESC), TRIM(TRAILING ' ' FROM DESC), TRIM(DESC), TRIM(BOTH ' ' FROM DESC) from P1 where id = ?");
+        // Test that commas work just like keyword separators
+        project.addStmtProcedure("ALT_TRIM_SPACE", "select id, TRIM(LEADING FROM DESC), TRIM(LEADING, ' ', DESC), " +
+                "TRIM(TRAILING, DESC), TRIM(TRAILING, ' ', DESC), TRIM(BOTH, DESC), TRIM(BOTH, ' ' , DESC) from P1 where id = ?");
         project.addStmtProcedure("TRIM_ANY", "select id, TRIM(LEADING ? FROM DESC), TRIM(TRAILING ? FROM DESC), " +
                 "TRIM(BOTH ? FROM DESC) from P1 where id = ?");
+        // Test that commas work just like keyword separators
+        project.addStmtProcedure("ALT_TRIM_ANY", "select id, TRIM(LEADING, ?, DESC), TRIM(TRAILING, ?, DESC), " +
+                "TRIM(BOTH, ?, DESC) from P1 where id = ?");
 
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
         project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
+        // Test that commas work just like keyword separators
+        project.addStmtProcedure("ALT_OVERLAY", "select id, OVERLAY(DESC, ?, ?, ?) from P1 where id = ?");
         project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
+        // Test that commas work just like keyword separators
+        project.addStmtProcedure("ALT_OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC, ?, ?) from P1 where id = ?");
 
         project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
 

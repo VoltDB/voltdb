@@ -1,0 +1,49 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    echo original patched directory does not exist: $1
+    exit 1
+fi
+if [ ! -d "$2" ]; then
+    echo original source code directory does not exist: $2
+    exit 2
+fi
+
+if [ ! -d "$3" ]; then
+    echo target patched directory does not exist: $2
+    exit 3
+fi
+
+BASELINE=$1
+SOURCE=$2
+TARGET=$3
+
+function do_merge_work {
+    if [ ! -d $BASELINE ]; then
+        echo Baseline directory should be an absolute path.
+        exit 3 
+    fi
+    hsqlsrc=$BASELINE/$1
+    voltsrc=$SOURCE/$1
+    targetsrc=$TARGET/$1
+    if [ -f $voltsrc ]; then
+        echo merging -A $targetsrc $hsqlsrc $voltsrc
+        merge -A $targetsrc $hsqlsrc $voltsrc
+    else
+        echo not merging "(missing)" $voltsrc
+    fi
+}
+pushd $3 >> /dev/null
+rm -f ../do_merges ../merges_do ../done_merges.out
+# Generate a script that applies do_diff_work to each java file in the patched source tree.
+find . -type f -name "*.java" | sed -e 's:^./:do_merge_work :' >> ../do_merges
+sort ../do_merges > ../merges_do
+
+# echo the generated script
+cat ../merges_do
+
+# run the generated script
+source ../merges_do &> ../done_merges.out
+
+popd >> /dev/null
+

@@ -35,6 +35,7 @@ class SchemaPageDdlSourceTab extends SchemaPage {
         sourceText  { mainContent.find('.dataBlockContent') }
         documentationLink 	{ $("#iconDoc") }
         generatedbytxt		{$("#catalogContainer > div.documentation > span")}
+        refreshddl		{ $("#MenuCatalog > div > button", text:"Refresh")}
     }
     static at = {
         ddlTab.displayed
@@ -48,6 +49,8 @@ class SchemaPageDdlSourceTab extends SchemaPage {
      * "Schema" page (or tab).
      * @return the displayed DDL Source (as a String).
      */
+
+
     def String getDdlSource() {
         return sourceText.first().text()
     }
@@ -57,6 +60,7 @@ class SchemaPageDdlSourceTab extends SchemaPage {
      * "Schema" page (or tab), returning each line as a separate String.
      * @return the displayed DDL Source (as a List<String>).
      */
+
     def List<String> getDdlSourceLines() {
         List<String> lines = []  // supports remove() method (unlike Arrays.asList)
         Arrays.asList(getDdlSource().split("\n")).each { lines.add(it) }

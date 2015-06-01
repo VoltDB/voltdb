@@ -54,6 +54,11 @@ public:
         return value.getInteger();
     }
 
+    static inline bool peekBoolean(const NValue value) {
+        assert(value.getValueType() == VALUE_TYPE_BOOLEAN);
+        return value.getBoolean();
+    }
+
     // cast as int and peek at value. this is used by index code that need a
     // real number from a tuple and the limit node code used to get the limit
     // from an expression.

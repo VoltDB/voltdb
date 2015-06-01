@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -36,10 +36,13 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
@@ -53,8 +56,17 @@ import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.QuantifierType;
 
 public abstract class AbstractParsedStmt {
+
+     // Internal statement counter
+    public static int NEXT_STMT_ID = 0;
+    // Internal parameter counter
+    public static int NEXT_PARAMETER_ID = 0;
+
+    // The unique id to identify the statement
+    public int m_stmtId;
 
     public String m_sql;
 
@@ -63,7 +75,13 @@ public abstract class AbstractParsedStmt {
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
+    // The parameter expression from the correlated expressions. The key is the parameter index.
+    // This map acts as intermediate storage for the parameter TVEs found while planning a subquery
+    // until they can be distributed to the parent's subquery expression where they originated.
+    public Map<Integer, AbstractExpression> m_parameterTveMap = new HashMap<Integer, AbstractExpression>();
+
     public ArrayList<Table> m_tableList = new ArrayList<Table>();
+
     private Table m_DDLIndexedTable = null;
 
     public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<AbstractExpression>();
@@ -85,6 +103,8 @@ public abstract class AbstractParsedStmt {
     protected final String[] m_paramValues;
     public final Database m_db;
 
+    // Parent statement if any
+    public AbstractParsedStmt m_parentStmt = null;
     boolean m_isUpsert = false;
 
     static final String INSERT_NODE_NAME = "insert";
@@ -107,7 +127,7 @@ public abstract class AbstractParsedStmt {
         m_DDLIndexedTable = tbl;
         // Add this table to the cache
         assert(tbl.getTypeName() != null);
-        addTableToStmtCache(tbl.getTypeName(), tbl.getTypeName(), null);
+        addTableToStmtCache(tbl, tbl.getTypeName());
     }
 
     /**
@@ -147,6 +167,8 @@ public abstract class AbstractParsedStmt {
        else {
            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
        }
+       // Set the unique id
+       retval.m_stmtId = NEXT_STMT_ID++;
        return retval;
    }
 
@@ -158,7 +180,7 @@ public abstract class AbstractParsedStmt {
      * @param joinOrder
      */
     private static void parse(AbstractParsedStmt parsedStmt, String sql,
-            VoltXMLElement stmtTypeElement,  String[] paramValues, Database db, String joinOrder) {
+            VoltXMLElement stmtTypeElement, Database db, String joinOrder) {
         // parse tables and parameters
         parsedStmt.parseTablesAndParams(stmtTypeElement);
 
@@ -180,8 +202,12 @@ public abstract class AbstractParsedStmt {
     public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
             Database db, String joinOrder) {
 
+        // reset the statement counters
+        NEXT_STMT_ID = 0;
+        NEXT_PARAMETER_ID = 0;
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
-        parse(retval, sql, stmtTypeElement, paramValues, db, joinOrder);
+
+        parse(retval, sql, stmtTypeElement, db, joinOrder);
         return retval;
     }
 
@@ -225,12 +251,8 @@ public abstract class AbstractParsedStmt {
     void parseTablesAndParams(VoltXMLElement root) {
         // Parse parameters first to satisfy a dependency of expression parsing
         // which happens during table scan parsing.
-        for (VoltXMLElement node : root.children) {
-            if (node.name.equalsIgnoreCase("parameters")) {
-                parseParameters(node);
-                break;
-            }
-        }
+        parseParameters(root);
+
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
                 parseTable(node);
@@ -258,6 +280,16 @@ public abstract class AbstractParsedStmt {
     // -- the function is now also called by DDLCompiler with no AbstractParsedStmt in sight --
     // so, the methods COULD be relocated to class AbstractExpression or ExpressionUtil.
     public AbstractExpression parseExpressionTree(VoltXMLElement root) {
+        AbstractExpression expr = parseExpressionTreeHelper(root);
+
+        // If there were any subquery expressions appearing in a scalar context,
+        // we must wrap them in ScalarValueExpressions to avoid wrong answers.
+        // See ENG-8226.
+        expr = ExpressionUtil.wrapScalarSubqueries(expr);
+        return expr;
+    }
+
+    private AbstractExpression parseExpressionTreeHelper(VoltXMLElement root) {
         String elementName = root.name.toLowerCase();
         AbstractExpression retval = null;
 
@@ -286,8 +318,11 @@ public abstract class AbstractParsedStmt {
         else if (elementName.equals("asterisk")) {
             return null;
         }
+        else if (elementName.equals("tablesubquery")) {
+            retval = parseSubqueryExpression(root);
+        }
         else if (elementName.equals("row")) {
-            throw new PlanningErrorException("Unsupported subquery syntax within an expression.");
+            retval = parseRowExpression(root);
         }
         else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
@@ -304,12 +339,13 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(argNode);
+            AbstractExpression argExpr = parseExpressionTreeHelper(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
 
         VectorValueExpression vve = new VectorValueExpression();
+        vve.setValueType(VoltType.VOLTTABLE);
         vve.setArgs(args);
         return vve;
     }
@@ -370,7 +406,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private TupleValueExpression parseColumnRefExpression(VoltXMLElement exprNode) {
+    private AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
 
         String tableName = exprNode.attributes.get("table");
         if (tableName == null) {
@@ -383,37 +419,132 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
-        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
-        assert(tableScan != null);
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
         // Collect the unique columns used in the plan for a given scan.
         // Resolve the tve and add it to the scan's cache of referenced columns
-        tableScan.resolveTVE(expr, columnName);
-        return expr;
+        // Get tableScan where this TVE is originated from. In case of the
+        // correlated queries it may not be THIS statement but its parent
+        StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
+        if (tableScan == null) {
+            // This never used to happen.  HSQL should make sure all the
+            // identifiers are defined.  But something has gone wrong.
+            // The query is "create index bidx2 on books ( cash + ( select cash from books as child where child.title < books.title ) );"
+            // from TestVoltCompler.testScalarSubqueriesExpectedFailures.
+            throw new PlanningErrorException("Object not found: " + tableAlias);
+        }
+        tableScan.resolveTVE(expr);
+
+        if (m_stmtId == tableScan.getStatementId()) {
+            return expr;
+        }
+
+        // This a TVE from the correlated expression
+        int paramIdx = NEXT_PARAMETER_ID++;
+        ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
+        m_parameterTveMap.put(paramIdx, expr);
+        return pve;
     }
 
     /**
-     * Add a table or a sub-query to the statement cache. If the subQuery is not NULL,
-     * the table name and the alias specify the sub-query
+     * Parse an expression subquery
+     */
+    private SelectSubqueryExpression parseSubqueryExpression(VoltXMLElement exprNode) {
+        assert(exprNode.children.size() == 1);
+        VoltXMLElement subqueryElmt = exprNode.children.get(0);
+        AbstractParsedStmt subqueryStmt = parseSubquery(subqueryElmt);
+        // add table to the query cache
+        String withoutAlias = null;
+        StmtSubqueryScan stmtSubqueryScan = addSubqueryToStmtCache(subqueryStmt, withoutAlias);
+        // Set to the default SELECT_SUBQUERY. May be overridden depending on the context
+        return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, stmtSubqueryScan);
+    }
+
+    /**
+    *
+    * @param exprNode
+    * @return
+    */
+   private AbstractExpression parseRowExpression(VoltXMLElement exprNode) {
+       // Parse individual columnref expressions from the IN output schema
+       // Short-circuit for COL IN (LIST) and COL IN (SELECT COL FROM ..)
+       if (exprNode.children.size() == 1) {
+           return parseExpressionTreeHelper(exprNode.children.get(0));
+       } else {
+           // (COL1, COL2) IN (SELECT C1, C2 FROM...)
+           return parseRowExpression(exprNode.children);
+       }
+   }
+
+   /**
+   *
+   * @param exprNode
+   * @return
+   */
+  private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
+      // Parse individual columnref expressions from the IN output schema
+      List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+      for (VoltXMLElement exprNode : exprNodes) {
+          AbstractExpression expr = this.parseExpressionTreeHelper(exprNode);
+          exprs.add(expr);
+      }
+      return new RowSubqueryExpression(exprs);
+  }
+
+    /**
+     * Return StmtTableScan by table alias. In case of correlated queries, would need
+     * to walk the statement tree up.
+     *
+     * @param stmt
+     * @param tableAlias
+     */
+    private StmtTableScan getStmtTableScanByAlias(String tableAlias) {
+        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
+        if (tableScan != null) {
+            return tableScan;
+        }
+        if (m_parentStmt != null) {
+            // This may be a correlated subquery
+            return m_parentStmt.getStmtTableScanByAlias(tableAlias);
+        }
+        return null;
+    }
+
+    /**
+     * Add a table to the statement cache.
      * @param tableName
      * @param tableAlias
-     * @param subQuery
-     * @return index into the cache array
+     * @return the cache entry
      */
-    private StmtTableScan addTableToStmtCache(String tableName, String tableAlias, AbstractParsedStmt subquery) {
+    protected StmtTableScan addTableToStmtCache(Table table, String tableAlias) {
         // Create an index into the query Catalog cache
         StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
         if (tableScan == null) {
-            if (subquery == null) {
-                tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
-            } else {
-                tableScan = new StmtSubqueryScan(subquery, tableAlias);
-            }
+            tableScan = new StmtTargetTableScan(table, tableAlias, m_stmtId);
             m_tableAliasMap.put(tableAlias, tableScan);
         }
         return tableScan;
+    }
+
+    /**
+     * Add a sub-query to the statement cache.
+     * @param subQuery
+     * @param tableAlias
+     * @return the cache entry
+     */
+    protected StmtSubqueryScan addSubqueryToStmtCache(AbstractParsedStmt subquery, String tableAlias) {
+        assert(subquery != null);
+        // If there is no usable alias because the subquery is inside an expression,
+        // generate a unique one for internal use.
+        if (tableAlias == null) {
+            tableAlias = "VOLT_TEMP_TABLE_" + subquery.m_stmtId;
+        }
+        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
+        assert(tableScan == null);
+        StmtSubqueryScan subqueryScan = new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
+        m_tableAliasMap.put(tableAlias, subqueryScan);
+        return subqueryScan;
     }
 
     /**
@@ -431,6 +562,7 @@ public abstract class AbstractParsedStmt {
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");
         }
+
         try {
             expr = exprType.getExpressionClass().newInstance();
         } catch (Exception e) {
@@ -444,13 +576,23 @@ public abstract class AbstractParsedStmt {
             expr.setValueType(VoltType.typeFromString(valueType));
         }
 
+        if (expr instanceof ComparisonExpression) {
+            String opsubtype = exprNode.attributes.get("opsubtype");
+            if (opsubtype != null) {
+                QuantifierType quantifier = QuantifierType.get(opsubtype);
+                if (quantifier != QuantifierType.NONE) {
+                    ((ComparisonExpression)expr).setQuantifier(quantifier);
+                }
+            }
+        }
+
         // get the first (left) node that is an element
         VoltXMLElement leftExprNode = exprNode.children.get(0);
         assert(leftExprNode != null);
 
         // recursively parse the left subtree (could be another operator or
         // a constant/tuple/param value operand).
-        AbstractExpression leftExpr = parseExpressionTree(leftExprNode);
+        AbstractExpression leftExpr = parseExpressionTreeHelper(leftExprNode);
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
         expr.setLeft(leftExpr);
 
@@ -464,7 +606,7 @@ public abstract class AbstractParsedStmt {
             assert(rightExprNode != null);
 
             // recursively parse the right subtree
-            AbstractExpression rightExpr = parseExpressionTree(rightExprNode);
+            AbstractExpression rightExpr = parseExpressionTreeHelper(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
         } else {
@@ -479,7 +621,189 @@ public abstract class AbstractParsedStmt {
                 expr.setValueSize(voltType.getMaxLengthInBytes());
             }
         }
+        if ((exprType == ExpressionType.COMPARE_EQUAL && QuantifierType.ANY == ((ComparisonExpression) expr).getQuantifier()) ||
+                exprType == ExpressionType.OPERATOR_EXISTS) {
+            // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
+            // AND/OR operator
+            // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
+            // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
+            expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
+            expr = optimizeSubqueryExpression(expr);
+        }
+        return expr;
+    }
 
+    /**
+     * Perform various optimizations for IN/EXISTS subqueries if possible
+     *
+     * @param expr to optimize
+     * @return optimized expression
+     */
+    private AbstractExpression optimizeSubqueryExpression(AbstractExpression expr) {
+        ExpressionType exprType = expr.getExpressionType();
+        if (ExpressionType.CONJUNCTION_AND == exprType || ExpressionType.CONJUNCTION_OR == exprType) {
+            AbstractExpression optimizedLeft = optimizeSubqueryExpression(expr.getLeft());
+            expr.setLeft(optimizedLeft);
+            AbstractExpression optimizedRight = optimizeSubqueryExpression(expr.getRight());
+            expr.setRight(optimizedRight);
+            return expr;
+        }
+        if (expr instanceof ComparisonExpression) {
+            QuantifierType quantifer = ((ComparisonExpression)expr).getQuantifier();
+            if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType() && quantifer == QuantifierType.ANY) {
+                expr = optimizeInExpression(expr);
+                // Do not return here because the original IN expressions
+                // is converted to EXISTS and can be optimized farther.
+            }
+        }
+        if (ExpressionType.OPERATOR_EXISTS == expr.getExpressionType()) {
+            expr = optimizeExistsExpression(expr);
+        }
+        return expr;
+    }
+
+    /**
+     * Verify that an IN expression can be safely converted to an EXISTS one
+     * IN (SELECT" forms e.g. "(A, B) IN (SELECT X, Y, FROM ...) =>
+     * EXISTS (SELECT 42 FROM ... AND|WHERE|HAVING A=X AND|WHERE|HAVING B=Y)
+     *
+     * @param inExpr
+     * @return existsExpr
+     */
+    private boolean canConvertInToExistsExpression(AbstractExpression inExpr) {
+        AbstractExpression leftExpr = inExpr.getLeft();
+        if (leftExpr instanceof SelectSubqueryExpression) {
+            // If the left child is a (SELECT ...) expression itself we can't convert it
+            // to the EXISTS expression because the manadatory run time scalar check -
+            // (expression must return a single row at most)
+            return false;
+        }
+        AbstractExpression rightExpr = inExpr.getRight();
+        if (!(rightExpr instanceof SelectSubqueryExpression)) {
+            return false;
+        }
+
+        // Must be a SELECT statement
+        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) inExpr.getRight();
+        AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
+        if (!(subquery instanceof ParsedSelectStmt)) {
+            return false;
+        }
+        // Must not have OFFSET set
+        // EXISTS (select * from T where T.X = parent.X order by T.Y offset 10 limit 5)
+        //      seems to require 11 matches
+        // parent.X IN (select T.X from T order by T.Y offset 10 limit 5)
+        //      seems to require 1 match that has exactly 10-14 rows (matching or not) with lesser or equal values of Y.
+        return ! ((ParsedSelectStmt) subquery).hasOffset();
+    }
+
+    /**
+     * Simplify the EXISTS expression:
+     *  1. EXISTS ( table-agg-without-having-groupby) => TRUE
+     *  2. Replace the display columns with a single dummy column "1" and GROUP BY expressions
+     *  3. Drop DISTINCT expression
+     *  4. Add LIMIT 1
+     *  5. Remove ORDER BY expressions if HAVING expression is not present
+     *
+     * @param existsExpr
+     * @return optimized exists expression
+     */
+    private AbstractExpression optimizeExistsExpression(AbstractExpression existsExpr) {
+        assert(ExpressionType.OPERATOR_EXISTS == existsExpr.getExpressionType());
+        assert(existsExpr.getLeft() != null);
+
+        if (existsExpr.getLeft() instanceof SelectSubqueryExpression) {
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) existsExpr.getLeft();
+            AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
+            if (subquery instanceof ParsedSelectStmt) {
+                ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
+                return selectSubquery.simplifyExistsSubqueryStmt(existsExpr);
+            }
+        }
+        return existsExpr;
+    }
+
+    /**
+     * Optimize IN expression
+     *
+     * @param inExpr
+     * @return existsExpr
+     */
+    private AbstractExpression optimizeInExpression(AbstractExpression inExpr) {
+        assert(ExpressionType.COMPARE_EQUAL == inExpr.getExpressionType());
+        if (canConvertInToExistsExpression(inExpr)) {
+            AbstractExpression inColumns = inExpr.getLeft();
+            assert(inColumns != null);
+            assert(inExpr.getRight() instanceof SelectSubqueryExpression);
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) inExpr.getRight();
+            AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
+            assert(subquery instanceof ParsedSelectStmt);
+            ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
+            ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inColumns);
+            subqueryExpr.resolveCorrelations();
+            AbstractExpression existsExpr = null;
+            try {
+                existsExpr = ExpressionType.OPERATOR_EXISTS.getExpressionClass().newInstance();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage(), e);
+            }
+            existsExpr.setExpressionType(ExpressionType.OPERATOR_EXISTS);
+            existsExpr.setLeft(subqueryExpr);
+            return existsExpr;
+        } else {
+            return inExpr;
+        }
+    }
+
+    /**
+     * Helper method to replace all TVEs and aggregated expressions with the corresponding PVEs.
+     * The original expressions are placed into the map to be propagated to the EE.
+     * The key to the map is the parameter index.
+     *
+     *
+     * @param stmt - subquery statement
+     * @param expr - expression with parent TVEs
+     * @return Expression with parent TVE replaced with PVE
+     */
+    protected AbstractExpression replaceExpressionsWithPve(AbstractExpression expr) {
+        assert(expr != null);
+        if (expr instanceof TupleValueExpression) {
+            int paramIdx = NEXT_PARAMETER_ID++;
+            ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
+            m_parameterTveMap.put(paramIdx, expr);
+            return pve;
+        }
+        if (expr instanceof AggregateExpression) {
+            int paramIdx = NEXT_PARAMETER_ID++;
+            ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
+            // Disallow aggregation of parent columns in a subquery.
+            // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
+            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+            assert(m_parentStmt != null);
+            for (TupleValueExpression tve : tves) {
+                int origId = tve.getOrigStmtId();
+                if (m_stmtId != origId && m_parentStmt.m_stmtId != origId) {
+                    throw new PlanningErrorException(
+                            "Subqueries do not support aggregation of parent statement columns");
+                }
+            }
+            m_parameterTveMap.put(paramIdx, expr);
+            return pve;
+        }
+        if (expr.getLeft() != null) {
+            expr.setLeft(replaceExpressionsWithPve(expr.getLeft()));
+        }
+        if (expr.getRight() != null) {
+            expr.setRight(replaceExpressionsWithPve(expr.getRight()));
+        }
+        if (expr.getArgs() != null) {
+            List<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
+            for (AbstractExpression argument : expr.getArgs()) {
+                newArgs.add(replaceExpressionsWithPve(argument));
+            }
+            expr.setArgs(newArgs);
+        }
         return expr;
     }
 
@@ -511,7 +835,7 @@ public abstract class AbstractParsedStmt {
 
         // recursively parse the child subtree -- could (in theory) be an operator or
         // a constant, column, or param value operand or null in the specific case of "COUNT(*)".
-        AbstractExpression childExpr = parseExpressionTree(childExprNode);
+        AbstractExpression childExpr = parseExpressionTreeHelper(childExprNode);
         if (childExpr == null) {
             assert(exprType == ExpressionType.AGGREGATE_COUNT);
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
@@ -542,44 +866,41 @@ public abstract class AbstractParsedStmt {
         }
         String value_type_name = exprNode.attributes.get("valuetype");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        String id = exprNode.attributes.get("function_id");
-        assert(id != null);
+        String function_id = exprNode.attributes.get("function_id");
+        assert(function_id != null);
         int idArg = 0;
         try {
-            idArg = Integer.parseInt(id);
+            idArg = Integer.parseInt(function_id);
         } catch (NumberFormatException nfe) {}
         assert(idArg > 0);
-        String parameter = exprNode.attributes.get("parameter");
-        String volt_alias = exprNode.attributes.get("volt_alias");
-        if (volt_alias == null) {
-            volt_alias = name; // volt shares the function name with HSQL
-        }
+        String result_type_parameter_index = exprNode.attributes.get("result_type_parameter_index");
+        String implied_argument = exprNode.attributes.get("implied_argument");
 
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(argNode);
+            AbstractExpression argExpr = parseExpressionTreeHelper(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
 
         FunctionExpression expr = new FunctionExpression();
-        expr.setAttributes(name, volt_alias, idArg);
+        expr.setAttributes(name, implied_argument, idArg);
         expr.setArgs(args);
         if (value_type != null) {
             expr.setValueType(value_type);
             expr.setValueSize(value_type.getMaxLengthInBytes());
         }
 
-        if (parameter != null) {
-            int parameter_idx = -1; // invalid argument index
+        if (result_type_parameter_index != null) {
+            int parameter_idx = -1;
             try {
-                parameter_idx = Integer.parseInt(parameter);
+                parameter_idx = Integer.parseInt(result_type_parameter_index);
             } catch (NumberFormatException nfe) {}
             assert(parameter_idx >= 0); // better be valid by now.
             assert(parameter_idx < args.size()); // must refer to a provided argument
-            expr.setParameterArg(parameter_idx);
+            expr.setResultTypeParameterIndex(parameter_idx);
             expr.negotiateInitialValueTypes();
         }
         return expr;
@@ -597,9 +918,9 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-*
-* @param tableNode
-*/
+     *
+     * @param tableNode
+     */
     private void parseTable(VoltXMLElement tableNode) {
         String tableName = tableNode.attributes.get("table");
         assert(tableName != null);
@@ -611,7 +932,7 @@ public abstract class AbstractParsedStmt {
         // Hsql rejects name conflicts in a single query
         m_tableAliasList.add(tableAlias);
 
-        AbstractParsedStmt subquery = null;
+        VoltXMLElement subqueryElement = null;
         // Possible sub-query
         for (VoltXMLElement childNode : tableNode.children) {
             if ( ! childNode.name.equals("tablesubquery")) {
@@ -620,14 +941,25 @@ public abstract class AbstractParsedStmt {
             if (childNode.children.isEmpty()) {
                 continue;
             }
-            subquery = parseSubquery(childNode.children.get(0));
+            // sub-query FROM (SELECT ...)
+            subqueryElement = childNode.children.get(0);
             break;
         }
 
         // add table to the query cache before processing the JOIN/WHERE expressions
         // The order is important because processing sub-query expressions assumes that
         // the sub-query is already registered
-        StmtTableScan tableScan = addTableToStmtCache(tableName, tableAlias, subquery);
+        StmtTableScan tableScan = null;
+        Table table = null;
+        if (subqueryElement == null) {
+            table = getTableFromDB(tableName);
+            m_tableList.add(table);
+            assert(table != null);
+            tableScan = addTableToStmtCache(table, tableAlias);
+        } else {
+            AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
+            tableScan = addSubqueryToStmtCache(subquery, tableAlias);
+        }
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
@@ -637,9 +969,7 @@ public abstract class AbstractParsedStmt {
         int nodeId = (m_joinTree == null) ? 0 : m_joinTree.getId() + 1;
 
         JoinNode leafNode;
-        if (tableScan instanceof StmtTargetTableScan) {
-            Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
-            m_tableList.add(table);
+        if (table != null) {
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         } else {
             assert(tableScan instanceof StmtSubqueryScan);
@@ -665,9 +995,9 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-*
-* @param tablesNode
-*/
+     *
+     * @param tablesNode
+     */
     private void parseTables(VoltXMLElement tablesNode) {
         Set<String> visited = new HashSet<String>();
 
@@ -695,11 +1025,27 @@ public abstract class AbstractParsedStmt {
      * Populate the statement's paramList from the "parameters" element
      * @param paramsNode
      */
-    private void parseParameters(VoltXMLElement paramsNode) {
+    protected void parseParameters(VoltXMLElement root) {
+        VoltXMLElement paramsNode = null;
+        for (VoltXMLElement node : root.children) {
+            if (node.name.equalsIgnoreCase("parameters")) {
+                paramsNode = node;
+                break;
+            }
+        }
+        if (paramsNode == null) {
+            return;
+        }
+
+        long max_parameter_id = -1;
+
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
                 int index = Integer.parseInt(node.attributes.get("index"));
+                if (index > max_parameter_id) {
+                    max_parameter_id = index;
+                }
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
                 VoltType type = VoltType.typeFromString(typeName);
@@ -713,13 +1059,16 @@ public abstract class AbstractParsedStmt {
                 m_paramsByIndex.put(index, pve);
             }
         }
+        if (max_parameter_id >= NEXT_PARAMETER_ID) {
+            NEXT_PARAMETER_ID = (int)max_parameter_id + 1;
+        }
     }
 
-    /** Get a list of the subqueries used by this statement.  This method
+    /** Get a list of the table subqueries used by this statement.  This method
      * may be overridden by subclasses, e.g., insert statements have a subquery
      * but does not use m_joinTree.
      **/
-    public List<StmtSubqueryScan> getSubqueries() {
+    public List<StmtSubqueryScan> getSubqueryScans() {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
         if (m_joinTree != null) {
@@ -800,13 +1149,24 @@ public abstract class AbstractParsedStmt {
         return retval;
     }
 
-    protected AbstractParsedStmt parseSubquery(VoltXMLElement queryNode) {
+    protected AbstractParsedStmt parseFromSubQuery(VoltXMLElement queryNode) {
         AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(queryNode, m_paramValues, m_db);
         // Propagate parameters from the parent to the child
         subquery.m_paramsById.putAll(m_paramsById);
         subquery.m_paramsByIndex = m_paramsByIndex;
-        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_paramValues, m_db, m_joinOrder);
+
+        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_db, m_joinOrder);
         return subquery;
+    }
+
+    protected AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
+        AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(suqueryElmt, m_paramValues, m_db);
+        // Propagate parameters from the parent to the child
+        subQuery.m_parentStmt = this;
+        subQuery.m_paramsById.putAll(m_paramsById);
+
+        AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
+        return subQuery;
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.
@@ -823,6 +1183,11 @@ public abstract class AbstractParsedStmt {
             condExpr = parseExpressionTree(childNode.children.get(0));
             assert(condExpr != null);
             ExpressionUtil.finalizeValueTypes(condExpr);
+            condExpr = ExpressionUtil.evaluateExpression(condExpr);
+            // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
+            if (ConstantValueExpression.isBooleanTrue(condExpr)) {
+                condExpr = null;
+            }
         }
         return condExpr;
     }
@@ -838,7 +1203,13 @@ public abstract class AbstractParsedStmt {
     }
 
     public ParameterValueExpression[] getParameters() {
-        return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
+        // Is a statement contains subqueries the parameters will be associated with
+        // the parent statement
+        if (m_parentStmt != null) {
+            return m_parentStmt.getParameters();
+        } else {
+            return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
+        }
     }
 
     public boolean hasLimitOrOffset()
@@ -861,6 +1232,46 @@ public abstract class AbstractParsedStmt {
         // The interface is established on AbstractParsedStmt for support
         // in ParsedSelectStmt and ParsedUnionStmt.
         throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
+    }
+
+    protected AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
+        // The id was previously passed to parameterCountIndexById, so if not -1,
+        // it has already been asserted to be a valid id for a parameter, and the
+        // parameter's type has been refined to INTEGER.
+        if (id != -1) {
+            return m_paramsById.get(id);
+        }
+        // The limit/offset is a non-parameterized literal value that needs to be wrapped in a
+        // BIGINT constant so it can be used in the addition expression for the pushed-down limit.
+        ConstantValueExpression constant = new ConstantValueExpression();
+        constant.setValue(Long.toString(value));
+        constant.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        return constant;
+    }
+
+    /*
+     *  Extract FROM(SELECT...) sub-queries from this statement
+     */
+    public List<StmtSubqueryScan> findAllFromSubqueries() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<StmtSubqueryScan>();
+        if (m_joinTree != null) {
+            m_joinTree.extractSubQueries(subqueries);
+        }
+        return subqueries;
+    }
+
+    /*
+     *  Extract all subexpressions of a given type from this statement
+     */
+    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        if (m_joinTree != null) {
+            AbstractExpression treeExpr = m_joinTree.getAllFilters();
+            if (treeExpr != null) {
+                exprs.addAll(treeExpr.findAllSubexpressionsOfType(exprType));
+            }
+        }
+        return exprs;
     }
 
     /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
@@ -1067,12 +1478,36 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /*
+     *  Extract all subexpressions of a given expression class from this statement
+     */
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        HashSet<AbstractExpression> exprs = new HashSet<AbstractExpression>();
+        if (m_joinTree != null) {
+            AbstractExpression treeExpr = m_joinTree.getAllFilters();
+            if (treeExpr != null) {
+                exprs.addAll(treeExpr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+        return exprs;
+    }
+
     /**
      * Return true if a SQL statement contains a subquery of any kind
      * @return TRUE is this statement contains a subquery
      */
     public boolean hasSubquery() {
         // This method should be called only after the statement is parsed and join tree is built
-        return !getSubqueries().isEmpty();
+        assert(m_joinTree != null);
+        // TO DO: If performance is an issue,
+        // hard-code a tree walk that stops at the first subquery scan.
+        if ( ! getSubqueryScans().isEmpty()) {
+            return true;
+        }
+        // Verify expression subqueries
+        Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
+                SelectSubqueryExpression.class);
+        return !subqueryExprs.isEmpty();
     }
+
 }

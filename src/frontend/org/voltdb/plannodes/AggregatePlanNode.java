@@ -18,16 +18,21 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -101,25 +106,88 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     public boolean isTableCountStar() {
-        if (m_groupByExpressions.isEmpty() == false)
+        if (m_groupByExpressions.isEmpty() == false) {
             return false;
-        if (m_aggregateTypes.size() != 1)
+        }
+        if (m_aggregateTypes.size() != 1) {
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR) == false)
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR) == false) {
             return false;
+        }
 
+        return true;
+    }
+
+    public boolean isTableNonDistinctCount() {
+        if (m_groupByExpressions.isEmpty() == false) {
+            return false;
+        }
+        if (m_aggregateTypes.size() != 1) {
+            return false;
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT) == false) {
+            return false;
+        }
+        // Does it have a distinct keyword?
+        if (m_aggregateDistinct.get(0) == 1) {
+            return false;
+        }
+        return true;
+    }
+
+    public boolean isTableNonDistinctCountConstant() {
+        if (!isTableNonDistinctCount()) {
+            return false;
+        }
+        // Is the expression a constant?
+        return m_aggregateExpressions.get(0).getExpressionType().equals(ExpressionType.VALUE_PARAMETER) ||
+                m_aggregateExpressions.get(0).getExpressionType().equals(ExpressionType.VALUE_CONSTANT);
+    }
+
+    public boolean isTableCountNonDistinctNullableColumn() {
+        if (!isTableNonDistinctCount()) {
+            return false;
+        }
+        // Is the expression a column?
+        if (! m_aggregateExpressions.get(0).getExpressionType().equals(ExpressionType.VALUE_TUPLE)) {
+            return false;
+        }
+        // Need to go to its child node to see the table schema.
+        // Normally it has to be a ScanPlanNode.
+        // If the query is a join query then the child will be something like nested loop.
+        assert (m_children.size() == 1);
+        if (! (m_children.get(0) instanceof AbstractScanPlanNode) ) {
+            return false;
+        }
+        AbstractScanPlanNode asp = (AbstractScanPlanNode)m_children.get(0);
+        if ( ! (asp.getTableScan() instanceof StmtTargetTableScan)) {
+            return false;
+        }
+        StmtTargetTableScan sttscan = (StmtTargetTableScan)asp.getTableScan();
+        Table tbl = sttscan.getTargetTable();
+        TupleValueExpression tve = (TupleValueExpression)m_aggregateExpressions.get(0);
+        String columnName = tve.getColumnName();
+        Column col = tbl.getColumns().get(columnName);
+        // Is the column nullable?
+        if (col.getNullable()) {
+            return false;
+        }
         return true;
     }
 
     // single min() without GROUP BY?
     public boolean isTableMin() {
         // do not support GROUP BY for now
-        if (m_groupByExpressions.isEmpty() == false)
+        if (m_groupByExpressions.isEmpty() == false) {
             return false;
-        if (m_aggregateTypes.size() != 1)
+        }
+        if (m_aggregateTypes.size() != 1) {
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN) == false)
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN) == false) {
             return false;
+        }
 
         return true;
     }
@@ -127,12 +195,15 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // single max() without GROUP BY?
     public boolean isTableMax() {
         // do not support GROUP BY for now
-        if (m_groupByExpressions.isEmpty() == false)
+        if (m_groupByExpressions.isEmpty() == false) {
             return false;
-        if (m_aggregateTypes.size() != 1)
+        }
+        if (m_aggregateTypes.size() != 1) {
             return false;
-        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX) == false)
+        }
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX) == false) {
             return false;
+        }
 
         return true;
     }
@@ -182,6 +253,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_children.get(0).generateOutputSchema(db);
 
             assert(m_hasSignificantOutputSchema);
+        }
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
         }
     }
 
@@ -258,6 +334,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
             tve.setColumnIndex(index);
         }
 
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
     }
 
     /**
@@ -405,7 +486,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
-            if (jobj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
+            if (tempObj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
                 m_aggregateExpressions.add(null);
             }
             else {
@@ -441,4 +522,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
         return aggNode;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_prePredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_postPredicate, aeClass));
+        for (AbstractExpression ae : m_aggregateExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        for (AbstractExpression ae : m_groupByExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
+    }
+
 }
