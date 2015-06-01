@@ -1154,7 +1154,7 @@ function alertNodeClicked(obj) {
                 if (!schemaCatalogTableTypes.hasOwnProperty(tableName)) {
                     schemaCatalogTableTypes[tableName] = {};
                     schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
-                    schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
+
                     if (entry[remarksIndex] != null) {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
                         schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
@@ -1162,6 +1162,7 @@ function alertNodeClicked(obj) {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
                     }
                 }
+                schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
             });
 
         };
@@ -2395,7 +2396,7 @@ function alertNodeClicked(obj) {
             return portConfigValues;
         };
 
-        var getCountDetails = function(connection, countDetails) {
+        var getCountDetails = function (connection, countDetails) {
             var colIndex = {};
             var counter = 0;
             var hostCount = 0;
