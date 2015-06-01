@@ -119,16 +119,14 @@ class PBDMMapSegment implements PBDSegment {
         return m_objectReadIndex;
     }
 
-    @Override
-    public void initNumEntries() throws IOException {
+    private void initNumEntries() throws IOException {
         final ByteBuffer buf = m_buf.b();
         buf.putInt(0, 0);
         buf.putInt(4, 0);
         m_syncedSinceLastEdit = false;
     }
 
-    @Override
-    public void incrementNumEntries(int size) throws IOException {
+    private void incrementNumEntries(int size) throws IOException {
         final ByteBuffer buf = m_buf.b();
         //First read the existing amount
         buf.putInt(COUNT_OFFSET, buf.getInt(COUNT_OFFSET) + 1);

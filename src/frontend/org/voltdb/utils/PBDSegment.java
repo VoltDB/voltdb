@@ -45,10 +45,6 @@ public interface PBDSegment {
 
     int readIndex();
 
-    void initNumEntries() throws IOException;
-
-    void incrementNumEntries(int size) throws IOException;
-
     void open(boolean forWrite) throws IOException;
 
     void closeAndDelete() throws IOException;
