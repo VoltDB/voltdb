@@ -535,8 +535,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
             m_target->deleteTuple(m_existingTuple, fallible);
         }
         // If there is no group by columns, the count() should remain 0 and other functions should
-        // have value null.
-        // ENG-7872
+        // have value null. See ENG-7872.
         else {
             m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
             NValue newValue;
