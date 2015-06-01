@@ -528,9 +528,30 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     // set up the first column, which is a count
     NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
 
+    int aggOffset = (int)m_groupByColumnCount + 1;
     // check if we should remove the tuple
     if (count.isZero()) {
-        m_target->deleteTuple(m_existingTuple, fallible);
+        if (m_groupByColumnCount != 0) {            
+            m_target->deleteTuple(m_existingTuple, fallible);
+        }
+        // If there is no group by columns, the count() should remain 0 and other functions should 
+        // have value null. 
+        // ENG-7872
+        else {
+            m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
+            NValue newValue;
+            for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+                if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+                    newValue = ValueFactory::getBigIntValue(0);
+                }
+                else {
+                    newValue = ValueFactory::getNullValue();
+                }
+                m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+            }
+            m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                       m_updatableIndexList, fallible);
+        }
         return;
     }
     // assume from here that we're just updating the existing row
@@ -546,7 +567,6 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
 
     m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
 
-    int aggOffset = (int)m_groupByColumnCount + 1;
     // set values for the other columns
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
         NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);

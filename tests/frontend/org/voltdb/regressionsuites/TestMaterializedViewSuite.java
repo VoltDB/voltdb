@@ -31,6 +31,7 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -91,21 +92,55 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
-    private void subtestENG7872() throws IOException, ProcCallException
+    private void assertAggNoGroupBy(VoltTable[] results, String... values) throws IOException, ProcCallException
+    {
+    		assertTrue(values != null);
+        assertTrue(results != null);
+        assertEquals(1, results.length);
+        VoltTable t = results[0];
+        assertTrue(values.length <= t.getColumnCount());
+        assertEquals(1, t.getRowCount());
+        t.advanceRow();
+        for (int i=0; i<values.length; ++i) {
+            // if it's integer
+            if (t.getColumnType(i) == VoltType.TINYINT ||
+            		t.getColumnType(i) == VoltType.SMALLINT || 
+            		t.getColumnType(i) == VoltType.INTEGER ||
+            		t.getColumnType(i) == VoltType.BIGINT) {
+            		long value = t.getLong(i);
+            		if (values[i].equals("null")) {
+            			assertTrue(t.wasNull());
+            		}
+            		else {
+            			assertEquals(Long.parseLong(values[i]), value);      
+            		}
+            }
+            else if (t.getColumnType(i) == VoltType.FLOAT) {
+	            	double value = t.getDouble(i);
+	        		if (values[i].equals("null")) {
+	        			assertTrue(t.wasNull());
+	        		}
+	        		else {
+	        			assertEquals(Double.parseDouble(values[i]), value);      
+	        		}
+            }
+        }
+    }
+
+    private void subtestENG7872SinglePartition() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
         VoltTable[] results = null;
-        VoltTable t;
 
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
-        assert(results != null);
-        assertEquals(1, results.length);
-        if(results[0].getRowCount() != 0) {
-            results[0].advanceRow();
-            System.out.println("Row count: " + results[0].getRowCount());
-        }
-        assertEquals(1, results[0].getRowCount());
+        assertAggNoGroupBy(results, "0");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "0");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "0", "null");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "0", "null", "null");
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
@@ -124,53 +159,49 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1L, results[0].asScalarLong());
 
         results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
-        assert(results != null);
-        assertEquals(1, results.length);
-        t = results[0];
-        assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
-        t.advanceRow();
-        assertEquals(5, t.getLong(0));
+        assertAggNoGroupBy(results, "5");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "2");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "2", "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "3", "900.0", "5");
 
-        // results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
+        results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
+        
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "1");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "2", "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "2", "1000.0", "5");
 
-        // results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE2").getResults();
-        // assert(results != null);
-        // assertEquals(1, results.length);
-        // t = results[0];
-        // assertEquals(1, t.getRowCount());
-        // System.out.println(t.toString());
-        // t.advanceRow();
-        // assertEquals(4, t.getLong(2));
-        // assertEquals(900, (int)(t.getDouble(3)));
-        // assertEquals(5, t.getLong(4));
-
-        // results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
-
-        // results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE2").getResults();
-        // assert(results != null);
-        // assertEquals(1, results.length);
-        // t = results[0];
-        // assertEquals(1, t.getRowCount());
-        // System.out.println(t.toString());
-        // t.advanceRow();
-        // assertEquals(4, t.getLong(2));
-        // assertEquals(200, (int)(t.getDouble(3)));
-        // assertEquals(9, t.getLong(4));        
+        results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
+        
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "2");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "1", "3");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "3", "200.0", "9");  
     }
 
     public void testSinglePartition() throws IOException, ProcCallException
     {
-        // subtestInsertSinglePartition();
-        // subtestDeleteSinglePartition();
-        // subtestUpdateSinglePartition();
-        // subtestSinglePartitionWithPredicates();
-        // subtestMinMaxSinglePartition();
-        // subtestMinMaxSinglePartitionWithPredicate();
-        // subtestIndexMinMaxSinglePartition();
-        // subtestIndexMinMaxSinglePartitionWithPredicate();
-        // subtestNullMinMaxSinglePartition();
-        subtestENG7872();
+		subtestInsertSinglePartition();
+		subtestDeleteSinglePartition();
+		subtestUpdateSinglePartition();
+		subtestSinglePartitionWithPredicates();
+		subtestMinMaxSinglePartition();
+		subtestMinMaxSinglePartitionWithPredicate();
+		subtestIndexMinMaxSinglePartition();
+		subtestIndexMinMaxSinglePartitionWithPredicate();
+		subtestNullMinMaxSinglePartition();
+        subtestENG7872SinglePartition();
     }
 
 
@@ -757,9 +788,116 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(200, (int)(t.getDouble(3)));
         assertEquals(9, t.getLong(4));
     }
+    
+    private void subtestENG7872MP() throws IOException, ProcCallException 
+    {
+    		Client client = getClient();
+        truncateBeforeTest(client);
+        VoltTable[] results = null;
 
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "0");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "0");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "0", "null");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "0", "null", "null");
 
-    private void testMPAndRegressions() throws IOException, ProcCallException
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 900.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 3L, 31L, 900.0, 1, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 4L, 31L, 2500.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 2, 5L, 31L, 1000.0, 3, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 2, 6L, 31L, 900.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 2, 7L, 31L, 900.0, 1, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 2, 8L, 31L, 2500.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "8");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "4", "8");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "6", "900.0", "5");
+
+        results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "7");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "3");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "4", "8");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "5", "900.0", "5");
+
+        results = client.callProcedure("DeletePerson", 2, 6L, NORMALLY).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "6");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "2");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "4", "8");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "4", "1000.0", "5");
+
+        results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
+        results = client.callProcedure("UpdatePerson", 2, 7L, 31L, 200, 9).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "6");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "2", "6");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "6", "200.0", "9");
+
+        results = client.callProcedure("UpdatePerson", 1, 4L, 31L, 0, 10).getResults();
+        results = client.callProcedure("UpdatePerson", 2, 8L, 31L, 0, 10).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "6");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "2", "6");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "6", "0.0", "10");
+
+        results = client.callProcedure("DeletePerson", 1, 1L, NORMALLY).getResults();
+        results = client.callProcedure("DeletePerson", 2, 5L, NORMALLY).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_COUNT").getResults();
+        assertAggNoGroupBy(results, "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT").getResults();
+        assertAggNoGroupBy(results, "4");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_SUM").getResults();
+        assertAggNoGroupBy(results, "0", "null");
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX").getResults();
+        assertAggNoGroupBy(results, "4", "0.0", "10");
+    }
+
+    public void testMPAndRegressions() throws IOException, ProcCallException
     {
         subtestMultiPartitionSimple();
         subtestInsertReplicated();
@@ -767,6 +905,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestENG798();
         subtestIndexed();
         subtestMinMaxMultiPartition();
+        subtestENG7872MP();
     }
 
     private void subtestMultiPartitionSimple() throws IOException, ProcCallException
