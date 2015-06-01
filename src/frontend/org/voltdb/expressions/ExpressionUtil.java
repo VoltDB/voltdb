@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
@@ -85,7 +86,8 @@ public abstract class ExpressionUtil {
         } else {
             ret.setRight(stack.pop());
         }
-        return ret;
+        // Simplify combined expression if possible
+        return ExpressionUtil.evaluateExpression(ret);
     }
 
     /**
@@ -230,7 +232,9 @@ public abstract class ExpressionUtil {
      * @return Both expressions passed in combined by an And conjunction.
      */
     public static AbstractExpression combine(AbstractExpression left, AbstractExpression right) {
-        return new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
+        AbstractExpression retval = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
+        // Simplify combined expression if possible
+        return ExpressionUtil.evaluateExpression(retval);
     }
 
     /**
@@ -558,5 +562,74 @@ public abstract class ExpressionUtil {
         scalarExpr.setValueType(expr.getValueType());
         scalarExpr.setValueSize(expr.getValueSize());
         return scalarExpr;
+    }
+
+    /**
+     * Evaluate/reduce/simplify an input expression at the compilation time
+     *
+     * @param expr Original Expression
+     * @return AbstractExpression
+     */
+    public static AbstractExpression evaluateExpression(AbstractExpression expr) {
+        if (expr == null) {
+            return null;
+        }
+
+        // Evaluate children first
+        expr.setLeft(evaluateExpression(expr.getLeft()));
+        expr.setRight(evaluateExpression(expr.getRight()));
+
+        // Evaluate self
+        if (ExpressionType.CONJUNCTION_AND == expr.getExpressionType()) {
+            if (ExpressionType.VALUE_CONSTANT == expr.getLeft().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getLeft())) {
+                    return expr.getRight();
+                } else {
+                    return expr.getLeft();
+                }
+            }
+            if (ExpressionType.VALUE_CONSTANT == expr.getRight().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getRight())) {
+                    return expr.getLeft();
+                } else {
+                    return expr.getRight();
+                }
+            }
+        } else if (ExpressionType.CONJUNCTION_OR == expr.getExpressionType()) {
+            if (ExpressionType.VALUE_CONSTANT == expr.getLeft().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getLeft())) {
+                    return expr.getLeft();
+                } else {
+                    return expr.getRight();
+                }
+            }
+            if (ExpressionType.VALUE_CONSTANT == expr.getRight().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getRight())) {
+                    return expr.getRight();
+                } else {
+                    return expr.getLeft();
+                }
+            }
+        } else if (ExpressionType.OPERATOR_NOT == expr.getExpressionType()) {
+            AbstractExpression leftExpr = expr.getLeft();
+            if (VoltType.BOOLEAN == leftExpr.getValueType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getLeft())) {
+                    return ConstantValueExpression.getFalse();
+                } else {
+                    return ConstantValueExpression.getTrue();
+                }
+            } else if (ExpressionType.OPERATOR_NOT == leftExpr.getExpressionType()) {
+                return leftExpr.getLeft();
+            } else if (ExpressionType.CONJUNCTION_OR == leftExpr.getExpressionType()) {
+                // NOT (.. OR .. OR ..) => NOT(..) AND NOT(..) AND NOT(..)
+                AbstractExpression l = new OperatorExpression(ExpressionType.OPERATOR_NOT, leftExpr.getLeft(), null);
+                AbstractExpression r = new OperatorExpression(ExpressionType.OPERATOR_NOT, leftExpr.getRight(), null);
+                leftExpr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, l, r);
+                return evaluateExpression(leftExpr);
+            }
+            // NOT (expr1 AND expr2) => (NOT expr1) || (NOT expr2)
+            // The above case is probably not interesting to do for short circuit purpose
+        }
+        return expr;
     }
 }

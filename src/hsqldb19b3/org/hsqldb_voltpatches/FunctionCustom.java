@@ -3801,6 +3801,10 @@ public class FunctionCustom extends FunctionSQL {
                 return getSQLSimple();
 
             default :
+            // A VoltDB extension to customize SQL function support
+            // This delegation to super (usually?) fails with a runtime exception.
+            //*enable to debug */ System.out.println("DEBUGGING: super.getSQL FUNCTION " + name + " VALUE " + funcType);
+            // End of VoltDB extension
                 return super.getSQL();
         }
     }

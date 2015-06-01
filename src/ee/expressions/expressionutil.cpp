@@ -431,6 +431,9 @@ constantValueFactory(PlannerDomValue obj,
     case VALUE_TYPE_DECIMAL:
         newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
         break;
+    case VALUE_TYPE_BOOLEAN:
+        newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
+        break;
     default:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "constantValueFactory: Unrecognized value"
@@ -494,6 +497,24 @@ ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, Ab
 
 }
 
+static void raiseFunctionFactoryError(const std::string& nameString, int functionId,
+                  const std::vector<AbstractExpression*>* args)
+{
+    char fn_message[1024];
+    if (args) {
+        snprintf(fn_message, sizeof(fn_message),
+             "Internal Error: SQL function '%s' with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
+             nameString.c_str(), functionId, (int)args->size());
+    }
+    else {
+        snprintf(fn_message, sizeof(fn_message),
+             "Internal Error: SQL function '%s' with ID (%d) was serialized without its required parameters list.",
+             nameString.c_str(), functionId);
+    }
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(false, fn_message);
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
+}
+
 
 /** Given an expression type and a valuetype, find the best
  * templated ctor to invoke. Several helpers, above, aid in this
@@ -551,7 +572,10 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         // add the function id
         int functionId = obj.valueForKey("FUNCTION_ID").asInt();
 
-        ret = functionFactory(functionId, args);
+        if (args) {
+            ret = functionFactory(functionId, args);
+        }
+
         if ( ! ret) {
             std::string nameString;
             if (obj.hasNonNullKey("NAME")) {
@@ -560,18 +584,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
             else {
                 nameString = "?";
             }
-
-            char aliasBuffer[256];
-            if (obj.hasNonNullKey("ALIAS")) {
-                std::string aliasString = obj.valueForKey("ALIAS").asStr();
-                snprintf(aliasBuffer, sizeof(aliasBuffer), " aliased to '%s'", aliasString.c_str());
-            }
-
-            char fn_message[1024];
-            snprintf(fn_message, sizeof(fn_message),
-                     "SQL function '%s'%s with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
-                     nameString.c_str(), aliasBuffer, functionId, (int)args->size());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
+            raiseFunctionFactoryError(nameString, functionId, args);
         }
     }
     break;

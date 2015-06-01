@@ -251,12 +251,8 @@ public abstract class AbstractParsedStmt {
     void parseTablesAndParams(VoltXMLElement root) {
         // Parse parameters first to satisfy a dependency of expression parsing
         // which happens during table scan parsing.
-        for (VoltXMLElement node : root.children) {
-            if (node.name.equalsIgnoreCase("parameters")) {
-                parseParameters(node);
-                break;
-            }
-        }
+        parseParameters(root);
+
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
                 parseTable(node);
@@ -661,7 +657,7 @@ public abstract class AbstractParsedStmt {
             }
         }
         if (ExpressionType.OPERATOR_EXISTS == expr.getExpressionType()) {
-            optimizeExistsExpression(expr);
+            expr = optimizeExistsExpression(expr);
         }
         return expr;
     }
@@ -702,15 +698,17 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Optimize EXISTS expression:
-     *  1. Replace the display columns with a single dummy column "1"
-     *  2. Drop DISTINCT expression
-     *  3. Add LIMIT 1
-     *  4. Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
+     * Simplify the EXISTS expression:
+     *  1. EXISTS ( table-agg-without-having-groupby) => TRUE
+     *  2. Replace the display columns with a single dummy column "1" and GROUP BY expressions
+     *  3. Drop DISTINCT expression
+     *  4. Add LIMIT 1
+     *  5. Remove ORDER BY expressions if HAVING expression is not present
      *
      * @param existsExpr
+     * @return optimized exists expression
      */
-    private void optimizeExistsExpression(AbstractExpression existsExpr) {
+    private AbstractExpression optimizeExistsExpression(AbstractExpression existsExpr) {
         assert(ExpressionType.OPERATOR_EXISTS == existsExpr.getExpressionType());
         assert(existsExpr.getLeft() != null);
 
@@ -719,9 +717,10 @@ public abstract class AbstractParsedStmt {
             AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
             if (subquery instanceof ParsedSelectStmt) {
                 ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
-                selectSubquery.simplifyExistsSubqueryStmt();
+                return selectSubquery.simplifyExistsSubqueryStmt(existsExpr);
             }
         }
+        return existsExpr;
     }
 
     /**
@@ -883,18 +882,15 @@ public abstract class AbstractParsedStmt {
         }
         String value_type_name = exprNode.attributes.get("valuetype");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        String id = exprNode.attributes.get("function_id");
-        assert(id != null);
+        String function_id = exprNode.attributes.get("function_id");
+        assert(function_id != null);
         int idArg = 0;
         try {
-            idArg = Integer.parseInt(id);
+            idArg = Integer.parseInt(function_id);
         } catch (NumberFormatException nfe) {}
         assert(idArg > 0);
-        String parameter = exprNode.attributes.get("parameter");
-        String volt_alias = exprNode.attributes.get("volt_alias");
-        if (volt_alias == null) {
-            volt_alias = name; // volt shares the function name with HSQL
-        }
+        String result_type_parameter_index = exprNode.attributes.get("result_type_parameter_index");
+        String implied_argument = exprNode.attributes.get("implied_argument");
 
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
         for (VoltXMLElement argNode : exprNode.children) {
@@ -906,21 +902,21 @@ public abstract class AbstractParsedStmt {
         }
 
         FunctionExpression expr = new FunctionExpression();
-        expr.setAttributes(name, volt_alias, idArg);
+        expr.setAttributes(name, implied_argument, idArg);
         expr.setArgs(args);
         if (value_type != null) {
             expr.setValueType(value_type);
             expr.setValueSize(value_type.getMaxLengthInBytes());
         }
 
-        if (parameter != null) {
-            int parameter_idx = -1; // invalid argument index
+        if (result_type_parameter_index != null) {
+            int parameter_idx = -1;
             try {
-                parameter_idx = Integer.parseInt(parameter);
+                parameter_idx = Integer.parseInt(result_type_parameter_index);
             } catch (NumberFormatException nfe) {}
             assert(parameter_idx >= 0); // better be valid by now.
             assert(parameter_idx < args.size()); // must refer to a provided argument
-            expr.setParameterArg(parameter_idx);
+            expr.setResultTypeParameterIndex(parameter_idx);
             expr.negotiateInitialValueTypes();
         }
         return expr;
@@ -1045,7 +1041,18 @@ public abstract class AbstractParsedStmt {
      * Populate the statement's paramList from the "parameters" element
      * @param paramsNode
      */
-    private void parseParameters(VoltXMLElement paramsNode) {
+    protected void parseParameters(VoltXMLElement root) {
+        VoltXMLElement paramsNode = null;
+        for (VoltXMLElement node : root.children) {
+            if (node.name.equalsIgnoreCase("parameters")) {
+                paramsNode = node;
+                break;
+            }
+        }
+        if (paramsNode == null) {
+            return;
+        }
+
         long max_parameter_id = -1;
 
         for (VoltXMLElement node : paramsNode.children) {
@@ -1192,6 +1199,11 @@ public abstract class AbstractParsedStmt {
             condExpr = parseExpressionTree(childNode.children.get(0));
             assert(condExpr != null);
             ExpressionUtil.finalizeValueTypes(condExpr);
+            condExpr = ExpressionUtil.evaluateExpression(condExpr);
+            // If the condition is a trivial CVE(TRUE) (after the evaluation) simply drop it
+            if (ConstantValueExpression.isBooleanTrue(condExpr)) {
+                condExpr = null;
+            }
         }
         return condExpr;
     }
@@ -1236,6 +1248,21 @@ public abstract class AbstractParsedStmt {
         // The interface is established on AbstractParsedStmt for support
         // in ParsedSelectStmt and ParsedUnionStmt.
         throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
+    }
+
+    protected AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
+        // The id was previously passed to parameterCountIndexById, so if not -1,
+        // it has already been asserted to be a valid id for a parameter, and the
+        // parameter's type has been refined to INTEGER.
+        if (id != -1) {
+            return m_paramsById.get(id);
+        }
+        // The limit/offset is a non-parameterized literal value that needs to be wrapped in a
+        // BIGINT constant so it can be used in the addition expression for the pushed-down limit.
+        ConstantValueExpression constant = new ConstantValueExpression();
+        constant.setValue(Long.toString(value));
+        constant.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        return constant;
     }
 
     /*
@@ -1470,8 +1497,8 @@ public abstract class AbstractParsedStmt {
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
-    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        HashSet<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
             if (treeExpr != null) {
@@ -1494,7 +1521,7 @@ public abstract class AbstractParsedStmt {
             return true;
         }
         // Verify expression subqueries
-        List<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
+        Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
                 SelectSubqueryExpression.class);
         return !subqueryExprs.isEmpty();
     }

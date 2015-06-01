@@ -35,7 +35,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DBBPool.MBBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.EELibraryLoader;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.xerial.snappy.Snappy;
 
 import com.google_voltpatches.common.base.Joiner;
@@ -255,15 +257,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         final boolean compress = object.b().isDirect() && allowCompression &&
                 (m_segments.size() > 1 || tail.sizeInBytes() > 1024 * 512);
         if (!tail.offer(object, compress)) {
-            //Check to see if the tail is completely consumed so we can close and delete it
-            if (!tail.hasMoreEntries() && tail.m_discardCount == tail.getNumEntries()) {
-                m_segments.pollLast();
-                tail.closeAndDelete();
-            }
-            Long nextIndex = tail.m_index + 1;
-            tail = new PBDSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
-            tail.open(true);
-            closeTailAndOffer(tail);
+            tail = addSegment(tail);
             final boolean success = tail.offer(object, compress);
             if (!success) {
                 throw new IOException("Failed to offer object in PBD");
@@ -271,6 +265,40 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
         incrementNumObjects();
         assertions();
+    }
+
+    @Override
+    public synchronized int offer(DeferredSerialization ds) throws IOException {
+        assertions();
+        if (m_closed) {
+            throw new IOException("Closed");
+        }
+
+        PBDSegment tail = m_segments.peekLast();
+        int written = tail.offer(ds);
+        if (written < 0) {
+            tail = addSegment(tail);
+            written = tail.offer(ds);
+            if (written < 0) {
+                throw new IOException("Failed to offer object in PBD");
+            }
+        }
+        incrementNumObjects();
+        assertions();
+        return written;
+    }
+
+    private PBDSegment addSegment(PBDSegment tail) throws IOException {
+        //Check to see if the tail is completely consumed so we can close and delete it
+        if (!tail.hasMoreEntries() && tail.m_discardCount == tail.getNumEntries()) {
+            m_segments.pollLast();
+            tail.closeAndDelete();
+        }
+        Long nextIndex = tail.m_index + 1;
+        tail = new PBDSegment(nextIndex, new VoltFile(m_path, m_nonce + "." + nextIndex + ".pbd"));
+        tail.open(true);
+        closeTailAndOffer(tail);
+        return tail;
     }
 
     @Override
@@ -477,6 +505,53 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
     }
 
+    public static class ByteBufferTruncatorResponse extends TruncatorResponse {
+        private final ByteBuffer m_retval;
+
+        public ByteBufferTruncatorResponse(ByteBuffer retval) {
+            super(Status.PARTIAL_TRUNCATE);
+            assert retval.remaining() > 0;
+            m_retval = retval;
+        }
+
+        @Override
+        public int writeTruncatedObject(ByteBuffer output) {
+            int objectSize = m_retval.remaining();
+            output.putInt(objectSize);
+            output.putInt(PBDSegment.NO_FLAGS);
+            output.put(m_retval);
+            return objectSize;
+        }
+    }
+
+    public static class DeferredSerializationTruncatorResponse extends TruncatorResponse {
+        public static interface Callback {
+            public void bytesWritten(int bytes);
+        }
+
+        private final DeferredSerialization m_ds;
+        private final Callback m_truncationCallback;
+
+        public DeferredSerializationTruncatorResponse(DeferredSerialization ds, Callback truncationCallback) {
+            super(Status.PARTIAL_TRUNCATE);
+            m_ds = ds;
+            m_truncationCallback = truncationCallback;
+        }
+
+        @Override
+        public int writeTruncatedObject(ByteBuffer output) throws IOException {
+            int bytesWritten = PBDSegment.writeDeferredSerialization(output, m_ds);
+            if (m_truncationCallback != null) {
+                m_truncationCallback.bytesWritten(bytesWritten);
+            }
+            return bytesWritten;
+        }
+    }
+
+    public static TruncatorResponse fullTruncateResponse() {
+        return new TruncatorResponse(Status.FULL_TRUNCATE);
+    }
+
     @Override
     public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
         assertions();
@@ -504,13 +579,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 try {
                     //Get the number of objects and then iterator over them
                     int numObjects = readBuffer.getInt();
-                    int size = readBuffer.getInt();
+                    readBuffer.position(PBDSegment.SIZE_OFFSET + 4);
+                    int sizeInBytes = 0;
+
                     int objectsProcessed = 0;
                     m_usageSpecificLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
                     for (int ii = 0; ii < numObjects; ii++) {
                         final int nextObjectLength = readBuffer.getInt();
                         final int nextObjectFlags = readBuffer.getInt();
-                        final boolean compressed = nextObjectFlags == PBDSegment.FLAG_COMPRESSED;
+                        final boolean compressed = (nextObjectFlags & PBDSegment.FLAG_COMPRESSED) != 0;
                         final int uncompressedLength = compressed ? (int)Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
                         objectsProcessed++;
                         //Copy the next object into a separate heap byte buffer
@@ -536,13 +613,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         }
                         try {
                             //Handoff the object to the truncator and await a decision
-                            ByteBuffer retval = truncator.parse(nextObject);
+                            TruncatorResponse retval = truncator.parse(nextObject);
                             if (retval == null) {
                                 //Nothing to do, leave the object alone and move to the next
+                                sizeInBytes += uncompressedLength;
                                 continue;
                             } else {
                                 //If the returned bytebuffer is empty, remove the object and truncate the file
-                                if (retval.remaining() == 0) {
+                                if (retval.status == Status.FULL_TRUNCATE) {
                                     if (ii == 0) {
                                         /*
                                          * If truncation is occuring at the first object
@@ -554,28 +632,24 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                     } else {
                                         addToNumObjects(-(numObjects - (objectsProcessed - 1)));
                                         //Don't forget to update the number of entries in the file
-                                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
-                                        numObjectsBuffer.putInt(0, ii);
+                                        ByteBuffer numObjectsBuffer = ByteBuffer.allocate(8);
+                                        numObjectsBuffer.putInt(ii);
+                                        numObjectsBuffer.putInt(sizeInBytes);
+                                        numObjectsBuffer.flip();
                                         fc.position(0);
                                         while (numObjectsBuffer.hasRemaining()) {
                                             fc.write(numObjectsBuffer);
                                         }
                                         fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
                                     }
-
                                 } else {
+                                    assert retval.status == Status.PARTIAL_TRUNCATE;
                                     addToNumObjects(-(numObjects - objectsProcessed));
                                     //Partial object truncation
-                                    ByteBuffer copy = ByteBuffer.allocate(retval.remaining());
-                                    copy.put(retval);
-                                    copy.flip();
                                     readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
-                                    readBuffer.putInt(copy.remaining());
-                                    readBuffer.putInt(0);
-                                    readBuffer.put(copy);
-
-                                    readBuffer.putInt(0, ii + 1);
-
+                                    sizeInBytes += retval.writeTruncatedObject(readBuffer);
+                                    readBuffer.putInt(PBDSegment.COUNT_OFFSET, ii + 1);
+                                    readBuffer.putInt(PBDSegment.SIZE_OFFSET, sizeInBytes);
                                     /*
                                      * SHOULD REALLY make a copy of the original and then swap them with renaming
                                      */

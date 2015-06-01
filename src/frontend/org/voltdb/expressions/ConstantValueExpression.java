@@ -162,6 +162,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
             case DECIMAL:
                 stringer.value(m_value);
                 break;
+            case BOOLEAN:
+                stringer.value(Boolean.valueOf(m_value));
+                break;
             default:
                 throw new JSONException("ConstantValueExpression.toJSONString(): Unrecognized value_type " + m_valueType);
             }
@@ -467,4 +470,60 @@ public class ConstantValueExpression extends AbstractValueExpression {
         return m_value;
     }
 
+    /**
+     * Create a new CVE for a given type and value
+     * @param dataType
+     * @param value
+     * @return
+     */
+    public static ConstantValueExpression makeExpression(VoltType dataType, String value) {
+        ConstantValueExpression constantExpr = new ConstantValueExpression();
+        constantExpr.setValueType(dataType);
+        constantExpr.setValue(value);
+        return constantExpr;
+    }
+
+    /**
+     * Create TRUE CVE
+     * @return
+     */
+    public static ConstantValueExpression getTrue() {
+        return makeExpression(VoltType.BOOLEAN, Boolean.TRUE.toString());
+    }
+
+    /**
+     * Create FALSE CVE
+     * @return
+     */
+   public static ConstantValueExpression getFalse() {
+        return makeExpression(VoltType.BOOLEAN, Boolean.FALSE.toString());
+    }
+
+   /**
+    * Return true if and only if an input expression's type is boolean and value is "true"
+    * @param expr
+    * @return
+    */
+   public static boolean isBooleanTrue(AbstractExpression expr) {
+       return isBooleanValue(expr, Boolean.TRUE);
+   }
+
+   /**
+    * Return true if and only if an input expression's type is boolean and value is "false"
+    * @param expr
+    * @return
+    */
+   public static boolean isBooleanFalse(AbstractExpression expr) {
+       return isBooleanValue(expr, Boolean.FALSE);
+   }
+
+   private static boolean isBooleanValue(AbstractExpression expr, Boolean value) {
+       if (expr instanceof ConstantValueExpression) {
+           ConstantValueExpression cve = (ConstantValueExpression) expr;
+           if (VoltType.BOOLEAN == cve.getValueType()) {
+               return value.toString().equals(cve.getValue());
+           }
+       }
+       return false;
+   }
 }

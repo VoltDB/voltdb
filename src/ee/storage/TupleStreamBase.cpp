@@ -38,7 +38,7 @@ using namespace voltdb;
 
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase()
+TupleStreamBase::TupleStreamBase(size_t extraHeaderSpace /*= 0*/)
     : m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
@@ -50,7 +50,8 @@ TupleStreamBase::TupleStreamBase()
       m_openTransactionUso(0),
       m_committedSpHandle(0), m_committedUso(0),
       m_committedSequenceNumber(-1),
-      m_committedUniqueId(0)
+      m_committedUniqueId(0),
+      m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -287,7 +288,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
     }
-    m_currBlock = new StreamBlock(buffer, blockSize, uso);
+    m_currBlock = new StreamBlock(buffer, m_headerSpace, blockSize, uso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }

@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
 
 /**
  * Specialized deque interface for storing binary objects. Objects can be provided as a buffer chain
@@ -54,6 +55,8 @@ public interface BinaryDeque {
      * @throws IOException
      */
     void offer(BBContainer object, boolean allowCompression) throws IOException;
+
+    int offer(DeferredSerialization ds) throws IOException;
 
     /**
      * A push creates a new file each time to be "the head" so it is more efficient to pass
@@ -96,6 +99,20 @@ public interface BinaryDeque {
 
     public void closeAndDelete() throws IOException;
 
+    public static class TruncatorResponse {
+        public enum Status {
+            FULL_TRUNCATE,
+            PARTIAL_TRUNCATE
+        }
+        public final Status status;
+        public TruncatorResponse(Status status) {
+            this.status = status;
+        }
+        public int writeTruncatedObject(ByteBuffer output) throws IOException {
+            throw new UnsupportedOperationException("Must implement this for partial object truncation");
+        }
+    }
+
     /*
      * A binary deque truncator parses all the objects in a binary deque
      * from head to tail until it find the truncation point. At the truncation
@@ -110,7 +127,7 @@ public interface BinaryDeque {
          * then the last object passed to parse will be truncated out of the deque. Part of the object
          * or a new object can be returned to replace it.
          */
-        public ByteBuffer parse(BBContainer bb);
+        public TruncatorResponse parse(BBContainer bb);
     }
 
     public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;

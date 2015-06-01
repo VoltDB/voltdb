@@ -1618,7 +1618,7 @@ public class DDLCompiler {
         List<AbstractExpression> functionsList = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
         for (AbstractExpression funcExpr: functionsList) {
             assert(funcExpr instanceof FunctionExpression);
-            if (((FunctionExpression)funcExpr).getFunctionId() == functionId) {
+            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
                 return true;
             }
         }
@@ -2279,7 +2279,7 @@ public class DDLCompiler {
         String msg = "Partial index \"" + indexName + "\" ";
 
         // Make sure all column expressions refer the index table
-        List<VoltXMLElement> columnRefs= predicateXML.findChildren("columnref");
+        List<VoltXMLElement> columnRefs= predicateXML.findChildrenRecursively("columnref");
         for (VoltXMLElement columnRef : columnRefs) {
             String columnRefTableName = columnRef.attributes.get("table");
             if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {
