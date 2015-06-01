@@ -63,7 +63,7 @@ function server() {
 # run socket listener
 function socketlistener() {
     buildclient
-    java -classpath $CLASSPATH:$APPNAME-client.jar $APPNAME.Importer 6060 localhost
+    java -classpath $CLASSPATH:$APPNAME-client.jar $APPNAME.Log4jImporter 6060 localhost
 }
 
 function logger() {

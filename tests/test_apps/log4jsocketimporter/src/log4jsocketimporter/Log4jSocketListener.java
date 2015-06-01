@@ -24,6 +24,7 @@
 package log4jsocketimporter;
 
 import java.io.BufferedInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.ServerSocket;
@@ -43,17 +44,15 @@ import org.voltdb.types.TimestampType;
  */
 public class Log4jSocketListener
 {
-    private ServerSocket m_serverSocket;
-    private String m_voltHostPort;
+    private final ServerSocket m_serverSocket;
+    private final String m_voltHostPort;
 
     /**
-     * Ctor
      *
      * @param log4jListenerPort
      *            Port on which this will start listening
      * @param voltHostPort
-     *            Volt server host and port in host:port form. Port may be
-     *            omitted.
+     *            Volt server host and port in host:port form. Port may be omitted.
      * @throws IOException
      *             If an error occurs trying to start the server socket
      */
@@ -92,16 +91,15 @@ public class Log4jSocketListener
      */
     private static class SocketReader implements Runnable
     {
-        private Socket m_socket;
-        private ObjectInputStream m_ois;
-        private Client m_voltClient;
+        private final Socket m_socket;
+        private final ObjectInputStream m_ois;
+        private final Client m_voltClient;
 
         public SocketReader(Socket socket, String voltHostPort) throws IOException
         {
             m_socket = socket;
             m_ois = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
-            m_voltClient = ClientFactory.createClient(); // TODO: no config for
-                                                         // now
+            m_voltClient = ClientFactory.createClient(); // TODO: no config for now
             connectToOneServerWithRetry(voltHostPort);
         }
 
@@ -140,6 +138,8 @@ public class Log4jSocketListener
                             new TimestampType(new Date(event.getTimeStamp())), event.getRenderedMessage(),
                             getThrowableRep(event));
                 }
+            } catch(EOFException e) { // normal exit condition
+                System.out.println("Client disconnected from " + m_socket.getRemoteSocketAddress());
             } catch (ClassNotFoundException | IOException e) { // assume that these are unrecoverable
                                                                // errors and exit from thread
                 System.err.println("Unexpected error reading from " + m_socket.getRemoteSocketAddress());
@@ -152,7 +152,7 @@ public class Log4jSocketListener
         // Returns null if there is no throwable information in the logging event.
         private String getThrowableRep(LoggingEvent event)
         {
-            if (event.getThrowableStrRep() == null) {
+            if (event.getThrowableStrRep() == null || event.getThrowableStrRep().length==0) {
                 return null;
             }
 
@@ -160,11 +160,9 @@ public class Log4jSocketListener
             for (String line : event.getThrowableStrRep()) {
                 sb.append(line + "\n");
             }
-            if (sb.length() > 0) { // remove the last newline and return the string
-                return sb.deleteCharAt(sb.length() - 1).toString();
-            } else {
-                return null;
-            }
+
+            // remove the last newline and return the string
+            return sb.deleteCharAt(sb.length() - 1).toString();
         }
     }
 

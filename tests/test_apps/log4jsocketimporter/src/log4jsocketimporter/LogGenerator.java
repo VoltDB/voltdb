@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
  */
 public class LogGenerator
 {
-    private static Logger[] s_loggers= {
+    private static final Logger[] s_loggers= {
         Logger.getLogger("blue"),
         Logger.getLogger("black"),
         Logger.getLogger("yellow"),
@@ -58,9 +58,10 @@ public class LogGenerator
 
     private static class LoggingRunnable implements Runnable
     {
-        private static Level[] levels = { Level.ALL, Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.OFF, Level.TRACE, Level.WARN };
+        private static final Level[] levels =
+            { Level.ALL, Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.OFF, Level.TRACE, Level.WARN };
 
-        private int m_id;
+        private final int m_id;
 
         public LoggingRunnable(int id)
         {
@@ -81,12 +82,6 @@ public class LogGenerator
                 } else {
                     logger.log(levels[random.nextInt(levels.length)], msg);
                 }
-                /*
-                try { Thread.sleep(random.nextInt(10)*100); } catch(InterruptedException e) {}
-                if (count%25==0) {
-                    System.out.println("Thread " + m_id + " logged " + count + " messages");
-                }
-                */
             }
         }
     }
