@@ -93,7 +93,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
         // clear the tuple that will be built to insert or overwrite
         memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
         // COUNT(*) column will be zero.
-        m_updatedTuple.setNValue(0, ValueFactory::getBigIntValue(0));
+        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
         int aggOffset = (int)m_groupByColumnCount + 1;
         NValue newValue;
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
