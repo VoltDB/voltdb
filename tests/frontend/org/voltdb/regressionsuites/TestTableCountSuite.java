@@ -150,16 +150,16 @@ public class TestTableCountSuite extends RegressionSuite {
     public void testTableCountsOnEmptyTable() throws Exception {
         Client client = getClient();
 
-        checkEmptryTableAggHelper(client, "COUNT(*)", 0);
+        checkEmptyTableAggHelper(client, "COUNT(*)", 0);
 
         String[] aggFunctions = {"SUM(POINTS)", "AVG(POINTS)", "MIN(POINTS)", "MAX(POINTS)" };
         final long nullVal = Long.MIN_VALUE;
         for (String agg: aggFunctions) {
-            checkEmptryTableAggHelper(client, agg, nullVal);
+            checkEmptyTableAggHelper(client, agg, nullVal);
         }
     }
 
-    private void checkEmptryTableAggHelper(Client client, String agg, long value) throws Exception {
+    private void checkEmptyTableAggHelper(Client client, String agg, long value) throws Exception {
         validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{});
         validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 1", new long[]{value});
         validateTableOfScalarLongs(client, "SELECT " + agg + " FROM TU1 LIMIT 0", new long[]{});
