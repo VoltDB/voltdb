@@ -46,6 +46,7 @@ public class PBDRegularSegment implements PBDSegment {
 
     //Index of the next object to read, not an offset into the file
     private int m_objectReadIndex = 0;
+    private int m_bytesRead = 0;
     // Maintains the read byte offset
     private long m_readOffset = SEGMENT_HEADER_BYTES;
 
@@ -53,14 +54,16 @@ public class PBDRegularSegment implements PBDSegment {
     private final Long m_index;
 
     private int m_discardCount;
+    private int m_numOfEntries = -1;
+    private int m_size = -1;
+
+    private DBBPool.BBContainer m_tmpHeaderBuf = null;
 
     public PBDRegularSegment(Long index, File file) {
         m_index = index;
         m_file = file;
         reset();
     }
-
-    private final ByteBuffer m_tmpHeaderBuf = ByteBuffer.allocateDirect(SEGMENT_HEADER_BYTES);
 
     @Override
     public long segmentId()
@@ -79,23 +82,30 @@ public class PBDRegularSegment implements PBDSegment {
     {
         m_syncedSinceLastEdit = false;
         m_objectReadIndex = 0;
+        m_bytesRead = 0;
         m_readOffset = SEGMENT_HEADER_BYTES;
         m_discardCount = 0;
-        m_tmpHeaderBuf.clear();
+        if (m_tmpHeaderBuf != null) {
+            m_tmpHeaderBuf.discard();
+            m_tmpHeaderBuf = null;
+        }
     }
 
     @Override
     public int getNumEntries() throws IOException
     {
-        // TODO: cache the result
         if (m_closed) {
             open(false);
         }
         if (m_fc.size() > 0) {
-            m_tmpHeaderBuf.clear();
-            PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf, COUNT_OFFSET);
-            return m_tmpHeaderBuf.getInt();
+            m_tmpHeaderBuf.b().clear();
+            PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), COUNT_OFFSET);
+            m_numOfEntries = m_tmpHeaderBuf.b().getInt();
+            m_size = m_tmpHeaderBuf.b().getInt();
+            return m_numOfEntries;
         } else {
+            m_numOfEntries = 0;
+            m_size = 0;
             return 0;
         }
     }
@@ -113,34 +123,6 @@ public class PBDRegularSegment implements PBDSegment {
     }
 
     @Override
-    public void initNumEntries() throws IOException {
-        m_tmpHeaderBuf.clear();
-        m_tmpHeaderBuf.putInt(0); // count
-        m_tmpHeaderBuf.putInt(0); // size
-        m_tmpHeaderBuf.flip();
-        PBDUtils.writeBuffer(m_fc, m_tmpHeaderBuf, COUNT_OFFSET);
-        m_syncedSinceLastEdit = false;
-    }
-
-    @Override
-    public void incrementNumEntries(int size) throws IOException
-    {
-        //First read the existing amount
-        m_tmpHeaderBuf.clear();
-        PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf, COUNT_OFFSET);
-
-        //Then write the incremented value
-        final int numEntries = m_tmpHeaderBuf.getInt();
-        final int curSize = m_tmpHeaderBuf.getInt();
-        m_tmpHeaderBuf.flip();
-        m_tmpHeaderBuf.putInt(numEntries + 1);
-        m_tmpHeaderBuf.putInt(curSize + size);
-        m_tmpHeaderBuf.flip();
-        PBDUtils.writeBuffer(m_fc, m_tmpHeaderBuf, COUNT_OFFSET);
-        m_syncedSinceLastEdit = false;
-    }
-
-    @Override
     public void open(boolean forWrite) throws IOException
     {
         if (!m_closed) {
@@ -148,11 +130,15 @@ public class PBDRegularSegment implements PBDSegment {
         }
 
         if (!m_file.exists()) {
+            if (!forWrite) {
+                throw new IOException("File " + m_file + " does not exist");
+            }
             m_syncedSinceLastEdit = false;
         }
         assert(m_ras == null);
         m_ras = new RandomAccessFile( m_file, forWrite ? "rw" : "r");
         m_fc = m_ras.getChannel();
+        m_tmpHeaderBuf = DBBPool.allocateDirect(SEGMENT_HEADER_BYTES);
 
         if (forWrite) {
             initNumEntries();
@@ -160,6 +146,31 @@ public class PBDRegularSegment implements PBDSegment {
         m_fc.position(SEGMENT_HEADER_BYTES);
 
         m_closed = false;
+    }
+
+    private void initNumEntries() throws IOException {
+        m_numOfEntries = 0;
+        m_size = 0;
+
+        m_tmpHeaderBuf.b().clear();
+        m_tmpHeaderBuf.b().putInt(m_numOfEntries);
+        m_tmpHeaderBuf.b().putInt(m_size);
+        m_tmpHeaderBuf.b().flip();
+        PBDUtils.writeBuffer(m_fc, m_tmpHeaderBuf.bDR(), COUNT_OFFSET);
+        m_syncedSinceLastEdit = false;
+    }
+
+    private void incrementNumEntries(int size) throws IOException
+    {
+        m_numOfEntries++;
+        m_size += size;
+
+        m_tmpHeaderBuf.b().clear();
+        m_tmpHeaderBuf.b().putInt(m_numOfEntries);
+        m_tmpHeaderBuf.b().putInt(m_size);
+        m_tmpHeaderBuf.b().flip();
+        PBDUtils.writeBuffer(m_fc, m_tmpHeaderBuf.bDR(), COUNT_OFFSET);
+        m_syncedSinceLastEdit = false;
     }
 
     /**
@@ -175,6 +186,9 @@ public class PBDRegularSegment implements PBDSegment {
     public void closeAndDelete() throws IOException {
         close();
         m_file.delete();
+
+        m_numOfEntries = -1;
+        m_size = -1;
     }
 
     @Override
@@ -188,10 +202,10 @@ public class PBDRegularSegment implements PBDSegment {
         try {
             if (m_fc != null) {
                 m_fc.close();
-                m_ras = null;
-                m_fc = null;
             }
         } finally {
+            m_ras = null;
+            m_fc = null;
             m_closed = true;
             reset();
         }
@@ -210,14 +224,14 @@ public class PBDRegularSegment implements PBDSegment {
     public boolean hasMoreEntries() throws IOException
     {
         if (m_closed) throw new IOException("Segment closed");
-        return m_objectReadIndex < getNumEntries();
+        return m_objectReadIndex < m_numOfEntries;
     }
 
     @Override
     public boolean isEmpty() throws IOException
     {
         if (m_closed) throw new IOException("Segment closed");
-        return m_discardCount == getNumEntries();
+        return m_discardCount == m_numOfEntries;
     }
 
     @Override
@@ -230,33 +244,28 @@ public class PBDRegularSegment implements PBDSegment {
         final int maxCompressedSize = (compress ? CompressionService.maxCompressedLength(remaining) : remaining) + OBJECT_HEADER_BYTES;
         if (remaining() < maxCompressedSize) return false;
 
-        final long startPos = m_fc.position();
-
         m_syncedSinceLastEdit = false;
         DBBPool.BBContainer destBuf = cont;
 
         try {
-            m_tmpHeaderBuf.clear();
+            m_tmpHeaderBuf.b().clear();
 
-            final long ssize;
             if (compress) {
                 destBuf = DBBPool.allocateDirectAndPool(maxCompressedSize);
                 final int compressedSize = CompressionService.compressBuffer(buf, destBuf.b());
                 destBuf.b().limit(compressedSize);
 
-                ssize = compressedSize;
-                m_tmpHeaderBuf.putInt(compressedSize);
-                m_tmpHeaderBuf.putInt(FLAG_COMPRESSED);
+                m_tmpHeaderBuf.b().putInt(compressedSize);
+                m_tmpHeaderBuf.b().putInt(FLAG_COMPRESSED);
             } else {
                 destBuf = cont;
-                ssize = remaining;
-                m_tmpHeaderBuf.putInt(remaining);
-                m_tmpHeaderBuf.putInt(NO_FLAGS);
+                m_tmpHeaderBuf.b().putInt(remaining);
+                m_tmpHeaderBuf.b().putInt(NO_FLAGS);
             }
 
-            m_tmpHeaderBuf.flip();
-            while (m_tmpHeaderBuf.hasRemaining()) {
-                m_fc.write(m_tmpHeaderBuf);
+            m_tmpHeaderBuf.b().flip();
+            while (m_tmpHeaderBuf.b().hasRemaining()) {
+                m_fc.write(m_tmpHeaderBuf.b());
             }
 
             while (destBuf.b().hasRemaining()) {
@@ -313,16 +322,16 @@ public class PBDRegularSegment implements PBDSegment {
 
         try {
             //Get the length and size prefix and then read the object
-            m_tmpHeaderBuf.clear();
-            while (m_tmpHeaderBuf.hasRemaining()) {
-                int read = m_fc.read(m_tmpHeaderBuf);
+            m_tmpHeaderBuf.b().clear();
+            while (m_tmpHeaderBuf.b().hasRemaining()) {
+                int read = m_fc.read(m_tmpHeaderBuf.b());
                 if (read == -1) {
                     throw new EOFException();
                 }
             }
-            m_tmpHeaderBuf.flip();
-            final int length = m_tmpHeaderBuf.getInt();
-            final int flags = m_tmpHeaderBuf.getInt();
+            m_tmpHeaderBuf.b().flip();
+            final int length = m_tmpHeaderBuf.b().getInt();
+            final int flags = m_tmpHeaderBuf.b().getInt();
             final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
 
             if (length < 1) {
@@ -360,6 +369,8 @@ public class PBDRegularSegment implements PBDSegment {
                 retcont.b().flip();
             }
 
+            m_bytesRead += length;
+
             return new DBBPool.BBContainer(retcont.b()) {
                 private boolean m_discarded = false;
 
@@ -382,9 +393,9 @@ public class PBDRegularSegment implements PBDSegment {
         }
     }
 
-    //A white lie, reflects actual disk usage, even if buffers are not taking up that much space.
     @Override
     public int sizeInBytes() {
-        return (int) (m_file.length() - SEGMENT_HEADER_BYTES);
+        if (m_closed) throw new RuntimeException("Segment closed");
+        return m_size - m_bytesRead - SEGMENT_HEADER_BYTES;
     }
 }

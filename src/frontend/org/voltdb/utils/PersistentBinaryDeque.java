@@ -262,7 +262,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         PBDSegment tail = m_segments.peekLast();
-        //If we are mostly empty, don't do compression, otherwise compress to reduce space and IO
         final boolean compress = object.b().isDirect() && allowCompression;
         if (!tail.offer(object, compress)) {
             tail = addSegment(tail);
