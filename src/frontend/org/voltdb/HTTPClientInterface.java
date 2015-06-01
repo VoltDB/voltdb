@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -33,7 +34,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -46,7 +46,7 @@ public class HTTPClientInterface {
     private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
-    AuthenticatedConnectionCache m_connections = null;
+    AtomicReference<AuthenticatedConnectionCache> m_connections = new AtomicReference();
     static final int CACHE_TARGET_SIZE = 10;
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
@@ -271,19 +271,19 @@ public class HTTPClientInterface {
         }
         String admin = request.getParameter(PARAM_ADMIN);
 
+        AuthenticatedConnectionCache connection_cache = m_connections.get();
+
         // first check for a catalog update and purge the cached connections
         // if one has happened since we were here last
         if (m_shouldUpdateCatalog.compareAndSet(true, false))
         {
-            if (m_connections != null) {
-                m_connections.closeAll();
-                // Just null the old object so we'll create a new one with
-                // updated state below
-                m_connections = null;
+            if (connection_cache != null) {
+                connection_cache.closeAll();
+                connection_cache = null;
             }
         }
 
-        if (m_connections == null) {
+        if (connection_cache == null) {
             Configuration config = VoltDB.instance().getConfig();
             int port = config.m_port;
             int adminPort = config.m_adminPort;
@@ -301,7 +301,7 @@ public class HTTPClientInterface {
             if (config.m_adminInterface.length() > 0) {
                 adminInterface = config.m_adminInterface;
             }
-            m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
+            m_connections.set(new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort));
         }
 
         // check for admin mode
@@ -320,7 +320,7 @@ public class HTTPClientInterface {
                 MessageDigest md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(ClientAuthHashScheme.HASH_SHA256));
                 hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
-                return new AuthenticationResult(null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
+                return new AuthenticationResult(null, null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority
@@ -329,14 +329,14 @@ public class HTTPClientInterface {
         // Hashedassword must be a 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)
         if (hashedPassword != null) {
             if (hashedPassword.length() != 40 && hashedPassword.length() != 64) {
-                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
             try {
                 hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
             }
             catch (Exception e) {
-                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
         }
@@ -345,13 +345,15 @@ public class HTTPClientInterface {
 
         try {
             // get a connection to localhost from the pool
-            Client client = m_connections.getClient(username, password, hashedPasswordBytes, adminMode);
-            if (client != null) {
-                return new AuthenticationResult(client, adminMode, username, "");
+            AuthenticatedConnectionCache.ClientWithHashScheme clientWithScheme =
+                    m_connections.get().getClient(username, password, hashedPasswordBytes, adminMode);
+            if (clientWithScheme != null && clientWithScheme.m_client != null && clientWithScheme.m_scheme != null) {
+                return new AuthenticationResult(clientWithScheme.m_client, clientWithScheme.m_scheme,
+                        adminMode, username, "");
             }
-            return new AuthenticationResult(null, adminMode, username, "Failed to get client.");
+            return new AuthenticationResult(null, null, adminMode, username, "Failed to get client.");
         } catch (IOException ex) {
-            return new AuthenticationResult(null, adminMode, username, ex.getMessage());
+            return new AuthenticationResult(null, null, adminMode, username, ex.getMessage());
         }
     }
 
@@ -368,7 +370,7 @@ public class HTTPClientInterface {
     public void releaseClient(AuthenticationResult authResult, boolean force) {
         if (authResult != null && authResult.m_client != null) {
             assert(m_connections != null);
-            m_connections.releaseClient(authResult.m_client, force);
+            m_connections.get().releaseClient(authResult.m_client, authResult.m_scheme, force);
         }
     }
 

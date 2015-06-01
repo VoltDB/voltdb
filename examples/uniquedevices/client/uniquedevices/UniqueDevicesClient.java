@@ -283,9 +283,9 @@ public class UniqueDevicesClient {
         double medianError = errors[config.appcount / 2];
         double meanError = errorSum / config.appcount;
 
-        System.out.printf("The maximum error percetange was: %.2f.\n", maxError);
-        System.out.printf("The median error percetange was: %.2f.\n", medianError);
-        System.out.printf("The mean error percetange was: %.2f.\n", meanError);
+        System.out.printf("The maximum error percentage was: %.2f.\n", maxError);
+        System.out.printf("The median error percentage was: %.2f.\n", medianError);
+        System.out.printf("The mean error percentage was: %.2f.\n", meanError);
         System.out.printf("The number of apps with perfect estimates was %d or %.2f%%.\n",
                 nonZeroCount, nonZeroCount * 100.0 / config.appcount);
 

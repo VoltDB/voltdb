@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -203,26 +202,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
-        scheduleDrTask(gateway);
-    }
-
-    private void scheduleDrTask(final PartitionDRGateway gateway)
-    {
-        if (gateway != null) {
-            // Schedules to be fired every 5ms
-            VoltDB.instance().schedulePriorityWork(new Runnable() {
-                @Override
-                public void run() {
-                    // Send a DR task to the site
-                    m_tasks.offer(new DRTask(gateway));
-                }
-            }, 0, 5, TimeUnit.MILLISECONDS);
-        }
     }
 
     public void setMpDRGateway(final PartitionDRGateway mpGateway)
     {
-        scheduleDrTask(mpGateway);
+        // intentionally blank placeholder
     }
 
     @Override

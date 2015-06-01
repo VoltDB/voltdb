@@ -86,4 +86,10 @@ public interface CommandLog {
      * Is Command logging enabled?
      */
     public abstract boolean isEnabled();
+
+    /**
+     * Attempt to start a truncation snapshot
+     * If a truncation snapshot is pending, passing false means don't start another one
+     */
+    public void requestTruncationSnapshot(final boolean queueIfPending);
 }

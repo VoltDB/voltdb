@@ -614,7 +614,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
-        return "ABS,CEILING,EXP,FLOOR,POWER,SQRT";
+        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,EXP,FLOOR,POWER,SQRT";
     }
 
     // Retrieves a description of the given table's primary key columns.
@@ -755,7 +755,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     {
         checkClosed();
         // TODO: find a more suitable place for COALESCE
-        return "COALESCE,CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,INSERT,LCASE,LEFT,LOWER,LTRIM," +
+        return "BIN,COALESCE,CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,HEX,INSERT,LCASE,LEFT,LOWER,LTRIM," +
                "OCTET_LENGTH,OVERLAY,POSITION,REPEAT,REPLACE,RIGHT,RTRIM,SPACE,SUBSTRING,SUBSTR,"+
                "TRIM,UCASE,UPPER";
     }

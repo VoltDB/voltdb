@@ -819,7 +819,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema2[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema2[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema2[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema2[3] = new ColumnInfo("ENABLED", VoltType.STRING);
+        expectedSchema2[3] = new ColumnInfo("STATE", VoltType.STRING);
         expectedSchema2[4] = new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING);
         expectedSchema2[5] = new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT);
         expectedSchema2[6] = new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT);
@@ -911,7 +911,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema2[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema2[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema2[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema2[3] = new ColumnInfo("ENABLED", VoltType.STRING);
+        expectedSchema2[3] = new ColumnInfo("STATE", VoltType.STRING);
         expectedSchema2[4] = new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING);
         expectedSchema2[5] = new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT);
         expectedSchema2[6] = new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT);

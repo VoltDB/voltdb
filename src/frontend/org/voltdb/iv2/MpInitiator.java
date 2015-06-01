@@ -68,6 +68,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
     @Override
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
@@ -86,7 +87,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
         m_consumerDRGateway = consumerDRGateway;
 
-        super.configureCommon(backend, catalogContext,
+        super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
@@ -101,7 +102,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
     }
 
@@ -164,7 +165,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
-                    if (m_consumerDRGateway != null) {
+                    if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
                         m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId);
                     }
                 }

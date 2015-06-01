@@ -46,7 +46,7 @@ public:
     /** Set the total number of bytes used (for rejoin/recover) */
     void setBytesUsed(size_t count) {
         assert(m_uso == 0);
-        StreamBlock *sb = new StreamBlock(new char[1], 0, count);
+        StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
         // Valgrind needs the newly created block to be initialized
         // Leaving the last 8 bytes for MAGIC_HEADER_SPACE_FOR_JAVA
         ::memset(sb->rawPtr(), 0, (count-8));
@@ -60,8 +60,8 @@ public:
     }
 
     int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity- MAGIC_HEADER_SPACE_FOR_JAVA)) +
-                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_signature);
+        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
+                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }
 
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);

@@ -21,6 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.TimestampType;
@@ -161,6 +162,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
             case DECIMAL:
                 stringer.value(m_value);
                 break;
+            case BOOLEAN:
+                stringer.value(Boolean.valueOf(m_value));
+                break;
             default:
                 throw new JSONException("ConstantValueExpression.toJSONString(): Unrecognized value_type " + m_valueType);
             }
@@ -211,6 +215,26 @@ public class ConstantValueExpression extends AbstractValueExpression {
         return null;
     }
 
+    /**
+     * This method will alter the type of this constant expression based on the context
+     * in which it appears.  For example, each constant in the value list of an INSERT
+     * statement will be refined to the type of the column in the table being inserted into.
+     *
+     * Here is a summary of the rules used to convert types here:
+     * - VARCHAR literals may be reinterpreted as (depending on the type needed):
+     *   - VARBINARY (string is required to have an even number of hex digits)
+     *   - TIMESTAMP (string must have timestamp format)
+     *   - Some numeric type (any of the four integer types, DECIMAL or FLOAT)
+     *
+     * In addition, if this object is a VARBINARY constant (e.g., X'00abcd') and we need
+     * an integer constant, (any of TINYINT, SMALLINT, INTEGER or BIGINT),
+     * we interpret the hex digits as a 64-bit signed integer.  If there are fewer than 16 hex digits,
+     * the most significant bits are assumed to be zeros.  So for example, X'FF' appearing where we want a
+     * TINYINT would be out-of-range, since it's 255 and not -1.
+     *
+     * There is corresponding code for handling integer hex literals in ParameterConverter for parameters,
+     * and in HSQL's ExpressionValue class.
+     */
     @Override
     public void refineValueType(VoltType neededType, int neededSize)
     {
@@ -302,7 +326,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             }
         }
 
-        if ((neededType == VoltType.FLOAT) || (neededType == VoltType.DECIMAL)) {
+        if ((neededType == VoltType.FLOAT || neededType == VoltType.DECIMAL)
+                && getValueType() != VoltType.VARBINARY) {
             if (m_valueType == null ||
                     (m_valueType != VoltType.NUMERIC && ! m_valueType.isExactNumeric())) {
                 try {
@@ -321,8 +346,14 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (neededType.isInteger()) {
             long value = 0;
             try {
-                value = Long.parseLong(getValue());
-            } catch (NumberFormatException nfe) {
+                if (getValueType() == VoltType.VARBINARY) {
+                    value = SQLParser.hexDigitsToLong(getValue());
+                    setValue(Long.toString(value));
+                }
+                else {
+                    value = Long.parseLong(getValue());
+                }
+            } catch (SQLParser.Exception | NumberFormatException exc) {
                 throw new PlanningErrorException("Value (" + getValue() +
                                                  ") has an invalid format for a constant " +
                                                  neededType.toSQLString() + " value");
@@ -439,4 +470,60 @@ public class ConstantValueExpression extends AbstractValueExpression {
         return m_value;
     }
 
+    /**
+     * Create a new CVE for a given type and value
+     * @param dataType
+     * @param value
+     * @return
+     */
+    public static ConstantValueExpression makeExpression(VoltType dataType, String value) {
+        ConstantValueExpression constantExpr = new ConstantValueExpression();
+        constantExpr.setValueType(dataType);
+        constantExpr.setValue(value);
+        return constantExpr;
+    }
+
+    /**
+     * Create TRUE CVE
+     * @return
+     */
+    public static ConstantValueExpression getTrue() {
+        return makeExpression(VoltType.BOOLEAN, Boolean.TRUE.toString());
+    }
+
+    /**
+     * Create FALSE CVE
+     * @return
+     */
+   public static ConstantValueExpression getFalse() {
+        return makeExpression(VoltType.BOOLEAN, Boolean.FALSE.toString());
+    }
+
+   /**
+    * Return true if and only if an input expression's type is boolean and value is "true"
+    * @param expr
+    * @return
+    */
+   public static boolean isBooleanTrue(AbstractExpression expr) {
+       return isBooleanValue(expr, Boolean.TRUE);
+   }
+
+   /**
+    * Return true if and only if an input expression's type is boolean and value is "false"
+    * @param expr
+    * @return
+    */
+   public static boolean isBooleanFalse(AbstractExpression expr) {
+       return isBooleanValue(expr, Boolean.FALSE);
+   }
+
+   private static boolean isBooleanValue(AbstractExpression expr, Boolean value) {
+       if (expr instanceof ConstantValueExpression) {
+           ConstantValueExpression cve = (ConstantValueExpression) expr;
+           if (VoltType.BOOLEAN == cve.getValueType()) {
+               return value.toString().equals(cve.getValue());
+           }
+       }
+       return false;
+   }
 }

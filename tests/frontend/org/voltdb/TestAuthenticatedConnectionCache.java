@@ -28,13 +28,12 @@ import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
-import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestAuthenticatedConnectionCache extends TestCase {
 
     ServerThread server;
-    Client client;
+    AuthenticatedConnectionCache.ClientWithHashScheme clientAndScheme;
 
     public void testAuthenticatedConnectionCache() throws Exception {
         try {
@@ -67,31 +66,31 @@ public class TestAuthenticatedConnectionCache extends TestCase {
             server.waitForInitialization();
 
             AuthenticatedConnectionCache ccache = new AuthenticatedConnectionCache(10, "localhost", server.m_config.m_port, "localhost", server.m_config.m_adminPort);
-            client = ccache.getClient(null, null, null, true);
+            clientAndScheme = ccache.getClient(null, null, null, true);
 
-            assertEquals(client.hashCode(), ccache.getUnauthenticatedAdminClient().hashCode());
-            client = ccache.getClient(null, null, null, false);
-            assertEquals(client.hashCode(), ccache.getUnauthenticatedClient().hashCode());
+            assertEquals(clientAndScheme.m_client.hashCode(), ccache.getUnauthenticatedAdminClient().hashCode());
+            clientAndScheme = ccache.getClient(null, null, null, false);
+            assertEquals(clientAndScheme.m_client.hashCode(), ccache.getUnauthenticatedClient().hashCode());
 
-            client = ccache.getClient("admin", "password", null, true);
+            clientAndScheme = ccache.getClient("admin", "password", null, true);
             assertEquals(1, ccache.getSize());
-            Client client2 = ccache.getClient("admin", "password", null, true);
-            assertEquals(client2.hashCode(), client.hashCode());
+            AuthenticatedConnectionCache.ClientWithHashScheme clientAndScheme2 = ccache.getClient("admin", "password", null, true);
+            assertEquals(clientAndScheme2.m_client.hashCode(), clientAndScheme.m_client.hashCode());
 
-            client = ccache.getClient("admin", "password", null, false);
+            clientAndScheme = ccache.getClient("admin", "password", null, false);
             assertEquals(2, ccache.getSize());
-            client2 = ccache.getClient("admin", "password", null, false);
-            assertEquals(client2.hashCode(), client.hashCode());
+            clientAndScheme2 = ccache.getClient("admin", "password", null, false);
+            assertEquals(clientAndScheme2.m_client.hashCode(), clientAndScheme.m_client.hashCode());
 
-            client = ccache.getClient("user", "password", null, true);
+            clientAndScheme = ccache.getClient("user", "password", null, true);
             assertEquals(3, ccache.getSize());
-            client2 = ccache.getClient("user", "password", null, true);
-            assertEquals(client2.hashCode(), client.hashCode());
+            clientAndScheme2 = ccache.getClient("user", "password", null, true);
+            assertEquals(clientAndScheme2.m_client.hashCode(), clientAndScheme.m_client.hashCode());
 
-            client = ccache.getClient("user", "password", null, false);
+            clientAndScheme = ccache.getClient("user", "password", null, false);
             assertEquals(4, ccache.getSize());
-            client2 = ccache.getClient("user", "password", null, false);
-            assertEquals(client2.hashCode(), client.hashCode());
+            clientAndScheme2 = ccache.getClient("user", "password", null, false);
+            assertEquals(clientAndScheme2.m_client.hashCode(), clientAndScheme.m_client.hashCode());
 
         } finally {
             if (server != null) {
@@ -99,8 +98,8 @@ public class TestAuthenticatedConnectionCache extends TestCase {
                 server.join();
             }
             server = null;
-            if (client != null) {
-                client.close();
+            if (clientAndScheme != null) {
+                clientAndScheme.m_client.close();
             }
         }
     }

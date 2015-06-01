@@ -59,6 +59,7 @@ public class OperatorExpression extends AbstractExpression {
         case OPERATOR_NOT:
         case OPERATOR_IS_NULL:
         case OPERATOR_CAST:
+        case OPERATOR_EXISTS:
             return false;
         default: return true;
         }
@@ -130,7 +131,8 @@ public class OperatorExpression extends AbstractExpression {
         finalizeChildValueTypes();
         ExpressionType type = getExpressionType();
         if (m_right == null) {
-            if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
+            if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT ||
+                    type == ExpressionType.OPERATOR_EXISTS) {
                 m_valueType = VoltType.BIGINT;
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
@@ -163,12 +165,16 @@ public class OperatorExpression extends AbstractExpression {
             return "(NOT " + m_left.explain(impliedTableName) + ")";
         }
         if (type == ExpressionType.OPERATOR_CAST) {
-            return "(CAST " + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + ")";
+            return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
+        }
+
+        if (type == ExpressionType.OPERATOR_EXISTS) {
+            return "(EXISTS " + m_left.explain(impliedTableName) + ")";
         }
         if (type == ExpressionType.OPERATOR_CASE_WHEN) {
-            return "CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
+            return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
                     m_right.m_left.explain(impliedTableName) + " ELSE " +
-                    m_right.m_right.explain(impliedTableName) + " END";
+                    m_right.m_right.explain(impliedTableName) + " END)";
         }
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +

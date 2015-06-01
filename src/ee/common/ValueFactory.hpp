@@ -48,6 +48,10 @@ public:
         return NValue::getDoubleValue(value);
     }
 
+    static inline NValue getBooleanValue(bool value) {
+        return NValue::getBooleanValue(value);
+    }
+
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     static inline NValue getStringValue(const char *value, Pool* pool = NULL) {

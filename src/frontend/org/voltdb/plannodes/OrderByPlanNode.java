@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -193,5 +194,14 @@ public class OrderByPlanNode extends AbstractPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         return "ORDER BY (SORT)";
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+        for (AbstractExpression ae : m_sortExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
     }
 }

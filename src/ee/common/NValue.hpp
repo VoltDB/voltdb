@@ -650,8 +650,20 @@ class NValue {
         return &valueChars[i];
     }
 
+    // Copy a value. If the value is inlined in a source tuple, then allocate
+    // memory from the temp string pool and copy data there
+    NValue copyNValue() const
+    {
+        NValue copy = *this;
+        if (m_sourceInlined) {
+            // The NValue storage is inlined (a pointer to the backing tuple storage) and needs
+            // to be copied to a local storage
+            copy.allocateObjectFromInlinedValue(getTempStringPool());
+        }
+        return copy;
+    }
 
-  private:
+private:
     /*
      * Private methods are private for a reason. Don't expose the raw
      * data so that it can be operated on directly.
@@ -2182,6 +2194,12 @@ class NValue {
         return retval;
     }
 
+    static NValue getBooleanValue(bool value) {
+        NValue retval(VALUE_TYPE_BOOLEAN);
+        retval.getBoolean() = value;
+        return retval;
+    }
+
     static NValue getDecimalValueFromString(const std::string &value) {
         NValue retval(VALUE_TYPE_DECIMAL);
         retval.createDecimalFromString(value);
@@ -2264,6 +2282,10 @@ class NValue {
         *reinterpret_cast<void**>(retval.m_data) = address;
         return retval;
     }
+
+    /// Common code to implement variants of the TRIM SQL function: LEADING, TRAILING, or BOTH
+    static NValue trimWithOptions(const std::vector<NValue>& arguments, bool leading, bool trailing);
+
 };
 
 /**
@@ -2382,6 +2404,8 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(char*);
       case VALUE_TYPE_DECIMAL:
         return sizeof(TTInt);
+      case VALUE_TYPE_BOOLEAN:
+        return sizeof(bool);
       default:
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",

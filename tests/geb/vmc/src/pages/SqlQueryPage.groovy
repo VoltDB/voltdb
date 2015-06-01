@@ -23,6 +23,7 @@
 
 package vmcTest.pages
 
+import geb.error.RequiredPageContentNotPresent
 import geb.navigator.Navigator
 import geb.waiting.WaitTimeoutException
 import org.openqa.selenium.support.ui.Select
@@ -59,20 +60,40 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         qrFormatDropDown    { $('#exportType') }
         qrfddOptions    { qrFormatDropDown.find('option') }
         qrfddSelected   { qrFormatDropDown.find('option', selected: "selected") }
-        queryResHtml { $('#resultHtml') }
-        queryTables  (required: false) { queryResHtml.find('table') }
-        queryErrHtml (required: false) { queryResHtml.find('span') }
-        queryDurHtml { $('#queryResults') }
-		
-		//options
+        queryResHtml    { $('#resultHtml') }
+        queryTables     (required: false) { queryResHtml.find('table') }
+        queryErrHtml    (required: false) { queryResHtml.find('span') }
+        queryDurHtml    { $('#queryResults') }
+
+
+        //popup query ok and cancel
+        cancelpopupquery        { $("#btnQueryDatabasePausedErrorCancel", text:"Cancel")}
+        okpopupquery            { $("#btnQueryDatabasePausedErrorOk", text:"Ok")}
+        switchadminport         { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(3) > span")}
+        queryexecutionerror     { $("#queryDatabasePausedInnerErrorPopup > div.overlay-title", text:"Query Execution Error")}
+        queryerrortxt           { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(1)")}
+
+        htmltableresult 	    { $("#table_r0_html_0")}
+        createerrorresult	    { $("#resultHtml > span")}
+        htmlresultallcolumns	{ $("#table_r0_html_0 > thead")}
+
+        htmlresultselect	    { $("#table_r0_html_0 > thead > tr")}
+        refreshquery		    { $("#tabMain > button", text:"Refresh")}
+
+        //options
         htmlOptions				{ $("option", text:"HTML") }
         csvOptions				{ $("option", text:"CSV") }
         monospaceOptions		{ $("option", text:"Monospace") }
-        
+
+        // for view
+        checkview		{ $("#tabMain > ul > li.active > a")}
+
         //result
         resultHtml		{ $("#resultHtml") }
         resultCsv		{ $("#resultCsv") }
         resultMonospace	{ $("#resultMonospace") }
+        
+        errorObjectNameAlreadyExist     { $("span", class:"errorValue") }
     }
     static at = {
         sqlQueryTab.displayed
@@ -88,6 +109,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Tables (by clicking the "Tables" tab).
      */
+
     def showTables() {
         clickToDisplay(tablesTab, tablesNames)
     }
@@ -95,6 +117,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Views (by clicking the "Views" tab).
      */
+
     def showViews() {
         clickToDisplay(viewsTab, viewsNames)
     }
@@ -102,6 +125,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Stored Procedures (by clicking the "Stored Procedures" tab).
      */
+
     def showStoredProcedures() {
         clickToDisplay(storedProcsTab, allStoredProcs)
     }
@@ -187,9 +211,13 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def List<String> getUserStoredProcedures() {
         def storedProcs = []
         showStoredProcedures()
-        userStoredProcs.each {
-            scrollIntoView(it);
-            storedProcs.add(it.text())
+        try {
+            userStoredProcs.each {
+                scrollIntoView(it)
+                storedProcs.add(it.text())
+            }
+        } catch (RequiredPageContentNotPresent e) {
+            // do nothing: empty list will be returned
         }
         return storedProcs
     }
@@ -370,9 +398,9 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         // sometimes does not, which is why we have to catch a WaitTimeoutException
         try {
             waitFor() {
-                queryResHtml.text() != null && !queryResHtml.text().isEmpty() && 
-                queryDurHtml.text() != null && !queryDurHtml.text().isEmpty() && 
-                (queryResHtml.text() != initQueryResultText || queryDurHtml.text() != initQueryDurationText)
+                queryResHtml.text() != null && !queryResHtml.text().isEmpty() &&
+                        queryDurHtml.text() != null && !queryDurHtml.text().isEmpty() &&
+                        (queryResHtml.text() != initQueryResultText || queryDurHtml.text() != initQueryDurationText)
             }
         } catch (WaitTimeoutException e) {
             String message = '\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; this is probably nothing to worry about'
@@ -443,7 +471,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return a List of Maps representing the contents of every table.
      */
     def List<Map<String,List<String>>> getQueryResults(
-                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
+            ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
         def results = []
         queryTables.each { results.add(getTableByColumn(it, colHeaderFormat)) }
         return results
@@ -462,7 +490,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return a Map representing the contents of the specified table.
      */
     def Map<String,List<String>> getQueryResult(int index,
-                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
+                                                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
         return getQueryResults(colHeaderFormat).get(index)
     }
 
@@ -476,7 +504,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return a Map representing the contents of the <i>last</i> table.
      */
     def Map<String,List<String>> getQueryResult(
-                ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
+            ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
         return getTableByColumn(queryTables.last(), colHeaderFormat)
     }
 
@@ -515,15 +543,15 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def boolean gotoDbMonitor() {
         header.tabDBMonitor.click()
     }
-	
-	/*
-	 * click DbMonitor tab to go to Db Monitor
-	 */
+
+    /*
+     * click DbMonitor tab to go to Db Monitor
+     */
     def boolean gotoSchema() {
         header.tabSchema.click()
     }
-	
-	/*
+
+    /*
      * get query to create a table
      */
     def String getQueryToCreateTable() {
@@ -560,22 +588,80 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
 
         return query
     }
-	
-	/*
-	 * get tablename that is created and deleted
-	 */
-	def String getTablename() {
-		BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
-		String line;
-		String query = ""
-		
-		while((line = br.readLine()) != "#name") {
-		}
 
-		while ((line = br.readLine()) != null) {
-			query = query + line + "\n"
-		}
-		
-		return query
-	}
+    /*
+     * get tablename that is created and deleted
+     */
+    def String getTablename() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#name") {
+        }
+
+        while ((line = br.readLine()) != null) {
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    //for view
+
+    /*
+     * get query to create a view
+     */
+    def String getQueryToCreateView() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#create") {
+        }
+
+        while ((line = br.readLine()) != "#delete") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+	 *	Get delete query
+	 */
+    def String getQueryToDeleteView() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * get viewname that is created and deleted
+     */
+    def String getViewname() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#name") {
+        }
+
+        while ((line = br.readLine()) != null) {
+            query = query + line + "\n"
+        }
+
+        return query
+    }
 }

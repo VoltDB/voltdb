@@ -59,6 +59,19 @@ public interface SnapshotCompletionInterest {
             this.drSequenceNumbers = drSequenceNumbers;
             this.remoteDCLastIds = remoteDCLastIds;
         }
+
+        // Factory method for simplified instances used in testing,
+        // to avoid repeating this long series of dummy-valued initializers.
+        public static SnapshotCompletionEvent newInstanceForTest(
+                String path,
+                String nonce,
+                long multipartTxnId,
+                Map<Integer, Long> partitionTxnIds,
+                boolean truncationSnapshot) {
+            return new SnapshotCompletionEvent(
+                    path, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
+                    true, "", null, null, null);
+        }
     }
 
     /**
