@@ -87,6 +87,10 @@ public enum LogKeys {
     export_ExportManager_NoLoaderExtensions,
     export_ExportManager_DataDroppedLoaderDead,
 
+    //IMPORT
+    import_ImportManager_NoLoaderExtensions,
+    import_ImportManager_DataDroppedLoaderDead,
+
     //COMPILER
     compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost,
     compiler_VoltCompiler_CatalogPath,
