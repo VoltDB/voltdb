@@ -84,7 +84,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     }
     /* If there is no group by column and the target table is still empty
      * even after catching up with pre-existing source tuples, we should initialize the
-     * target table with one default row of data.
+     * target table with a row of default values.
      * COUNT() functions should have value 0, other aggregation functions should have value NULL.
      * See ENG-7872
      */
@@ -534,7 +534,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
         if (m_groupByColumnCount != 0) {
             m_target->deleteTuple(m_existingTuple, fallible);
         }
-        // If there is no group by columns, the count() should remain 0 and other functions should
+        // If there is no group by column, the count() should remain 0 and other functions should
         // have value null. See ENG-7872.
         else {
             m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
@@ -620,8 +620,7 @@ bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
 {
     // find the key for this tuple (which is the group by columns)
     // For the case where is no grouping column, like SELECT COUNT(*) FROM T;
-    // We directly return the only row in the view.
-    // See ENG-7872
+    // We directly return the only row in the view. See ENG-7872.
     if (m_groupByColumnCount == 0) {
         TableIterator iterator = m_target->iteratorDeletingAsWeGo();
         iterator.next(m_existingTuple);
