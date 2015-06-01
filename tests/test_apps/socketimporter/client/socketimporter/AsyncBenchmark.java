@@ -79,6 +79,7 @@ public class AsyncBenchmark {
     static final AtomicLong rowsMismatch = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
     static final AtomicLong writers = new AtomicLong(0);
+    static final AtomicLong socketWrites = new AtomicLong(0);
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -254,9 +255,10 @@ public class AsyncBenchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
-        AtomicLong icnt = new AtomicLong(0);
+
         SecureRandom rnd = new SecureRandom();
 	    rnd.setSeed(Thread.currentThread().getId());
+        final AtomicLong icnt = new AtomicLong(0);
 	    //System.out.println(rnd.nextInt());
         try {
             // Run the benchmark loop for the requested warmup time
@@ -265,7 +267,6 @@ public class AsyncBenchmark {
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
             	long t = System.currentTimeMillis();
-
             	long key = rnd.nextLong();
             	Pair<Long,Long> p = new Pair<Long,Long>(key, t);
                 queue.offer(p);
@@ -309,6 +310,7 @@ public class AsyncBenchmark {
             try {
                 OutputStream writer = haplist.get(hap);
                 writer.write(data.getBytes());
+                socketWrites.incrementAndGet();
                 return;
             } catch (IOException ex) {
                 OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), hap.getPort());
@@ -379,21 +381,26 @@ public class AsyncBenchmark {
         checkDB.processQueue();
         cdl.await();
 
+        // close socket connections...
+        for (HostAndPort hap : haplist.keySet()) {
+             OutputStream writer = haplist.get(hap);
+             writer.flush();
+             writer.close();
+         }
+
         System.out.println("...starting timed check looping... " + queue.size());
         // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
         final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
         System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
 
         while (queueEndTime > System.currentTimeMillis()) {
-        	if ((queueEndTime - System.currentTimeMillis())/1000 % 15 == 0) {
-         		System.out.println("...still looping... Queue length: " + queue.size());
-        	}
         	checkDB.processQueue();
         }
         client.drain();
 
         System.out.println("Queued tuples remaining: " + queue.size());
         System.out.println("Total rows added by Socket Injester: " + finalInsertCount.get());
+        System.out.println("Socket write count: " + socketWrites.get());
         System.out.println("Rows checked against database: " + rowsChecked.get());
         System.out.println("Mismatch rows (value added <> value in DB): " + rowsMismatch.get());
     }
